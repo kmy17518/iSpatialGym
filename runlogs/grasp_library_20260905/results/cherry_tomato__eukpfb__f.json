@@ -1,0 +1,199 @@
+{
+ "task": "object_scaling",
+ "relation": null,
+ "category": "cherry_tomato",
+ "model": "eukpfb",
+ "key": "cherry_tomato__eukpfb__f",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.034751487731933595,
+  0.021616226196289064,
+  0.021690322875976564
+ ],
+ "ready": true,
+ "round": 2,
+ "candidates_meta": {
+  "object": {
+   "category": "cherry_tomato",
+   "model": "eukpfb"
+  },
+  "task": "object_scaling",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 488,
+   "n_lever": 488,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    0.0001,
+    -0.0,
+    0.0
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.022,
+    0.0
+   ],
+   "score": 19.7007,
+   "meta": {
+    "com_perp": 0.00039,
+    "width": 0.02052,
+    "antipodal": 0.9873,
+    "coverage": 1.0,
+    "clearance": 0.03427,
+    "tilt_deg": 111.90878,
+    "graspgen_conf": 0.95254
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g0_v1.png",
+    "v2": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g0_v2.png",
+    "v3": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g0_v3.png",
+    "wrist": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g0_wrist.png"
+   },
+   "t_s": 3.01
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0229,
+    0.0
+   ],
+   "score": 19.662,
+   "meta": {
+    "com_perp": 0.00049,
+    "width": 0.0212,
+    "antipodal": 0.9815,
+    "coverage": 1.0,
+    "clearance": 0.03084,
+    "tilt_deg": 142.89898,
+    "graspgen_conf": 0.95948
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g1_v1.png",
+    "v2": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g1_v2.png",
+    "v3": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g1_v3.png",
+    "wrist": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g1_wrist.png"
+   },
+   "t_s": 3.03
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0231,
+    0.0
+   ],
+   "score": 19.6303,
+   "meta": {
+    "com_perp": 0.00058,
+    "width": 0.02097,
+    "antipodal": 0.98496,
+    "coverage": 1.0,
+    "clearance": 0.0334,
+    "tilt_deg": 153.87714,
+    "graspgen_conf": 0.96303
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g2_v1.png",
+    "v2": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g2_v2.png",
+    "v3": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g2_v3.png",
+    "wrist": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g2_wrist.png"
+   },
+   "t_s": 3.02
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0211,
+    0.0
+   ],
+   "score": 19.5875,
+   "meta": {
+    "com_perp": 0.00061,
+    "width": 0.02083,
+    "antipodal": 0.97108,
+    "coverage": 1.0,
+    "clearance": 0.03432,
+    "tilt_deg": 141.96641,
+    "graspgen_conf": 0.95637
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g3_v1.png",
+    "v2": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g3_v2.png",
+    "v3": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g3_v3.png",
+    "wrist": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g3_wrist.png"
+   },
+   "t_s": 3.02
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0227,
+    0.0
+   ],
+   "score": 19.5713,
+   "meta": {
+    "com_perp": 0.00064,
+    "width": 0.02093,
+    "antipodal": 0.9781,
+    "coverage": 1.0,
+    "clearance": 0.03527,
+    "tilt_deg": 171.95826,
+    "graspgen_conf": 0.95139
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g4_v1.png",
+    "v2": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g4_v2.png",
+    "v3": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g4_v3.png",
+    "wrist": "/tmp/glib/frames/cherry_tomato__eukpfb__f/g4_wrist.png"
+   },
+   "t_s": 3.0
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 19.2
+}

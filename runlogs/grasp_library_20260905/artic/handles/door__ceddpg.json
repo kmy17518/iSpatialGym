@@ -1,0 +1,136 @@
+{
+ "category": "door",
+ "model": "ceddpg",
+ "key": "door__ceddpg",
+ "aabb_extent": [
+  0.18045184016227722,
+  0.7942470908164978,
+  2.286799430847168
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0833,
+   -0.4049,
+   -1.2572
+  ],
+  "bbox_max": [
+   0.0935,
+   0.3894,
+   1.0296
+  ],
+  "n_pieces": 4
+ },
+ "joints": [
+  {
+   "joint": "j_link_1",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "link_1",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.0631,
+   "axis_dir_obj": [
+    0.0,
+    -0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    -0.00716,
+    0.34112,
+    -0.13757
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5709983110427856,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.0134,
+    -0.3337,
+    -1.249
+   ],
+   "link_bbox_max": [
+    0.0631,
+    0.3336,
+    0.974
+   ],
+   "handles": [
+    {
+     "kind": "knob",
+     "contact": [
+      0.0248,
+      -0.2834,
+      -0.289
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0677,
+     "length": 0.0691,
+     "depth": 0.0341,
+     "face_s": 0.0631,
+     "n_pieces": 0,
+     "source": "handle link link_2",
+     "pull_dir": [
+      -0.9987,
+      -0.0511,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.0343,
+     -0.2987,
+     -0.5079
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     -0.0934,
+     0.9956,
+     -0.0
+    ],
+    "width": 0.0765,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     -0.9979,
+     -0.0647,
+     0.0
+    ]
+   },
+   "sub_links": [
+    {
+     "link": "link_2",
+     "joint": "j_link_2",
+     "bbox_min": [
+      -0.0475,
+      -0.318,
+      -0.3228
+     ],
+     "bbox_max": [
+      0.0972,
+      -0.2489,
+      -0.2551
+     ]
+    }
+   ],
+   "status": "handle"
+  }
+ ]
+}

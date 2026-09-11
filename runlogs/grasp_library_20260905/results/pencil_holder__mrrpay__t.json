@@ -1,0 +1,140 @@
+{
+ "task": "disembedding",
+ "relation": null,
+ "category": "pencil_holder",
+ "model": "mrrpay",
+ "key": "pencil_holder__mrrpay__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.06645296859741211,
+  0.07870957946777343,
+  0.07324692153930665
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "pencil_holder",
+   "model": "mrrpay"
+  },
+  "task": "disembedding",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 6000,
+   "n_tilt": 828,
+   "n_width_antipodal": 63,
+   "n_table": 63,
+   "n_collision": 11,
+   "n_sweep": 9,
+   "n_lever": 6,
+   "n_selected": 3,
+   "com": [
+    -0.0017,
+    0.0008,
+    0.0003
+   ],
+   "rest_pose": "x_down"
+  },
+  "rest_pose": "x_down",
+  "rest_quat_wxyz": [
+   0.7071067811865475,
+   -0.0,
+   0.7071067811865475,
+   -0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0251
+   ],
+   "score": 8.3665,
+   "meta": {
+    "com_perp": 0.0114,
+    "width": 0.0697,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01005,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pencil_holder__mrrpay__t/g0_v1.png",
+    "v2": "/tmp/glib/frames/pencil_holder__mrrpay__t/g0_v2.png",
+    "v3": "/tmp/glib/frames/pencil_holder__mrrpay__t/g0_v3.png",
+    "wrist": "/tmp/glib/frames/pencil_holder__mrrpay__t/g0_wrist.png"
+   },
+   "t_s": 3.45
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0467,
+    0.0283
+   ],
+   "score": 7.7993,
+   "meta": {
+    "com_perp": 0.00545,
+    "width": 0.0697,
+    "antipodal": 1.0,
+    "coverage": 0.0,
+    "clearance": 0.01005,
+    "tilt_deg": 30.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pencil_holder__mrrpay__t/g1_v1.png",
+    "v2": "/tmp/glib/frames/pencil_holder__mrrpay__t/g1_v2.png",
+    "v3": "/tmp/glib/frames/pencil_holder__mrrpay__t/g1_v3.png",
+    "wrist": "/tmp/glib/frames/pencil_holder__mrrpay__t/g1_wrist.png"
+   },
+   "t_s": 3.46
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.025
+   ],
+   "score": 7.0814,
+   "meta": {
+    "com_perp": 0.02022,
+    "width": 0.0709,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.00145,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pencil_holder__mrrpay__t/g2_v1.png",
+    "v2": "/tmp/glib/frames/pencil_holder__mrrpay__t/g2_v2.png",
+    "v3": "/tmp/glib/frames/pencil_holder__mrrpay__t/g2_v3.png",
+    "wrist": "/tmp/glib/frames/pencil_holder__mrrpay__t/g2_wrist.png"
+   },
+   "t_s": 3.47
+  }
+ ],
+ "n_valid": 3,
+ "error": null,
+ "t_model_s": 13.9
+}

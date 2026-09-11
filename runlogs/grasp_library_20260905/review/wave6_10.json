@@ -1,0 +1,351 @@
+{
+  "batch": "wave6_10",
+  "models": [
+    {
+      "key": "spatula__bqsefv__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck pinch near CoM, both pads on thin handle"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch, firm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck pinch, firm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck pinch, mild tilt"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck pinch, firm"}
+      ],
+      "object_note": "thin 14 mm metal handle; fingers 15/0 but both pads touch"
+    },
+    {
+      "key": "spatula__hkvsep__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "wooden handle pinch near neck"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "handle pinch near neck"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck pinch, head above"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "handle pinch, natural"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "handle pinch, natural"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "spatula__iktnwh__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle pinch near neck"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "handle pinch near neck"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch at tapered neck of head, firm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "handle pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "handle pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "spatula__ymvrct__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle pinch near neck"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck pinch, tilt 38 acceptable"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "handle pinch, natural"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "handle pinch, natural"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "spatula__crkmux__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "metal handle pinch near neck"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "handle pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "handle pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "handle pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "handle pinch, CoM 58 mm but handle grasp"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "spatula__pdqgzq__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck pinch at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch at CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck/handle pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck/handle pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck/handle pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "spatula__pxwpuw__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck/handle pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck/handle pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck pinch, head above pads"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "handle pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck pinch, tilt 31 acceptable"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "spatula__jzaedf__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "thin rod pinched at neck, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rod pinch near head"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rod pinch near head"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rod pinch near head"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rod pinch at neck"}
+      ],
+      "object_note": "skimmer with 7-10 mm wire handle; small object but V2 shows contact both sides"
+    },
+    {
+      "key": "jar_of_spaghetti_sauce__zahyds__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "top-body pinch, both pads touch, off-centre"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "top-body pinch, both pads touch, off-centre"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "top-body pinch, both pads touch, off-centre"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top-body pinch, both pads touch, off-centre"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "top-body pinch, both pads touch, off-centre"}
+      ],
+      "object_note": "fingers 50/14: 63 mm jar pushed against open finger (17 mm off-centre) but firmly clamped"
+    },
+    {
+      "key": "jar_of_spaghetti_sauce__yqnmoy__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug 85 mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"}
+      ],
+      "object_note": "85 mm jar nearly fills 97 mm opening; one finger stays at 50"
+    },
+    {
+      "key": "jar_of_spaghetti_sauce__fyocnu__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug 86 mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "jar_of_spaghetti_sauce__xpasvb__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug 87 mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "jar_of_spaghetti_sauce__efrxze__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug 86 mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "jar_of_spaghetti_sauce__exmsmm__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug 85 mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "lid/shoulder pinch, snug"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "spray_can__tehmzy__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-body diameter pinch at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-body diameter pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-body diameter pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-body diameter pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-body diameter pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "spray_can__buxqkr__f",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-body diameter pinch at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-body diameter pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-body diameter pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-body pinch, attach slower but firm"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "spray_can__bgalkx__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "65 mm body diameter pinch at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body diameter pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body diameter pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body diameter pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body diameter pinch, CoM 17 mm fine"}
+      ],
+      "object_note": "one finger stays at 50 for this 65 mm can; both pads touch"
+    },
+    {
+      "key": "bottle_of_salsa__dvxotd__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "base-rim pinch, pads 71 mm vs 31 mm chord, antipodal 0.70"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "neck floats between pads; pads on shoulder/cap rim, body 91 mm"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "base-end pinch, lower pad half on body, CoM 58 mm"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch line at base edge (16 mm chord), body hangs 80 mm"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "cap/shoulder rim pinch, neck floats, body 91 mm away"}
+      ],
+      "object_note": "tall 72 mm bottle; all grasps at cap or base end, pads 61-72 mm apart vs 16-34 mm chord"
+    },
+    {
+      "key": "bottle_of_salsa__mavope__f",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "cap/neck end pinch, pads on shoulder rim, body 100 mm"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "neck pinch line, pads stop on shoulder rim, body 86 mm"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "cap/neck end pinch, body 100 mm away"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "shoulder-edge pinch, antipodal 0.59, body 88 mm away"}
+      ],
+      "object_note": "tall dark bottle; pads 54-70 mm apart vs 30-50 mm pinch-line chord, body wider than pads hangs below fingertips"
+    },
+    {
+      "key": "bottle_of_salsa__nafwlf__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "neck floats (37 mm) between 70 mm pads; shoulder-rim contact only"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "neck floats between pads, contact on cap/shoulder rim, body 86 mm"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "cap/neck end pinch, body 93 mm away"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "cap/neck end pinch, body 90 mm away"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "cap/neck end pinch, body 96 mm away"}
+      ],
+      "object_note": "pads never reach the 34-40 mm neck; they stop on cap/shoulder at 61-70 mm, so contact is rim-edge only"
+    },
+    {
+      "key": "bottle_of_olive_oil__luikop__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-body diameter pinch at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-body diameter pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-body diameter pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-body diameter pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-body diameter pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_olive_oil__cqycjk__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch near CoM, pads snug in V2"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch, snug"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, snug"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch, snug"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch, snug"}
+      ],
+      "object_note": "header width 24 mm is inconsistent: ~45 mm body visibly fills 48 mm pad gap (<=3 mm slack)"
+    },
+    {
+      "key": "bottle_of_olive_oil__wztvie__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "square body pinched across rotated faces, pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "square body pinch, pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "square body pinch, pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "square body pinch, pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "square body pinch, antipodal 0.86"}
+      ],
+      "object_note": "fingers 50/0 (48.5 mm) vs 36 mm face width: body sits rotated so pads bear on corners/edges; no visible daylight"
+    },
+    {
+      "key": "bottle_of_olive_oil__ksxqkk__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "cone pinched at wide base rim, base toward palm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "base-rim pinch, wedged toward palm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "base-rim pinch, wedged toward palm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "base-rim pinch, tilt 146, still wedged"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "base-rim pinch, wedged toward palm"}
+      ],
+      "object_note": "conical bottle approached from below; pad edges bear on 63 mm base rim, taper wedges object against palm"
+    },
+    {
+      "key": "bottle_of_sake__swlykk__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body diameter pinch near CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch toward shoulder, full diameter"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "upper-body/shoulder pinch, body between pads"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "shoulder pinch 50 of 59 mm, body wedged"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch near base, full diameter"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_sake__utwglw__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck/shoulder pinch, pads contact at pinch line, body below"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck/shoulder pinch, body 98 mm below"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck/shoulder pinch, body 89 mm below"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck/shoulder pinch, body 96 mm below"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck/shoulder pinch, body 93 mm below"}
+      ],
+      "object_note": "all grasps hold the bottle by the neck/shoulder (handle-like); wider body below cannot pass pads"
+    },
+    {
+      "key": "bottle_of_sake__vfxfuj__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "38 mm neck cylinder pinch, body 119 mm below"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck cylinder pinch, body 122 mm below"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck cylinder pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck cylinder pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck cylinder pinch"}
+      ],
+      "object_note": "wine-style bottle held by neck (handle-like); pads snug on neck"
+    },
+    {
+      "key": "bottle_of_sake__pwtebq__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "tapered neck pinch, pads contact, body 120 mm below"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "tapered neck pinch, body 131 mm below"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "tapered neck pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "tapered neck pinch, 42 mm chord, pads catch wider part"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "tapered neck pinch"}
+      ],
+      "object_note": "conical bottle held near narrow neck; body wider than pads below, so wedged rather than friction-only"
+    },
+    {
+      "key": "beefsteak_tomato__eevvzv__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch, both pads touch"},
+        {"rank": 3, "verdict": "flag", "flags": ["gap", "one_finger"], "note": "~10 mm daylight to open finger, tomato on other pad only"},
+        {"rank": 4, "verdict": "flag", "flags": ["gap", "one_finger"], "note": "~5 mm daylight to open finger, tomato on other pad only"},
+        {"rank": 5, "verdict": "flag", "flags": ["gap", "one_finger"], "note": "~8 mm daylight to open finger, tomato on other pad only"}
+      ],
+      "object_note": "fingers 50/9-12 on 50 mm tomato: open finger stops 5-10 mm short of body (calyx in collision hull?)"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+(define (problem mental_rotation-0)
+    (:domain ispatialgym)
+
+    (:objects
+        mug.n.04_1 - mug.n.04
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop agent.n.01_1 floor.n.01_1)
+        (grasped agent.n.01_1 mug.n.04_1)
+    )
+
+    ; Binary success: the object is still held and its world-frame orientation is within tolerance of the goal
+    ; (TRO pose_targets["mug.n.04_1"]: orientation_metric = "full", position_metric = null).
+    (:goal
+        (and
+            (grasped ?agent.n.01_1 ?mug.n.04_1)
+            (pose_reached ?mug.n.04_1)
+            (pose_settled ?mug.n.04_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+)

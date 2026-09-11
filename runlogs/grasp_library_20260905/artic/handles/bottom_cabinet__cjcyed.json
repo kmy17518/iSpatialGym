@@ -1,0 +1,87 @@
+{
+ "category": "bottom_cabinet",
+ "model": "cjcyed",
+ "key": "bottom_cabinet__cjcyed",
+ "aabb_extent": [
+  0.3226102292537689,
+  0.6845345497131348,
+  0.6843715906143188
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.1145,
+   -0.3346,
+   -0.3425
+  ],
+  "bbox_max": [
+   0.1613,
+   0.3499,
+   0.3419
+  ],
+  "n_pieces": 8
+ },
+ "joints": [
+  {
+   "joint": "j_link_1",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "link_1",
+   "outward_normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "face_s": 0.0566,
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "hinge_point_obj": null,
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.27515631914138794,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.1602,
+    -0.0566,
+    -0.3382
+   ],
+   "link_bbox_max": [
+    0.2081,
+    0.3455,
+    0.3376
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.1842,
+     -0.0566,
+     0.3026
+    ],
+    "pinch_axis": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0,
+    "exposed": true,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     0.0,
+     -1.0,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "edge"
+  }
+ ]
+}

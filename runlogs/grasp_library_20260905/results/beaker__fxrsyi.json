@@ -1,0 +1,196 @@
+{
+ "task": "object_scaling",
+ "category": "beaker",
+ "model": "fxrsyi",
+ "key": "beaker__fxrsyi",
+ "pipeline": "graspgen",
+ "mode": "V",
+ "constraint": "floating",
+ "bbox": [
+  0.0457759780883789,
+  0.045775838851928714,
+  0.0663202953338623
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "beaker",
+   "model": "fxrsyi"
+  },
+  "task": "object_scaling",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 500,
+   "n_selected": 12,
+   "mode": "V",
+   "com": [
+    -0.0001,
+    0.0002,
+    -0.0003
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0442,
+    0.0
+   ],
+   "score": 19.7062,
+   "meta": {
+    "com_perp": 0.00077,
+    "width": 0.03047,
+    "antipodal": 0.9911,
+    "coverage": 1.0,
+    "clearance": 0.02346,
+    "tilt_deg": 87.94072,
+    "graspgen_conf": 0.97037
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/beaker__fxrsyi/g0_v1.png",
+    "v2": "/tmp/glib/frames/beaker__fxrsyi/g0_v2.png",
+    "v3": "/tmp/glib/frames/beaker__fxrsyi/g0_v3.png",
+    "wrist": "/tmp/glib/frames/beaker__fxrsyi/g0_wrist.png"
+   },
+   "t_s": 3.13
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0439,
+    0.0
+   ],
+   "score": 19.5967,
+   "meta": {
+    "com_perp": 0.00121,
+    "width": 0.03166,
+    "antipodal": 0.98624,
+    "coverage": 1.0,
+    "clearance": 0.02303,
+    "tilt_deg": 94.34451,
+    "graspgen_conf": 0.98052
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/beaker__fxrsyi/g1_v1.png",
+    "v2": "/tmp/glib/frames/beaker__fxrsyi/g1_v2.png",
+    "v3": "/tmp/glib/frames/beaker__fxrsyi/g1_v3.png",
+    "wrist": "/tmp/glib/frames/beaker__fxrsyi/g1_wrist.png"
+   },
+   "t_s": 3.14
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0451,
+    0.0
+   ],
+   "score": 19.5833,
+   "meta": {
+    "com_perp": 0.00076,
+    "width": 0.03159,
+    "antipodal": 0.99138,
+    "coverage": 1.0,
+    "clearance": 0.01712,
+    "tilt_deg": 119.11439,
+    "graspgen_conf": 0.97934
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/beaker__fxrsyi/g2_v1.png",
+    "v2": "/tmp/glib/frames/beaker__fxrsyi/g2_v2.png",
+    "v3": "/tmp/glib/frames/beaker__fxrsyi/g2_v3.png",
+    "wrist": "/tmp/glib/frames/beaker__fxrsyi/g2_wrist.png"
+   },
+   "t_s": 3.14
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0441,
+    0.0
+   ],
+   "score": 19.4384,
+   "meta": {
+    "com_perp": 0.00171,
+    "width": 0.03023,
+    "antipodal": 0.99306,
+    "coverage": 1.0,
+    "clearance": 0.02143,
+    "tilt_deg": 89.39112,
+    "graspgen_conf": 0.96775
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/beaker__fxrsyi/g3_v1.png",
+    "v2": "/tmp/glib/frames/beaker__fxrsyi/g3_v2.png",
+    "v3": "/tmp/glib/frames/beaker__fxrsyi/g3_v3.png",
+    "wrist": "/tmp/glib/frames/beaker__fxrsyi/g3_wrist.png"
+   },
+   "t_s": 3.13
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0439,
+    0.0
+   ],
+   "score": 19.4107,
+   "meta": {
+    "com_perp": 0.00186,
+    "width": 0.03039,
+    "antipodal": 0.99171,
+    "coverage": 1.0,
+    "clearance": 0.02268,
+    "tilt_deg": 92.54233,
+    "graspgen_conf": 0.97548
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/beaker__fxrsyi/g4_v1.png",
+    "v2": "/tmp/glib/frames/beaker__fxrsyi/g4_v2.png",
+    "v3": "/tmp/glib/frames/beaker__fxrsyi/g4_v3.png",
+    "wrist": "/tmp/glib/frames/beaker__fxrsyi/g4_wrist.png"
+   },
+   "t_s": 2.91
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 20.0
+}

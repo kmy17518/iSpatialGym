@@ -1,0 +1,271 @@
+{
+ "task": "object_scaling",
+ "relation": null,
+ "category": "pack_of_cigarettes",
+ "model": "cfmlhf",
+ "key": "pack_of_cigarettes__cfmlhf__f",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.11012486267089844,
+  0.054607805252075196,
+  0.016033097267150877
+ ],
+ "ready": true,
+ "round": 2,
+ "candidates_meta": {
+  "object": {
+   "category": "pack_of_cigarettes",
+   "model": "cfmlhf"
+  },
+  "task": "object_scaling",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 500,
+   "n_lever": 457,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    -0.0,
+    0.0,
+    -0.0
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 19.4826,
+   "meta": {
+    "com_perp": 0.00276,
+    "width": 0.01604,
+    "antipodal": 0.9996,
+    "coverage": 1.0,
+    "clearance": 0.02047,
+    "tilt_deg": 89.32623,
+    "graspgen_conf": 0.97991
+   },
+   "frames": {},
+   "t_s": 4.49
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0175,
+    0.0
+   ],
+   "score": 19.458,
+   "meta": {
+    "com_perp": 0.00288,
+    "width": 0.01604,
+    "antipodal": 0.99951,
+    "coverage": 1.0,
+    "clearance": 0.02034,
+    "tilt_deg": 88.74829,
+    "graspgen_conf": 0.97736
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g1_v1.png",
+    "v2": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g1_v2.png",
+    "v3": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g1_v3.png",
+    "wrist": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g1_wrist.png"
+   },
+   "t_s": 3.05
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 19.361,
+   "meta": {
+    "com_perp": 0.00349,
+    "width": 0.01604,
+    "antipodal": 0.99974,
+    "coverage": 1.0,
+    "clearance": 0.02104,
+    "tilt_deg": 91.20525,
+    "graspgen_conf": 0.97811
+   },
+   "frames": {},
+   "t_s": 4.51
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0174,
+    0.0
+   ],
+   "score": 19.3466,
+   "meta": {
+    "com_perp": 0.00352,
+    "width": 0.01603,
+    "antipodal": 0.99996,
+    "coverage": 1.0,
+    "clearance": 0.02044,
+    "tilt_deg": 90.40704,
+    "graspgen_conf": 0.97334
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g3_v1.png",
+    "v2": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g3_v2.png",
+    "v3": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g3_v3.png",
+    "wrist": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g3_wrist.png"
+   },
+   "t_s": 3.03
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0175,
+    0.0
+   ],
+   "score": 18.148,
+   "meta": {
+    "com_perp": 0.01132,
+    "width": 0.01603,
+    "antipodal": 0.99999,
+    "coverage": 1.0,
+    "clearance": 0.01763,
+    "tilt_deg": 89.96743,
+    "graspgen_conf": 0.97623
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g4_v1.png",
+    "v2": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g4_v2.png",
+    "v3": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g4_v3.png",
+    "wrist": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g4_wrist.png"
+   },
+   "t_s": 2.83
+  },
+  {
+   "grasp": "grasp_5",
+   "idx": 5,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 18.0434,
+   "meta": {
+    "com_perp": 0.01295,
+    "width": 0.01604,
+    "antipodal": 0.99958,
+    "coverage": 1.0,
+    "clearance": 0.01915,
+    "tilt_deg": 91.03615,
+    "graspgen_conf": 0.98112
+   },
+   "frames": {},
+   "t_s": 4.48
+  },
+  {
+   "grasp": "grasp_6",
+   "idx": 6,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0175,
+    0.0
+   ],
+   "score": 17.8786,
+   "meta": {
+    "com_perp": 0.0149,
+    "width": 0.01604,
+    "antipodal": 0.99965,
+    "coverage": 1.0,
+    "clearance": 0.02293,
+    "tilt_deg": 90.08305,
+    "graspgen_conf": 0.98412
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g6_v1.png",
+    "v2": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g6_v2.png",
+    "v3": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g6_v3.png",
+    "wrist": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g6_wrist.png"
+   },
+   "t_s": 3.03
+  },
+  {
+   "grasp": "grasp_7",
+   "idx": 7,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0174,
+    0.0
+   ],
+   "score": 17.7814,
+   "meta": {
+    "com_perp": 0.01546,
+    "width": 0.01604,
+    "antipodal": 0.99935,
+    "coverage": 1.0,
+    "clearance": 0.01961,
+    "tilt_deg": 88.29825,
+    "graspgen_conf": 0.97516
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g7_v1.png",
+    "v2": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g7_v2.png",
+    "v3": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g7_v3.png",
+    "wrist": "/tmp/glib/frames/pack_of_cigarettes__cfmlhf__f/g7_wrist.png"
+   },
+   "t_s": 3.04
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 35.0
+}

@@ -1,0 +1,197 @@
+{
+ "task": "mental_rotation",
+ "category": "statue",
+ "model": "ihagjy",
+ "key": "statue__ihagjy",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.05779218673706055,
+  0.1209084358215332,
+  0.19091525268554688
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "statue",
+   "model": "ihagjy"
+  },
+  "task": "mental_rotation",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 497,
+   "n_width": 496,
+   "n_lever": 207,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    0.0007,
+    0.0,
+    -0.0068
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0116
+   ],
+   "score": 16.7062,
+   "meta": {
+    "com_perp": 0.04444,
+    "width": 0.05999,
+    "antipodal": 0.99839,
+    "coverage": 1.0,
+    "clearance": 0.01791,
+    "tilt_deg": 119.11123,
+    "graspgen_conf": 0.9131
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/statue__ihagjy/g0_v1.png",
+    "v2": "/tmp/glib/frames/statue__ihagjy/g0_v2.png",
+    "v3": "/tmp/glib/frames/statue__ihagjy/g0_v3.png",
+    "wrist": "/tmp/glib/frames/statue__ihagjy/g0_wrist.png"
+   },
+   "t_s": 2.88
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0116
+   ],
+   "score": 16.5711,
+   "meta": {
+    "com_perp": 0.04693,
+    "width": 0.06007,
+    "antipodal": 0.997,
+    "coverage": 1.0,
+    "clearance": 0.01737,
+    "tilt_deg": 92.84607,
+    "graspgen_conf": 0.90982
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/statue__ihagjy/g1_v1.png",
+    "v2": "/tmp/glib/frames/statue__ihagjy/g1_v2.png",
+    "v3": "/tmp/glib/frames/statue__ihagjy/g1_v3.png",
+    "wrist": "/tmp/glib/frames/statue__ihagjy/g1_wrist.png"
+   },
+   "t_s": 3.06
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0116
+   ],
+   "score": 16.3183,
+   "meta": {
+    "com_perp": 0.05295,
+    "width": 0.05995,
+    "antipodal": 0.99902,
+    "coverage": 1.0,
+    "clearance": 0.01623,
+    "tilt_deg": 120.77213,
+    "graspgen_conf": 0.92175
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/statue__ihagjy/g2_v1.png",
+    "v2": "/tmp/glib/frames/statue__ihagjy/g2_v2.png",
+    "v3": "/tmp/glib/frames/statue__ihagjy/g2_v3.png",
+    "wrist": "/tmp/glib/frames/statue__ihagjy/g2_wrist.png"
+   },
+   "t_s": 3.01
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0115
+   ],
+   "score": 16.1806,
+   "meta": {
+    "com_perp": 0.05481,
+    "width": 0.05995,
+    "antipodal": 0.99901,
+    "coverage": 1.0,
+    "clearance": 0.0151,
+    "tilt_deg": 160.83638,
+    "graspgen_conf": 0.9128
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/statue__ihagjy/g3_v1.png",
+    "v2": "/tmp/glib/frames/statue__ihagjy/g3_v2.png",
+    "v3": "/tmp/glib/frames/statue__ihagjy/g3_v3.png",
+    "wrist": "/tmp/glib/frames/statue__ihagjy/g3_wrist.png"
+   },
+   "t_s": 3.03
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0111
+   ],
+   "score": 16.165,
+   "meta": {
+    "com_perp": 0.05466,
+    "width": 0.05997,
+    "antipodal": 0.99864,
+    "coverage": 1.0,
+    "clearance": 0.01467,
+    "tilt_deg": 119.13321,
+    "graspgen_conf": 0.91342
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/statue__ihagjy/g4_v1.png",
+    "v2": "/tmp/glib/frames/statue__ihagjy/g4_v2.png",
+    "v3": "/tmp/glib/frames/statue__ihagjy/g4_v3.png",
+    "wrist": "/tmp/glib/frames/statue__ihagjy/g4_wrist.png"
+   },
+   "t_s": 3.06
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 19.4
+}

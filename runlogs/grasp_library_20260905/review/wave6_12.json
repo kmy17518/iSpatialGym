@@ -1,0 +1,344 @@
+{
+  "batch": "wave6_12",
+  "models": [
+    {
+      "key": "ginger_root__wqcasl__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "compact body pinch, both pads on object"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch near CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "lobe pinch near CoM, firm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch; low antipodal 0.30 but firm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "lower-lobe pinch; antipodal 0.13, still firm"}
+      ],
+      "object_note": "irregular compact root; all pinches within 6 mm of CoM"
+    },
+    {
+      "key": "gaming_controller__yofqbq__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch near shoulder, 34 mm off CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch across one grip (handle-like)"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch across one grip (handle-like)"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch across one grip (handle-like)"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch across one grip (handle-like)"}
+      ],
+      "object_note": "grip pinches ~60 mm from CoM treated as handle grasps; full pad contact"
+    },
+    {
+      "key": "stapler__kgnsas__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at CoM spanning open arm and base"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch at CoM spanning open arm and base"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "side pinch across stapler at CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch at CoM spanning open arm and base"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "side pinch across stapler at CoM"}
+      ],
+      "object_note": "stapler modelled open; openings exceed CoM-line width because pads span arm and base"
+    },
+    {
+      "key": "drill__nzgmza__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "handle pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "upper handle/body pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "chuck pinch, 76 mm lever arm, full contact"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rear housing pinch, 88 mm lever arm, wide contact"}
+      ],
+      "object_note": "rows 4-5 far from CoM but wide solid contact; body would swing, not slip"
+    },
+    {
+      "key": "mallet__wpswgw__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle pinch near head"},
+        {"rank": 2, "verdict": "flag", "flags": ["gap"], "note": "opening 28 mm vs 9 mm width; antipodal 0.29"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "collar pinch; opening 28 vs 17 mm, borderline"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "handle pinch near head"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "handle pinch near head"}
+      ],
+      "object_note": "all grasps on handle collar next to head; head hull may stop fingers early"
+    },
+    {
+      "key": "cleaver__vpmydv__h",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "handle pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "handle pinch near bolster"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "handle pinch"},
+        {"rank": 5, "verdict": "flag", "flags": ["gap"], "note": "opening 33 mm vs 11 mm width; coverage 0.5, antipodal 0.24"}
+      ],
+      "object_note": "handle_half constraint respected; row 5 oblique half-coverage contact"
+    },
+    {
+      "key": "soap_dispenser__cgxrwd__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "top pinch on pump neck"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "top pinch at pump head/collar, 34 mm opening"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "top pinch at pump head/collar, 34 mm opening"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top pinch at pump head/collar, half coverage"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "top pinch at pump head/collar, half coverage"}
+      ],
+      "object_note": "rows 2-5 stop at 34-35 mm on 21 mm neck; pads appear to bear on head/collar"
+    },
+    {
+      "key": "soap_dispenser__ijxawq__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch on pump ball head, half coverage"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch on pump ball head, half coverage"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch on pump ball head, half coverage"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch on pump ball head, half coverage"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch at bottle shoulder, firm"}
+      ],
+      "object_note": "pump head is rigid in sim; ball pinch accepted"
+    },
+    {
+      "key": "soap_dispenser__zwudcz__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "upper body pinch, one finger at open limit"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "upper body pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "upper body pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "upper body pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "upper body pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "soap_dispenser__edinmg__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pump head pinch, half coverage"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch at bottle top"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch at bottle top"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch at bottle top"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch at bottle top"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "soap_dispenser__sinntg__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "upper body pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "upper body pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "upper body pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "upper body pinch across wide side"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "upper body pinch across wide side"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "soap_dispenser__jmulpc__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch on pump head/neck, full coverage"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch on pump head/neck, full coverage"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch on pump head/neck, full coverage"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch on pump head/neck, mild tilt"},
+        {"rank": 5, "verdict": "flag", "flags": ["fragile"], "note": "pinch on 10 mm spout/stem; head grasps available"}
+      ],
+      "object_note": "squat body >97 mm, only pump graspable"
+    },
+    {
+      "key": "bottle_of_milk__debqen__t",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "cap/neck pinch of lying carton, 76 mm lever arm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch of lying carton, 77 mm lever arm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "cap/neck pinch of lying carton, 76 mm lever arm"}
+      ],
+      "object_note": "only cap/neck graspable; full pad coverage, carton would pivot to hang, not slip"
+    },
+    {
+      "key": "bottle_of_milk__czblzn__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch of lying bottle at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch of lying bottle at CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, 22 deg tilt"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch, 28 deg tilt"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch, 26 deg tilt"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_milk__mrejrs__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch of lying bottle at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch of lying bottle at CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, 28 deg tilt"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch, 38 deg tilt"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch, 38 deg tilt"}
+      ],
+      "object_note": "fingers 50/0 on 50 mm body: object fills full opening, firm"
+    },
+    {
+      "key": "bottle_of_milk__ddvsgl__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch of lying carton at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch of lying carton at CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, 30 deg tilt"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch, 30 deg tilt"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch, 30 deg tilt"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_milk__utfsmp__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch of lying carton at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch of lying carton at CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, 30 deg tilt"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch, 30 deg tilt"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch of lying carton at CoM"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_milk__qsnnbp__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch of lying carton, 30 deg tilt"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch of lying carton, 30 deg tilt"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch of lying carton, 30 deg tilt"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch, 5 mm off CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch, 12 mm off CoM"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "box_of_rice__yyheuw__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "top pinch across box thickness"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "top pinch across box thickness"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "top pinch across box thickness"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top pinch across box thickness"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "top pinch, 30 deg tilt"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "box_of_rice__fvulow__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "top pinch across box thickness"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "top pinch across box thickness"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "top pinch, 30 deg tilt"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top pinch, 30 deg tilt"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "top pinch, 30 deg tilt"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "box_of_rice__pstqvm__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "top pinch across box thickness"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "top pinch across box thickness"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "top pinch, 30 deg tilt"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top pinch, 30 deg tilt"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "top pinch, 30 deg tilt"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "box_of_granola_bars__bqeeki__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "top pinch across box thickness"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "top pinch across box thickness"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "top pinch across box thickness"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top pinch, 30 deg tilt"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "top pinch, 30 deg tilt"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "box_of_granola_bars__awombj__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "top pinch across box thickness"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "top pinch across box thickness"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "top pinch, 30 deg tilt"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top pinch, 30 deg tilt"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "top pinch, 30 deg tilt"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "box_of_granola_bars__tqwhvz__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "top pinch across box thickness"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "top pinch across box thickness"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "top pinch across box thickness"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top pinch, 30 deg tilt"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "top pinch across box thickness"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "box_of_oatmeal__jtqeef__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "top pinch of bag near CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "top pinch of bag, 16 mm off CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "top pinch of bag, 20 mm off CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top pinch of bag, 21 mm off CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "top pinch of bag, 32 deg tilt, 25 mm off CoM"}
+      ],
+      "object_note": "soft pouch; top pinches are the natural bag grasp"
+    },
+    {
+      "key": "box_of_oatmeal__rabeel__t",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "top pinch of bag, 13 mm off CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "top pinch of bag, 42 mm off CoM, full coverage"}
+      ],
+      "object_note": "soft pouch; bag hangs from top pinch"
+    },
+    {
+      "key": "pencil_holder__jyetcl__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across holder walls near top"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch across holder walls near top"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch across holder walls near top"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch across holder walls near top"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch near top, 30 deg tilt, coverage 0.75"}
+      ],
+      "object_note": "openings ~6 mm wider than reported width in all rows; no visible gap"
+    },
+    {
+      "key": "pencil_holder__taixcy__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across holder walls near top"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch across holder walls near top"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch across holder walls near top"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch near top, 30 deg tilt"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch across holder walls near top"}
+      ],
+      "object_note": "openings ~6-8 mm wider than reported width in all rows; no visible gap"
+    },
+    {
+      "key": "pencil_holder__jkuiqg__t",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "pads only touch top rim edge; coverage 0.00"}
+      ],
+      "object_note": "finger tips stop at rim level, body entirely below pads; would slip without AG"
+    }
+  ]
+}

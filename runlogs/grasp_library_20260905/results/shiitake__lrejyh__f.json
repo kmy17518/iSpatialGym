@@ -1,0 +1,199 @@
+{
+ "task": "object_scaling",
+ "relation": null,
+ "category": "shiitake",
+ "model": "lrejyh",
+ "key": "shiitake__lrejyh__f",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.04696895408630371,
+  0.04650205993652344,
+  0.03705358600616455
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "shiitake",
+   "model": "lrejyh"
+  },
+  "task": "object_scaling",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 478,
+   "n_lever": 478,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    -0.0002,
+    0.0007,
+    0.0001
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0372,
+    0.0
+   ],
+   "score": 19.409,
+   "meta": {
+    "com_perp": 0.00053,
+    "width": 0.02383,
+    "antipodal": 0.85454,
+    "coverage": 1.0,
+    "clearance": 0.02369,
+    "tilt_deg": 101.69841,
+    "graspgen_conf": 0.88593
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/shiitake__lrejyh__f/g0_v1.png",
+    "v2": "/tmp/glib/frames/shiitake__lrejyh__f/g0_v2.png",
+    "v3": "/tmp/glib/frames/shiitake__lrejyh__f/g0_v3.png",
+    "wrist": "/tmp/glib/frames/shiitake__lrejyh__f/g0_wrist.png"
+   },
+   "t_s": 3.45
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0387,
+    0.0
+   ],
+   "score": 18.9131,
+   "meta": {
+    "com_perp": 0.00104,
+    "width": 0.01746,
+    "antipodal": 0.84241,
+    "coverage": 0.75,
+    "clearance": 0.01977,
+    "tilt_deg": 134.77794,
+    "graspgen_conf": 0.87719
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/shiitake__lrejyh__f/g1_v1.png",
+    "v2": "/tmp/glib/frames/shiitake__lrejyh__f/g1_v2.png",
+    "v3": "/tmp/glib/frames/shiitake__lrejyh__f/g1_v3.png",
+    "wrist": "/tmp/glib/frames/shiitake__lrejyh__f/g1_wrist.png"
+   },
+   "t_s": 3.65
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0361,
+    0.0
+   ],
+   "score": 18.8477,
+   "meta": {
+    "com_perp": 0.00218,
+    "width": 0.01535,
+    "antipodal": 0.92968,
+    "coverage": 1.0,
+    "clearance": 0.02328,
+    "tilt_deg": 82.43577,
+    "graspgen_conf": 0.8807
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/shiitake__lrejyh__f/g2_v1.png",
+    "v2": "/tmp/glib/frames/shiitake__lrejyh__f/g2_v2.png",
+    "v3": "/tmp/glib/frames/shiitake__lrejyh__f/g2_v3.png",
+    "wrist": "/tmp/glib/frames/shiitake__lrejyh__f/g2_wrist.png"
+   },
+   "t_s": 3.67
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0491,
+    0.0
+   ],
+   "score": 18.8055,
+   "meta": {
+    "com_perp": 0.00217,
+    "width": 0.03044,
+    "antipodal": 0.8608,
+    "coverage": 1.0,
+    "clearance": 0.02501,
+    "tilt_deg": 72.81901,
+    "graspgen_conf": 0.89142
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/shiitake__lrejyh__f/g3_v1.png",
+    "v2": "/tmp/glib/frames/shiitake__lrejyh__f/g3_v2.png",
+    "v3": "/tmp/glib/frames/shiitake__lrejyh__f/g3_v3.png",
+    "wrist": "/tmp/glib/frames/shiitake__lrejyh__f/g3_wrist.png"
+   },
+   "t_s": 3.61
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0364,
+    0.0
+   ],
+   "score": 18.7646,
+   "meta": {
+    "com_perp": 0.00167,
+    "width": 0.0149,
+    "antipodal": 0.88896,
+    "coverage": 0.75,
+    "clearance": 0.02272,
+    "tilt_deg": 91.15532,
+    "graspgen_conf": 0.89205
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/shiitake__lrejyh__f/g4_v1.png",
+    "v2": "/tmp/glib/frames/shiitake__lrejyh__f/g4_v2.png",
+    "v3": "/tmp/glib/frames/shiitake__lrejyh__f/g4_v3.png",
+    "wrist": "/tmp/glib/frames/shiitake__lrejyh__f/g4_wrist.png"
+   },
+   "t_s": 3.65
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 23.2
+}

@@ -1,0 +1,21 @@
+{
+ "task": "IORS",
+ "relation": "ontop",
+ "category": "canned_food",
+ "model": "zfmfje",
+ "key": "canned_food__zfmfje__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.1,
+  0.1,
+  0.1570306429117918
+ ],
+ "ready": true,
+ "round": 2,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

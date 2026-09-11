@@ -1,0 +1,184 @@
+{
+  "batch": "wave6_00a",
+  "models": [
+    {
+      "key": "lid__kdswwr__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch, both pads on 22 mm edge, hangs vertically"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch, both pads on edge, hangs vertically"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch, both pads on edge, hangs vertically"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch, both pads on edge, hangs vertically"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch, both pads on edge, hangs vertically"}
+      ],
+      "object_note": "very large lid (CoM offset ~205 mm); rim pinch hangs vertically, long lever arm only if held flat"
+    },
+    {
+      "key": "lid__bemtjd__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on thick metal disc, hangs vertically"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch on thick metal disc, hangs vertically"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch on thick metal disc, hangs vertically"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch on thick metal disc, hangs vertically"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch, hangs slightly tilted, both pads touch"}
+      ],
+      "object_note": "11 cm stepped metal lid, 18-21 mm thick; all rows rim pinch across thickness"
+    },
+    {
+      "key": "lid__xdyddo__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on 20 mm edge, hangs vertically"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch on 20 mm edge, hangs vertically"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch on 20 mm edge, hangs vertically"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch on 20 mm edge, hangs vertically"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch on 20 mm edge, hangs vertically"}
+      ],
+      "object_note": "large rounded-square lid (~27 cm); all rows rim pinch across thickness, hangs stably"
+    },
+    {
+      "key": "lid__snklci__f",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across tray depth at rim; hangs tilted, contacts visible"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch across tray depth at rim; hangs tilted, contacts visible"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "edge pinch across depth, tilted hang, low coverage"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "edge pinch across depth; coverage 0 but pads touch"}
+      ],
+      "object_note": "shallow tray lid pinched across ~28 mm rim depth; tilted hang is closure artefact, low antipodal from lip edge"
+    },
+    {
+      "key": "lid__niarsj__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch across skirt depth; hangs tilted, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch across skirt depth, hangs vertically"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch across skirt depth; hangs tilted, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch across skirt depth; hangs tilted, both pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch across skirt depth, hangs vertically"}
+      ],
+      "object_note": "skirted lid pinched across ~28 mm rim depth; tilted hang in rows 1/3/4 is closure artefact"
+    },
+    {
+      "key": "lid__muczdt__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on 14 mm disc, hangs vertically, knob clear"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch on 14 mm disc, hangs vertically, knob clear"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch on 13 mm disc, hangs vertically, knob clear"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch on 14 mm disc, hangs vertically, knob clear"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch on 14 mm disc, hangs vertically, knob clear"}
+      ],
+      "object_note": "notched sugar-bowl lid with knob; all rows rim pinch across thickness"
+    },
+    {
+      "key": "lid__dkncbi__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch across 32 mm depth, both pads flush"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch across 32 mm depth, both pads flush"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch across 32 mm depth, both pads flush"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch across 32 mm depth, both pads flush"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch across 32 mm depth, both pads flush"}
+      ],
+      "object_note": "deep round lid; all rows rim pinch across depth, hangs vertically"
+    },
+    {
+      "key": "lid__fnqhbz__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on thin 6 mm disc, hangs near-vertical"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch on thin 7 mm disc, hangs near-vertical"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch on thin 5 mm disc, hangs vertically"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch on 3 mm disc edge, hangs near-vertical"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch on thin 7 mm disc, hangs near-vertical"}
+      ],
+      "object_note": "thin disc lid (5-7 mm) with small handle; all rows rim pinch with both pads on disc"
+    },
+    {
+      "key": "lid__wtjthb__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on thin dome flange, hangs vertically"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch on thin dome flange, hangs vertically"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch on thin dome flange, hangs vertically"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch on thin dome flange, hangs vertically"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch on 3 mm flange edge, hangs vertically"}
+      ],
+      "object_note": "large thin domed lid (~24 cm) with knob; rim pinches hang stably, knob clear"
+    },
+    {
+      "key": "lid__egfobe__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on 15 mm edge, hangs vertically"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch on 15 mm edge, hangs vertically"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch on 15 mm edge, hangs vertically"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch on 15 mm edge, hangs vertically"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch on 14 mm edge, hangs vertically"}
+      ],
+      "object_note": "19 cm round lid with knob; all rows rim pinch across thickness"
+    },
+    {
+      "key": "lid__qferch__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch; hangs ~35 deg tilted in pads, both touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch; hangs ~35 deg tilted in pads, both touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch on 11 mm edge, hangs vertically"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch on 11 mm edge, hangs vertically"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch, hangs slightly tilted, both pads touch"}
+      ],
+      "object_note": "lid with loop handle; rim pinches; tilted hang in rows 1/2/5 is closure artefact, handle clear"
+    },
+    {
+      "key": "lid__qkpdih__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across ~46 mm tray depth at rim, hangs vertically"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch across ~46 mm tray depth at rim, hangs vertically"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch across ~46 mm tray depth at rim, hangs vertically"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch across tray depth at rim, coverage 0.75, hangs vertically"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "lid held horizontal, cantilevered ~10 cm from 7 mm edge pinch"}
+      ],
+      "object_note": "deep gridded tray lid (~20 cm, ~46 mm deep); rows 1-4 rim pinches across depth hang stably"
+    },
+    {
+      "key": "cap__eukcfr__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "side pinch across 14 mm cap, open end free"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "side pinch across 14 mm cap, open end free"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "side pinch across 13 mm cap, axis along approach"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "side pinch across 14 mm cap, open end free"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "side pinch, cap wedged diagonally at fingertips, still held"}
+      ],
+      "object_note": "tiny 14 mm cap; all side pinches across diameter, open end not covered"
+    },
+    {
+      "key": "cap__mgirzi__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "side pinch across diameter; open end likely faces palm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "side pinch across diameter, open end faces sideways"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "side pinch across diameter, top faces palm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "side pinch across diameter; open end likely faces palm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "side pinch across diameter; open end likely faces palm"}
+      ],
+      "object_note": "27 mm cap, side pinches; open end faces palm in rows 1/4/5 (floating pipeline, not enforced)"
+    },
+    {
+      "key": "cap__ygsmgm__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "side pinch across 36 mm diameter, open end free"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "side pinch across 36 mm diameter, open end free"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "side pinch across 36 mm diameter, top faces palm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "side pinch, cap tilted between pads, still held"},
+        {"rank": 5, "verdict": "flag", "flags": ["task_violation"], "note": "pinch across cap height; pad covers open mating end"}
+      ],
+      "object_note": "36 mm ridged screw cap; rows 1-4 side pinches; row 5 pinches top-to-open-end"
+    }
+  ]
+}

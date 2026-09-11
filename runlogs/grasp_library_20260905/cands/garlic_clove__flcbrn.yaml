@@ -1,0 +1,76 @@
+format: isaac_grasp
+format_version: 1.0
+object_frame: base_link
+gripper_frame: right_eef_link
+ispatialgym:
+  object:
+    category: garlic_clove
+    model: flcbrn
+  task: IORS
+  constraint: tabletop_insert
+  pipeline: a1
+  gripper: r1pro_right
+  source: a1_tabletop_insert
+  log:
+    n_sampled: 6000
+    n_tilt: 496
+    n_width_antipodal: 152
+    n_table: 2
+    n_collision: 2
+    n_selected: 2
+    com:
+    - -0.0002
+    - -0.0001
+    - -0.0001
+    rest_pose: canonical
+  rest_pose: canonical
+  rest_quat_wxyz:
+  - 1.0
+  - 0.0
+  - 0.0
+  - 0.0
+grasps:
+  grasp_0:
+    confidence: 4.2389
+    position:
+    - -0.003359513744770642
+    - -0.00023197099278455602
+    - 0.016078225310960457
+    orientation:
+      w: 0.06772032130050301
+      xyz:
+      - -0.7993993169559906
+      - 0.5931177355434661
+      - -0.06772032130050301
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.02834
+      width: .inf
+      antipodal: 0.0
+      coverage: 0.0
+      clearance: 0.04424
+      tilt_deg: 10.99139
+  grasp_1:
+    confidence: 4.1716
+    position:
+    - -0.004374468095954613
+    - 0.002969162652225275
+    - 0.01655960679908398
+    orientation:
+      w: 0.08458007432275691
+      xyz:
+      - 0.9704199223860231
+      - 0.20970836008947857
+      - 0.08458007432275698
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.02926
+      width: .inf
+      antipodal: 0.0
+      coverage: 0.0
+      clearance: 0.04231
+      tilt_deg: 13.73969

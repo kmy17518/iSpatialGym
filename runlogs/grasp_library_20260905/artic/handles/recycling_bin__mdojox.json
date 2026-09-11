@@ -1,0 +1,91 @@
+{
+ "category": "recycling_bin",
+ "model": "mdojox",
+ "key": "recycling_bin__mdojox",
+ "aabb_extent": [
+  0.5804529786109924,
+  0.5266072750091553,
+  0.8852239847183228
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.319,
+   -0.2633,
+   -0.447
+  ],
+  "bbox_max": [
+   0.2614,
+   0.2633,
+   0.4103
+  ],
+  "n_pieces": 8
+ },
+ "joints": [
+  {
+   "joint": "j_link_2",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "link_2",
+   "outward_normal": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "face_s": 0.4382,
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    -0.30074,
+    -0.01079,
+    0.39311
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 3.124138116836548,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.3153,
+    -0.211,
+    0.3773
+   ],
+   "link_bbox_max": [
+    0.2245,
+    0.211,
+    0.4382
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     0.1891,
+     -0.0676,
+     0.4274
+    ],
+    "pinch_axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "approach_dir": [
+     -0.9984,
+     -0.0,
+     -0.0572
+    ],
+    "width": 0.0488,
+    "exposed": false,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     -0.0698,
+     0.0,
+     0.9976
+    ]
+   },
+   "sub_links": [],
+   "status": "ungraspable"
+  }
+ ]
+}

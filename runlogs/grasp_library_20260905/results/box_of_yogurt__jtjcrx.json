@@ -1,0 +1,19 @@
+{
+ "task": "disembedding",
+ "category": "box_of_yogurt",
+ "model": "jtjcrx",
+ "key": "box_of_yogurt__jtjcrx",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.15882047271728517,
+  0.16699371337890626,
+  0.10496035003662109
+ ],
+ "ready": true,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

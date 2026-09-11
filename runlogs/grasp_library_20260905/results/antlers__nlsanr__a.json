@@ -1,0 +1,21 @@
+{
+ "task": "configuration_matching",
+ "relation": null,
+ "category": "antlers",
+ "model": "nlsanr",
+ "key": "antlers__nlsanr__a",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "attachment_free",
+ "bbox": [
+  0.5606878051757812,
+  0.290725341796875,
+  0.03493586730957031
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

@@ -1,0 +1,192 @@
+{
+ "task": "disembedding",
+ "category": "box_of_cane_sugar",
+ "model": "cqlofx",
+ "key": "box_of_cane_sugar__cqlofx",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.05373593330383301,
+  0.12420549774169921,
+  0.18105224609375
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "box_of_cane_sugar",
+   "model": "cqlofx"
+  },
+  "task": "disembedding",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 3720,
+   "n_tilt": 930,
+   "n_width_antipodal": 930,
+   "n_table": 930,
+   "n_collision": 275,
+   "n_selected": 12,
+   "com": [
+    -0.0,
+    0.0,
+    0.0
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0034
+   ],
+   "score": 7.6061,
+   "meta": {
+    "com_perp": 0.06828,
+    "width": 0.05321,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.02008,
+    "tilt_deg": 0.00032
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g0_v1.png",
+    "v2": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g0_v2.png",
+    "v3": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g0_v3.png",
+    "wrist": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g0_wrist.png"
+   },
+   "t_s": 3.1
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0035
+   ],
+   "score": 7.5697,
+   "meta": {
+    "com_perp": 0.0698,
+    "width": 0.05321,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.02184,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g1_v1.png",
+    "v2": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g1_v2.png",
+    "v3": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g1_v3.png",
+    "wrist": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g1_wrist.png"
+   },
+   "t_s": 3.14
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0035
+   ],
+   "score": 7.5289,
+   "meta": {
+    "com_perp": 0.05957,
+    "width": 0.05321,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01376,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g2_v1.png",
+    "v2": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g2_v2.png",
+    "v3": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g2_v3.png",
+    "wrist": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g2_wrist.png"
+   },
+   "t_s": 3.09
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0035
+   ],
+   "score": 7.5217,
+   "meta": {
+    "com_perp": 0.07188,
+    "width": 0.05321,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.02184,
+    "tilt_deg": 0.00032
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g3_v1.png",
+    "v2": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g3_v2.png",
+    "v3": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g3_v3.png",
+    "wrist": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g3_wrist.png"
+   },
+   "t_s": 3.15
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0033
+   ],
+   "score": 7.4743,
+   "meta": {
+    "com_perp": 0.068,
+    "width": 0.05321,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01723,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g4_v1.png",
+    "v2": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g4_v2.png",
+    "v3": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g4_v3.png",
+    "wrist": "/tmp/glib/frames/box_of_cane_sugar__cqlofx/g4_wrist.png"
+   },
+   "t_s": 3.13
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 20.0
+}

@@ -1,0 +1,59 @@
+format: isaac_grasp
+format_version: 1.0
+object_frame: base_link
+gripper_frame: right_eef_link
+ispatialgym:
+  object:
+    category: lily
+    model: mohrqo
+  task: IORS
+  constraint: flower_stem_top
+  pipeline: a1
+  gripper: r1pro_right
+  source: a1_flower_stem_top
+  log:
+    n_sampled: 5988
+    n_tilt: 454
+    n_width_antipodal: 112
+    n_table: 102
+    n_collision: 40
+    n_sweep: 32
+    n_flower: 2
+    stem_len: 0.465
+    n_selected: 1
+    com:
+    - -0.0198
+    - 0.0014
+    - 0.0002
+    rest_pose: canonical
+  rest_pose: canonical
+  rest_quat_wxyz:
+  - 1.0
+  - 0.0
+  - 0.0
+  - 0.0
+grasps:
+  grasp_0:
+    confidence: 10.1209
+    position:
+    - -0.22208781150328002
+    - 0.030442250777290975
+    - -0.013576149099416603
+    orientation:
+      w: 0.1149268831648965
+      xyz:
+      - -0.033547148547371196
+      - -0.9803553587708302
+      - -0.15674747487490598
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.19409
+      width: 0.01003
+      antipodal: 0.99662
+      coverage: 1.0
+      clearance: 0.03701
+      tilt_deg: 22.41532
+      stem_t: 0.79409
+      pinch_across: 0.10181

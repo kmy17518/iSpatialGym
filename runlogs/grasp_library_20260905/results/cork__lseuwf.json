@@ -1,0 +1,203 @@
+{
+ "task": "configuration_matching",
+ "category": "cork",
+ "model": "lseuwf",
+ "key": "cork__lseuwf",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "attachment_free",
+ "bbox": [
+  0.018606258392333985,
+  0.018377617835998537,
+  0.030310928344726564
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "cork",
+   "model": "lseuwf"
+  },
+  "task": "configuration_matching",
+  "constraint": "attachment_free",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_attachment_free",
+  "log": {
+   "n_sampled": 6000,
+   "n_tilt": 1236,
+   "n_width_antipodal": 1236,
+   "n_table": 1236,
+   "n_collision": 1236,
+   "n_attachment_free": 1236,
+   "n_selected": 12,
+   "com": [
+    -0.0,
+    -0.0,
+    0.0001
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0197,
+    0.0
+   ],
+   "score": 11.8328,
+   "meta": {
+    "com_perp": 0.00203,
+    "width": 0.01827,
+    "antipodal": 0.99406,
+    "coverage": 0.75,
+    "clearance": 0.03081,
+    "tilt_deg": 30.01277,
+    "attach_dist": 0.04793,
+    "attach_side": -1.59749
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/cork__lseuwf/g0_v1.png",
+    "v2": "/tmp/glib/frames/cork__lseuwf/g0_v2.png",
+    "v3": "/tmp/glib/frames/cork__lseuwf/g0_v3.png",
+    "wrist": "/tmp/glib/frames/cork__lseuwf/g0_wrist.png"
+   },
+   "t_s": 3.26
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0197,
+    0.0
+   ],
+   "score": 11.7653,
+   "meta": {
+    "com_perp": 0.00223,
+    "width": 0.01821,
+    "antipodal": 0.99317,
+    "coverage": 0.75,
+    "clearance": 0.03107,
+    "tilt_deg": 29.86941,
+    "attach_dist": 0.04813,
+    "attach_side": -1.7778
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/cork__lseuwf/g1_v1.png",
+    "v2": "/tmp/glib/frames/cork__lseuwf/g1_v2.png",
+    "v3": "/tmp/glib/frames/cork__lseuwf/g1_v3.png",
+    "wrist": "/tmp/glib/frames/cork__lseuwf/g1_wrist.png"
+   },
+   "t_s": 3.39
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0197,
+    0.0
+   ],
+   "score": 11.7121,
+   "meta": {
+    "com_perp": 0.00222,
+    "width": 0.0182,
+    "antipodal": 0.99212,
+    "coverage": 0.75,
+    "clearance": 0.02968,
+    "tilt_deg": 29.92672,
+    "attach_dist": 0.04679,
+    "attach_side": -1.54034
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/cork__lseuwf/g2_v1.png",
+    "v2": "/tmp/glib/frames/cork__lseuwf/g2_v2.png",
+    "v3": "/tmp/glib/frames/cork__lseuwf/g2_v3.png",
+    "wrist": "/tmp/glib/frames/cork__lseuwf/g2_wrist.png"
+   },
+   "t_s": 3.4
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.02,
+    0.0
+   ],
+   "score": 11.7083,
+   "meta": {
+    "com_perp": 0.00238,
+    "width": 0.01822,
+    "antipodal": 0.99195,
+    "coverage": 0.75,
+    "clearance": 0.03122,
+    "tilt_deg": 30.12042,
+    "attach_dist": 0.04826,
+    "attach_side": -1.70207
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/cork__lseuwf/g3_v1.png",
+    "v2": "/tmp/glib/frames/cork__lseuwf/g3_v2.png",
+    "v3": "/tmp/glib/frames/cork__lseuwf/g3_v3.png",
+    "wrist": "/tmp/glib/frames/cork__lseuwf/g3_wrist.png"
+   },
+   "t_s": 3.38
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0197,
+    0.0
+   ],
+   "score": 11.6502,
+   "meta": {
+    "com_perp": 0.00249,
+    "width": 0.01811,
+    "antipodal": 0.9895,
+    "coverage": 0.75,
+    "clearance": 0.03133,
+    "tilt_deg": 30.66435,
+    "attach_dist": 0.04837,
+    "attach_side": -1.98583
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/cork__lseuwf/g4_v1.png",
+    "v2": "/tmp/glib/frames/cork__lseuwf/g4_v2.png",
+    "v3": "/tmp/glib/frames/cork__lseuwf/g4_v3.png",
+    "wrist": "/tmp/glib/frames/cork__lseuwf/g4_wrist.png"
+   },
+   "t_s": 3.39
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 21.6
+}

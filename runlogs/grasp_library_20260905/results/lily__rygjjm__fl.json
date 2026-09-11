@@ -1,0 +1,21 @@
+{
+ "task": "IORS",
+ "relation": "inside",
+ "category": "lily",
+ "model": "rygjjm",
+ "key": "lily__rygjjm__fl",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "flower_stem_top",
+ "bbox": [
+  0.42415921020507813,
+  0.2408032760620117,
+  0.17307061767578125
+ ],
+ "ready": false,
+ "round": 3,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

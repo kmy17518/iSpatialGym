@@ -21,3 +21,11 @@ env/
 # Logs / caches
 *.log
 .cache/
+
+# Separate nested repo (StanfordVL/BEHAVIOR-1K)
+Behavior-1K/
+
+# Generated task instances (ispatialgym.sampling default output) and sampler probes
+datasets/
+sampling_report_*.json
+validation_report_*.json

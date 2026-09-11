@@ -1,0 +1,43 @@
+{
+  "category": "toy_dice",
+  "model": "isgblk",
+  "edge_m": 0.0254,
+  "mass_kg": 0.0069,
+  "mass_note": "ARAT 2.5 cm wooden block (6.5 g) scaled by volume to 25.4 mm: 6.8 g, rounded to 6.9 g",
+  "faces": {
+    "+z": "red",
+    "-z": "blue",
+    "+x": "white",
+    "-x": "yellow",
+    "+y": "blue|yellow",
+    "-y": "red|white"
+  },
+  "opposite_pairs": [
+    [
+      "+z",
+      "-z"
+    ],
+    [
+      "+x",
+      "-x"
+    ],
+    [
+      "+y",
+      "-y"
+    ]
+  ],
+  "tile_up_axis": {
+    "+z": "+y",
+    "-z": "+y",
+    "+x": "+z",
+    "-x": "+z",
+    "+y": "+z",
+    "-y": "+z"
+  },
+  "bbox_m": [
+    0.0254,
+    0.0254,
+    0.0254
+  ],
+  "urdf": "/home/minyeongk/Desktop/projects/ispatialgym/ispatialgym/assets/objects/kohs_block/model/isgblk/isgblk.urdf"
+}

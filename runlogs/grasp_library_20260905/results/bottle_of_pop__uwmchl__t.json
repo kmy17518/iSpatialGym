@@ -1,0 +1,21 @@
+{
+ "task": "disembedding",
+ "relation": null,
+ "category": "bottle_of_pop",
+ "model": "uwmchl",
+ "key": "bottle_of_pop__uwmchl__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.062126609802246095,
+  0.06189960861206055,
+  0.17
+ ],
+ "ready": true,
+ "round": 2,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

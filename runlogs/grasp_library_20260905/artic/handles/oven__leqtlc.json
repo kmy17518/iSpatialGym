@@ -1,0 +1,176 @@
+{
+ "category": "oven",
+ "model": "leqtlc",
+ "key": "oven__leqtlc",
+ "aabb_extent": [
+  0.5268529653549194,
+  0.5039840340614319,
+  0.49473387002944946
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.2394,
+   -0.2519,
+   -0.2625
+  ],
+  "bbox_max": [
+   0.2657,
+   0.2521,
+   0.2323
+  ],
+  "n_pieces": 6
+ },
+ "joints": [
+  {
+   "joint": "j_dof_rootd_aa001_r",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "dof_rootd_aa001_r",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.2645,
+   "axis_dir_obj": [
+    -0.005350000225007534,
+    0.9999899864196777,
+    -9.000000136438757e-05
+   ],
+   "hinge_point_obj": [
+    0.24703,
+    0.00026,
+    -0.16617
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.496047019958496,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.2351,
+    -0.1938,
+    -0.1777
+   ],
+   "link_bbox_max": [
+    0.2875,
+    0.1967,
+    0.1247
+   ],
+   "handles": [
+    {
+     "kind": "knob",
+     "contact": [
+      0.2752,
+      0.1447,
+      0.053
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0115,
+     "length": 0.0121,
+     "depth": 0.0215,
+     "face_s": 0.2645,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9914,
+      0.0053,
+      -0.1309
+     ]
+    },
+    {
+     "kind": "knob",
+     "contact": [
+      0.276,
+      -0.1421,
+      0.0531
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0115,
+     "length": 0.013,
+     "depth": 0.023,
+     "face_s": 0.2645,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9918,
+      0.0053,
+      -0.1276
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      0.276,
+      -0.0032,
+      0.0531
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0123,
+     "length": 0.2755,
+     "depth": 0.023,
+     "face_s": 0.2645,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9914,
+      0.0053,
+      -0.1309
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     0.2596,
+     0.015,
+     0.0576
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     -0.1017,
+     -0.0006,
+     -0.9948
+    ],
+    "width": 0.0021,
+    "exposed": false,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     0.9984,
+     0.0053,
+     -0.0564
+    ]
+   },
+   "sub_links": [],
+   "status": "handle"
+  }
+ ]
+}

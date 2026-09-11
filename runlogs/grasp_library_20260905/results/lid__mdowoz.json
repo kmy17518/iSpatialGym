@@ -1,0 +1,19 @@
+{
+ "task": "configuration_matching",
+ "category": "lid",
+ "model": "mdowoz",
+ "key": "lid__mdowoz",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "attachment_free",
+ "bbox": [
+  0.22171075439453125,
+  0.22171075439453125,
+  0.01415191650390625
+ ],
+ "ready": true,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

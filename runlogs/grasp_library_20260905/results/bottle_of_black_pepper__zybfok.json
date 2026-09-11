@@ -1,0 +1,220 @@
+{
+ "task": "object_scaling",
+ "category": "bottle_of_black_pepper",
+ "model": "zybfok",
+ "key": "bottle_of_black_pepper__zybfok",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.060909627914428714,
+  0.06135549545288086,
+  0.07317990493774414
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "bottle_of_black_pepper",
+   "model": "zybfok"
+  },
+  "task": "object_scaling",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 500,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    0.0007,
+    -0.0002,
+    -0.0058
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0121
+   ],
+   "score": 19.3289,
+   "meta": {
+    "com_perp": 0.00123,
+    "width": 0.04695,
+    "antipodal": 0.9367,
+    "coverage": 1.0,
+    "clearance": 0.01616,
+    "tilt_deg": 90.59553,
+    "graspgen_conf": 0.95466
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g0_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g0_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g0_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g0_wrist.png"
+   },
+   "t_s": 3.42
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0329,
+    0.0287
+   ],
+   "score": 19.1618,
+   "meta": {
+    "com_perp": 0.00149,
+    "width": 0.04349,
+    "antipodal": 0.98176,
+    "coverage": 1.0,
+    "clearance": 0.01394,
+    "tilt_deg": 91.95805,
+    "graspgen_conf": 0.93667
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g1_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g1_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g1_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g1_wrist.png"
+   },
+   "t_s": 3.47
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0112
+   ],
+   "score": 19.0979,
+   "meta": {
+    "com_perp": 0.00237,
+    "width": 0.04349,
+    "antipodal": 0.98448,
+    "coverage": 1.0,
+    "clearance": 0.01704,
+    "tilt_deg": 91.84262,
+    "graspgen_conf": 0.93473
+   },
+   "frames": {},
+   "t_s": 5.11
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0114
+   ],
+   "score": 18.8566,
+   "meta": {
+    "com_perp": 0.00283,
+    "width": 0.0478,
+    "antipodal": 0.93298,
+    "coverage": 1.0,
+    "clearance": 0.01475,
+    "tilt_deg": 90.72679,
+    "graspgen_conf": 0.95134
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g3_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g3_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g3_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g3_wrist.png"
+   },
+   "t_s": 3.4
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.011
+   ],
+   "score": 18.7895,
+   "meta": {
+    "com_perp": 0.00276,
+    "width": 0.04363,
+    "antipodal": 0.97515,
+    "coverage": 1.0,
+    "clearance": 0.01301,
+    "tilt_deg": 92.90971,
+    "graspgen_conf": 0.93154
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g4_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g4_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g4_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g4_wrist.png"
+   },
+   "t_s": 3.39
+  },
+  {
+   "grasp": "grasp_5",
+   "idx": 5,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0119
+   ],
+   "score": 18.7641,
+   "meta": {
+    "com_perp": 0.00295,
+    "width": 0.04982,
+    "antipodal": 0.8805,
+    "coverage": 1.0,
+    "clearance": 0.01518,
+    "tilt_deg": 88.57653,
+    "graspgen_conf": 0.93419
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g5_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g5_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g5_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_black_pepper__zybfok/g5_wrist.png"
+   },
+   "t_s": 3.41
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 28.3
+}

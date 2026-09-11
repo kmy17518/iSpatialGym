@@ -1,0 +1,21 @@
+{
+ "task": "IORS",
+ "relation": "inside",
+ "category": "lily",
+ "model": "pfodaq",
+ "key": "lily__pfodaq__fl",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "flower_stem_top",
+ "bbox": [
+  0.42449188232421875,
+  0.23385862731933593,
+  0.17281610107421874
+ ],
+ "ready": false,
+ "round": 3,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

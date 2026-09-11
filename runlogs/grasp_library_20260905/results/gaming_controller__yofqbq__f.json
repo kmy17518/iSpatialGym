@@ -1,0 +1,199 @@
+{
+ "task": "mental_rotation",
+ "relation": null,
+ "category": "gaming_controller",
+ "model": "yofqbq",
+ "key": "gaming_controller__yofqbq__f",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.12053345108032226,
+  0.1784105453491211,
+  0.06150420379638672
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "gaming_controller",
+   "model": "yofqbq"
+  },
+  "task": "mental_rotation",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 499,
+   "n_width": 499,
+   "n_lever": 398,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    -0.0014,
+    0.0006,
+    -0.0009
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0399,
+    0.0
+   ],
+   "score": 17.0985,
+   "meta": {
+    "com_perp": 0.03415,
+    "width": 0.03776,
+    "antipodal": 0.97368,
+    "coverage": 1.0,
+    "clearance": 0.01944,
+    "tilt_deg": 93.63325,
+    "graspgen_conf": 0.91331
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/gaming_controller__yofqbq__f/g0_v1.png",
+    "v2": "/tmp/glib/frames/gaming_controller__yofqbq__f/g0_v2.png",
+    "v3": "/tmp/glib/frames/gaming_controller__yofqbq__f/g0_v3.png",
+    "wrist": "/tmp/glib/frames/gaming_controller__yofqbq__f/g0_wrist.png"
+   },
+   "t_s": 3.51
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0453,
+    0.0
+   ],
+   "score": 16.111,
+   "meta": {
+    "com_perp": 0.05949,
+    "width": 0.04168,
+    "antipodal": 0.9514,
+    "coverage": 1.0,
+    "clearance": 0.0231,
+    "tilt_deg": 98.81345,
+    "graspgen_conf": 0.9206
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/gaming_controller__yofqbq__f/g1_v1.png",
+    "v2": "/tmp/glib/frames/gaming_controller__yofqbq__f/g1_v2.png",
+    "v3": "/tmp/glib/frames/gaming_controller__yofqbq__f/g1_v3.png",
+    "wrist": "/tmp/glib/frames/gaming_controller__yofqbq__f/g1_wrist.png"
+   },
+   "t_s": 3.53
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0444,
+    0.0
+   ],
+   "score": 16.1066,
+   "meta": {
+    "com_perp": 0.06116,
+    "width": 0.04245,
+    "antipodal": 0.99835,
+    "coverage": 1.0,
+    "clearance": 0.0228,
+    "tilt_deg": 91.81726,
+    "graspgen_conf": 0.91919
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/gaming_controller__yofqbq__f/g2_v1.png",
+    "v2": "/tmp/glib/frames/gaming_controller__yofqbq__f/g2_v2.png",
+    "v3": "/tmp/glib/frames/gaming_controller__yofqbq__f/g2_v3.png",
+    "wrist": "/tmp/glib/frames/gaming_controller__yofqbq__f/g2_wrist.png"
+   },
+   "t_s": 3.43
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0446,
+    0.0
+   ],
+   "score": 16.0691,
+   "meta": {
+    "com_perp": 0.06114,
+    "width": 0.04126,
+    "antipodal": 0.93656,
+    "coverage": 1.0,
+    "clearance": 0.02092,
+    "tilt_deg": 98.15991,
+    "graspgen_conf": 0.93106
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/gaming_controller__yofqbq__f/g3_v1.png",
+    "v2": "/tmp/glib/frames/gaming_controller__yofqbq__f/g3_v2.png",
+    "v3": "/tmp/glib/frames/gaming_controller__yofqbq__f/g3_v3.png",
+    "wrist": "/tmp/glib/frames/gaming_controller__yofqbq__f/g3_wrist.png"
+   },
+   "t_s": 3.55
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0453,
+    0.0
+   ],
+   "score": 16.0632,
+   "meta": {
+    "com_perp": 0.06286,
+    "width": 0.04253,
+    "antipodal": 0.99429,
+    "coverage": 1.0,
+    "clearance": 0.0197,
+    "tilt_deg": 100.36916,
+    "graspgen_conf": 0.9308
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/gaming_controller__yofqbq__f/g4_v1.png",
+    "v2": "/tmp/glib/frames/gaming_controller__yofqbq__f/g4_v2.png",
+    "v3": "/tmp/glib/frames/gaming_controller__yofqbq__f/g4_v3.png",
+    "wrist": "/tmp/glib/frames/gaming_controller__yofqbq__f/g4_wrist.png"
+   },
+   "t_s": 3.57
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 23.0
+}

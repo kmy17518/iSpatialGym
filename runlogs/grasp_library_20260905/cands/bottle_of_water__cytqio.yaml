@@ -1,0 +1,55 @@
+format: isaac_grasp
+format_version: 1.0
+object_frame: base_link
+gripper_frame: right_eef_link
+ispatialgym:
+  object:
+    category: bottle_of_water
+    model: cytqio
+  task: object_scaling
+  constraint: floating
+  pipeline: graspgen
+  gripper: r1pro_right
+  source: graspgen_floating
+  log:
+    n_graspgen: 500
+    n_collision: 500
+    n_width: 498
+    n_lever: 1
+    n_selected: 1
+    mode: C
+    com:
+    - -0.0012
+    - 0.0004
+    - 0.0037
+    rest_pose: canonical
+  rest_pose: canonical
+  rest_quat_wxyz:
+  - 1.0
+  - 0.0
+  - 0.0
+  - 0.0
+grasps:
+  grasp_0:
+    confidence: 15.587
+    position:
+    - -0.002632285810499485
+    - 0.008558117480658808
+    - 0.09108525156948269
+    orientation:
+      w: 0.2619742975055311
+      xyz:
+      - -0.6187929500065096
+      - 0.3036250109402955
+      - 0.6754824980709939
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.08703
+      width: 0.03303
+      antipodal: 0.99477
+      coverage: 0.75
+      clearance: 0.01892
+      tilt_deg: 92.85533
+      graspgen_conf: 0.94234

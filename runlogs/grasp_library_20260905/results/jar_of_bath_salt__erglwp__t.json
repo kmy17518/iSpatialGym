@@ -1,0 +1,21 @@
+{
+ "task": "disembedding",
+ "relation": null,
+ "category": "jar_of_bath_salt",
+ "model": "erglwp",
+ "key": "jar_of_bath_salt__erglwp__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.06747982025146484,
+  0.06735953903198243,
+  0.069725830078125
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

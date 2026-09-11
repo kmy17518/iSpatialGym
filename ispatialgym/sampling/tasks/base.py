@@ -1,0 +1,842 @@
+"""Base class shared by every task sampler: role binding, spawning, concrete BDDL, the per-instance
+settle / validate / goal-feasibility pipeline and the TRO / template writers.
+
+Task-specific samplers implement :meth:`TaskSampler.bind_fixed_roles`, :meth:`prepare_template` (cached
+geometry) and :meth:`sample` (one :class:`Draft`), and may override the hooks marked *hook* below.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import math
+import os
+import time
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+
+import numpy as np
+import torch as th
+
+from ispatialgym.sampling import robot_utils  # noqa: F401  (warp pinning before omnigibson)
+
+import omnigibson as og  # noqa: E402
+from omnigibson.utils.bddl_utils import evaluate_bddl_predicate  # noqa: E402
+
+from ispatialgym.activity.problem import AGENT_INSTANCE  # noqa: E402
+from ispatialgym.eval.group_entity import GroupEntity  # noqa: E402
+from ispatialgym.eval.tro import apply_targets_to_scope, physical_instances  # noqa: E402
+from ispatialgym.oracle import r1pro_model as M  # noqa: E402
+from ispatialgym.sampling import geometry as G  # noqa: E402
+from ispatialgym.sampling import knowledge as K  # noqa: E402
+from ispatialgym.sampling.bddl_writer import Bindings, Bound, build_problem  # noqa: E402
+from ispatialgym.sampling.robot_utils import RobotKit, ViewSolution  # noqa: E402
+from ispatialgym.sampling.sim_utils import Reject, SimWorld, SupportTop  # noqa: E402
+from ispatialgym.sampling.spec import ModelChoice, ProblemSpec, SceneSpec, sha256_of_file, sha256_of_text  # noqa: E402
+from ispatialgym.sampling.tro_writer import build_tro, meta_from_dict, validate_and_write  # noqa: E402
+
+log = logging.getLogger("ispatialgym.sampling")
+
+TABLE_CATEGORIES = ("breakfast_table", "desk", "coffee_table", "conference_table", "pedestal_table", "countertop", "bar", "nightstand", "console_table", "side_table")
+
+
+@dataclass
+class Draft:
+    """Everything one instance attempt decided; filled progressively by the sampler and the pipeline."""
+
+    object_poses: Dict[str, G.Pose] = field(default_factory=dict)  # bddl instance -> init root pose
+    object_joints: Dict[str, th.Tensor] = field(default_factory=dict)
+    robot_q: Optional[th.Tensor] = None  # 28-D (base virtual joints ignored)
+    base_pose2d: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    pose_targets: Dict[str, Any] = field(default_factory=dict)
+    groups: Dict[str, Any] = field(default_factory=dict)
+    articulation_targets: Dict[str, Any] = field(default_factory=dict)
+    goal_poses: Dict[str, G.Pose] = field(default_factory=dict)
+    goal_joints: Dict[str, th.Tensor] = field(default_factory=dict)
+    extras: Dict[str, Any] = field(default_factory=dict)  # grasps / constraints / attachment_targets / initial_occlusion
+    summary: Dict[str, Any] = field(default_factory=dict)
+    settle_free: Optional[List[str]] = None  # objects released during settling (default: all spawned)
+    layout_template_id: Optional[str] = None
+
+
+@dataclass
+class Stance:
+    edge_name: str
+    edge_mid: th.Tensor  # world xy of the front-edge midpoint
+    inward: th.Tensor  # unit xy normal pointing from the edge into the support
+    tangent: th.Tensor  # unit xy along the edge (robot's left = +tangent when facing inward)
+    base_pose2d: Tuple[float, float, float]
+    q_stance: th.Tensor  # 28-D with base virtual joints encoding base_pose2d (root frame)
+    view: Optional[ViewSolution] = None
+
+    @property
+    def base_xy(self) -> th.Tensor:
+        return th.tensor(self.base_pose2d[:2])
+
+    @property
+    def edge_depth(self) -> float:
+        """Distance from the base centre to the front edge along the inward direction."""
+        return float(th.dot(self.edge_mid - self.base_xy, self.inward))
+
+    def local(self, xy) -> Tuple[float, float]:
+        """(depth into the support from the front edge, lateral offset from the robot's centre line; +lateral = robot's left)."""
+        rel = G.t(xy)[:2] - self.base_xy
+        return float(rel @ self.inward) - self.edge_depth, float(rel @ self.tangent)
+
+    def world(self, depth: float, lateral: float) -> th.Tensor:
+        return self.base_xy + self.inward * (self.edge_depth + depth) + self.tangent * lateral
+
+    def to_json(self):
+        d = {"edge": self.edge_name, "edge_mid": self.edge_mid.tolist(), "inward": self.inward.tolist(), "tangent": self.tangent.tolist(),
+             "base_pose2d": list(self.base_pose2d), "edge_depth": self.edge_depth}
+        if self.view is not None:
+            d["view"] = {"translate": self.view.translate, "tilt": self.view.tilt, "axis_angle": self.view.angle}
+        return d
+
+
+class SamplerContext:
+    def __init__(self, problem_spec: ProblemSpec, scene_spec: SceneSpec, choices: Dict[str, ModelChoice], world: SimWorld, kit: RobotKit,
+                 out_dir: str, template_id: str, spec_sha256: str, base_seed: int):
+        self.problem_spec = problem_spec
+        self.scene_spec = scene_spec
+        self.choices = choices
+        self.world = world
+        self.kit = kit
+        self.out_dir = out_dir
+        self.template_id = template_id
+        self.spec_sha256 = spec_sha256
+        self.base_seed = base_seed
+
+
+class TaskSampler:
+    activity: str = ""
+    definition_id: int = 0
+    #: settling steps and tolerances shared by all tasks
+    DEFAULT_SETTLE_STEPS = 90
+
+    def __init__(self, ctx: SamplerContext):
+        self.ctx = ctx
+        self.spec = ctx.problem_spec
+        self.scene_spec = ctx.scene_spec
+        self.choices = ctx.choices
+        self.world: SimWorld = ctx.world
+        self.kit: RobotKit = ctx.kit
+        self.robot = self.world.robot
+        self.activity = self.spec.activity
+        self.definition_id = self.spec.definition_id
+        self.bindings = Bindings()
+        self.objects: Dict[str, Any] = {}  # bddl instance -> simulator object
+        self.problem = None
+        self.compiled = None
+        self.scope: Dict[str, Any] = {}
+        self.template_meta: Dict[str, Any] = {"template_id": ctx.template_id, "scene": self.world.scene_model, "timings": {}}
+        self.template_paths: Optional[Tuple[str, str]] = None
+        self.template_sha: Optional[str] = None
+        self.rejections: Dict[str, int] = {}
+
+    # ------------------------------------------------------------------ spec helpers
+
+    def gen(self, key: str, default=None):
+        return self.spec.generation.get(key, default)
+
+    def tol(self, key: str, default: float) -> float:
+        return float((self.gen("tolerances") or {}).get(key, default))
+
+    # ------------------------------------------------------------------ template phase
+
+    def setup(self):
+        t0 = time.time()
+        self.bind_fixed_roles()
+        self.spawn_roles()
+        self.kit.sync_world()
+        self.prepare_bindings()
+        self.problem = build_problem(self.activity, self.definition_id, self.bindings)
+        self.compiled = self.problem.compile()
+        self.template_meta["bddl_sha256"] = sha256_of_text(self.problem.text)
+        self.build_scope()
+        self.template_meta["timings"]["bind_spawn_s"] = time.time() - t0
+        t1 = time.time()
+        self.kit.sync_world()
+        self.prepare_template()
+        self.template_meta["timings"]["prepare_template_s"] = time.time() - t1
+        self.template_meta["bindings"] = [b.__dict__ for b in self.bindings.all()]
+
+    def bind_fixed_roles(self):  # hook
+        self.bind_floor()
+
+    def prepare_bindings(self):  # hook: bindings that need the spawned objects' geometry (e.g. choosing the support)
+        pass
+
+    def prepare_template(self):  # hook: cached geometry once the problem is compiled
+        pass
+
+    def spawn_roles(self):
+        """Spawn every non-fixed role of the spec (``count`` copies) and bind it."""
+        for role in self.spec.spawned_roles():
+            if role.name not in self.choices:
+                continue
+            self.spawn_role(role.name, self.choices[role.name], count=role.count)
+
+    def spawn_role(self, role: str, choice: ModelChoice, count: int = 1, name_prefix: Optional[str] = None, extra_abilities=None) -> List[Any]:
+        objs = []
+        for i in range(count):
+            idx = len(self.bindings.roles.get(role, []))
+            name = f"{name_prefix or role}_{choice.category}_{choice.model}_{idx}"
+            obj = self.world.spawn(name, choice.category, choice.model, dataset=choice.dataset, scale=choice.scale, extra_abilities=extra_abilities)
+            b = self.bindings.add(role, choice.synset, choice.category, choice.model, obj.name, choice.dataset)
+            self.objects[b.name] = obj
+            objs.append(obj)
+        return objs
+
+    def bind_scene_object(self, role: str, obj) -> Bound:
+        b = self.bindings.add(role, K.synset_of_category(obj.category), obj.category, obj.model, obj.name)
+        self.objects[b.name] = obj
+        return b
+
+    def alias_role(self, role: str, bound: Bound):
+        self.bindings.roles[role] = [bound]
+
+    def bind_floor(self, role: str = "floor", room: Optional[str] = None):
+        req = self.scene_spec.fixed.get(role)
+        if isinstance(req, dict) and "room" in req:
+            room = req["room"]
+        if isinstance(req, list) and req:
+            obj = self.world.obj(req[0])
+        else:
+            room = room or (self.scene_spec.rooms[0] if self.scene_spec.rooms else None)
+            if room is None:
+                raise Reject("spec", f"{self.spec.name}: no room / floor binding for role {role!r}")
+            obj = self.world.floor_of_room(room)
+        return self.bind_scene_object(role, obj)
+
+    def fixed_candidates(self, role: str, default_categories: Sequence[str] = ()) -> List[Any]:
+        """Scene objects the fixed ``role`` may bind to, in spec order."""
+        req = self.scene_spec.fixed.get(role)
+        if isinstance(req, list):
+            return [self.world.obj(n) for n in req]
+        cats = list((req or {}).get("category", default_categories)) if isinstance(req, dict) or req is None else []
+        out = [o for o in self.world.scene.objects if o.category in cats and o.name in self.world.scene_object_names]
+        return sorted(out, key=lambda o: o.name)
+
+    def build_scope(self):
+        self.scope = {AGENT_INSTANCE: self.robot}
+        for inst in self.problem.instances:
+            if inst != AGENT_INSTANCE:
+                self.scope[inst] = self.objects[inst]
+        for g, members in self.problem.groups.items():
+            self.scope[g] = GroupEntity(g, members, resolve_member=lambda n: self.scope.get(n))
+
+    @property
+    def spawned_instances(self) -> List[str]:
+        return [b.name for b in self.bindings.all() if b.scene_object_name in self.world.spawned]
+
+    @property
+    def physical(self) -> List[str]:
+        return physical_instances(self.compiled)
+
+    def obj(self, role: str):
+        return self.objects[self.bindings.one(role).name]
+
+    def objs(self, role: str) -> List[Any]:
+        return [self.objects[b.name] for b in self.bindings.many(role)]
+
+    # ------------------------------------------------------------------ predicate evaluation
+
+    def _evaluate(self, predicate_cls, *names):
+        return evaluate_bddl_predicate(predicate_cls, *[self.scope[n] for n in names])
+
+    def _refresh_for_predicates(self):
+        """Wake every task object and run one *full* simulator step so contact / kinematic / AABB caches see the
+        current state: ``step_physics`` alone leaves the per-step caches (collision boundary points, contact matrix)
+        stale, and sleeping objects are treated as unchanged by ``KinematicsMixin``."""
+        self.world.wake(self.objects.values())
+        self.robot.keep_still()
+        og.sim.step()
+        self.robot.keep_still()
+        for e in self.scope.values():
+            if isinstance(e, GroupEntity):
+                e.invalidate()
+
+    def init_holds(self) -> Tuple[bool, Any]:
+        self._refresh_for_predicates()
+        return self.compiled.check_initial_conditions(self._evaluate)
+
+    def binary_goal_holds(self) -> Tuple[bool, Any]:
+        self._refresh_for_predicates()
+        _, status = self.compiled.check_goal(self._evaluate)
+        return set(self.compiled.binary_goal_head_idxs) <= set(status["satisfied"]), status
+
+    def configure_targets(self, draft: Draft):
+        meta = meta_from_dict(self.tro_meta_block(draft, instance_id="draft", seed=0))
+        apply_targets_to_scope(meta, self.scope)
+
+    # ------------------------------------------------------------------ instance pipeline
+
+    def sample(self, rng: np.random.Generator) -> Draft:  # abstract
+        raise NotImplementedError
+
+    def apply_draft(self, draft: Draft):  # hook
+        for name, pose in draft.object_poses.items():
+            obj = self.objects[name]
+            obj.set_position_orientation(G.t(pose[0]), G.t(pose[1]))
+            if obj.name in self.world.spawned:
+                self.world.activate(obj)
+            obj.keep_still()
+        for name, q in draft.object_joints.items():
+            obj = self.objects[name]
+            obj.set_joint_positions(G.t(q))
+            obj.set_joint_velocities(th.zeros_like(G.t(q)))
+            obj.keep_still()
+        self.kit.apply(draft.robot_q, draft.base_pose2d)
+        for name in draft.object_poses:
+            self.objects[name].keep_still()
+        self.apply_draft_extras(draft)
+
+    def apply_draft_extras(self, draft: Draft):  # hook (grasps, hinges, ...)
+        pass
+
+    def settle_entities(self, draft: Draft) -> List[Any]:
+        names = draft.settle_free if draft.settle_free is not None else self.spawned_instances
+        return [self.objects[n] for n in names]
+
+    def settle_and_validate(self, draft: Draft):
+        free = self.settle_entities(draft)
+        err = self.world.settle(free, steps=int(self.gen("settle_steps", self.DEFAULT_SETTLE_STEPS)))
+        if err:
+            raise Reject("unstable_init", err)
+        for name in draft.object_poses:
+            p, q = self.objects[name].get_position_orientation()
+            draft.object_poses[name] = (p.clone(), q.clone())
+        for name in draft.object_joints:
+            draft.object_joints[name] = self.objects[name].get_joint_positions().clone()
+        err = self.world.check_scene_unchanged([o.name for o in self.objects.values()])
+        if err:
+            raise Reject("scene_disturbed", err)
+        self.after_settle(draft)
+        ok, status = self.init_holds()
+        if not ok:
+            raise Reject("init_false", str(status))
+        self.configure_targets(draft)
+        holds, status = self.binary_goal_holds()
+        if holds:
+            raise Reject("goal_satisfied_at_init", str(status))
+        err = self.world.drift_after(free, steps=10)
+        if err:
+            raise Reject("drift", err)
+        self.extra_checks(draft)
+
+    def after_settle(self, draft: Draft):  # hook: refresh draft data that depends on settled poses
+        pass
+
+    def extra_checks(self, draft: Draft):  # hook: renders, reachability, ...
+        pass
+
+    def goal_entities(self, draft: Draft) -> List[Any]:
+        return [self.objects[n] for n in list(draft.goal_poses) + list(draft.goal_joints)]
+
+    def apply_goal(self, draft: Draft):  # hook
+        for name, pose in draft.goal_poses.items():
+            obj = self.objects[name]
+            obj.set_position_orientation(G.t(pose[0]), G.t(pose[1]))
+            obj.keep_still()
+        for name, q in draft.goal_joints.items():
+            obj = self.objects[name]
+            obj.set_joint_positions(G.t(q))
+            obj.set_joint_velocities(th.zeros_like(G.t(q)))
+            obj.keep_still()
+
+    def check_goal_feasible(self, draft: Draft):
+        """Teleport the objects to the goal (robot untouched), settle, require the binary goal to hold, restore."""
+        if not draft.goal_poses and not draft.goal_joints:
+            return
+        state = self.world.snapshot()
+        try:
+            self.apply_goal(draft)
+            ents = self.goal_entities(draft)
+            err = self.world.settle(ents, steps=int(self.gen("goal_settle_steps", 2 * self.DEFAULT_SETTLE_STEPS)))
+            if err:
+                raise Reject("goal_unstable", err)
+            self.refine_targets_from_goal(draft)
+            self.configure_targets(draft)
+            holds, status = self.binary_goal_holds()
+            settled = {o.name: [[round(v, 3) for v in o.get_position_orientation()[0].tolist()], [round(v, 3) for v in o.aabb[0].tolist()], [round(v, 3) for v in o.aabb[1].tolist()]] for o in ents}
+            if not holds:
+                failed = [c["bddl"] for c in self.goal_report(status) if not c["satisfied"] and "pose_settled" not in c["bddl"]]
+                raise Reject("goal_infeasible", f"unsatisfied {failed}; goal objects (pos, aabb lo, aabb hi) {settled}")
+            draft.summary["goal_check"] = {"settled_poses": {o.name: [o.get_position_orientation()[0].tolist(), o.get_position_orientation()[1].tolist()] for o in ents}}
+        finally:
+            self.world.restore(state)
+            self.world.keep_still(self.objects.values())
+            self.robot.keep_still()
+            self.configure_targets(draft)
+
+    def refine_targets_from_goal(self, draft: Draft):  # hook: snap targets to the settled goal poses
+        for name in draft.goal_poses:
+            tgt = draft.pose_targets.get(name)
+            if tgt is None:
+                continue
+            p, q = self.objects[name].get_position_orientation()
+            if tgt.get("position_metric") == "full" and tgt.get("frame", "world") == "world":
+                tgt["position"] = p.tolist()
+            if tgt.get("orientation_metric") == "full":
+                tgt["orientation"] = q.tolist()
+
+    def goal_report(self, status):
+        satisfied = set(status["satisfied"])
+        return [{"bddl": " ".join(str(self.problem.goal[i]).split()), "satisfied": i in satisfied} for i in range(len(self.problem.goal))]
+
+    # ------------------------------------------------------------------ writing
+
+    def object_bindings(self) -> Dict[str, Dict[str, Any]]:
+        out = {}
+        for b in self.bindings.all():
+            d = {"scene_object_name": b.scene_object_name, "category": b.category, "model": b.model}
+            if b.dataset and b.dataset != "behavior-1k-assets":
+                d["dataset_name"] = b.dataset
+            out[b.name] = d
+        return out
+
+    def scene_block(self) -> Dict[str, Any]:
+        return {
+            "model": self.world.scene_model,
+            "floor": 0,
+            "template_path": "../template.json",
+            "template_sha256": self.template_sha,
+            "load_room_instances": list(self.world.rooms or []),
+            "required_scene_objects": sorted({b.scene_object_name for b in self.bindings.all() if b.scene_object_name in self.world.scene_object_names}),
+        }
+
+    def tro_meta_block(self, draft: Draft, instance_id: str, seed: int) -> Dict[str, Any]:
+        robot_state = {
+            "bddl_instance": AGENT_INSTANCE,
+            "model": "r1pro",
+            "joint_positions": self.kit.joint_dict(),
+            "joint_velocities": {n: 0.0 for n in M.ALL_JOINTS if n not in M.BASE_VIRTUAL_JOINTS},
+            "controller_targets": {},
+        }
+        p, q = self.robot.get_position_orientation()
+        tro = build_tro(
+            problem_name=self.spec.name,
+            activity=self.activity,
+            definition_id=self.definition_id,
+            task_variant=self.problem.alias,
+            instance_id=instance_id,
+            generation_seed=seed,
+            bddl_sha256=self.template_meta["bddl_sha256"],
+            task_spec_sha256=self.ctx.spec_sha256,
+            scene=self.scene_block(),
+            object_bindings=self.object_bindings(),
+            object_states={},
+            robot_pose={"position": p.tolist(), "orientation": q.tolist()},
+            robot_state=robot_state,
+            pose_targets=draft.pose_targets,
+            groups=draft.groups,
+            articulation_targets=draft.articulation_targets,
+            grasps=draft.extras.get("grasps"),
+            constraints=draft.extras.get("constraints"),
+            attachment_targets=draft.extras.get("attachment_targets"),
+            initial_occlusion=draft.extras.get("initial_occlusion"),
+            layout_template_id=draft.layout_template_id,
+        )
+        return tro["ispatialgym"]
+
+    def instance_id(self, index: int) -> str:
+        return f"{self.spec.name}__{self.ctx.template_id}__{index:04d}"
+
+    def save_template(self):
+        inst_to_name = {b.name: b.scene_object_name for b in self.bindings.all()}
+        inst_to_name[AGENT_INSTANCE] = self.robot.name
+        p, q = self.robot.get_position_orientation()
+        robot_poses = {"robot": [{"position": p.tolist(), "orientation": q.tolist()}]}
+        t0 = time.time()
+        partial, full = self.world.save_template(self.ctx.out_dir, inst_to_name, robot_poses)
+        self.template_paths = (partial, full)
+        self.template_sha = sha256_of_file(full)
+        bddl_dir = os.path.join(self.ctx.out_dir, "activity_definitions", self.activity)
+        os.makedirs(bddl_dir, exist_ok=True)
+        with open(os.path.join(bddl_dir, f"problem{self.definition_id}.bddl"), "w") as f:
+            f.write(self.problem.text)
+        self.template_meta["timings"]["save_template_s"] = time.time() - t0
+        self.template_meta.update({
+            "template_sha256": self.template_sha,
+            "template_path": full,
+            "template_partial_path": partial,
+            "load_room_instances": list(self.world.rooms or []),
+            "problem": self.spec.name,
+            "alias": self.problem.alias,
+            "choices": {r: c.__dict__ for r, c in self.choices.items()},
+            "inst_to_name": inst_to_name,
+            "scene_load_s": self.world.load_time,
+        })
+
+    def write_template_meta(self):
+        with open(os.path.join(self.ctx.out_dir, "template_meta.json"), "w") as f:
+            json.dump(_jsonable(self.template_meta), f, indent=2)
+
+    def write_instance(self, draft: Draft, index: int, seed: int) -> str:
+        iid = self.instance_id(index)
+        states = {inst: self.objects[inst].dump_state(serialized=False) for inst in self.physical}
+        meta = self.tro_meta_block(draft, iid, seed)
+        tro = dict(states)
+        p, q = self.robot.get_position_orientation()
+        tro["robot_poses"] = {"robot": [{"position": p.tolist(), "orientation": q.tolist()}]}
+        tro["ispatialgym"] = meta
+        path = os.path.join(self.ctx.out_dir, "instances", f"{iid}-tro_state.json")
+        validate_and_write(tro, self.compiled, path)
+        summary = dict(draft.summary)
+        summary.update({"instance_id": iid, "seed": seed, "base_pose2d": list(draft.base_pose2d), "trunk": list(self.kit.trunk_of(draft.robot_q)),
+                        "rejections_so_far": dict(self.rejections)})
+        with open(os.path.join(self.ctx.out_dir, "instances", f"{iid}.summary.json"), "w") as f:
+            json.dump(_jsonable(summary), f, indent=2)
+        return path
+
+    # ------------------------------------------------------------------ main loop
+
+    def run(self, n_instances: int, max_attempts: int = 30) -> List[str]:
+        written = []
+        for index in range(n_instances):
+            ok = False
+            for attempt in range(max_attempts):
+                seed = int(self.ctx.base_seed * 1000003 + index * 1009 + attempt)
+                rng = np.random.default_rng(seed)
+                t0 = time.time()
+                try:
+                    draft = self.sample(rng)
+                    self.apply_draft(draft)
+                    self.settle_and_validate(draft)
+                    self.check_goal_feasible(draft)
+                    if self.template_paths is None:
+                        self.save_template()
+                    draft.summary["wall_time_s"] = time.time() - t0
+                    written.append(self.write_instance(draft, index, seed))
+                    log.info("%s: instance %d written (attempt %d, %.1fs)", self.spec.name, index, attempt, time.time() - t0)
+                    ok = True
+                    break
+                except Reject as e:
+                    self.rejections[e.reason] = self.rejections.get(e.reason, 0) + 1
+                    log.info("%s: instance %d attempt %d rejected: %s", self.spec.name, index, attempt, e)
+                    self.on_reject(e)
+            if not ok:
+                log.error("%s: instance %d failed after %d attempts; rejections=%s", self.spec.name, index, max_attempts, self.rejections)
+        self.template_meta["rejections"] = dict(self.rejections)
+        self.template_meta["n_written"] = len(written)
+        if self.template_paths is not None:
+            self.write_template_meta()
+        return written
+
+    def on_reject(self, err: Reject):  # hook
+        try:
+            for arm in M.ARMS:
+                if self.robot._ag_obj_in_hand.get(arm) is not None:
+                    self.robot.release_grasp_immediately(arm)
+        except Exception:
+            pass
+        for i, o in enumerate(self.world.spawned.values()):
+            self.world.park(o, i)
+        og.sim.step_physics()
+
+    # ------------------------------------------------------------------ shared geometry helpers
+
+    def support_top(self, support, ignore: Sequence[Any] = ()) -> SupportTop:
+        return self.world.support_top(support, resolution=float(self.gen("support_resolution", 0.02)), ignore=list(ignore) + list(self.world.spawned.values()))
+
+    def choose_stance(self, top: SupportTop, focus_xy: Optional[th.Tensor] = None, stand_off: Optional[float] = None, arms: str = "untucked",
+                      translates: Optional[Sequence[float]] = None, preferred_edge: Optional[str] = None, lateral_step: float = 0.10,
+                      edge_margin: float = 0.25) -> Stance:
+        """Base pose in front of one edge of the support (facing inward), on the traversability map and whole-body
+        collision free at every trunk translate in ``translates`` (viewing and reaching levels).
+
+        Candidates are all (edge, lateral position) pairs; they are collision-checked in one batch. Preference: the
+        edge named by ``preferred_edge`` / the spec (``fixed.<role>_front_edge``), then the lateral position closest to
+        ``focus_xy`` (or to the edge centre), then the free run behind the robot.
+        """
+        stand_off = float(self.gen("stand_off", 0.45)) if stand_off is None else stand_off
+        translates = list(self.gen("reach_translates", [0.5, 0.75, 1.0, 1.25])) if translates is None else list(translates)
+        if M.DEFAULT_TRUNK_TRANSLATE not in translates:
+            translates = [M.DEFAULT_TRUNK_TRANSLATE] + translates
+        q0 = self.kit.q_config(arms=arms, translate=M.DEFAULT_TRUNK_TRANSLATE)
+        cands = []
+        # the top raster can be inset from the object's footprint (bed frames, footboards, table aprons): measure the
+        # stand-off from whichever is further out along the edge normal
+        support = self.world.obj(top.name)
+        lo, hi = support.aabb
+        aabb_xy = G.aabb_corners(lo, hi)[:, :2]
+        for name, mid, normal, length in top.edges():
+            if preferred_edge is not None and name != preferred_edge:
+                continue
+            inward = -normal
+            tangent = th.tensor([-float(inward[1]), float(inward[0])])  # robot's left when facing inward
+            yaw = math.atan2(float(inward[1]), float(inward[0]))
+            half = max(0.0, length / 2 - edge_margin)
+            n_lat = max(1, int(round(2 * half / lateral_step)) + 1)
+            want = float(th.dot(G.t(focus_xy) - mid, tangent)) if focus_xy is not None else 0.0
+            overhang = max(0.0, float((aabb_xy @ normal).max()) - float(th.dot(mid, normal)))
+            if overhang < 0.05:
+                overhang = 0.0  # bevelled table edges: the arm reach over the table is marginal, keep the stance as is
+            for lat in th.linspace(-half, half, n_lat).tolist():
+                base_xy = mid + normal * (stand_off + overhang) + tangent * lat
+                if not self.kit.trav_free(base_xy):
+                    continue
+                cands.append((name, mid, inward, tangent, length, lat, abs(lat - want), base_xy, yaw))
+        if not cands:
+            raise Reject("no_stance", f"no traversable stance around {top.name}")
+        qs = []
+        for c in cands:
+            for tr in translates:
+                qs.append(self.kit.q_at_base_pose(self.kit.with_trunk(q0, tr, 0.0), float(c[7][0]), float(c[7][1]), c[8]))
+        free = self.kit.collision_free(th.stack(qs), margin=0.01).view(len(cands), len(translates))
+        log.info("choose_stance(%s): %d candidates, %d free at default translate, %d free at all translates",
+                 top.name, len(cands), int(free[:, 0].sum()), int(free.all(dim=1).sum()))
+        good = []
+        for c, f in zip(cands, free):
+            if not bool(f[0]):  # must be free at the default (viewing) translate
+                continue
+            n_free_tr = int(f.sum())
+            back = 0.0
+            for d in (0.2, 0.4, 0.6, 0.8):
+                if self.kit.trav_free(c[7] - c[2] * d):
+                    back = d
+                else:
+                    break
+            good.append((-n_free_tr, c[6], -back, c))
+        if not good:
+            raise Reject("no_stance", f"no collision-free stance around {top.name}")
+        good.sort(key=lambda g: (g[0], g[1], g[2]))
+        _, _, _, (name, mid, inward, tangent, length, lat, _, base_xy, yaw) = good[0]
+        q = self.kit.q_at_base_pose(q0, float(base_xy[0]), float(base_xy[1]), yaw)
+        st = Stance(name, mid, inward, tangent, (float(base_xy[0]), float(base_xy[1]), yaw), q)
+        st.lateral = lat  # type: ignore[attr-defined]
+        return st
+
+    #: arm configuration assumed while the robot "sits" (deep trunk translates) to reach: hanging arms stay clear of the
+    #: table top, whereas the untucked / ready hands would sweep through it. The oracle lowers the arms before sitting.
+    REACH_ARMS = "tucked"
+
+    def stance_free_translates(self, stance: Stance, translates: Sequence[float], arms: Optional[str] = None) -> List[float]:
+        q0 = self.kit.q_config(arms=arms or self.REACH_ARMS)
+        qs = th.stack([self.kit.q_at_base_pose(self.kit.with_trunk(q0, tr, 0.0), *stance.base_pose2d) for tr in translates])
+        free = self.kit.collision_free(qs, margin=0.01)
+        return [float(tr) for tr, f in zip(translates, free.tolist()) if f]
+
+    def reach_seed(self, stance: Stance, translate: float) -> th.Tensor:
+        """Configuration used as IK seed / locked-joint source when testing reachability at ``translate``."""
+        q0 = self.kit.q_config(arms=self.REACH_ARMS, translate=translate)
+        return self.kit.q_at_base_pose(q0, *stance.base_pose2d)
+
+    def stance_with_view(self, top: SupportTop, depth_mid: float, arms: str = "untucked", stand_off: Optional[float] = None,
+                         preferred_edge: Optional[str] = None, focus_xy: Optional[th.Tensor] = None, focus_z: Optional[float] = None,
+                         prefer_translate: Optional[float] = None) -> Stance:
+        """Stance plus the trunk (translate, tilt) that centres the point at ``depth_mid`` in front of the robot.
+        ``prefer_translate`` (default spec ``view_prefer_translate`` or the JoyLo default 0.5) biases the trunk: low
+        translates keep the camera high and behind the table edge (wide objects), high ones bring it close.
+
+        If no viewing configuration with ``arms`` is collision free (objects already on the table under the untucked
+        hands), the compact ``ready`` arm pose is tried; the arm mode used is recorded in ``template_meta``."""
+        errors = []
+        for arm_mode in ([arms] + [a for a in self.gen("view_arm_fallbacks", ["ready"]) if a != arms]):
+            try:
+                st = self._stance_with_view(top, depth_mid, arm_mode, stand_off, preferred_edge, focus_xy, focus_z, prefer_translate)
+                self.template_meta["view_arms"] = arm_mode
+                return st
+            except Reject as e:
+                errors.append(f"{arm_mode}: {e}")
+        raise Reject("stance_collision", "; ".join(errors))
+
+    def _stance_with_view(self, top: SupportTop, depth_mid: float, arms: str, stand_off, preferred_edge, focus_xy, focus_z, prefer_translate) -> Stance:
+        st = self.choose_stance(top, focus_xy=focus_xy, stand_off=stand_off, arms=arms, preferred_edge=preferred_edge)
+        base_xy = th.tensor(st.base_pose2d[:2])
+        # point on the robot's centre line, depth_mid into the support from the edge
+        d_edge = float(th.dot(st.edge_mid - base_xy, st.inward))
+        focus = th.tensor([*(base_xy + st.inward * (d_edge + depth_mid)).tolist(), top.z + (0.05 if focus_z is None else focus_z)])
+        translates = th.tensor(self.gen("view_translates", [0.0, 0.25, 0.5, 0.75, 1.0]))
+        pref = float(self.gen("view_prefer_translate", M.DEFAULT_TRUNK_TRANSLATE)) if prefer_translate is None else float(prefer_translate)
+        chosen = None
+        n_cand = 0
+        # exact centring first; if every centred configuration collides (low furniture close to the robot), accept
+        # views that put the focus within 20 deg of the optical axis
+        for max_angle in (math.radians(8.0), math.radians(20.0)):
+            views = self.kit.solve_view(st.q_stance, focus, translates=translates, top_k=24, prefer_translate=pref, max_angle=max_angle)
+            qs = th.stack([self.kit.with_trunk(st.q_stance, v.translate, v.tilt) for v in views])
+            free = self.kit.collision_free(qs, margin=0.01)
+            n_cand += len(views)
+            for v, q, f in zip(views, qs, free.tolist()):
+                if f:
+                    chosen = (v, q)
+                    break
+            if chosen is not None:
+                break
+        if chosen is None:
+            raise Reject("stance_collision", f"no collision-free viewing trunk configuration ({n_cand} candidates)")
+        st.view, st.q_stance = chosen
+        st.view.cam_pose = self.kit.camera_pose(st.q_stance)
+        st.focus = focus  # type: ignore[attr-defined]
+        return st
+
+    def region_cells(self, top: SupportTop, stance: Stance, depth_range: Tuple[float, float], lateral_half: float, margin: float = 0.04,
+                     lateral_center: float = 0.0) -> th.Tensor:
+        """Free cells of ``top`` within ``depth_range`` from the front edge and ``|lateral - lateral_center| <= lateral_half``
+        (lateral measured from the robot's centre line, + = robot's left)."""
+        cells = top.cells(free_only=True)
+        rel = cells - stance.base_xy
+        depth = rel @ stance.inward - stance.edge_depth
+        lat = rel @ stance.tangent
+        keep = (depth >= depth_range[0]) & (depth <= depth_range[1]) & ((lat - lateral_center).abs() <= lateral_half)
+        if len(cells) and int(keep.sum()) == 0:
+            log.info("region_cells(%s): %d free cells, depth %.2f..%.2f, lateral %.2f..%.2f; none within depth %s lateral %.2f+-%.2f",
+                     top.name, len(cells), float(depth.min()), float(depth.max()), float(lat.min()), float(lat.max()), list(depth_range), lateral_center, lateral_half)
+        cells = cells[keep]
+        if len(cells) == 0:
+            return cells
+        kept = [c for c in cells if top.contains(c, margin)]
+        return th.stack(kept) if kept else th.zeros(0, 2)
+
+    def reachable_cells(self, cells: th.Tensor, stance: Stance, z: float, translates=None, yaws=None, tilts=(0.0, 30.0)) -> Tuple[th.Tensor, List[Optional[float]]]:
+        translates = list(self.gen("reach_translates", [0.5, 0.75, 1.0, 1.25])) if translates is None else list(translates)
+        translates = self.stance_free_translates(stance, translates)
+        if not translates:
+            return th.zeros(len(cells), dtype=th.bool), [None] * len(cells)
+        yaw0 = stance.base_pose2d[2]
+        yaws = [yaw0, yaw0 + math.pi / 2] if yaws is None else yaws
+        q_seed = self.reach_seed(stance, translates[0])
+        return self.kit.reach_grid(q_seed, cells, z, yaws, translates, toward=stance.inward, tilts=tilts, ignore_for_grasp=self.grasp_ignore())
+
+    def grasp_ignore(self) -> List[Any]:
+        """Objects ignored for the *grasp* pose collision check (the support: fingertips may touch / dip into it, the
+        oracle's final approach is not collision checked). Overridden by samplers that know their support."""
+        return [self.objects[b.name] for b in self.bindings.roles.get("table", [])]
+
+    def reachable_poses(self, stance: Stance, eef_poses: Sequence[G.Pose], translates=None, ignore_for_last=None) -> Optional[float]:
+        """Exact (32-seed) check that every eef pose is IK-feasible from the stance at some collision-free translate
+        (the last pose is checked with the support -- or ``ignore_for_last`` -- ignored)."""
+        translates = list(self.gen("reach_translates", [0.5, 0.75, 1.0, 1.25])) if translates is None else list(translates)
+        ignore = self.grasp_ignore() if ignore_for_last is None else list(ignore_for_last)
+        for tr in self.stance_free_translates(stance, translates):
+            if self.kit.reachable(eef_poses, self.reach_seed(stance, tr), ignore_for_last=ignore) is not None:
+                return tr
+        return None
+
+    def grasp_combo_table(self, stance: Stance, cells: th.Tensor, pose_at, grasps, translates: Sequence[float],
+                          yaws: Optional[Sequence[float]] = None, cell_translates: Optional[Sequence[Optional[float]]] = None) -> Dict[int, List[Tuple[float, Any, float]]]:
+        """Per cell index: feasible (yaw, grasp, translate) combinations of the library grasps (screening IK), computed
+        once per template so that instance sampling never has to search for a reachable grasp.
+
+        ``pose_at(cell_xy, yaw) -> (pos, quat)`` gives the object pose. Translates are tried shallowest first; a cell
+        stops being evaluated once it has combinations.
+        """
+        yaws = list(th.linspace(-math.pi, math.pi, 9)[:-1].tolist()) if yaws is None else list(yaws)
+        table: Dict[int, List[Tuple[float, Any, float]]] = {}
+        free_tr = self.stance_free_translates(stance, translates)
+        ignore = self.grasp_ignore()
+        for tr in free_tr:
+            q_seed = self.reach_seed(stance, tr)
+            todo = [i for i in range(len(cells)) if i not in table]
+            if not todo:
+                break
+            pairs, index = [], []
+            for i in todo:
+                for yaw in yaws:
+                    obj_pose = pose_at(cells[i], yaw)
+                    for g in grasps:
+                        pairs.append(self.grasp_eef_poses(obj_pose, g))
+                        index.append((i, yaw, g))
+            if not pairs:
+                continue
+            feas = self.kit.pairs_feasible(pairs, q_seed, ignore)
+            for (i, yaw, g), s in zip(index, feas.tolist()):
+                if s:
+                    table.setdefault(i, []).append((yaw, g, float(tr)))
+        return table
+
+    def coarse_cells(self, cells: th.Tensor, resolution: float, raster: float) -> th.Tensor:
+        """Sub-sample raster cells (spacing ``raster``) to a coarser lattice of spacing ``resolution``."""
+        if len(cells) == 0:
+            return cells
+        k = max(1, int(round(resolution / raster)))
+        origin = cells.min(dim=0).values
+        idx = th.round((cells - origin) / raster).long()
+        keep = (idx[:, 0] % k == 0) & (idx[:, 1] % k == 0)
+        return cells[keep]
+
+    def visible_cells(self, cells: th.Tensor, cam_pose: G.Pose, z: float, height: float, margin: float = 0.05, radius: float = 0.0) -> th.Tensor:
+        """Mask of cells whose object footprint (radius ``radius`` around the cell, from ``z`` to ``z + height``) projects
+        inside the image with ``margin`` (fraction of the image size). Vectorised frustum test, no renders."""
+        if len(cells) == 0:
+            return th.zeros(0, dtype=th.bool)
+        offsets = [(0.0, 0.0)] if radius <= 0 else [(radius, 0.0), (-radius, 0.0), (0.0, radius), (0.0, -radius)]
+        ok = th.ones(len(cells), dtype=th.bool)
+        for dx, dy in offsets:
+            for zz in (z, z + height):
+                pts = th.cat([cells + th.tensor([dx, dy]), th.full((len(cells), 1), float(zz))], dim=1)
+                ok &= self.world.camera_model.inside(cam_pose, pts, margin)
+        return ok
+
+    def feasible_yaw_grasps(self, stance: Stance, xy, z_of_yaw, grasps, translates: Sequence[float], yaws: Optional[Sequence[float]] = None,
+                            rng=None) -> List[Tuple[float, Any, float]]:
+        """(yaw, grasp, translate) combinations for an object at ``xy`` whose library grasp (pre-grasp + grasp) passes the
+        screening IK, evaluated in one batched call per translate. ``z_of_yaw(yaw) -> (pos, quat)`` gives the object pose.
+
+        Returns the feasible combinations shuffled (if ``rng``) so that callers can take the first that also passes the
+        support / view checks; each should be confirmed with :meth:`reachable_poses` (32 seeds) before use.
+        """
+        yaws = list(th.linspace(-math.pi, math.pi, 13)[:-1].tolist()) if yaws is None else list(yaws)
+        out = []
+        for tr in translates:
+            q_seed = self.reach_seed(stance, tr)
+            poses, index = [], []
+            for yaw in yaws:
+                obj_pose = z_of_yaw(yaw)
+                for g in grasps:
+                    poses.extend(self.grasp_eef_poses(obj_pose, g))
+                    index.append((yaw, g))
+            succ = self.kit.ik_batch(poses, q_seed).view(-1, 2).all(dim=1)
+            for (yaw, g), s in zip(index, succ.tolist()):
+                if s:
+                    out.append((yaw, g, float(tr)))
+            if out:
+                break  # prefer the shallowest translate at which anything is feasible
+        if rng is not None and out:
+            perm = rng.permutation(len(out))
+            out = [out[i] for i in perm]
+        return out
+
+    def grasp_eef_poses(self, obj_pose: G.Pose, grasp, pregrasp: float = 0.10) -> List[G.Pose]:
+        """[pre-grasp, grasp] world eef poses for a library grasp (eef in object frame) at ``obj_pose``."""
+        eef = G.compose(obj_pose, grasp.pose)
+        axis = G.rotate(eef[1], th.tensor([0.0, 0.0, 1.0]))
+        return [(eef[0] - axis * pregrasp, eef[1]), eef]
+
+    def verify_grasp_reachable(self, stance: Stance, obj_pose: G.Pose, grasps, translates=None):
+        """First library grasp whose pre-grasp and grasp are IK-feasible from the stance; returns (grasp, translate)."""
+        for g in grasps:
+            tr = self.reachable_poses(stance, self.grasp_eef_poses(obj_pose, g), translates)
+            if tr is not None:
+                return g, tr
+        raise Reject("grasp_unreachable", "no library grasp reachable from the stance")
+
+    def frustum_ok(self, cam_pose: G.Pose, points: th.Tensor, margin: float = 0.05) -> bool:
+        return self.world.camera_model.all_inside(cam_pose, points, margin)
+
+    def hull_corners_world(self, local_hull: th.Tensor, pose: G.Pose) -> th.Tensor:
+        pts = self.world.hull_at(local_hull, pose)
+        lo, hi = pts.min(dim=0).values, pts.max(dim=0).values
+        return G.aabb_corners(lo, hi)
+
+    def non_structural_visible(self, min_pixels: int = 200) -> Dict[str, int]:
+        px = self.world.visible_pixels(exclude_structure=True)
+        return {k: v for k, v in px.items() if v >= min_pixels and k != self.robot.name}
+
+
+def _jsonable(x):
+    if isinstance(x, dict):
+        return {str(k): _jsonable(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [_jsonable(v) for v in x]
+    if isinstance(x, th.Tensor):
+        return x.tolist()
+    if isinstance(x, (np.floating, np.integer)):
+        return x.item()
+    if isinstance(x, np.ndarray):
+        return x.tolist()
+    if hasattr(x, "__dict__") and not isinstance(x, type):
+        return _jsonable(vars(x))
+    return x

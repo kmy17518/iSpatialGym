@@ -1,0 +1,19 @@
+{
+ "task": "disembedding",
+ "category": "notebook",
+ "model": "rwhloa",
+ "key": "notebook__rwhloa",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.3080001373291016,
+  0.23129019165039064,
+  0.005223396301269531
+ ],
+ "ready": true,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

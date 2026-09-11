@@ -1,0 +1,196 @@
+{
+ "task": "disembedding",
+ "relation": null,
+ "category": "box_of_oatmeal",
+ "model": "jtqeef",
+ "key": "box_of_oatmeal__jtqeef__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.07115036010742187,
+  0.229606201171875,
+  0.24799740600585937
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "box_of_oatmeal",
+   "model": "jtqeef"
+  },
+  "task": "disembedding",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 4788,
+   "n_tilt": 1158,
+   "n_width_antipodal": 909,
+   "n_table": 909,
+   "n_collision": 43,
+   "n_sweep": 15,
+   "n_lever": 15,
+   "n_selected": 12,
+   "com": [
+    -0.0002,
+    0.0,
+    -0.0049
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0035
+   ],
+   "score": 9.9228,
+   "meta": {
+    "com_perp": 0.0014,
+    "width": 0.05143,
+    "antipodal": 0.93224,
+    "coverage": 1.0,
+    "clearance": 0.00126,
+    "tilt_deg": 10.23957
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g0_v1.png",
+    "v2": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g0_v2.png",
+    "v3": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g0_v3.png",
+    "wrist": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g0_wrist.png"
+   },
+   "t_s": 3.54
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0405,
+    0.0124
+   ],
+   "score": 9.1299,
+   "meta": {
+    "com_perp": 0.01641,
+    "width": 0.04933,
+    "antipodal": 0.90255,
+    "coverage": 1.0,
+    "clearance": 0.00509,
+    "tilt_deg": 8.72164
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g1_v1.png",
+    "v2": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g1_v2.png",
+    "v3": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g1_v3.png",
+    "wrist": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g1_wrist.png"
+   },
+   "t_s": 3.56
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0024
+   ],
+   "score": 8.8284,
+   "meta": {
+    "com_perp": 0.01985,
+    "width": 0.04456,
+    "antipodal": 0.89238,
+    "coverage": 1.0,
+    "clearance": 0.00407,
+    "tilt_deg": 10.23957
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g2_v1.png",
+    "v2": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g2_v2.png",
+    "v3": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g2_v3.png",
+    "wrist": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g2_wrist.png"
+   },
+   "t_s": 3.55
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0458,
+    0.009
+   ],
+   "score": 8.6068,
+   "meta": {
+    "com_perp": 0.0212,
+    "width": 0.0518,
+    "antipodal": 0.89238,
+    "coverage": 1.0,
+    "clearance": 0.00385,
+    "tilt_deg": 16.53857
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g3_v1.png",
+    "v2": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g3_v2.png",
+    "v3": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g3_v3.png",
+    "wrist": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g3_wrist.png"
+   },
+   "t_s": 3.46
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0445,
+    0.0
+   ],
+   "score": 8.1121,
+   "meta": {
+    "com_perp": 0.02496,
+    "width": 0.0399,
+    "antipodal": 0.88098,
+    "coverage": 1.0,
+    "clearance": 0.00429,
+    "tilt_deg": 31.64451
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g4_v1.png",
+    "v2": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g4_v2.png",
+    "v3": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g4_v3.png",
+    "wrist": "/tmp/glib/frames/box_of_oatmeal__jtqeef__t/g4_wrist.png"
+   },
+   "t_s": 3.54
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 22.5
+}

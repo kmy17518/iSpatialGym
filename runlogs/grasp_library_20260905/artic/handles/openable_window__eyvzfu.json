@@ -1,0 +1,87 @@
+{
+ "category": "openable_window",
+ "model": "eyvzfu",
+ "key": "openable_window__eyvzfu",
+ "aabb_extent": [
+  0.23572343587875366,
+  2.8788764476776123,
+  2.7156639099121094
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0921,
+   -0.9761,
+   -1.3572
+  ],
+  "bbox_max": [
+   0.1436,
+   1.9028,
+   1.3585
+  ],
+  "n_pieces": 8
+ },
+ "joints": [
+  {
+   "joint": "j_movingpart",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "movingpart",
+   "outward_normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "face_s": -0.4344,
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "hinge_point_obj": null,
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.3561562299728394,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.0235,
+    0.4344,
+    -1.3078
+   ],
+   "link_bbox_max": [
+    0.1228,
+    1.8825,
+    1.2919
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.0496,
+     0.4374,
+     1.2566
+    ],
+    "pinch_axis": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0061,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     0.0,
+     -1.0,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "ungraspable"
+  }
+ ]
+}

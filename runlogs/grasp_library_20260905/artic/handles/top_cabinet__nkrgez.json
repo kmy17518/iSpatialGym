@@ -1,0 +1,157 @@
+{
+ "category": "top_cabinet",
+ "model": "nkrgez",
+ "key": "top_cabinet__nkrgez",
+ "aabb_extent": [
+  0.20038318634033203,
+  1.2114534378051758,
+  0.832504391670227
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0822,
+   -0.6057,
+   -0.3492
+  ],
+  "bbox_max": [
+   0.111,
+   0.6057,
+   0.4834
+  ],
+  "n_pieces": 36
+ },
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "link_0",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.1181,
+   "axis_dir_obj": [
+    -0.02386000007390976,
+    9.999999747378752e-06,
+    0.9997199773788452
+   ],
+   "hinge_point_obj": [
+    0.10221,
+    0.57657,
+    0.06019
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5707950592041016,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.0889,
+    0.263,
+    -0.2947
+   ],
+   "link_bbox_max": [
+    0.1181,
+    0.5764,
+    0.4328
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.1092,
+     0.298,
+     -0.0521
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     -0.0096,
+     1.0,
+     -0.0002
+    ],
+    "width": 0.0292,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     0.9996,
+     0.0155,
+     0.0239
+    ]
+   },
+   "sub_links": [],
+   "status": "ungraspable"
+  },
+  {
+   "joint": "j_link_1",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "link_1",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.1181,
+   "axis_dir_obj": [
+    0.02386000007390976,
+    -9.999999747378752e-06,
+    -0.9997199773788452
+   ],
+   "hinge_point_obj": [
+    0.10135,
+    -0.57738,
+    0.06018
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.570794939994812,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.0882,
+    -0.5764,
+    -0.2948
+   ],
+   "link_bbox_max": [
+    0.1181,
+    -0.263,
+    0.4328
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.1019,
+     -0.298,
+     0.1902
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     -0.0127,
+     -0.9999,
+     -0.0003
+    ],
+    "width": 0.0299,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     0.9996,
+     -0.0131,
+     0.0239
+    ]
+   },
+   "sub_links": [],
+   "status": "ungraspable"
+  }
+ ]
+}

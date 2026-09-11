@@ -1,0 +1,21 @@
+{
+ "task": "disembedding",
+ "relation": null,
+ "category": "box_of_oatmeal",
+ "model": "zkggxm",
+ "key": "box_of_oatmeal__zkggxm__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.12748727416992187,
+  0.27320538330078126,
+  0.22718824768066406
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

@@ -1,0 +1,196 @@
+{
+ "task": "IORS",
+ "relation": "under",
+ "category": "bottle_of_supplements",
+ "model": "oqakev",
+ "key": "bottle_of_supplements__oqakev__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.06378423690795898,
+  0.06379439926147461,
+  0.11606767272949219
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "bottle_of_supplements",
+   "model": "oqakev"
+  },
+  "task": "IORS",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 5580,
+   "n_tilt": 1209,
+   "n_width_antipodal": 552,
+   "n_table": 549,
+   "n_collision": 117,
+   "n_sweep": 66,
+   "n_lever": 66,
+   "n_selected": 12,
+   "com": [
+    0.0,
+    -0.0,
+    -0.0034
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0166
+   ],
+   "score": 10.9598,
+   "meta": {
+    "com_perp": 0.00064,
+    "width": 0.05605,
+    "antipodal": 0.9892,
+    "coverage": 1.0,
+    "clearance": 0.01481,
+    "tilt_deg": 3.23854
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g0_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g0_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g0_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g0_wrist.png"
+   },
+   "t_s": 3.43
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0168
+   ],
+   "score": 10.7873,
+   "meta": {
+    "com_perp": 0.00148,
+    "width": 0.05592,
+    "antipodal": 0.98848,
+    "coverage": 1.0,
+    "clearance": 0.01473,
+    "tilt_deg": 3.6751
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g1_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g1_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g1_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g1_wrist.png"
+   },
+   "t_s": 3.47
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0169
+   ],
+   "score": 10.7386,
+   "meta": {
+    "com_perp": 0.0001,
+    "width": 0.05569,
+    "antipodal": 0.97756,
+    "coverage": 1.0,
+    "clearance": 0.01311,
+    "tilt_deg": 6.87867
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g2_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g2_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g2_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g2_wrist.png"
+   },
+   "t_s": 3.48
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0168
+   ],
+   "score": 10.7184,
+   "meta": {
+    "com_perp": 0.00031,
+    "width": 0.05599,
+    "antipodal": 0.97182,
+    "coverage": 1.0,
+    "clearance": 0.01331,
+    "tilt_deg": 6.78494
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g3_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g3_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g3_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g3_wrist.png"
+   },
+   "t_s": 3.49
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0166
+   ],
+   "score": 10.7074,
+   "meta": {
+    "com_perp": 0.00058,
+    "width": 0.0551,
+    "antipodal": 0.97443,
+    "coverage": 1.0,
+    "clearance": 0.01357,
+    "tilt_deg": 6.12024
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g4_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g4_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g4_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_supplements__oqakev__t/g4_wrist.png"
+   },
+   "t_s": 3.48
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 22.4
+}

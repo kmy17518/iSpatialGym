@@ -1,0 +1,78 @@
+{
+ "task": "object_scaling",
+ "relation": null,
+ "category": "toy_dice",
+ "model": "pzbapa",
+ "key": "toy_dice__pzbapa__f",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.10072879028320313,
+  0.11414595794677734,
+  0.10228579711914063
+ ],
+ "ready": true,
+ "round": 2,
+ "candidates_meta": {
+  "object": {
+   "category": "toy_dice",
+   "model": "pzbapa"
+  },
+  "task": "object_scaling",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 21,
+   "n_width": 21,
+   "n_lever": 1,
+   "n_selected": 1,
+   "mode": "C",
+   "com": [
+    0.0001,
+    -0.0004,
+    0.0003
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 14.0792,
+   "meta": {
+    "com_perp": 0.04352,
+    "width": 0.07393,
+    "antipodal": 0.7229,
+    "coverage": 0.5,
+    "clearance": 0.00446,
+    "tilt_deg": 85.91837,
+    "graspgen_conf": 0.77253
+   },
+   "frames": {},
+   "t_s": 4.39
+  }
+ ],
+ "n_valid": 0,
+ "error": null,
+ "t_model_s": 5.5
+}

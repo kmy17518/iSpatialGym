@@ -1,0 +1,196 @@
+{
+ "task": "IORS",
+ "relation": "nextto",
+ "category": "jar_of_spaghetti_sauce",
+ "model": "zahyds",
+ "key": "jar_of_spaghetti_sauce__zahyds__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.06496041488647461,
+  0.06496040725708008,
+  0.10621481177210808
+ ],
+ "ready": true,
+ "round": 2,
+ "candidates_meta": {
+  "object": {
+   "category": "jar_of_spaghetti_sauce",
+   "model": "zahyds"
+  },
+  "task": "IORS",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 4944,
+   "n_tilt": 1194,
+   "n_width_antipodal": 1194,
+   "n_table": 1188,
+   "n_collision": 562,
+   "n_sweep": 562,
+   "n_lever": 562,
+   "n_selected": 12,
+   "com": [
+    0.0,
+    -0.0,
+    0.0001
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0145
+   ],
+   "score": 11.3461,
+   "meta": {
+    "com_perp": 4e-05,
+    "width": 0.06279,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01706,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g0_v1.png",
+    "v2": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g0_v2.png",
+    "v3": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g0_v3.png",
+    "wrist": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g0_wrist.png"
+   },
+   "t_s": 3.63
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0145
+   ],
+   "score": 11.3205,
+   "meta": {
+    "com_perp": 0.00017,
+    "width": 0.06278,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01706,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g1_v1.png",
+    "v2": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g1_v2.png",
+    "v3": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g1_v3.png",
+    "wrist": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g1_wrist.png"
+   },
+   "t_s": 3.59
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0145
+   ],
+   "score": 11.2838,
+   "meta": {
+    "com_perp": 0.00037,
+    "width": 0.06279,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01706,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g2_v1.png",
+    "v2": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g2_v2.png",
+    "v3": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g2_v3.png",
+    "wrist": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g2_wrist.png"
+   },
+   "t_s": 3.58
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0145
+   ],
+   "score": 11.2637,
+   "meta": {
+    "com_perp": 0.00048,
+    "width": 0.06279,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01706,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g3_v1.png",
+    "v2": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g3_v2.png",
+    "v3": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g3_v3.png",
+    "wrist": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g3_wrist.png"
+   },
+   "t_s": 3.61
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0146
+   ],
+   "score": 11.2636,
+   "meta": {
+    "com_perp": 0.00048,
+    "width": 0.06279,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01706,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g4_v1.png",
+    "v2": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g4_v2.png",
+    "v3": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g4_v3.png",
+    "wrist": "/tmp/glib/frames/jar_of_spaghetti_sauce__zahyds__t/g4_wrist.png"
+   },
+   "t_s": 3.59
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 23.1
+}

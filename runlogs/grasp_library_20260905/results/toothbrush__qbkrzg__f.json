@@ -1,0 +1,222 @@
+{
+ "task": "mental_rotation",
+ "relation": null,
+ "category": "toothbrush",
+ "model": "qbkrzg",
+ "key": "toothbrush__qbkrzg__f",
+ "pipeline": "graspgen",
+ "mode": "H",
+ "constraint": "floating",
+ "bbox": [
+  0.14396048736572264,
+  0.011579010486602783,
+  0.016246845245361328
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "toothbrush",
+   "model": "qbkrzg"
+  },
+  "task": "mental_rotation",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 198,
+   "n_selected": 12,
+   "mode": "H",
+   "com": [
+    -0.0389,
+    0.0007,
+    -0.0036
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0131,
+    0.0
+   ],
+   "score": 97.925,
+   "meta": {
+    "com_perp": 0.00204,
+    "width": 0.01067,
+    "antipodal": 0.99821,
+    "coverage": 0.75,
+    "clearance": 0.02189,
+    "tilt_deg": 30.198,
+    "graspgen_conf": 0.97108
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/toothbrush__qbkrzg__f/g0_v1.png",
+    "v2": "/tmp/glib/frames/toothbrush__qbkrzg__f/g0_v2.png",
+    "v3": "/tmp/glib/frames/toothbrush__qbkrzg__f/g0_v3.png",
+    "wrist": "/tmp/glib/frames/toothbrush__qbkrzg__f/g0_wrist.png"
+   },
+   "t_s": 3.54
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.013,
+    0.0
+   ],
+   "score": 97.9222,
+   "meta": {
+    "com_perp": 0.00487,
+    "width": 0.00647,
+    "antipodal": 0.36515,
+    "coverage": 0.75,
+    "clearance": 0.03467,
+    "tilt_deg": 71.02724,
+    "graspgen_conf": 0.97154
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/toothbrush__qbkrzg__f/g1_v1.png",
+    "v2": "/tmp/glib/frames/toothbrush__qbkrzg__f/g1_v2.png",
+    "v3": "/tmp/glib/frames/toothbrush__qbkrzg__f/g1_v3.png",
+    "wrist": "/tmp/glib/frames/toothbrush__qbkrzg__f/g1_wrist.png"
+   },
+   "t_s": 3.59
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0103,
+    0.0
+   ],
+   "score": 97.922,
+   "meta": {
+    "com_perp": 0.00509,
+    "width": 0.00589,
+    "antipodal": 0.1783,
+    "coverage": 0.5,
+    "clearance": 0.02392,
+    "tilt_deg": 25.03512,
+    "graspgen_conf": 0.97486
+   },
+   "frames": {},
+   "t_s": 5.33
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0118,
+    0.0
+   ],
+   "score": 97.9208,
+   "meta": {
+    "com_perp": 0.00629,
+    "width": 0.0105,
+    "antipodal": 0.97827,
+    "coverage": 0.5,
+    "clearance": 0.02469,
+    "tilt_deg": 146.98916,
+    "graspgen_conf": 0.97092
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/toothbrush__qbkrzg__f/g3_v1.png",
+    "v2": "/tmp/glib/frames/toothbrush__qbkrzg__f/g3_v2.png",
+    "v3": "/tmp/glib/frames/toothbrush__qbkrzg__f/g3_v3.png",
+    "wrist": "/tmp/glib/frames/toothbrush__qbkrzg__f/g3_wrist.png"
+   },
+   "t_s": 3.6
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0098,
+    0.0
+   ],
+   "score": 97.92,
+   "meta": {
+    "com_perp": 0.00707,
+    "width": 0.00976,
+    "antipodal": 0.86814,
+    "coverage": 0.75,
+    "clearance": 0.02626,
+    "tilt_deg": 63.59095,
+    "graspgen_conf": 0.97206
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/toothbrush__qbkrzg__f/g4_v1.png",
+    "v2": "/tmp/glib/frames/toothbrush__qbkrzg__f/g4_v2.png",
+    "v3": "/tmp/glib/frames/toothbrush__qbkrzg__f/g4_v3.png",
+    "wrist": "/tmp/glib/frames/toothbrush__qbkrzg__f/g4_wrist.png"
+   },
+   "t_s": 3.53
+  },
+  {
+   "grasp": "grasp_5",
+   "idx": 5,
+   "ag_attached": true,
+   "attached_step": 15,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0106,
+    0.0
+   ],
+   "score": 97.9197,
+   "meta": {
+    "com_perp": 0.00739,
+    "width": 0.00547,
+    "antipodal": 0.14674,
+    "coverage": 0.5,
+    "clearance": 0.02849,
+    "tilt_deg": 96.57375,
+    "graspgen_conf": 0.97114
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/toothbrush__qbkrzg__f/g5_v1.png",
+    "v2": "/tmp/glib/frames/toothbrush__qbkrzg__f/g5_v2.png",
+    "v3": "/tmp/glib/frames/toothbrush__qbkrzg__f/g5_v3.png",
+    "wrist": "/tmp/glib/frames/toothbrush__qbkrzg__f/g5_wrist.png"
+   },
+   "t_s": 3.59
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 29.1
+}

@@ -1,0 +1,10 @@
+{
+  "status": "passed",
+  "dataset_name": "ispatialgym-assets",
+  "category": "toy_dice",
+  "model": "isgblk",
+  "source_urdf": "/home/minyeongk/Desktop/projects/ispatialgym/ispatialgym/assets/objects/kohs_block/model/isgblk/isgblk.urdf",
+  "processed_urdf": "/home/minyeongk/Desktop/projects/ispatialgym/ispatialgym/assets/objects/kohs_block/model/isgblk/isgblk_with_meta_links.urdf",
+  "usd": "/home/minyeongk/Desktop/projects/ispatialgym/Behavior-1K/datasets/ispatialgym-assets/objects/toy_dice/isgblk/usd/isgblk.usd",
+  "usd_size_bytes": 11242
+}

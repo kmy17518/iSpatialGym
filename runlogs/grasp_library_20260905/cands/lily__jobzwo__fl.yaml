@@ -1,0 +1,59 @@
+format: isaac_grasp
+format_version: 1.0
+object_frame: base_link
+gripper_frame: right_eef_link
+ispatialgym:
+  object:
+    category: lily
+    model: jobzwo
+  task: IORS
+  constraint: flower_stem_top
+  pipeline: a1
+  gripper: r1pro_right
+  source: a1_flower_stem_top
+  log:
+    n_sampled: 6000
+    n_tilt: 738
+    n_width_antipodal: 130
+    n_table: 130
+    n_collision: 36
+    n_sweep: 9
+    n_flower: 1
+    stem_len: 0.465
+    n_selected: 1
+    com:
+    - -0.0044
+    - -0.0006
+    - 0.0048
+    rest_pose: canonical
+  rest_pose: canonical
+  rest_quat_wxyz:
+  - 1.0
+  - 0.0
+  - 0.0
+  - 0.0
+grasps:
+  grasp_0:
+    confidence: 9.68
+    position:
+    - -0.08991078253147772
+    - 0.027355622292572466
+    - -0.029845079908803203
+    orientation:
+      w: 0.3294317824541887
+      xyz:
+      - 0.910467924297413
+      - 0.24934848548898442
+      - 0.018659912083559285
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.05728
+      width: 0.01667
+      antipodal: 0.95991
+      coverage: 1.0
+      clearance: 0.01086
+      tilt_deg: 38.53268
+      stem_t: 0.56816
+      pinch_across: 0.44175

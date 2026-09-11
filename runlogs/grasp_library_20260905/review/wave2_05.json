@@ -1,0 +1,360 @@
+{
+  "batch": "wave2_05",
+  "models": [
+    {
+      "key": "pencil_case__otcmih",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-body top pinch, both pads on case"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-body pinch, asymmetric 43/24 but both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-body pinch, fingers 40/28"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-body pinch, tilt 21, pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-body pinch, CoM 15 mm"}
+      ],
+      "object_note": "soft fabric case; all closures asymmetric (~43/25) but opening matches 55 mm body"
+    },
+    {
+      "key": "pickle__gytwes",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-body pinch, CoM 10 mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-body pinch, tilt 31"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-body pinch, coverage 1.0"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch nearer one end, coverage 0.75"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch, CoM 12 mm"}
+      ],
+      "object_note": "all rows X/0 finger pattern; opening matches width, pickle off-centre but pinched"
+    },
+    {
+      "key": "pickle__ifterk",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-body pinch, CoM 4 mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-body pinch, CoM 4 mm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-body pinch, CoM 6 mm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch, tilt 3"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch, narrow 21 mm section, pads touch"}
+      ],
+      "object_note": "short stubby pickle; X/0 closures, both pads on body"
+    },
+    {
+      "key": "pickle__iobrqp",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-body pinch, 38 mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-body pinch, tilt 7"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-body pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-body pinch, antipodal 0.97"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-body pinch, CoM 8 mm"}
+      ],
+      "object_note": "41/0 closures, opening within 5 mm of width"
+    },
+    {
+      "key": "pickle__rxuimv",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-body pinch, CoM 5 mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-body pinch, CoM 6 mm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, CoM 12 mm, not at tip"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch, tilt 32"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch, CoM 12 mm"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pickle__vuspsy",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-body pinch, CoM 5 mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-body pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-body pinch, tilt 4"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch, CoM 9 mm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch toward one end, CoM 13 mm, pads covered"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "quartz__drqtci",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "fingertips on crystal tip, CoM 37 mm, body dangles"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "tip pinch, pinch axis misses mesh (width inf)"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "tip pinch, coverage 0, crystal hangs from tips"}
+      ],
+      "object_note": "all rows width inf / coverage 0: nominal pinch axis off the mesh, only the termination tip caught"
+    },
+    {
+      "key": "quartz__kilkpz",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "crystal enclosed along length, pinched across 22 mm width"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "same axial grasp, CoM 5 mm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "same axial grasp, antipodal 1.0"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "side pinch across 15 mm, CoM 12 mm, not tip"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "side pinch across 15 mm, pads covered"}
+      ],
+      "object_note": "x_down rest pose; rows 1-3 approach along crystal axis"
+    },
+    {
+      "key": "quartz__klgses",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "tip pinch, long crystal hangs, CoM 33 mm"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "extreme tip pinch, CoM 50 mm, coverage 0"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "extreme tip pinch, CoM 54 mm"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "extreme tip pinch, CoM 58 mm, crystal dangles"}
+      ],
+      "object_note": "long crystal; every row width inf / coverage 0, fingertips catch termination only"
+    },
+    {
+      "key": "quartz__poplsu",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "crystal hangs below fingertips, tip contact only"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "tip pinch, CoM 36 mm, coverage 0"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "tip pinch, CoM 39 mm"}
+      ],
+      "object_note": "all rows width inf / coverage 0; pinch axis misses mesh"
+    },
+    {
+      "key": "quartz__tgqodl",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger", "end_grasp"], "note": "50/33: pads span whole cluster on spike tips, nominal 14 mm"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger", "end_grasp"], "note": "50/33: 83 mm opening on outer spike tips, cluster pushed"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch on central spike faces, CoM hangs below"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "central spike pinch, 27 mm, coverage 1.0"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "central spike pinch, tilt 33, heavy cluster"}
+      ],
+      "object_note": "large heavy cluster; rows 3-5 hold central spike, plausible but load high"
+    },
+    {
+      "key": "quartz__vfuilh",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "tip pinch, crystal sticks out sideways, CoM 34 mm"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "tip pinch, coverage 0"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "tip pinch, 28/0, crystal hangs from tips"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "tip pinch, CoM 38 mm"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "tip pinch, CoM 39 mm"}
+      ],
+      "object_note": "all rows width inf / coverage 0; only termination tip between fingertips"
+    },
+    {
+      "key": "sandal__shdahi",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/36: pads on 86 mm sole edges, nominal strap 48 mm"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/33: sole pushed against open finger, nominal 53 mm"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/35: opening 85 vs 48 mm, not nominal contact"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/37, tilt 30, coverage 0.25, sole pushed"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/39: opening 89 vs 35 mm nominal"}
+      ],
+      "object_note": "flip-flop; every row one finger never moves, fingers stop on wide sole not planned strap"
+    },
+    {
+      "key": "sandal__tkfdsk",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/25: opening 75 vs 46 mm, coverage 0, sandal pushed"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/25, width inf, pinch axis misses mesh"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "toe-post strap pinched 7 mm, sandal hangs"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "strap pinch, sandal hangs, stem-like handle"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "strap pinch 16/0, sandal hangs"}
+      ],
+      "object_note": "rows 3-5 nominal width inf but fingers close firmly on strap; natural pick-up"
+    },
+    {
+      "key": "sandal__txkidl",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/26: opening 76 vs 47 mm, sole pushed"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/34, width inf, fingers catch sole edges"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/29, width inf, coverage 0"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/20, width inf, sandal pushed 15 mm"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/21, width inf, coverage 0"}
+      ],
+      "object_note": "flip-flop; all rows one finger stuck at 50, nominal pinch axis off mesh in 4 rows"
+    },
+    {
+      "key": "sandal__uhzfis",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/32: pads on 82 mm sole, nominal strap 55 mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "sole pinch 79 mm, opening matches, asymmetric 50/33"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "sole pinch 78 mm, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "sole pinch 75 mm, tilt 33"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "sole pinch 82 mm from above, CoM 24 mm"}
+      ],
+      "object_note": "wide sole nearly fills gripper, so 50/x closure expected in rows 2-5"
+    },
+    {
+      "key": "sandal__zafskl",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/32: opening 82 vs 23 mm strap, pads on sole"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/32: opening 82 vs 34 mm nominal"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/27: opening 77 vs 26 mm, coverage 0.5"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "heel sole pinch 63 mm, opening matches, pushed ~15 mm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "heel sole pinch 61 mm, symmetric 36/29"}
+      ],
+      "object_note": "rows 1-3 planned strap pinch but fingers stop on sole edges"
+    },
+    {
+      "key": "shampoo_dispenser__eblcnw",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: bottle pushed 25 mm against open finger"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/6, bottle strongly off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/2, bottle strongly off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/5, bottle strongly off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "48/0 on 20 mm neck: one pad on spout, neck not pinched"}
+      ],
+      "object_note": "cylindrical pump bottle 55 mm; every row shows push-against-one-finger pattern"
+    },
+    {
+      "key": "shampoo_dispenser__eywylh",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/20: opening 70 below 84 mm body, bottle skewed"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "shoulder pinch 85 mm, opening matches, asymmetric"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "shoulder pinch, both pads on body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "shoulder pinch 83 mm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "shoulder pinch 82 mm, V4 saturated"}
+      ],
+      "object_note": "wide bottle nearly fills gripper; 50/37 closures expected"
+    },
+    {
+      "key": "shampoo_dispenser__kkbhzw",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "shoulder pinch 68 mm, opening matches"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch 33 mm from top, bottle hangs"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/0 on 40 mm neck, tall bottle pushed 20 mm"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "49/0 on neck, strongly off-centre"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "shoulder pinch 55 mm, 50/19, pads on tapered body"}
+      ],
+      "object_note": "tall pump bottle; neck grasps carry bottle at CoM 113 mm"
+    },
+    {
+      "key": "shampoo_dispenser__ndrvvm",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: 34 mm body pushed against open finger"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/0, opening 50 vs 34 mm"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/0, body strongly off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "49/2, same pattern"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/1, same pattern"}
+      ],
+      "object_note": "chrome cylinder; all rows one finger never moves, other fully closed"
+    },
+    {
+      "key": "shampoo_dispenser__nrthyl",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/12: opening 62 vs 48 mm, box pushed"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "symmetric 29/21 body pinch"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/0, box pushed 25 mm against open finger"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/1, strongly off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/0, strongly off-centre"}
+      ],
+      "object_note": "rectangular 48 mm dispenser; row 2 shows what a centred pinch looks like"
+    },
+    {
+      "key": "shampoo_dispenser__thurmw",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "symmetric 24/25 pinch on 44 mm box"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "49/0, box pushed against open finger"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "49/0, strongly off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "49/0, strongly off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "49/0, strongly off-centre"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "shampoo_dispenser__zoyyia",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "39/12 body pinch, both fingers moved, opening matches"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "symmetric 26/24 body pinch"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/0, box pushed 25 mm"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/0, strongly off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/0, strongly off-centre"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "sunflower__dkajbh",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["fragile", "one_finger"], "note": "pinch across head 57 mm on petals, 50/7"},
+        {"rank": 2, "verdict": "flag", "flags": ["fragile"], "note": "42/36: pads on petal tips, 78 vs 53 mm"},
+        {"rank": 3, "verdict": "flag", "flags": ["fragile", "one_finger"], "note": "50/25: 75 mm opening on petals, nominal 38 mm"},
+        {"rank": 4, "verdict": "flag", "flags": ["fragile", "one_finger"], "note": "48/9: head pinched across petals"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "receptacle/stem-top pinch 21 mm, stem end free"}
+      ],
+      "object_note": "stem t 0.17-0.29 all rows, task ok; only row 5 avoids petals"
+    },
+    {
+      "key": "sunflower__hvpodm",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["fragile", "one_finger"], "note": "50/28: 78 mm opening on petal tips, nominal 19 mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "receptacle pinch behind head, 44/0, stem free"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "receptacle pinch 40/0, stem free"},
+        {"rank": 4, "verdict": "flag", "flags": ["fragile", "one_finger"], "note": "50/29: 79 mm opening on petals, nominal 21 mm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "receptacle pinch 33/0, nominal stem 7 mm"}
+      ],
+      "object_note": "receptacle grasps stop wider than nominal stem width but on sturdy head back"
+    },
+    {
+      "key": "sunflower__itrbng",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "receptacle pinch 30/0, stem free"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "receptacle pinch 30/0, 25 mm"},
+        {"rank": 3, "verdict": "flag", "flags": ["fragile"], "note": "face-on head pinch 40 mm through petals"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "receptacle pinch, nominal stem 10 mm, pads on head back"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "receptacle pinch 31/0, tilt 37"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "sunflower__jsgdlc",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["fragile", "one_finger"], "note": "50/33: 83 mm opening on petal tips, nominal 37 mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "receptacle pinch 33/0 behind head, stem free"},
+        {"rank": 3, "verdict": "flag", "flags": ["fragile", "one_finger"], "note": "50/10: 60 mm opening on petals, nominal stem 6 mm"},
+        {"rank": 4, "verdict": "flag", "flags": ["fragile", "one_finger"], "note": "50/14: 64 mm opening on petals"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "receptacle pinch 28/0, stem free"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "sunflower__mastuj",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["fragile"], "note": "face-on head pinch 38 mm through petals, coverage 0.25"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "receptacle pinch 31/0, stem free"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "receptacle pinch 33/0"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "receptacle pinch 35/0"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "receptacle pinch 36/0"}
+      ],
+      "object_note": "rows 2-5 nominal stem 12-14 mm, pads stop on ~35 mm head back"
+    },
+    {
+      "key": "sunflower__mdpoct",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["fragile", "one_finger"], "note": "50/15: 65 mm opening on petals, nominal 20 mm"},
+        {"rank": 2, "verdict": "flag", "flags": ["fragile", "one_finger"], "note": "50/33: 83 mm opening on petal tips"},
+        {"rank": 3, "verdict": "flag", "flags": ["fragile", "one_finger"], "note": "50/28: 78 mm opening, nominal stem 5 mm"},
+        {"rank": 4, "verdict": "flag", "flags": ["fragile"], "note": "48/37: pads on petal tips, 85 mm vs 6 mm"},
+        {"rank": 5, "verdict": "flag", "flags": ["fragile", "one_finger"], "note": "50/28: 78 mm opening on petals"}
+      ],
+      "object_note": "every row pinches head across petal tips; stem/receptacle never reached"
+    }
+  ]
+}

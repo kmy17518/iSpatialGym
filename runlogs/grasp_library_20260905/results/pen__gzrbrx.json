@@ -1,0 +1,192 @@
+{
+ "task": "IORS",
+ "category": "pen",
+ "model": "gzrbrx",
+ "key": "pen__gzrbrx",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.15826242828369141,
+  0.011413971900939941,
+  0.011012607574462891
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "pen",
+   "model": "gzrbrx"
+  },
+  "task": "IORS",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 5964,
+   "n_tilt": 434,
+   "n_width_antipodal": 398,
+   "n_table": 175,
+   "n_collision": 175,
+   "n_selected": 12,
+   "com": [
+    0.0001,
+    -0.0002,
+    0.0002
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0115,
+    0.0
+   ],
+   "score": 7.3148,
+   "meta": {
+    "com_perp": 0.01632,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.04363,
+    "tilt_deg": 0.84528
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pen__gzrbrx/g0_v1.png",
+    "v2": "/tmp/glib/frames/pen__gzrbrx/g0_v2.png",
+    "v3": "/tmp/glib/frames/pen__gzrbrx/g0_v3.png",
+    "wrist": "/tmp/glib/frames/pen__gzrbrx/g0_wrist.png"
+   },
+   "t_s": 3.5
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0119,
+    0.0
+   ],
+   "score": 7.2071,
+   "meta": {
+    "com_perp": 0.01315,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.04239,
+    "tilt_deg": 29.4139
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pen__gzrbrx/g1_v1.png",
+    "v2": "/tmp/glib/frames/pen__gzrbrx/g1_v2.png",
+    "v3": "/tmp/glib/frames/pen__gzrbrx/g1_v3.png",
+    "wrist": "/tmp/glib/frames/pen__gzrbrx/g1_wrist.png"
+   },
+   "t_s": 3.53
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0111,
+    0.0
+   ],
+   "score": 7.1941,
+   "meta": {
+    "com_perp": 0.01289,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.04041,
+    "tilt_deg": 30.59712
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pen__gzrbrx/g2_v1.png",
+    "v2": "/tmp/glib/frames/pen__gzrbrx/g2_v2.png",
+    "v3": "/tmp/glib/frames/pen__gzrbrx/g2_v3.png",
+    "wrist": "/tmp/glib/frames/pen__gzrbrx/g2_wrist.png"
+   },
+   "t_s": 3.53
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0116,
+    0.0
+   ],
+   "score": 6.7136,
+   "meta": {
+    "com_perp": 0.02334,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.04297,
+    "tilt_deg": 12.26856
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pen__gzrbrx/g3_v1.png",
+    "v2": "/tmp/glib/frames/pen__gzrbrx/g3_v2.png",
+    "v3": "/tmp/glib/frames/pen__gzrbrx/g3_v3.png",
+    "wrist": "/tmp/glib/frames/pen__gzrbrx/g3_wrist.png"
+   },
+   "t_s": 3.5
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0106,
+    0.0
+   ],
+   "score": 6.6727,
+   "meta": {
+    "com_perp": 0.02484,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.04379,
+    "tilt_deg": 0.84528
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pen__gzrbrx/g4_v1.png",
+    "v2": "/tmp/glib/frames/pen__gzrbrx/g4_v2.png",
+    "v3": "/tmp/glib/frames/pen__gzrbrx/g4_v3.png",
+    "wrist": "/tmp/glib/frames/pen__gzrbrx/g4_wrist.png"
+   },
+   "t_s": 3.39
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 22.3
+}

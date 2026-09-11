@@ -1,0 +1,354 @@
+{
+  "batch": "wave1_03",
+  "models": [
+    {
+      "key": "bottle_of_wine__ivuvbv",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck grasp just below cap, both pads on neck"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck grasp below cap"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck grasp below cap"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck grasp, slightly higher on neck"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck grasp near top of neck"}
+      ],
+      "object_note": "All five are neck grasps; fingers close 32/0 (bottle displaced toward one pad) but both pads contact."
+    },
+    {
+      "key": "bottle_of_wine__jdqahn",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck grasp under cork, approach along bottle axis"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck grasp just below cork"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck grasp under cork, cork inside gripper"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck grasp below cork"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck grasp below cork, width 21 mm"}
+      ],
+      "object_note": "Slender dark bottle; all neck grasps, asymmetric 26/0 closure but both pads on neck."
+    },
+    {
+      "key": "bottle_of_wine__nhmtvt",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body grasp near shoulder; 50/22 closure, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body grasp, approach from below, 46/25 closure"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body grasp, 50/22 closure, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck grasp below cork"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck grasp below cork"}
+      ],
+      "object_note": "Body grasps show bottle pushed against fully open finger (50/22); visually both pads contact the body."
+    },
+    {
+      "key": "bottle_of_wine__pgfplm",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck grasp below foil cap"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck grasp below foil cap"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck grasp below foil cap"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck grasp, tilted bottle, antipodal 0.84"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck grasp below foil cap"}
+      ],
+      "object_note": "All neck grasps with asymmetric 30/0 closure; no visible gap or penetration."
+    },
+    {
+      "key": "bottle_of_wine__qvsnjo",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck grasp on gold foil"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck grasp on foil below cap"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck grasp on foil"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck grasp on foil"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck grasp high on foil, CoM 107 mm, pads on neck"}
+      ],
+      "object_note": "All neck grasps; natural bottle-neck hold, both pads on neck."
+    },
+    {
+      "key": "bottle_of_wine__uoykwx",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body grasp near base, 47/21 closure, pads on body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body grasp near base, 41/29 closure"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body grasp near base, 50/21 closure, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body grasp near base, 50/20 closure"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body grasp near base, 50/20 closure"}
+      ],
+      "object_note": "Clear bottle; all body grasps toward base end, full pad coverage; bottle pushed against open finger (50/20)."
+    },
+    {
+      "key": "bottle_of_wine__vecadn",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck grasp below red wax cap"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck grasp; width 17 vs 33 mm closure, antipodal 0.78"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck grasp on wax cap, CoM 147 mm, pads on neck"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck grasp; width 26 vs 33 mm closure, antipodal 0.79"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck grasp under cap, approach along bottle axis"}
+      ],
+      "object_note": "Long-neck bottle; rows 2 and 4 report width smaller than finger gap, no gap visible in renders."
+    },
+    {
+      "key": "bottle_of_wine__wzdrcl",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck grasp below cork"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck grasp below cork"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck grasp below cork"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck grasp under cork, approach along bottle axis"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck grasp below cork"}
+      ],
+      "object_note": "All neck grasps; both pads on neck in every row."
+    },
+    {
+      "key": "bottle_of_wine__xzipsi",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck grasp, bottle hanging from neck"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck grasp, bottle horizontal"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck grasp, bottle horizontal"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck grasp, bottle horizontal"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck grasp, bottle hanging at angle"}
+      ],
+      "object_note": "Transparent glass bottle; all neck grasps, contact hard to see but geometry consistent."
+    },
+    {
+      "key": "can_of_soda__bfrzvk",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred body grasp across diameter"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body grasp, CoM 17 mm"}
+      ],
+      "object_note": "All rows close 50/xx (can pushed against open finger) but both pads visibly contact the can."
+    },
+    {
+      "key": "can_of_soda__evcxlr",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body grasp, CoM 23 mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body grasp, CoM 25 mm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body grasp, CoM 34 mm, antipodal 0.86"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body grasp toward end, CoM 40 mm, full coverage"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body grasp toward end, CoM 44 mm, full coverage"}
+      ],
+      "object_note": "Large faceted can; grasps drift toward one end but pads stay fully on cylindrical body."
+    },
+    {
+      "key": "can_of_soda__frewxk",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body grasp, CoM 26 mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body grasp, CoM 42 mm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body grasp, CoM 40 mm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body grasp, CoM 43 mm, antipodal 0.86"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body grasp near bottom end, CoM 51 mm, pads on body"}
+      ],
+      "object_note": "White can; all body grasps, full pad coverage, 50/xx closure artifact."
+    },
+    {
+      "key": "can_of_soda__itolcg",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body grasp, CoM 17 mm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body grasp, CoM 20 mm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body grasp, CoM 23 mm"}
+      ],
+      "object_note": "Orange can; all centred body grasps, both pads contact."
+    },
+    {
+      "key": "can_of_soda__lugwcz",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body grasp, CoM 25 mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body grasp, CoM 33 mm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body grasp toward end, CoM 44 mm, full coverage"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body grasp toward end, CoM 46 mm, full coverage"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body grasp toward end, CoM 47 mm, full coverage"}
+      ],
+      "object_note": "Textured can; grasps toward one end but pads fully on body."
+    },
+    {
+      "key": "can_of_soda__opivig",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "centred body grasp"}
+      ],
+      "object_note": "Red can; all centred body grasps."
+    },
+    {
+      "key": "can_of_soda__ttxyui",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body grasp, CoM 38 mm on tall can"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body grasp, CoM 53 mm, pads on body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body grasp toward end, CoM 72 mm, full coverage"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top grasp along can axis near end, pads on body"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "top grasp along can axis near end, pads on body"}
+      ],
+      "object_note": "Tall (~210 mm) faceted can; end-region grasps still have full pad coverage on cylinder."
+    },
+    {
+      "key": "can_of_soda__wbrrad",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "centred body grasp, antipodal 0.90"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body grasp, CoM 19 mm"}
+      ],
+      "object_note": "Red faceted can; all centred body grasps."
+    },
+    {
+      "key": "can_of_soda__xmjfcg",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body grasp, CoM 31 mm"}
+      ],
+      "object_note": "Gold can; all body grasps with full coverage."
+    },
+    {
+      "key": "canned_food__acgdtc",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch on tapered bottom rim, width 56, coverage 0.75"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body grasp near bottom taper, coverage 0.75, plausible"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "top grasp on inverted barrel, pads cover upper body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body grasp at widest part, full coverage"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch at very end taper, coverage 0.50, antipodal 0.58"}
+      ],
+      "object_note": "Barrel-shaped can; passing grasps cluster at tapered ends, low GraspGen confidence (0.62-0.71)."
+    },
+    {
+      "key": "canned_food__byakrm",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred body grasp across small can"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "centred body grasp, tilted can"}
+      ],
+      "object_note": "Small 53 mm can; all centred, full coverage."
+    },
+    {
+      "key": "canned_food__cbmndg",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "shoulder grasp under lid, 65 mm lever, full coverage"}
+      ],
+      "object_note": "Jam jar, only 1/12 passed; pinch on curved shoulder just below lid, lid rim acts as stop."
+    },
+    {
+      "key": "canned_food__foetdd",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred grasp across narrow side of box"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "centred grasp across narrow side"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "centred grasp across narrow side"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "centred grasp across narrow side"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "centred grasp, tilted approach"}
+      ],
+      "object_note": "Rectangular pasta container; all centred flat-face grasps."
+    },
+    {
+      "key": "canned_food__pkopdw",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch at top rim, coverage 0.50, antipodal 0.69"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch on narrower lid only, 56 mm lever, antipodal 0.67"}
+      ],
+      "object_note": "Jar with lid, only 2/12 passed; both grasps on lid/top edge with GraspGen conf 0.48."
+    },
+    {
+      "key": "canned_food__qhgdys",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "centred body grasp"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body grasp, CoM 11 mm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body grasp, CoM 14 mm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body grasp, CoM 19 mm"}
+      ],
+      "object_note": "Green can; all body grasps with full coverage."
+    },
+    {
+      "key": "canned_food__ycbspm",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "axial grasp across narrow side, from bottom"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "axial grasp across narrow side, from bottom"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "top-down grasp across narrow side"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top-down grasp across narrow side"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "axial grasp across narrow side, from bottom"}
+      ],
+      "object_note": "SPAM-style can; all grasps across 53-55 mm width, full coverage."
+    },
+    {
+      "key": "canned_food__zfmfje",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch on lid end only, 72 mm lever, coverage 0.75"}
+      ],
+      "object_note": "Glass jar, only 1/12 passed; grasp on narrower lid with body hanging, antipodal 0.68."
+    },
+    {
+      "key": "carton_of_milk__atyqub",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "top-down grasp on body below gable"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "top-down grasp on body below gable"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "top-down grasp on body below gable"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top-down grasp on body below gable"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "top-down grasp on body below gable"}
+      ],
+      "object_note": "Fingers far above bottom face; near-identical grasps, 50/37 closure with carton filling gripper."
+    },
+    {
+      "key": "carton_of_milk__kszoro",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "top-down grasp on upper body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "top-down grasp on upper body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "top-down grasp on upper body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top-down grasp on upper body"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "top-down grasp on upper body, CoM 66 mm"}
+      ],
+      "object_note": "Fingers stay well above bottom face; full coverage on flat faces."
+    },
+    {
+      "key": "carton_of_milk__xmugpm",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "top-down grasp on body below gable"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "top-down grasp on body below gable"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "top-down grasp high on body, CoM 79 mm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top-down grasp high on body, CoM 79 mm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "top-down grasp on body below gable"}
+      ],
+      "object_note": "Tall 1 L carton; pads on 84 mm body just under gable, fingers far above bottom."
+    },
+    {
+      "key": "carving_knife__alekva",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch on blade heel/bolster next to handle, full coverage"},
+        {"rank": 2, "verdict": "unsure", "flags": ["unsure"], "note": "coverage 0.50, antipodal 0.74; pads likely half on bolster taper"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch on blade heel at handle, antipodal 1.0"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch on blade heel at handle, antipodal 1.0"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch on blade heel at handle, antipodal 0.97"}
+      ],
+      "object_note": "All grasps pinch 9 mm heel/bolster next to handle, not the handle; chef pinch-grip location."
+    }
+  ]
+}

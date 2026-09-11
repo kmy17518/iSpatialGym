@@ -1,0 +1,199 @@
+{
+ "task": "mental_rotation",
+ "relation": null,
+ "category": "sunflower",
+ "model": "zdmbjt",
+ "key": "sunflower__zdmbjt__f",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.22308596801757813,
+  0.08975798416137695,
+  0.07712980270385743
+ ],
+ "ready": true,
+ "round": 2,
+ "candidates_meta": {
+  "object": {
+   "category": "sunflower",
+   "model": "zdmbjt"
+  },
+  "task": "mental_rotation",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 498,
+   "n_width": 324,
+   "n_lever": 215,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    0.0052,
+    0.0019,
+    0.0022
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0371,
+    0.0
+   ],
+   "score": 17.8114,
+   "meta": {
+    "com_perp": 0.02804,
+    "width": 0.02745,
+    "antipodal": 0.914,
+    "coverage": 1.0,
+    "clearance": 0.02084,
+    "tilt_deg": 84.6237,
+    "graspgen_conf": 0.9301
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/sunflower__zdmbjt__f/g0_v1.png",
+    "v2": "/tmp/glib/frames/sunflower__zdmbjt__f/g0_v2.png",
+    "v3": "/tmp/glib/frames/sunflower__zdmbjt__f/g0_v3.png",
+    "wrist": "/tmp/glib/frames/sunflower__zdmbjt__f/g0_wrist.png"
+   },
+   "t_s": 3.01
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0375,
+    0.0
+   ],
+   "score": 17.6446,
+   "meta": {
+    "com_perp": 0.0257,
+    "width": 0.02804,
+    "antipodal": 0.85214,
+    "coverage": 1.0,
+    "clearance": 0.01568,
+    "tilt_deg": 89.4538,
+    "graspgen_conf": 0.92109
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/sunflower__zdmbjt__f/g1_v1.png",
+    "v2": "/tmp/glib/frames/sunflower__zdmbjt__f/g1_v2.png",
+    "v3": "/tmp/glib/frames/sunflower__zdmbjt__f/g1_v3.png",
+    "wrist": "/tmp/glib/frames/sunflower__zdmbjt__f/g1_wrist.png"
+   },
+   "t_s": 3.14
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0328,
+    0.0
+   ],
+   "score": 17.5682,
+   "meta": {
+    "com_perp": 0.03303,
+    "width": 0.0276,
+    "antipodal": 0.95702,
+    "coverage": 1.0,
+    "clearance": 0.02072,
+    "tilt_deg": 64.13079,
+    "graspgen_conf": 0.91595
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/sunflower__zdmbjt__f/g2_v1.png",
+    "v2": "/tmp/glib/frames/sunflower__zdmbjt__f/g2_v2.png",
+    "v3": "/tmp/glib/frames/sunflower__zdmbjt__f/g2_v3.png",
+    "wrist": "/tmp/glib/frames/sunflower__zdmbjt__f/g2_wrist.png"
+   },
+   "t_s": 3.14
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0314,
+    0.0
+   ],
+   "score": 17.4653,
+   "meta": {
+    "com_perp": 0.03273,
+    "width": 0.02794,
+    "antipodal": 0.84992,
+    "coverage": 1.0,
+    "clearance": 0.02408,
+    "tilt_deg": 137.10805,
+    "graspgen_conf": 0.91071
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/sunflower__zdmbjt__f/g3_v1.png",
+    "v2": "/tmp/glib/frames/sunflower__zdmbjt__f/g3_v2.png",
+    "v3": "/tmp/glib/frames/sunflower__zdmbjt__f/g3_v3.png",
+    "wrist": "/tmp/glib/frames/sunflower__zdmbjt__f/g3_wrist.png"
+   },
+   "t_s": 3.13
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0256,
+    0.0
+   ],
+   "score": 17.3871,
+   "meta": {
+    "com_perp": 0.0341,
+    "width": 0.01927,
+    "antipodal": 0.95257,
+    "coverage": 1.0,
+    "clearance": 0.01759,
+    "tilt_deg": 116.55655,
+    "graspgen_conf": 0.91414
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/sunflower__zdmbjt__f/g4_v1.png",
+    "v2": "/tmp/glib/frames/sunflower__zdmbjt__f/g4_v2.png",
+    "v3": "/tmp/glib/frames/sunflower__zdmbjt__f/g4_v3.png",
+    "wrist": "/tmp/glib/frames/sunflower__zdmbjt__f/g4_wrist.png"
+   },
+   "t_s": 3.19
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 20.2
+}

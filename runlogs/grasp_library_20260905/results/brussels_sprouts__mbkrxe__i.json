@@ -1,0 +1,196 @@
+{
+ "task": "IORS",
+ "relation": "inside",
+ "category": "brussels_sprouts",
+ "model": "mbkrxe",
+ "key": "brussels_sprouts__mbkrxe__i",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop_insert",
+ "bbox": [
+  0.05803399276733399,
+  0.04295589256286621,
+  0.041075040817260745
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "brussels_sprouts",
+   "model": "mbkrxe"
+  },
+  "task": "IORS",
+  "constraint": "tabletop_insert",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop_insert",
+  "log": {
+   "n_sampled": 6000,
+   "n_tilt": 642,
+   "n_width_antipodal": 400,
+   "n_table": 345,
+   "n_collision": 345,
+   "n_sweep": 345,
+   "n_lever": 345,
+   "n_selected": 12,
+   "com": [
+    -0.0021,
+    -0.0008,
+    0.0011
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0432,
+    0.0
+   ],
+   "score": 11.2709,
+   "meta": {
+    "com_perp": 0.00019,
+    "width": 0.04168,
+    "antipodal": 0.98626,
+    "coverage": 1.0,
+    "clearance": 0.02748,
+    "tilt_deg": 16.84745
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g0_v1.png",
+    "v2": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g0_v2.png",
+    "v3": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g0_v3.png",
+    "wrist": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g0_wrist.png"
+   },
+   "t_s": 1.48
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0462,
+    0.0
+   ],
+   "score": 11.2476,
+   "meta": {
+    "com_perp": 0.00041,
+    "width": 0.04484,
+    "antipodal": 0.98063,
+    "coverage": 1.0,
+    "clearance": 0.0254,
+    "tilt_deg": 13.9151
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g1_v1.png",
+    "v2": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g1_v2.png",
+    "v3": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g1_v3.png",
+    "wrist": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g1_wrist.png"
+   },
+   "t_s": 1.48
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0431,
+    0.0
+   ],
+   "score": 11.2104,
+   "meta": {
+    "com_perp": 0.00048,
+    "width": 0.0413,
+    "antipodal": 0.99881,
+    "coverage": 1.0,
+    "clearance": 0.02772,
+    "tilt_deg": 16.48462
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g2_v1.png",
+    "v2": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g2_v2.png",
+    "v3": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g2_v3.png",
+    "wrist": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g2_wrist.png"
+   },
+   "t_s": 1.48
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0455,
+    0.0
+   ],
+   "score": 11.1883,
+   "meta": {
+    "com_perp": 0.00018,
+    "width": 0.04285,
+    "antipodal": 0.98533,
+    "coverage": 1.0,
+    "clearance": 0.02617,
+    "tilt_deg": 22.65059
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g3_v1.png",
+    "v2": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g3_v2.png",
+    "v3": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g3_v3.png",
+    "wrist": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g3_wrist.png"
+   },
+   "t_s": 1.52
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.042,
+    0.0167
+   ],
+   "score": 11.1308,
+   "meta": {
+    "com_perp": 0.00025,
+    "width": 0.0567,
+    "antipodal": 0.96805,
+    "coverage": 1.0,
+    "clearance": 0.0201,
+    "tilt_deg": 8.03074
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g4_v1.png",
+    "v2": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g4_v2.png",
+    "v3": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g4_v3.png",
+    "wrist": "/tmp/glib/frames/brussels_sprouts__mbkrxe__i/g4_wrist.png"
+   },
+   "t_s": 1.46
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 9.6
+}

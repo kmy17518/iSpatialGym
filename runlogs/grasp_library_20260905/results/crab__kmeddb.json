@@ -1,0 +1,196 @@
+{
+ "task": "mental_rotation",
+ "category": "crab",
+ "model": "kmeddb",
+ "key": "crab__kmeddb",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.22138050365447998,
+  0.17931842613220214,
+  0.03425883769989014
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "crab",
+   "model": "kmeddb"
+  },
+  "task": "mental_rotation",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 493,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    -0.0055,
+    0.003,
+    0.0003
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0399,
+    0.0
+   ],
+   "score": 19.3127,
+   "meta": {
+    "com_perp": 0.00231,
+    "width": 0.03392,
+    "antipodal": 0.88812,
+    "coverage": 0.75,
+    "clearance": 0.02338,
+    "tilt_deg": 167.05434,
+    "graspgen_conf": 0.93947
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/crab__kmeddb/g0_v1.png",
+    "v2": "/tmp/glib/frames/crab__kmeddb/g0_v2.png",
+    "v3": "/tmp/glib/frames/crab__kmeddb/g0_v3.png",
+    "wrist": "/tmp/glib/frames/crab__kmeddb/g0_wrist.png"
+   },
+   "t_s": 3.44
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.04,
+    0.0
+   ],
+   "score": 19.1911,
+   "meta": {
+    "com_perp": 0.00292,
+    "width": 0.02548,
+    "antipodal": 0.61382,
+    "coverage": 1.0,
+    "clearance": 0.0189,
+    "tilt_deg": 161.7296,
+    "graspgen_conf": 0.9446
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/crab__kmeddb/g1_v1.png",
+    "v2": "/tmp/glib/frames/crab__kmeddb/g1_v2.png",
+    "v3": "/tmp/glib/frames/crab__kmeddb/g1_v3.png",
+    "wrist": "/tmp/glib/frames/crab__kmeddb/g1_wrist.png"
+   },
+   "t_s": 3.46
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0401,
+    0.0
+   ],
+   "score": 18.4653,
+   "meta": {
+    "com_perp": 0.01796,
+    "width": 0.03811,
+    "antipodal": 0.98003,
+    "coverage": 1.0,
+    "clearance": 0.02452,
+    "tilt_deg": 6.28834,
+    "graspgen_conf": 0.93543
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/crab__kmeddb/g2_v1.png",
+    "v2": "/tmp/glib/frames/crab__kmeddb/g2_v2.png",
+    "v3": "/tmp/glib/frames/crab__kmeddb/g2_v3.png",
+    "wrist": "/tmp/glib/frames/crab__kmeddb/g2_wrist.png"
+   },
+   "t_s": 3.33
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0402,
+    0.0
+   ],
+   "score": 18.4373,
+   "meta": {
+    "com_perp": 0.01382,
+    "width": 0.03534,
+    "antipodal": 0.91521,
+    "coverage": 0.75,
+    "clearance": 0.02185,
+    "tilt_deg": 163.03182,
+    "graspgen_conf": 0.93856
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/crab__kmeddb/g3_v1.png",
+    "v2": "/tmp/glib/frames/crab__kmeddb/g3_v2.png",
+    "v3": "/tmp/glib/frames/crab__kmeddb/g3_v3.png",
+    "wrist": "/tmp/glib/frames/crab__kmeddb/g3_wrist.png"
+   },
+   "t_s": 3.52
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0411,
+    0.0
+   ],
+   "score": 18.3431,
+   "meta": {
+    "com_perp": 0.00705,
+    "width": 0.01563,
+    "antipodal": 0.52746,
+    "coverage": 0.5,
+    "clearance": 0.02119,
+    "tilt_deg": 169.33233,
+    "graspgen_conf": 0.95677
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/crab__kmeddb/g4_v1.png",
+    "v2": "/tmp/glib/frames/crab__kmeddb/g4_v2.png",
+    "v3": "/tmp/glib/frames/crab__kmeddb/g4_v3.png",
+    "wrist": "/tmp/glib/frames/crab__kmeddb/g4_wrist.png"
+   },
+   "t_s": 3.47
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 22.1
+}

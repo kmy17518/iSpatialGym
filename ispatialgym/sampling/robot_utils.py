@@ -1,0 +1,366 @@
+"""R1Pro kinematics / reachability / viewing helpers for the sampler, built on the oracle's cuRobo backend.
+
+Everything here reasons about *hypothetical* robot configurations: the robot stays parked while candidate
+base poses are expressed through the virtual base joints (``base_footprint_{x,y,rz}_joint``) in the root
+frame, exactly like ``Skills.q_with_base_pose``. Only the chosen configuration is teleported.
+"""
+
+from __future__ import annotations
+
+import logging
+import math
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Sequence, Tuple
+
+import torch as th
+
+from ispatialgym.oracle.curobo_planner import R1ProCuRobo  # noqa: F401  (must precede omnigibson import)
+
+import omnigibson.utils.transform_utils as T  # noqa: E402
+
+from ispatialgym.oracle import r1pro_model as M  # noqa: E402
+from ispatialgym.oracle.tasks.camera_relocalization import camera_offset_in_zed  # noqa: E402
+from ispatialgym.oracle.trunk import torso_q, torso_q_to_translate_tilt  # noqa: E402
+from ispatialgym.sampling import geometry as G  # noqa: E402
+
+log = logging.getLogger("ispatialgym.sampling")
+
+#: right-gripper pad centre along the eef z axis (from the grasp library's gripper description)
+CONTACT_CENTER_Z = -0.01186
+FINGER_OPEN = 0.05
+#: base_link height above the floor when R1Pro stands on its wheels (measured on the flat floor plane)
+NOMINAL_BASE_Z = 0.0053
+
+
+@dataclass
+class ViewSolution:
+    translate: float
+    tilt: float
+    angle: float  # angle between the optical axis and the ray to the target (rad)
+    cam_pose: G.Pose
+    q: th.Tensor
+
+
+class RobotKit:
+    def __init__(self, world, prebuild: Sequence[str] = ("right_arm",)):
+        self.world = world
+        self.robot = world.robot
+        self.backend = R1ProCuRobo(self.robot, prebuild=prebuild)
+        self.jidx = self.backend._jidx
+        self.cam_in_zed = camera_offset_in_zed(self.robot, world.cam_key)
+        idx = self.robot.trunk_control_idx
+        self.trunk_limits = (self.robot.joint_lower_limits[idx].clone(), self.robot.joint_upper_limits[idx].clone())
+        self._trav_cache: Dict[int, th.Tensor] = {}
+        self.floor_z = float(getattr(world, "floor_z", 0.0))
+
+    # ------------------------------------------------------------------ configurations
+
+    def arm_q(self, mode: str, arm: str) -> th.Tensor:
+        if mode == "untucked":
+            return self.robot.untucked_default_joint_pos[self.robot.arm_control_idx[arm]].clone()
+        if mode == "tucked":
+            return th.zeros(7)
+        if mode == "ready":
+            return th.tensor(M.ARM_READY_Q[arm], dtype=th.float32)
+        raise ValueError(mode)
+
+    def q_config(self, arms: str = "untucked", translate: Optional[float] = None, tilt: float = 0.0, torso_zero: bool = False,
+                 right_arm: Optional[th.Tensor] = None, left_arm: Optional[th.Tensor] = None, fingers: float = FINGER_OPEN) -> th.Tensor:
+        """28-D configuration; the virtual base joints place base_link upright at the nominal standing height above
+        the floor (``floor_z + NOMINAL_BASE_Z``) so that collision checks do not depend on how far the simulated
+        robot has currently sunk into or hovers above the floor. ``q_at_base_pose`` then sets x / y / yaw."""
+        q = th.zeros(28)
+        rp, _ = self.backend.root_pose()
+        q[self.jidx["base_footprint_z_joint"]] = self.floor_z + NOMINAL_BASE_Z - float(rp[2])
+        if not torso_zero:
+            q[self.robot.trunk_control_idx] = torso_q(M.DEFAULT_TRUNK_TRANSLATE if translate is None else translate, tilt, self.trunk_limits)
+        for arm in M.ARMS:
+            q[self.robot.arm_control_idx[arm]] = self.arm_q(arms, arm)
+            q[self.robot.gripper_control_idx[arm]] = fingers
+        if right_arm is not None:
+            q[self.robot.arm_control_idx["right"]] = G.t(right_arm)
+        if left_arm is not None:
+            q[self.robot.arm_control_idx["left"]] = G.t(left_arm)
+        return q
+
+    def with_trunk(self, q: th.Tensor, translate: float, tilt: float) -> th.Tensor:
+        qk = q.clone()
+        qk[self.robot.trunk_control_idx] = torso_q(translate, tilt, self.trunk_limits)
+        return qk
+
+    def trunk_of(self, q: th.Tensor) -> Tuple[float, float]:
+        return torso_q_to_translate_tilt(q[self.robot.trunk_control_idx])
+
+    def q_at_base_pose(self, q: th.Tensor, x: float, y: float, yaw: float) -> th.Tensor:
+        """Copy of ``q`` whose virtual base joints put base_link at world (x, y, yaw) given the current root pose."""
+        rp, rq = self.backend.root_pose()
+        ryaw = G.yaw_of(rq)
+        c, s = math.cos(ryaw), math.sin(ryaw)
+        dx, dy = float(x - rp[0]), float(y - rp[1])
+        qk = G.t(q).clone()
+        qk[self.jidx["base_footprint_x_joint"]] = c * dx + s * dy
+        qk[self.jidx["base_footprint_y_joint"]] = -s * dx + c * dy
+        qk[self.jidx["base_footprint_rz_joint"]] = G.wrap_angle(float(yaw) - ryaw)
+        # the articulation root stays where the robot was spawned (possibly metres above the floor); the z / roll / pitch
+        # virtual joints always put base_link upright at the nominal standing height, whatever ``q`` carried
+        qk[self.jidx["base_footprint_z_joint"]] = self.floor_z + NOMINAL_BASE_Z - float(rp[2])
+        qk[self.jidx["base_footprint_rx_joint"]] = 0.0
+        qk[self.jidx["base_footprint_ry_joint"]] = 0.0
+        return qk
+
+    def q_current(self) -> th.Tensor:
+        return self.backend.q_full()
+
+    def sync_world(self, ignore_objects=()):
+        self.backend.update_world(ignore_objects=ignore_objects)
+        self._synced_root = self.backend.root_pose()[0].clone()
+
+    def _ensure_synced(self):
+        """cuRobo stores obstacles relative to the robot root at sync time; if the simulated root moved since (e.g. the
+        parked robot sank), every query would see a shifted world. Re-sync when the drift exceeds 1 cm."""
+        root = self.backend.root_pose()[0]
+        prev = getattr(self, "_synced_root", None)
+        if prev is None or float(th.linalg.norm(root - prev)) > 0.01:
+            if prev is not None:
+                log.warning("robot root moved %.3f m since the last cuRobo sync; re-syncing", float(th.linalg.norm(root - prev)))
+            self.sync_world()
+
+    # ------------------------------------------------------------------ kinematics
+
+    def fk(self, frames: Sequence[str], q: th.Tensor) -> Dict[str, G.Pose]:
+        return self.backend.fk(list(frames), q_full=q, emb_name="whole_body")
+
+    def camera_pose(self, q: th.Tensor) -> G.Pose:
+        zed = self.fk([M.HEAD_CAMERA_LINK], q)[M.HEAD_CAMERA_LINK]
+        return G.compose(zed, self.cam_in_zed)
+
+    def camera_poses_batch(self, qs: th.Tensor) -> List[G.Pose]:
+        pos, quat = self.backend.fk_batch(M.HEAD_CAMERA_LINK, qs, emb_name="whole_body")
+        return [G.compose((pos[i], quat[i]), self.cam_in_zed) for i in range(pos.shape[0])]
+
+    def eef_pose(self, q: th.Tensor, arm: str = "right") -> G.Pose:
+        return self.fk([M.EEF_LINK[arm]], q)[M.EEF_LINK[arm]]
+
+    def pad_center(self, eef_pose: G.Pose) -> th.Tensor:
+        return G.t(eef_pose[0]) + G.rotate(eef_pose[1], th.tensor([0.0, 0.0, CONTACT_CENTER_Z]))
+
+    # ------------------------------------------------------------------ viewing
+
+    def solve_view(self, q_base: th.Tensor, target, translates=None, tilts=None, prefer_translate: float = M.DEFAULT_TRUNK_TRANSLATE,
+                   top_k: int = 1, max_angle: float = math.radians(8.0)) -> List[ViewSolution]:
+        """Trunk (translate, tilt) candidates whose optical axis points at ``target`` (world) from the base pose encoded in
+        ``q_base``, best first (axis angle plus a small preference toward ``prefer_translate``). Only candidates within
+        ``max_angle`` of the target are returned (at least one)."""
+        translates = th.linspace(0.0, 1.5, 31) if translates is None else G.t(translates)
+        tilts = th.linspace(-0.9, 0.9, 37) if tilts is None else G.t(tilts)
+        qs, keys = [], []
+        for tr in translates.tolist():
+            for ti in tilts.tolist():
+                qs.append(self.with_trunk(q_base, tr, ti))
+                keys.append((tr, ti))
+        cams = self.camera_poses_batch(th.stack(qs))
+        tgt = G.t(target)
+        scored = []
+        for (tr, ti), cam, qk in zip(keys, cams, qs):
+            ang = self.world.camera_model.angle_off_axis(cam, tgt)
+            scored.append((ang + 0.02 * abs(tr - prefer_translate), ViewSolution(tr, ti, ang, cam, qk)))
+        scored.sort(key=lambda s: s[0])
+        out = [v for _, v in scored if v.angle <= max_angle][:top_k]
+        return out or [scored[0][1]]
+
+    # ------------------------------------------------------------------ collision
+
+    def collision_free(self, qs: th.Tensor, margin: float = 0.01, sync: bool = False) -> th.Tensor:
+        qs = G.t(qs)
+        if qs.ndim == 1:
+            qs = qs.unsqueeze(0)
+        if not sync:
+            self._ensure_synced()
+        return ~self.backend.check_collision(qs, emb_name="whole_body", sync_world=sync, margin=margin)
+
+    # ------------------------------------------------------------------ IK
+
+    def ik(self, eef_pose: G.Pose, q_seed: th.Tensor, arm: str = "right", torso: bool = False) -> Optional[th.Tensor]:
+        emb = f"{arm}_arm_torso" if torso else f"{arm}_arm"
+        self._ensure_synced()
+        return self.backend.solve_ik(emb, {M.EEF_LINK[arm]: (G.t(eef_pose[0]), G.t(eef_pose[1]))}, q_seed=q_seed, sync_world=False)
+
+    def reachable(self, eef_poses: Sequence[G.Pose], q_seed: th.Tensor, arm: str = "right", torso: bool = False, ignore_for_last=()) -> Optional[th.Tensor]:
+        """Configuration reaching the *last* pose if every pose in the list is IK-feasible from ``q_seed``, else None.
+        ``ignore_for_last``: objects ignored (collision) for the last pose only (the support under a grasp)."""
+        q = None
+        n = len(eef_poses)
+        for i, p in enumerate(eef_poses):
+            if i == n - 1 and ignore_for_last:
+                with self.ignoring(ignore_for_last):
+                    q = self.ik(p, q_seed, arm=arm, torso=torso)
+            else:
+                q = self.ik(p, q_seed, arm=arm, torso=torso)
+            if q is None:
+                return None
+        return q
+
+    def reachable_any_translate(self, eef_poses: Sequence[G.Pose], q_stance: th.Tensor, translates: Sequence[float], arm: str = "right") -> Optional[float]:
+        """First trunk translate (tilt 0) in ``translates`` from which every pose is reachable (arm only)."""
+        for tr in translates:
+            q = self.with_trunk(q_stance, float(tr), 0.0)
+            if self.reachable(eef_poses, q, arm=arm) is not None:
+                return float(tr)
+        return None
+
+    # ------------------------------------------------------------------ grasp poses
+
+    @staticmethod
+    def top_down_quat(yaw: float, tilt_deg: float = 0.0, toward=None) -> th.Tensor:
+        """Approach axis (eef +z) pointing down, pitched ``tilt_deg`` toward the unit xy direction ``toward``; wrist yaw."""
+        z = th.tensor([0.0, 0.0, -1.0])
+        if tilt_deg and toward is not None:
+            tw = G.t([float(toward[0]), float(toward[1]), 0.0])
+            tw = tw / th.linalg.norm(tw)
+            tr = math.radians(tilt_deg)
+            z = z * math.cos(tr) + tw * math.sin(tr)
+        x_ref = th.tensor([math.cos(yaw), math.sin(yaw), 0.0])
+        x = x_ref - th.dot(x_ref, z) * z
+        x = x / th.linalg.norm(x)
+        y = th.cross(z, x, dim=0)
+        return T.mat2quat(th.stack([x, y, z], dim=1))
+
+    def grasp_candidates_at(self, point, yaw_choices: Sequence[float], tilts: Sequence[float] = (0.0, 30.0), toward=None, pregrasp: float = 0.10) -> List[List[G.Pose]]:
+        """[pre-grasp, grasp] eef pose pairs above ``point`` for several wrist yaws / approach tilts."""
+        out = []
+        p = G.t(point)
+        for tilt in tilts:
+            for yaw in yaw_choices:
+                q = self.top_down_quat(yaw, tilt, toward)
+                axis = G.rotate(q, th.tensor([0.0, 0.0, 1.0]))
+                out.append([(p - axis * pregrasp, q), (p, q)])
+        return out
+
+    def ik_batch(self, poses: Sequence[G.Pose], q_seed: th.Tensor, arm: str = "right", batch_size: int = 64, ignore=()) -> th.Tensor:
+        """Screening IK for many eef poses at once (fewer seeds than :meth:`ik`); returns a bool mask.
+
+        ``ignore``: objects whose collision meshes are disabled for these queries (e.g. the support surface for the
+        final grasp pose, which the oracle approaches without collision checking); re-enabled afterwards.
+        """
+        if len(poses) == 0:
+            return th.zeros(0, dtype=th.bool)
+        self._ensure_synced()
+        with self.ignoring(ignore):
+            succ, _ = self.backend.solve_ik_batch(f"{arm}_arm", M.EEF_LINK[arm], list(poses), q_seed, batch_size=batch_size)
+        return succ
+
+    def ignoring(self, objs):
+        """Context manager: temporarily drop ``objs`` from the cuRobo collision world."""
+        kit = self
+
+        class _Ctx:
+            def __enter__(self_inner):
+                if objs:
+                    kit.backend.update_world(ignore_objects=list(objs))
+
+            def __exit__(self_inner, *exc):
+                if objs:
+                    kit.backend.update_world()
+
+        return _Ctx()
+
+    def pairs_feasible(self, pairs: Sequence[Sequence[G.Pose]], q_seed: th.Tensor, ignore_for_grasp=()) -> th.Tensor:
+        """Batched screening of [pre-grasp, grasp] pairs: pre-grasps against the full world, grasps with
+        ``ignore_for_grasp`` (typically the support) disabled. Returns a bool mask per pair."""
+        pres = [p[0] for p in pairs]
+        grasps = [p[-1] for p in pairs]
+        ok_pre = self.ik_batch(pres, q_seed)
+        idx = [i for i, s in enumerate(ok_pre.tolist()) if s]
+        out = th.zeros(len(pairs), dtype=th.bool)
+        if idx:
+            ok_g = self.ik_batch([grasps[i] for i in idx], q_seed, ignore=ignore_for_grasp)
+            for i, s in zip(idx, ok_g.tolist()):
+                out[i] = bool(s)
+        return out
+
+    def reach_grid(self, q_stance: th.Tensor, cells_xy: th.Tensor, z: float, yaw_choices: Sequence[float], translates: Sequence[float],
+                   toward=None, tilts: Sequence[float] = (0.0, 30.0), pregrasp: float = 0.10, ignore_for_grasp=()) -> Tuple[th.Tensor, List[Optional[float]]]:
+        """Per cell: whether some (translate, yaw, tilt) makes grasp + pre-grasp IK-feasible; returns (mask, translate).
+
+        All poses of one trunk translate are solved in batched IK calls (the locked torso joints differ per translate).
+        """
+        n = len(cells_xy)
+        ok = th.zeros(n, dtype=th.bool)
+        tr_of: List[Optional[float]] = [None] * n
+        for tr in translates:
+            todo = [i for i in range(n) if not ok[i]]
+            if not todo:
+                break
+            q = self.with_trunk(q_stance, float(tr), 0.0)
+            pairs, index = [], []
+            for i in todo:
+                p = th.tensor([float(cells_xy[i][0]), float(cells_xy[i][1]), float(z)])
+                for k, pair in enumerate(self.grasp_candidates_at(p, yaw_choices, tilts, toward, pregrasp)):
+                    pairs.append(pair)
+                    index.append((i, k))
+            feas = self.pairs_feasible(pairs, q, ignore_for_grasp)
+            for (i, k), s in zip(index, feas.tolist()):
+                if s and not ok[i]:
+                    ok[i] = True
+                    tr_of[i] = float(tr)
+        return ok, tr_of
+
+    # ------------------------------------------------------------------ traversability
+
+    def eroded_trav_map(self, floor: int = 0) -> th.Tensor:
+        """BEHAVIOR's navigation map: eroded by half the robot's chassis diagonal + 0.2 m (``TraversableMap``)."""
+        if floor not in self._trav_cache:
+            trav = self.world.scene.trav_map
+            self._trav_cache[floor] = trav._erode_trav_map(th.clone(trav.floor_map[floor]), robot=self.robot)
+        return self._trav_cache[floor]
+
+    def trav_free(self, xy, floor: int = 0, eroded: bool = False) -> bool:
+        """Whether ``xy`` is on free floor. ``eroded=True`` uses the navigation map (robot footprint + margin); the
+        default un-eroded map only asserts that there is floor to stand on (stances next to furniture are validated
+        with the whole-body collision check instead)."""
+        trav = self.world.scene.trav_map
+        m = self.eroded_trav_map(floor) if eroded else trav.floor_map[floor]
+        ij = trav.world_to_map(G.t(xy)[:2])
+        i, j = int(ij[0]), int(ij[1])
+        if i < 0 or j < 0 or i >= m.shape[0] or j >= m.shape[1]:
+            return False
+        return bool(m[i, j] == 255)
+
+    def geodesic(self, a_xy, b_xy, floor: int = 0):
+        trav = self.world.scene.trav_map
+        path, dist = trav.get_shortest_path(floor, G.t(a_xy)[:2], G.t(b_xy)[:2], entire_path=True, robot=self.robot)
+        return path, (None if dist is None else float(dist))
+
+    def random_free_points(self, rng, n: int, floor: int = 0, room_filter=None) -> List[th.Tensor]:
+        trav = self.world.scene.trav_map
+        m = self.eroded_trav_map(floor)
+        free = th.nonzero(m == 255)
+        out = []
+        tries = 0
+        while len(out) < n and tries < 50 * n:
+            tries += 1
+            k = int(rng.integers(len(free)))
+            xy = trav.map_to_world(free[k])
+            if room_filter is not None and not room_filter(xy):
+                continue
+            out.append(xy)
+        return out
+
+    # ------------------------------------------------------------------ sim application
+
+    def apply(self, q: th.Tensor, base_pose2d: Optional[Tuple[float, float, float]] = None):
+        """Teleport the robot to ``q`` (arm / trunk joints) and ``base_pose2d`` (world), then re-sync the cuRobo world."""
+        qk = G.t(q).clone()
+        qk[[self.jidx[n] for n in M.BASE_VIRTUAL_JOINTS]] = 0.0
+        self.world.teleport_robot(base_pose2d if base_pose2d is not None else self.world_base_pose2d(), qk)
+        self.sync_world()
+
+    def world_base_pose2d(self) -> Tuple[float, float, float]:
+        p, q = self.robot.get_position_orientation()
+        return float(p[0]), float(p[1]), G.yaw_of(q)
+
+    def joint_dict(self, q: Optional[th.Tensor] = None, include_base: bool = False) -> Dict[str, float]:
+        """Joint positions by name. The six virtual base joints are excluded by default: the loader restores the base
+        pose from ``robot_poses`` and the virtual joints only hold the offset to the (arbitrary) articulation root."""
+        q = self.robot.get_joint_positions() if q is None else G.t(q)
+        return {n: float(q[i]) for i, n in enumerate(M.ALL_JOINTS) if include_base or n not in M.BASE_VIRTUAL_JOINTS}

@@ -1,0 +1,332 @@
+{
+  "batch": "wave6_01",
+  "models": [
+    {
+      "key": "toy_dice__hbkqqp__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pads on opposite cube faces, both touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pads on opposite cube faces, both touching"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pads on opposite cube faces, both touching"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pads on opposite cube faces, both touching"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pads on opposite cube faces, both touching"}
+      ],
+      "object_note": "fingers end 43/0 (object pushed to closed-limit finger); pad gap matches 42 mm width"
+    },
+    {
+      "key": "marker__zvvovh__f",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "oblique mid-barrel pinch, lower coverage but firm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, CoM offset 4 mm"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "marker__jlvneb__f",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "oblique mid-barrel pinch, firm"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "marker__erhlbb__f",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 2, "verdict": "flag", "flags": ["penetration"], "note": "fingers closed to 6 mm on 15 mm barrel"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"}
+      ],
+      "object_note": "row 2: collision hull much thinner than visual mesh at mid-barrel (pads 6 mm apart, body 15 mm)"
+    },
+    {
+      "key": "marker__zmimhb__f",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "marker__tcsmqv__f",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "marker__rsxbso__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "marker__hmlofs__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "marker__qemval__f",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "small marker, mid-barrel pinch, both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "marker__kjxpdi__f",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, CoM offset 4 mm"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "marker__slgheo__f",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, CoM offset 5 mm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, CoM offset 5 mm"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "marker__mcpkkq__f",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-barrel pinch, both pads touching"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pack_of_cigarettes__tngixy__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch across 55 mm, both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch, fingers 40/17, centred"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch across 55 mm, both pads touching"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch across 55 mm, both pads touching"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch, CoM offset 20 mm, full pad contact"}
+      ],
+      "object_note": "rows 1,3-5 fingers 50/4-5: box rests on fully-open finger; pad gap equals width, both pads touch"
+    },
+    {
+      "key": "pack_of_cigarettes__kienyo__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch across 55 mm, both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch across 55 mm, both pads touching"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch across 55 mm, both pads touching"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "upper-body pinch, CoM offset 18 mm, full pad contact"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "upper-body pinch, CoM offset 16 mm, full pad contact"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pack_of_cigarettes__ohpqua__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch across 55 mm, both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch across 55 mm, both pads touching"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch across 55 mm, both pads touching"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch across 55 mm, both pads touching"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "upper-body pinch, CoM offset 18 mm, full pad contact"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pack_of_cigarettes__wjfbhw__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch across 55 mm, both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch across 55 mm, both pads touching"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch across 55 mm, both pads touching"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "upper-body pinch, CoM offset 19 mm, full pad contact"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "upper-body pinch, CoM offset 22 mm, full pad contact"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pack_of_cigarettes__ajphvf__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "flat-face pinch, CoM offset 12 mm, middle third"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pack_of_cigarettes__dthkix__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "flat-face pinch, CoM offset 12 mm, middle third"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "flat-face pinch, CoM offset 14 mm, long pad contact"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pack_of_cigarettes__wpmpcf__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "flat-face pinch, CoM offset 7 mm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "flat-face pinch, CoM offset 13 mm, long pad contact"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pack_of_cigarettes__ppbmak__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "flat-face pinch, CoM offset 11 mm, middle third"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pack_of_cigarettes__ipmejr__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, near centre"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, near centre"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, near centre"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "flat-face pinch, CoM offset 11 mm, middle third"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "flat-face pinch, CoM offset 16 mm, long pad contact"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pack_of_cigarettes__qldhnm__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "flat-face pinch, CoM offset 15 mm, long pad contact"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pack_of_cigarettes__hmhqkq__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "flat-face pinch, CoM offset 16 mm, long pad contact"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pack_of_cigarettes__cfmlhf__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "flat-face pinch across 16 mm, centred"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "flat-face pinch, CoM offset 11 mm, middle third"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "flat-face pinch, CoM offset 15 mm, long pad contact"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "flat-face pinch, CoM offset 15 mm, long pad contact"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "box_of_cereal__wrlalk__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "upper-box pinch across 60 mm depth, full pad contact"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "upper-box pinch across 60 mm depth, full pad contact"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "upper-box pinch across 60 mm depth, full pad contact"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "upper-box pinch across 60 mm depth, full pad contact"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "upper-box pinch across 60 mm depth, full pad contact"}
+      ],
+      "object_note": "fingers 50/12: box rests on fully-open finger; pad gap equals width, both pads touch"
+    },
+    {
+      "key": "box_of_cereal__dkhgxn__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "top-third pinch across 73 mm depth, long lever but full pads"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "top-third pinch across 72 mm depth, full pad contact"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "high pinch, CoM offset 71 mm, pads still fully on faces"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top-third pinch across 73 mm depth, full pad contact"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "top-third pinch across 74 mm depth, full pad contact"}
+      ],
+      "object_note": "large box, all grasps near top edge (CoM offset 56-71 mm); pad gap ~2-3 mm over visual width, not visible"
+    },
+    {
+      "key": "box_of_cereal__yorray__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "upper-box pinch across 50 mm depth, full pad contact"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "upper-box pinch across 50 mm depth, full pad contact"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "upper-box pinch across 50 mm depth, full pad contact"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "upper-box pinch across 50 mm depth, full pad contact"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "upper-box pinch across 50 mm depth, full pad contact"}
+      ],
+      "object_note": "fingers 50/0: box against fully-open finger, other finger at closed limit; pad gap equals width"
+    },
+    {
+      "key": "box_of_cereal__sgirte__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "upper-box pinch across 50 mm depth, full pad contact"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "upper-box pinch across 50 mm depth, full pad contact"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "upper-box pinch across 50 mm depth, full pad contact"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "upper-box pinch across 50 mm depth, full pad contact"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "upper-box pinch across 50 mm depth, full pad contact"}
+      ],
+      "object_note": "fingers 50/0: box against fully-open finger, other finger at closed limit; pad gap equals width"
+    },
+    {
+      "key": "box_of_cereal__pfwgkm__f",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "upper-box pinch across 35 mm depth, full pad contact"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "upper-box pinch across 35 mm depth, full pad contact"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "upper-box pinch across 35 mm depth, full pad contact"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "upper-box pinch across 35 mm depth, full pad contact"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "upper-box pinch across 35 mm depth, full pad contact"}
+      ],
+      "object_note": ""
+    }
+  ]
+}

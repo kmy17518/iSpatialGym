@@ -1,0 +1,197 @@
+{
+ "task": "mental_rotation",
+ "category": "statue",
+ "model": "ponfvo",
+ "key": "statue__ponfvo",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.48793118286132814,
+  0.18125418853759764,
+  0.2363717041015625
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "statue",
+   "model": "ponfvo"
+  },
+  "task": "mental_rotation",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 355,
+   "n_lever": 249,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    -0.0128,
+    -0.0013,
+    0.05
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0155,
+    0.0
+   ],
+   "score": 17.0962,
+   "meta": {
+    "com_perp": 0.09639,
+    "width": 0.01407,
+    "antipodal": 0.97674,
+    "coverage": 1.0,
+    "clearance": 0.02003,
+    "tilt_deg": 102.33265,
+    "graspgen_conf": 0.91917
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/statue__ponfvo/g0_v1.png",
+    "v2": "/tmp/glib/frames/statue__ponfvo/g0_v2.png",
+    "v3": "/tmp/glib/frames/statue__ponfvo/g0_v3.png",
+    "wrist": "/tmp/glib/frames/statue__ponfvo/g0_wrist.png"
+   },
+   "t_s": 3.03
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0006,
+   "finger_q": [
+    0.0298,
+    0.0
+   ],
+   "score": 17.0783,
+   "meta": {
+    "com_perp": 0.0916,
+    "width": 0.014,
+    "antipodal": 0.98168,
+    "coverage": 1.0,
+    "clearance": 0.01803,
+    "tilt_deg": 100.08453,
+    "graspgen_conf": 0.91155
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/statue__ponfvo/g1_v1.png",
+    "v2": "/tmp/glib/frames/statue__ponfvo/g1_v2.png",
+    "v3": "/tmp/glib/frames/statue__ponfvo/g1_v3.png",
+    "wrist": "/tmp/glib/frames/statue__ponfvo/g1_wrist.png"
+   },
+   "t_s": 3.19
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 15,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0159,
+    0.0
+   ],
+   "score": 16.9362,
+   "meta": {
+    "com_perp": 0.10195,
+    "width": 0.01375,
+    "antipodal": 0.99989,
+    "coverage": 1.0,
+    "clearance": 0.0182,
+    "tilt_deg": 90.3505,
+    "graspgen_conf": 0.92294
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/statue__ponfvo/g2_v1.png",
+    "v2": "/tmp/glib/frames/statue__ponfvo/g2_v2.png",
+    "v3": "/tmp/glib/frames/statue__ponfvo/g2_v3.png",
+    "wrist": "/tmp/glib/frames/statue__ponfvo/g2_wrist.png"
+   },
+   "t_s": 3.24
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0172,
+    0.0
+   ],
+   "score": 16.8538,
+   "meta": {
+    "com_perp": 0.11057,
+    "width": 0.01375,
+    "antipodal": 0.99955,
+    "coverage": 1.0,
+    "clearance": 0.0216,
+    "tilt_deg": 91.70998,
+    "graspgen_conf": 0.91081
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/statue__ponfvo/g3_v1.png",
+    "v2": "/tmp/glib/frames/statue__ponfvo/g3_v2.png",
+    "v3": "/tmp/glib/frames/statue__ponfvo/g3_v3.png",
+    "wrist": "/tmp/glib/frames/statue__ponfvo/g3_wrist.png"
+   },
+   "t_s": 3.25
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0005,
+   "finger_q": [
+    0.0121,
+    0.0061
+   ],
+   "score": 16.8241,
+   "meta": {
+    "com_perp": 0.11487,
+    "width": 0.01375,
+    "antipodal": 0.9999,
+    "coverage": 1.0,
+    "clearance": 0.01961,
+    "tilt_deg": 90.42783,
+    "graspgen_conf": 0.94059
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/statue__ponfvo/g4_v1.png",
+    "v2": "/tmp/glib/frames/statue__ponfvo/g4_v2.png",
+    "v3": "/tmp/glib/frames/statue__ponfvo/g4_v3.png",
+    "wrist": "/tmp/glib/frames/statue__ponfvo/g4_wrist.png"
+   },
+   "t_s": 3.19
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 20.4
+}

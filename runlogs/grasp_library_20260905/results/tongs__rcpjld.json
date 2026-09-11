@@ -1,0 +1,196 @@
+{
+ "task": "mental_rotation",
+ "category": "tongs",
+ "model": "rcpjld",
+ "key": "tongs__rcpjld",
+ "pipeline": "graspgen",
+ "mode": "H",
+ "constraint": "floating",
+ "bbox": [
+  0.1303475806117058,
+  0.03351384353637695,
+  0.031690420150756834
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "tongs",
+   "model": "rcpjld"
+  },
+  "task": "mental_rotation",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 338,
+   "n_selected": 12,
+   "mode": "H",
+   "com": [
+    0.0066,
+    -0.0018,
+    0.0006
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0306,
+    0.0
+   ],
+   "score": 97.2871,
+   "meta": {
+    "com_perp": 0.00269,
+    "width": 0.0157,
+    "antipodal": 0.99653,
+    "coverage": 1.0,
+    "clearance": 0.02905,
+    "tilt_deg": 176.75424,
+    "graspgen_conf": 0.96914
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/tongs__rcpjld/g0_v1.png",
+    "v2": "/tmp/glib/frames/tongs__rcpjld/g0_v2.png",
+    "v3": "/tmp/glib/frames/tongs__rcpjld/g0_v3.png",
+    "wrist": "/tmp/glib/frames/tongs__rcpjld/g0_wrist.png"
+   },
+   "t_s": 3.1
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.033,
+    0.0
+   ],
+   "score": 97.2851,
+   "meta": {
+    "com_perp": 0.00466,
+    "width": 0.01599,
+    "antipodal": 0.97374,
+    "coverage": 1.0,
+    "clearance": 0.02527,
+    "tilt_deg": 168.91345,
+    "graspgen_conf": 0.97026
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/tongs__rcpjld/g1_v1.png",
+    "v2": "/tmp/glib/frames/tongs__rcpjld/g1_v2.png",
+    "v3": "/tmp/glib/frames/tongs__rcpjld/g1_v3.png",
+    "wrist": "/tmp/glib/frames/tongs__rcpjld/g1_wrist.png"
+   },
+   "t_s": 3.09
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0288,
+    0.0
+   ],
+   "score": 97.2847,
+   "meta": {
+    "com_perp": 0.00502,
+    "width": 0.01622,
+    "antipodal": 0.97795,
+    "coverage": 0.75,
+    "clearance": 0.02413,
+    "tilt_deg": 28.71567,
+    "graspgen_conf": 0.96411
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/tongs__rcpjld/g2_v1.png",
+    "v2": "/tmp/glib/frames/tongs__rcpjld/g2_v2.png",
+    "v3": "/tmp/glib/frames/tongs__rcpjld/g2_v3.png",
+    "wrist": "/tmp/glib/frames/tongs__rcpjld/g2_wrist.png"
+   },
+   "t_s": 3.04
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0306,
+    0.0
+   ],
+   "score": 97.283,
+   "meta": {
+    "com_perp": 0.00672,
+    "width": 0.01606,
+    "antipodal": 0.93864,
+    "coverage": 0.5,
+    "clearance": 0.02525,
+    "tilt_deg": 12.55647,
+    "graspgen_conf": 0.96402
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/tongs__rcpjld/g3_v1.png",
+    "v2": "/tmp/glib/frames/tongs__rcpjld/g3_v2.png",
+    "v3": "/tmp/glib/frames/tongs__rcpjld/g3_v3.png",
+    "wrist": "/tmp/glib/frames/tongs__rcpjld/g3_wrist.png"
+   },
+   "t_s": 3.08
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0244,
+    0.0
+   ],
+   "score": 97.2738,
+   "meta": {
+    "com_perp": 0.016,
+    "width": 0.01508,
+    "antipodal": 0.99798,
+    "coverage": 1.0,
+    "clearance": 0.03065,
+    "tilt_deg": 177.29383,
+    "graspgen_conf": 0.9631
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/tongs__rcpjld/g4_v1.png",
+    "v2": "/tmp/glib/frames/tongs__rcpjld/g4_v2.png",
+    "v3": "/tmp/glib/frames/tongs__rcpjld/g4_v3.png",
+    "wrist": "/tmp/glib/frames/tongs__rcpjld/g4_wrist.png"
+   },
+   "t_s": 3.13
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 19.9
+}

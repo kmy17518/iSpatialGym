@@ -1,0 +1,192 @@
+{
+ "task": "disembedding",
+ "category": "box_of_baking_mix",
+ "model": "qkvqkm",
+ "key": "box_of_baking_mix__qkvqkm",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.049999996185302736,
+  0.11499999237060547,
+  0.1528395233154297
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "box_of_baking_mix",
+   "model": "qkvqkm"
+  },
+  "task": "disembedding",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 3456,
+   "n_tilt": 864,
+   "n_width_antipodal": 864,
+   "n_table": 864,
+   "n_collision": 296,
+   "n_selected": 12,
+   "com": [
+    0.0001,
+    0.0,
+    -0.0115
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0005
+   ],
+   "score": 7.7822,
+   "meta": {
+    "com_perp": 0.052,
+    "width": 0.05,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.0205,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g0_v1.png",
+    "v2": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g0_v2.png",
+    "v3": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g0_v3.png",
+    "wrist": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g0_wrist.png"
+   },
+   "t_s": 3.45
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0004
+   ],
+   "score": 7.7579,
+   "meta": {
+    "com_perp": 0.04875,
+    "width": 0.05,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01724,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g1_v1.png",
+    "v2": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g1_v2.png",
+    "v3": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g1_v3.png",
+    "wrist": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g1_wrist.png"
+   },
+   "t_s": 3.48
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0004
+   ],
+   "score": 7.7513,
+   "meta": {
+    "com_perp": 0.05221,
+    "width": 0.05,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01952,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g2_v1.png",
+    "v2": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g2_v2.png",
+    "v3": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g2_v3.png",
+    "wrist": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g2_wrist.png"
+   },
+   "t_s": 3.47
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0157
+   ],
+   "score": 7.6892,
+   "meta": {
+    "com_perp": 0.03401,
+    "width": 0.05,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.00272,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g3_v1.png",
+    "v2": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g3_v2.png",
+    "v3": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g3_v3.png",
+    "wrist": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g3_wrist.png"
+   },
+   "t_s": 3.44
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0002
+   ],
+   "score": 7.6844,
+   "meta": {
+    "com_perp": 0.03614,
+    "width": 0.05,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.00486,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g4_v1.png",
+    "v2": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g4_v2.png",
+    "v3": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g4_v3.png",
+    "wrist": "/tmp/glib/frames/box_of_baking_mix__qkvqkm/g4_wrist.png"
+   },
+   "t_s": 3.51
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 22.2
+}

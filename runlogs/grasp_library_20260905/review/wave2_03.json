@@ -1,0 +1,348 @@
+{
+  "batch": "wave2_03",
+  "models": [
+    {
+      "key": "cork__uyceta",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "upright cork pinched near top; bottom mating end free"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "same top pinch, both pads on cork"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "same top pinch, both pads on cork"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "same top pinch, both pads on cork"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "same top pinch, both pads on cork"}
+      ],
+      "object_note": "fingers read 37/0 on all rows (one finger at centreline) but both pads clearly contact the cork"
+    },
+    {
+      "key": "dip_candle__gbaons",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "held just above middle; base free 67 mm below pads"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "near-identical body pinch, base free"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "near-identical body pinch, base free"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "near-identical body pinch, base free"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "near-identical body pinch, base free"}
+      ],
+      "object_note": "all five candidates are essentially the same 30-deg side pinch of the candle body"
+    },
+    {
+      "key": "dip_candle__ghctun",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "horizontal candle pinched across middle; both ends free"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-body pinch, base end free"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-body pinch, base end free"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-body pinch, base end free"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-body pinch, base end free"}
+      ],
+      "object_note": "short candle; pads fully enclose the 23 mm body (gap 24)"
+    },
+    {
+      "key": "dip_candle__mxjejs",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "held at very wick tip (20 mm); candle hangs vertically"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "held at wick end, candle hangs, base free"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "held at wick end, candle hangs, base free"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "wick-end hold at 30 deg; long lever arm but holds"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "wick-end hold at 30 deg; long lever arm but holds"}
+      ],
+      "object_note": "very long taper candle held by top 30 mm; lever arm 130+ mm, natural for base-first insertion"
+    },
+    {
+      "key": "dip_candle__poexjo",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "upper-body pinch, base hangs free"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "antipodal 0.78 on tapered body; both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "horizontal candle pinched near middle; both ends free"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "upper-body pinch, base hangs free"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "upper-body pinch, base hangs free"}
+      ],
+      "object_note": "tapered candle; pads slightly wider than visual width (hull margin) but contact visible"
+    },
+    {
+      "key": "french_fries__kxpfcj",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp", "one_finger"], "note": "fry squeezed lengthwise tip-to-tip; one finger stuck at 50"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "fry squeezed lengthwise between its two tips; antipodal 0"}
+      ],
+      "object_note": "thin curved fry; both surviving grasps pinch along its length (width inf), not across it"
+    },
+    {
+      "key": "garlic_clove__saombi",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "clove squeezed lengthwise tip-to-butt at fingertip edge"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "clove squeezed lengthwise tip-to-butt at fingertip edge"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "clove squeezed lengthwise tip-to-butt at fingertip edge"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "clove squeezed lengthwise tip-to-butt at fingertip edge"}
+      ],
+      "object_note": "all grasps pinch the clove along its 28 mm length with pointed tip on one pad; width inf, antipodal 0"
+    },
+    {
+      "key": "hammer__bbzlel",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle pinched next to head; head hangs"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "oblique handle pinch near head, antipodal 0.30, enclosed"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "handle pinched next to head"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "handle near head, head hangs tilted"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "handle near head; gap 31 vs width 15, no daylight seen"}
+      ],
+      "object_note": "mallet always held by handle adjacent to head; natural tool grasp, black head hides pad edges"
+    },
+    {
+      "key": "hard_candy__ojznyf",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body between fingertips, both pads on wrapper"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "fingertip pinch, body partly below tips, both touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "left pad touches only at fingertip; right pad full"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "candy at very fingertip, both tips touch wrapper"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "candy at fingertip, lower half below tips"}
+      ],
+      "object_note": "12 mm wrapped candy pinched at fingertip edge; pinch axis above body (width inf) yet pads touch"
+    },
+    {
+      "key": "hard_candy__qptjgv",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body between fingertips, both pads touch wrapper"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "right pad touches only at fingertip"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "fingertip pinch, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "candy at very fingertip, wrapper end hangs below"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "candy at very fingertip, both tips touch"}
+      ],
+      "object_note": "tabletop candy pinched at pad edges; marginal but visual contact on both sides in every row"
+    },
+    {
+      "key": "hard_candy__vwegtt",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["fragile", "one_finger"], "note": "lengthwise pinch on wrapper twists (50 mm); finger stuck at 50"},
+        {"rank": 2, "verdict": "flag", "flags": ["fragile", "one_finger"], "note": "lengthwise pinch on wrapper twists; finger stuck at 50"},
+        {"rank": 3, "verdict": "flag", "flags": ["fragile", "one_finger"], "note": "lengthwise pinch on wrapper twists; finger stuck at 50"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "cross pinch at fingertips, both pads touch body"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "cross pinch at fingertips, both pads touch body"}
+      ],
+      "object_note": "3 of 5 grasps squeeze the crinkled wrapper ends along the candy axis instead of the body"
+    },
+    {
+      "key": "hard_candy__vyxhmv",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body between fingertips, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "fingertip pinch, both pads touch body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body at fingertips, wrapper twist hangs below"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "fingertip pinch, both pads touch"},
+        {"rank": 5, "verdict": "flag", "flags": ["fragile"], "note": "diagonal 41 mm pinch: pad on wrapper twist, tip on body"}
+      ],
+      "object_note": "small wrapped candy; rows 1-4 are marginal fingertip pinches with contact, row 5 catches the wrapper"
+    },
+    {
+      "key": "hard_candy__yuatcg",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body between fingertips, both pads on wrapper"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "right pad full, left pad touches at fingertip"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pads on body and wrapper fold; antipodal 0.23"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pads partly on wrapper folds; antipodal 0.07"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body at fingertips, both pads touch"}
+      ],
+      "object_note": "wrapped candy pinched at fingertips; low antipodal scores come from centre ray hitting wrapper"
+    },
+    {
+      "key": "lid__pwgbsb",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "gripper at opening limit; pads on dome widest part"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "gripper at opening limit; pads on dome widest part"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "pad on knob, other on dome slope; lid hangs tilted"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "pad on knob, other on dome slope; lid hangs tilted"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "pad on knob, other on dome slope; lid hangs tilted"}
+      ],
+      "object_note": "domed pot lid with knob; no candidate grasps the knob; fingers read 50/x everywhere"
+    },
+    {
+      "key": "lid__qhlsdq",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "box lid pinched by flared skirt sides; open side free"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "side pinch at 30 deg, mating rim free"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "side pinch, mating rim free"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "side pinch, mating rim free"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "side pinch at 30 deg, mating rim free"}
+      ],
+      "object_note": "large box lid ~90 mm; gripper near 97 mm limit but pads touch the flared skirt on both sides"
+    },
+    {
+      "key": "lid__sihkub",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp", "task_violation"], "note": "rim edge pinched top/bottom; lid dangles tilted"}
+      ],
+      "object_note": "metal jar lid caught by its rim edge only (13 mm gap, CoM 33 mm off); underside not free"
+    },
+    {
+      "key": "lid__tnwisp",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim-edge diameter pinch at opening limit; antipodal 0.98"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim-edge diameter pinch at opening limit"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim-edge diameter pinch at opening limit"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim-edge diameter pinch at opening limit"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "asymmetric knob/dome pinch (50/13); lid tilted"}
+      ],
+      "object_note": "flat saucer lid ~92 mm; rows 1-4 pinch rim edges with one finger stuck fully open"
+    },
+    {
+      "key": "lid__ugfmpq",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim diameter pinch at opening limit; handle grasp preferable"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim diameter pinch, contact at fingertip bottom"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim diameter pinch, contact at fingertip bottom"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim diameter pinch at 30 deg"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim diameter pinch at 30 deg"}
+      ],
+      "object_note": "disc lid with wire handle; all grasps pinch the rim at max opening (50/40), antipodal ~1.0"
+    },
+    {
+      "key": "lid__zkderg",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pads on dome equator; antipodal metric taken on knob"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "left pad on knob, right on dome; lid tilted"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "pad on knob, other on dome; lid tilted"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "dome equator pinch at max opening"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "pad on knob plus dome (50/9); lid hangs tilted"}
+      ],
+      "object_note": "domed lid with wide knob; 50/9-11 rows catch knob and dome asymmetrically"
+    },
+    {
+      "key": "light_bulb__kfmkwd",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "globe pinched; screw base points away, free"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "globe pinched, base free"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "globe pinched symmetrically, base free"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "globe pinched, base hangs down free"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "globe pinched, base points sideways free"}
+      ],
+      "object_note": "asymmetric finger readouts (50/20) but the 68 mm globe fills the gap on both sides"
+    },
+    {
+      "key": "light_bulb__sxkjea",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "60 mm glass globe pinched; width 10 is shell artefact"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "globe pinched, base points away"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "globe pinched, base free"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "globe pinched, base sideways free"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "globe pinched, base sideways free"}
+      ],
+      "object_note": "clear bulb; pads on the globe in all rows, black screw base never inside the gripper"
+    },
+    {
+      "key": "light_bulb__ymomhw",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "globe pinched at opening limit; base sideways, free"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "globe pinched; base points toward camera, tilted up"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "globe pinched, base sideways free"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "globe pinched, base sideways free"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "globe pinched, base sideways free"}
+      ],
+      "object_note": "large 85 mm bulb, gripper near 97 mm limit; CoM offset 37-50 mm because base is heavy"
+    },
+    {
+      "key": "marker__ablbdc",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch near middle at fingertips"},
+        {"rank": 2, "verdict": "flag", "flags": ["gap"], "note": "fingers closed to 6 mm above 15 mm marker; crown only"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch (13 mm gap), marker between pads"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "full-width body pinch toward one end"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp", "gap"], "note": "6 mm closure on marker end tip, 47 mm from CoM"}
+      ],
+      "object_note": "tabletop marker; width inf is expected for flat fingertip pinches, but 6 mm closures are not real pinches"
+    },
+    {
+      "key": "marker__bwwkmb",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch (12 mm), marker between pads"},
+        {"rank": 2, "verdict": "flag", "flags": ["gap"], "note": "fingers closed to 6 mm above marker body; crown only"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, both pads enclose marker"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch toward cap end"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch, both pads enclose marker"}
+      ],
+      "object_note": "marker with tan cap; only row 2 closes far below the marker diameter"
+    },
+    {
+      "key": "marker__gldosk",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch, marker between pads"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch, marker between pads"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch at 38 deg, marker between pads"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch (12 mm) toward one end"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp", "gap"], "note": "6 mm closure on marker end tip, 44 mm from CoM"}
+      ],
+      "object_note": "marker with pink cap; row 5 catches only the rounded end"
+    },
+    {
+      "key": "marker__kjxpdi",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch, 15 mm gap, marker between pads"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp", "gap"], "note": "7 mm closure at marker end tip; body below fingertips"}
+      ],
+      "object_note": "chunky metallic marker; only 2 of 12 candidates valid"
+    },
+    {
+      "key": "marker__mcpkkq",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "12 mm body pinch, marker between pads"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch on cyan cap section"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch on cyan cap section, fully enclosed"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch on cyan cap section"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch on cyan cap section"}
+      ],
+      "object_note": "gap differences (12 vs 16-18 mm) reflect thin body vs thicker cap, not bad contact"
+    },
+    {
+      "key": "marker__mznenj",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch near orange cap, enclosed"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch near orange cap, enclosed"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "13 mm body pinch near cap"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch on cap section, enclosed"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "13 mm body pinch toward one end"}
+      ],
+      "object_note": "marker with orange cap; all rows enclose body or cap at full diameter"
+    },
+    {
+      "key": "marker__oyjbhy",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "held by cap end, marker hangs; light object, holds"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "6 mm pinch on tapered nib tip; would slip out"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "7 mm pinch on tapered nib tip; would slip out"}
+      ],
+      "object_note": "thin marker with pink cap; rows 2-3 hold only the nib taper"
+    },
+    {
+      "key": "marker__qemval",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "13 mm body pinch near middle, marker between pads"}
+      ],
+      "object_note": "only 1 of 12 candidates valid; the survivor is a plain body pinch"
+    }
+  ]
+}

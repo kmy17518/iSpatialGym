@@ -1,0 +1,621 @@
+"""OmniGibson-side helpers for the sampler: environment construction, spawning, placement geometry
+(support rasters), state snapshots, renders and the BEHAVIOR settle / validation checks.
+
+Import order matters: :mod:`ispatialgym.oracle.curobo_planner` pins pip-warp and must be imported before
+``omnigibson`` (done by :mod:`ispatialgym.sampling.robot_utils`, which this module imports first).
+"""
+
+from __future__ import annotations
+
+import copy
+import json
+import logging
+import math
+import os
+import time
+from dataclasses import dataclass, field
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+
+import torch as th
+
+from ispatialgym.sampling import robot_utils  # noqa: F401  (import before omnigibson: warp pinning)
+
+import omnigibson as og  # noqa: E402
+import omnigibson.utils.transform_utils as T  # noqa: E402
+from omnigibson.macros import gm  # noqa: E402
+from omnigibson.objects.dataset_object import DatasetObject  # noqa: E402
+from omnigibson.utils.asset_utils import get_dataset_path  # noqa: E402
+from omnigibson.utils.config_utils import TorchEncoder  # noqa: E402
+from omnigibson.utils.data_utils import merge_scene_files  # noqa: E402
+from omnigibson.utils.sampling_utils import raytest_batch  # noqa: E402
+
+from ispatialgym.oracle import r1pro_model as M  # noqa: E402
+from ispatialgym.sampling import geometry as G  # noqa: E402
+from ispatialgym.sampling.knowledge import STRUCTURE_CATEGORIES  # noqa: E402
+
+log = logging.getLogger("ispatialgym.sampling")
+
+PARK_POSITION = th.tensor([40.0, 40.0, 5.0])
+HEAD_APERTURE_MM = 40.0
+IMAGE_SIZE = 1080
+
+
+class Reject(Exception):
+    """An instance attempt failed a check (counted per reason, attempt retried)."""
+
+    def __init__(self, reason: str, message: str = "", **details):
+        super().__init__(f"[{reason}] {message}" + (f" {details}" if details else ""))
+        self.reason = reason
+        self.details = details
+
+
+def stable_scene_path(scene_model: str) -> str:
+    return os.path.join(get_dataset_path("2026-challenge-task-instances"), "scenes", scene_model, "json", f"{scene_model}_stable.json")
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Environment
+# ----------------------------------------------------------------------------------------------------------------
+
+
+class SimWorld:
+    """One OmniGibson environment (scene + R1Pro) plus the helpers every task sampler needs."""
+
+    def __init__(self, scene_model: str, rooms: Optional[Sequence[str]], robot_name: str = "robot_r1", image_size: int = IMAGE_SIZE):
+        # macros lock once they have been read (second SimWorld in one process after og.clear())
+        for name, value in (("ENABLE_OBJECT_STATES", True), ("USE_GPU_DYNAMICS", False), ("ENABLE_TRANSITION_RULES", False)):
+            if getattr(gm, name) != value:
+                with gm.unlocked():
+                    setattr(gm, name, value)
+        self.scene_model = scene_model
+        self.rooms = list(rooms) if rooms else None
+        self.robot_name = robot_name
+        self.stable_path = stable_scene_path(scene_model)
+        with open(self.stable_path) as f:
+            self.stable_scene = json.load(f)
+        cfg = {
+            "env": {"action_frequency": 30, "physics_frequency": 120},
+            "scene": {
+                "type": "InteractiveTraversableScene",
+                "scene_model": scene_model,
+                "scene_file": self.stable_path,
+                "seg_map_resolution": 0.1,
+                "trav_map_resolution": 0.1,
+                "load_room_instances": self.rooms,
+            },
+            "robots": [
+                M.joylo_robot_config(
+                    robot_name,
+                    obs_modalities=["rgb", "seg_instance"],
+                    sensor_config={"VisionSensor": {"sensor_kwargs": {"image_height": image_size, "image_width": image_size}}},
+                    position=PARK_POSITION.tolist(),
+                )
+            ],
+        }
+        t0 = time.time()
+        self.env = og.Environment(configs=cfg)
+        self.scene = self.env.scene
+        self.robot = self.env.robots[0]
+        self.cam_key = [k for k in self.robot.sensors if k.endswith(M.HEAD_CAMERA_SENSOR_SUFFIX)][0]
+        self.cam = self.robot.sensors[self.cam_key]
+        self.cam.horizontal_aperture = HEAD_APERTURE_MM
+        self.camera_model = G.CameraModel.from_sensor(float(self.cam.focal_length), HEAD_APERTURE_MM, image_size, image_size)
+        for obj in self.scene.objects:
+            obj.keep_still()
+        self.n_scene_objects = len(self.scene.objects)
+        self.scene_object_names = {o.name for o in self.scene.objects}
+        self.spawned: Dict[str, DatasetObject] = {}
+        self.floor_z = float(self.scene.trav_map.floor_heights[0]) if getattr(self.scene, "trav_map", None) is not None else 0.0
+        self.robot_park_xy = self.park_robot(floor_z=self.floor_z)
+        self.scene.update_initial_file()
+        # Isaac Sim 5.1's synthetic-data graph (seg_instance) segfaults deterministically on the third frame when a
+        # light fixture (``room_light``; later also seen with ``downlight`` in the living room) and glass (sliding doors /
+        # windows) are both in the head camera's view (bisected object by object on house_single_floor). Renders here
+        # only feed measurements, so every light-like fixture is hidden while sampling and shown again around template
+        # saving (see save_template). ``ISG_HIDE_CATEGORY_SUBSTRINGS`` (comma separated) overrides the rule.
+        subs = tuple(s for s in os.environ.get("ISG_HIDE_CATEGORY_SUBSTRINGS", "light,lamp,chandelier").split(",") if s)
+        self.render_hidden = [o for o in self.scene.objects if any(s in o.category for s in subs)]
+        for o in self.render_hidden:
+            o.visible = False
+        if self.render_hidden:
+            log.info("hidden for rendering: %s", [o.name for o in self.render_hidden])
+        self.load_time = time.time() - t0
+        self.robot_visible = True
+        log.info("scene %s loaded (%d objects, rooms=%s) in %.1fs", scene_model, self.n_scene_objects, self.rooms, self.load_time)
+
+    # ------------------------------------------------------------------ objects
+
+    def obj(self, name: str):
+        o = self.scene.object_registry("name", name)
+        if o is None:
+            raise KeyError(f"no object {name!r} in scene {self.scene_model}")
+        return o
+
+    def spawn(self, name: str, category: str, model: str, dataset: str = "behavior-1k-assets", scale=None, fixed_base: bool = False,
+              extra_abilities: Optional[Dict[str, dict]] = None) -> DatasetObject:
+        kwargs = {}
+        if scale is not None:
+            kwargs["scale"] = th.tensor(scale, dtype=th.float32)
+        if self.rooms:
+            # partial-room loading (``load_room_instances``) skips scene-file objects without a room assignment, so a
+            # template must record the loaded rooms on every spawned object (BEHAVIOR templates do the same)
+            kwargs["in_rooms"] = list(self.rooms)
+        if extra_abilities:
+            # object states follow the abilities; e.g. AttachedTo needs "attachable", which the taxonomy does not give
+            # every model that carries attachment meta links
+            from ispatialgym.sampling import knowledge as K
+
+            abilities = K.abilities_of_category(category)
+            abilities.update(extra_abilities)
+            kwargs["abilities"] = abilities
+        obj = DatasetObject(name=name, category=category, model=model, dataset_name=dataset, fixed_base=fixed_base, **kwargs)
+        # Adding (articulated) objects while playing can invalidate PhysX tensor views after earlier removals; do it
+        # stopped and restore the simulation state afterwards (as BEHAVIOR's sample_robot_pose.py does).
+        state = og.sim.dump_state()
+        og.sim.stop()
+        self.scene.add_object(obj)
+        og.sim.play()
+        og.sim.load_state(state)
+        self.spawned[name] = obj
+        self.park(obj, len(self.spawned) - 1)
+        og.sim.step()
+        return obj
+
+    def remove(self, obj):
+        self.spawned.pop(obj.name, None)
+        # never remove an object the robot still holds with assisted grasping: the robot's state would keep referring to it
+        try:
+            for arm, held in getattr(self.robot, "_ag_obj_in_hand", {}).items():
+                if held is obj:
+                    self.robot.release_grasp_immediately(arm)
+        except Exception:
+            pass
+        state = og.sim.dump_state()
+        og.sim.stop()
+        self.scene.remove_object(obj)
+        og.sim.play()
+        try:
+            og.sim.load_state(state)
+        except Exception:
+            pass
+        og.sim.step()
+
+    def park(self, obj, index: int = 0):
+        """Move ``obj`` far away with gravity disabled (there is no floor there: partial-room loading)."""
+        obj.set_position_orientation(PARK_POSITION + th.tensor([index * 1.0, 0.0, 0.0]), G.IDENTITY_QUAT)
+        obj.disable_gravity()
+        obj.keep_still()
+
+    def activate(self, obj):
+        """Re-enable gravity for an object that has been placed."""
+        obj.enable_gravity()
+        obj.keep_still()
+
+    def park_robot(self, xy: Optional[th.Tensor] = None, floor_z: float = 0.0):
+        """Stand the robot on a free traversability-map cell of the loaded floor (it must not float / fall)."""
+        if xy is None:
+            trav = self.scene.trav_map
+            m = trav._erode_trav_map(th.clone(trav.floor_map[0]), robot=self.robot)
+            free = th.nonzero(m == 255)
+            if len(free) == 0:
+                raise RuntimeError("no free traversable cell to park the robot")
+            # the parking cell must lie in a *loaded* room: elsewhere there is no floor and the robot falls, which
+            # silently shifts the cuRobo world (meshes are stored relative to the robot root at sync time)
+            if self.rooms:
+                seg = self.scene.seg_map
+                in_rooms = th.tensor([seg.get_room_instance_by_point(trav.map_to_world(c)) in self.rooms for c in free])
+                if bool(in_rooms.any()):
+                    free = free[in_rooms]
+                else:
+                    log.warning("no free traversable cell inside %s; parking the robot elsewhere", self.rooms)
+            centre = free.float().mean(dim=0)
+            k = int(th.argmin(th.linalg.norm(free.float() - centre, dim=1)))
+            xy = trav.map_to_world(free[k])
+        self.robot.set_joint_positions(self.robot.tucked_default_joint_pos)
+        self.robot.set_joint_velocities(th.zeros(self.robot.n_joints))
+        self.robot.set_position_orientation(th.tensor([float(xy[0]), float(xy[1]), floor_z + robot_utils.NOMINAL_BASE_Z]), G.IDENTITY_QUAT)
+        self.robot.keep_still()
+        for _ in range(5):
+            og.sim.step_physics()
+            self.robot.keep_still()
+        return xy
+
+    def local_hull(self, obj) -> th.Tensor:
+        """Collision boundary points of every link in the object's root frame (for footprints at any orientation)."""
+        root = obj.get_position_orientation()
+        pts = []
+        for link in obj.links.values():
+            p = link.collision_boundary_points_world
+            if p is None or len(p) == 0:
+                continue
+            pts.append(p)
+        if not pts:
+            return th.zeros(0, 3)
+        world = th.cat(pts, dim=0)
+        Rt = T.quat2mat(root[1]).T
+        return (world - root[0]) @ Rt.T
+
+    def hull_at(self, local_hull: th.Tensor, pose: G.Pose) -> th.Tensor:
+        return G.local_points_world(local_hull, pose)
+
+    def footprint(self, local_hull: th.Tensor, pose: G.Pose) -> th.Tensor:
+        return G.convex_hull_2d(self.hull_at(local_hull, pose)[:, :2])
+
+    def bottom_offset(self, local_hull: th.Tensor, quat) -> float:
+        """Distance from the root origin down to the lowest collision point when the object has orientation ``quat``."""
+        pts = G.local_points_world(local_hull, (th.zeros(3), G.t(quat)))
+        return -float(pts[:, 2].min())
+
+    def top_offset(self, local_hull: th.Tensor, quat) -> float:
+        pts = G.local_points_world(local_hull, (th.zeros(3), G.t(quat)))
+        return float(pts[:, 2].max())
+
+    def place(self, obj, xy, quat, support_z: float, local_hull: Optional[th.Tensor] = None, drop: float = 0.003):
+        """Put ``obj`` with orientation ``quat`` so that its lowest collision point is ``drop`` above ``support_z``."""
+        hull = self.local_hull(obj) if local_hull is None else local_hull
+        z = support_z + self.bottom_offset(hull, quat) + drop
+        pos = th.tensor([float(xy[0]), float(xy[1]), z])
+        obj.set_position_orientation(pos, G.t(quat))
+        self.activate(obj)
+        return pos
+
+    # ------------------------------------------------------------------ sim stepping / state
+
+    def step_physics(self, n: int, still: Iterable = ()):
+        still = list(still)
+        for _ in range(n):
+            og.sim.step_physics()
+            for e in still:
+                e.keep_still()
+
+    def step(self, n: int = 1):
+        for _ in range(n):
+            og.sim.step()
+
+    def snapshot(self):
+        return og.sim.dump_state(serialized=False)
+
+    def restore(self, state):
+        og.sim.load_state(state, serialized=False)
+        og.sim.step_physics()
+
+    def keep_still(self, entities: Iterable):
+        for e in entities:
+            e.keep_still()
+
+    def wake(self, entities: Iterable):
+        for e in entities:
+            if isinstance(e, DatasetObject):
+                e.wake()
+
+    # ------------------------------------------------------------------ renders
+
+    def render(self, n: int = 3):
+        for _ in range(n):
+            og.sim.render()
+
+    def seg_instance(self, n_renders: int = 3) -> Tuple[th.Tensor, Dict[int, str]]:
+        self.render(n_renders)
+        obs, info = self.robot.get_obs()
+        seg = obs[self.cam_key]["seg_instance"]
+        mapping = {int(k): v for k, v in info[self.cam_key]["seg_instance"].items()}
+        return seg.cpu(), mapping
+
+    def visible_pixels(self, n_renders: int = 3, exclude_structure: bool = True) -> Dict[str, int]:
+        seg, mapping = self.seg_instance(n_renders)
+        ids, counts = th.unique(seg, return_counts=True)
+        out = {}
+        for i, c in zip(ids.tolist(), counts.tolist()):
+            name = mapping.get(int(i))
+            if name is None or name in ("background", "unlabelled", "groundPlane", "BACKGROUND", "UNLABELLED"):
+                continue
+            if exclude_structure:
+                o = self.scene.object_registry("name", name)
+                if o is not None and o.category in STRUCTURE_CATEGORIES:
+                    continue
+            out[name] = int(c)
+        return out
+
+    def set_visible(self, objs: Iterable, visible: bool):
+        for o in objs:
+            o.visible = visible
+
+    def object_pixels(self, obj, hidden: Iterable = (), n_renders: int = 3) -> int:
+        hidden = list(hidden)
+        self.set_visible(hidden, False)
+        try:
+            px = self.visible_pixels(n_renders, exclude_structure=False).get(obj.name, 0)
+        finally:
+            self.set_visible(hidden, True)
+        return px
+
+    def ensure_segmented(self, obj) -> bool:
+        """True if ``obj`` appears in the instance-segmentation label map.
+
+        A teleported sleeping body occasionally keeps a stale render transform (it is physically in view but the
+        replicator never lists it), non-deterministically. Remedies in order: wake + full simulator step (physics ->
+        render transform sync), visibility toggle, re-writing the pose. Each is followed by fresh renders.
+        """
+
+        def present():
+            _, mapping = self.seg_instance()
+            return obj.name in mapping.values()
+
+        if present():
+            return True
+        self.wake([obj])
+        self.robot.keep_still()
+        og.sim.step()
+        if present():
+            return True
+        obj.visible = False
+        self.render(2)
+        obj.visible = True
+        self.render(3)
+        if present():
+            return True
+        p, q = obj.get_position_orientation()
+        obj.set_position_orientation(p, q)
+        obj.keep_still()
+        og.sim.step()
+        self.robot.keep_still()
+        return present()
+
+    def rgb(self, n_renders: int = 3):
+        self.render(n_renders)
+        obs, _ = self.robot.get_obs()
+        return obs[self.cam_key]["rgb"][..., :3].cpu()
+
+    # ------------------------------------------------------------------ raycasts / supports
+
+    def support_top(self, support, resolution: float = 0.02, z_margin: float = 0.03, ignore: Iterable = ()) -> "SupportTop":
+        """Raster of the support's top surface: cells whose downward ray first hits the support near its top."""
+        lo, hi = support.aabb
+        top = float(hi[2])
+        xs = th.arange(float(lo[0]) + resolution / 2, float(hi[0]), resolution)
+        ys = th.arange(float(lo[1]) + resolution / 2, float(hi[1]), resolution)
+        gx, gy = th.meshgrid(xs, ys, indexing="ij")
+        starts = th.stack([gx.flatten(), gy.flatten(), th.full_like(gx.flatten(), top + 0.30)], dim=1)
+        ends = starts.clone()
+        ends[:, 2] = float(lo[2]) - 0.05
+        ignore_paths = [self.robot.prim_path] + [o.prim_path for o in ignore]
+        prim_to_obj = {}
+        for o in self.scene.objects:
+            for l in o.links.values():
+                prim_to_obj[l.prim_path] = o
+        hits = raytest_batch(starts.tolist(), ends.tolist(), only_closest=True)
+        mask = th.zeros(len(xs), len(ys), dtype=th.bool)
+        occupied = th.zeros_like(mask)
+        zs = th.full((len(xs), len(ys)), float("nan"))
+        occupants = set()
+        own_hits = []  # (i, j, z) of rays that first hit the support itself
+        other_hits = []  # (i, j, z, obj) of rays that first hit another object
+        for k, h in enumerate(hits):
+            i, j = divmod(k, len(ys))
+            if not h["hit"]:
+                continue
+            body = h["rigidBody"]
+            if any(body.startswith(p) for p in ignore_paths):
+                continue
+            o = prim_to_obj.get(body)
+            hz = float(h["position"][2])
+            if o is support:
+                own_hits.append((i, j, hz))
+            elif o is not None:
+                other_hits.append((i, j, hz, o))
+        # the usable surface is the support's largest horizontal face, not necessarily its AABB top (a bed's headboard
+        # or a chair back is higher than the mattress / seat): take the most populated 2 cm height bin
+        if own_hits:
+            hz_all = th.tensor([z for _, _, z in own_hits])
+            bins = th.round((hz_all - float(lo[2])) / 0.02).long()
+            best = int(th.mode(bins).values)
+            z_top = float(hz_all[bins == best].median())
+        else:
+            z_top = top
+        for i, j, hz in own_hits:
+            if abs(hz - z_top) <= z_margin:
+                mask[i, j] = True
+                zs[i, j] = hz
+        for i, j, hz, o in other_hits:
+            if hz > z_top - z_margin:
+                occupied[i, j] = True
+                occupants.add(o.name)
+        yaw = G.yaw_of(support.get_position_orientation()[1])
+        return SupportTop(support.name, xs, ys, mask, occupied, z_top, yaw, sorted(occupants), resolution)
+
+    def raycast(self, starts: th.Tensor, ends: th.Tensor):
+        return raytest_batch(G.t(starts).tolist(), G.t(ends).tolist(), only_closest=True)
+
+    # ------------------------------------------------------------------ validation (BEHAVIOR semantics)
+
+    #: residual-motion thresholds after settling. BEHAVIOR's ``_validate_object_state_stability(strict=False)`` accepts
+    #: 1 m/s / pi rad/s and relies on the pose comparison over the following 10 steps (which we keep, see
+    #: ``drift_after``); ours tolerate the slow rocking of round objects (ladles, lemons) but reject anything sliding.
+    STABLE_LIN_VEL = 0.05
+    STABLE_ANG_VEL = 0.50
+
+    def check_stability(self, entities: Iterable, lin_tol: float = STABLE_LIN_VEL, ang_tol: float = STABLE_ANG_VEL) -> Optional[str]:
+        for e in entities:
+            if not isinstance(e, DatasetObject):
+                continue
+            v = float(th.linalg.norm(e.get_linear_velocity()))
+            w = float(th.linalg.norm(e.get_angular_velocity()))
+            if v > lin_tol or w > ang_tol:
+                return f"{e.name} moving (v={v:.3f} m/s, w={w:.3f} rad/s)"
+        return None
+
+    def check_scene_unchanged(self, task_object_names: Iterable[str], pos_tol: float = 0.05, ori_tol: float = 0.05) -> Optional[str]:
+        """Non-task scene objects must still be at their stable-scene poses (BEHAVIOR validate_task step 2)."""
+        task_names = set(task_object_names) | set(self.spawned) | {self.robot.name}
+        ref = self.stable_scene["state"]["registry"]["object_registry"]
+        for o in self.scene.objects:
+            if o.name in task_names or o.name not in ref:
+                continue
+            r = ref[o.name]["root_link"]
+            p, q = o.get_position_orientation()
+            if float(th.linalg.norm(p - th.tensor(r["pos"]))) > pos_tol:
+                return f"scene object {o.name} moved by {float(th.linalg.norm(p - th.tensor(r['pos']))):.3f} m"
+            if G.quat_angle(q, th.tensor(r["ori"])) > ori_tol:
+                return f"scene object {o.name} rotated"
+        return None
+
+    def settle(self, task_entities: Iterable, steps: int = 60, robot_still: bool = True) -> Optional[str]:
+        """Let the task objects settle under physics (robot base held) and report residual motion."""
+        ents = list(task_entities)
+        self.wake(ents)
+        for _ in range(steps):
+            og.sim.step_physics()
+            if robot_still:
+                self.robot.keep_still()
+        for _ in range(10):
+            og.sim.step_physics()
+            if robot_still:
+                self.robot.keep_still()
+        # one full step refreshes the per-step caches (AABBs, contacts) that step_physics leaves stale
+        og.sim.step()
+        if robot_still:
+            self.robot.keep_still()
+        return self.check_stability(ents)
+
+    def drift_after(self, entities: Iterable, steps: int = 10, pos_tol: float = 0.01, ang_tol: float = 0.05) -> Optional[str]:
+        ents = list(entities)
+        before = {e.name: e.get_position_orientation() for e in ents}
+        joints = {e.name: e.get_joint_positions().clone() for e in ents if e.n_joints > 0}
+        for _ in range(steps):
+            og.sim.step_physics()
+            self.robot.keep_still()
+        for e in ents:
+            p, q = e.get_position_orientation()
+            p0, q0 = before[e.name]
+            if float(th.linalg.norm(p - p0)) > pos_tol or G.quat_angle(q, q0) > ang_tol:
+                return f"{e.name} drifted {float(th.linalg.norm(p - p0)):.3f} m / {G.quat_angle(q, q0):.3f} rad in {steps} steps"
+            if e.name in joints and float((e.get_joint_positions() - joints[e.name]).abs().max()) > 0.02:
+                return f"{e.name} joints drifted"
+        return None
+
+    # ------------------------------------------------------------------ templates
+
+    def save_template(self, out_dir: str, inst_to_name: Dict[str, str], robot_poses: Dict) -> Tuple[str, str]:
+        """Write ``template-partial_rooms.json`` (what is loaded) and ``template.json`` (merged with the stable scene)."""
+        os.makedirs(out_dir, exist_ok=True)
+        self.scene.write_task_metadata(key="inst_to_name", data=dict(inst_to_name))
+        self.scene.write_task_metadata(key="robot_poses", data=robot_poses)
+        partial = os.path.join(out_dir, "template-partial_rooms.json")
+        for o in self.render_hidden:  # the template must not record the render workaround
+            o.visible = True
+        try:
+            self.scene.save(json_path=partial)
+        finally:
+            for o in self.render_hidden:
+                o.visible = False
+        with open(partial) as f:
+            scene_b = json.load(f)
+        merged = merge_scene_files(copy.deepcopy(self.stable_scene), scene_b, keep_robot_from="b")
+        full = os.path.join(out_dir, "template.json")
+        with open(full, "w") as f:
+            json.dump(merged, f, cls=TorchEncoder, indent=2)
+        return partial, full
+
+    # ------------------------------------------------------------------ robot placement
+
+    def teleport_robot(self, base_pose2d: Tuple[float, float, float], q: Optional[th.Tensor] = None, z: Optional[float] = None):
+        """Set the robot base (x, y, yaw) and optionally the full joint vector; keep it still."""
+        x, y, yaw = base_pose2d
+        zb = (self.floor_z + robot_utils.NOMINAL_BASE_Z) if z is None else float(z)
+        if q is not None:
+            self.robot.set_joint_positions(G.t(q))
+            self.robot.set_joint_velocities(th.zeros_like(G.t(q)))
+        self.robot.set_position_orientation(th.tensor([x, y, zb]), G.quat_from_yaw(yaw))
+        self.robot.keep_still()
+        og.sim.step_physics()
+        self.robot.keep_still()
+
+    def robot_floor_z(self) -> float:
+        return 0.0
+
+    def camera_pose(self) -> G.Pose:
+        p, q = self.cam.get_position_orientation()
+        return p.float(), q.float()
+
+    def floor_of_room(self, room: str):
+        for o in self.scene.objects:
+            if o.category == "floors" and room in (o.in_rooms or []):
+                return o
+        raise KeyError(f"no floors object in room {room!r}")
+
+
+@dataclass
+class SupportTop:
+    """Raster of a support's usable top surface (world frame, axis-aligned grid)."""
+
+    name: str
+    xs: th.Tensor
+    ys: th.Tensor
+    mask: th.Tensor  # (nx, ny) True where the support top is exposed
+    occupied: th.Tensor  # (nx, ny) True where another object sits on the support
+    z: float
+    yaw: float  # support root yaw (its local x axis direction)
+    occupants: List[str] = field(default_factory=list)
+    resolution: float = 0.02
+
+    @property
+    def free(self) -> th.Tensor:
+        return self.mask & ~self.occupied
+
+    def cells(self, free_only: bool = True) -> th.Tensor:
+        m = self.free if free_only else self.mask
+        idx = th.nonzero(m)
+        return th.stack([self.xs[idx[:, 0]], self.ys[idx[:, 1]]], dim=1)
+
+    def local_axes(self) -> Tuple[th.Tensor, th.Tensor]:
+        c, s = math.cos(self.yaw), math.sin(self.yaw)
+        return th.tensor([c, s]), th.tensor([-s, c])
+
+    def local_bounds(self):
+        """Bounds of the exposed top in the support's local (yaw) frame: (umin, umax, vmin, vmax), and the centre."""
+        pts = self.cells(free_only=False)
+        ax, ay = self.local_axes()
+        u = pts @ ax
+        v = pts @ ay
+        return float(u.min()), float(u.max()), float(v.min()), float(v.max())
+
+    def contains(self, xy, margin: float = 0.0) -> bool:
+        """True if world ``xy`` lies on an exposed (free) cell; ``margin`` requires neighbours within it to be free too."""
+        pts = [G.t(xy)]
+        if margin > 0:
+            for dx, dy in ((margin, 0), (-margin, 0), (0, margin), (0, -margin), (margin, margin), (-margin, -margin), (margin, -margin), (-margin, margin)):
+                pts.append(G.t(xy) + th.tensor([dx, dy]))
+        for p in pts:
+            i = int(th.round((p[0] - self.xs[0]) / self.resolution))
+            j = int(th.round((p[1] - self.ys[0]) / self.resolution))
+            if i < 0 or j < 0 or i >= len(self.xs) or j >= len(self.ys) or not bool(self.free[i, j]):
+                return False
+        return True
+
+    def polygon_supported(self, poly_xy: th.Tensor, margin: float = 0.02) -> bool:
+        """Every vertex and the centroid of a footprint polygon lie on free cells (with margin)."""
+        for p in poly_xy:
+            if not self.contains(p, margin):
+                return False
+        return self.contains(poly_xy.mean(dim=0), 0.0)
+
+    def edges(self):
+        """The four sides of the exposed top in the local frame: list of (name, midpoint_world, outward_normal_world, length)."""
+        umin, umax, vmin, vmax = self.local_bounds()
+        ax, ay = self.local_axes()
+        uc, vc = (umin + umax) / 2, (vmin + vmax) / 2
+        out = []
+        for name, mid_uv, normal, length in (
+            ("+u", (umax, vc), ax, vmax - vmin),
+            ("-u", (umin, vc), -ax, vmax - vmin),
+            ("+v", (uc, vmax), ay, umax - umin),
+            ("-v", (uc, vmin), -ay, umax - umin),
+        ):
+            mid = mid_uv[0] * ax + mid_uv[1] * ay
+            out.append((name, mid, normal, length))
+        return out
+
+    def to_json(self):
+        umin, umax, vmin, vmax = self.local_bounds()
+        return {"name": self.name, "z": self.z, "yaw": self.yaw, "local_bounds": [umin, umax, vmin, vmax],
+                "n_free_cells": int(self.free.sum()), "occupants": self.occupants, "resolution": self.resolution}

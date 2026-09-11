@@ -1,0 +1,192 @@
+{
+ "task": "disembedding",
+ "category": "video_game",
+ "model": "quzjuo",
+ "key": "video_game__quzjuo",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.05932375717163086,
+  0.06525223541259766,
+  0.007184017390012741
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "video_game",
+   "model": "quzjuo"
+  },
+  "task": "disembedding",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 6000,
+   "n_tilt": 303,
+   "n_width_antipodal": 303,
+   "n_table": 303,
+   "n_collision": 303,
+   "n_selected": 12,
+   "com": [
+    0.0,
+    -0.0004,
+    0.0002
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0095
+   ],
+   "score": 5.6959,
+   "meta": {
+    "com_perp": 0.01717,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.01899,
+    "tilt_deg": 3e-05
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/video_game__quzjuo/g0_v1.png",
+    "v2": "/tmp/glib/frames/video_game__quzjuo/g0_v2.png",
+    "v3": "/tmp/glib/frames/video_game__quzjuo/g0_v3.png",
+    "wrist": "/tmp/glib/frames/video_game__quzjuo/g0_wrist.png"
+   },
+   "t_s": 3.33
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.045,
+    0.016
+   ],
+   "score": 5.6878,
+   "meta": {
+    "com_perp": 0.01725,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.01899,
+    "tilt_deg": 2e-05
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/video_game__quzjuo/g1_v1.png",
+    "v2": "/tmp/glib/frames/video_game__quzjuo/g1_v2.png",
+    "v3": "/tmp/glib/frames/video_game__quzjuo/g1_v3.png",
+    "wrist": "/tmp/glib/frames/video_game__quzjuo/g1_wrist.png"
+   },
+   "t_s": 3.3
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0458,
+    0.0148
+   ],
+   "score": 5.659,
+   "meta": {
+    "com_perp": 0.01406,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.01895,
+    "tilt_deg": 30.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/video_game__quzjuo/g2_v1.png",
+    "v2": "/tmp/glib/frames/video_game__quzjuo/g2_v2.png",
+    "v3": "/tmp/glib/frames/video_game__quzjuo/g2_v3.png",
+    "wrist": "/tmp/glib/frames/video_game__quzjuo/g2_wrist.png"
+   },
+   "t_s": 3.32
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0095
+   ],
+   "score": 5.6479,
+   "meta": {
+    "com_perp": 0.01414,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.01895,
+    "tilt_deg": 30.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/video_game__quzjuo/g3_v1.png",
+    "v2": "/tmp/glib/frames/video_game__quzjuo/g3_v2.png",
+    "v3": "/tmp/glib/frames/video_game__quzjuo/g3_v3.png",
+    "wrist": "/tmp/glib/frames/video_game__quzjuo/g3_wrist.png"
+   },
+   "t_s": 3.33
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0435,
+    0.0235
+   ],
+   "score": 5.5453,
+   "meta": {
+    "com_perp": 0.0172,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.01604,
+    "tilt_deg": 0.05639
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/video_game__quzjuo/g4_v1.png",
+    "v2": "/tmp/glib/frames/video_game__quzjuo/g4_v2.png",
+    "v3": "/tmp/glib/frames/video_game__quzjuo/g4_v3.png",
+    "wrist": "/tmp/glib/frames/video_game__quzjuo/g4_wrist.png"
+   },
+   "t_s": 3.26
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 21.3
+}

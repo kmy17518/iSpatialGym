@@ -1,0 +1,21 @@
+{
+ "task": "IORS",
+ "relation": "inside",
+ "category": "lily",
+ "model": "qpqtlz",
+ "key": "lily__qpqtlz__fl",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "flower_stem_top",
+ "bbox": [
+  0.42449217224121094,
+  0.23431231689453125,
+  0.17365287780761718
+ ],
+ "ready": false,
+ "round": 3,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

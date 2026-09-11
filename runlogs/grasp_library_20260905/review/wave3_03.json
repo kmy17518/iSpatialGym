@@ -1,0 +1,320 @@
+{
+  "batch": "wave3_03",
+  "models": [
+    {
+      "key": "quartz__poplsu",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "small crystal pinched between both pads"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "same pinch family as rank 1"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "same pinch family as rank 1"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "same pinch family as rank 1"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "planned width 50 vs closed 30 mm, crystal still held"}
+      ],
+      "object_note": "small crystal; ranks 1-4 are near-duplicate grasps"
+    },
+    {
+      "key": "quartz__drqtci",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "small crystal pinched between both pads"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "same pinch family as rank 1"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "same pinch family as rank 1"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "same pinch family as rank 1"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "vertical approach, 11 mm off CoM, still centred"}
+      ],
+      "object_note": "small crystal; ranks 1-4 are near-duplicate grasps"
+    },
+    {
+      "key": "quartz__klgses",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch at very tip of long crystal, CoM 50 mm away"}
+      ],
+      "object_note": "elongated crystal; only a fallback tip grasp survived (antipodal 0)"
+    },
+    {
+      "key": "quartz__vfuilh",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch near termination, bulk of long crystal hangs below"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch near termination, bulk of long crystal hangs below"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch near termination, bulk of long crystal hangs below"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch near termination, CoM 38 mm away"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch near termination, CoM 39 mm away"}
+      ],
+      "object_note": "long crystal; every grasp sits on the tapered end with antipodal/coverage 0"
+    },
+    {
+      "key": "quartz__tgqodl",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "wide pinch on upper spire; one finger stayed open"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "wide pinch on upper spire; one finger stayed open"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "wide pinch around spires, low antipodal but held"}
+      ],
+      "object_note": "large cluster; all grasps high on tallest spire, fingers 50/33 (object pushed to one pad)"
+    },
+    {
+      "key": "marker__qemval",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "13 mm body pinch near middle"}
+      ]
+    },
+    {
+      "key": "marker__kjxpdi",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "15 mm body pinch about a third from end"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "closed to 2 mm on writing tip; marker dangles"}
+      ]
+    },
+    {
+      "key": "marker__slgheo",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch a third from end"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch at cap/body junction"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch a third from end"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid pinch at cap base, tilted approach"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch near cap base; body hangs but clamped"}
+      ]
+    },
+    {
+      "key": "marker__mcpkkq",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch near cap"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch at cap/body junction"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch at cap/body junction"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "6 mm closure on tapered tip; body hangs far below"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "16 mm cap pinch, body hangs but clamped"}
+      ]
+    },
+    {
+      "key": "marker__mznenj",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at cap/body junction"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "13 mm body pinch near cap"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "19 mm pinch on cap"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "14 mm body pinch; marker pivots but clamped"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "7 mm closure on tip, CoM 52 mm away"}
+      ]
+    },
+    {
+      "key": "marker__xakoic",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch near middle"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch beside cap"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, tilted approach"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "6 mm closure on tip; body hangs"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "1 mm closure on very tip, CoM 48 mm away"}
+      ]
+    },
+    {
+      "key": "marker__vrjwkg",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at cap base"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch at cap/body junction"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "14 mm pinch on cap"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "5 mm closure on tip, CoM 39 mm away"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "cap pinch ~2 cm from end; marker pivots to hang"}
+      ]
+    },
+    {
+      "key": "marker__ablbdc",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch near middle"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch near middle"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp", "penetration"], "note": "fingers fully closed 0/0; marker dangles from fingertips"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch a third from end"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "13 mm body pinch 2-3 cm from end, clamped"}
+      ],
+      "object_note": "rank 3 closed to 0/0: no object between pads, only attach joint holds it"
+    },
+    {
+      "key": "marker__oyjbhy",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at cap base"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch near cap"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "14 mm pinch on cap"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "7 mm closure on cap tip; body hangs"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "2 mm closure on writing tip"}
+      ]
+    },
+    {
+      "key": "marker__gldosk",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at cap base"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid pinch, tilted approach"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "6 mm closure on tapered tip; body hangs"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "8 mm closure at end, CoM 44 mm away"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "6 mm closure on tapered tip"}
+      ]
+    },
+    {
+      "key": "marker__vjjsul",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at cap/body junction"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid pinch, tilted approach"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "12 mm body pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch at cap base"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch at cap base; body hangs but clamped"}
+      ]
+    },
+    {
+      "key": "marker__bwwkmb",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch near middle"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch at cap/body junction"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "closed to 2/1 mm; marker hangs from writing tip"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch at cap base"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "6 mm closure on tip; body hangs"}
+      ]
+    },
+    {
+      "key": "cap__clhquh__s",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "side pinch across cap, mating face free"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "side pinch across cap, both pads on rim"}
+      ],
+      "object_note": "rank 1 one finger stayed at 50 but cap sits between both pads"
+    },
+    {
+      "key": "cap__yqvild__s",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "side pinch across cap, mating face free"}
+      ]
+    },
+    {
+      "key": "french_fries__nfgqwu__s",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "fry pinched lengthwise between its two tips"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "fry pinched lengthwise, antipodal 0.04"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "fry pinched lengthwise between its two tips"}
+      ],
+      "object_note": "fry ends up along the pinch axis in every row; contact only on rounded ends"
+    },
+    {
+      "key": "french_fries__xzsoub__s",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "7 mm closure on tapered tip; fry dangles"}
+      ]
+    },
+    {
+      "key": "french_fries__oeterg__s",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp", "one_finger"], "note": "50/0: pushed against open finger, pinched tip to tip"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp", "one_finger"], "note": "50/0: pushed against open finger, pinched tip to tip"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp", "one_finger"], "note": "49/0: pushed against open finger, pinched tip to tip"}
+      ],
+      "object_note": "one finger never moved in any row; fry spans gap lengthwise"
+    },
+    {
+      "key": "french_fries__kxpfcj__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "lengthwise tip-to-tip pinch, antipodal 0.04"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "lengthwise tip-to-tip pinch, antipodal 0.04"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp", "penetration"], "note": "fingers fully closed 0/0; fry dangles beside fingertips"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "lengthwise tip-to-tip pinch"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "7 mm closure on tip; fry hangs"}
+      ],
+      "object_note": "no cross-body pinch survived; rank 3 has nothing between the pads"
+    },
+    {
+      "key": "french_fries__xshwvn__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "12 mm closure on tapered end; fry dangles"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "1 mm closure on very tip, attached late (step 51)"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "end pinch; long body hangs from fingertips"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "end pinch; long body hangs from fingertips"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp", "one_finger"], "note": "44/0 lengthwise tip-to-tip, pushed against open finger"}
+      ],
+      "object_note": "thin curved fry; every grasp is on an end, none across the body"
+    },
+    {
+      "key": "french_fries__kjqhuo__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "lengthwise tip-to-tip pinch despite planned 25 mm width"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "7 mm closure on tip; fry hangs"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "lengthwise tip-to-tip pinch, one finger stayed open"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "12 mm closure near end; fry hangs"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "1 mm closure on very tip"}
+      ],
+      "object_note": "planned cross pinches turned into lengthwise or tip grasps after closing"
+    },
+    {
+      "key": "garlic_clove__zpzrac__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "28 mm body pinch"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "46/0 lengthwise root-to-tip, pushed against open finger"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "34 mm body pinch after clove rotated"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "49/0 lengthwise root-to-tip, pushed against open finger"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "29 mm body pinch"}
+      ],
+      "object_note": "ranks 2 and 4: one finger never moved, tip contact on far pad doubtful"
+    },
+    {
+      "key": "garlic_clove__qaqrqd__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "28 mm body pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "28 mm body pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch on root end, tip hangs below"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch on root end, tip hangs below"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch on root end, tip hangs below"}
+      ]
+    },
+    {
+      "key": "garlic_clove__xotobt__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "27 mm body pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "29 mm body pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "27 mm body pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "35 mm pinch on wide part, tip hangs"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "36 mm pinch on wide part"}
+      ]
+    },
+    {
+      "key": "garlic_clove__hpzvmi__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "30 mm body pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "31 mm pinch on upper body, tip hangs"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "31 mm body pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "30 mm pinch on upper body, tip hangs"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "48/0 lengthwise, pushed against open finger; tip contact doubtful"}
+      ]
+    },
+    {
+      "key": "garlic_clove__saombi__s",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "28 mm pinch at fingertips, both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "28 mm pinch at fingertips, both pads touching"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "28 mm pinch at fingertips"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "26 mm pinch at fingertips"}
+      ],
+      "object_note": "small clove held near the very fingertips in every row"
+    }
+  ]
+}

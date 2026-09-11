@@ -1,0 +1,199 @@
+{
+ "task": "object_scaling",
+ "relation": null,
+ "category": "bottle_of_olive_oil",
+ "model": "luikop",
+ "key": "bottle_of_olive_oil__luikop__f",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.040227542877197264,
+  0.040227542877197264,
+  0.15934388870373367
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "bottle_of_olive_oil",
+   "model": "luikop"
+  },
+  "task": "object_scaling",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 500,
+   "n_lever": 496,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    0.0001,
+    0.0,
+    0.0004
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.042,
+    0.0
+   ],
+   "score": 19.6775,
+   "meta": {
+    "com_perp": 0.00223,
+    "width": 0.03986,
+    "antipodal": 0.98885,
+    "coverage": 1.0,
+    "clearance": 0.02306,
+    "tilt_deg": 91.44506,
+    "graspgen_conf": 0.9803
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g0_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g0_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g0_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g0_wrist.png"
+   },
+   "t_s": 3.59
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0416,
+    0.0
+   ],
+   "score": 19.6242,
+   "meta": {
+    "com_perp": 0.00194,
+    "width": 0.03996,
+    "antipodal": 0.99369,
+    "coverage": 1.0,
+    "clearance": 0.01837,
+    "tilt_deg": 109.3627,
+    "graspgen_conf": 0.97467
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g1_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g1_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g1_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g1_wrist.png"
+   },
+   "t_s": 3.61
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0418,
+    0.0
+   ],
+   "score": 19.6042,
+   "meta": {
+    "com_perp": 0.00303,
+    "width": 0.03981,
+    "antipodal": 0.99382,
+    "coverage": 1.0,
+    "clearance": 0.02205,
+    "tilt_deg": 88.69131,
+    "graspgen_conf": 0.98802
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g2_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g2_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g2_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g2_wrist.png"
+   },
+   "t_s": 3.61
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0424,
+    0.0
+   ],
+   "score": 19.5568,
+   "meta": {
+    "com_perp": 0.00297,
+    "width": 0.03968,
+    "antipodal": 0.97699,
+    "coverage": 1.0,
+    "clearance": 0.02213,
+    "tilt_deg": 89.28382,
+    "graspgen_conf": 0.96949
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g3_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g3_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g3_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g3_wrist.png"
+   },
+   "t_s": 3.65
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0422,
+    0.0
+   ],
+   "score": 19.5113,
+   "meta": {
+    "com_perp": 0.0037,
+    "width": 0.03943,
+    "antipodal": 0.97952,
+    "coverage": 1.0,
+    "clearance": 0.02135,
+    "tilt_deg": 90.46662,
+    "graspgen_conf": 0.98753
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g4_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g4_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g4_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_olive_oil__luikop__f/g4_wrist.png"
+   },
+   "t_s": 3.56
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 23.1
+}

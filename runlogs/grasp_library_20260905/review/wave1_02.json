@@ -1,0 +1,1082 @@
+{
+ "batch": "wave1_02",
+ "models": [
+  {
+   "key": "bottle_of_medicine__qqsukh",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, bottle spans both pads"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, bottle spans both pads"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, bottle spans both pads"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, bottle spans both pads"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, bottle spans both pads"
+    }
+   ],
+   "object_note": "reported width 25mm inconsistent with ~48mm bottle filling pad gap; 50/x closure but body spans both pads"
+  },
+  {
+   "key": "bottle_of_medicine__syfpak",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, bottle spans both pads"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, bottle spans both pads"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, bottle spans both pads"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, bottle spans both pads"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, bottle spans both pads"
+    }
+   ],
+   "object_note": "reported width 25mm inconsistent with ~48mm bottle filling pad gap; 50/x closure but body spans both pads"
+  },
+  {
+   "key": "bottle_of_medicine__zfbnjh",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near CoM, centred between pads"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near CoM, centred between pads"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near CoM, centred between pads"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near CoM, centred between pads"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near CoM, centred between pads"
+    }
+   ]
+  },
+  {
+   "key": "bottle_of_pop__hjrwqb",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "V1 empty render; V2/V3 show centred body pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    }
+   ]
+  },
+  {
+   "key": "bottle_of_pop__iynssk",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    }
+   ]
+  },
+  {
+   "key": "bottle_of_pop__jnoksl",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    }
+   ]
+  },
+  {
+   "key": "bottle_of_pop__msmlud",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "V1 empty render; V2/V3 show centred body pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    }
+   ]
+  },
+  {
+   "key": "bottle_of_pop__oeipjl",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "V1 empty render; V2/V3 show centred body pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    }
+   ]
+  },
+  {
+   "key": "bottle_of_pop__oghrnk",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    }
+   ]
+  },
+  {
+   "key": "bottle_of_pop__pfjzkn",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "V1 empty render; V2/V3 show centred body pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "V2 shows oblique view instead; V1/V3 body pinch fine"
+    }
+   ]
+  },
+  {
+   "key": "bottle_of_pop__pvabxf",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    }
+   ]
+  },
+  {
+   "key": "bottle_of_pop__pyrics",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "V1 empty render; V2/V3 show centred body pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    }
+   ]
+  },
+  {
+   "key": "bottle_of_pop__rhclfg",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "V1 empty render; V2/V3 show centred body pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    }
+   ]
+  },
+  {
+   "key": "bottle_of_pop__twtsry",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, bottle fills pad gap in V2"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, bottle fills pad gap in V2"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, bottle fills pad gap in V2"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, bottle fills pad gap in V2"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, bottle fills pad gap in V2"
+    }
+   ],
+   "object_note": "reported width 18mm inconsistent with ~55mm body filling pad gap; width metric likely wrong"
+  },
+  {
+   "key": "bottle_of_pop__ubazru",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "V1 empty render; V2/V3 show centred body pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    }
+   ]
+  },
+  {
+   "key": "bottle_of_water__atvnqy",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body pinch, 57mm contact, both pads on body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder/upper-body pinch, 53mm contact, both pads on body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "bottle hangs vertically from wide base section; full pad contact"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "bottle hangs vertically from wide base section; full pad contact"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "bottle hangs vertically from wide base section; full pad contact"
+    }
+   ]
+  },
+  {
+   "key": "bottle_of_water__cytqio",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "short neck pinch under lip flare; lever arm ~93mm but lip shape-locks"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "short neck pinch under lip flare; lever arm ~93mm but lip shape-locks"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "short neck pinch under lip flare; lever arm ~93mm but lip shape-locks"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "short neck pinch under lip flare; lever arm ~93mm but lip shape-locks"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "short neck pinch under lip flare; lever arm ~93mm but lip shape-locks"
+    }
+   ],
+   "object_note": "jug body too wide to grasp; all rows pinch the short neck just under the flared lip"
+  },
+  {
+   "key": "bottle_of_water__cyzaue",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on flat facets near CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on flat facets near CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on flat facets near CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, antipodal 0.83 across facet edge, both pads touch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder taper pinch 28mm, wider body below pads (wedge lock)"
+    }
+   ]
+  },
+  {
+   "key": "bottle_of_water__eeaimz",
+   "n_rows": 1,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch under cap, wide tapered body below pads wedges"
+    }
+   ],
+   "object_note": "large jug; only one candidate, pads nearly at max opening (81mm) on shoulder, lever arm 137mm"
+  },
+  {
+   "key": "bottle_of_water__emquat",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "78mm body pinch near base end, wider belly hangs below pads"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "78mm body pinch near base end, wider belly hangs below pads"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "78mm body pinch near base end, wider belly hangs below pads"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "78mm body pinch near base end, wider belly hangs below pads"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "78mm body pinch near base end, wider belly hangs below pads"
+    }
+   ],
+   "object_note": "wide bottle (78mm) pinched at base-end waist; lever arm 68-78mm but full pad contact and belly wedge-locks"
+  },
+  {
+   "key": "bottle_of_water__jmwngr",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch 52mm below cap, body hangs below pads"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "cap-only pinch 22mm, 175mm lever arm on 2L bottle"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper body/shoulder pinch 63mm, full pad contact"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "cap-only pinch 21mm, 176mm lever arm on 2L bottle"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "cap-only pinch 22mm, horizontal bottle, 177mm lever arm"
+    }
+   ],
+   "object_note": "large 2L bottle; cap pinches would swing/slip without assisted grasp, shoulder pinches fine"
+  },
+  {
+   "key": "bottle_of_water__lkpaas",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/shoulder pinch below mouth, body hangs below pads (wedge lock)"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/shoulder pinch below mouth, body hangs below pads (wedge lock)"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/shoulder pinch below mouth, body hangs below pads (wedge lock)"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/shoulder pinch below mouth, body hangs below pads (wedge lock)"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body pinch 66mm near neck, horizontal, full pad contact"
+    }
+   ],
+   "object_note": "very large transparent bottle; all grasps at neck/shoulder with 149-170mm lever arm, handle-like so accepted"
+  },
+  {
+   "key": "bottle_of_water__migvlt",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch on octagonal flats through CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch on octagonal flats through CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch on octagonal flats through CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, antipodal 0.88 pad on facet edge, both touch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch on octagonal flats through CoM"
+    }
+   ]
+  },
+  {
+   "key": "bottle_of_water__rmtdxh",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch 34-41mm, shoulder below wedge-locks when hanging"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch 34-41mm, shoulder below wedge-locks when hanging"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch 34-41mm, shoulder below wedge-locks when hanging"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch 34-41mm, shoulder below wedge-locks when hanging"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "bottle hangs vertically from 67mm body near base; full pad contact"
+    }
+   ],
+   "object_note": "bulbous bottle; neck grasps have 81-93mm lever arm but neck is a natural handle-like feature"
+  },
+  {
+   "key": "bottle_of_water__rrkhva",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body pinch 60mm, both pads on body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch 16-18mm just under mouth rim; shoulder below wedge-locks"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch 16-18mm just under mouth rim; shoulder below wedge-locks"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch 16-18mm just under mouth rim; shoulder below wedge-locks"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch 16-18mm just under mouth rim; shoulder below wedge-locks"
+    }
+   ],
+   "object_note": "small metal bottle; neck grasps are handle-like, lever arm 50-57mm"
+  },
+  {
+   "key": "bottle_of_water__suytyi",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, antipodal 0.80 but bottle spans both pads"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on body"
+    }
+   ],
+   "object_note": "reported width 35-44mm inconsistent with ~60mm body filling pad gap; width metric likely wrong"
+  },
+  {
+   "key": "bottle_of_water__sxffiv",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch on flat faces through CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch 57mm, CoM offset 41mm, full pad contact"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch 64mm near base end, full pad contact"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "base-end body pinch 66mm, pads fully on flat faces"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "base-end body pinch 62mm, lever arm 80mm, pads fully on faces"
+    }
+   ],
+   "object_note": "square 1L bottle; rows 3-5 sit toward the base end but with full flat-face pad contact"
+  },
+  {
+   "key": "bottle_of_wine__bmudli",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near CoM, both pads on glass"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near base, bottle hangs neck-down, full pad contact"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near base, tilted, full pad contact"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near base, hangs neck-down, firm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near base, tilted, firm"
+    }
+   ],
+   "object_note": "Small wine bottle; 50/x finger readings but both pads visibly on body"
+  },
+  {
+   "key": "bottle_of_wine__cldder",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch below cork/lip, lip shape-locks; long lever arm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch at shoulder junction, wedge lock; long lever arm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch at shoulder junction, wedge lock; long lever arm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper neck pinch below lip, lip shape-locks; long lever arm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch at shoulder junction, wedge lock; long lever arm"
+    }
+   ],
+   "object_note": "All grasps on neck (CoM offset 100-117mm); finger readings a/0 but tips visibly on neck"
+  },
+  {
+   "key": "bottle_of_wine__hnkiog",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near CoM, both pads on body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, both pads on body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch toward base, full pad contact"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near base end, full pad contact"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near base end, full pad contact"
+    }
+   ],
+   "object_note": "Squat wine bottle; 50/x finger readings but pads visibly on body"
+  }
+ ]
+}

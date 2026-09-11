@@ -1,0 +1,120 @@
+{
+ "category": "top_cabinet",
+ "model": "fqitbw",
+ "key": "top_cabinet__fqitbw",
+ "aabb_extent": [
+  0.18009045720100403,
+  0.5690925121307373,
+  0.15761306881904602
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0663,
+   -0.2838,
+   -0.0771
+  ],
+  "bbox_max": [
+   0.0939,
+   0.2853,
+   0.0805
+  ],
+  "n_pieces": 9
+ },
+ "joints": [
+  {
+   "joint": "j_link_1",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "link_1",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.1016,
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.09307,
+    0.02874,
+    0.07808
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 2.094395160675049,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.0906,
+    -0.2799,
+    -0.0745
+   ],
+   "link_bbox_max": [
+    0.1138,
+    0.2813,
+    0.0786
+   ],
+   "handles": [
+    {
+     "kind": "knob",
+     "contact": [
+      0.1077,
+      0.25,
+      -0.0584
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0159,
+     "length": 0.0159,
+     "depth": 0.0122,
+     "face_s": 0.1016,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9943,
+      0.0,
+      0.1066
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     0.0954,
+     -0.0554,
+     -0.0396
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     -0.1192,
+     -0.0,
+     0.9929
+    ],
+    "width": 0.0206,
+    "exposed": true,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     0.9998,
+     0.0,
+     0.0198
+    ]
+   },
+   "sub_links": [],
+   "status": "handle"
+  }
+ ]
+}

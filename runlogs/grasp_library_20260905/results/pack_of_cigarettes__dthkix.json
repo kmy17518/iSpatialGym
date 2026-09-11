@@ -1,0 +1,192 @@
+{
+ "task": "disembedding",
+ "category": "pack_of_cigarettes",
+ "model": "dthkix",
+ "key": "pack_of_cigarettes__dthkix",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.11012501525878907,
+  0.05460805130004883,
+  0.01603305149078369
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "pack_of_cigarettes",
+   "model": "dthkix"
+  },
+  "task": "disembedding",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 5496,
+   "n_tilt": 324,
+   "n_width_antipodal": 324,
+   "n_table": 324,
+   "n_collision": 324,
+   "n_selected": 12,
+   "com": [
+    -0.0,
+    -0.0,
+    0.0
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0035
+   ],
+   "score": 7.1482,
+   "meta": {
+    "com_perp": 0.01274,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.02115,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g0_v1.png",
+    "v2": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g0_v2.png",
+    "v3": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g0_v3.png",
+    "wrist": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g0_wrist.png"
+   },
+   "t_s": 3.33
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0437,
+    0.0117
+   ],
+   "score": 7.1481,
+   "meta": {
+    "com_perp": 0.01274,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.02115,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g1_v1.png",
+    "v2": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g1_v2.png",
+    "v3": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g1_v3.png",
+    "wrist": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g1_wrist.png"
+   },
+   "t_s": 3.38
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0473,
+    0.0078
+   ],
+   "score": 7.123,
+   "meta": {
+    "com_perp": 0.00962,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.02115,
+    "tilt_deg": 30.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g2_v1.png",
+    "v2": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g2_v2.png",
+    "v3": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g2_v3.png",
+    "wrist": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g2_wrist.png"
+   },
+   "t_s": 3.39
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0476,
+    0.0075
+   ],
+   "score": 7.1195,
+   "meta": {
+    "com_perp": 0.00965,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.02115,
+    "tilt_deg": 30.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g3_v1.png",
+    "v2": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g3_v2.png",
+    "v3": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g3_v3.png",
+    "wrist": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g3_wrist.png"
+   },
+   "t_s": 3.15
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0062
+   ],
+   "score": 6.7197,
+   "meta": {
+    "com_perp": 0.01297,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.02115,
+    "tilt_deg": 30.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g4_v1.png",
+    "v2": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g4_v2.png",
+    "v3": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g4_v3.png",
+    "wrist": "/tmp/glib/frames/pack_of_cigarettes__dthkix/g4_wrist.png"
+   },
+   "t_s": 3.39
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 21.4
+}

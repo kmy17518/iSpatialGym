@@ -1,0 +1,19 @@
+{
+ "task": "IORS",
+ "category": "sunflower",
+ "model": "ooefvj",
+ "key": "sunflower__ooefvj",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "flower_stem_top",
+ "bbox": [
+  0.13771393585205077,
+  0.06709648895263672,
+  0.06047726440429688
+ ],
+ "ready": true,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

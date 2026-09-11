@@ -1,0 +1,365 @@
+{
+  "batch": "wave1_01",
+  "models": [
+    {
+      "key": "bottle_of_beer__fgzjnb",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/19: base-end body pushed against open finger"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/20: base-end body pushed against open finger"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck pinch below cap, asymmetric 37/0 but closed"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck pinch below cap"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck pinch below cap"}
+      ],
+      "object_note": "Wide body grasps sit against the open finger; neck grasps are natural handle-like pinches."
+    },
+    {
+      "key": "bottle_of_beer__gxxbhh",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/20: body pushed against open finger, hangs vertical"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/18: base-end body pushed against open finger"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck pinch below cap, 37/0"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/20: base-end body pushed against open finger"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck pinch below cap, 37/0"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_beer__kqskmv",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck pinch below lip, 34/0"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/15: base-end body pushed against open finger"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/15: base-end body pushed against open finger"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "44/20 asymmetric but both pads closed on body"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/14: base-end body pushed against open finger"}
+      ],
+      "object_note": "Body grasps are at the very base end (CoM offset ~72mm) but contact is full pad on cylinder."
+    },
+    {
+      "key": "bottle_of_beer__meqliv",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck pinch below cap, 44/0"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch below cap, 44/0"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck pinch below cap, cap visible in wrist cam"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck pinch below cap, 45/0"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck pinch below cap, 42/0"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_beer__nfzzqc",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck pinch below cap, 48/0 asymmetric but closed"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch below cap, 47/0"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck pinch on label, 46/0"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck pinch below cap, 46/0"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck pinch below cap, 46/0"}
+      ],
+      "object_note": "Large bottle; all grasps on upper neck with long lever arm (CoM 130-144mm), handle-like so accepted."
+    },
+    {
+      "key": "bottle_of_beer__phdimo",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck pinch at top of neck, 40/0"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch at top of neck, 40/0"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck pinch at top of neck, 40/0"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/18: base-end body pushed against open finger"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck pinch at top of neck, 44/0"}
+      ],
+      "object_note": "Clear glass bottle; transparency makes pad contact hard to verify."
+    },
+    {
+      "key": "bottle_of_beer__qepxvl",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/6: mid-body pushed against open finger"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/7: mid-body pushed against open finger"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/7: mid-body pushed against open finger"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/7: mid-body pushed against open finger"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/7: mid-body pushed against open finger"}
+      ],
+      "object_note": "Grasp locations (mid-body, CoM offset 12-24mm) are good; only the one-finger closure pattern is wrong."
+    },
+    {
+      "key": "bottle_of_beer__rdnopv",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/7: mid-body pushed against open finger"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/7: mid-body pushed against open finger"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/7: mid-body pushed against open finger"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/7: mid-body pushed against open finger"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/7: base-end body, vertical hang, open finger"}
+      ],
+      "object_note": "Grasp locations are good; every row shows the 50/x one-finger closure pattern."
+    },
+    {
+      "key": "bottle_of_beer__saslsh",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/13: base-end body pushed against open finger"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch below cap, 35/0"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck pinch below cap, 35/0"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck pinch below cap, 35/0"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "upper neck pinch just under cap, 34/0"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_beer__zbsxro",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck pinch below cap, 42/0"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch below cap, 42/0"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck pinch below cap, cap in wrist cam"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck pinch below cap, 42/0"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck pinch below cap, 42/0"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_beer__zlmwyn",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "thin neck pinch (29mm), cap protrudes, 33/0"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "thin neck pinch (29mm), 33/0"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "lower neck flare, antipodal 0.87, pad gap exceeds width"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "upper neck pinch under cap, 30/0"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "upper neck pinch under cap, 30/0"}
+      ],
+      "object_note": "Long-neck bottle; all neck grasps with long lever arm (CoM 131-147mm), handle-like so accepted."
+    },
+    {
+      "key": "bottle_of_black_pepper__ejtiig",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/12: body pushed against open finger"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/14: body pushed against open finger"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/12: body pushed against open finger"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/13: body pushed against open finger"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/12: body pushed against open finger"}
+      ],
+      "object_note": "Pad gap from finger values (~60mm) exceeds reported width 47-50mm; pads likely stop on rim or oversized hull."
+    },
+    {
+      "key": "bottle_of_black_pepper__honise",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "small jar body pinch at CoM, 45/0 asymmetric"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "small jar body pinch at CoM, 45/0"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "small jar body pinch at CoM, 45/0"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "small jar body pinch, tilt 107, 45/0"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "small jar body pinch at CoM, 45/0"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_black_pepper__ydzzrv",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/12: body pushed against open finger"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/12, antipodal 0.88, width 51 vs ~60 pad gap"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/12, antipodal 0.90"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/12, antipodal 0.74 poor opposition, likely rim contact"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/12: body pushed against open finger"}
+      ],
+      "object_note": "Pad gap (~60mm) exceeds reported width 44-51mm; low antipodal scores suggest pads on dome/rim, not cylinder."
+    },
+    {
+      "key": "bottle_of_black_pepper__zybfok",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/12: body pushed against open finger"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "33/29 symmetric pinch; pad gap exceeds width 43"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/11: body pushed against open finger"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/11: body pushed against open finger"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/12, antipodal 0.88"}
+      ],
+      "object_note": "Pad gap (~60mm) exceeds reported width 43-50mm; pads likely stop on rim or oversized collision hull."
+    },
+    {
+      "key": "bottle_of_catsup__ahoiqe",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/4: body pushed against open finger"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/4: body pushed against open finger"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/5: body pushed against open finger"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/5: body pushed against open finger"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/4: body pushed against open finger"}
+      ],
+      "object_note": "Mid-body pinches through CoM are well placed; only the one-finger closure pattern is wrong."
+    },
+    {
+      "key": "bottle_of_catsup__bcqfxb",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/17: upper body pushed against open finger"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/18: upper body pushed against open finger"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/17: upper body pushed against open finger"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/19, antipodal 0.92, shoulder taper"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "31/38 near-symmetric upper-body pinch, neck between fingers"}
+      ],
+      "object_note": "Over-the-cap grasps on upper body/shoulder of large bottle; long lever arm (CoM ~112mm) but full pad contact."
+    },
+    {
+      "key": "bottle_of_catsup__dmyfdf",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "49/0: body against open finger, other fully closed"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/2: body pushed against open finger"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/3: body pushed against open finger"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/2: body pushed against open finger"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: body against open finger, other fully closed"}
+      ],
+      "object_note": "Cone-shaped squeeze bottle; pinches through CoM on wide base section are well placed."
+    },
+    {
+      "key": "bottle_of_catsup__hvxkso",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "flat body pinch near CoM, 38/0 asymmetric"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "flat body pinch near CoM, 39/0"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "flat body pinch near CoM, 38/0"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "flat body pinch, tilt 78, antipodal 0.91"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "flat body pinch, CoM offset 19mm, 38/0"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_catsup__ialodu",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: body against open finger, other fully closed"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: body against open finger, other fully closed"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/2: body pushed against open finger"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: body against open finger, other fully closed"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/2: body pushed against open finger"}
+      ],
+      "object_note": "Cone-shaped squeeze bottle; pinches on wide base section near CoM are well placed."
+    },
+    {
+      "key": "bottle_of_essential_oil__eyyhld",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM, both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM, tilt 66"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "small bottle body pinch, approach from cap side"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_essential_oil__wansva",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM, tilt 62"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_essential_oil__xhoipk",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch, coverage 0.75, approach from cap"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM, tilt 62"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM, tilt 64"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_essential_oil__xvqshn",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM, tilt 60"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_essential_oil__yjxvpg",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM, tilt 63"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM, tilt 62"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "small bottle body pinch, coverage 0.75"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "small bottle body pinch at CoM, tilt 61"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_medicine__egondf",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: body against open finger, other fully closed"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: body against open finger, tilt 69"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "46/6 asymmetric but both pads closed, coverage 0.75"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: body pushed against open finger"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: body pushed against open finger, coverage 0.75"}
+      ],
+      "object_note": "Pill bottle body pinches through CoM; placement fine, closure pattern one-sided in 4 of 5."
+    },
+    {
+      "key": "bottle_of_medicine__fmfwng",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: body pushed against open finger"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/1, antipodal 0.93"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: body against open finger, coverage 0.75"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: body against open finger, tilt 67"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: body pushed against open finger"}
+      ],
+      "object_note": "Reported width 25-26mm inconsistent with visual (~48mm bottle fills pad gap); width metric likely wrong."
+    },
+    {
+      "key": "bottle_of_medicine__hvocpc",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "box pinched across thin dimension at CoM, tilt 63"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "box pinched across thin dimension at CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "box pinched across thin dimension at CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "box pinched across thin dimension at CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "box pinched across thin dimension at CoM"}
+      ],
+      "object_note": "Object is a medicine box, not a bottle; flat-face pinches are ideal."
+    },
+    {
+      "key": "bottle_of_medicine__kasbsy",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "42/8 asymmetric but both pads closed on body"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: body against open finger, other fully closed"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: body against open finger, other fully closed"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: body against open finger, other fully closed"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: body against open finger, other fully closed"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_medicine__kqkwoq",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: body pushed against open finger"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "48/3 asymmetric, both pads closed; borderline"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: body pushed against open finger, tilt 105"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "44/8 asymmetric but closed, antipodal 0.91"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: body pushed against open finger, tilt 67"}
+      ],
+      "object_note": "Reported width 24-27mm inconsistent with visual (~48mm bottle fills pad gap); width metric likely wrong."
+    }
+  ]
+}

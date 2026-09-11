@@ -1,0 +1,271 @@
+{
+ "category": "oven",
+ "model": "nkxhvf",
+ "key": "oven__nkxhvf",
+ "aabb_extent": [
+  0.5114114284515381,
+  0.5362890362739563,
+  0.8526049852371216
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.2271,
+   -0.2681,
+   -0.4775
+  ],
+  "bbox_max": [
+   0.2488,
+   0.2682,
+   0.362
+  ],
+  "n_pieces": 8
+ },
+ "joints": [
+  {
+   "joint": "j_link_3",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "link_3",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.2453,
+   "axis_dir_obj": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.22605,
+    -5e-05,
+    -0.47078
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5707964897155762,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.2224,
+    -0.2664,
+    -0.4906
+   ],
+   "link_bbox_max": [
+    0.281,
+    0.2665,
+    -0.0226
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.269,
+      -0.0943,
+      -0.0768
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0229,
+     "length": 0.2433,
+     "depth": 0.0357,
+     "face_s": 0.2453,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9941,
+      0.0,
+      -0.1084
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      0.269,
+      0.0955,
+      -0.077
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0229,
+     "length": 0.2387,
+     "depth": 0.0357,
+     "face_s": 0.2453,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9941,
+      0.0,
+      -0.1084
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     0.2313,
+     -0.0136,
+     -0.0578
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     -0.1189,
+     -0.0,
+     -0.9929
+    ],
+    "width": 0.0211,
+    "exposed": false,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     0.9999,
+     0.0,
+     -0.0127
+    ]
+   },
+   "sub_links": [],
+   "status": "handle"
+  },
+  {
+   "joint": "j_link_4",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "link_4",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.2466,
+   "axis_dir_obj": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.22816,
+    0.00078,
+    -0.01099
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5707948207855225,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.2232,
+    -0.2664,
+    -0.0311
+   ],
+   "link_bbox_max": [
+    0.2843,
+    0.2664,
+    0.2349
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.2723,
+      -0.0942,
+      0.191
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.023,
+     "length": 0.2355,
+     "depth": 0.0377,
+     "face_s": 0.2466,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9769,
+      0.0,
+      -0.2135
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      0.2723,
+      0.0938,
+      0.1913
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.023,
+     "length": 0.2405,
+     "depth": 0.0377,
+     "face_s": 0.2466,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.977,
+      0.0,
+      -0.2132
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     0.2326,
+     0.0993,
+     0.2002
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     -0.2211,
+     -0.0,
+     -0.9753
+    ],
+    "width": 0.0557,
+    "exposed": false,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     0.9998,
+     0.0,
+     -0.021
+    ]
+   },
+   "sub_links": [],
+   "status": "handle"
+  }
+ ]
+}

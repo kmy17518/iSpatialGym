@@ -1,0 +1,363 @@
+{
+ "task": "mental_rotation",
+ "relation": null,
+ "category": "garlic_clove",
+ "model": "hpzvmi",
+ "key": "garlic_clove__hpzvmi__sf",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.008821546077728271,
+  0.013404611110687257,
+  0.0055399172306060795
+ ],
+ "ready": true,
+ "round": 2,
+ "scale": [
+  3.61,
+  3.61,
+  3.61
+ ],
+ "scale_rule": "uniform",
+ "candidates_meta": {
+  "object": {
+   "category": "garlic_clove",
+   "model": "hpzvmi"
+  },
+  "task": "mental_rotation",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 490,
+   "n_lever": 490,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    -0.0007,
+    -0.0001,
+    -0.0001
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 19.8898,
+   "meta": {
+    "com_perp": 8e-05,
+    "width": 0.01777,
+    "antipodal": 0.96484,
+    "coverage": 1.0,
+    "clearance": 0.02672,
+    "tilt_deg": 90.11634,
+    "graspgen_conf": 0.97991
+   },
+   "frames": {},
+   "t_s": 5.02
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 19.5297,
+   "meta": {
+    "com_perp": 0.00087,
+    "width": 0.01774,
+    "antipodal": 0.94506,
+    "coverage": 1.0,
+    "clearance": 0.02112,
+    "tilt_deg": 110.13054,
+    "graspgen_conf": 0.9668
+   },
+   "frames": {},
+   "t_s": 5.01
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 19.5242,
+   "meta": {
+    "com_perp": 0.00102,
+    "width": 0.01735,
+    "antipodal": 0.98029,
+    "coverage": 1.0,
+    "clearance": 0.03147,
+    "tilt_deg": 97.21656,
+    "graspgen_conf": 0.97556
+   },
+   "frames": {},
+   "t_s": 5.13
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 19.5138,
+   "meta": {
+    "com_perp": 0.00106,
+    "width": 0.01748,
+    "antipodal": 0.98651,
+    "coverage": 1.0,
+    "clearance": 0.02127,
+    "tilt_deg": 96.64318,
+    "graspgen_conf": 0.97391
+   },
+   "frames": {},
+   "t_s": 5.04
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 19.4298,
+   "meta": {
+    "com_perp": 0.00112,
+    "width": 0.01813,
+    "antipodal": 0.93483,
+    "coverage": 1.0,
+    "clearance": 0.02455,
+    "tilt_deg": 110.19,
+    "graspgen_conf": 0.96985
+   },
+   "frames": {},
+   "t_s": 5.02
+  },
+  {
+   "grasp": "grasp_5",
+   "idx": 5,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0009,
+    0.0
+   ],
+   "score": 19.4204,
+   "meta": {
+    "com_perp": 0.00114,
+    "width": 0.0187,
+    "antipodal": 0.92272,
+    "coverage": 1.0,
+    "clearance": 0.02196,
+    "tilt_deg": 88.45894,
+    "graspgen_conf": 0.97439
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/garlic_clove__hpzvmi__sf/g5_v1.png",
+    "v2": "/tmp/glib/frames/garlic_clove__hpzvmi__sf/g5_v2.png",
+    "v3": "/tmp/glib/frames/garlic_clove__hpzvmi__sf/g5_v3.png",
+    "wrist": "/tmp/glib/frames/garlic_clove__hpzvmi__sf/g5_wrist.png"
+   },
+   "t_s": 3.46
+  },
+  {
+   "grasp": "grasp_6",
+   "idx": 6,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 19.3924,
+   "meta": {
+    "com_perp": 0.00133,
+    "width": 0.01793,
+    "antipodal": 0.9791,
+    "coverage": 1.0,
+    "clearance": 0.02184,
+    "tilt_deg": 96.77521,
+    "graspgen_conf": 0.96744
+   },
+   "frames": {},
+   "t_s": 5.13
+  },
+  {
+   "grasp": "grasp_7",
+   "idx": 7,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0064,
+    0.0
+   ],
+   "score": 19.3479,
+   "meta": {
+    "com_perp": 0.00149,
+    "width": 0.01774,
+    "antipodal": 0.98838,
+    "coverage": 1.0,
+    "clearance": 0.02206,
+    "tilt_deg": 93.08862,
+    "graspgen_conf": 0.97056
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/garlic_clove__hpzvmi__sf/g7_v1.png",
+    "v2": "/tmp/glib/frames/garlic_clove__hpzvmi__sf/g7_v2.png",
+    "v3": "/tmp/glib/frames/garlic_clove__hpzvmi__sf/g7_v3.png",
+    "wrist": "/tmp/glib/frames/garlic_clove__hpzvmi__sf/g7_wrist.png"
+   },
+   "t_s": 3.48
+  },
+  {
+   "grasp": "grasp_8",
+   "idx": 8,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 19.3431,
+   "meta": {
+    "com_perp": 0.00147,
+    "width": 0.01736,
+    "antipodal": 0.97956,
+    "coverage": 1.0,
+    "clearance": 0.0287,
+    "tilt_deg": 78.38802,
+    "graspgen_conf": 0.96887
+   },
+   "frames": {},
+   "t_s": 5.13
+  },
+  {
+   "grasp": "grasp_9",
+   "idx": 9,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0012,
+    0.0
+   ],
+   "score": 19.3321,
+   "meta": {
+    "com_perp": 0.00154,
+    "width": 0.0177,
+    "antipodal": 0.98243,
+    "coverage": 1.0,
+    "clearance": 0.02209,
+    "tilt_deg": 101.22143,
+    "graspgen_conf": 0.97511
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/garlic_clove__hpzvmi__sf/g9_v1.png",
+    "v2": "/tmp/glib/frames/garlic_clove__hpzvmi__sf/g9_v2.png",
+    "v3": "/tmp/glib/frames/garlic_clove__hpzvmi__sf/g9_v3.png",
+    "wrist": "/tmp/glib/frames/garlic_clove__hpzvmi__sf/g9_wrist.png"
+   },
+   "t_s": 3.49
+  },
+  {
+   "grasp": "grasp_10",
+   "idx": 10,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 19.3189,
+   "meta": {
+    "com_perp": 0.00152,
+    "width": 0.01732,
+    "antipodal": 0.97478,
+    "coverage": 1.0,
+    "clearance": 0.02575,
+    "tilt_deg": 84.18213,
+    "graspgen_conf": 0.96759
+   },
+   "frames": {},
+   "t_s": 5.17
+  },
+  {
+   "grasp": "grasp_11",
+   "idx": 11,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 19.2767,
+   "meta": {
+    "com_perp": 0.0017,
+    "width": 0.01725,
+    "antipodal": 0.97889,
+    "coverage": 1.0,
+    "clearance": 0.02849,
+    "tilt_deg": 78.19219,
+    "graspgen_conf": 0.97832
+   },
+   "frames": {},
+   "t_s": 5.17
+  }
+ ],
+ "n_valid": 3,
+ "error": null,
+ "t_model_s": 67.3
+}

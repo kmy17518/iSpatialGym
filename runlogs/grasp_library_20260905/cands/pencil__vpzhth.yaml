@@ -1,0 +1,76 @@
+format: isaac_grasp
+format_version: 1.0
+object_frame: base_link
+gripper_frame: right_eef_link
+ispatialgym:
+  object:
+    category: pencil
+    model: vpzhth
+  task: IORS
+  constraint: tabletop
+  pipeline: a1
+  gripper: r1pro_right
+  source: a1_tabletop
+  log:
+    n_sampled: 5952
+    n_tilt: 408
+    n_width_antipodal: 390
+    n_table: 3
+    n_collision: 3
+    n_selected: 2
+    com:
+    - 0.0005
+    - -0.0
+    - -0.0
+    rest_pose: canonical
+  rest_pose: canonical
+  rest_quat_wxyz:
+  - 1.0
+  - 0.0
+  - 0.0
+  - 0.0
+grasps:
+  grasp_0:
+    confidence: 4.7864
+    position:
+    - 0.052646391446889
+    - -0.0018936085652588753
+    - 0.011956089833687702
+    orientation:
+      w: 0.04778832119557686
+      xyz:
+      - -0.997666512135115
+      - 0.009699653538722389
+      - -0.04778832119557686
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.05636
+      width: .inf
+      antipodal: 0.0
+      coverage: 0.0
+      clearance: 0.04627
+      tilt_deg: 7.75034
+  grasp_1:
+    confidence: 4.2934
+    position:
+    - 0.05887702354111035
+    - -0.0018922130623663792
+    - 0.01098477675601016
+    orientation:
+      w: 0.048670428704522366
+      xyz:
+      - -0.9760403777539355
+      - -0.0029993817997836514
+      - 0.21205512036376808
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.06702
+      width: .inf
+      antipodal: 0.0
+      coverage: 0.0
+      clearance: 0.04627
+      tilt_deg: 25.13255

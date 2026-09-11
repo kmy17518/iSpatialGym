@@ -1,0 +1,192 @@
+{
+ "task": "disembedding",
+ "category": "carton_of_milk",
+ "model": "kszoro",
+ "key": "carton_of_milk__kszoro",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.08415573120117187,
+  0.123388427734375,
+  0.1812252197265625
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "carton_of_milk",
+   "model": "kszoro"
+  },
+  "task": "disembedding",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 2760,
+   "n_tilt": 690,
+   "n_width_antipodal": 690,
+   "n_table": 690,
+   "n_collision": 194,
+   "n_selected": 12,
+   "com": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 10,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.036
+   ],
+   "score": 6.9551,
+   "meta": {
+    "com_perp": 0.05559,
+    "width": 0.08416,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.0045,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/carton_of_milk__kszoro/g0_v1.png",
+    "v2": "/tmp/glib/frames/carton_of_milk__kszoro/g0_v2.png",
+    "v3": "/tmp/glib/frames/carton_of_milk__kszoro/g0_v3.png",
+    "wrist": "/tmp/glib/frames/carton_of_milk__kszoro/g0_wrist.png"
+   },
+   "t_s": 2.81
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 10,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.036
+   ],
+   "score": 6.8946,
+   "meta": {
+    "com_perp": 0.06062,
+    "width": 0.08416,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.00637,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/carton_of_milk__kszoro/g1_v1.png",
+    "v2": "/tmp/glib/frames/carton_of_milk__kszoro/g1_v2.png",
+    "v3": "/tmp/glib/frames/carton_of_milk__kszoro/g1_v3.png",
+    "wrist": "/tmp/glib/frames/carton_of_milk__kszoro/g1_wrist.png"
+   },
+   "t_s": 2.83
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 10,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0359
+   ],
+   "score": 6.8886,
+   "meta": {
+    "com_perp": 0.05587,
+    "width": 0.08416,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.00336,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/carton_of_milk__kszoro/g2_v1.png",
+    "v2": "/tmp/glib/frames/carton_of_milk__kszoro/g2_v2.png",
+    "v3": "/tmp/glib/frames/carton_of_milk__kszoro/g2_v3.png",
+    "wrist": "/tmp/glib/frames/carton_of_milk__kszoro/g2_wrist.png"
+   },
+   "t_s": 2.82
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 10,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0359
+   ],
+   "score": 6.7515,
+   "meta": {
+    "com_perp": 0.05879,
+    "width": 0.08416,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.00243,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/carton_of_milk__kszoro/g3_v1.png",
+    "v2": "/tmp/glib/frames/carton_of_milk__kszoro/g3_v2.png",
+    "v3": "/tmp/glib/frames/carton_of_milk__kszoro/g3_v3.png",
+    "wrist": "/tmp/glib/frames/carton_of_milk__kszoro/g3_wrist.png"
+   },
+   "t_s": 2.74
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 10,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.036
+   ],
+   "score": 6.7466,
+   "meta": {
+    "com_perp": 0.06604,
+    "width": 0.08416,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.00637,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/carton_of_milk__kszoro/g4_v1.png",
+    "v2": "/tmp/glib/frames/carton_of_milk__kszoro/g4_v2.png",
+    "v3": "/tmp/glib/frames/carton_of_milk__kszoro/g4_v3.png",
+    "wrist": "/tmp/glib/frames/carton_of_milk__kszoro/g4_wrist.png"
+   },
+   "t_s": 2.85
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 18.0
+}

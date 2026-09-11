@@ -1,0 +1,207 @@
+{
+ "task": "configuration_matching",
+ "relation": null,
+ "category": "skateboard_wheel_assembly",
+ "model": "acmbvb",
+ "key": "skateboard_wheel_assembly__acmbvb__a",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "attachment_free",
+ "bbox": [
+  0.31589273071289065,
+  0.13596005249023438,
+  0.14012821197509764
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "skateboard_wheel_assembly",
+   "model": "acmbvb"
+  },
+  "task": "configuration_matching",
+  "constraint": "attachment_free",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_attachment_free",
+  "log": {
+   "n_sampled": 4320,
+   "n_tilt": 682,
+   "n_width_antipodal": 553,
+   "n_table": 553,
+   "n_collision": 224,
+   "n_sweep": 207,
+   "n_lever": 207,
+   "n_attachment_free": 207,
+   "n_selected": 12,
+   "com": [
+    -0.0002,
+    0.0006,
+    -0.0021
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0134
+   ],
+   "score": 10.6019,
+   "meta": {
+    "com_perp": 0.00645,
+    "width": 0.06033,
+    "antipodal": 0.99841,
+    "coverage": 1.0,
+    "clearance": 0.0073,
+    "tilt_deg": 30.14685,
+    "attach_dist": 0.07386,
+    "attach_side": -0.26462
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g0_v1.png",
+    "v2": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g0_v2.png",
+    "v3": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g0_v3.png",
+    "wrist": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g0_wrist.png"
+   },
+   "t_s": 3.55
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0135
+   ],
+   "score": 10.4293,
+   "meta": {
+    "com_perp": 0.00808,
+    "width": 0.0611,
+    "antipodal": 0.99844,
+    "coverage": 1.0,
+    "clearance": 0.00525,
+    "tilt_deg": 30.00053,
+    "attach_dist": 0.07466,
+    "attach_side": -0.42392
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g1_v1.png",
+    "v2": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g1_v2.png",
+    "v3": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g1_v3.png",
+    "wrist": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g1_wrist.png"
+   },
+   "t_s": 3.65
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0118
+   ],
+   "score": 10.3312,
+   "meta": {
+    "com_perp": 0.0089,
+    "width": 0.05998,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.00395,
+    "tilt_deg": 30.0005,
+    "attach_dist": 0.07524,
+    "attach_side": -0.36495
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g2_v1.png",
+    "v2": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g2_v2.png",
+    "v3": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g2_v3.png",
+    "wrist": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g2_wrist.png"
+   },
+   "t_s": 3.55
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0118
+   ],
+   "score": 10.2973,
+   "meta": {
+    "com_perp": 0.03398,
+    "width": 0.05998,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01166,
+    "tilt_deg": 0.2222,
+    "attach_dist": 0.0793,
+    "attach_side": -0.88316
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g3_v1.png",
+    "v2": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g3_v2.png",
+    "v3": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g3_v3.png",
+    "wrist": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g3_wrist.png"
+   },
+   "t_s": 3.59
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0201
+   ],
+   "score": 10.2367,
+   "meta": {
+    "com_perp": 0.00138,
+    "width": 0.0681,
+    "antipodal": 0.9998,
+    "coverage": 0.5,
+    "clearance": 0.0153,
+    "tilt_deg": 30.00285,
+    "attach_dist": 0.05421,
+    "attach_side": 4.07366
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g4_v1.png",
+    "v2": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g4_v2.png",
+    "v3": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g4_v3.png",
+    "wrist": "/tmp/glib/frames/skateboard_wheel_assembly__acmbvb__a/g4_wrist.png"
+   },
+   "t_s": 3.47
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 23.1
+}

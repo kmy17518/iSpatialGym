@@ -1,0 +1,234 @@
+{
+  "_comment": "iSpatialGym task spec (test round). Keys are <activity>-<def_id>; see docs/instance_sampling_spec.md section 2.2.",
+
+  "camera_relocalization-0": {
+    "alias": null,
+    "roles": {"floor": {"fixed": true}},
+    "scenes": {
+      "house_single_floor": {"rooms": ["living_room_0"], "fixed": {"floor": {"room": "living_room_0"}}}
+    },
+    "generation": {
+      "instances_per_template": 5,
+      "max_euclidean_m": 5.0, "max_geodesic_m": 10.0, "max_heading_deg": 60.0,
+      "goal_translate_range": [0.0, 1.25], "goal_tilt_range": [-0.5, 0.5],
+      "min_goal_objects": 3, "min_shared_visible_fraction": 0.3, "min_object_pixels": 200,
+      "tolerances": {"position": 0.05, "orientation": 0.10}
+    }
+  },
+
+  "object_scaling-0": {
+    "alias": null,
+    "roles": {
+      "target": {"models": {"bottle_of_beer": ["gxxbhh"]}, "grasps": {"key": "bottle_of_beer__gxxbhh"}},
+      "floor": {"fixed": true}
+    },
+    "scenes": {"house_single_floor": {"rooms": ["living_room_0"], "fixed": {"floor": {"room": "living_room_0"}}}},
+    "generation": {
+      "instances_per_template": 5,
+      "init_depth": 0.55, "goal_depth_range": [0.35, 0.85], "min_depth_change": 0.10,
+      "max_self_occlusion": 0.60, "depth_tolerance": 0.03
+    }
+  },
+
+  "mental_rotation-0": {
+    "alias": null,
+    "roles": {
+      "target": {"models": {"toy_figure": ["zuntus"]}, "grasps": {"key": "toy_figure__zuntus"}},
+      "floor": {"fixed": true}
+    },
+    "scenes": {"house_single_floor": {"rooms": ["living_room_0"], "fixed": {"floor": {"room": "living_room_0"}}}},
+    "generation": {
+      "instances_per_template": 5,
+      "init_depth": 0.55, "goal_angle_range_deg": [30.0, 120.0],
+      "max_self_occlusion": 0.60, "orientation_tolerance": 0.15
+    }
+  },
+
+  "disembedding-0": {
+    "alias": null,
+    "roles": {
+      "target": {"models": {"box_of_cereal": ["iucshm"]}, "grasps": {"key": "box_of_cereal__iucshm"}},
+      "same_category_pool": {"models": {"box_of_cereal": ["ykuyqb", "surzft", "hcwbzw", "tiykku", "qirvmd", "hosfhj", "yorray", "sgirte", "wdkcbu", "ihedod"]}, "pick": "pool"},
+      "distractor_pool": {"models": {
+        "box_of_rice": ["pstqvm", "fvulow", "yyheuw"],
+        "box_of_cane_sugar": ["gpbobo", "qvjiti", "cqlofx"],
+        "box_of_shampoo": ["bclpiq", "nijidu"],
+        "carton_of_milk": ["kszoro", "xmugpm"],
+        "box_of_oatmeal": ["jtqeef"]
+      }, "pick": "pool"},
+      "tray_source": {"models": {"tray": ["gsxbym"]}},
+      "tray_dest": {"models": {"tray": ["hvlfig"]}},
+      "table": {"fixed": true},
+      "floor": {"fixed": true}
+    },
+    "scenes": {
+      "house_single_floor": {"rooms": ["dining_room_0"], "fixed": {"table": ["breakfast_table_rhjoby_0"], "floor": {"room": "dining_room_0"}}}
+    },
+    "generation": {
+      "instances_per_template": 3, "templates_per_scene": 3,
+      "same_category_prob": 0.5, "max_distractors": 3,
+      "occlusion": {"prob": 0.5, "ratio_range": [0.30, 0.70], "min_visible_pixels": 400, "unoccluded_max_ratio": 0.10},
+      "tray_edge_offset": 0.08, "dest_visible_width": 0.04,
+      "tolerances": {"position": 0.03, "orientation": 0.20}
+    }
+  },
+
+  "configuration_matching-0": {
+    "alias": "block_design",
+    "roles": {
+      "blocks": {"models": {"toy_dice": ["isgblk"]}, "dataset": "ispatialgym-assets", "count": 4},
+      "table": {"fixed": true},
+      "floor": {"fixed": true}
+    },
+    "scenes": {
+      "house_single_floor": {"rooms": ["dining_room_0"], "fixed": {"table": ["breakfast_table_rhjoby_0"], "floor": {"room": "dining_room_0"}}}
+    },
+    "generation": {
+      "instances_per_template": 5, "grid": [2, 2],
+      "patterns": {"test_rbbr": ["red", "blue", "blue", "red"]},
+      "block_gap": 0.001, "scatter_min_gap": 0.03,
+      "tolerances": {"position": 0.01, "orientation": 0.15}
+    }
+  },
+
+  "configuration_matching-1": {
+    "alias": "articulation",
+    "roles": {
+      "artic": {"models": {"toolbox": ["redmtl"]}, "joint": "j_lid", "handle_key": "toolbox__redmtl"},
+      "table": {"fixed": true},
+      "floor": {"fixed": true}
+    },
+    "scenes": {
+      "house_single_floor": {"rooms": ["dining_room_0"], "fixed": {"table": ["breakfast_table_rhjoby_0"], "floor": {"room": "dining_room_0"}}}
+    },
+    "generation": {"instances_per_template": 3, "open_fraction_range": [0.5, 0.95], "tolerances": {"revolute": 0.10, "prismatic": 0.02}}
+  },
+
+  "configuration_matching-2": {
+    "alias": "articulation",
+    "roles": {
+      "artic": {"models": {"toolbox": ["redmtl"]}, "joint": "j_lid", "handle_key": "toolbox__redmtl"},
+      "table": {"fixed": true},
+      "floor": {"fixed": true}
+    },
+    "scenes": {
+      "house_single_floor": {"rooms": ["dining_room_0"], "fixed": {"table": ["breakfast_table_rhjoby_0"], "floor": {"room": "dining_room_0"}}}
+    },
+    "generation": {"instances_per_template": 3, "open_fraction_range": [0.5, 0.95], "tolerances": {"revolute": 0.10, "prismatic": 0.02}}
+  },
+
+  "configuration_matching-3": {
+    "alias": "attachment",
+    "roles": {
+      "male": {"models": {"cap": ["xxqyrt"]}, "grasps": {"key": "cap__xxqyrt"}},
+      "female": {"models": {"lemonade_bottle": ["yprkek"]}},
+      "table": {"fixed": true},
+      "floor": {"fixed": true}
+    },
+    "scenes": {
+      "house_single_floor": {"rooms": ["dining_room_0"], "fixed": {"table": ["breakfast_table_rhjoby_0"], "floor": {"room": "dining_room_0"}}}
+    },
+    "generation": {"instances_per_template": 3, "symmetry_step_deg": 15.0, "tolerances": {"position": 0.01, "orientation": 0.15}}
+  },
+
+  "world_alignment-0": {
+    "alias": "table_surface",
+    "roles": {
+      "target": {"models": {"keyboard": ["hgtbot", "injrgc"]}},
+      "table": {"fixed": true},
+      "floor": {"fixed": true}
+    },
+    "scenes": {
+      "house_single_floor": {"rooms": ["dining_room_0"], "fixed": {"table": ["breakfast_table_rhjoby_0"], "floor": {"room": "dining_room_0"}}}
+    },
+    "generation": {
+      "instances_per_template": 3, "deviation_range_deg": [20.0, 70.0],
+      "front_axis": "+x", "long_axis": "y",
+      "tolerances": {"orientation": 0.10}
+    }
+  },
+
+  "world_alignment-1": {
+    "alias": "world_vertical",
+    "roles": {
+      "target": {"models": {"painting": ["dacihj", "ljabhq"]}},
+      "wall": {"fixed": true},
+      "floor": {"fixed": true}
+    },
+    "scenes": {
+      "house_single_floor": {"rooms": ["living_room_0"], "fixed": {"floor": {"room": "living_room_0"}}}
+    },
+    "generation": {
+      "instances_per_template": 3, "height": 1.45, "front_axis": "+x", "deviation_range_deg": [15.0, 45.0],
+      "arc_radius_range": [0.6, 0.95], "arc_half_angle_deg": 35.0, "min_visible_objects": 5,
+      "tolerances": {"orientation": 0.08}
+    }
+  },
+
+  "inter_object_relation_satisfaction-0": {
+    "alias": "ontop",
+    "roles": {
+      "target": {"models": {"pack_of_kielbasa": ["dgodnn"]}, "grasps": {"key": "pack_of_kielbasa__dgodnn__t"}},
+      "partner": {"models": {"platter": ["csanbr"]}},
+      "table": {"fixed": true}, "floor": {"fixed": true}
+    },
+    "scenes": {
+      "house_single_floor": {"rooms": ["dining_room_0"], "fixed": {"table": ["breakfast_table_rhjoby_0"], "floor": {"room": "dining_room_0"}}}
+    },
+    "generation": {"instances_per_template": 3, "tolerances": {"position": 0.03, "orientation": 0.20}}
+  },
+
+  "inter_object_relation_satisfaction-1": {
+    "alias": "under",
+    "roles": {
+      "target": {"models": {"toy_figure": ["cobfpg"]}, "grasps": {"key": "toy_figure__cobfpg__t"}},
+      "partner": {"fixed": true},
+      "table": {"fixed": true}, "floor": {"fixed": true}
+    },
+    "scenes": {
+      "house_single_floor": {"rooms": ["childs_room_0"], "fixed": {"partner": ["bed_rrcvaq_0"], "table": {"category": ["desk", "nightstand", "breakfast_table"]}, "floor": {"room": "childs_room_0"}}}
+    },
+    "generation": {"instances_per_template": 3, "max_partner_geodesic": 3.0, "depth_range": [0.08, 0.35], "lateral_half": 0.30,
+                   "stand_offs": [0.45, 0.35, 0.55], "try_all_edges": true, "tolerances": {"position": 0.03, "orientation": 0.20},
+                   "_note": "childs_room_0: toy on desk_xhjsub_0, goal under bed_rrcvaq_0 (2.6 m apart). bedroom_0's bed_gxfipj_0 has no table nearby and its frame keeps the arm from all but a 6 cm strip of the mattress."}
+  },
+
+  "inter_object_relation_satisfaction-2": {
+    "alias": "inside",
+    "roles": {
+      "target": {"models": {"lemon": ["ovbcff"]}, "grasps": {"key": "lemon__ovbcff__i"}},
+      "partner": {"models": {"bowl": ["belcml"]}},
+      "table": {"fixed": true}, "floor": {"fixed": true}
+    },
+    "scenes": {
+      "house_single_floor": {"rooms": ["dining_room_0"], "fixed": {"table": ["breakfast_table_rhjoby_0"], "floor": {"room": "dining_room_0"}}}
+    },
+    "generation": {"instances_per_template": 3, "tolerances": {"position": 0.03, "orientation": 0.20}}
+  },
+
+  "inter_object_relation_satisfaction-3": {
+    "alias": "nextto",
+    "roles": {
+      "target": {"models": {"spatula": ["hkvsep"]}, "grasps": {"key": "spatula__hkvsep__t"}},
+      "partner": {"models": {"soup_ladle": ["cfzneb"]}},
+      "table": {"fixed": true}, "floor": {"fixed": true}
+    },
+    "scenes": {
+      "house_single_floor": {"rooms": ["dining_room_0"], "fixed": {"table": ["breakfast_table_rhjoby_0"], "floor": {"room": "dining_room_0"}}}
+    },
+    "generation": {"instances_per_template": 3, "nextto_gap": 0.02, "tolerances": {"position": 0.03, "orientation": 0.20}}
+  },
+
+  "inter_object_relation_satisfaction-4": {
+    "alias": "touching",
+    "roles": {
+      "target": {"models": {"can_of_baking_mix": ["blrqqz", "orwvfx"]}},
+      "partner": {"models": {"board_game": ["eoywpy", "gcfkqa"]}},
+      "table": {"fixed": true}, "floor": {"fixed": true}
+    },
+    "scenes": {
+      "house_single_floor": {"rooms": ["dining_room_0"], "fixed": {"table": ["breakfast_table_rhjoby_0"], "floor": {"room": "dining_room_0"}}}
+    },
+    "generation": {"instances_per_template": 3, "templates_per_scene": 2, "tolerances": {"position": 0.03, "orientation": 0.20}}
+  }
+}

@@ -1,0 +1,348 @@
+{
+  "batch": "wave6_07",
+  "models": [
+    {
+      "key": "teaspoon__vgbcmo__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle pinch across 3 mm thickness near CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "handle pinch near CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "handle pinch near CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-handle pinch, 22 mm from CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-handle pinch, tilt 31 deg"}
+      ],
+      "object_note": "spoon on its side (y_down); all grasps pinch handle thickness"
+    },
+    {
+      "key": "teaspoon__eilfij__t",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 48/0; spoon jammed skew between open and closed finger"}
+      ],
+      "object_note": "only 1/4 valid; spoon rotated during closing, contact not at nominal points"
+    },
+    {
+      "key": "teaspoon__piqabk__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck pinch across 8 mm width"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch across 8 mm width"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck pinch, tilt 27 deg"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck pinch, tilt 34 deg"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck pinch, tilt 34 deg"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "teaspoon__qdepdj__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck pinch 12 mm from CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "bowl pinched across 29 mm width, both pads on rims"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "bowl pinch near neck, tilt 30 deg"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck pinch, tilt 38 deg"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "bowl pinch at widest part, handle free"}
+      ],
+      "object_note": "rows 2,3,5 hold the bowl sideways; acceptable, not at the tip"
+    },
+    {
+      "key": "teaspoon__nxddfp__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck pinch near CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch near CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "oblique pinch on bowl base, width 20 mm, pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck pinch, tilt 37 deg"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-handle pinch 27 mm from CoM"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "teaspoon__prbhag__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck pinch; label says 13 mm but fingers closed ~6 mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch; label says 13 mm but fingers closed ~5 mm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck pinch 8 mm from CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck pinch 11 mm from CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck pinch, tilt 30 deg"}
+      ],
+      "object_note": "rows 1-2 width label mismatches finger closure; zoom shows 5 mm neck between pads, no penetration"
+    },
+    {
+      "key": "teaspoon__bjzgmj__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck pinch near CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch 12 mm from CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck pinch, tilt 22 deg"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck pinch, tilt 26 deg"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "wide-handle pinch 25 mm from CoM"}
+      ],
+      "object_note": "reflective metal spoon; all pinches on neck/handle"
+    },
+    {
+      "key": "tablefork__uodzrq__t",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck pinch 12 mm from CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch 16 mm from CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "thin neck pinch, 6 mm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "thin neck pinch, tilt 24 deg"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "tablefork__hktwlm__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "shoulder pinch, 17 mm wide"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "shoulder pinch, tilt 26 deg"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch across tine base, handle free"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "tine-base pinch, tilt 38 deg"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "widest shoulder pinch 52 mm from CoM, full coverage"}
+      ],
+      "object_note": "heavy ornate handle shifts CoM; head grasps in rows 3-5 are near geometric centre"
+    },
+    {
+      "key": "tablefork__yuihyg__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck pinch at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch near CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck pinch, tilt 21 deg"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck pinch, tilt 34 deg"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck pinch, tilt 32 deg"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "tablefork__pqrtkc__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck pinch at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch near CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "handle pinch 10 mm from CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck pinch near CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck pinch, tilt 30 deg"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "tablefork__flexrc__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "neck pinch at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "neck pinch at CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "handle pinch 17 mm from CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck pinch, tilt 30 deg"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck pinch 23 mm from CoM"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "beaker__dtjmai__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch, one finger inside bowl"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch, tilt 32 deg"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch, 3 mm wall"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch, tilt 21 deg"}
+      ],
+      "object_note": "hemispherical bowl wider than gripper opening; rim pinch is the only option, wall not fragile"
+    },
+    {
+      "key": "beaker__jdijek__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch across 71 mm near rim"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch near rim"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch near rim"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch near rim"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch, 48/31 mildly off-centre"}
+      ],
+      "object_note": "tapered cup: pads contact at rim edge with small wedge below (taper, not hull gap)"
+    },
+    {
+      "key": "beaker__rhohgs__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "50/29: pushed against open finger, ~10 mm off-centre, both touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "50/29, ~10 mm off-centre, both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "50/29, ~10 mm off-centre, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "50/29, ~10 mm off-centre, both pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "50/29, ~10 mm off-centre, both pads touch"}
+      ],
+      "object_note": "all rows fingers 50/29; one finger stayed open, beaker ~10 mm off gripper centre, both pads in contact"
+    },
+    {
+      "key": "beaker__uobdoq__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "50/29, ~10 mm off-centre, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "50/29, ~10 mm off-centre, both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "near-symmetric body pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "50/29, ~10 mm off-centre, both pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "symmetric body pinch 40/40"}
+      ],
+      "object_note": "rows 1,2,4 one finger stayed at open limit; offset mild"
+    },
+    {
+      "key": "beaker__zycgen__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "symmetric body pinch near rim"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "50/29, ~10 mm off-centre, both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "50/29, ~10 mm off-centre, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "50/29, ~10 mm off-centre, both pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "near-symmetric body pinch"}
+      ],
+      "object_note": "dark glass beaker; rows 2-4 one finger stayed at open limit, offset mild"
+    },
+    {
+      "key": "beaker__fyrkzs__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "50/29, ~10 mm off-centre, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "50/29, ~10 mm off-centre, both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "symmetric body pinch 40/40"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "50/29, ~10 mm off-centre, both pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "near-symmetric body pinch"}
+      ],
+      "object_note": "rows 1,2,4 one finger stayed at open limit; offset mild"
+    },
+    {
+      "key": "beaker__exzsal__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on tapered cup, finger inside"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch, tilt 13 deg"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch"}
+      ],
+      "object_note": "4-5 mm ceramic wall, not fragile; body near max opening"
+    },
+    {
+      "key": "beaker__effbnc__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch, tilt 15 deg"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch, 15 mm lip"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch"}
+      ],
+      "object_note": "faceted metal beaker far wider than gripper; rim pinch is the only option"
+    },
+    {
+      "key": "beaker__sfvswx__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch, 6 mm wall"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch, 4 mm wall"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch"}
+      ],
+      "object_note": "large faceted beaker wider than gripper; rim pinch is the only option"
+    },
+    {
+      "key": "bottle_of_water__emquat__a",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["task_violation"], "note": "shoulder pinch encloses neck/cap (mating side) under palm"},
+        {"rank": 2, "verdict": "flag", "flags": ["task_violation"], "note": "shoulder pinch encloses neck/cap (mating side) under palm"},
+        {"rank": 3, "verdict": "flag", "flags": ["task_violation"], "note": "shoulder pinch encloses neck/cap (mating side) under palm"},
+        {"rank": 4, "verdict": "flag", "flags": ["task_violation"], "note": "shoulder pinch encloses neck/cap (mating side) under palm"},
+        {"rank": 5, "verdict": "flag", "flags": ["task_violation"], "note": "shoulder pinch encloses neck/cap (mating side) under palm"}
+      ],
+      "object_note": "all grasps at shoulder with cap between fingers, attach dist 14-15 mm; mating end not free"
+    },
+    {
+      "key": "apple__obixxh__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/8: apple pushed against open finger, ~20 mm off-centre"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/10: apple pushed against open finger, ~19 mm off-centre"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "symmetric equator pinch 32/31"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/13: apple pushed against open finger, ~18 mm off-centre"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "near-symmetric equator pinch, tilt 19 deg"}
+      ],
+      "object_note": "flagged rows: both pads do touch but object sits strongly off gripper centre"
+    },
+    {
+      "key": "apple__zlxfxt__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "38/22 mildly asymmetric equator pinch"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/10: apple pushed against open finger, ~19 mm off-centre"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "symmetric equator pinch 31/32"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/13: apple pushed against open finger, ~18 mm off-centre"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "near-symmetric equator pinch, tilt 19 deg"}
+      ],
+      "object_note": "rows 2-5 identical to apple obixxh; flagged rows strongly off-centre"
+    },
+    {
+      "key": "apple__bwteqh__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/5: apple pushed against open finger, ~22 mm off-centre"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "symmetric equator pinch 35/36"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "symmetric equator pinch 37/36"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/19: pushed against open finger, ~15 mm off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/20: pushed against open finger, ~15 mm off-centre"}
+      ],
+      "object_note": "flagged rows: both pads touch, but one finger never moved and apple sits far off-centre"
+    },
+    {
+      "key": "apple__agveuv__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "50/26: ~12 mm off-centre, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "symmetric equator pinch 36/41"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "50/24: ~12 mm off-centre, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "50/28: ~10 mm off-centre, both pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "50/24: ~12 mm off-centre, tilt 30 deg"}
+      ],
+      "object_note": "large apple (74-76 mm); one finger at open limit in 4 rows but offset only ~12 mm"
+    },
+    {
+      "key": "apple__omzprq__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "50/26: ~12 mm off-centre, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "50/24: ~12 mm off-centre, both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "50/26: ~12 mm off-centre, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "50/29: ~10 mm off-centre, both pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "28/47: ~9 mm off-centre, tilt 25 deg"}
+      ],
+      "object_note": "large apple (72-76 mm); one finger near open limit in all rows, offsets mild"
+    },
+    {
+      "key": "apple__netbsb__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "50/30: ~9 mm off-centre, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "50/25: ~12 mm off-centre, both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "50/28: ~10 mm off-centre, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "50/32: ~8 mm off-centre, 80 mm wide"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "50/29: ~10 mm off-centre, tilt 26 deg"}
+      ],
+      "object_note": "large apple (75-80 mm); all rows one finger at open limit, offsets 8-12 mm only"
+    },
+    {
+      "key": "coffee_cup__dkxddg__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch away from handle, finger inside"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch, tilt 14 deg"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch opposite handle"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch"}
+      ],
+      "object_note": "5-6 mm ceramic rim, not fragile; fingers stay well above cup bottom"
+    }
+  ]
+}

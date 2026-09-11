@@ -1,0 +1,107 @@
+{
+ "task": "IORS",
+ "relation": "under",
+ "category": "toy_figure",
+ "model": "usnnxe",
+ "key": "toy_figure__usnnxe__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.18706207275390624,
+  0.19693756103515625,
+  0.06268580436706543
+ ],
+ "ready": true,
+ "round": 2,
+ "candidates_meta": {
+  "object": {
+   "category": "toy_figure",
+   "model": "usnnxe"
+  },
+  "task": "IORS",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 6000,
+   "n_tilt": 328,
+   "n_width_antipodal": 58,
+   "n_table": 58,
+   "n_collision": 6,
+   "n_sweep": 3,
+   "n_lever": 3,
+   "n_selected": 2,
+   "com": [
+    0.002,
+    0.0003,
+    0.0006
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0292,
+    0.0209
+   ],
+   "score": 6.8901,
+   "meta": {
+    "com_perp": 0.06043,
+    "width": 0.04698,
+    "antipodal": 0.93491,
+    "coverage": 1.0,
+    "clearance": 0.00194,
+    "tilt_deg": 4.13048
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/toy_figure__usnnxe__t/g0_v1.png",
+    "v2": "/tmp/glib/frames/toy_figure__usnnxe__t/g0_v2.png",
+    "v3": "/tmp/glib/frames/toy_figure__usnnxe__t/g0_v3.png",
+    "wrist": "/tmp/glib/frames/toy_figure__usnnxe__t/g0_wrist.png"
+   },
+   "t_s": 3.47
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 5.9621,
+   "meta": {
+    "com_perp": 0.05799,
+    "width": 0.0346,
+    "antipodal": 0.98866,
+    "coverage": 0.75,
+    "clearance": 0.00154,
+    "tilt_deg": 32.85327
+   },
+   "frames": {},
+   "t_s": 4.77
+  }
+ ],
+ "n_valid": 1,
+ "error": null,
+ "t_model_s": 10.6
+}

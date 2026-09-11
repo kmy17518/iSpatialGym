@@ -1,0 +1,19 @@
+{
+ "task": "configuration_matching",
+ "category": "license_plate",
+ "model": "naclac",
+ "key": "license_plate__naclac",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "attachment_free",
+ "bbox": [
+  0.3077864074707031,
+  0.1554632110595703,
+  0.00412976610660553
+ ],
+ "ready": true,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

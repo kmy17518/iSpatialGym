@@ -1,0 +1,157 @@
+{
+ "category": "carton",
+ "model": "ylrxhe",
+ "key": "carton__ylrxhe",
+ "aabb_extent": [
+  0.6372079849243164,
+  0.6416953206062317,
+  0.5064695477485657
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.3178,
+   -0.3167,
+   -0.1891
+  ],
+  "bbox_max": [
+   0.3194,
+   0.325,
+   0.309
+  ],
+  "n_pieces": 8
+ },
+ "joints": [
+  {
+   "joint": "j_link0",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "link0",
+   "outward_normal": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "face_s": 0.316,
+   "axis_dir_obj": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    -0.00067,
+    0.30009,
+    0.30586
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 2.96705961227417,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.3071,
+    -0.0021,
+    0.2957
+   ],
+   "link_bbox_max": [
+    0.3072,
+    0.306,
+    0.316
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     -0.2932,
+     0.0331,
+     0.3054
+    ],
+    "pinch_axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "approach_dir": [
+     -0.0,
+     1.0,
+     0.0001
+    ],
+    "width": 0.0135,
+    "exposed": true,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     0.0,
+     -0.0017,
+     1.0
+    ]
+   },
+   "sub_links": [],
+   "status": "edge"
+  },
+  {
+   "joint": "j_link1",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "link1",
+   "outward_normal": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "face_s": 0.3174,
+   "axis_dir_obj": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.00026,
+    -0.30649,
+    0.30424
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 2.967059373855591,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.3072,
+    -0.3056,
+    0.2983
+   ],
+   "link_bbox_max": [
+    0.307,
+    0.0044,
+    0.3174
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     0.2623,
+     -0.0307,
+     0.3066
+    ],
+    "pinch_axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "approach_dir": [
+     -0.0,
+     -0.9997,
+     -0.0232
+    ],
+    "width": 0.016,
+    "exposed": true,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     0.0,
+     -0.0086,
+     1.0
+    ]
+   },
+   "sub_links": [],
+   "status": "edge"
+  }
+ ]
+}

@@ -1,0 +1,196 @@
+{
+ "task": "mental_rotation",
+ "category": "mouse",
+ "model": "pljjtu",
+ "key": "mouse__pljjtu",
+ "pipeline": "graspgen",
+ "mode": "H",
+ "constraint": "floating",
+ "bbox": [
+  0.11933757781982422,
+  0.06628536605834962,
+  0.03904939079284668
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "mouse",
+   "model": "pljjtu"
+  },
+  "task": "mental_rotation",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 500,
+   "n_selected": 12,
+   "mode": "H",
+   "com": [
+    0.001,
+    0.0,
+    0.0017
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0407,
+    0.0
+   ],
+   "score": 99.1286,
+   "meta": {
+    "com_perp": 0.00691,
+    "width": 0.03808,
+    "antipodal": 0.99447,
+    "coverage": 1.0,
+    "clearance": 0.01912,
+    "tilt_deg": 91.09245,
+    "graspgen_conf": 0.98162
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/mouse__pljjtu/g0_v1.png",
+    "v2": "/tmp/glib/frames/mouse__pljjtu/g0_v2.png",
+    "v3": "/tmp/glib/frames/mouse__pljjtu/g0_v3.png",
+    "wrist": "/tmp/glib/frames/mouse__pljjtu/g0_wrist.png"
+   },
+   "t_s": 3.07
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0413,
+    0.0
+   ],
+   "score": 99.1163,
+   "meta": {
+    "com_perp": 0.01929,
+    "width": 0.03808,
+    "antipodal": 0.98055,
+    "coverage": 1.0,
+    "clearance": 0.01719,
+    "tilt_deg": 87.40792,
+    "graspgen_conf": 0.98278
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/mouse__pljjtu/g1_v1.png",
+    "v2": "/tmp/glib/frames/mouse__pljjtu/g1_v2.png",
+    "v3": "/tmp/glib/frames/mouse__pljjtu/g1_v3.png",
+    "wrist": "/tmp/glib/frames/mouse__pljjtu/g1_wrist.png"
+   },
+   "t_s": 3.07
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0379,
+    0.0
+   ],
+   "score": 99.116,
+   "meta": {
+    "com_perp": 0.01955,
+    "width": 0.03593,
+    "antipodal": 0.98417,
+    "coverage": 1.0,
+    "clearance": 0.01628,
+    "tilt_deg": 93.01336,
+    "graspgen_conf": 0.98157
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/mouse__pljjtu/g2_v1.png",
+    "v2": "/tmp/glib/frames/mouse__pljjtu/g2_v2.png",
+    "v3": "/tmp/glib/frames/mouse__pljjtu/g2_v3.png",
+    "wrist": "/tmp/glib/frames/mouse__pljjtu/g2_wrist.png"
+   },
+   "t_s": 3.13
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0411,
+    0.0
+   ],
+   "score": 99.1133,
+   "meta": {
+    "com_perp": 0.02224,
+    "width": 0.03796,
+    "antipodal": 0.96846,
+    "coverage": 1.0,
+    "clearance": 0.02021,
+    "tilt_deg": 85.83481,
+    "graspgen_conf": 0.98149
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/mouse__pljjtu/g3_v1.png",
+    "v2": "/tmp/glib/frames/mouse__pljjtu/g3_v2.png",
+    "v3": "/tmp/glib/frames/mouse__pljjtu/g3_v3.png",
+    "wrist": "/tmp/glib/frames/mouse__pljjtu/g3_wrist.png"
+   },
+   "t_s": 3.11
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0374,
+    0.0
+   ],
+   "score": 99.1113,
+   "meta": {
+    "com_perp": 0.02422,
+    "width": 0.03485,
+    "antipodal": 0.98313,
+    "coverage": 1.0,
+    "clearance": 0.01947,
+    "tilt_deg": 97.60844,
+    "graspgen_conf": 0.98202
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/mouse__pljjtu/g4_v1.png",
+    "v2": "/tmp/glib/frames/mouse__pljjtu/g4_v2.png",
+    "v3": "/tmp/glib/frames/mouse__pljjtu/g4_v3.png",
+    "wrist": "/tmp/glib/frames/mouse__pljjtu/g4_wrist.png"
+   },
+   "t_s": 3.09
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 19.8
+}

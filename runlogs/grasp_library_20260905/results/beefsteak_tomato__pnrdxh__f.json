@@ -1,0 +1,199 @@
+{
+ "task": "object_scaling",
+ "relation": null,
+ "category": "beefsteak_tomato",
+ "model": "pnrdxh",
+ "key": "beefsteak_tomato__pnrdxh__f",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.09338796615600586,
+  0.09126411437988281,
+  0.07419097137451172
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "beefsteak_tomato",
+   "model": "pnrdxh"
+  },
+  "task": "object_scaling",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 480,
+   "n_width": 480,
+   "n_lever": 480,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    0.0,
+    -0.0,
+    0.0
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0213
+   ],
+   "score": 17.3667,
+   "meta": {
+    "com_perp": 0.01098,
+    "width": 0.07035,
+    "antipodal": 0.93852,
+    "coverage": 1.0,
+    "clearance": 0.00942,
+    "tilt_deg": 100.93967,
+    "graspgen_conf": 0.91477
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g0_v1.png",
+    "v2": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g0_v2.png",
+    "v3": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g0_v3.png",
+    "wrist": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g0_wrist.png"
+   },
+   "t_s": 3.46
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0215
+   ],
+   "score": 17.3587,
+   "meta": {
+    "com_perp": 0.0109,
+    "width": 0.07037,
+    "antipodal": 0.94571,
+    "coverage": 1.0,
+    "clearance": 0.00939,
+    "tilt_deg": 101.09319,
+    "graspgen_conf": 0.90284
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g1_v1.png",
+    "v2": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g1_v2.png",
+    "v3": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g1_v3.png",
+    "wrist": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g1_wrist.png"
+   },
+   "t_s": 3.46
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0259
+   ],
+   "score": 16.9847,
+   "meta": {
+    "com_perp": 0.01324,
+    "width": 0.07181,
+    "antipodal": 0.9544,
+    "coverage": 1.0,
+    "clearance": 0.00764,
+    "tilt_deg": 105.56861,
+    "graspgen_conf": 0.90474
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g2_v1.png",
+    "v2": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g2_v2.png",
+    "v3": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g2_v3.png",
+    "wrist": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g2_wrist.png"
+   },
+   "t_s": 3.48
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0211
+   ],
+   "score": 16.9775,
+   "meta": {
+    "com_perp": 0.01529,
+    "width": 0.06874,
+    "antipodal": 0.98678,
+    "coverage": 1.0,
+    "clearance": 0.01094,
+    "tilt_deg": 81.00648,
+    "graspgen_conf": 0.9211
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g3_v1.png",
+    "v2": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g3_v2.png",
+    "v3": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g3_v3.png",
+    "wrist": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g3_wrist.png"
+   },
+   "t_s": 3.45
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.021
+   ],
+   "score": 16.8419,
+   "meta": {
+    "com_perp": 0.01545,
+    "width": 0.07023,
+    "antipodal": 0.91901,
+    "coverage": 1.0,
+    "clearance": 0.00985,
+    "tilt_deg": 100.22696,
+    "graspgen_conf": 0.92321
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g4_v1.png",
+    "v2": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g4_v2.png",
+    "v3": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g4_v3.png",
+    "wrist": "/tmp/glib/frames/beefsteak_tomato__pnrdxh__f/g4_wrist.png"
+   },
+   "t_s": 3.45
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 22.2
+}

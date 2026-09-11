@@ -1,0 +1,197 @@
+{
+ "task": "object_scaling",
+ "category": "bottle_of_water",
+ "model": "emquat",
+ "key": "bottle_of_water__emquat",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.08167681884765625,
+  0.0788812255859375,
+  0.2215403075814247
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "bottle_of_water",
+   "model": "emquat"
+  },
+  "task": "object_scaling",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 499,
+   "n_width": 499,
+   "n_lever": 491,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    -0.0,
+    -0.0,
+    0.0008
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0297
+   ],
+   "score": 15.5284,
+   "meta": {
+    "com_perp": 0.06762,
+    "width": 0.07805,
+    "antipodal": 0.9923,
+    "coverage": 1.0,
+    "clearance": 0.00932,
+    "tilt_deg": 90.89622,
+    "graspgen_conf": 0.79831
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_water__emquat/g0_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_water__emquat/g0_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_water__emquat/g0_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_water__emquat/g0_wrist.png"
+   },
+   "t_s": 2.72
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0303
+   ],
+   "score": 15.1967,
+   "meta": {
+    "com_perp": 0.07835,
+    "width": 0.0781,
+    "antipodal": 0.99042,
+    "coverage": 1.0,
+    "clearance": 0.00936,
+    "tilt_deg": 89.88033,
+    "graspgen_conf": 0.76208
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_water__emquat/g1_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_water__emquat/g1_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_water__emquat/g1_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_water__emquat/g1_wrist.png"
+   },
+   "t_s": 2.74
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0297
+   ],
+   "score": 0.7436,
+   "meta": {
+    "com_perp": 0.07647,
+    "width": 0.07813,
+    "antipodal": 0.99873,
+    "coverage": 1.0,
+    "clearance": 0.00658,
+    "tilt_deg": 90.84974,
+    "graspgen_conf": 0.74356
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_water__emquat/g2_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_water__emquat/g2_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_water__emquat/g2_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_water__emquat/g2_wrist.png"
+   },
+   "t_s": 2.9
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0297
+   ],
+   "score": 0.7399,
+   "meta": {
+    "com_perp": 0.07136,
+    "width": 0.07797,
+    "antipodal": 0.97217,
+    "coverage": 1.0,
+    "clearance": 0.00909,
+    "tilt_deg": 92.2586,
+    "graspgen_conf": 0.73994
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_water__emquat/g3_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_water__emquat/g3_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_water__emquat/g3_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_water__emquat/g3_wrist.png"
+   },
+   "t_s": 2.94
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0309
+   ],
+   "score": 0.7329,
+   "meta": {
+    "com_perp": 0.07064,
+    "width": 0.07806,
+    "antipodal": 0.99381,
+    "coverage": 1.0,
+    "clearance": 0.00726,
+    "tilt_deg": 91.06429,
+    "graspgen_conf": 0.73286
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_water__emquat/g4_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_water__emquat/g4_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_water__emquat/g4_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_water__emquat/g4_wrist.png"
+   },
+   "t_s": 2.94
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 18.2
+}

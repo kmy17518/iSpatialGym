@@ -1,0 +1,297 @@
+{
+  "batch": "wave6_14",
+  "models": [
+    {
+      "key": "pack_of_kielbasa__twgpur__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "50/23 asymmetric; 72 mm pack fills opening, both pads on it"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "50/23 asymmetric; centred body pinch, both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "50/23 asymmetric; centred body pinch, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "50/23 asymmetric; tilt 21 deg, centred body pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "50/23 asymmetric; CoM 9 mm, both pads touch"}
+      ],
+      "object_note": "All rows close 50/23 (idle finger) but 72 mm pack nearly fills 97 mm opening; only ~13 mm off-centre."
+    },
+    {
+      "key": "half_bagel__gywbkh__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "42/0 asymmetric but firmly closed across tube near arc middle"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "42/0 asymmetric but closed; tube pinch, tilt 37 deg"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "47/0 asymmetric but closed; 45 mm tube pinch"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bagel pushed against open finger, ~24 mm off-centre"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "42/0 asymmetric but closed; 40 mm tube pinch"}
+      ],
+      "object_note": "Every row bottoms one finger at 0; only row 4 has the idle open-limit finger. Body pinches across tube."
+    },
+    {
+      "key": "half_bagel__hsvakn__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "47/0 asymmetric but closed; 46 mm tube pinch"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bagel pushed against open finger, ~24 mm off-centre; coverage 0.75"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "49/0: bagel against near-open finger, ~24 mm off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bagel pushed against open finger, ~24 mm off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/2: bagel pushed against open finger, ~23 mm off-centre"}
+      ],
+      "object_note": "Body pinches across tube; rows 2-5 have idle open-limit finger, bagel entirely in one half of opening."
+    },
+    {
+      "key": "baguette__xydhpd__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: baguette pushed against open finger, ~24 mm off-centre"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: baguette pushed against open finger, ~24 mm off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: baguette pushed against open finger, ~24 mm off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: baguette pushed against open finger, ~24 mm off-centre"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "44/0 asymmetric but closed; centred pinch across 46 mm"}
+      ],
+      "object_note": "Centred body pinches on short baguette (CoM 0-5 mm); rows 1-4 have idle open-limit finger."
+    },
+    {
+      "key": "bottle_of_supplements__oqakev__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "50/17 idle finger, ~16 mm off-centre, borderline; shoulder pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "50/17 idle finger, ~16 mm off-centre, borderline; shoulder pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "50/17 idle finger, ~16 mm off-centre, borderline; shoulder pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "50/17 idle finger, ~16 mm off-centre, borderline; shoulder pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "50/17 idle finger, ~16 mm off-centre, borderline; shoulder pinch"}
+      ],
+      "object_note": "Pads sit on ~65 mm shoulder bulge above the 56 mm body, so opening/width mismatch is shape, not gap."
+    },
+    {
+      "key": "bottle_of_supplements__kgreql__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["gap", "one_finger"], "note": "opening 56 mm vs 48 mm cylinder; idle finger 50/8, pad off"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "44/6 asymmetric but closed; upper-body pinch below cap"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "44/6 asymmetric but closed; upper-body pinch below cap"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against open finger, ~24 mm off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "49/0: bottle against near-open finger, ~24 mm off-centre"}
+      ],
+      "object_note": "Straight 48 mm cylinder; rows 2-5 close to 48 mm, row 1 stops 8 mm wider (gap inferred from numbers)."
+    },
+    {
+      "key": "tennis_ball__rgekxe__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "symmetric 33/34 pinch across ball"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "47/20 asymmetric but closed, ~13 mm off-centre"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "44/24 near-symmetric pinch across ball"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "50/17 idle finger, ~16 mm off-centre; 66 mm ball fills opening"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "49/19 asymmetric, ~15 mm off-centre, tilt 13 deg"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "lily__yltekp__fl",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "stem+leaf pinch high on stem, head close; 28/0 closed"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "stem+leaf pinch high on stem; 30/0 closed, tilt 38 deg"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "stem pinch high; opening 24 vs 19 mm, minor hull mismatch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "stem+leaf pinch high on stem; 26/0 closed"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "clean 11 mm stem pinch high on stem, stem end free"}
+      ],
+      "object_note": "All pinches just below the flower/leaf cluster with long stem end free; leaf sandwiched with stem in rows 1-4."
+    },
+    {
+      "key": "lily__mohrqo__fl",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "clean 10 mm stem pinch near head, stem end free"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "lily__jfeimu__fl",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "fingers closed to 5 mm through 18 mm stem/leaf section"}
+      ],
+      "object_note": "Stem collision hull much thinner than visual mesh at the pinch (5/0 closure vs 18 mm width)."
+    },
+    {
+      "key": "lily__relerp__fl",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "clean 12 mm stem pinch just below head; 13/0 closed"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "clean 12 mm stem pinch below head, leaf beside; 13/0"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "clean 12 mm stem pinch below head; tilt 25 deg"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "clean 12 mm stem pinch just below head; 13/0 closed"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "lily__jtouad__fl",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "stem pinch below leaves; opening 16.5 vs 13 mm, minor"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "lily__jobzwo__fl",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["gap", "fragile", "one_finger"], "note": "pads 47 mm apart on 17 mm stem; squeezing foliage cluster, 48/0"}
+      ],
+      "object_note": "Grasp lands in middle of flower/leaf cluster (t 0.57); pads stop on coarse foliage hull, not the stem."
+    },
+    {
+      "key": "half_lime__mxmmcp__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/8: lime pushed against open finger, ~20 mm off-centre"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/7: lime pushed against open finger, ~21 mm off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/9: lime pushed against open finger, ~20 mm off-centre"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "42/19 asymmetric but closed; top-down dome pinch"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "49/12: lime against near-open finger, ~18 mm off-centre"}
+      ],
+      "object_note": "Top-down pinches across 58 mm dome, finger tips stay above cut face; most rows have idle open-limit finger."
+    },
+    {
+      "key": "half_lime__iwjqqq__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "40/22 near-symmetric dome pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "31/30 symmetric dome pinch"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/7: lime pushed against open finger, ~21 mm off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/8: lime pushed against open finger, ~20 mm off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/8: lime pushed against open finger, ~20 mm off-centre"}
+      ],
+      "object_note": "Top-down pinches across 59 mm dome, finger tips stay above cut face."
+    },
+    {
+      "key": "half_lime__wdadtn__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "46/14 asymmetric but closed, ~16 mm off-centre"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/9: lime pushed against open finger, ~20 mm off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/8: lime pushed against open finger, ~20 mm off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/2: lime pushed against open finger, ~23 mm off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/7: lime pushed against open finger, ~21 mm off-centre"}
+      ],
+      "object_note": "Top-down pinches across 58 mm dome; row 4 closes 50 mm on 57 mm width (pads higher on dome), fine."
+    },
+    {
+      "key": "half_lime__dtyjkb__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "44/16 asymmetric but closed, ~14 mm off-centre"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/7: lime pushed against open finger, ~21 mm off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/8: lime pushed against open finger, ~20 mm off-centre"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "42/17 asymmetric but closed, ~12 mm off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "49/10: lime against near-open finger, ~19 mm off-centre"}
+      ],
+      "object_note": "Top-down pinches across 58 mm dome, finger tips stay above cut face."
+    },
+    {
+      "key": "brussels_sprouts__mbkrxe__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "43/0 asymmetric but firmly closed across sprout"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "46/0 asymmetric but closed across sprout"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "43/0 asymmetric but closed across sprout"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "46/0 asymmetric but closed, tilt 23 deg"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "42/17 asymmetric but closed; 57 mm long-axis pinch"}
+      ],
+      "object_note": "All rows bottom one finger at 0 but no idle open-limit finger; both pads on sprout."
+    },
+    {
+      "key": "brussels_sprouts__vdamtq__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "49/0: sprout against near-open finger, ~24 mm off-centre"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "48/0: sprout against near-open finger, ~23 mm off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "49/0: sprout against near-open finger, ~24 mm off-centre; tilt 22"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "49/0: sprout against near-open finger, ~24 mm off-centre; tilt 28"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "49/0: sprout against near-open finger, ~24 mm off-centre; tilt 28"}
+      ],
+      "object_note": "Every row has one finger idle at 48-49 and the other at 0; sprout entirely in one half of opening."
+    },
+    {
+      "key": "brussels_sprouts__hkwyzk__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "40/12 asymmetric but closed, ~14 mm off-centre"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: sprout pushed against open finger, ~24 mm off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: sprout pushed against open finger, ~24 mm off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/5: sprout pushed against open finger, ~22 mm off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: sprout pushed against open finger, ~24 mm off-centre"}
+      ],
+      "object_note": "Top-down pinches across 50 mm sprout; rows 2-5 have idle open-limit finger."
+    },
+    {
+      "key": "brussels_sprouts__siodbb__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: sprout pushed against open finger, ~24 mm off-centre"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "46/6 asymmetric, both fingers moved, firmly closed"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/8: sprout pushed against open finger, ~20 mm off-centre"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "38/25 near-symmetric pinch across 60 mm"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/14: sprout against open finger, ~17 mm off-centre, borderline"}
+      ],
+      "object_note": "Row 3 rendered from a different camera yaw but clearly a two-pad pinch."
+    },
+    {
+      "key": "salt_shaker__fonexa__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: shaker pushed against open finger, ~24 mm off-centre"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: shaker pushed against open finger, ~24 mm off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: shaker pushed against open finger, ~24 mm off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: shaker pushed against open finger, ~24 mm off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: shaker pushed against open finger, ~24 mm off-centre; tilt 9"}
+      ],
+      "object_note": "Natural pinch on 49 mm top bulge below knob, but every row has idle open-limit finger."
+    },
+    {
+      "key": "salt_shaker__iomwtn__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "43/3 asymmetric but closed; top bulge pinch"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: shaker pushed against open finger, ~24 mm off-centre"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "42/8 asymmetric but closed, ~16 mm off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: shaker pushed against open finger, ~24 mm off-centre; tilt 10"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: shaker pushed against open finger, ~24 mm off-centre; tilt 13"}
+      ],
+      "object_note": "Natural pinch on top bulge below knob."
+    },
+    {
+      "key": "pepper_shaker__stbqbt__t",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "upper-cone pinch below cap, 29/0 closed, coverage 0.75"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp", "penetration"], "note": "fingers fully closed 0/0 through cap; hangs from finial tip"}
+      ],
+      "object_note": "Small conical shaker, only 2/12 candidates valid; row 2 pads meet inside the cap visual."
+    },
+    {
+      "key": "pepper_shaker__ykujyn__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/12: cap pushed against open finger, ~18 mm off-centre"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "50/16 idle finger, ~16 mm off-centre, borderline; 62 mm cap"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/14: cap against open finger, ~17 mm off-centre, borderline"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/14: cap against open finger, ~17 mm off-centre, borderline"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/14: cap against open finger, ~17 mm off-centre, borderline"}
+      ],
+      "object_note": "Pinch on 62 mm grinder cap fills most of opening; off-centre 16-18 mm sits right at the flag threshold."
+    },
+    {
+      "key": "pepper_shaker__tgcwtr__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "50/16 idle finger, ~16 mm off-centre, borderline; 63 mm cap"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/12: cap pushed against open finger, ~18 mm off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/14: cap against open finger, ~17 mm off-centre, borderline"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "50/16 idle finger, ~16 mm off-centre, borderline; 62 mm cap"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "50/17 idle finger, ~16 mm off-centre, tilt 9 deg"}
+      ],
+      "object_note": "Pinch on 62-63 mm grinder cap fills most of opening; off-centre 16-18 mm sits right at the flag threshold."
+    }
+  ]
+}

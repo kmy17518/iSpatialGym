@@ -1,0 +1,232 @@
+{
+ "task": "configuration_matching",
+ "relation": null,
+ "category": "skateboard_wheel_assembly",
+ "model": "jljqtt",
+ "key": "skateboard_wheel_assembly__jljqtt__a",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "attachment_free",
+ "bbox": [
+  0.3273528289794922,
+  0.11325997924804687,
+  0.13546768951416016
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "skateboard_wheel_assembly",
+   "model": "jljqtt"
+  },
+  "task": "configuration_matching",
+  "constraint": "attachment_free",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_attachment_free",
+  "log": {
+   "n_sampled": 4188,
+   "n_tilt": 733,
+   "n_width_antipodal": 543,
+   "n_table": 542,
+   "n_collision": 157,
+   "n_sweep": 80,
+   "n_lever": 80,
+   "n_attachment_free": 80,
+   "n_selected": 12,
+   "com": [
+    0.0001,
+    0.0008,
+    -0.0036
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0187
+   ],
+   "score": 11.1644,
+   "meta": {
+    "com_perp": 0.001,
+    "width": 0.06665,
+    "antipodal": 0.99833,
+    "coverage": 1.0,
+    "clearance": 0.01545,
+    "tilt_deg": 1.65963,
+    "attach_dist": 0.05562,
+    "attach_side": 6.07753
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g0_v1.png",
+    "v2": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g0_v2.png",
+    "v3": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g0_v3.png",
+    "wrist": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g0_wrist.png"
+   },
+   "t_s": 3.45
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0186
+   ],
+   "score": 11.066,
+   "meta": {
+    "com_perp": 0.00204,
+    "width": 0.06594,
+    "antipodal": 0.99812,
+    "coverage": 1.0,
+    "clearance": 0.0149,
+    "tilt_deg": 1.86246,
+    "attach_dist": 0.0619,
+    "attach_side": 7.24486
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g1_v1.png",
+    "v2": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g1_v2.png",
+    "v3": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g1_v3.png",
+    "wrist": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g1_wrist.png"
+   },
+   "t_s": 3.49
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 10.5419,
+   "meta": {
+    "com_perp": 0.03075,
+    "width": 0.02864,
+    "antipodal": 0.99623,
+    "coverage": 1.0,
+    "clearance": 0.00124,
+    "tilt_deg": 30.0,
+    "attach_dist": 0.05228,
+    "attach_side": -0.88359
+   },
+   "frames": {},
+   "t_s": 5.4
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0186
+   ],
+   "score": 10.3905,
+   "meta": {
+    "com_perp": 0.01445,
+    "width": 0.06602,
+    "antipodal": 0.99811,
+    "coverage": 1.0,
+    "clearance": 0.01486,
+    "tilt_deg": 1.86246,
+    "attach_dist": 0.06356,
+    "attach_side": 6.28952
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g3_v1.png",
+    "v2": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g3_v2.png",
+    "v3": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g3_v3.png",
+    "wrist": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g3_wrist.png"
+   },
+   "t_s": 3.4
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0476,
+    0.0218
+   ],
+   "score": 9.9185,
+   "meta": {
+    "com_perp": 0.01163,
+    "width": 0.06689,
+    "antipodal": 0.99681,
+    "coverage": 0.75,
+    "clearance": 0.01508,
+    "tilt_deg": 29.98158,
+    "attach_dist": 0.05824,
+    "attach_side": 4.78325
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g4_v1.png",
+    "v2": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g4_v2.png",
+    "v3": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g4_v3.png",
+    "wrist": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g4_wrist.png"
+   },
+   "t_s": 3.49
+  },
+  {
+   "grasp": "grasp_5",
+   "idx": 5,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.019
+   ],
+   "score": 9.8296,
+   "meta": {
+    "com_perp": 0.0222,
+    "width": 0.06689,
+    "antipodal": 0.99681,
+    "coverage": 0.75,
+    "clearance": 0.01568,
+    "tilt_deg": 0.64923,
+    "attach_dist": 0.06053,
+    "attach_side": 4.78325
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g5_v1.png",
+    "v2": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g5_v2.png",
+    "v3": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g5_v3.png",
+    "wrist": "/tmp/glib/frames/skateboard_wheel_assembly__jljqtt__a/g5_wrist.png"
+   },
+   "t_s": 3.5
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 28.7
+}

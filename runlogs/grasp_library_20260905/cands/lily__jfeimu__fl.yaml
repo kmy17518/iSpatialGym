@@ -1,0 +1,59 @@
+format: isaac_grasp
+format_version: 1.0
+object_frame: base_link
+gripper_frame: right_eef_link
+ispatialgym:
+  object:
+    category: lily
+    model: jfeimu
+  task: IORS
+  constraint: flower_stem_top
+  pipeline: a1
+  gripper: r1pro_right
+  source: a1_flower_stem_top
+  log:
+    n_sampled: 5988
+    n_tilt: 676
+    n_width_antipodal: 170
+    n_table: 170
+    n_collision: 51
+    n_sweep: 14
+    n_flower: 1
+    stem_len: 0.424
+    n_selected: 1
+    com:
+    - 0.0109
+    - 0.0004
+    - 0.0059
+    rest_pose: canonical
+  rest_pose: canonical
+  rest_quat_wxyz:
+  - 1.0
+  - 0.0
+  - 0.0
+  - 0.0
+grasps:
+  grasp_0:
+    confidence: 9.6192
+    position:
+    - -0.19976158390774781
+    - 0.008208512953090084
+    - -0.03197212250983489
+    orientation:
+      w: 0.24377879590857646
+      xyz:
+      - 0.9440111704357097
+      - 0.21225740401064674
+      - -0.06604243484781044
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.17833
+      width: 0.01787
+      antipodal: 0.87922
+      coverage: 1.0
+      clearance: 0.02928
+      tilt_deg: 29.25884
+      stem_t: 0.79424
+      pinch_across: 0.43295

@@ -1,0 +1,293 @@
+{
+ "batch": "wave4_01",
+ "models": [
+  {
+   "key": "quartz__poplsu",
+   "n_rows": 3,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "side pinch across crystal near middle, both pads on"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "side pinch across crystal near middle, both pads on"},
+    {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch ~40% along small crystal; fine"}
+   ],
+   "object_note": "small crystal (~7 cm); all pinches across 26 mm body"
+  },
+  {
+   "key": "quartz__drqtci",
+   "n_rows": 3,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "side pinch across crystal body, both pads on"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "side pinch across crystal body, both pads on"},
+    {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch ~35% along crystal; not an end grasp"}
+   ],
+   "object_note": "small crystal (~7 cm); pinches across 26 mm body"
+  },
+  {
+   "key": "quartz__klgses",
+   "n_rows": 4,
+   "grasps": [
+    {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "pads on pointed tip; ~12 cm crystal hangs to one side"},
+    {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch within ~15% of tip end; long body cantilevered"},
+    {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch at very end, crystal dangles diagonally; coverage 0.75"},
+    {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch near one end; long body extends to other side"}
+   ],
+   "object_note": "long heavy crystal (~12 cm); every valid grasp is at one end, CoM offset 25-36 mm"
+  },
+  {
+   "key": "quartz__vfuilh",
+   "n_rows": 5,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "centred side pinch across crystal body"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "centred side pinch across crystal body"},
+    {"rank": 3, "verdict": "ok", "flags": [], "note": "centred side pinch across crystal body"},
+    {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch ~45% along crystal; fine"},
+    {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch ~35-38% along crystal; edge of middle third"}
+   ],
+   "object_note": "~10 cm crystal; all pinches on body, none at ends"
+  },
+  {
+   "key": "quartz__tgqodl",
+   "n_rows": 5,
+   "grasps": [
+    {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "finger stuck open at 50; 13 mm spike cannot span 80 mm"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "fingers pinch central spike group (32 mm) from above"},
+    {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "finger stuck open at 50; pads on spike tips 80 mm apart"},
+    {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch on central spikes, somewhat off-centre (36 mm)"},
+    {"rank": 5, "verdict": "ok", "flags": [], "note": "wide pinch across cluster body (76 mm), finger at open limit"}
+   ],
+   "object_note": "large quartz cluster; fingers descend between spikes, contacts hard to verify; V4 saturated"
+  },
+  {
+   "key": "marker__qemval",
+   "n_rows": 3,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "centred side pinch on marker body"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "centred side pinch on marker body, tilted approach"},
+    {"rank": 3, "verdict": "ok", "flags": [], "note": "centred side pinch on marker body, tilted approach"}
+   ]
+  },
+  {
+   "key": "marker__kjxpdi",
+   "n_rows": 2,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "centred side pinch on marker body"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch ~35% along marker; fine"}
+   ]
+  },
+  {
+   "key": "marker__slgheo",
+   "n_rows": 5,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "centred pinch; closed 11 mm on 16 mm body, slight sink"},
+    {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "marker dangles 33 deg from pads near rear end; metrics disagree"},
+    {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch near middle of marker body"},
+    {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch ~44% along marker; fine"},
+    {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch at cap/body junction, ~33% from cap end"}
+   ],
+   "object_note": "grasp 2 render shows marker rotated in pad plane; likely moved during closing"
+  },
+  {
+   "key": "marker__mcpkkq",
+   "n_rows": 5,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "centred side pinch on marker body"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "centred side pinch on marker body"},
+    {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch near middle, cap side"},
+    {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch ~40% along marker; fine"},
+    {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch ~40% along marker; fine"}
+   ]
+  },
+  {
+   "key": "marker__mznenj",
+   "n_rows": 3,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at cap/body junction near middle"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch on body, inside middle third"},
+    {"rank": 3, "verdict": "flag", "flags": ["end_grasp", "penetration"], "note": "pads on rear tip (~13% from end); closed 6 of 13 mm"}
+   ]
+  },
+  {
+   "key": "marker__xakoic",
+   "n_rows": 5,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "centred side pinch on marker body"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "centred side pinch on marker body"},
+    {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch near middle, cap side"},
+    {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch ~40% along marker; fine"},
+    {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch ~40% along marker; fine"}
+   ]
+  },
+  {
+   "key": "marker__vrjwkg",
+   "n_rows": 5,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "centred side pinch on marker body"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch ~40% along marker; fine"},
+    {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch near middle, cap side"},
+    {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch at cap/body junction near middle"},
+    {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch on cap end of body, ~37% from end"}
+   ]
+  },
+  {
+   "key": "marker__ablbdc",
+   "n_rows": 5,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "centred side pinch on marker body"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "centred side pinch on marker body"},
+    {"rank": 3, "verdict": "ok", "flags": [], "note": "centred side pinch on marker body"},
+    {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch near middle on thinner section (13 mm)"},
+    {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "pads on last ~2 cm of marker; rest cantilevered"}
+   ]
+  },
+  {
+   "key": "marker__oyjbhy",
+   "n_rows": 4,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "centred side pinch on marker body"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch near middle of marker body"},
+    {"rank": 3, "verdict": "flag", "flags": ["penetration"], "note": "closed 7 mm on 14 mm marker; pads sink into body"},
+    {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch ~23-28% from rear end; acceptable, not extreme"}
+   ]
+  },
+  {
+   "key": "marker__gldosk",
+   "n_rows": 5,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at cap/body junction, ~35% from cap end"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch ~35% along marker; fine"},
+    {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch ~31% along marker; edge of middle third"},
+    {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch at cap/body junction near middle"},
+    {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch on body just past cap, near middle"}
+   ]
+  },
+  {
+   "key": "marker__vjjsul",
+   "n_rows": 5,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at cap/body junction, ~37% from cap end"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch ~37% along marker; fine"},
+    {"rank": 3, "verdict": "flag", "flags": ["end_grasp", "penetration"], "note": "pads at rear end of marker; closed 3 mm on 16 mm"},
+    {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch ~37% along marker; fine"},
+    {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch on cap end of body, ~37% from end"}
+   ]
+  },
+  {
+   "key": "marker__bwwkmb",
+   "n_rows": 5,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "centred side pinch on marker body"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch near middle, cap side"},
+    {"rank": 3, "verdict": "ok", "flags": [], "note": "oblique pinch near middle; coverage 0.75 from 35 deg tilt"},
+    {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch at cap/body junction, ~35% from cap end"},
+    {"rank": 5, "verdict": "ok", "flags": [], "note": "side pinch at cap junction ~30% from end; odd V1/V2 angle"}
+   ],
+   "object_note": "grasp 5 V1/V2 rendered end-on (camera azimuth); V4 shows normal side pinch"
+  },
+  {
+   "key": "cap__clhquh__s",
+   "n_rows": 2,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "side pinch across cap diameter at rim; open side free"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "side pinch across cap diameter at rim; open side free"}
+   ],
+   "object_note": "large cap (~70 mm) held across diameter; pads half beyond open rim (coverage 0.5)"
+  },
+  {
+   "key": "cap__yqvild__s",
+   "n_rows": 1,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "side pinch across cap diameter at rim; coverage 0.25, light object"}
+   ],
+   "object_note": "large cap (~70 mm) held across diameter at open rim; mating side stays free"
+  },
+  {
+   "key": "french_fries__jhskfy__s",
+   "n_rows": 1,
+   "grasps": [
+    {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "fingers closed to 4 mm on 15 mm fry; pads inside mesh"}
+   ],
+   "object_note": "collision hull much thinner than scaled visual mesh"
+  },
+  {
+   "key": "french_fries__nfgqwu__s",
+   "n_rows": 3,
+   "grasps": [
+    {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "lengthwise squeeze on both tips of 8 cm fry; coverage 0.25"},
+    {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "lengthwise squeeze on both tips; coverage 0.00"},
+    {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "lengthwise squeeze on both tips; coverage 0.00"}
+   ],
+   "object_note": "all grasps pinch the thin fry end-to-end along its length with near-zero pad coverage"
+  },
+  {
+   "key": "french_fries__uqsuef__s",
+   "n_rows": 1,
+   "grasps": [
+    {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "fingers fully closed (0/0) through 15 mm fry"}
+   ],
+   "object_note": "collision hull much thinner than scaled visual mesh"
+  },
+  {
+   "key": "french_fries__xzsoub__s",
+   "n_rows": 3,
+   "grasps": [
+    {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "closed 8 mm on 19 mm fry; pads sink in"},
+    {"rank": 2, "verdict": "flag", "flags": ["penetration"], "note": "closed 2 mm on 16 mm fry; pads sink in"},
+    {"rank": 3, "verdict": "flag", "flags": ["penetration"], "note": "closed 5 mm on 17 mm fry; pads sink in"}
+   ],
+   "object_note": "collision hull much thinner than scaled visual mesh"
+  },
+  {
+   "key": "french_fries__oeterg__s",
+   "n_rows": 5,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "cross-section pinch at middle; closed 11 mm on 16 mm, mild"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "short chunky fry squeezed lengthwise by ends; coverage 0.5"},
+    {"rank": 3, "verdict": "ok", "flags": [], "note": "short chunky fry squeezed lengthwise by ends; coverage 0.5"},
+    {"rank": 4, "verdict": "ok", "flags": [], "note": "short chunky fry squeezed lengthwise by ends; coverage 0.5"},
+    {"rank": 5, "verdict": "ok", "flags": [], "note": "short chunky fry squeezed lengthwise by ends; coverage 0.5"}
+   ],
+   "object_note": "48 mm chunk fills gripper at open limit (50/0); both pads on fry ends"
+  },
+  {
+   "key": "french_fries__kxpfcj__s",
+   "n_rows": 5,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "centred cross-section pinch on fry"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "fry squeezed lengthwise by its ends; coverage 0.5"},
+    {"rank": 3, "verdict": "ok", "flags": [], "note": "fry squeezed lengthwise by its ends; coverage 0.5"},
+    {"rank": 4, "verdict": "ok", "flags": [], "note": "fry squeezed lengthwise by its ends; coverage 0.5"},
+    {"rank": 5, "verdict": "ok", "flags": [], "note": "cross-section pinch near middle, fry hangs along approach"}
+   ],
+   "object_note": "grasps 2-4 hold the 65 mm fry end-to-end; non-optimal but both pads seated"
+  },
+  {
+   "key": "french_fries__xshwvn__s",
+   "n_rows": 5,
+   "grasps": [
+    {"rank": 1, "verdict": "ok", "flags": [], "note": "centred cross-section pinch on curved fry"},
+    {"rank": 2, "verdict": "ok", "flags": [], "note": "centred cross-section pinch on curved fry"},
+    {"rank": 3, "verdict": "ok", "flags": [], "note": "centred cross-section pinch on curved fry"},
+    {"rank": 4, "verdict": "ok", "flags": [], "note": "curved fry squeezed lengthwise by its tips; coverage 0.5"},
+    {"rank": 5, "verdict": "ok", "flags": [], "note": "curved fry squeezed lengthwise by tips; finger at open limit"}
+   ],
+   "object_note": "grasps 4-5 hold banana-shaped fry end-to-end (44-50 mm); both pads on tips"
+  },
+  {
+   "key": "french_fries__kjqhuo__s",
+   "n_rows": 3,
+   "grasps": [
+    {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "closed 7 mm on 12 mm fry; pads sink in"},
+    {"rank": 2, "verdict": "flag", "flags": ["penetration"], "note": "closed 5 mm on 18 mm fry; coverage 0.25"},
+    {"rank": 3, "verdict": "flag", "flags": ["penetration"], "note": "closed 2 mm on 11 mm fry; pads sink in"}
+   ],
+   "object_note": "collision hull much thinner than scaled visual mesh"
+  },
+  {
+   "key": "french_fries__xlkkxg__s",
+   "n_rows": 1,
+   "grasps": [
+    {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "closed 4 mm on 15 mm fry; attached only at step 36"}
+   ],
+   "object_note": "collision hull much thinner than scaled visual mesh"
+  }
+ ]
+}

@@ -1,0 +1,196 @@
+{
+ "task": "IORS",
+ "relation": "ontop",
+ "category": "pack_of_kielbasa",
+ "model": "dgodnn",
+ "key": "pack_of_kielbasa__dgodnn__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.22094134521484374,
+  0.06684130859375,
+  0.06245208740234375
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "pack_of_kielbasa",
+   "model": "dgodnn"
+  },
+  "task": "IORS",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 5988,
+   "n_tilt": 363,
+   "n_width_antipodal": 196,
+   "n_table": 196,
+   "n_collision": 196,
+   "n_sweep": 196,
+   "n_lever": 196,
+   "n_selected": 12,
+   "com": [
+    0.0004,
+    0.0,
+    -0.0
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0164
+   ],
+   "score": 10.9783,
+   "meta": {
+    "com_perp": 0.0012,
+    "width": 0.06463,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01577,
+    "tilt_deg": 21.24208
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g0_v1.png",
+    "v2": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g0_v2.png",
+    "v3": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g0_v3.png",
+    "wrist": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g0_wrist.png"
+   },
+   "t_s": 3.49
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0164
+   ],
+   "score": 10.6635,
+   "meta": {
+    "com_perp": 0.00449,
+    "width": 0.06463,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01508,
+    "tilt_deg": 21.24883
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g1_v1.png",
+    "v2": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g1_v2.png",
+    "v3": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g1_v3.png",
+    "wrist": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g1_wrist.png"
+   },
+   "t_s": 3.28
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0164
+   ],
+   "score": 10.5374,
+   "meta": {
+    "com_perp": 0.00602,
+    "width": 0.06463,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01418,
+    "tilt_deg": 18.79316
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g2_v1.png",
+    "v2": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g2_v2.png",
+    "v3": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g2_v3.png",
+    "wrist": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g2_wrist.png"
+   },
+   "t_s": 3.34
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0164
+   ],
+   "score": 10.4765,
+   "meta": {
+    "com_perp": 0.00567,
+    "width": 0.06463,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.0124,
+    "tilt_deg": 18.79284
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g3_v1.png",
+    "v2": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g3_v2.png",
+    "v3": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g3_v3.png",
+    "wrist": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g3_wrist.png"
+   },
+   "t_s": 3.4
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0164
+   ],
+   "score": 10.3601,
+   "meta": {
+    "com_perp": 0.00955,
+    "width": 0.06463,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01614,
+    "tilt_deg": 18.79284
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g4_v1.png",
+    "v2": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g4_v2.png",
+    "v3": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g4_v3.png",
+    "wrist": "/tmp/glib/frames/pack_of_kielbasa__dgodnn__t/g4_wrist.png"
+   },
+   "t_s": 3.42
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 21.7
+}

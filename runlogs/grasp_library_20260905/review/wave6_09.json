@@ -1,0 +1,345 @@
+{
+  "batch": "wave6_09",
+  "models": [
+    {
+      "key": "toy_figure__cqeowc__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 42/0: toy against one pad, ~20 mm off-centre"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 42/0: toy against one pad, ~20 mm off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 43/0: toy against one pad, ~20 mm off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch on thin tail tip, CoM 61 mm away"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch on thin tail tip, CoM 60 mm away"}
+      ],
+      "object_note": "elongated robot-dinosaur; rows 1-3 strongly asymmetric body pinches, rows 4-5 hold the tail end"
+    },
+    {
+      "key": "toy_figure__cobfpg__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "torso pinch, both pads on body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "torso pinch, both pads on body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "torso pinch, both pads on body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "torso pinch, mild tilt"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "torso pinch, both pads on body"}
+      ],
+      "object_note": "wide (72 mm) figure; one finger stays at 50 in all rows but offset only ~12 mm, firmly held"
+    },
+    {
+      "key": "toy_figure__fekpjq__t",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch on thick dorsal fin directly above CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch across fish"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch across fish"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "toy_figure__gqspnb__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch, near CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch, near CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch, tilt 39 deg acceptable"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch across head/upper body, bulky part"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "lemon__pwqedq__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "diametral pinch, fingertips above bottom"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "diametral pinch, tilt 30 deg"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "diametral pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "lemon__bbvonm__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 48/0: lemon against open pad, other finger at limit"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/4: lemon against open pad, ~22 mm off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/1: lemon against open pad, ~24 mm off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/3: lemon against open pad, ~23 mm off-centre"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "symmetric pinch 27/22, lemon centred"}
+      ],
+      "object_note": "small lemon (~50 mm); rows 1-4 have one finger stationary and the other at its closed limit"
+    },
+    {
+      "key": "lemon__kvgfdl__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "asymmetric 50/9 but firmly pinched across diameter"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "asymmetric 50/12 but firmly pinched"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "asymmetric 50/13 but firmly pinched"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "asymmetric 50/12 but firmly pinched"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "asymmetric 50/12 but firmly pinched, tilt 31"}
+      ],
+      "object_note": "all rows keep one finger at 50 (lemon against open pad, ~18 mm off-centre); borderline, not flagged"
+    },
+    {
+      "key": "lemon__gkrfha__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "asymmetric 50/13 but firmly pinched"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "near-symmetric pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "asymmetric 50/11 but firmly pinched"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "asymmetric 50/13 but firmly pinched"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "diametral pinch"}
+      ],
+      "object_note": "rows 1,3,4 keep one finger at 50 (~18 mm off-centre); borderline, not flagged"
+    },
+    {
+      "key": "lemon__pqweio__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "diametral pinch, tilt 27"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "diametral pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "lemon__bmvxas__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "diametral pinch, tilt 26"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch across long axis, symmetric"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "lemon__asdada__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "symmetric pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "diametral pinch, tilt 23"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "lemon__vuwehu__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "symmetric pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "diametral pinch, tilt 32"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "symmetric pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "lemon__ovbcff__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "symmetric pinch 36/35"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "diametral pinch, tilt 29"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "diametral pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "lemon__peqwoa__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "symmetric pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "diametral pinch, tilt 33"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "symmetric pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "lemon__dsacfa__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "symmetric pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "diametral pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "lemon__pffkae__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "symmetric pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "diametral pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "symmetric pinch, tilt 29"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "ice_cube__kdlafa__i",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "fingertip pinch across edges of rotated cube"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "fingertip face pinch, cube below tips"}
+      ],
+      "object_note": "20 mm cube; every row closes one finger to its 0 limit, cube ~12 mm off centre, both pads touch"
+    },
+    {
+      "key": "ice_cube__dueotq__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "fingertip pinch across edges of rotated cube"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "fingertip pinch on slightly rotated cube"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "face pinch, tilt 30"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "face pinch, tilt 32"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "face pinch, tilt 31"}
+      ],
+      "object_note": "every row closes one finger to its 0 limit (cube ~11-14 mm off centre); both pads visibly touch"
+    },
+    {
+      "key": "ice_cube__lkirej__i",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "face pinch at fingertips"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "corner-to-corner pinch of rotated cube, tilt 30"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "edge pinch of rotated cube, tilt 30"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "face pinch, tilt 30"}
+      ],
+      "object_note": "every row closes one finger to its 0 limit; both pads touch the cube"
+    },
+    {
+      "key": "ice_cube__xupugj__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "edge pinch of rotated cube"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "face pinch at fingertips"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "diagonal pinch, low coverage but antipodal"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "edge pinch, tilt 31"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "face pinch, tilt 30"}
+      ],
+      "object_note": "every row closes one finger to its 0 limit; both pads touch the cube"
+    },
+    {
+      "key": "ice_cube__ujmgkb__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "face pinch at fingertips"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "face pinch at fingertips"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "face pinch at fingertips"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "face pinch at fingertips"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "face pinch, tilt 30"}
+      ],
+      "object_note": "every row closes one finger to its 0 limit; both pads touch the cube"
+    },
+    {
+      "key": "ice_cube__pjgror__i",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "face pinch, tilt 32"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "face pinch, tilt 30"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "face pinch, tilt 30"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "edge pinch of cube seen along body diagonal"}
+      ],
+      "object_note": "every row closes one finger to its 0 limit; both pads touch the cube"
+    },
+    {
+      "key": "ice_cube__czbfpm__i",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "face pinch at fingertips"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "face pinch, tilt 29"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "diagonal pinch, low coverage but antipodal"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "face pinch, tilt 29"}
+      ],
+      "object_note": "every row closes one finger to its 0 limit; both pads touch the cube"
+    },
+    {
+      "key": "ice_cube__tqsquu__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "corner pinch of rotated cube at fingertips"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "face pinch at fingertips"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "face pinch at fingertips"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "face pinch, tilt 24"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "edge pinch of rotated cube, tilt 30"}
+      ],
+      "object_note": "every row closes one finger to its 0 limit; both pads touch the cube"
+    },
+    {
+      "key": "chili__xhbpqh__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-body pinch of 6 mm chili at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-body pinch at CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-body pinch, tilt 32"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-body pinch, tilt 33"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-body pinch, low coverage from thin body"}
+      ],
+      "object_note": "very thin chili (6 mm); fingers nearly fully closed, stem and tip free"
+    },
+    {
+      "key": "chili__pbbkpz__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-body pinch at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-body pinch at CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-body pinch, tilt 30"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-body pinch, tilt 25"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-body pinch, tilt 37"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "chili__agecro__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-body pinch at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-body pinch, tilt 31"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-body pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-body pinch, tilt 40 still acceptable"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-body pinch, tilt 27"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "chili__rafkbt__i",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-body pinch at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-body pinch at CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-body pinch, tilt 25"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-body pinch, tilt 37"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-body pinch, tilt 37"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "spatula__ktkigm__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle/neck pinch near CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "handle/neck pinch, tilt 30"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "handle/neck pinch, tilt 33"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "handle pinch, natural tool grasp"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "handle pinch, natural tool grasp"}
+      ],
+      "object_note": "all rows pinch the handle; one finger closes to its 0 limit in every row, both pads on handle"
+    }
+  ]
+}

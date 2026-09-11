@@ -1,0 +1,176 @@
+{
+ "category": "dishwasher",
+ "model": "tnlzww",
+ "key": "dishwasher__tnlzww",
+ "aabb_extent": [
+  0.5735809803009033,
+  0.5231328010559082,
+  0.7547934055328369
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.2505,
+   -0.2614,
+   -0.4094
+  ],
+  "bbox_max": [
+   0.3032,
+   0.2615,
+   0.3453
+  ],
+  "n_pieces": 16
+ },
+ "joints": [
+  {
+   "joint": "j_link_4",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "link_4",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.3004,
+   "axis_dir_obj": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.28235,
+    0.00047,
+    -0.02779
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5707963705062866,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.2688,
+    -0.2615,
+    -0.0451
+   ],
+   "link_bbox_max": [
+    0.3231,
+    0.2616,
+    0.2734
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.3117,
+      0.1032,
+      0.2476
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0385,
+     "length": 0.1954,
+     "depth": 0.0227,
+     "face_s": 0.3004,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9944,
+      0.0,
+      -0.106
+     ]
+    },
+    {
+     "kind": "knob",
+     "contact": [
+      0.3117,
+      0.2435,
+      0.249
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0403,
+     "length": 0.0618,
+     "depth": 0.0227,
+     "face_s": 0.3004,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9944,
+      0.0,
+      -0.1054
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      0.3117,
+      -0.1717,
+      0.2516
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0406,
+     "length": 0.2659,
+     "depth": 0.0227,
+     "face_s": 0.3004,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9945,
+      0.0,
+      -0.1045
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     0.2914,
+     -0.0008,
+     0.238
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     -0.0954,
+     -0.0,
+     -0.9954
+    ],
+    "width": 0.0543,
+    "exposed": false,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     0.9994,
+     0.0,
+     -0.034
+    ]
+   },
+   "sub_links": [],
+   "status": "handle"
+  }
+ ]
+}

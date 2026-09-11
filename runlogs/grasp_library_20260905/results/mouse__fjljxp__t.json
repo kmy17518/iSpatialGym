@@ -1,0 +1,196 @@
+{
+ "task": "disembedding",
+ "relation": null,
+ "category": "mouse",
+ "model": "fjljxp",
+ "key": "mouse__fjljxp__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.10603614807128907,
+  0.05878164672851562,
+  0.028253803253173827
+ ],
+ "ready": true,
+ "round": 2,
+ "candidates_meta": {
+  "object": {
+   "category": "mouse",
+   "model": "fjljxp"
+  },
+  "task": "disembedding",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 5964,
+   "n_tilt": 249,
+   "n_width_antipodal": 18,
+   "n_table": 18,
+   "n_collision": 18,
+   "n_sweep": 18,
+   "n_lever": 18,
+   "n_selected": 8,
+   "com": [
+    0.0022,
+    0.0,
+    0.0003
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.006
+   ],
+   "score": 9.9352,
+   "meta": {
+    "com_perp": 0.00882,
+    "width": 0.0557,
+    "antipodal": 0.913,
+    "coverage": 1.0,
+    "clearance": 0.02048,
+    "tilt_deg": 11.96307
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/mouse__fjljxp__t/g0_v1.png",
+    "v2": "/tmp/glib/frames/mouse__fjljxp__t/g0_v2.png",
+    "v3": "/tmp/glib/frames/mouse__fjljxp__t/g0_v3.png",
+    "wrist": "/tmp/glib/frames/mouse__fjljxp__t/g0_wrist.png"
+   },
+   "t_s": 3.49
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0385,
+    0.0199
+   ],
+   "score": 9.5916,
+   "meta": {
+    "com_perp": 0.00684,
+    "width": 0.0557,
+    "antipodal": 0.913,
+    "coverage": 1.0,
+    "clearance": 0.01967,
+    "tilt_deg": 39.0395
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/mouse__fjljxp__t/g1_v1.png",
+    "v2": "/tmp/glib/frames/mouse__fjljxp__t/g1_v2.png",
+    "v3": "/tmp/glib/frames/mouse__fjljxp__t/g1_v3.png",
+    "wrist": "/tmp/glib/frames/mouse__fjljxp__t/g1_wrist.png"
+   },
+   "t_s": 3.49
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0099
+   ],
+   "score": 9.52,
+   "meta": {
+    "com_perp": 0.01116,
+    "width": 0.05753,
+    "antipodal": 0.92195,
+    "coverage": 1.0,
+    "clearance": 0.01829,
+    "tilt_deg": 1.85001
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/mouse__fjljxp__t/g2_v1.png",
+    "v2": "/tmp/glib/frames/mouse__fjljxp__t/g2_v2.png",
+    "v3": "/tmp/glib/frames/mouse__fjljxp__t/g2_v3.png",
+    "wrist": "/tmp/glib/frames/mouse__fjljxp__t/g2_wrist.png"
+   },
+   "t_s": 3.47
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0063
+   ],
+   "score": 9.4397,
+   "meta": {
+    "com_perp": 0.0082,
+    "width": 0.05753,
+    "antipodal": 0.92195,
+    "coverage": 1.0,
+    "clearance": 0.01779,
+    "tilt_deg": 31.13507
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/mouse__fjljxp__t/g3_v1.png",
+    "v2": "/tmp/glib/frames/mouse__fjljxp__t/g3_v2.png",
+    "v3": "/tmp/glib/frames/mouse__fjljxp__t/g3_v3.png",
+    "wrist": "/tmp/glib/frames/mouse__fjljxp__t/g3_wrist.png"
+   },
+   "t_s": 3.49
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0059
+   ],
+   "score": 9.16,
+   "meta": {
+    "com_perp": 0.01114,
+    "width": 0.05753,
+    "antipodal": 0.92195,
+    "coverage": 1.0,
+    "clearance": 0.01849,
+    "tilt_deg": 28.93167
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/mouse__fjljxp__t/g4_v1.png",
+    "v2": "/tmp/glib/frames/mouse__fjljxp__t/g4_v2.png",
+    "v3": "/tmp/glib/frames/mouse__fjljxp__t/g4_v3.png",
+    "wrist": "/tmp/glib/frames/mouse__fjljxp__t/g4_wrist.png"
+   },
+   "t_s": 3.48
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 22.4
+}

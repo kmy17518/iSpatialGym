@@ -1,0 +1,1108 @@
+{
+  "batch": "wave6_02",
+  "models": [
+    {
+      "key": "box_of_cereal__qirvmd__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, pads flat on faces"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, pads flat on faces"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, pads flat on faces"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, pads flat on faces"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, pads flat on faces"
+        }
+      ],
+      "object_note": "fingers close asymmetrically (47/0) but box fills the pad gap; both pads touching"
+    },
+    {
+      "key": "box_of_cereal__hosfhj__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side"
+        }
+      ],
+      "object_note": "asymmetric closure (47/0) but both pads on box faces"
+    },
+    {
+      "key": "box_of_cereal__wdkcbu__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across thin side near box centre"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across thin side near box centre"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across thin side near box centre"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across thin side near box centre"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across thin side near box centre"
+        }
+      ],
+      "object_note": "asymmetric closure (50/0) but both pads on box faces"
+    },
+    {
+      "key": "box_of_cereal__ykuyqb__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across thin side near box centre"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across thin side near box centre"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across thin side near box centre"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across thin side near box centre"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across thin side near box centre"
+        }
+      ],
+      "object_note": "asymmetric closure (50/0) but both pads on box faces"
+    },
+    {
+      "key": "box_of_cereal__iucshm__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, box hangs below"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, box hangs below"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, box hangs below"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, box hangs below"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, box hangs below"
+        }
+      ],
+      "object_note": "large box; pads cover top ~30 mm of faces, both touching"
+    },
+    {
+      "key": "box_of_cereal__surzft__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, box hangs below"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, box hangs below"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, box hangs below"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, box hangs below"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, box hangs below"
+        }
+      ],
+      "object_note": "large box; pads cover top ~30 mm of faces, both touching"
+    },
+    {
+      "key": "box_of_cereal__hcwbzw__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, box hangs below"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, box hangs below"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, box hangs below"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, box hangs below"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "top-edge pinch across thin side, box hangs below"
+        }
+      ],
+      "object_note": "large box; pads cover top ~30 mm of faces, both touching"
+    },
+    {
+      "key": "shampoo_dispenser__thurmw__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch on cube, centred"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch on cube, centred"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch on cube, centred"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch on cube, centred"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch on cube, centred"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "shampoo_dispenser__zoyyia__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch on cube, centred"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch on cube, centred"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch on cube, centred"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch on cube, centred"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch on cube, centred"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "shampoo_dispenser__nrthyl__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch on cube, centred"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch on cube, centred"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch on cube, centred"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch on cube, centred"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch on cube, centred"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "shampoo_dispenser__ndrvvm__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across cylinder body at mid-length"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across cylinder body at mid-length"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across cylinder body at mid-length"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across cylinder body at mid-length"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across cylinder body at mid-length"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "shampoo_dispenser__eblcnw__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across cylinder body at mid-length"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across cylinder body at mid-length"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across cylinder body at mid-length"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across cylinder body at mid-length"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across cylinder body at mid-length"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "shampoo_dispenser__kkbhzw__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch near bottle base, pads well engaged"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch near bottle base, pads well engaged"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch near bottle base, pads well engaged"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch near bottle base, symmetric closure"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "body pinch near bottle base, pads well engaged"
+        }
+      ],
+      "object_note": "grasps sit toward base end (CoM offset ~60 mm) but pads cover a long stretch of body"
+    },
+    {
+      "key": "shampoo_dispenser__eywylh__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "flag",
+          "flags": [
+            "end_grasp",
+            "fragile"
+          ],
+          "note": "pinches 16 mm pump knob; big body hangs 81 mm away"
+        },
+        {
+          "rank": 2,
+          "verdict": "flag",
+          "flags": [
+            "end_grasp",
+            "fragile"
+          ],
+          "note": "pinches 15 mm pump knob; big body hangs 79 mm away"
+        },
+        {
+          "rank": 3,
+          "verdict": "flag",
+          "flags": [
+            "end_grasp",
+            "fragile"
+          ],
+          "note": "pinches 14 mm pump knob; big body hangs 81 mm away"
+        },
+        {
+          "rank": 4,
+          "verdict": "flag",
+          "flags": [
+            "end_grasp",
+            "fragile"
+          ],
+          "note": "pinches 16 mm pump knob; big body hangs 87 mm away"
+        },
+        {
+          "rank": 5,
+          "verdict": "flag",
+          "flags": [
+            "end_grasp",
+            "fragile"
+          ],
+          "note": "pinches 16 mm pump knob; big body hangs 88 mm away"
+        }
+      ],
+      "object_note": "all grasps on the small pump knob; body ~90-100 mm wide, near gripper max opening"
+    },
+    {
+      "key": "hard_candy__ojznyf__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "hard_candy__vwegtt__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "hard_candy__vyxhmv__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "hard_candy__qptjgv__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "hard_candy__yuatcg__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "fingertip pinch on candy body, both pads touching"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "cherry_tomato__dqvtgm__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "cherry_tomato__iydznu__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "cherry_tomato__eukpfb__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "cherry_tomato__hmsqrh__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred fingertip pinch, both pads on tomato"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "cherry_tomato__dqjuub__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred pinch on 32 mm tomato, both pads touching"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred pinch on 32 mm tomato, both pads touching"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred pinch on 34 mm tomato, both pads touching"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred pinch on 32 mm tomato, both pads touching"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred pinch on 33 mm tomato, both pads touching"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bar_soap__utgixp__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred pinch across 11 mm slab, pads flat"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred pinch across 11 mm slab, pads flat"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred pinch across 11 mm slab, pads flat"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred pinch across 11 mm slab, pads flat"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "centred pinch across 11 mm slab, pads flat"
+        }
+      ],
+      "object_note": "very thin soap (11 mm), held at its centre"
+    },
+    {
+      "key": "bar_soap__ofargb__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across thickness on upper part of bar"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across thickness on upper part of bar"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across thickness on upper part of bar"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across thickness on upper part of bar"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across thickness on upper part of bar"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bar_soap__ozifwa__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across puck thickness, pads flat on faces"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across puck thickness, pads flat on faces"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across puck thickness, pads flat on faces"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across puck thickness, pads flat on faces"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch across puck thickness, pads flat on faces"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bar_soap__feqemg__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch at widest part of oval soap, both pads touching"
+        },
+        {
+          "rank": 2,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch at widest part of oval soap, both pads touching"
+        },
+        {
+          "rank": 3,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch at widest part of oval soap, both pads touching"
+        },
+        {
+          "rank": 4,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch at widest part of oval soap, both pads touching"
+        },
+        {
+          "rank": 5,
+          "verdict": "ok",
+          "flags": [],
+          "note": "pinch at widest part of oval soap, both pads touching"
+        }
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "sandal__tkfdsk__f",
+      "n_rows": 5,
+      "grasps": [
+        {
+          "rank": 1,
+          "verdict": "flag",
+          "flags": [
+            "one_finger",
+            "fragile"
+          ],
+          "note": "pads 38 mm apart, sole 13 mm; far pad on strap"
+        },
+        {
+          "rank": 2,
+          "verdict": "flag",
+          "flags": [
+            "one_finger",
+            "fragile"
+          ],
+          "note": "pads 34 mm apart, sole 11 mm; far pad on strap"
+        },
+        {
+          "rank": 3,
+          "verdict": "flag",
+          "flags": [
+            "one_finger",
+            "fragile"
+          ],
+          "note": "pads 37 mm apart, sole 13 mm; far pad on strap"
+        },
+        {
+          "rank": 4,
+          "verdict": "flag",
+          "flags": [
+            "one_finger",
+            "fragile"
+          ],
+          "note": "pads 37 mm apart, sole 12 mm; far pad on strap"
+        },
+        {
+          "rank": 5,
+          "verdict": "flag",
+          "flags": [
+            "one_finger",
+            "fragile"
+          ],
+          "note": "pads 36 mm apart, sole 12 mm; far pad on strap"
+        }
+      ],
+      "object_note": "sole is pressed against one pad only; other pad rests on the thin strap arch, not the sole"
+    }
+  ]
+}

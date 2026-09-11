@@ -1,0 +1,55 @@
+format: isaac_grasp
+format_version: 1.0
+object_frame: base_link
+gripper_frame: right_eef_link
+ispatialgym:
+  object:
+    category: bottle_of_water
+    model: eeaimz
+  task: object_scaling
+  constraint: floating
+  pipeline: graspgen
+  gripper: r1pro_right
+  source: graspgen_floating
+  log:
+    n_graspgen: 500
+    n_collision: 5
+    n_width: 5
+    n_lever: 1
+    n_selected: 1
+    mode: C
+    com:
+    - 0.0
+    - 0.0
+    - 0.0017
+    rest_pose: canonical
+  rest_pose: canonical
+  rest_quat_wxyz:
+  - 1.0
+  - 0.0
+  - 0.0
+  - 0.0
+grasps:
+  grasp_0:
+    confidence: 14.3116
+    position:
+    - 0.006653317934953981
+    - -0.002962205524337694
+    - 0.13045467042041986
+    orientation:
+      w: 0.2896763200624337
+      xyz:
+      - 0.7648295286995286
+      - -0.3374151303588717
+      - 0.4661270764815632
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.13294
+      width: 0.08566
+      antipodal: 0.86482
+      coverage: 1.0
+      clearance: 0.00171
+      tilt_deg: 66.57013
+      graspgen_conf: 0.65838

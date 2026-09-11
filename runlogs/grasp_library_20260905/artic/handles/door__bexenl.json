@@ -1,0 +1,120 @@
+{
+ "category": "door",
+ "model": "bexenl",
+ "key": "door__bexenl",
+ "aabb_extent": [
+  0.14582650363445282,
+  0.9419651031494141,
+  2.0552051067352295
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0516,
+   -0.4708,
+   -1.1924
+  ],
+  "bbox_max": [
+   0.0535,
+   0.4712,
+   0.8628
+  ],
+  "n_pieces": 3
+ },
+ "joints": [
+  {
+   "joint": "j_leaf",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "leaf",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.0717,
+   "axis_dir_obj": [
+    0.0,
+    -0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    0.06564,
+    -0.41441,
+    -0.17037
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.569969654083252,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.0281,
+    -0.4227,
+    -1.1803
+   ],
+   "link_bbox_max": [
+    0.0943,
+    0.4226,
+    0.8164
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.083,
+      0.2812,
+      -0.092
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0362,
+     "length": 0.1461,
+     "depth": 0.0225,
+     "face_s": 0.0717,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9997,
+      -0.0249,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.0338,
+     0.3871,
+     -0.1807
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0.0783,
+     -0.9969,
+     -0.0
+    ],
+    "width": 0.1224,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     0.9992,
+     0.0397,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle"
+  }
+ ]
+}

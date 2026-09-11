@@ -1,0 +1,25 @@
+(define (problem object_scaling-0)
+    (:domain ispatialgym)
+
+    (:objects
+        mug.n.04_1 - mug.n.04
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop agent.n.01_1 floor.n.01_1)
+        (grasped agent.n.01_1 mug.n.04_1)
+    )
+
+    ; Binary success: the object is still held and its depth along the head-camera optical axis matches the goal
+    ; depth within tolerance (TRO pose_targets["mug.n.04_1"]: frame = head camera, position_metric = "depth").
+    (:goal
+        (and
+            (grasped ?agent.n.01_1 ?mug.n.04_1)
+            (pose_reached ?mug.n.04_1)
+            (pose_settled ?mug.n.04_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+)

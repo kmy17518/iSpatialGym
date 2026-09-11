@@ -1,0 +1,120 @@
+{
+ "category": "door",
+ "model": "dlncrt",
+ "key": "door__dlncrt",
+ "aabb_extent": [
+  0.08080805093050003,
+  0.8636838793754578,
+  1.9016869068145752
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0167,
+   -0.1027,
+   -0.9539
+  ],
+  "bbox_max": [
+   0.0585,
+   0.1245,
+   0.9478
+  ],
+  "n_pieces": 9
+ },
+ "joints": [
+  {
+   "joint": "j_leaf",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "leaf",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.0458,
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "hinge_point_obj": [
+    0.0033,
+    0.10339,
+    0.01698
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.7854748368263245,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.006,
+    0.0966,
+    -0.917
+   ],
+   "link_bbox_max": [
+    0.0641,
+    0.761,
+    0.9478
+   ],
+   "handles": [
+    {
+     "kind": "knob",
+     "contact": [
+      0.055,
+      0.6972,
+      -0.002
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0383,
+     "length": 0.0383,
+     "depth": 0.0183,
+     "face_s": 0.0458,
+     "n_pieces": 1,
+     "pull_dir": [
+      -0.9962,
+      0.0867,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.0391,
+     0.7245,
+     0.0151
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     -0.0789,
+     -0.9969,
+     -0.0
+    ],
+    "width": 0.0701,
+    "exposed": true,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     -0.9983,
+     0.0575,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle"
+  }
+ ]
+}

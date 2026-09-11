@@ -1,0 +1,353 @@
+{
+  "batch": "wave6_06",
+  "models": [
+    {
+      "key": "can_of_soda__lugwcz__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "firm side pinch on upper body, both pads on can"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "firm side pinch on upper body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "firm side pinch on upper body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "firm side pinch on upper body"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "firm side pinch on upper body"}
+      ],
+      "object_note": "fingers 50/26 on all rows: can pushed against open finger, but wide object, both pads flat on body"
+    },
+    {
+      "key": "can_of_soda__xmjfcg__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "firm side pinch on faceted can body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "firm side pinch on faceted can body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "firm side pinch on faceted can body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "firm side pinch on faceted can body"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "firm side pinch on faceted can body"}
+      ],
+      "object_note": "fingers 50/24 on all rows: can rests against open finger; wide object, both pads on body"
+    },
+    {
+      "key": "can_of_soda__frewxk__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "firm side pinch on upper body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "firm side pinch on upper body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "firm side pinch on upper body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "firm side pinch on upper body"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "firm side pinch on upper body"}
+      ],
+      "object_note": "fingers 50/27 on all rows: can rests against open finger; wide object, both pads on body"
+    },
+    {
+      "key": "can_of_soda__evcxlr__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "firm side pinch on upper body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "firm side pinch on upper body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "firm side pinch on upper body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "firm side pinch on upper body"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "firm side pinch on upper body"}
+      ],
+      "object_note": "fingers 50/28 on all rows: can rests against open finger; wide object, both pads on body"
+    },
+    {
+      "key": "bottle_of_medicine__hvocpc__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "flat pinch across 34 mm box faces, off-centre in gripper"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "flat pinch across box faces, off-centre in gripper"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "flat pinch across box faces, off-centre in gripper"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "flat pinch across box faces, off-centre in gripper"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "flat pinch across box faces, off-centre in gripper"}
+      ],
+      "object_note": "fingers 37/0 on all rows: box sits entirely on one side, one finger at closed limit; both pads on faces"
+    },
+    {
+      "key": "bottle_of_medicine__syfpak__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle against open finger, tilt 5 deg"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"}
+      ],
+      "object_note": "all rows 50/0; pad separation ~48 mm exceeds 38 mm bottle width, hull/visual mismatch suspected"
+    },
+    {
+      "key": "bottle_of_medicine__fmfwng__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: bottle pushed against fully open finger, off-centre"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: bottle pushed against fully open finger, off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: bottle pushed against fully open finger, off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: bottle pushed against fully open finger, off-centre"}
+      ],
+      "object_note": "all rows 50/0-1; pad separation ~49 mm exceeds 43 mm bottle width, hull/visual mismatch suspected"
+    },
+    {
+      "key": "bottle_of_medicine__egondf__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: bottle pushed against fully open finger, off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: bottle pushed against fully open finger, off-centre"}
+      ],
+      "object_note": "all rows 50/0-1; pad separation ~49 mm exceeds 42 mm bottle width, hull/visual mismatch suspected"
+    },
+    {
+      "key": "bottle_of_medicine__kqkwoq__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: bottle pushed against fully open finger, off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: bottle pushed against fully open finger, off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"}
+      ],
+      "object_note": "all rows 50/0-1; pad separation ~48 mm exceeds 37 mm bottle width, hull/visual mismatch suspected"
+    },
+    {
+      "key": "bottle_of_medicine__qqsukh__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: bottle pushed against fully open finger, off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: bottle pushed against fully open finger, off-centre"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/1: bottle against open finger, tilt 5 deg"}
+      ],
+      "object_note": "all rows 50/0-1; pad separation ~48 mm exceeds 38 mm bottle width, hull/visual mismatch suspected"
+    },
+    {
+      "key": "bottle_of_medicine__kasbsy__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle against open finger, tilt 6 deg"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle against open finger, tilt 6 deg"}
+      ],
+      "object_note": "all rows 50/0; 49-50 mm bottle fills one half of gripper, other finger fully closed"
+    },
+    {
+      "key": "bottle_of_medicine__zfbnjh__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle against open finger, tilt 6 deg"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "45/6: near one-sided closure, bottle hugs open finger"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/0: bottle pushed against fully open finger, off-centre"}
+      ],
+      "object_note": "50 mm bottle sits in one half of gripper on all rows; both pads visually on body"
+    },
+    {
+      "key": "mug__fapsrj__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on 6 mm wall, both pads on wall"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch opposite handle"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch on 9 mm wall"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch, handle clear"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch, handle clear"}
+      ],
+      "object_note": "all rows are top-down rim pinches (fingers 10-12/0), sturdy ceramic wall"
+    },
+    {
+      "key": "mug__ehnmxj__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch above handle root, 8 mm wall"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch, handle clear"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch, handle clear"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch, handle clear"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch on 10 mm wall"}
+      ],
+      "object_note": "all rows are top-down rim pinches (fingers 9-12/0)"
+    },
+    {
+      "key": "mug__lgxhsc__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "side pinch on upper body, small handle at one pad"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "side pinch on upper body, handle at one pad"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "side pinch on upper body, handle at one pad"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "side pinch on upper body"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "side pinch on upper body"}
+      ],
+      "object_note": "fingers 50/28 (~76 mm) vs 61-67 mm body on all rows: pinch likely spans body plus small handle"
+    },
+    {
+      "key": "mug__ppzttc__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on 6 mm wall"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch on 6 mm wall"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch opposite handle"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch on 6 mm wall"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch on 5 mm wall"}
+      ],
+      "object_note": "all rows are top-down rim pinches (fingers 7-9/0)"
+    },
+    {
+      "key": "mug__ycbmug__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across body and handle outer face, 93 mm span"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch across body and handle outer face"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch across body and handle outer face"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch across body and handle outer face"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch across body and handle outer face"}
+      ],
+      "object_note": "fingers 50/46 on all rows: every pinch spans body plus sturdy enamel handle, near max opening"
+    },
+    {
+      "key": "mug__jgethp__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on 6 mm wall, tilt 17 deg"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch on 10 mm wall, tilt 27 deg"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch on 10 mm wall, tilt 24 deg"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch on 8 mm wall, tilt 17 deg"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch on 6 mm wall, tilt 24 deg"}
+      ],
+      "object_note": "wide teacup; all rim pinches use 17-27 deg approach tilt, cup hangs tilted but both pads on wall"
+    },
+    {
+      "key": "mug__waqrdy__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on 7 mm wall"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch on 8 mm wall"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch, tilt 13 deg, CoM offset 5 mm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch on 8 mm wall"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch on 8 mm wall; camera views permuted in row"}
+      ],
+      "object_note": "tall mug, all rows top-down rim pinches (fingers 9-10/0); row 5 panels rendered in different view order"
+    },
+    {
+      "key": "mug__ppdqbj__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on 8 mm wall"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch on 8 mm wall"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch at handle root, 9 mm wall"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch on 8 mm wall"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch on 8 mm wall"}
+      ],
+      "object_note": "all rows top-down rim pinches (fingers 10-13/0)"
+    },
+    {
+      "key": "mug__yxaapv__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on 8 mm wall, tilt 16 deg"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch on 9 mm wall"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch on 9 mm wall"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch, CoM offset 4 mm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch, CoM offset 4 mm"}
+      ],
+      "object_note": "tall latte mug, all rows top-down rim pinches (fingers 10-13/0)"
+    },
+    {
+      "key": "mug__ntgftr__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on 6 mm wall, tilt 8 deg"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch on far side of rim"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "symmetric rim pinch (5/4)"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch on 6 mm wall"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch on 6 mm wall"}
+      ],
+      "object_note": "all rows top-down rim pinches; camera framing varies between rows"
+    },
+    {
+      "key": "mouse__oydobn__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "tiny mouse pinched at fingertips, both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "tiny mouse pinched at fingertips"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 25 deg, coverage 0.75"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 28 deg, coverage 0.5"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 36 deg, coverage 0.5"}
+      ],
+      "object_note": "model is very small (~19 mm wide, unscaled); object only visible as small blob at fingertips"
+    },
+    {
+      "key": "mouse__fjljxp__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/6: mouse pushed against fully open finger"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "38/20 side pinch across width, tilt 39 deg"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/10: mouse pushed against fully open finger"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/6: mouse against open finger, tilt 31 deg"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/6: mouse against open finger, tilt 29 deg"}
+      ],
+      "object_note": "side pinches across 56-58 mm width; four rows end with one finger fully open"
+    },
+    {
+      "key": "mouse__ihpnjx__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/8: mouse pushed against fully open finger"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/7: mouse against open finger, tilt 22 deg"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/8: mouse against open finger, tilt 24 deg"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/5: mouse against open finger, tilt 39 deg"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/10: mouse against open finger, CoM offset 17 mm"}
+      ],
+      "object_note": "all rows end with one finger fully open and the other closed to 5-10; mouse hugs open pad"
+    },
+    {
+      "key": "mouse__eosngb__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "44/13 pinch across slab width, tilt 30 deg"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "50/4: slab pushed against fully open finger"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "48/7: slab against open finger, tilt 32 deg"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/4: slab pushed against fully open finger"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "50/5: slab against open finger, tilt 30 deg"}
+      ],
+      "object_note": "flat slab-style mouse, 54 mm wide; fingertips reach about to bottom face but not below"
+    },
+    {
+      "key": "mouse__wwyopp__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "50/6: mouse pushed against fully open finger"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "45/13 pinch across width, coverage 0.75"},
+        {"rank": 3, "verdict": "flag", "flags": ["one_finger"], "note": "50/6: mouse against open finger, tilt 30 deg"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "50/6: mouse against open finger, tilt 32 deg"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "44/15 pinch across width, tilt 30 deg, coverage 0.5"}
+      ],
+      "object_note": "arched dark mouse, 55-56 mm wide; three rows end with one finger fully open"
+    },
+    {
+      "key": "mouse__cduwda__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "45/25 side pinch across 69 mm width"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "50/18 side pinch, tilt 21 deg"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "50/18 side pinch, tilt 19 deg"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "48/20 side pinch, tilt 21 deg"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "50/19 side pinch, tilt 24 deg"}
+      ],
+      "object_note": "wide 64-69 mm mouse; rows 2-5 rest against open finger but other pad closed well onto body"
+    },
+    {
+      "key": "mouse__pljjtu__t",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "50/16 side pinch across 64 mm width"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "46/19 side pinch, tilt 10 deg"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "38/28 near-symmetric side pinch, tilt 25 deg"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "43/23 side pinch, tilt 36 deg"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "46/20 side pinch, tilt 24 deg"}
+      ],
+      "object_note": "wide 62-65 mm mouse, both pads closed onto body in all rows"
+    }
+  ]
+}

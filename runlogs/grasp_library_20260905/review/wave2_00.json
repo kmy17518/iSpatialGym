@@ -1,0 +1,1312 @@
+{
+ "batch": "wave2_00",
+ "models": [
+  {
+   "key": "bar_soap__feqemg",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "dome soap 86 mm fills gripper; 50/36 but both pads contact"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "same side pinch, tilt 26, both pads contact"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch at CoM, both pads contact"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch, CoM 6 mm, both pads contact"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tilt 37 side pinch, both pads on dome, tips above bottom"
+    }
+   ],
+   "object_note": "86 mm soap nearly fills 97 mm gripper; one finger stays at open limit by geometry"
+  },
+  {
+   "key": "bar_soap__ofargb",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across 85 mm bar, tilt 30, both pads contact"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across 85 mm bar, tilt 30"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across 85 mm bar, tilt 30"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "vertical face pinch, tips above bottom face"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "vertical face pinch, CoM 12 mm, tips above bottom"
+    }
+   ],
+   "object_note": "85 mm bar nearly fills gripper; 50/37 readings are width-limited, both pads touch"
+  },
+  {
+   "key": "bar_soap__ozifwa",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "puck on edge, pads on both flat faces; 38/0 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on both flat faces at centre, asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tilt 30, pads on both flat faces, closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tilt 30, pads on both flat faces, closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tilt 30, pads on both flat faces, closed"
+    }
+   ]
+  },
+  {
+   "key": "bar_soap__utgixp",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "small bar between pads, 30/0 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "small bar between pads, 30/0 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "49/0: bar pushed against open-limit finger, other fully closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "small bar between pads, 30/0 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "small bar between pads, 30/0 asymmetric but closed"
+    }
+   ],
+   "object_note": "width/antipodal metrics invalid (inf / 0.00); judged visually"
+  },
+  {
+   "key": "beer_glass__lymciz",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "fragile"
+     ],
+     "note": "pinches 5 mm glass lip, CoM 72 mm below; body grasp available"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "fragile"
+     ],
+     "note": "rim lip pinch 6 mm, glass hangs tilted from lip"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "fragile"
+     ],
+     "note": "rim lip pinch 6 mm, glass hangs tilted from lip"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "fragile"
+     ],
+     "note": "rim lip pinch 5 mm, glass hangs tilted from lip"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "fragile"
+     ],
+     "note": "rim lip pinch 5 mm, CoM 73 mm below pinch"
+    }
+   ],
+   "object_note": "tall thin pilsner glass; every candidate pinches the rim lip, 70 mm body grasp is available"
+  },
+  {
+   "key": "beer_glass__mxsliu",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: glass body pushed against open-limit finger, 22 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: body pushed against open-limit finger"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/3: body pushed against open-limit finger, CoM 50 mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/5: body pushed against open-limit finger"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: body pushed against open-limit finger"
+    }
+   ],
+   "object_note": "width 10-12 mm and coverage 0.00 are bogus; pads span ~55 mm tumbler body"
+  },
+  {
+   "key": "beer_glass__rxscji",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: glass body pushed against open-limit finger, 22 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/5: body pushed against open-limit finger"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/7: body pushed against open-limit finger"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/5: body pushed against open-limit finger, approach over mouth"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: body pushed against open-limit finger, approach over mouth"
+    }
+   ],
+   "object_note": "width 10-11 mm and coverage 0.00 are bogus; pads span ~55 mm tumbler body"
+  },
+  {
+   "key": "bottle_of_wine__bmudli",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder body pinch, 50/20 asymmetric but closed, both pads on body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near base, hangs neck-down; 50/20 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near base, tilted hang; 50/20 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near base, hangs neck-down; 50/20 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near base, tilted hang; 49/22 asymmetric but closed"
+    }
+   ],
+   "object_note": "small 68 mm bottle; one finger at open limit in every row, bottle only ~14 mm off-centre, both pads touch"
+  },
+  {
+   "key": "bottle_of_wine__cldder",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch under lip, 39/0 asymmetric but closed; long lever arm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch at shoulder junction, bottle horizontal; wedge lock"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch at shoulder junction, bottle horizontal"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper neck pinch under lip, both pads on neck"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch near shoulder, 30/0 asymmetric but closed"
+    }
+   ],
+   "object_note": "all neck grasps, CoM offset 102-117 mm; readings a/0 exceed neck width but no daylight visible"
+  },
+  {
+   "key": "bottle_of_wine__hnkiog",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/14: body pushed against open-limit finger; both pads contact"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/16: body against open-limit finger, CoM 30 mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/15: body against open-limit finger, toward base, CoM 44 mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger",
+      "end_grasp"
+     ],
+     "note": "50/15; pads on last 20 mm at base, 50 mm lever arm"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger",
+      "end_grasp"
+     ],
+     "note": "50/14; pads at base end, 54 mm lever arm, horizontal"
+    }
+   ],
+   "object_note": "squat 63 mm bottle held horizontally; every row one finger at open limit, 17 mm off-centre"
+  },
+  {
+   "key": "box_of_baking_mix__fmewsz",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre; deeper pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    }
+   ],
+   "object_note": "top pinch across 50 mm thickness is otherwise sound; every row has one finger stuck at open limit"
+  },
+  {
+   "key": "box_of_baking_mix__fnbgwd",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre; deeper pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre; deeper pinch"
+    }
+   ],
+   "object_note": "top pinch across 50 mm thickness is otherwise sound; every row has one finger stuck at open limit"
+  },
+  {
+   "key": "box_of_baking_mix__lgusnr",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre; deeper pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    }
+   ],
+   "object_note": "top pinch across 50 mm thickness is otherwise sound; every row has one finger stuck at open limit"
+  },
+  {
+   "key": "box_of_baking_mix__ltccey",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/16: box yawed, pads on vertical edges, 64 mm span"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    }
+   ],
+   "object_note": "top pinch across 50 mm thickness; one finger stuck at open limit in every row; row 4 box rotated"
+  },
+  {
+   "key": "box_of_baking_mix__luwlfd",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/16: box yawed, pads on vertical edges, 64 mm span"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    }
+   ],
+   "object_note": "top pinch across 50 mm thickness; one finger stuck at open limit in every row; row 4 box rotated"
+  },
+  {
+   "key": "box_of_baking_mix__qkvqkm",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/16: box yawed, pads on vertical edges, 64 mm span"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    }
+   ],
+   "object_note": "top pinch across 50 mm thickness; one finger stuck at open limit in every row; row 4 box rotated"
+  },
+  {
+   "key": "box_of_baking_mix__uhvkxj",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre; deeper pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    }
+   ],
+   "object_note": "top pinch across 50 mm thickness is otherwise sound; every row has one finger stuck at open limit"
+  },
+  {
+   "key": "box_of_baking_mix__xcxrek",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/16: box yawed, pads on vertical edges, 64 mm span"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other finger at centre"
+    }
+   ],
+   "object_note": "top pinch across 50 mm thickness; one finger stuck at open limit in every row; row 4 box rotated"
+  },
+  {
+   "key": "box_of_cane_sugar__cqlofx",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/3: box pushed against open-limit finger, 23 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, 23 mm off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, deeper pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, 23 mm off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/3: box pushed against open-limit finger, 23 mm off-centre"
+    }
+   ],
+   "object_note": "tall 53 mm box, top pinch hangs fine; every row one finger stuck at open limit"
+  },
+  {
+   "key": "box_of_cane_sugar__gpbobo",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across 77 mm box, 50/29 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across 77 mm box, 50/29 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across 77 mm box, 50/29 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across 77 mm box, 50/29 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "deeper top pinch, CoM 46 mm, 50/29 asymmetric but closed"
+    }
+   ],
+   "object_note": "77 mm box fills most of gripper; box only 10 mm off-centre, both pads flat on faces"
+  },
+  {
+   "key": "box_of_cane_sugar__qvjiti",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across 73 mm box, 50/24 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across 73 mm box, 50/24 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across 73 mm box, 50/24 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across 73 mm box, 50/24 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across 73 mm box, 50/24 asymmetric but closed"
+    }
+   ],
+   "object_note": "73 mm box fills most of gripper; box ~12 mm off-centre, both pads flat on faces"
+  },
+  {
+   "key": "box_of_cane_sugar__rvsivw",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shallow top pinch across 89 mm bag, 50/41, both pads touch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shallow top pinch, 40/50 mirrored, both pads touch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shallow top pinch across 89 mm bag, 50/41"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shallow top pinch across 89 mm bag, 50/42"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shallow top pinch across 88 mm bag, 50/41"
+    }
+   ],
+   "object_note": "soft 89 mm sugar bag nearly fills gripper; pads only on top 20 mm but bag hangs straight"
+  },
+  {
+   "key": "box_of_cereal__hcwbzw",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/3: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    }
+   ],
+   "object_note": "tall 53 mm cereal box hangs from top pinch, CoM 110-121 mm below; one finger at open limit every row"
+  },
+  {
+   "key": "box_of_cereal__hosfhj",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    }
+   ],
+   "object_note": "thin 45 mm box hangs from top pinch; box sits entirely in one half of gripper every row"
+  },
+  {
+   "key": "box_of_cereal__ihedod",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/12: 60 mm box pushed against open-limit finger, 18 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/12: box pushed against open-limit finger, 18 mm off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/12: box pushed against open-limit finger, 18 mm off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/11: box pushed against open-limit finger, 19 mm off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/12: box pushed against open-limit finger, 18 mm off-centre"
+    }
+   ],
+   "object_note": "60 mm granola box, top pinch hangs fine; one finger stuck at open limit every row"
+  },
+  {
+   "key": "box_of_cereal__iucshm",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across 53 mm box, 38/17 both fingers closed on box"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/3: box pushed against open-limit finger, other pad at centre"
+    }
+   ],
+   "object_note": "tall 53 mm cereal box hangs from top pinch, CoM 113-126 mm below"
+  },
+  {
+   "key": "box_of_cereal__pfwgkm",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "deep pinch near CoM on 35 mm box, 37/0 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "deep pinch near CoM on 35 mm box, 37/0 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch on 35 mm box, 37/0 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch on 35 mm box, 37/0 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on 35 mm box, 37/0 asymmetric but closed"
+    }
+   ],
+   "object_note": "small 35 mm bar box; both fingers moved, pads flat on both faces"
+  },
+  {
+   "key": "box_of_cereal__qirvmd",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    }
+   ],
+   "object_note": "thin 45 mm box hangs from top pinch; V2 shows box against one finger, other finger at centreline"
+  },
+  {
+   "key": "box_of_cereal__sgirte",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/1: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other pad at centre"
+    }
+   ],
+   "object_note": "50 mm muesli box, top pinch hangs fine; one finger stuck at open limit every row"
+  },
+  {
+   "key": "box_of_cereal__surzft",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across 53 mm box, 35/20 both fingers closed on box"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across 53 mm box, 41/15 asymmetric but closed"
+    }
+   ],
+   "object_note": "tall 53 mm cereal box hangs from top pinch, CoM 109-121 mm below"
+  }
+ ]
+}

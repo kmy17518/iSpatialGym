@@ -1,0 +1,192 @@
+{
+ "task": "IORS",
+ "category": "shampoo_dispenser",
+ "model": "ndrvvm",
+ "key": "shampoo_dispenser__ndrvvm",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.06650529098510742,
+  0.051099945068359375,
+  0.1513524169921875
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "shampoo_dispenser",
+   "model": "ndrvvm"
+  },
+  "task": "IORS",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 5532,
+   "n_tilt": 1177,
+   "n_width_antipodal": 1132,
+   "n_table": 1132,
+   "n_collision": 311,
+   "n_selected": 12,
+   "com": [
+    -0.0011,
+    0.0,
+    -0.0112
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0008
+   ],
+   "score": 7.5463,
+   "meta": {
+    "com_perp": 0.05951,
+    "width": 0.03395,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.02044,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g0_v1.png",
+    "v2": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g0_v2.png",
+    "v3": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g0_v3.png",
+    "wrist": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g0_wrist.png"
+   },
+   "t_s": 3.1
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0005
+   ],
+   "score": 7.5425,
+   "meta": {
+    "com_perp": 0.05964,
+    "width": 0.03395,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.02056,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g1_v1.png",
+    "v2": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g1_v2.png",
+    "v3": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g1_v3.png",
+    "wrist": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g1_wrist.png"
+   },
+   "t_s": 3.34
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0005
+   ],
+   "score": 7.5215,
+   "meta": {
+    "com_perp": 0.06042,
+    "width": 0.03395,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.02136,
+    "tilt_deg": 0.0
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g2_v1.png",
+    "v2": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g2_v2.png",
+    "v3": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g2_v3.png",
+    "wrist": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g2_wrist.png"
+   },
+   "t_s": 3.14
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.049,
+    0.0022
+   ],
+   "score": 7.5113,
+   "meta": {
+    "com_perp": 0.05689,
+    "width": 0.03395,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01781,
+    "tilt_deg": 0.00187
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g3_v1.png",
+    "v2": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g3_v2.png",
+    "v3": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g3_v3.png",
+    "wrist": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g3_wrist.png"
+   },
+   "t_s": 3.01
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.001
+   ],
+   "score": 7.4506,
+   "meta": {
+    "com_perp": 0.05377,
+    "width": 0.03395,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.0147,
+    "tilt_deg": 0.00052
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g4_v1.png",
+    "v2": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g4_v2.png",
+    "v3": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g4_v3.png",
+    "wrist": "/tmp/glib/frames/shampoo_dispenser__ndrvvm/g4_wrist.png"
+   },
+   "t_s": 3.14
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 20.5
+}

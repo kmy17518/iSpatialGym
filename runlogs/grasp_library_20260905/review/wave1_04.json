@@ -1,0 +1,358 @@
+{
+  "batch": "wave1_04",
+  "models": [
+    {
+      "key": "carving_knife__awvoox",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle pinch next to blade junction, firm asymmetric close"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "handle pinch toward butt, blade points away, firm"}
+      ],
+      "object_note": "handle is thin (11 mm); both grasps on handle, not blade"
+    },
+    {
+      "key": "carving_knife__fqqbop",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch on serrated blade tip, handle 130 mm away"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "blade tip pinch, handle hangs far end"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "blade tip pinch, handle hangs far end"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "blade tip pinch, 5 mm blade, 149 mm lever arm"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "blade tip pinch, 153 mm lever arm"}
+      ],
+      "object_note": "all valid grasps pinch the extreme blade tip; no handle grasp survived"
+    },
+    {
+      "key": "carving_knife__gixmnd",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "blade tip pinch, handle hangs 119 mm away"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "blade tip pinch, handle at far end"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "blade tip pinch, handle hangs below in V2"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "blade tip pinch, 132 mm lever arm"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "blade tip pinch, handle at far end in V3"}
+      ],
+      "object_note": "all five grasps are on the blade tip (5-6 mm wide), CoM 119-135 mm away"
+    },
+    {
+      "key": "carving_knife__zaihmr",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "symmetric pinch at wide blade heel next to handle"}
+      ],
+      "object_note": "CoM offset 92 mm is large for a heel pinch; geometry hard to read"
+    },
+    {
+      "key": "cellulose_tape_dispenser__budhaz",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch across flat sides near CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch across flat sides near CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, both pads adjacent in V2"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch from roll side, firm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch across flat sides"}
+      ],
+      "object_note": "fingers report 50/0 on every row, but V2 shows body spanning both pads; off-centre not one-finger"
+    },
+    {
+      "key": "cellulose_tape_dispenser__fetnry",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch across flat sides near CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch across flat sides near CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, both pads adjacent in V2"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch across flat sides"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch from roll side, firm"}
+      ],
+      "object_note": "fingers report 50/1 on every row, but V2 shows body spanning both pads"
+    },
+    {
+      "key": "cellulose_tape_dispenser__yyekns",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch across flat sides near CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch across flat sides near CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, both pads adjacent in V2"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch from roll side, firm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch across flat sides"}
+      ],
+      "object_note": "fingers report 50/1 on every row, but V2 shows body spanning both pads"
+    },
+    {
+      "key": "chili__xhbpqh",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch at shoulder below stem, chili at fingertips"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch near thick end, at fingertips"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch near thick end, at fingertips"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "tilted body pinch, fingers do not pass below chili"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch just below stem, not on stem"}
+      ],
+      "object_note": "small object mostly hidden between pads; V4 shows pinch on red body, not stem or tip"
+    },
+    {
+      "key": "coffee_cup__ckkwmj",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle pinch, cup hangs below"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch across cup, both pads on wall"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch near rim from opening side"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch from opening side, handle free"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch near rim, antipodal 0.48 but firm"}
+      ],
+      "object_note": "reported width (14-23 mm) does not match 74 mm pad separation on body pinches"
+    },
+    {
+      "key": "coffee_cup__dkxddg",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch near CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch near CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, handle free"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch, handle free"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch near handle side, antipodal 0.43"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "coffee_cup__fgizgn",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch near CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch near CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, upright cup, handle free"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch near CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch, tilted cup"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "coffee_cup__ibhhfj",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch on conical cup, antipodal 0.37"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch near rim from opening side, antipodal 0.24"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "handle pinch, cup hangs below"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "handle pinch, cup hangs below"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch near rim from opening side, antipodal 0.27"}
+      ],
+      "object_note": "strongly conical cup; body pinches from opening side have low antipodal scores, hold by friction only"
+    },
+    {
+      "key": "coffee_cup__nbhcgu",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim wall pinch, one pad inside cup"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim wall pinch, firm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim wall pinch near handle"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim wall pinch, firm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim wall pinch, firm"}
+      ],
+      "object_note": "all grasps pinch the ceramic wall at the rim (10-13 mm); not fragile"
+    },
+    {
+      "key": "coffee_cup__nhzrei",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch on tall cup"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch, upright, handle free"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, tilted cup"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch, upright, handle free"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch, tilted cup"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "coffee_cup__rypdvd",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch near CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, handle free"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch, upright, handle free"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "coffee_cup__siksnl",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim wall pinch from above, one pad inside"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim wall pinch, firm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim wall pinch, handle free"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim wall pinch, 4 mm wall, firm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim wall pinch, coverage 0.75"}
+      ],
+      "object_note": "all grasps are rim pinches on a 4-6 mm ceramic wall; acceptable, not glass lip"
+    },
+    {
+      "key": "coffee_cup__skamgp",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim wall pinch from above"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim wall pinch opposite handle"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim wall pinch, 5 mm wall"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim wall pinch, firm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim wall pinch, coverage 0.75"}
+      ],
+      "object_note": "wide teacup shape; all grasps rim pinches (5-8 mm wall)"
+    },
+    {
+      "key": "coffee_cup__xjdyon",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim wall pinch, firm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim wall pinch, firm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim wall pinch, handle free"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim wall pinch, firm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim wall pinch near handle side"}
+      ],
+      "object_note": "all grasps rim pinches on 10-13 mm ceramic wall"
+    },
+    {
+      "key": "coffee_cup__ykuftq",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch across square mug near CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch near CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, upright, handle free"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch, upright, handle free"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch, tilted mug"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "crab__bkkzhf",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch on thick leg segment at body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch at leg joint near body, antipodal 0.36"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch on leg segment, mid-cluster"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch on thick red segment"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch on thick claw/leg segment, 42 mm from CoM"}
+      ],
+      "object_note": "leg cluster; all grasps pinch 9-15 mm leg segments near body, rigid mesh so acceptable"
+    },
+    {
+      "key": "crab__eqfklx",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-leg pinch on thick section, coverage 0.75"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-leg pinch near CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-leg pinch near CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-leg pinch near CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-leg pinch, coverage 0.75"}
+      ],
+      "object_note": "single king crab leg; all pinches on thick middle section"
+    },
+    {
+      "key": "crab__kmeddb",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-leg pinch near CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch on thick end section, antipodal 0.61"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch on thick joint section, firm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-leg pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-leg pinch, coverage 0.50, width 16 vs 41 mm pads"}
+      ],
+      "object_note": "single long crab leg; rank 5 has weakest contact metrics but no visible gap"
+    },
+    {
+      "key": "crab__ohjsdr",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch on leg segment near joint"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch on leg segment near joint"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch on leg segment near joint"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch on leg segment near joint"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch on leg segment near joint"}
+      ],
+      "object_note": "bent two-segment leg; all pinches near the knee, close to CoM"
+    },
+    {
+      "key": "crab__tjkiva",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch on leg segment at body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch on leg segment at body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch on leg segment near body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch on thick leg segment"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch on leg segment near body"}
+      ],
+      "object_note": "leg cluster; all grasps on 13-15 mm leg segments near body"
+    },
+    {
+      "key": "hammer__fcrlbo",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle pinch directly under head"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "handle pinch under head"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "handle pinch under head"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "diagonal handle pinch under head, antipodal 0.42"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "handle pinch under head"}
+      ],
+      "object_note": "all grasps on handle next to head, near CoM"
+    },
+    {
+      "key": "hook__akwlam",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "edge pinch across plate width, near CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "edge pinch across plate width at fingertips"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "edge pinch across plate width"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "edge pinch across plate width at fingertips"},
+        {"rank": 5, "verdict": "unsure", "flags": ["unsure"], "note": "plate skewed between pads, antipodal 0.14, coverage 0"}
+      ],
+      "object_note": "flat plate hook; pads stop on 3 mm plate edges (coverage 0-0.25), never on faces"
+    },
+    {
+      "key": "hook__ddbsdk",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch on hook stem, full coverage"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch on stem next to disc"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch on disc edge/stem, coverage 0.5"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch across J-bend of hook, coverage 0.5"},
+        {"rank": 5, "verdict": "unsure", "flags": ["unsure"], "note": "antipodal 0.14, pads on disc and stem, contact unclear"}
+      ],
+      "object_note": "small disc-base hook; rank 5 contact geometry cannot be read from images"
+    },
+    {
+      "key": "hook__hewhtl",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "face pinch on plate near top edge"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "face pinch at plate corner, full coverage"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "face pinch on plate near top edge"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "face pinch on plate near top edge"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "face pinch on plate, wire hook free"}
+      ],
+      "object_note": "plate hangs 30 mm below pinch; face contact with full coverage, stable"
+    },
+    {
+      "key": "hook__wmvozo",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "unsure", "flags": ["unsure"], "note": "tiny chrome disc pinched by rim, antipodal 0.36"},
+        {"rank": 2, "verdict": "unsure", "flags": ["unsure"], "note": "tiny chrome disc pinched by rim, antipodal 0.33"},
+        {"rank": 3, "verdict": "unsure", "flags": ["unsure"], "note": "disc rim pinch, antipodal 0.17, coverage 0.5"},
+        {"rank": 4, "verdict": "unsure", "flags": ["unsure"], "note": "disc rim pinch, antipodal 0.19, coverage 0.25"},
+        {"rank": 5, "verdict": "unsure", "flags": ["unsure"], "note": "disc rim pinch, antipodal 0.30, coverage 0.25"}
+      ],
+      "object_note": "object ~30 mm, reflective; all grasps pinch suction-disc rim, not hook; contacts too small to verify"
+    },
+    {
+      "key": "hook__yfikis",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rod pinch near CoM, full coverage"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rod pinch near CoM, full coverage"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rod pinch near CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rod pinch near CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rod pinch near CoM"}
+      ],
+      "object_note": "bent 6 mm rod hook; symmetric 7/0 pinches"
+    }
+  ]
+}

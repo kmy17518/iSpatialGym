@@ -1,0 +1,321 @@
+format: isaac_grasp
+format_version: 1.0
+object_frame: base_link
+gripper_frame: right_eef_link
+ispatialgym:
+  object:
+    category: cork
+    model: ncxgpe
+  task: configuration_matching
+  constraint: attachment_free
+  pipeline: a1
+  gripper: r1pro_right
+  source: a1_attachment_free
+  log:
+    n_sampled: 6000
+    n_tilt: 1088
+    n_width_antipodal: 1040
+    n_table: 1040
+    n_collision: 1040
+    n_attachment_free: 1040
+    n_selected: 12
+    com:
+    - 0.0
+    - -0.0
+    - 0.0003
+    rest_pose: canonical
+  rest_pose: canonical
+  rest_quat_wxyz:
+  - 1.0
+  - 0.0
+  - 0.0
+  - 0.0
+grasps:
+  grasp_0:
+    confidence: 12.5401
+    position:
+    - 0.0051670977672543745
+    - -0.0029938911283538547
+    - -0.009950561672588138
+    orientation:
+      w: 0.06847340394675877
+      xyz:
+      - 0.9337307435524491
+      - -0.24858090390026322
+      - 0.24832604719010565
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 8.0e-05
+      width: 0.01727
+      antipodal: 0.99875
+      coverage: 0.5
+      clearance: 0.0277
+      tilt_deg: 29.85464
+      attach_dist: 0.04961
+      attach_side: -0.00247
+  grasp_1:
+    confidence: 12.533
+    position:
+    - -0.005115971185172296
+    - 0.0029151845544402523
+    - -0.009920271498438644
+    orientation:
+      w: 0.06499074464864485
+      xyz:
+      - -0.9327975678060068
+      - 0.24951407964670558
+      - 0.2518087064882198
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 8.0e-05
+      width: 0.01727
+      antipodal: 0.99875
+      coverage: 0.5
+      clearance: 0.02778
+      tilt_deg: 30.14729
+      attach_dist: 0.04962
+      attach_side: -0.00247
+  grasp_2:
+    confidence: 12.3483
+    position:
+    - -0.003410392646391878
+    - 0.005310187453353068
+    - -0.009795393767864957
+    orientation:
+      w: 0.2254170544414353
+      xyz:
+      - -0.4527054184406885
+      - -0.8536480454160765
+      - -0.12461930122858475
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.00046
+      width: 0.01728
+      antipodal: 0.99883
+      coverage: 0.5
+      clearance: 0.02764
+      tilt_deg: 29.85196
+      attach_dist: 0.04955
+      attach_side: -0.01069
+  grasp_3:
+    confidence: 12.3398
+    position:
+    - 0.0032200075731406777
+    - -0.004523245612220817
+    - -0.00976397603877972
+    orientation:
+      w: 0.2316071271154954
+      xyz:
+      - 0.454364043414793
+      - 0.8519894204419722
+      - -0.11842922855452484
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.00046
+      width: 0.01728
+      antipodal: 0.99883
+      coverage: 0.5
+      clearance: 0.02803
+      tilt_deg: 30.15549
+      attach_dist: 0.04954
+      attach_side: -0.01069
+  grasp_4:
+    confidence: 12.2751
+    position:
+    - -0.0010782661921440052
+    - -0.005946811694532937
+    - -0.009363858408431291
+    orientation:
+      w: 0.16668669987634877
+      xyz:
+      - 0.746037340404972
+      - 0.6136618289860339
+      - -0.19764359451123986
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.00063
+      width: 0.01719
+      antipodal: 0.9999
+      coverage: 0.5
+      clearance: 0.02812
+      tilt_deg: 29.96793
+      attach_dist: 0.04964
+      attach_side: -0.03336
+  grasp_5:
+    confidence: 12.269
+    position:
+    - 0.0011901889803279807
+    - 0.00569422184123498
+    - -0.009356833480541712
+    orientation:
+      w: 0.1624759979271066
+      xyz:
+      - -0.7449090862181045
+      - -0.6147900831729015
+      - -0.20185429646048172
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.00063
+      width: 0.01719
+      antipodal: 0.9999
+      coverage: 0.5
+      clearance: 0.02824
+      tilt_deg: 30.0358
+      attach_dist: 0.04953
+      attach_side: -0.03336
+  grasp_6:
+    confidence: 12.2634
+    position:
+    - 0.004811349965319907
+    - -0.0008445992565917326
+    - -0.009648135184633946
+    orientation:
+      w: 0.2620767998320541
+      xyz:
+      - 0.0942251314305564
+      - 0.960218072843359
+      - -0.020460405217627174
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.00117
+      width: 0.01719
+      antipodal: 0.9999
+      coverage: 0.75
+      clearance: 0.02854
+      tilt_deg: 30.48136
+      attach_dist: 0.04949
+      attach_side: -0.015
+  grasp_7:
+    confidence: 12.2048
+    position:
+    - -0.004691876275678155
+    - -0.0009288736923077918
+    - -0.010107187017425395
+    orientation:
+      w: 0.2620374465249424
+      xyz:
+      - 0.10534243560139102
+      - -0.9590115628849902
+      - 0.02315534783031978
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.00125
+      width: 0.01718
+      antipodal: 0.9999
+      coverage: 0.75
+      clearance: 0.02815
+      tilt_deg: 30.50325
+      attach_dist: 0.04945
+      attach_side: 0.00948
+  grasp_8:
+    confidence: 12.1007
+    position:
+    - -0.006592949528206815
+    - -0.0014982057616288811
+    - -0.01035387812538924
+    orientation:
+      w: 0.02949276213158097
+      xyz:
+      - 0.9607219480331786
+      - 0.10369421560339709
+      - -0.2557166893254735
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.00093
+      width: 0.01718
+      antipodal: 0.9999
+      coverage: 0.5
+      clearance: 0.0269
+      tilt_deg: 29.83309
+      attach_dist: 0.04956
+      attach_side: 0.01915
+  grasp_9:
+    confidence: 12.0859
+    position:
+    - 0.004991369198710068
+    - 0.0010438320990142959
+    - -0.010319191697790725
+    orientation:
+      w: 0.026305626567977736
+      xyz:
+      - -0.9598679576327427
+      - -0.10454820600383308
+      - -0.25890382488907643
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.00093
+      width: 0.01718
+      antipodal: 0.9999
+      coverage: 0.5
+      clearance: 0.02784
+      tilt_deg: 30.16822
+      attach_dist: 0.04941
+      attach_side: 0.01915
+  grasp_10:
+    confidence: 12.0577
+    position:
+    - 0.002732739723797997
+    - 0.004897010458332683
+    - -0.008920643145082095
+    orientation:
+      w: 0.22076488116075063
+      xyz:
+      - -0.48234531698227906
+      - 0.8372369670841315
+      - 0.13281612620126068
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.00111
+      width: 0.01733
+      antipodal: 0.9999
+      coverage: 0.5
+      clearance: 0.02876
+      tilt_deg: 29.85989
+      attach_dist: 0.0496
+      attach_side: -0.05777
+  grasp_11:
+    confidence: 12.0556
+    position:
+    - -0.003190212395444014
+    - -0.00537807314569604
+    - -0.008890724532368971
+    orientation:
+      w: 0.22743048819340325
+      xyz:
+      - 0.4841313610037415
+      - -0.8354509230626691
+      - 0.12615051916860767
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.00111
+      width: 0.01733
+      antipodal: 0.9999
+      coverage: 0.5
+      clearance: 0.02843
+      tilt_deg: 30.14893
+      attach_dist: 0.04974
+      attach_side: -0.05777

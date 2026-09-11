@@ -1,0 +1,21 @@
+{
+ "task": "IORS",
+ "relation": "ontop",
+ "category": "canned_food",
+ "model": "cbmndg",
+ "key": "canned_food__cbmndg__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.09999999237060547,
+  0.09928215789794922,
+  0.13691719323396684
+ ],
+ "ready": true,
+ "round": 2,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

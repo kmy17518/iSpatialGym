@@ -1,0 +1,91 @@
+{
+ "category": "carton",
+ "model": "libote",
+ "key": "carton__libote",
+ "aabb_extent": [
+  0.21538397669792175,
+  0.21419267356395721,
+  0.13907383382320404
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.1068,
+   -0.1077,
+   -0.0389
+  ],
+  "bbox_max": [
+   0.1061,
+   0.1043,
+   0.0953
+  ],
+  "n_pieces": 31
+ },
+ "joints": [
+  {
+   "joint": "j_link0",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "link0",
+   "outward_normal": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "face_s": 0.1,
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "hinge_point_obj": [
+    -0.10509,
+    0.03389,
+    0.09445
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 2.356194257736206,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.1059,
+    -0.1092,
+    0.0741
+   ],
+   "link_bbox_max": [
+    0.1086,
+    0.105,
+    0.1002
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     0.0737,
+     0.047,
+     0.0786
+    ],
+    "pinch_axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "approach_dir": [
+     -0.9977,
+     -0.0,
+     0.0684
+    ],
+    "width": 0.0256,
+    "exposed": true,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     0.0883,
+     0.0,
+     0.9961
+    ]
+   },
+   "sub_links": [],
+   "status": "edge"
+  }
+ ]
+}

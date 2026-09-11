@@ -1,0 +1,19 @@
+{
+ "task": "disembedding",
+ "category": "box_of_cookies",
+ "model": "qkzrdd",
+ "key": "box_of_cookies__qkzrdd",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.17022589111328126,
+  0.06831181335449218,
+  0.064877197265625
+ ],
+ "ready": true,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

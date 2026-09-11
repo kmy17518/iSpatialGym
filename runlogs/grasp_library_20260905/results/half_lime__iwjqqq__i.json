@@ -1,0 +1,196 @@
+{
+ "task": "IORS",
+ "relation": "inside",
+ "category": "half_lime",
+ "model": "iwjqqq",
+ "key": "half_lime__iwjqqq__i",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop_insert",
+ "bbox": [
+  0.05965841293334961,
+  0.060102359771728515,
+  0.03810345268249512
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "half_lime",
+   "model": "iwjqqq"
+  },
+  "task": "IORS",
+  "constraint": "tabletop_insert",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop_insert",
+  "log": {
+   "n_sampled": 6000,
+   "n_tilt": 565,
+   "n_width_antipodal": 99,
+   "n_table": 99,
+   "n_collision": 99,
+   "n_sweep": 99,
+   "n_lever": 99,
+   "n_selected": 12,
+   "com": [
+    -0.0,
+    -0.0002,
+    0.0013
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0396,
+    0.022
+   ],
+   "score": 11.2668,
+   "meta": {
+    "com_perp": 0.00031,
+    "width": 0.05978,
+    "antipodal": 0.96138,
+    "coverage": 1.0,
+    "clearance": 0.01854,
+    "tilt_deg": 1.52841
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/half_lime__iwjqqq__i/g0_v1.png",
+    "v2": "/tmp/glib/frames/half_lime__iwjqqq__i/g0_v2.png",
+    "v3": "/tmp/glib/frames/half_lime__iwjqqq__i/g0_v3.png",
+    "wrist": "/tmp/glib/frames/half_lime__iwjqqq__i/g0_wrist.png"
+   },
+   "t_s": 1.47
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.031,
+    0.0302
+   ],
+   "score": 11.2455,
+   "meta": {
+    "com_perp": 0.00043,
+    "width": 0.05861,
+    "antipodal": 0.98816,
+    "coverage": 1.0,
+    "clearance": 0.01868,
+    "tilt_deg": 5.61756
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/half_lime__iwjqqq__i/g1_v1.png",
+    "v2": "/tmp/glib/frames/half_lime__iwjqqq__i/g1_v2.png",
+    "v3": "/tmp/glib/frames/half_lime__iwjqqq__i/g1_v3.png",
+    "wrist": "/tmp/glib/frames/half_lime__iwjqqq__i/g1_wrist.png"
+   },
+   "t_s": 1.41
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0074
+   ],
+   "score": 11.17,
+   "meta": {
+    "com_perp": 0.00017,
+    "width": 0.05884,
+    "antipodal": 0.97402,
+    "coverage": 1.0,
+    "clearance": 0.01894,
+    "tilt_deg": 3.1874
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/half_lime__iwjqqq__i/g2_v1.png",
+    "v2": "/tmp/glib/frames/half_lime__iwjqqq__i/g2_v2.png",
+    "v3": "/tmp/glib/frames/half_lime__iwjqqq__i/g2_v3.png",
+    "wrist": "/tmp/glib/frames/half_lime__iwjqqq__i/g2_wrist.png"
+   },
+   "t_s": 1.46
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0083
+   ],
+   "score": 11.1488,
+   "meta": {
+    "com_perp": 0.00053,
+    "width": 0.0589,
+    "antipodal": 0.99958,
+    "coverage": 1.0,
+    "clearance": 0.01906,
+    "tilt_deg": 1.1779
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/half_lime__iwjqqq__i/g3_v1.png",
+    "v2": "/tmp/glib/frames/half_lime__iwjqqq__i/g3_v2.png",
+    "v3": "/tmp/glib/frames/half_lime__iwjqqq__i/g3_v3.png",
+    "wrist": "/tmp/glib/frames/half_lime__iwjqqq__i/g3_wrist.png"
+   },
+   "t_s": 1.48
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0084
+   ],
+   "score": 10.9608,
+   "meta": {
+    "com_perp": 0.00138,
+    "width": 0.05866,
+    "antipodal": 0.9854,
+    "coverage": 1.0,
+    "clearance": 0.01887,
+    "tilt_deg": 1.40872
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/half_lime__iwjqqq__i/g4_v1.png",
+    "v2": "/tmp/glib/frames/half_lime__iwjqqq__i/g4_v2.png",
+    "v3": "/tmp/glib/frames/half_lime__iwjqqq__i/g4_v3.png",
+    "wrist": "/tmp/glib/frames/half_lime__iwjqqq__i/g4_wrist.png"
+   },
+   "t_s": 1.48
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 9.5
+}

@@ -1,0 +1,91 @@
+{
+ "category": "hinged_jar",
+ "model": "vzwhbg",
+ "key": "hinged_jar__vzwhbg",
+ "aabb_extent": [
+  0.2719062566757202,
+  0.20725350081920624,
+  0.21599221229553223
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.1292,
+   -0.0998,
+   -0.0858
+  ],
+  "bbox_max": [
+   0.1332,
+   0.0984,
+   0.094
+  ],
+  "n_pieces": 32
+ },
+ "joints": [
+  {
+   "joint": "j_rb1",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "rb1",
+   "outward_normal": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "face_s": 0.1302,
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    -0.12609,
+    0.01677,
+    0.07097
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 3.1241579055786133,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.1366,
+    -0.1045,
+    0.0598
+   ],
+   "link_bbox_max": [
+    0.1353,
+    0.1028,
+    0.1302
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     0.0989,
+     0.0034,
+     0.1145
+    ],
+    "pinch_axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "approach_dir": [
+     -0.9821,
+     -0.0,
+     -0.1881
+    ],
+    "width": 0.0171,
+    "exposed": true,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     -0.19,
+     0.0,
+     0.9818
+    ]
+   },
+   "sub_links": [],
+   "status": "edge"
+  }
+ ]
+}

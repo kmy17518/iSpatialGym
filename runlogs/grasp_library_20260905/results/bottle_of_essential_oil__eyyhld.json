@@ -1,0 +1,196 @@
+{
+ "task": "object_scaling",
+ "category": "bottle_of_essential_oil",
+ "model": "eyyhld",
+ "key": "bottle_of_essential_oil__eyyhld",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.022166302680969238,
+  0.022181079864501952,
+  0.05996076965332031
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "bottle_of_essential_oil",
+   "model": "eyyhld"
+  },
+  "task": "object_scaling",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 500,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    0.0,
+    -0.0,
+    -0.0013
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0238,
+    0.0
+   ],
+   "score": 19.7536,
+   "meta": {
+    "com_perp": 0.00045,
+    "width": 0.02213,
+    "antipodal": 0.99525,
+    "coverage": 1.0,
+    "clearance": 0.02603,
+    "tilt_deg": 116.7174,
+    "graspgen_conf": 0.95275
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g0_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g0_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g0_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g0_wrist.png"
+   },
+   "t_s": 3.4
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0241,
+    0.0
+   ],
+   "score": 19.7359,
+   "meta": {
+    "com_perp": 0.00051,
+    "width": 0.02232,
+    "antipodal": 0.9917,
+    "coverage": 1.0,
+    "clearance": 0.02791,
+    "tilt_deg": 65.60205,
+    "graspgen_conf": 0.95485
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g1_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g1_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g1_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g1_wrist.png"
+   },
+   "t_s": 3.42
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0236,
+    0.0
+   ],
+   "score": 19.5243,
+   "meta": {
+    "com_perp": 0.00116,
+    "width": 0.0222,
+    "antipodal": 0.98299,
+    "coverage": 1.0,
+    "clearance": 0.03285,
+    "tilt_deg": 90.77125,
+    "graspgen_conf": 0.95483
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g2_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g2_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g2_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g2_wrist.png"
+   },
+   "t_s": 3.39
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0241,
+    0.0
+   ],
+   "score": 19.4164,
+   "meta": {
+    "com_perp": 0.00152,
+    "width": 0.02238,
+    "antipodal": 0.99083,
+    "coverage": 1.0,
+    "clearance": 0.02533,
+    "tilt_deg": 58.74971,
+    "graspgen_conf": 0.95188
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g3_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g3_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g3_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g3_wrist.png"
+   },
+   "t_s": 3.42
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0238,
+    0.0
+   ],
+   "score": 19.3809,
+   "meta": {
+    "com_perp": 0.00178,
+    "width": 0.02214,
+    "antipodal": 0.99992,
+    "coverage": 1.0,
+    "clearance": 0.02703,
+    "tilt_deg": 110.32849,
+    "graspgen_conf": 0.96747
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g4_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g4_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g4_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_essential_oil__eyyhld/g4_wrist.png"
+   },
+   "t_s": 3.4
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 21.8
+}

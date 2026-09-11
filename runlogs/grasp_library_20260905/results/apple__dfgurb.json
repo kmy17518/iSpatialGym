@@ -1,0 +1,19 @@
+{
+ "task": "object_scaling",
+ "category": "apple",
+ "model": "dfgurb",
+ "key": "apple__dfgurb",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.11519743347167968,
+  0.11356654739379883,
+  0.11173290634155274
+ ],
+ "ready": true,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

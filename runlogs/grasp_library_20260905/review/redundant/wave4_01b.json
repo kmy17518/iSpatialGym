@@ -1,0 +1,148 @@
+{
+  "batch": "wave4_01b",
+  "models": [
+    {
+      "key": "marker__gldosk",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-body pinch, both pads on marker"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch 17 mm off CoM, firm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch near cap junction, firm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch on cap section 24 mm off CoM, not end"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "28 mm off CoM, still well inside body"}
+      ],
+      "object_note": "One finger always closes to 0 so marker sits off-centre; all pinches look firm on body."
+    },
+    {
+      "key": "marker__vjjsul",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred body pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "centred body pinch"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp", "penetration"], "note": "fingers closed 3/0; tail end butts closed fingertips"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "centred body pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch 8 mm off CoM"}
+      ],
+      "object_note": "Grasp 3: pinch axis along marker (CoM offset 0), fingers nearly closed; no real pinch."
+    },
+    {
+      "key": "marker__bwwkmb",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred body pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch 13 mm off CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch, tilt 35 deg but firm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch on cap section 25 mm off CoM, not end"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "marker along finger axis, cap end protrudes below tips"}
+      ],
+      "object_note": "Grasp 5 holds marker along the finger axis; cap end protrudes below fingertips, fine."
+    },
+    {
+      "key": "cap__clhquh__s",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "right finger stuck open at 50; pad not seated, cap pushed"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 48/23; cap pushed onto open finger, only tip touches"}
+      ],
+      "object_note": "Cap ~67 mm held across diameter (side grasp OK for task); open finger never moved, only its tip touches."
+    },
+    {
+      "key": "cap__yqvild__s",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "finger stuck at 50; cap pushed onto it, pad barely touches"}
+      ],
+      "object_note": "Cap ~67 mm held across diameter (side grasp OK for task); open finger never moved, only its tip touches."
+    },
+    {
+      "key": "french_fries__jhskfy__s",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "fingers 3/1 mm inside 15 mm fry; hull unscaled"}
+      ],
+      "object_note": "Scaled visual far wider than collision hull; fingers close 3/1 mm inside fry."
+    },
+    {
+      "key": "french_fries__nfgqwu__s",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "fry pinched lengthwise between its two tips (82 mm)"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "lengthwise tip-to-tip pinch, coverage 0"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "lengthwise tip-to-tip pinch, coverage 0"}
+      ],
+      "object_note": "All valid grasps pinch the 82 mm fry lengthwise between its tips; cross-section never used."
+    },
+    {
+      "key": "french_fries__uqsuef__s",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "fingers fully closed 0/0 inside fry visual"}
+      ],
+      "object_note": "Fingers close fully (0/0) through fry; collision hull much smaller than scaled visual."
+    },
+    {
+      "key": "french_fries__xzsoub__s",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "fingers 8/0 on 19 mm fry; pads sunk into visual"},
+        {"rank": 2, "verdict": "flag", "flags": ["penetration", "end_grasp"], "note": "fingers closed 2/0 sit on fry top at its end"},
+        {"rank": 3, "verdict": "flag", "flags": ["penetration"], "note": "fingers 5/0 on 17 mm fry; visual surrounds pads"}
+      ],
+      "object_note": "Collision hull much smaller than scaled visual; fingers close 2-8 mm on 16-19 mm fry."
+    },
+    {
+      "key": "french_fries__oeterg__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "cross-section pinch at CoM, both pads touching"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp", "one_finger"], "note": "lengthwise pinch on fry ends; finger stuck at 50, other at 0"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp", "one_finger"], "note": "lengthwise pinch on fry ends; finger stuck at 50, other at 0"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp", "one_finger"], "note": "lengthwise pinch on fry ends; finger stuck at 50, other at 0"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp", "one_finger"], "note": "lengthwise pinch on fry ends; finger stuck at 50, other at 0"}
+      ],
+      "object_note": "Grasps 2-5 pinch the 48 mm fry lengthwise with one finger fully open (50/0); fry fully off-centre."
+    },
+    {
+      "key": "french_fries__kxpfcj__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred cross-section pinch, both pads touching"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "fry pinched lengthwise between its ends (65 mm)"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "fry pinched lengthwise between its ends (65 mm)"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "fry pinched lengthwise between its ends (66 mm)"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "cross-section pinch 7 mm off CoM, fry along fingers"}
+      ],
+      "object_note": "Grasps 2-4 pinch the 65 mm fry lengthwise between its ends."
+    },
+    {
+      "key": "french_fries__xshwvn__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred cross-section pinch, both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "centred cross-section pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "centred cross-section pinch, tilt 28 deg"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp", "one_finger"], "note": "lengthwise pinch on curved fry ends; fingers 44/0"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp", "one_finger"], "note": "lengthwise pinch; finger stuck at 50, other fully closed"}
+      ],
+      "object_note": "Grasps 4-5 pinch the curved fry lengthwise with one finger fully closed at 0; fry fully off-centre."
+    },
+    {
+      "key": "french_fries__kjqhuo__s",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "fingers 7/0 on 12 mm fry; visual overlaps pads"},
+        {"rank": 2, "verdict": "flag", "flags": ["penetration"], "note": "fingers 4/1 on 18 mm fry; visual surrounds pads"},
+        {"rank": 3, "verdict": "flag", "flags": ["penetration"], "note": "fingers 2/0 on 11 mm fry; visual surrounds pads"}
+      ],
+      "object_note": "Collision hull much smaller than scaled visual; fingers close 2-7 mm on 11-18 mm fry."
+    },
+    {
+      "key": "french_fries__xlkkxg__s",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "fingers 3/1 on 15 mm fry; pads sunk into visual"}
+      ],
+      "object_note": "Collision hull much smaller than scaled visual; fingers close 3/1 mm on 15 mm fry."
+    }
+  ]
+}

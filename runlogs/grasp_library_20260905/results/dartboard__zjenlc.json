@@ -1,0 +1,19 @@
+{
+ "task": "configuration_matching",
+ "category": "dartboard",
+ "model": "zjenlc",
+ "key": "dartboard__zjenlc",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "attachment_free",
+ "bbox": [
+  0.4510000457763672,
+  0.4509999542236328,
+  0.016781508445739748
+ ],
+ "ready": true,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

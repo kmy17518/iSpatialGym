@@ -1,0 +1,196 @@
+{
+ "task": "disembedding",
+ "relation": null,
+ "category": "bottle_of_medicine",
+ "model": "fmfwng",
+ "key": "bottle_of_medicine__fmfwng__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.05045599746704101,
+  0.05066644096374512,
+  0.08971175049245357
+ ],
+ "ready": true,
+ "round": 2,
+ "candidates_meta": {
+  "object": {
+   "category": "bottle_of_medicine",
+   "model": "fmfwng"
+  },
+  "task": "disembedding",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 6000,
+   "n_tilt": 1170,
+   "n_width_antipodal": 506,
+   "n_table": 503,
+   "n_collision": 281,
+   "n_sweep": 69,
+   "n_lever": 69,
+   "n_selected": 12,
+   "com": [
+    -0.0,
+    0.0,
+    -0.0012
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0006
+   ],
+   "score": 11.4594,
+   "meta": {
+    "com_perp": 3e-05,
+    "width": 0.04264,
+    "antipodal": 0.99457,
+    "coverage": 1.0,
+    "clearance": 0.02285,
+    "tilt_deg": 0.47687
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g0_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g0_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g0_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g0_wrist.png"
+   },
+   "t_s": 3.37
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0008
+   ],
+   "score": 11.4191,
+   "meta": {
+    "com_perp": 4e-05,
+    "width": 0.04254,
+    "antipodal": 0.99828,
+    "coverage": 1.0,
+    "clearance": 0.02268,
+    "tilt_deg": 1.40782
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g1_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g1_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g1_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g1_wrist.png"
+   },
+   "t_s": 3.48
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0006
+   ],
+   "score": 11.3739,
+   "meta": {
+    "com_perp": 0.00021,
+    "width": 0.04266,
+    "antipodal": 0.99427,
+    "coverage": 1.0,
+    "clearance": 0.0228,
+    "tilt_deg": 1.32056
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g2_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g2_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g2_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g2_wrist.png"
+   },
+   "t_s": 3.44
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0005
+   ],
+   "score": 11.371,
+   "meta": {
+    "com_perp": 0.00011,
+    "width": 0.04256,
+    "antipodal": 0.99504,
+    "coverage": 1.0,
+    "clearance": 0.02251,
+    "tilt_deg": 2.10165
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g3_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g3_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g3_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g3_wrist.png"
+   },
+   "t_s": 3.44
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0008
+   ],
+   "score": 11.3385,
+   "meta": {
+    "com_perp": 0.00045,
+    "width": 0.04274,
+    "antipodal": 0.99939,
+    "coverage": 1.0,
+    "clearance": 0.0227,
+    "tilt_deg": 1.73305
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g4_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g4_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g4_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_medicine__fmfwng__t/g4_wrist.png"
+   },
+   "t_s": 3.54
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 22.3
+}

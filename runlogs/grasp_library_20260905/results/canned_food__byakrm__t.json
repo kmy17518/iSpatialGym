@@ -1,0 +1,196 @@
+{
+ "task": "IORS",
+ "relation": "ontop",
+ "category": "canned_food",
+ "model": "byakrm",
+ "key": "canned_food__byakrm__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.057796133041381835,
+  0.057796133041381835,
+  0.08181195068359375
+ ],
+ "ready": true,
+ "round": 2,
+ "candidates_meta": {
+  "object": {
+   "category": "canned_food",
+   "model": "byakrm"
+  },
+  "task": "IORS",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 6000,
+   "n_tilt": 1149,
+   "n_width_antipodal": 1140,
+   "n_table": 1140,
+   "n_collision": 721,
+   "n_sweep": 721,
+   "n_lever": 721,
+   "n_selected": 12,
+   "com": [
+    -0.0,
+    -0.0,
+    -0.0001
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0039
+   ],
+   "score": 11.4286,
+   "meta": {
+    "com_perp": 6e-05,
+    "width": 0.05348,
+    "antipodal": 0.99908,
+    "coverage": 1.0,
+    "clearance": 0.02171,
+    "tilt_deg": 1.27618
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/canned_food__byakrm__t/g0_v1.png",
+    "v2": "/tmp/glib/frames/canned_food__byakrm__t/g0_v2.png",
+    "v3": "/tmp/glib/frames/canned_food__byakrm__t/g0_v3.png",
+    "wrist": "/tmp/glib/frames/canned_food__byakrm__t/g0_wrist.png"
+   },
+   "t_s": 2.97
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0039
+   ],
+   "score": 11.396,
+   "meta": {
+    "com_perp": 0.00011,
+    "width": 0.0539,
+    "antipodal": 0.99908,
+    "coverage": 1.0,
+    "clearance": 0.0215,
+    "tilt_deg": 1.56401
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/canned_food__byakrm__t/g1_v1.png",
+    "v2": "/tmp/glib/frames/canned_food__byakrm__t/g1_v2.png",
+    "v3": "/tmp/glib/frames/canned_food__byakrm__t/g1_v3.png",
+    "wrist": "/tmp/glib/frames/canned_food__byakrm__t/g1_wrist.png"
+   },
+   "t_s": 3.37
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0038
+   ],
+   "score": 11.3533,
+   "meta": {
+    "com_perp": 0.00036,
+    "width": 0.05355,
+    "antipodal": 0.99908,
+    "coverage": 1.0,
+    "clearance": 0.02168,
+    "tilt_deg": 1.23617
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/canned_food__byakrm__t/g2_v1.png",
+    "v2": "/tmp/glib/frames/canned_food__byakrm__t/g2_v2.png",
+    "v3": "/tmp/glib/frames/canned_food__byakrm__t/g2_v3.png",
+    "wrist": "/tmp/glib/frames/canned_food__byakrm__t/g2_wrist.png"
+   },
+   "t_s": 3.38
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0039
+   ],
+   "score": 11.3474,
+   "meta": {
+    "com_perp": 0.00037,
+    "width": 0.05364,
+    "antipodal": 0.99908,
+    "coverage": 1.0,
+    "clearance": 0.02163,
+    "tilt_deg": 1.56401
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/canned_food__byakrm__t/g3_v1.png",
+    "v2": "/tmp/glib/frames/canned_food__byakrm__t/g3_v2.png",
+    "v3": "/tmp/glib/frames/canned_food__byakrm__t/g3_v3.png",
+    "wrist": "/tmp/glib/frames/canned_food__byakrm__t/g3_wrist.png"
+   },
+   "t_s": 3.39
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0041
+   ],
+   "score": 11.2983,
+   "meta": {
+    "com_perp": 0.00062,
+    "width": 0.0534,
+    "antipodal": 0.99908,
+    "coverage": 1.0,
+    "clearance": 0.02175,
+    "tilt_deg": 1.23601
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/canned_food__byakrm__t/g4_v1.png",
+    "v2": "/tmp/glib/frames/canned_food__byakrm__t/g4_v2.png",
+    "v3": "/tmp/glib/frames/canned_food__byakrm__t/g4_v3.png",
+    "wrist": "/tmp/glib/frames/canned_food__byakrm__t/g4_wrist.png"
+   },
+   "t_s": 3.36
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 21.3
+}

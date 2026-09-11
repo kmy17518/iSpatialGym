@@ -1,0 +1,19 @@
+{
+ "task": "disembedding",
+ "category": "notebook",
+ "model": "flpxdx",
+ "key": "notebook__flpxdx",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.3080635986328125,
+  0.23129557037353515,
+  0.0052217311859130856
+ ],
+ "ready": true,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

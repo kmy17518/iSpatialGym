@@ -1,0 +1,324 @@
+{
+  "batch": "wave4_02",
+  "models": [
+    {
+      "key": "garlic_clove__zpzrac__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "fingertip pinch mid-clove, both pads on object"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 33 acceptable"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "firm pinch, pads 28mm on 26mm clove"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "near-vertical pinch mid-clove"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 30 acceptable"}
+      ],
+      "object_note": "all rows closed X/0 (object pushed to one finger's limit) but both pads contact"
+    },
+    {
+      "key": "garlic_clove__qaqrqd__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "fingertip pinch mid-clove"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 33 acceptable"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 35 acceptable"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "firm pinch, pads 28mm on 27mm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "vertical pinch mid-clove"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "garlic_clove__xotobt__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "fingertip pinch mid-clove"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 30 acceptable"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pads 29mm vs planned 17mm; clove rotated, no daylight seen"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pads 28mm vs planned 17mm; clove rotated, no daylight seen"},
+        {"rank": 5, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 50/0: one finger stuck fully open, clove shoved across"}
+      ],
+      "object_note": "rank 5 finger positions 50/0 with 21mm width: object pushed against open finger"
+    },
+    {
+      "key": "garlic_clove__hpzvmi__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "vertical fingertip pinch mid-clove"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 31 acceptable"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "firm pinch, pads 31mm on 29mm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 30 acceptable"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "wide 45mm pinch across clove body, both pads touch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "garlic_clove__saombi__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "small clove pinched at fingertips, pads 17mm on 17mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "fingertip pinch, both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 31 acceptable"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pads 24mm vs planned 7mm; clove rotated, fills pad gap in V4"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pads 28mm vs planned 13mm; no daylight visible"}
+      ],
+      "object_note": "cross-section scaled clove is small; ranks 4-5 achieved width differs from planned"
+    },
+    {
+      "key": "garlic_clove__zpybkr__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "fingertip pinch mid-clove"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 33 acceptable"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "wide 46mm pinch across clove width, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 31 acceptable"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "wide 43mm pinch across clove width, both pads touch"}
+      ],
+      "object_note": "ranks 3/5 planned width 19mm but clove rotated to wide pinch; visually spans pads"
+    },
+    {
+      "key": "garlic_clove__faeyay__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "fingertip pinch mid-clove"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "fingertip pinch mid-clove"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 30 acceptable"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 32 acceptable"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "firm pinch, pads 28mm on 27mm"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "garlic_clove__flcbrn__s",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 32 acceptable"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "wide 43mm pinch across clove body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "wide 42mm pinch across clove body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "wide pinch, tilt 39 moderate but firm"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "garlic_clove__wyyhmi__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "vertical fingertip pinch mid-clove"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "fingertip pinch, pads 24mm on 24mm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "firm pinch, 1mm hull slack only"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 30 acceptable"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "fingertip pinch, tilt 31 acceptable"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "garlic_clove__jwhnfc__s",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "fingers closed 0/0 through 33mm clove; fingertips inside mesh"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "firm pinch, pads 33mm on 31mm"}
+      ],
+      "object_note": "rank 1 collision hull missing/undersized: fully closed fingers still attached to clove"
+    },
+    {
+      "key": "pencil__lykqoh__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-shaft cross-section pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 26 acceptable"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, CoM offset 2mm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, CoM offset 5mm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, CoM offset 5mm"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__rzscao__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-shaft cross-section pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 23 acceptable"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 27 acceptable"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "CoM offset 10mm, still middle third"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "CoM offset 8mm, middle third"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__mvmxfo__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-shaft cross-section pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 17"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pads 22mm vs 14mm pencil; no clear daylight at this resolution"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 22"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "firm pinch, pads 15mm on 14mm"}
+      ],
+      "object_note": "rank 3 finger opening 22mm exceeds 14mm width; possible skewed pinch"
+    },
+    {
+      "key": "pencil__gbzzcg__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-shaft cross-section pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 24"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 23"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 28"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, CoM offset 5mm"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__jntybl__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-shaft cross-section pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 28"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, near vertical"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 36 moderate"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 33"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__vpzhth__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-shaft cross-section pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 22"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 21"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, CoM offset 1mm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "firm pinch, pads 15mm on 14mm"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__lruiot__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-shaft cross-section pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, near vertical"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 22"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 36 moderate"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 26"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__heqkmr__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-shaft cross-section pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 24"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 22"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 21"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "CoM offset 6mm, middle third"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__fnlbpu__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-shaft cross-section pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 26"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, CoM offset 4mm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 34 moderate"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, CoM offset 5mm"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__vedvit__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-shaft cross-section pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 22"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 22"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, CoM offset 3mm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 29"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__vvofwr__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-shaft cross-section pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 22"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, CoM offset 2mm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, CoM offset 3mm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "CoM offset 10mm, still middle third"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__hmawzy__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-shaft cross-section pinch, near vertical"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 17"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 22"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 28"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "mid-shaft pinch, tilt 33"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "cinnamon_stick__hjhcpm__s",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "fingers closed to 3/1mm through 15mm quill; tips inside stick"},
+        {"rank": 2, "verdict": "flag", "flags": ["penetration"], "note": "fingers closed to 2/1mm through 15mm quill"}
+      ],
+      "object_note": "collision hull far smaller than visual quill; fingers close almost fully yet stay attached"
+    },
+    {
+      "key": "cinnamon_stick__cdkjfo__s",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "fingers closed to 3/1mm through 17mm quill"},
+        {"rank": 2, "verdict": "flag", "flags": ["penetration"], "note": "fingers closed to 4/0mm through 17mm quill"}
+      ],
+      "object_note": "collision hull far smaller than visual quill; both rows sink fingertips into stick"
+    },
+    {
+      "key": "cinnamon_stick__qxpzdm__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-stick pinch, pads 21mm on 19mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "mid-stick pinch, pads 20mm on 19mm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "CoM 16mm, stick yawed; pads 14mm across thinner curl"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "CoM 16mm, stick yawed; pads 14mm across thinner curl"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "CoM 11mm, skewed pinch; pads 15mm, both touch"}
+      ],
+      "object_note": "ranks 3-5 stick rotated during closing (skewed in V4); still within middle third"
+    },
+    {
+      "key": "cinnamon_stick__qsqvgk__s",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "fingers closed to 5/0mm through 17mm quill"},
+        {"rank": 2, "verdict": "flag", "flags": ["penetration"], "note": "fingers closed to 5/0mm; wrist view shows pads inside quill"},
+        {"rank": 3, "verdict": "flag", "flags": ["penetration"], "note": "fingers closed to 2/0mm through 17mm quill"}
+      ],
+      "object_note": "collision hull far smaller than visual quill in every row"
+    },
+    {
+      "key": "cinnamon_stick__kdaxdy__s",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-stick pinch, pads 21mm on 20mm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch near middle, tilt 35 moderate, both pads touch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "cinnamon_stick__smfuqz__s",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "fingers closed to 5/0mm through 18mm quill"},
+        {"rank": 2, "verdict": "flag", "flags": ["penetration"], "note": "fingers closed to 7/0mm through 18mm quill"},
+        {"rank": 3, "verdict": "flag", "flags": ["penetration"], "note": "fingers closed to 11/0mm on 18mm quill; pads sunk into bark"}
+      ],
+      "object_note": "collision hull consistently smaller than visual quill (5-11mm vs 18mm)"
+    }
+  ]
+}

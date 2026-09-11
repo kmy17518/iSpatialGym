@@ -1,0 +1,1024 @@
+{
+ "batch": "wave1_08",
+ "models": [
+  {
+   "key": "teacup__tfzfam",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, cup hangs from fingertips"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, cup hangs from fingertips"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, cup hangs from fingertips"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, cup hangs from fingertips"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, cup hangs from fingertips"
+    }
+   ]
+  },
+  {
+   "key": "teacup__vckahe",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "bowl pinch: one finger inside cup, one outside"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "bowl pinch: one finger inside cup, one outside"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "bowl pinch: one finger inside cup, one outside"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "bowl pinch: one finger inside cup, one outside"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "bowl pinch: one finger inside cup, one outside"
+    }
+   ],
+   "object_note": "Small bowl-shaped cup; one finger enters the bowl, pads contact the curved shell at different heights"
+  },
+  {
+   "key": "teacup__wopjex",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on tall mug, cup hangs tilted"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on tall mug, cup hangs tilted"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on tall mug, cup hangs tilted"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on tall mug, cup hangs tilted"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on tall mug, cup hangs tilted"
+    }
+   ]
+  },
+  {
+   "key": "teacup__zdvgol",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch at flared widest section, pads flush"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch at flared widest section, pads flush"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch at flared widest section, pads flush"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch at flared widest section, pads flush"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on flare, cup hangs"
+    }
+   ],
+   "object_note": "Tulip cup; body grasps read fingers 50/14 but both pads sit flush on the wide flared section"
+  },
+  {
+   "key": "teaspoon__bjzgmj",
+   "n_rows": 1,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle-tip pinch, long lever arm, natural handle grasp"
+    }
+   ]
+  },
+  {
+   "key": "teaspoon__eilfij",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on rear of bowl"
+    }
+   ]
+  },
+  {
+   "key": "teaspoon__fgeimy",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    }
+   ]
+  },
+  {
+   "key": "teaspoon__nxddfp",
+   "n_rows": 2,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on rear of bowl"
+    }
+   ]
+  },
+  {
+   "key": "teaspoon__piqabk",
+   "n_rows": 1,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    }
+   ]
+  },
+  {
+   "key": "teaspoon__prbhag",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch near neck"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    }
+   ]
+  },
+  {
+   "key": "teaspoon__qdepdj",
+   "n_rows": 2,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at neck, bowl below fingertips"
+    }
+   ]
+  },
+  {
+   "key": "teaspoon__vgbcmo",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    }
+   ]
+  },
+  {
+   "key": "tongs__gbjqyn",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-arm pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-arm pinch on curved arm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch near hinge end, tongs hang"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-arm pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-arm pinch"
+    }
+   ]
+  },
+  {
+   "key": "tongs__igsklx",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "central pinch across arms"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "central pinch across arms"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "central pinch across arms"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on arms, approach from below"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on arms, approach from below"
+    }
+   ]
+  },
+  {
+   "key": "tongs__rcpjld",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "central pinch near hinge"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "central pinch near hinge"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "central pinch near hinge"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "central pinch near hinge"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "arm pinch near hinge"
+    }
+   ]
+  },
+  {
+   "key": "toy_dice__akguod",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt about pinch axis, pads still flush"
+    }
+   ],
+   "object_note": "Fingers read 43/0 but cube sits centred between flush pads; fingertips flush with bottom face"
+  },
+  {
+   "key": "toy_dice__bjrxkj",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt about pinch axis, pads still flush"
+    }
+   ],
+   "object_note": "Fingers read 43/0 but cube sits centred between flush pads; fingertips flush with bottom face"
+  },
+  {
+   "key": "toy_dice__eqwazv",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt about pinch axis, pads still flush"
+    }
+   ],
+   "object_note": "Fingers read 43/0 but cube sits centred between flush pads; fingertips flush with bottom face"
+  },
+  {
+   "key": "toy_dice__ievnsq",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt about pinch axis, pads still flush"
+    }
+   ],
+   "object_note": "Fingers read 43/0 but cube sits centred between flush pads; fingertips flush with bottom face"
+  },
+  {
+   "key": "toy_dice__kmagva",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt about pinch axis, pads still flush"
+    }
+   ],
+   "object_note": "Fingers read 43/0 but cube sits centred between flush pads; fingertips flush with bottom face"
+  },
+  {
+   "key": "toy_dice__krpdji",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt about pinch axis, pads still flush"
+    }
+   ],
+   "object_note": "Fingers read 43/0 but cube sits centred between flush pads; fingertips flush with bottom face"
+  },
+  {
+   "key": "toy_dice__rbzyrv",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt about pinch axis, pads still flush"
+    }
+   ],
+   "object_note": "Fingers read 43/0 but cube sits centred between flush pads; fingertips flush with bottom face"
+  },
+  {
+   "key": "toy_dice__xfqqhh",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt about pinch axis, pads still flush"
+    }
+   ],
+   "object_note": "Fingers read 43/0 but cube sits centred between flush pads; fingertips flush with bottom face"
+  },
+  {
+   "key": "toy_figure__fnueyn",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "torso pinch near CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "torso pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mane/shoulder pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "head/mane pinch, body hangs"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "head/mane pinch, body hangs"
+    }
+   ]
+  },
+  {
+   "key": "toy_figure__gnofgv",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "torso pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "torso pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "hindquarter pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/shoulder pinch"
+    }
+   ]
+  },
+  {
+   "key": "toy_figure__jddrck",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pinches small top figure; heavy base 66-71 mm away"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pinches small top figure; heavy base 66-71 mm away"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pinches small top figure; heavy base 66-71 mm away"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pinches small top figure; heavy base 66-71 mm away"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pinches small top figure; heavy base 66-71 mm away"
+    }
+   ],
+   "object_note": "Ring-stacker: every grasp holds the small top figure at the far end of a large heavy toy"
+  },
+  {
+   "key": "toy_figure__jwjrza",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body pinch, pads on flat side panels"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch, pads on flat side panels"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "chest pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "chest pinch"
+    }
+   ]
+  },
+  {
+   "key": "toy_figure__krmxjk",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "limb pinch (23 mm cylinder), body hangs"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "limb pinch (23 mm cylinder), body hangs"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "limb pinch (23 mm cylinder), body hangs"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "limb pinch (23 mm cylinder), body hangs"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "limb pinch (23 mm cylinder), body hangs"
+    }
+   ]
+  },
+  {
+   "key": "toy_figure__orunry",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near CoM"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near CoM"
+    }
+   ]
+  },
+  {
+   "key": "toy_figure__tjchdg",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "nose fuselage pinch, light glider"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rear fuselage pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "fingers fully closed 0/0 on 6 mm fin; pads meet"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tail fuselage pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "nose pinch beside propeller"
+    }
+   ]
+  }
+ ]
+}

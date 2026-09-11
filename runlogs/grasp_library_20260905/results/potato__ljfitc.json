@@ -1,0 +1,196 @@
+{
+ "task": "object_scaling",
+ "category": "potato",
+ "model": "ljfitc",
+ "key": "potato__ljfitc",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.07620135498046875,
+  0.0603509521484375,
+  0.05783403778076172
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "potato",
+   "model": "ljfitc"
+  },
+  "task": "object_scaling",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 500,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    -0.0001,
+    0.0,
+    -0.0
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0052
+   ],
+   "score": 19.6977,
+   "meta": {
+    "com_perp": 0.00016,
+    "width": 0.05692,
+    "antipodal": 0.98066,
+    "coverage": 1.0,
+    "clearance": 0.01593,
+    "tilt_deg": 166.40695,
+    "graspgen_conf": 0.9809
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/potato__ljfitc/g0_v1.png",
+    "v2": "/tmp/glib/frames/potato__ljfitc/g0_v2.png",
+    "v3": "/tmp/glib/frames/potato__ljfitc/g0_v3.png",
+    "wrist": "/tmp/glib/frames/potato__ljfitc/g0_wrist.png"
+   },
+   "t_s": 3.26
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0123
+   ],
+   "score": 19.6044,
+   "meta": {
+    "com_perp": 0.00037,
+    "width": 0.06014,
+    "antipodal": 0.95093,
+    "coverage": 1.0,
+    "clearance": 0.0167,
+    "tilt_deg": 73.0063,
+    "graspgen_conf": 0.95755
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/potato__ljfitc/g1_v1.png",
+    "v2": "/tmp/glib/frames/potato__ljfitc/g1_v2.png",
+    "v3": "/tmp/glib/frames/potato__ljfitc/g1_v3.png",
+    "wrist": "/tmp/glib/frames/potato__ljfitc/g1_wrist.png"
+   },
+   "t_s": 3.25
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0068
+   ],
+   "score": 19.413,
+   "meta": {
+    "com_perp": 0.0013,
+    "width": 0.05723,
+    "antipodal": 0.96053,
+    "coverage": 1.0,
+    "clearance": 0.01675,
+    "tilt_deg": 66.66652,
+    "graspgen_conf": 0.97163
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/potato__ljfitc/g2_v1.png",
+    "v2": "/tmp/glib/frames/potato__ljfitc/g2_v2.png",
+    "v3": "/tmp/glib/frames/potato__ljfitc/g2_v3.png",
+    "wrist": "/tmp/glib/frames/potato__ljfitc/g2_wrist.png"
+   },
+   "t_s": 3.15
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0046
+   ],
+   "score": 19.3928,
+   "meta": {
+    "com_perp": 0.00116,
+    "width": 0.05648,
+    "antipodal": 0.92011,
+    "coverage": 1.0,
+    "clearance": 0.01643,
+    "tilt_deg": 114.94156,
+    "graspgen_conf": 0.97311
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/potato__ljfitc/g3_v1.png",
+    "v2": "/tmp/glib/frames/potato__ljfitc/g3_v2.png",
+    "v3": "/tmp/glib/frames/potato__ljfitc/g3_v3.png",
+    "wrist": "/tmp/glib/frames/potato__ljfitc/g3_wrist.png"
+   },
+   "t_s": 3.24
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0106
+   ],
+   "score": 19.377,
+   "meta": {
+    "com_perp": 0.00054,
+    "width": 0.05792,
+    "antipodal": 0.97608,
+    "coverage": 1.0,
+    "clearance": 0.01236,
+    "tilt_deg": 120.55135,
+    "graspgen_conf": 0.96102
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/potato__ljfitc/g4_v1.png",
+    "v2": "/tmp/glib/frames/potato__ljfitc/g4_v2.png",
+    "v3": "/tmp/glib/frames/potato__ljfitc/g4_v3.png",
+    "wrist": "/tmp/glib/frames/potato__ljfitc/g4_wrist.png"
+   },
+   "t_s": 3.3
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 20.8
+}

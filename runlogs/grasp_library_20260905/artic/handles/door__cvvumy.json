@@ -1,0 +1,157 @@
+{
+ "category": "door",
+ "model": "cvvumy",
+ "key": "door__cvvumy",
+ "aabb_extent": [
+  0.1546722948551178,
+  1.8084611892700195,
+  2.1336112022399902
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0779,
+   -0.9042,
+   -1.3575
+  ],
+  "bbox_max": [
+   0.0768,
+   0.9042,
+   0.7761
+  ],
+  "n_pieces": 3
+ },
+ "joints": [
+  {
+   "joint": "j_left_leaf",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "left_leaf",
+   "outward_normal": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "face_s": 0.053,
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "hinge_point_obj": [
+    -0.04611,
+    -0.86054,
+    -0.40765
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5523947477340698,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.053,
+    -0.8573,
+    -1.3483
+   ],
+   "link_bbox_max": [
+    0.0206,
+    0.0094,
+    0.7282
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     -0.0168,
+     -0.0375,
+     -0.383
+    ],
+    "pinch_axis": [
+     -1.0,
+     -0.0,
+     -0.0
+    ],
+    "approach_dir": [
+     -0.0683,
+     -0.9977,
+     -0.0
+    ],
+    "width": 0.0736,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     -0.9994,
+     0.0356,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "ungraspable"
+  },
+  {
+   "joint": "j_right_leaf",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "right_leaf",
+   "outward_normal": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "face_s": 0.0432,
+   "axis_dir_obj": [
+    0.0,
+    -0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    -0.03785,
+    0.87526,
+    -12.90639
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5891975164413452,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.0432,
+    0.0138,
+    -1.3483
+   ],
+   "link_bbox_max": [
+    0.0266,
+    0.8801,
+    0.7282
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     -0.0123,
+     0.058,
+     -0.3269
+    ],
+    "pinch_axis": [
+     -1.0,
+     -0.0,
+     -0.0
+    ],
+    "approach_dir": [
+     -0.0688,
+     0.9976,
+     -0.0
+    ],
+    "width": 0.0698,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     -0.9995,
+     -0.0312,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "ungraspable"
+  }
+ ]
+}

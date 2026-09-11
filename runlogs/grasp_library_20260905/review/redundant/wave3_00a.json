@@ -1,0 +1,177 @@
+{
+  "batch": "wave3_00a",
+  "models": [
+    {
+      "key": "bottle_of_water__cyzaue",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred body pinch; V1 blank but V2/V3 show both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "shoulder pinch, both pads on faceted body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "shoulder pinch, body extends to one side"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch near shoulder"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck/shoulder pinch 37 mm from CoM; pads in contact"}
+      ],
+      "object_note": "all grasps close 50/0-8 (object pushed to one pad) but both pads contact the object"
+    },
+    {
+      "key": "bottle_of_water__suytyi",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch through CoM; V1 blank, V2 shows pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch through CoM, pads flush in V2"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch through CoM, pads flush in V2"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch through CoM, pads flush in V2"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch through CoM; lower antipodal score, still firm"}
+      ],
+      "object_note": "labelled widths 29-44 mm but aperture 62 mm; V2 shows pads flush on ~60 mm body"
+    },
+    {
+      "key": "bottle_of_water__sxffiv",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-body pinch near CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "upper body pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "upper body pinch below shoulder"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "shoulder pinch near cap, 71 mm from CoM; natural bottle grasp"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "shoulder pinch near cap, 80 mm from CoM; natural bottle grasp"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_water__rrkhva",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "shoulder/body pinch, pads flush"},
+        {"rank": 2, "verdict": "flag", "flags": ["gap"], "note": "29 mm aperture on 16 mm neck; pads on lip/hull, not neck"},
+        {"rank": 3, "verdict": "flag", "flags": ["gap"], "note": "29 mm aperture on 18 mm neck; pads on lip/hull, not neck"},
+        {"rank": 4, "verdict": "flag", "flags": ["gap"], "note": "29 mm aperture on 16 mm neck; pads on lip/hull, not neck"},
+        {"rank": 5, "verdict": "flag", "flags": ["gap"], "note": "30 mm aperture on 16 mm neck; pads on lip/hull, not neck"}
+      ],
+      "object_note": "neck grasps stop at 29-30 mm aperture though neck is 16-18 mm; coarse collision hull or lip catch"
+    },
+    {
+      "key": "bottle_of_water__atvnqy",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "mid-body pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "upper body pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "shoulder pinch just below cap"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "lower body pinch ~45 mm from base, bottle hangs axially"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "lower body pinch ~45 mm from base, bottle hangs axially"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_water__rmtdxh",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "shoulder pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "shoulder / neck-base pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "neck-base pinch, natural bottle grasp"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "neck-base pinch below lip"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "neck-base pinch"}
+      ],
+      "object_note": "all candidates sit on the shoulder/neck base; apertures match widths within 6 mm"
+    },
+    {
+      "key": "bottle_of_water__migvlt",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred body pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "centred body pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "centred body pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "centred body pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "centred body pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_water__emquat",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["end_grasp"], "note": "side pinch at very base of bottle; 68 mm lever arm"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp"], "note": "side pinch at base rim, pad likely overhangs bottom; 78 mm lever"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "axial pinch of base end; fingers along body sides, hangs stably"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "side pinch at very base of bottle; 71 mm lever arm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "axial pinch of base end; fingers along body sides, hangs stably"}
+      ],
+      "object_note": "all candidates pinch the bottom end (CoM offset 68-78 mm); GraspGen confidence lowest in batch"
+    },
+    {
+      "key": "bottle_of_water__cytqio",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "axial neck pinch below flared mouth; body hangs, natural"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "bottle_of_water__jmwngr",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "shoulder pinch below cap; large bottle hangs from neck region"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "shoulder pinch below cap, side approach; natural neck-region grasp"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "shoulder pinch below cap, side approach; natural neck-region grasp"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "axial shoulder pinch below neck ring"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "shoulder pinch below cap, side approach; natural neck-region grasp"}
+      ],
+      "object_note": "large bottle, CoM offsets 128-139 mm are inherent to neck/shoulder grasps; shoulder taper locks it"
+    },
+    {
+      "key": "bottle_of_water__eeaimz",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "shoulder pinch near max aperture (96 mm); contact plausible, low contrast"}
+      ],
+      "object_note": "aperture 96 mm vs width 86 mm; white-on-white V2 makes gap check hard"
+    },
+    {
+      "key": "bottle_of_water__lkpaas",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "axial shoulder pinch under neck; large bottle hangs, natural"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "axial shoulder pinch under neck; large bottle hangs, natural"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "axial shoulder pinch under neck"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "axial shoulder pinch under neck"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "axial shoulder pinch under neck"}
+      ],
+      "object_note": "transparent crumpled bottle; pads hard to see but apertures match widths within 7 mm"
+    },
+    {
+      "key": "canned_food__byakrm",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred diametral pinch on can"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "centred diametral pinch on can"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "centred diametral pinch on can"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "centred diametral pinch on can"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "centred diametral pinch on can, tilted approach"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "canned_food__ycbspm",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across can top/bottom faces, 13 mm off centre"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch across can top/bottom faces, 12 mm off centre"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch across can top/bottom faces, 14 mm off centre"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch across can top/bottom faces, 13 mm off centre"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch across can top/bottom faces, 15 mm off centre"}
+      ],
+      "object_note": "all candidates approach from the short end and clamp the flat top/bottom faces; firm"
+    },
+    {
+      "key": "canned_food__foetdd",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred pinch across box"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "centred pinch across box"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "centred pinch across box"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "centred pinch across box"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "centred pinch across box, tilted approach"}
+      ],
+      "object_note": ""
+    }
+  ]
+}

@@ -1,0 +1,120 @@
+{
+ "category": "blender",
+ "model": "eyedvd",
+ "key": "blender__eyedvd",
+ "aabb_extent": [
+  0.17623218894004822,
+  0.15930040180683136,
+  0.364931583404541
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0832,
+   -0.0684,
+   -0.0759
+  ],
+  "bbox_max": [
+   0.093,
+   0.0685,
+   0.1179
+  ],
+  "n_pieces": 4
+ },
+ "joints": [
+  {
+   "joint": "j_lid",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "lid",
+   "outward_normal": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "face_s": 0.2627,
+   "axis_dir_obj": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    -0.01757,
+    0.0638,
+    0.25833
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 2.143458604812622,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.0742,
+    -0.0566,
+    0.2276
+   ],
+   "link_bbox_max": [
+    0.039,
+    0.0587,
+    0.289
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      -0.0176,
+      0.0455,
+      0.277
+     ],
+     "pinch_axis": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "approach_dir": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "width": 0.0078,
+     "length": 0.0269,
+     "depth": 0.0263,
+     "face_s": 0.2627,
+     "n_pieces": 6,
+     "pull_dir": [
+      0.0,
+      0.7141,
+      0.7
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     -0.017,
+     -0.0176,
+     0.2513
+    ],
+    "pinch_axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "approach_dir": [
+     -0.0,
+     1.0,
+     0.0005
+    ],
+    "width": 0.0271,
+    "exposed": true,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     0.0,
+     -0.086,
+     0.9963
+    ]
+   },
+   "sub_links": [],
+   "status": "handle"
+  }
+ ]
+}

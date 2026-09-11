@@ -1,0 +1,361 @@
+{
+  "batch": "wave1_06",
+  "models": [
+    {
+      "key": "mouse__oydobn",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "tiny object pinched at fingertips, both pads touch"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "fingers 32/0 on 9 mm object; caught off-centre at fingertip edge"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "fingertip pinch, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "fingertip pinch, both pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "fingertip pinch, both pads touch"}
+      ],
+      "object_note": "object is only ~10 mm wide (possibly mis-scaled); every grasp is a fingertip pinch"
+    },
+    {
+      "key": "mouse__pljjtu",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across mouse width near centre"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch across width, mouse slightly rotated"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch across width"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch across width, 22 mm from CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch across width toward one end, still body grasp"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "mouse__wwyopp",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "fingertip pinch at shell end edge, ~15 mm overlap"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "fingertip pinch at shell end edge"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "fingertip pinch at shell end edge"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "fingertip pinch at shell end edge"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "very tip of shell, 11 mm, tilt 135; body hangs away"}
+      ],
+      "object_note": "object is a thin curved shell (mouse cover?); all grasps pinch one end edge, bulk hangs ~80 mm away"
+    },
+    {
+      "key": "mug__ehnmxj",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "mug__fapsrj",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "mug__jgethp",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch on wide cup"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch, cup hangs tilted"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "mug__lgxhsc",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle loop pinch; width metric is bar thickness"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "handle loop pinch, mug hangs"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch from base side; one finger stayed open, both touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch, tilted; both pads on body"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim lip pinch, low antipodal 0.51 but closed"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "mug__ntgftr",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch, symmetric 7/2"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "mug__ppdqbj",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch next to handle"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "mug__ppzttc",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "handle bar pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch from base side; one finger stayed open, both touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch near base, both pads on wall"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch near rim, both pads on wall"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "handle bar pinch, low antipodal but closed"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "mug__waqrdy",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch on tapered mug; fingertip contact only"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch on tapered mug; fingertip contact only"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "handle pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "handle pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "handle pinch"}
+      ],
+      "object_note": "tapered body: pads converge only at fingertips for base-side grasps"
+    },
+    {
+      "key": "mug__ycbmug",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch; fingers 9 mm wider than wall"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch; fingers 9 mm wider than wall"},
+        {"rank": 4, "verdict": "flag", "flags": ["gap"], "note": "fingers 23 mm apart on 3 mm wall; pads not on wall"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch; fingers 9 mm wider than wall"}
+      ],
+      "object_note": "fingers stop 7-20 mm wider than the thin enamel wall; rim collision hull likely thicker than visual"
+    },
+    {
+      "key": "mug__yxaapv",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "rim pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "rim pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pack_of_cigarettes__gzxueq",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across pack width, pack fills opening"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch across pack width"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "tilted pinch across width, centred"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "tilted pinch across width"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "tilted pinch across width"}
+      ],
+      "object_note": "50/4 readings reflect the 55 mm pack filling the gap, both pads on sides"
+    },
+    {
+      "key": "pack_of_cigarettes__hmhqkq",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across pack width"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch across pack width"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "tilted pinch across width"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "tilted pinch across width"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "tilted pinch across width, centred"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pack_of_cigarettes__ipmejr",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across pack width"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch across pack width"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "tilted pinch across width"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "tilted pinch across width, centred"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "tilted pinch across width"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pack_of_cigarettes__ppbmak",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across pack width"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch across pack width"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "tilted pinch across width"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "tilted pinch across width"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "tilted pinch across width"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pack_of_cigarettes__qldhnm",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across pack width"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch across pack width"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "tilted pinch across width"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "tilted pinch across width"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "tilted pinch across width"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pack_of_cigarettes__wpmpcf",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across pack width"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch across pack width"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "tilted pinch across width"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "tilted pinch across width"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "tilted pinch across width"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "potato__bpwohr",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch, both pads on potato"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch, near symmetric"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "potato__ljfitc",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "potato__lqjear",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "potato__ngjeog",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch on large potato"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "potato__reczhi",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "symmetric body pinch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "body pinch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "body pinch"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "sandal__chgcrm",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across sole width at arch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch across sole width at heel"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "tilted pinch across sole at arch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch across sole width at heel"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "tilted pinch across sole at heel"}
+      ],
+      "object_note": "finger opening matches sole width (+4 mm) in all rows"
+    },
+    {
+      "key": "sandal__dfkzbd",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across toe box / sole, 85 vs 79 mm"},
+        {"rank": 2, "verdict": "flag", "flags": ["gap"], "note": "fingers 87 mm vs 70 mm strap; pads off visual mesh"},
+        {"rank": 3, "verdict": "flag", "flags": ["gap"], "note": "fingers 83 mm vs 55 mm; sandal floats between pads"},
+        {"rank": 4, "verdict": "flag", "flags": ["gap"], "note": "fingers 82 mm vs 50 mm heel strap; large daylight"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch across sole, 76 vs 74 mm"}
+      ],
+      "object_note": "collision hull around straps/heel much wider than visual mesh; fingers stop 17-32 mm too wide"
+    },
+    {
+      "key": "sandal__spcddb",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "centred pinch across foam sole"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "tilted centred pinch across sole"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "tilted pinch across sole"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "tilted pinch across sole"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch across sole at heel"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "sandal__vwbomj",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "toe-box pinch; long lever to heavy heel"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "heel pinch across 67 mm"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "arch pinch; fingers 11 mm wider than measured"},
+        {"rank": 4, "verdict": "flag", "flags": ["gap"], "note": "fingers 82 mm vs 41 mm heel; pads far from mesh"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "tilted toe pinch across sole"}
+      ],
+      "object_note": "heel/ankle-strap collision hull much wider than visual mesh (82 vs 41 mm)"
+    },
+    {
+      "key": "soda_cup__fsfsas",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "base-side pinch on tapered cup, fingertip contact"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "base-side pinch on tapered cup"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "base-side pinch, near symmetric"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "side pinch across body near base"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "tilted base-side pinch"}
+      ],
+      "object_note": "tapered cup: parallel pads touch only at fingertips; width metric unreliable"
+    },
+    {
+      "key": "soda_cup__gnzegv",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "base-end pinch on tall cup, ~35 mm pad overlap"}
+      ],
+      "object_note": "only 1/12 candidates valid"
+    }
+  ]
+}

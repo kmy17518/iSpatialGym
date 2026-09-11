@@ -1,0 +1,199 @@
+{
+ "task": "object_scaling",
+ "relation": null,
+ "category": "pine_cone",
+ "model": "bmvhss",
+ "key": "pine_cone__bmvhss__f",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.08675342559814453,
+  0.07087866973876954,
+  0.06756036376953126
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "pine_cone",
+   "model": "bmvhss"
+  },
+  "task": "object_scaling",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 500,
+   "n_lever": 500,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    -0.0053,
+    0.0004,
+    -0.0013
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0202
+   ],
+   "score": 19.2455,
+   "meta": {
+    "com_perp": 0.00123,
+    "width": 0.06481,
+    "antipodal": 0.95406,
+    "coverage": 1.0,
+    "clearance": 0.0134,
+    "tilt_deg": 84.48749,
+    "graspgen_conf": 0.94763
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pine_cone__bmvhss__f/g0_v1.png",
+    "v2": "/tmp/glib/frames/pine_cone__bmvhss__f/g0_v2.png",
+    "v3": "/tmp/glib/frames/pine_cone__bmvhss__f/g0_v3.png",
+    "wrist": "/tmp/glib/frames/pine_cone__bmvhss__f/g0_wrist.png"
+   },
+   "t_s": 3.3
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0471,
+    0.0199
+   ],
+   "score": 19.184,
+   "meta": {
+    "com_perp": 0.0012,
+    "width": 0.06237,
+    "antipodal": 0.95299,
+    "coverage": 1.0,
+    "clearance": 0.01262,
+    "tilt_deg": 143.4117,
+    "graspgen_conf": 0.93446
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pine_cone__bmvhss__f/g1_v1.png",
+    "v2": "/tmp/glib/frames/pine_cone__bmvhss__f/g1_v2.png",
+    "v3": "/tmp/glib/frames/pine_cone__bmvhss__f/g1_v3.png",
+    "wrist": "/tmp/glib/frames/pine_cone__bmvhss__f/g1_wrist.png"
+   },
+   "t_s": 3.33
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0175
+   ],
+   "score": 19.078,
+   "meta": {
+    "com_perp": 0.00172,
+    "width": 0.06403,
+    "antipodal": 0.94461,
+    "coverage": 1.0,
+    "clearance": 0.0135,
+    "tilt_deg": 28.35567,
+    "graspgen_conf": 0.91936
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pine_cone__bmvhss__f/g2_v1.png",
+    "v2": "/tmp/glib/frames/pine_cone__bmvhss__f/g2_v2.png",
+    "v3": "/tmp/glib/frames/pine_cone__bmvhss__f/g2_v3.png",
+    "wrist": "/tmp/glib/frames/pine_cone__bmvhss__f/g2_wrist.png"
+   },
+   "t_s": 3.34
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0229
+   ],
+   "score": 19.0672,
+   "meta": {
+    "com_perp": 0.00177,
+    "width": 0.06636,
+    "antipodal": 0.94265,
+    "coverage": 1.0,
+    "clearance": 0.01264,
+    "tilt_deg": 65.87024,
+    "graspgen_conf": 0.94149
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pine_cone__bmvhss__f/g3_v1.png",
+    "v2": "/tmp/glib/frames/pine_cone__bmvhss__f/g3_v2.png",
+    "v3": "/tmp/glib/frames/pine_cone__bmvhss__f/g3_v3.png",
+    "wrist": "/tmp/glib/frames/pine_cone__bmvhss__f/g3_wrist.png"
+   },
+   "t_s": 3.34
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0173
+   ],
+   "score": 19.0024,
+   "meta": {
+    "com_perp": 0.00223,
+    "width": 0.0625,
+    "antipodal": 0.97066,
+    "coverage": 1.0,
+    "clearance": 0.01368,
+    "tilt_deg": 36.4463,
+    "graspgen_conf": 0.91723
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/pine_cone__bmvhss__f/g4_v1.png",
+    "v2": "/tmp/glib/frames/pine_cone__bmvhss__f/g4_v2.png",
+    "v3": "/tmp/glib/frames/pine_cone__bmvhss__f/g4_v3.png",
+    "wrist": "/tmp/glib/frames/pine_cone__bmvhss__f/g4_wrist.png"
+   },
+   "t_s": 3.34
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 21.4
+}

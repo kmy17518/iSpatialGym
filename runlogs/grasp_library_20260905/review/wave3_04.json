@@ -1,0 +1,235 @@
+{
+  "batch": "wave3_04",
+  "models": [
+    {
+      "key": "garlic_clove__zpybkr__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "body pinch, 38 mm between pads, clove held at tips"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "wide body pinch, clove spans both pads"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "pads 6 mm apart on pointed tip; clove hangs sideways"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "wide body pinch across widest part"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch on tapered end, 17 mm of clove between pads"}
+      ],
+      "object_note": "second finger value is 0 in every row (likely reporting artifact); off-centre judged visually only"
+    },
+    {
+      "key": "garlic_clove__faeyay__s",
+      "n_rows": 2,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "wide body pinch, clove between both pads"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "body pinch near upper end, 28 mm width, hangs below tips"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "garlic_clove__flcbrn__s",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "fingers closed to 3/1 mm inside 14 mm wide clove"},
+        {"rank": 2, "verdict": "flag", "flags": ["penetration"], "note": "fingers fully closed (1/0) inside 16 mm wide clove"},
+        {"rank": 3, "verdict": "flag", "flags": ["penetration"], "note": "fingers fully closed (1/0) inside 14 mm wide clove"}
+      ],
+      "object_note": "fingers close to 1-4 mm while visual clove is 14-16 mm wide at pads: collision hull far smaller than visual"
+    },
+    {
+      "key": "garlic_clove__wyyhmi__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "25 mm body pinch on upper part, clove hangs below tips"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "25 mm body pinch on upper part"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "19 mm body pinch across thin axis"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "25 mm body pinch on upper part"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "24 mm body pinch on upper part"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "garlic_clove__jwhnfc__s",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "33 mm body pinch, clove hangs below tips"},
+        {"rank": 2, "verdict": "flag", "flags": ["end_grasp", "fragile"], "note": "fingers fully closed on tip sliver; clove hangs sideways"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "33 mm body pinch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "30 mm body pinch on upper part"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__lykqoh__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "cross pinch, slightly off centre"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "cross pinch, slightly off centre"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "cross pinch, slightly off centre"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__rzscao__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "cross pinch, body behind sharpened cone"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "cross pinch, 24 mm off centre, body contact"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__mvmxfo__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "cross pinch ~25 mm from eraser end, pads on body"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__gbzzcg__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "cross pinch, 22 mm off centre, body contact"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__jntybl__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "cross pinch, slightly off centre"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__vpzhth__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "cross pinch, slightly off centre"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "cross pinch, 21 mm off centre, body contact"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "cross pinch, 21 mm off centre, body contact"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "cross pinch, 22 mm off centre, body contact"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__lruiot__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "cross pinch on body just behind sharpened cone"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "cross pinch, slightly toward eraser end"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "cross pinch on body behind sharpened cone"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__heqkmr__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "cross pinch, slightly toward eraser end"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "cross pinch ~28 mm from tip, pads on body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__fnlbpu__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "cross pinch, 22 mm toward tip, body contact"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "cross pinch on body just behind cone, 29 mm off"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "cross pinch on body just behind cone, 31 mm off"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__vedvit__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "cross pinch, 22 mm off centre, body contact"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "cross pinch, slightly off centre"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "cross pinch on body just behind cone, 29 mm off"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__vvofwr__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "cross pinch, slightly toward tip"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "cross pinch, 23 mm off centre, body contact"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "cross pinch, slightly off centre"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "pencil__hmawzy__s",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "cross pinch near middle of body"}
+      ],
+      "object_note": ""
+    },
+    {
+      "key": "cinnamon_stick__cdkjfo__s",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["fragile"], "note": "4 mm pinch on thin bark flap; quill hangs below tips"}
+      ],
+      "object_note": "only 1/12 candidates valid; the survivor holds a bark flap, not the 20 mm quill body"
+    },
+    {
+      "key": "cinnamon_stick__kdaxdy__s",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["penetration"], "note": "fingers fully closed (1/0) inside 20 mm quill near end"}
+      ],
+      "object_note": "fingers close to 1 mm while quill is 20 mm thick: collision geometry much thinner than visual"
+    },
+    {
+      "key": "cinnamon_stick__bmbjdf__s",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["fragile"], "note": "5 mm pinch on twine tie/bark edge; bundle hangs"}
+      ],
+      "object_note": "bundle of sticks tied with twine; only 1/12 valid, survivor not a body grasp"
+    },
+    {
+      "key": "cinnamon_stick__qmlyim__s",
+      "n_rows": 1,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["fragile"], "note": "7 mm pinch on bark lip at top; quill hangs below tips"}
+      ],
+      "object_note": "only 1/12 candidates valid; the survivor holds a bark edge, not the 20 mm quill body"
+    }
+  ]
+}

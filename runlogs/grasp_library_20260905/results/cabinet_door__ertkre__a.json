@@ -1,0 +1,207 @@
+{
+ "task": "configuration_matching",
+ "relation": null,
+ "category": "cabinet_door",
+ "model": "ertkre",
+ "key": "cabinet_door__ertkre__a",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "attachment_free",
+ "bbox": [
+  0.0240557861328125,
+  0.2625546417236328,
+  0.45651246643066407
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "cabinet_door",
+   "model": "ertkre"
+  },
+  "task": "configuration_matching",
+  "constraint": "attachment_free",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_attachment_free",
+  "log": {
+   "n_sampled": 5808,
+   "n_tilt": 1452,
+   "n_width_antipodal": 1446,
+   "n_table": 1446,
+   "n_collision": 198,
+   "n_sweep": 198,
+   "n_lever": 172,
+   "n_attachment_free": 136,
+   "n_selected": 12,
+   "com": [
+    -0.0001,
+    -0.0004,
+    -0.0001
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0099,
+    0.0
+   ],
+   "score": 12.635,
+   "meta": {
+    "com_perp": 0.006,
+    "width": 0.00825,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01967,
+    "tilt_deg": 0.0,
+    "attach_dist": 0.2165,
+    "attach_side": 0.05474
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/cabinet_door__ertkre__a/g0_v1.png",
+    "v2": "/tmp/glib/frames/cabinet_door__ertkre__a/g0_v2.png",
+    "v3": "/tmp/glib/frames/cabinet_door__ertkre__a/g0_v3.png",
+    "wrist": "/tmp/glib/frames/cabinet_door__ertkre__a/g0_wrist.png"
+   },
+   "t_s": 3.75
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0101,
+    0.0
+   ],
+   "score": 12.5163,
+   "meta": {
+    "com_perp": 0.01205,
+    "width": 0.00825,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.02097,
+    "tilt_deg": 0.0,
+    "attach_dist": 0.22793,
+    "attach_side": -0.08585
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/cabinet_door__ertkre__a/g1_v1.png",
+    "v2": "/tmp/glib/frames/cabinet_door__ertkre__a/g1_v2.png",
+    "v3": "/tmp/glib/frames/cabinet_door__ertkre__a/g1_v3.png",
+    "wrist": "/tmp/glib/frames/cabinet_door__ertkre__a/g1_wrist.png"
+   },
+   "t_s": 3.77
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0095,
+    0.0
+   ],
+   "score": 12.4217,
+   "meta": {
+    "com_perp": 0.0045,
+    "width": 0.00825,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.03366,
+    "tilt_deg": 30.0,
+    "attach_dist": 0.30902,
+    "attach_side": -0.94132
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/cabinet_door__ertkre__a/g2_v1.png",
+    "v2": "/tmp/glib/frames/cabinet_door__ertkre__a/g2_v2.png",
+    "v3": "/tmp/glib/frames/cabinet_door__ertkre__a/g2_v3.png",
+    "wrist": "/tmp/glib/frames/cabinet_door__ertkre__a/g2_wrist.png"
+   },
+   "t_s": 3.73
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0101,
+    0.0
+   ],
+   "score": 12.3257,
+   "meta": {
+    "com_perp": 0.00944,
+    "width": 0.00825,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.01737,
+    "tilt_deg": 0.0,
+    "attach_dist": 0.21276,
+    "attach_side": 0.08146
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/cabinet_door__ertkre__a/g3_v1.png",
+    "v2": "/tmp/glib/frames/cabinet_door__ertkre__a/g3_v2.png",
+    "v3": "/tmp/glib/frames/cabinet_door__ertkre__a/g3_v3.png",
+    "wrist": "/tmp/glib/frames/cabinet_door__ertkre__a/g3_wrist.png"
+   },
+   "t_s": 3.76
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.01,
+    0.0
+   ],
+   "score": 12.3004,
+   "meta": {
+    "com_perp": 0.00742,
+    "width": 0.00825,
+    "antipodal": 1.0,
+    "coverage": 1.0,
+    "clearance": 0.02514,
+    "tilt_deg": 30.0,
+    "attach_dist": 0.2999,
+    "attach_side": -0.88769
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/cabinet_door__ertkre__a/g4_v1.png",
+    "v2": "/tmp/glib/frames/cabinet_door__ertkre__a/g4_v2.png",
+    "v3": "/tmp/glib/frames/cabinet_door__ertkre__a/g4_v3.png",
+    "wrist": "/tmp/glib/frames/cabinet_door__ertkre__a/g4_wrist.png"
+   },
+   "t_s": 3.75
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 24.0
+}

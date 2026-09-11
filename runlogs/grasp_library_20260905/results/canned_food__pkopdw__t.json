@@ -1,0 +1,21 @@
+{
+ "task": "IORS",
+ "relation": "ontop",
+ "category": "canned_food",
+ "model": "pkopdw",
+ "key": "canned_food__pkopdw__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.11000000381469727,
+  0.09984035873413086,
+  0.12818725468218325
+ ],
+ "ready": true,
+ "round": 2,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

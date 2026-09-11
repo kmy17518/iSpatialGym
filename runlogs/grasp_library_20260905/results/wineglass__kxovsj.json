@@ -1,0 +1,196 @@
+{
+ "task": "object_scaling",
+ "category": "wineglass",
+ "model": "kxovsj",
+ "key": "wineglass__kxovsj",
+ "pipeline": "graspgen",
+ "mode": "V",
+ "constraint": "floating",
+ "bbox": [
+  0.11683245849609375,
+  0.11668550109863281,
+  0.14732662963867188
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "wineglass",
+   "model": "kxovsj"
+  },
+  "task": "object_scaling",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 45,
+   "n_width": 29,
+   "n_selected": 12,
+   "mode": "V",
+   "com": [
+    -0.0009,
+    -0.0005,
+    0.0042
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0095,
+    0.0
+   ],
+   "score": 15.5055,
+   "meta": {
+    "com_perp": 0.04178,
+    "width": 0.00483,
+    "antipodal": 0.9857,
+    "coverage": 1.0,
+    "clearance": 0.00141,
+    "tilt_deg": 90.50518,
+    "graspgen_conf": 0.91427
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/wineglass__kxovsj/g0_v1.png",
+    "v2": "/tmp/glib/frames/wineglass__kxovsj/g0_v2.png",
+    "v3": "/tmp/glib/frames/wineglass__kxovsj/g0_v3.png",
+    "wrist": "/tmp/glib/frames/wineglass__kxovsj/g0_wrist.png"
+   },
+   "t_s": 3.77
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0102,
+    0.0
+   ],
+   "score": 15.3663,
+   "meta": {
+    "com_perp": 0.04528,
+    "width": 0.00532,
+    "antipodal": 0.99637,
+    "coverage": 1.0,
+    "clearance": 0.00107,
+    "tilt_deg": 94.50451,
+    "graspgen_conf": 0.92067
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/wineglass__kxovsj/g1_v1.png",
+    "v2": "/tmp/glib/frames/wineglass__kxovsj/g1_v2.png",
+    "v3": "/tmp/glib/frames/wineglass__kxovsj/g1_v3.png",
+    "wrist": "/tmp/glib/frames/wineglass__kxovsj/g1_wrist.png"
+   },
+   "t_s": 3.76
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0097,
+    0.0
+   ],
+   "score": 15.202,
+   "meta": {
+    "com_perp": 0.0461,
+    "width": 0.00391,
+    "antipodal": 0.86559,
+    "coverage": 1.0,
+    "clearance": 0.00115,
+    "tilt_deg": 94.6182,
+    "graspgen_conf": 0.91812
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/wineglass__kxovsj/g2_v1.png",
+    "v2": "/tmp/glib/frames/wineglass__kxovsj/g2_v2.png",
+    "v3": "/tmp/glib/frames/wineglass__kxovsj/g2_v3.png",
+    "wrist": "/tmp/glib/frames/wineglass__kxovsj/g2_wrist.png"
+   },
+   "t_s": 3.34
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 15,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0094,
+    0.0
+   ],
+   "score": 0.8896,
+   "meta": {
+    "com_perp": 0.05704,
+    "width": 0.08676,
+    "antipodal": 0.2709,
+    "coverage": 0.5,
+    "clearance": 0.00175,
+    "tilt_deg": 98.40996,
+    "graspgen_conf": 0.88955
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/wineglass__kxovsj/g3_v1.png",
+    "v2": "/tmp/glib/frames/wineglass__kxovsj/g3_v2.png",
+    "v3": "/tmp/glib/frames/wineglass__kxovsj/g3_v3.png",
+    "wrist": "/tmp/glib/frames/wineglass__kxovsj/g3_wrist.png"
+   },
+   "t_s": 3.83
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0098,
+    0.0
+   ],
+   "score": 0.8862,
+   "meta": {
+    "com_perp": 0.04849,
+    "width": 0.00426,
+    "antipodal": 0.9943,
+    "coverage": 1.0,
+    "clearance": 0.00182,
+    "tilt_deg": 93.0402,
+    "graspgen_conf": 0.88619
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/wineglass__kxovsj/g4_v1.png",
+    "v2": "/tmp/glib/frames/wineglass__kxovsj/g4_v2.png",
+    "v3": "/tmp/glib/frames/wineglass__kxovsj/g4_v3.png",
+    "wrist": "/tmp/glib/frames/wineglass__kxovsj/g4_wrist.png"
+   },
+   "t_s": 3.92
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 24.8
+}

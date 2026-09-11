@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ispatialgym"
+version = "0.0.1"
+description = "iSpatialGym: a robotics benchmark for spatial intelligence built on BEHAVIOR-1K / OmniGibson"
+requires-python = ">=3.10"
+# Runtime dependencies (omnigibson, bddl, nvidia-curobo, torch) are provided by the
+# `ispatialgym` conda environment created by setup.sh and are intentionally not pinned here.
+dependencies = []
+
+[tool.setuptools.packages.find]
+include = ["ispatialgym*"]
+exclude = ["ispatialgym.assets*", "ispatialgym.docs*", "ispatialgym.data_collection*"]

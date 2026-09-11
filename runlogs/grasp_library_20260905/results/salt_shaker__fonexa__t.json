@@ -1,0 +1,196 @@
+{
+ "task": "IORS",
+ "relation": "nextto",
+ "category": "salt_shaker",
+ "model": "fonexa",
+ "key": "salt_shaker__fonexa__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.05070263671875,
+  0.0507025146484375,
+  0.15505484008789064
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "salt_shaker",
+   "model": "fonexa"
+  },
+  "task": "IORS",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 6000,
+   "n_tilt": 987,
+   "n_width_antipodal": 899,
+   "n_table": 897,
+   "n_collision": 351,
+   "n_sweep": 289,
+   "n_lever": 289,
+   "n_selected": 12,
+   "com": [
+    -0.0,
+    0.0001,
+    -0.0005
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0
+   ],
+   "score": 10.8742,
+   "meta": {
+    "com_perp": 0.00114,
+    "width": 0.04876,
+    "antipodal": 0.88001,
+    "coverage": 1.0,
+    "clearance": 0.01338,
+    "tilt_deg": 0.65899
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/salt_shaker__fonexa__t/g0_v1.png",
+    "v2": "/tmp/glib/frames/salt_shaker__fonexa__t/g0_v2.png",
+    "v3": "/tmp/glib/frames/salt_shaker__fonexa__t/g0_v3.png",
+    "wrist": "/tmp/glib/frames/salt_shaker__fonexa__t/g0_wrist.png"
+   },
+   "t_s": 3.36
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0497,
+    0.0
+   ],
+   "score": 10.7858,
+   "meta": {
+    "com_perp": 0.00046,
+    "width": 0.0481,
+    "antipodal": 0.98725,
+    "coverage": 1.0,
+    "clearance": 0.01227,
+    "tilt_deg": 5.73337
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/salt_shaker__fonexa__t/g1_v1.png",
+    "v2": "/tmp/glib/frames/salt_shaker__fonexa__t/g1_v2.png",
+    "v3": "/tmp/glib/frames/salt_shaker__fonexa__t/g1_v3.png",
+    "wrist": "/tmp/glib/frames/salt_shaker__fonexa__t/g1_wrist.png"
+   },
+   "t_s": 3.52
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0
+   ],
+   "score": 10.7096,
+   "meta": {
+    "com_perp": 0.00036,
+    "width": 0.04983,
+    "antipodal": 0.9326,
+    "coverage": 1.0,
+    "clearance": 0.01193,
+    "tilt_deg": 7.5833
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/salt_shaker__fonexa__t/g2_v1.png",
+    "v2": "/tmp/glib/frames/salt_shaker__fonexa__t/g2_v2.png",
+    "v3": "/tmp/glib/frames/salt_shaker__fonexa__t/g2_v3.png",
+    "wrist": "/tmp/glib/frames/salt_shaker__fonexa__t/g2_wrist.png"
+   },
+   "t_s": 3.4
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0
+   ],
+   "score": 10.5771,
+   "meta": {
+    "com_perp": 0.00243,
+    "width": 0.04801,
+    "antipodal": 0.99478,
+    "coverage": 1.0,
+    "clearance": 0.01252,
+    "tilt_deg": 6.29351
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/salt_shaker__fonexa__t/g3_v1.png",
+    "v2": "/tmp/glib/frames/salt_shaker__fonexa__t/g3_v2.png",
+    "v3": "/tmp/glib/frames/salt_shaker__fonexa__t/g3_v3.png",
+    "wrist": "/tmp/glib/frames/salt_shaker__fonexa__t/g3_wrist.png"
+   },
+   "t_s": 3.51
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0
+   ],
+   "score": 10.5757,
+   "meta": {
+    "com_perp": 0.00099,
+    "width": 0.05076,
+    "antipodal": 0.95253,
+    "coverage": 1.0,
+    "clearance": 0.01226,
+    "tilt_deg": 8.52981
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/salt_shaker__fonexa__t/g4_v1.png",
+    "v2": "/tmp/glib/frames/salt_shaker__fonexa__t/g4_v2.png",
+    "v3": "/tmp/glib/frames/salt_shaker__fonexa__t/g4_v3.png",
+    "wrist": "/tmp/glib/frames/salt_shaker__fonexa__t/g4_wrist.png"
+   },
+   "t_s": 3.5
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 22.5
+}

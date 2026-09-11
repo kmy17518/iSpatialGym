@@ -1,0 +1,202 @@
+{
+ "task": "mental_rotation",
+ "category": "carving_knife",
+ "model": "awvoox",
+ "key": "carving_knife__awvoox",
+ "pipeline": "graspgen",
+ "mode": "H",
+ "constraint": "handle_half",
+ "bbox": [
+  0.22613139343261718,
+  0.030230620384216308,
+  0.017069977283477783
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "carving_knife",
+   "model": "awvoox"
+  },
+  "task": "mental_rotation",
+  "constraint": "handle_half",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_handle_half",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 99,
+   "n_handle": 70,
+   "n_selected": 12,
+   "mode": "H+handle",
+   "com": [
+    -0.0348,
+    -0.0011,
+    0.0004
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0164,
+    0.0
+   ],
+   "score": 115.8884,
+   "meta": {
+    "com_perp": 0.00517,
+    "width": 0.01285,
+    "antipodal": 0.87539,
+    "coverage": 1.0,
+    "clearance": 0.02621,
+    "tilt_deg": 78.19556,
+    "graspgen_conf": 0.95908,
+    "handle_t": 0.30475
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/carving_knife__awvoox/g0_v1.png",
+    "v2": "/tmp/glib/frames/carving_knife__awvoox/g0_v2.png",
+    "v3": "/tmp/glib/frames/carving_knife__awvoox/g0_v3.png",
+    "wrist": "/tmp/glib/frames/carving_knife__awvoox/g0_wrist.png"
+   },
+   "t_s": 3.02
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0163,
+    0.0
+   ],
+   "score": 115.6758,
+   "meta": {
+    "com_perp": 0.00668,
+    "width": 0.00842,
+    "antipodal": 0.46783,
+    "coverage": 1.0,
+    "clearance": 0.03127,
+    "tilt_deg": 107.83317,
+    "graspgen_conf": 0.95802,
+    "handle_t": 0.31193
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/carving_knife__awvoox/g1_v1.png",
+    "v2": "/tmp/glib/frames/carving_knife__awvoox/g1_v2.png",
+    "v3": "/tmp/glib/frames/carving_knife__awvoox/g1_v3.png",
+    "wrist": "/tmp/glib/frames/carving_knife__awvoox/g1_wrist.png"
+   },
+   "t_s": 3.0
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0166,
+    0.0
+   ],
+   "score": 115.5187,
+   "meta": {
+    "com_perp": 0.00723,
+    "width": 0.01095,
+    "antipodal": 0.83213,
+    "coverage": 0.75,
+    "clearance": 0.02574,
+    "tilt_deg": 79.14272,
+    "graspgen_conf": 0.95619,
+    "handle_t": 0.31065
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/carving_knife__awvoox/g2_v1.png",
+    "v2": "/tmp/glib/frames/carving_knife__awvoox/g2_v2.png",
+    "v3": "/tmp/glib/frames/carving_knife__awvoox/g2_v3.png",
+    "wrist": "/tmp/glib/frames/carving_knife__awvoox/g2_wrist.png"
+   },
+   "t_s": 3.01
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0163,
+    0.0
+   ],
+   "score": 113.7425,
+   "meta": {
+    "com_perp": 0.01188,
+    "width": 0.01368,
+    "antipodal": 0.96793,
+    "coverage": 1.0,
+    "clearance": 0.02936,
+    "tilt_deg": 103.36372,
+    "graspgen_conf": 0.95438,
+    "handle_t": 0.34464
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/carving_knife__awvoox/g3_v1.png",
+    "v2": "/tmp/glib/frames/carving_knife__awvoox/g3_v2.png",
+    "v3": "/tmp/glib/frames/carving_knife__awvoox/g3_v3.png",
+    "wrist": "/tmp/glib/frames/carving_knife__awvoox/g3_wrist.png"
+   },
+   "t_s": 2.92
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0171,
+    0.0
+   ],
+   "score": 113.3833,
+   "meta": {
+    "com_perp": 0.01061,
+    "width": 0.01173,
+    "antipodal": 0.80488,
+    "coverage": 1.0,
+    "clearance": 0.03045,
+    "tilt_deg": 103.75059,
+    "graspgen_conf": 0.95566,
+    "handle_t": 0.24901
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/carving_knife__awvoox/g4_v1.png",
+    "v2": "/tmp/glib/frames/carving_knife__awvoox/g4_v2.png",
+    "v3": "/tmp/glib/frames/carving_knife__awvoox/g4_v3.png",
+    "wrist": "/tmp/glib/frames/carving_knife__awvoox/g4_wrist.png"
+   },
+   "t_s": 3.01
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 19.0
+}

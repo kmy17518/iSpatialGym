@@ -1,0 +1,21 @@
+{
+ "task": "disembedding",
+ "relation": null,
+ "category": "beaker",
+ "model": "fxrsyi",
+ "key": "beaker__fxrsyi__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.0457759780883789,
+  0.045775838851928714,
+  0.0663202953338623
+ ],
+ "ready": true,
+ "round": 2,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

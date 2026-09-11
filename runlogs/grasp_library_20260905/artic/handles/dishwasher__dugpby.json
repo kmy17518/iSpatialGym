@@ -1,0 +1,91 @@
+{
+ "category": "dishwasher",
+ "model": "dugpby",
+ "key": "dishwasher__dugpby",
+ "aabb_extent": [
+  0.5756174325942993,
+  0.5330312252044678,
+  0.652862548828125
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.2668,
+   -0.2759,
+   -0.3036
+  ],
+  "bbox_max": [
+   0.2372,
+   0.2556,
+   0.3493
+  ],
+  "n_pieces": 8
+ },
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "link_0",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.3089,
+   "axis_dir_obj": [
+    0.0,
+    1.0,
+    -0.0
+   ],
+   "hinge_point_obj": [
+    0.26304,
+    0.08448,
+    -0.26105
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.570796012878418,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.217,
+    -0.2769,
+    -0.2661
+   ],
+   "link_bbox_max": [
+    0.3089,
+    0.2561,
+    0.337
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     0.2979,
+     0.0423,
+     0.3016
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0.0003,
+     -0.0,
+     -1.0
+    ],
+    "width": 0.0534,
+    "exposed": false,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     0.9981,
+     -0.0,
+     -0.0618
+    ]
+   },
+   "sub_links": [],
+   "status": "ungraspable"
+  }
+ ]
+}

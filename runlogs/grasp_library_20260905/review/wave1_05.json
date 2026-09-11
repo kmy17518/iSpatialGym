@@ -1,0 +1,362 @@
+{
+  "batch": "wave1_05",
+  "models": [
+    {
+      "key": "ice_cube__czbfpm",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "face pinch on 21 mm cube, both pads touching"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "face pinch, cube centred between pad tips"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "face pinch, coverage 0.75 but firm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"}
+      ],
+      "object_note": "21 mm cube; x/0 finger readings are the usual sweep artifact, both pads in contact."
+    },
+    {
+      "key": "ice_cube__dueotq",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"}
+      ],
+      "object_note": "21 mm cube, all five rows are clean 22 mm face pinches."
+    },
+    {
+      "key": "ice_cube__kdlafa",
+      "n_rows": 3,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "face pinch, 21 mm closure on 20 mm cube"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "cube rotated, pinched across edges (30 mm closure vs 22 face)"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "cube rotated, edge pinch (29 mm closure vs 20 face)"}
+      ],
+      "object_note": "Rows 2-3 pinch the cube across opposite edges (cube rotated); would self-align under squeeze, not flagged."
+    },
+    {
+      "key": "ice_cube__lkirej",
+      "n_rows": 4,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"}
+      ],
+      "object_note": "21 mm cube, four clean 22 mm face pinches."
+    },
+    {
+      "key": "ice_cube__pjgror",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "cube rotated, edge pinch (29 mm vs 21 face), self-aligning"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"}
+      ],
+      "object_note": "Row 4 holds the cube across edges (V4 shows rotated cube); acceptable for a small cube."
+    },
+    {
+      "key": "ice_cube__tqsquu",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"}
+      ],
+      "object_note": "20-21 mm cube, five clean face pinches."
+    },
+    {
+      "key": "ice_cube__ujmgkb",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"}
+      ],
+      "object_note": "21 mm cube, five clean face pinches."
+    },
+    {
+      "key": "ice_cube__xupugj",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "cube rotated ~20 deg, edge pinch (28 mm vs 22 face)"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "cube rotated, near-diagonal edge pinch (32 mm vs 21 face)"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "face pinch, coverage 0.75 but firm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "face pinch, both pads on cube"}
+      ],
+      "object_note": "Rows 1-2 pinch the rotated cube across edges (V4 diamond); would self-align, rows 3-5 are clean."
+    },
+    {
+      "key": "jar_of_spaghetti_sauce__efrxze",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch mid-body, 20 mm from CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch mid-body, 24 mm from CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "diameter pinch, 34 mm from CoM, pads fully on body"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch at bottom end, 46 mm lever arm on heavy jar"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "diameter pinch, 29 mm from CoM"}
+      ],
+      "object_note": "~150 mm jar; 50/37 finger readings are normal for this width. End-region grasp flagged for lever arm."
+    },
+    {
+      "key": "jar_of_spaghetti_sauce__exmsmm",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch at CoM (9 mm)"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch mid-body, 15 mm from CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "diameter pinch mid-body, 21 mm from CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "diameter pinch mid-body, 23 mm from CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "diameter pinch mid-body, 22 mm from CoM"}
+      ],
+      "object_note": "All five grasps are mid-body diameter pinches, both pads on the glass."
+    },
+    {
+      "key": "jar_of_spaghetti_sauce__fyocnu",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch mid-body, 17 mm from CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch mid-body, 19 mm from CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch toward bottom end, 37 mm offset, acceptable"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch at bottom end, 49 mm lever arm, wrist cam sees end"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch at very bottom edge, 53 mm lever arm"}
+      ],
+      "object_note": "Rows 4-5 grip the last ~20 mm of the jar; heavy jar would pivot without assisted grasp."
+    },
+    {
+      "key": "jar_of_spaghetti_sauce__xpasvb",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch mid-body, 20 mm from CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch toward bottom end, 37 mm offset, acceptable"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch at bottom end, 46 mm lever arm on heavy jar"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch at bottom end, 50 mm lever arm"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "pinch at very bottom end, 54 mm lever arm"}
+      ],
+      "object_note": "Three of five grasps sit in the end third of the jar (46-54 mm from CoM); rows 1-2 are good."
+    },
+    {
+      "key": "jar_of_spaghetti_sauce__yqnmoy",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch near CoM (11 mm)"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch mid-body, 18 mm from CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "diameter pinch mid-body, 17 mm from CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "diameter pinch mid-body, 17 mm from CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "diameter pinch mid-body, 21 mm from CoM"}
+      ],
+      "object_note": "All five grasps mid-body, both pads on the glass."
+    },
+    {
+      "key": "jar_of_spaghetti_sauce__zahyds",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "diameter pinch at CoM, both pads on label"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "diameter pinch at CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "diameter pinch at CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "diameter pinch at CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "diameter pinch at CoM"}
+      ],
+      "object_note": "Smaller 64 mm jar; all pinches within 4 mm of CoM, clean."
+    },
+    {
+      "key": "lemon__asdada",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "equatorial pinch at CoM, lemon against open finger, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "equatorial pinch at CoM, both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "equatorial pinch at CoM, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "equatorial pinch at CoM, 49/20 firm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "equatorial pinch at CoM, 48/17 firm"}
+      ],
+      "object_note": "66 mm lemon swept against the fully open finger (50/18) in most rows; both pads on lemon."
+    },
+    {
+      "key": "lemon__bbvonm",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "flag", "flags": ["one_finger"], "note": "48/0: lemon pushed onto open finger, other finger at closed limit"},
+        {"rank": 2, "verdict": "flag", "flags": ["one_finger"], "note": "47/0: lemon entirely on one side, pressed against open finger"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "symmetric 25/28 pinch at CoM, clean"},
+        {"rank": 4, "verdict": "flag", "flags": ["one_finger"], "note": "48/0: lemon against fully open finger, moving finger fully closed"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "asymmetric 33/14 but firm pinch at CoM"}
+      ],
+      "object_note": "Small 46 mm lemon; three rows show the ~50/0 pattern (object swept onto open finger), pads visually touching."
+    },
+    {
+      "key": "lemon__bmvxas",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at CoM, 46/16 firm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch at CoM, lemon against open finger, both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "symmetric 29/38 pinch at CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch at CoM, 42/24 firm"}
+      ],
+      "object_note": "63-64 mm lemon, all body pinches at CoM."
+    },
+    {
+      "key": "lemon__dsacfa",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at CoM, 45/29 firm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "symmetric 38/38 pinch at CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch at CoM, lemon against open finger, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch at CoM, 47/27 firm"}
+      ],
+      "object_note": "71-73 mm lemon, all body pinches at CoM."
+    },
+    {
+      "key": "lemon__gkrfha",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at CoM, lemon against open finger, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "symmetric 26/35 pinch at CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "50/8: lemon pushed to open finger, both pads still touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"}
+      ],
+      "object_note": "60-61 mm lemon, all body pinches at CoM."
+    },
+    {
+      "key": "lemon__hoghjl",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "symmetric 36/35 pinch at CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"}
+      ],
+      "object_note": "71-73 mm lemon, all body pinches at CoM."
+    },
+    {
+      "key": "lemon__kvgfdl",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "50/8: lemon pushed to open finger, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "50/8: lemon pushed to open finger, both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch at CoM, 42/20 firm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "50/8: lemon pushed to open finger, both pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "symmetric 34/28 pinch at CoM"}
+      ],
+      "object_note": "59-61 mm lemon, all body pinches at CoM."
+    },
+    {
+      "key": "lemon__ovbcff",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at CoM, 48/24 firm"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"}
+      ],
+      "object_note": "70-71 mm lemon, all body pinches at CoM."
+    },
+    {
+      "key": "lemon__peqwoa",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "28/43 pinch at CoM, firm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"}
+      ],
+      "object_note": "69-71 mm lemon, all body pinches at CoM."
+    },
+    {
+      "key": "lemon__pffkae",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "33/43 pinch at CoM, firm"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "45/28 pinch at CoM, firm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "40/33 pinch at CoM, firm"}
+      ],
+      "object_note": "70-73 mm lemon, all body pinches at CoM."
+    },
+    {
+      "key": "lemon__pqweio",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "46/21 pinch at CoM, firm"}
+      ],
+      "object_note": "63-65 mm lemon, all body pinches at CoM."
+    },
+    {
+      "key": "lemon__vuwehu",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "pinch at CoM, both pads touch"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "symmetric 37/32 pinch at CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "28/40 pinch, 4 mm off CoM, firm"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "37/36 pinch, 7 mm off CoM, fine"}
+      ],
+      "object_note": "66-70 mm lemon, all body pinches near CoM."
+    },
+    {
+      "key": "mouse__cduwda",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "top/bottom pinch across 38 mm height, 9 mm from CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "top/bottom pinch, 9 mm from CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "top/bottom pinch, 16 mm from CoM, pads on body"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top/bottom pinch, 17 mm from CoM, pads on body"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "top/bottom pinch, 18 mm from CoM, pads on body"}
+      ],
+      "object_note": "38 mm tall mouse pinched top/bottom with body sideways; all offsets <= 18 mm on a ~110 mm body."
+    },
+    {
+      "key": "mouse__eosngb",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "pinch across 15 mm shell thickness at centre, flat contacts"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "side-edge pinch 19 mm from CoM, flat contacts, coverage 0.75"},
+        {"rank": 3, "verdict": "flag", "flags": ["end_grasp"], "note": "curled tip of shell, antipodal 0.47, fingers 10 mm wider than width"},
+        {"rank": 4, "verdict": "flag", "flags": ["end_grasp"], "note": "curled end of shell, antipodal 0.60, coverage 0.75, 29 mm lever"},
+        {"rank": 5, "verdict": "flag", "flags": ["end_grasp"], "note": "shell hangs from its very end, antipodal 0.83, 29 mm lever"}
+      ],
+      "object_note": "Thin curved Arc-style mouse shell (~15 mm thick); rows 3-5 pinch the curled end on non-parallel surfaces."
+    },
+    {
+      "key": "mouse__fjljxp",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "top/bottom pinch across 28 mm height at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "top/bottom pinch, 5 mm from CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "top/bottom pinch, 7 mm from CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top/bottom pinch, 11 mm from CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "top/bottom pinch, 11 mm from CoM"}
+      ],
+      "object_note": "Low-profile 28 mm mouse pinched across its height near CoM; all clean."
+    },
+    {
+      "key": "mouse__ihpnjx",
+      "n_rows": 5,
+      "grasps": [
+        {"rank": 1, "verdict": "ok", "flags": [], "note": "top/bottom pinch across 28 mm height at CoM"},
+        {"rank": 2, "verdict": "ok", "flags": [], "note": "top/bottom pinch at CoM"},
+        {"rank": 3, "verdict": "ok", "flags": [], "note": "top/bottom pinch, 10 mm from CoM"},
+        {"rank": 4, "verdict": "ok", "flags": [], "note": "top/bottom pinch, 11 mm from CoM"},
+        {"rank": 5, "verdict": "ok", "flags": [], "note": "top/bottom pinch, 14 mm from CoM, pads on body"}
+      ],
+      "object_note": "Low-profile 26-28 mm mouse pinched across its height near CoM; all clean."
+    }
+  ]
+}

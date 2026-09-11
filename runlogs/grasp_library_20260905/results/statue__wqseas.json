@@ -1,0 +1,19 @@
+{
+ "task": "mental_rotation",
+ "category": "statue",
+ "model": "wqseas",
+ "key": "statue__wqseas",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.11978123092651367,
+  0.558145751953125,
+  0.23338285827636718
+ ],
+ "ready": true,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

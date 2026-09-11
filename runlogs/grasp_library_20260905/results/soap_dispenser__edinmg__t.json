@@ -1,0 +1,219 @@
+{
+ "task": "disembedding",
+ "relation": null,
+ "category": "soap_dispenser",
+ "model": "edinmg",
+ "key": "soap_dispenser__edinmg__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.08988032531738281,
+  0.07978083038330078,
+  0.20743511962890626
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "soap_dispenser",
+   "model": "edinmg"
+  },
+  "task": "disembedding",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 5100,
+   "n_tilt": 1015,
+   "n_width_antipodal": 938,
+   "n_table": 938,
+   "n_collision": 100,
+   "n_sweep": 85,
+   "n_lever": 85,
+   "n_selected": 12,
+   "com": [
+    -0.0003,
+    0.0,
+    -0.0072
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0297,
+    0.0
+   ],
+   "score": 10.5412,
+   "meta": {
+    "com_perp": 9e-05,
+    "width": 0.02286,
+    "antipodal": 0.99617,
+    "coverage": 0.5,
+    "clearance": 0.01156,
+    "tilt_deg": 0.33562
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/soap_dispenser__edinmg__t/g0_v1.png",
+    "v2": "/tmp/glib/frames/soap_dispenser__edinmg__t/g0_v2.png",
+    "v3": "/tmp/glib/frames/soap_dispenser__edinmg__t/g0_v3.png",
+    "wrist": "/tmp/glib/frames/soap_dispenser__edinmg__t/g0_wrist.png"
+   },
+   "t_s": 3.52
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 10,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.032
+   ],
+   "score": 10.3685,
+   "meta": {
+    "com_perp": 0.00054,
+    "width": 0.07917,
+    "antipodal": 0.99066,
+    "coverage": 1.0,
+    "clearance": 0.00552,
+    "tilt_deg": 4.10042
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/soap_dispenser__edinmg__t/g1_v1.png",
+    "v2": "/tmp/glib/frames/soap_dispenser__edinmg__t/g1_v2.png",
+    "v3": "/tmp/glib/frames/soap_dispenser__edinmg__t/g1_v3.png",
+    "wrist": "/tmp/glib/frames/soap_dispenser__edinmg__t/g1_wrist.png"
+   },
+   "t_s": 3.41
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 10.2343,
+   "meta": {
+    "com_perp": 0.00182,
+    "width": 0.02359,
+    "antipodal": 0.88346,
+    "coverage": 0.75,
+    "clearance": 0.00571,
+    "tilt_deg": 0.05985
+   },
+   "frames": {},
+   "t_s": 5.33
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 10,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0325
+   ],
+   "score": 10.1911,
+   "meta": {
+    "com_perp": 0.00033,
+    "width": 0.07924,
+    "antipodal": 0.99048,
+    "coverage": 1.0,
+    "clearance": 0.00165,
+    "tilt_deg": 3.99553
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/soap_dispenser__edinmg__t/g3_v1.png",
+    "v2": "/tmp/glib/frames/soap_dispenser__edinmg__t/g3_v2.png",
+    "v3": "/tmp/glib/frames/soap_dispenser__edinmg__t/g3_v3.png",
+    "wrist": "/tmp/glib/frames/soap_dispenser__edinmg__t/g3_wrist.png"
+   },
+   "t_s": 3.4
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 10,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.032
+   ],
+   "score": 10.1121,
+   "meta": {
+    "com_perp": 0.00071,
+    "width": 0.07997,
+    "antipodal": 0.99054,
+    "coverage": 1.0,
+    "clearance": 0.00106,
+    "tilt_deg": 4.47835
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/soap_dispenser__edinmg__t/g4_v1.png",
+    "v2": "/tmp/glib/frames/soap_dispenser__edinmg__t/g4_v2.png",
+    "v3": "/tmp/glib/frames/soap_dispenser__edinmg__t/g4_v3.png",
+    "wrist": "/tmp/glib/frames/soap_dispenser__edinmg__t/g4_wrist.png"
+   },
+   "t_s": 3.41
+  },
+  {
+   "grasp": "grasp_5",
+   "idx": 5,
+   "ag_attached": true,
+   "attached_step": 10,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0498,
+    0.0343
+   ],
+   "score": 10.0964,
+   "meta": {
+    "com_perp": 0.00182,
+    "width": 0.08023,
+    "antipodal": 0.99048,
+    "coverage": 1.0,
+    "clearance": 0.0029,
+    "tilt_deg": 3.95602
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/soap_dispenser__edinmg__t/g5_v1.png",
+    "v2": "/tmp/glib/frames/soap_dispenser__edinmg__t/g5_v2.png",
+    "v3": "/tmp/glib/frames/soap_dispenser__edinmg__t/g5_v3.png",
+    "wrist": "/tmp/glib/frames/soap_dispenser__edinmg__t/g5_wrist.png"
+   },
+   "t_s": 3.43
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 29.1
+}

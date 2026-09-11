@@ -1,0 +1,196 @@
+{
+ "task": "disembedding",
+ "relation": null,
+ "category": "bottle_of_beer",
+ "model": "kqskmv",
+ "key": "bottle_of_beer__kqskmv__t",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.06335020065307617,
+  0.06392041015625,
+  0.2537908325195313
+ ],
+ "ready": true,
+ "round": 2,
+ "candidates_meta": {
+  "object": {
+   "category": "bottle_of_beer",
+   "model": "kqskmv"
+  },
+  "task": "disembedding",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 5640,
+   "n_tilt": 1023,
+   "n_width_antipodal": 899,
+   "n_table": 899,
+   "n_collision": 113,
+   "n_sweep": 113,
+   "n_lever": 113,
+   "n_selected": 12,
+   "com": [
+    -0.0023,
+    0.0007,
+    -0.0048
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0109,
+    0.0171
+   ],
+   "score": 10.8764,
+   "meta": {
+    "com_perp": 0.00054,
+    "width": 0.02512,
+    "antipodal": 0.98854,
+    "coverage": 0.75,
+    "clearance": 0.03292,
+    "tilt_deg": 4.30518
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g0_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g0_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g0_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g0_wrist.png"
+   },
+   "t_s": 3.53
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0286,
+    0.0
+   ],
+   "score": 10.8135,
+   "meta": {
+    "com_perp": 0.00233,
+    "width": 0.02592,
+    "antipodal": 0.99294,
+    "coverage": 0.75,
+    "clearance": 0.0279,
+    "tilt_deg": 3.40153
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g1_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g1_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g1_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g1_wrist.png"
+   },
+   "t_s": 3.5
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0286,
+    0.0
+   ],
+   "score": 10.6144,
+   "meta": {
+    "com_perp": 0.0049,
+    "width": 0.02591,
+    "antipodal": 0.99266,
+    "coverage": 0.75,
+    "clearance": 0.02692,
+    "tilt_deg": 4.31189
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g2_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g2_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g2_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g2_wrist.png"
+   },
+   "t_s": 3.53
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0278,
+    0.0
+   ],
+   "score": 10.5795,
+   "meta": {
+    "com_perp": 0.00408,
+    "width": 0.02478,
+    "antipodal": 0.98974,
+    "coverage": 0.75,
+    "clearance": 0.03335,
+    "tilt_deg": 5.22067
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g3_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g3_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g3_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g3_wrist.png"
+   },
+   "t_s": 3.54
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0279,
+    0.0
+   ],
+   "score": 10.5612,
+   "meta": {
+    "com_perp": 0.00602,
+    "width": 0.02524,
+    "antipodal": 0.9939,
+    "coverage": 0.75,
+    "clearance": 0.03298,
+    "tilt_deg": 4.31507
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g4_v1.png",
+    "v2": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g4_v2.png",
+    "v3": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g4_v3.png",
+    "wrist": "/tmp/glib/frames/bottle_of_beer__kqskmv__t/g4_wrist.png"
+   },
+   "t_s": 3.55
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 22.7
+}

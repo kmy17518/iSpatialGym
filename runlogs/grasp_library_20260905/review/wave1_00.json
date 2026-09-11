@@ -1,0 +1,1117 @@
+{
+ "batch": "wave1_00",
+ "models": [
+  {
+   "key": "apple__agveuv",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body, both pads on fruit"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body, both pads on fruit"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body, both pads on fruit"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body, both pads on fruit"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body, both pads on fruit"
+    }
+   ]
+  },
+  {
+   "key": "apple__bwteqh",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "closed pinch on apple; one finger stayed fully open"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "closed pinch on apple; one finger stayed fully open"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "closed pinch on apple; one finger stayed fully open"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "closed pinch on apple; one finger stayed fully open"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "closed pinch on apple; one finger stayed fully open"
+    }
+   ],
+   "object_note": "all rows close asymmetrically (50/6-7) but apple spans both pads"
+  },
+  {
+   "key": "apple__netbsb",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    }
+   ]
+  },
+  {
+   "key": "apple__obixxh",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    }
+   ]
+  },
+  {
+   "key": "apple__omzprq",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    }
+   ]
+  },
+  {
+   "key": "apple__qrqzvs",
+   "n_rows": 3,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter pinch; pad tips reach equator"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter pinch; pad tips reach equator"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter pinch; pad tips reach equator"
+    }
+   ],
+   "object_note": "large apple (81-88 mm) near max opening; pads sit high but tips reach the equator"
+  },
+  {
+   "key": "apple__zlxfxt",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on apple body"
+    }
+   ]
+  },
+  {
+   "key": "banana__vvyyyv",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-banana pinch across width, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-banana pinch across width, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-banana pinch across width, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-banana pinch across width, both pads touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-banana pinch across width, both pads touching"
+    }
+   ],
+   "object_note": "closing finger reaches 0 on every row, yet banana fills the pad gap in V2"
+  },
+  {
+   "key": "banana__znakxm",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-banana pinch across width, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-banana pinch across width, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-banana pinch across width, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-banana pinch across width, both pads touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-banana pinch across width, both pads touching"
+    }
+   ],
+   "object_note": "closing finger reaches 0 on every row, yet banana fills the pad gap in V2"
+  },
+  {
+   "key": "beaker__dtjmai",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "19 mm opening vs 5 mm wall; inner pad off wall"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "17 mm opening vs 5 mm wall; inner pad off wall"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "17 mm opening vs 3 mm wall; inner pad off wall"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "16 mm opening vs 4 mm wall; inner pad off wall"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "17 mm opening vs 3 mm wall; inner pad off wall"
+    }
+   ],
+   "object_note": "hemispherical bowl: collision hull fills the cavity, inner finger stops ~13 mm from the visual wall"
+  },
+  {
+   "key": "beaker__effbnc",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on metal beaker, both pads on rim"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on metal beaker, both pads on rim"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on metal beaker, both pads on rim"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on metal beaker, both pads on rim"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on metal beaker, both pads on rim"
+    }
+   ]
+  },
+  {
+   "key": "beaker__exzsal",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on cup wall, both pads on rim"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on cup wall, both pads on rim"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on cup wall, both pads on rim"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on cup wall, both pads on rim"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on cup wall, both pads on rim"
+    }
+   ]
+  },
+  {
+   "key": "beaker__fxrsyi",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on opposite faces of box beaker"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on opposite faces of box beaker"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on opposite faces of box beaker"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on opposite faces of box beaker"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on opposite faces of box beaker"
+    }
+   ],
+   "object_note": "width metric (30 mm) underestimates the ~44 mm box; V2 shows both pads touching the faces"
+  },
+  {
+   "key": "beaker__fyrkzs",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch, tips in contact"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch, tips in contact"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch, tips in contact"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch, tips in contact"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch, tips in contact"
+    }
+   ]
+  },
+  {
+   "key": "beaker__jdijek",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch, tips in contact"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch, tips in contact"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch, tips in contact"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch, tips in contact"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch, tips in contact"
+    }
+   ]
+  },
+  {
+   "key": "beaker__rhohgs",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch"
+    }
+   ]
+  },
+  {
+   "key": "beaker__sfvswx",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on large beaker"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on large beaker"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on large beaker"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on large beaker"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on large beaker"
+    }
+   ],
+   "object_note": "beaker body wider than the 97 mm opening; rim pinch is the only feasible grasp"
+  },
+  {
+   "key": "beaker__uobdoq",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch"
+    }
+   ]
+  },
+  {
+   "key": "beaker__zycgen",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-diameter body pinch"
+    }
+   ]
+  },
+  {
+   "key": "beeswax_candle__nhdnje",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch on candle body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch on candle body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch on candle body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch on candle body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch on candle body"
+    }
+   ]
+  },
+  {
+   "key": "beeswax_candle__nxewyk",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    }
+   ]
+  },
+  {
+   "key": "beeswax_candle__oimgmh",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    }
+   ]
+  },
+  {
+   "key": "beeswax_candle__ouzkdj",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    }
+   ]
+  },
+  {
+   "key": "beeswax_candle__pfewit",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch near candle middle"
+    }
+   ]
+  },
+  {
+   "key": "bell_pepper__ggurxn",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across pepper lobes"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across pepper lobes"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across pepper lobes"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across pepper lobes"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across pepper lobes"
+    }
+   ]
+  },
+  {
+   "key": "bell_pepper__ihctxa",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across pepper lobes"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across pepper lobes"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across pepper lobes"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across pepper lobes"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across pepper lobes"
+    }
+   ],
+   "object_note": "width metric 10-13 mm reflects hollow shell walls; actual body pinch is ~60 mm"
+  },
+  {
+   "key": "bell_pepper__ukkycp",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across pepper lobes"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across pepper lobes"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across pepper lobes"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across pepper lobes"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across pepper lobes"
+    }
+   ]
+  },
+  {
+   "key": "bell_pepper__uqcenz",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-width body pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pinch on tapered stem-end shoulders; body outside pads; antipodal 0.83"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pinch on tapered stem-end shoulders; body outside pads; antipodal 0.78"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pinch on tapered end; body outside pads; antipodal 0.84"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pinch on tapered stem-end shoulders; body outside pads; antipodal 0.81"
+    }
+   ],
+   "object_note": "rows 2-5 pinch a 36-45 mm chord at the narrow end, 18-23 mm off CoM; pepper would squeeze out"
+  },
+  {
+   "key": "bell_pepper__wszvwc",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pinch on pepper tip; antipodal 0.24, coverage 0.25"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "fragile",
+      "end_grasp"
+     ],
+     "note": "pinches thin stem 61 mm from CoM; body grasp available"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "fragile",
+      "end_grasp"
+     ],
+     "note": "pinches thin stem 59 mm from CoM; body grasp available"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "fragile",
+      "end_grasp"
+     ],
+     "note": "pinches thin stem 56 mm from CoM; body grasp available"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "fragile",
+      "end_grasp",
+      "one_finger"
+     ],
+     "note": "stem against one finger; other finger fully open (50/0)"
+    }
+   ],
+   "object_note": "rows 2-5 hang the pepper by its 4-8 mm stem; row 1 pinches the tapered tip"
+  },
+  {
+   "key": "bottle_of_beer__crfcwo",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch below cap, both pads on neck"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch below cap, both pads on neck"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch below cap, both pads on neck"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch below cap, both pads on neck"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch below cap, both pads on neck"
+    }
+   ],
+   "object_note": "all grasps on the bottle neck ~90 mm from CoM; handle-like grasp, accepted"
+  }
+ ]
+}

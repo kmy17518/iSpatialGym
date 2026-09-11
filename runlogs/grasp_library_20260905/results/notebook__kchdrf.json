@@ -1,0 +1,19 @@
+{
+ "task": "disembedding",
+ "category": "notebook",
+ "model": "kchdrf",
+ "key": "notebook__kchdrf",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.30800904846191407,
+  0.23129035186767577,
+  0.00522196912765503
+ ],
+ "ready": true,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

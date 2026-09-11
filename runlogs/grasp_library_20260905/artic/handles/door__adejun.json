@@ -1,0 +1,383 @@
+{
+ "category": "door",
+ "model": "adejun",
+ "key": "door__adejun",
+ "aabb_extent": [
+  0.2276829183101654,
+  1.6722393035888672,
+  2.6199140548706055
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.1111,
+   -0.8353,
+   -1.7371
+  ],
+  "bbox_max": [
+   0.1166,
+   0.8369,
+   0.8828
+  ],
+  "n_pieces": 7
+ },
+ "joints": [
+  {
+   "joint": "j_left_leaf",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "left_leaf",
+   "outward_normal": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "face_s": 0.0615,
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "hinge_point_obj": [
+    -0.05672,
+    0.76214,
+    -8.12921
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5709525346755981,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.0954,
+    -0.0013,
+    -1.7317
+   ],
+   "link_bbox_max": [
+    -0.0099,
+    0.763,
+    0.3737
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      -0.0834,
+      0.0489,
+      -0.7369
+     ],
+     "pinch_axis": [
+      0.0,
+      1.0,
+      0.0
+     ],
+     "approach_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "width": 0.0665,
+     "length": 2.1029,
+     "depth": 0.0339,
+     "face_s": 0.0615,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9993,
+      -0.0374,
+      0.0
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      -0.0824,
+      0.3996,
+      -1.6818
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "width": 0.0665,
+     "length": 0.7619,
+     "depth": 0.0329,
+     "face_s": 0.0615,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9975,
+      -0.0707,
+      0.0
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      -0.0834,
+      0.3415,
+      0.3245
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "width": 0.0665,
+     "length": 0.7619,
+     "depth": 0.0339,
+     "face_s": 0.0615,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.998,
+      -0.0633,
+      0.0
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      -0.0834,
+      0.716,
+      -0.8202
+     ],
+     "pinch_axis": [
+      0.0,
+      1.0,
+      0.0
+     ],
+     "approach_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "width": 0.0669,
+     "length": 2.1029,
+     "depth": 0.0339,
+     "face_s": 0.0615,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.8657,
+      -0.5006,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     -0.0671,
+     0.0345,
+     -0.7599
+    ],
+    "pinch_axis": [
+     -1.0,
+     -0.0,
+     -0.0
+    ],
+    "approach_dir": [
+     -0.0107,
+     0.9999,
+     -0.0
+    ],
+    "width": 0.0855,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     0.9999,
+     -0.0143,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle"
+  },
+  {
+   "joint": "j_right_leaf",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "right_leaf",
+   "outward_normal": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "face_s": 0.0613,
+   "axis_dir_obj": [
+    0.0,
+    -0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    -0.05677,
+    -0.76167,
+    -0.73176
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.570868968963623,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.0954,
+    -0.7625,
+    -1.7317
+   ],
+   "link_bbox_max": [
+    -0.0099,
+    -0.0211,
+    0.3737
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      -0.0834,
+      -0.714,
+      -0.679
+     ],
+     "pinch_axis": [
+      0.0,
+      1.0,
+      0.0
+     ],
+     "approach_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "width": 0.066,
+     "length": 2.1054,
+     "depth": 0.0342,
+     "face_s": 0.0613,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.873,
+      0.4877,
+      0.0
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      -0.0834,
+      -0.0697,
+      -0.679
+     ],
+     "pinch_axis": [
+      0.0,
+      1.0,
+      0.0
+     ],
+     "approach_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "width": 0.066,
+     "length": 2.1054,
+     "depth": 0.0341,
+     "face_s": 0.0613,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9993,
+      0.0385,
+      0.0
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      -0.0824,
+      -0.3918,
+      -1.6816
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "width": 0.068,
+     "length": 0.7414,
+     "depth": 0.0331,
+     "face_s": 0.0613,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9976,
+      0.0691,
+      0.0
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      -0.0834,
+      -0.3918,
+      0.3237
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "width": 0.068,
+     "length": 0.7414,
+     "depth": 0.0342,
+     "face_s": 0.0613,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9974,
+      0.0718,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     -0.0714,
+     -0.0564,
+     -0.7745
+    ],
+    "pinch_axis": [
+     -1.0,
+     -0.0,
+     -0.0
+    ],
+    "approach_dir": [
+     -0.0111,
+     -0.9999,
+     -0.0
+    ],
+    "width": 0.0855,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     0.9998,
+     0.0207,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle"
+  }
+ ]
+}

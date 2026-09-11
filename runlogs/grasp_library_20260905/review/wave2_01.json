@@ -1,0 +1,1275 @@
+{
+ "batch": "wave2_01",
+ "models": [
+  {
+   "key": "box_of_cereal__tiykku",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/3: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, both fingers closed 35/21"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, asymmetric but closed 41/14"
+    }
+   ],
+   "object_note": "tall box pinched at top edge; CoM hangs below pinch, no lever torque"
+  },
+  {
+   "key": "box_of_cereal__wdkcbu",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "all candidates close 50/0; every pinch is one-sided on the top edge"
+  },
+  {
+   "key": "box_of_cereal__ykuyqb",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "all candidates close 50/0; every top-edge pinch is one-sided"
+  },
+  {
+   "key": "box_of_cereal__yorray",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "all candidates close 50/0; every top-edge pinch is one-sided"
+  },
+  {
+   "key": "box_of_cookies__apjokz",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "41/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "41/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "41/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "41/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "41/0: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "box lying x_down, pinched across 39mm thickness; all close 41/0"
+  },
+  {
+   "key": "box_of_cookies__dlhqft",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wide box nearly fills opening, 50/40 near-symmetric pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wide box nearly fills opening, 50/40 near-symmetric pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wide box nearly fills opening, 50/40 near-symmetric pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wide box nearly fills opening, 50/40 near-symmetric pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wide box nearly fills opening, 50/39 near-symmetric pinch"
+    }
+   ],
+   "object_note": "88mm box pinched across its width, both pads on box"
+  },
+  {
+   "key": "box_of_cookies__fzlaol",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    }
+   ],
+   "object_note": "tall box hangs from top-edge pinch; CoM below pinch"
+  },
+  {
+   "key": "box_of_cookies__hdgsxz",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "all candidates close 44/0; top-edge pinches all one-sided"
+  },
+  {
+   "key": "box_of_cookies__jtalxs",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "all candidates close 44/0; top-edge pinches all one-sided"
+  },
+  {
+   "key": "box_of_cookies__levwda",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/2: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/2: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/2: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/2: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, both fingers closed 32/21"
+    }
+   ],
+   "object_note": "tall box hangs from top-edge pinch; CoM below pinch"
+  },
+  {
+   "key": "box_of_cookies__lwhbid",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "task_violation"
+     ],
+     "note": "fingertips protrude below box bottom face (placement task)"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "task_violation"
+     ],
+     "note": "fingertips protrude below box bottom face (placement task)"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "task_violation"
+     ],
+     "note": "tilted 30, fingertips reach below box bottom edge"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "task_violation"
+     ],
+     "note": "tilted 30, fingertips reach below box bottom edge"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "task_violation"
+     ],
+     "note": "tilted 30, fingertips reach below box bottom edge"
+    }
+   ],
+   "object_note": "shallow 88mm box; fingers wrap full side and stick out under bottom"
+  },
+  {
+   "key": "box_of_cookies__nirfva",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 42/9 asymmetric but both fingers closed"
+    }
+   ],
+   "object_note": "tall box hangs from top-edge pinch; CoM below pinch"
+  },
+  {
+   "key": "box_of_cookies__nnfisz",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "all candidates close 50/0; top-edge pinches all one-sided"
+  },
+  {
+   "key": "box_of_cookies__ohhshb",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    }
+   ],
+   "object_note": "tall box hangs from top-edge pinch; CoM below pinch"
+  },
+  {
+   "key": "box_of_cookies__sjcnoq",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "all candidates close 50/0; top-edge pinches all one-sided"
+  },
+  {
+   "key": "box_of_sanitary_napkins__acaivd",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/22 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/22 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/22 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    }
+   ],
+   "object_note": "wide box, both pads on side faces, fingers end above bottom"
+  },
+  {
+   "key": "box_of_sanitary_napkins__arqcyu",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    }
+   ],
+   "object_note": "wide box, both pads on side faces, fingers end above bottom"
+  },
+  {
+   "key": "box_of_sanitary_napkins__cmnpuv",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "box yawed between pads, pads on opposite edges; 50/25 closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/11: box pushed against open finger, strongly off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across 78mm side, 50/29 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across 78mm side, 50/30 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/12: box pushed against open finger, strongly off-centre"
+    }
+   ],
+   "object_note": "row1 pad gap 75mm > 60mm width: box rotated, diagonal edge contact"
+  },
+  {
+   "key": "box_of_sanitary_napkins__humkqw",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    }
+   ],
+   "object_note": "wide box, both pads on side faces, fingers end above bottom"
+  },
+  {
+   "key": "box_of_sanitary_napkins__mxdefq",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "box yawed between pads, pads on opposite edges; 50/26 closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/12: box pushed against open finger, strongly off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across 78mm side, 50/29 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across 78mm side, 50/30 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/12: box pushed against open finger, strongly off-centre"
+    }
+   ],
+   "object_note": "row1 pad gap 76mm > 60mm width: box rotated, diagonal edge contact"
+  },
+  {
+   "key": "box_of_sanitary_napkins__skltgp",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/22 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    }
+   ],
+   "object_note": "wide box, both pads on side faces, fingers end above bottom"
+  },
+  {
+   "key": "box_of_sanitary_napkins__tkrzkb",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 71mm box, 50/23 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 71mm box, 50/23 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 71mm box, 50/23 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 71mm box, 50/23 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 71mm box, 50/23 asymmetric but closed"
+    }
+   ],
+   "object_note": "wide box, both pads on side faces, fingers end above bottom"
+  },
+  {
+   "key": "box_of_sanitary_napkins__ykpeja",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/22 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    }
+   ],
+   "object_note": "wide box, both pads on side faces, fingers end above bottom"
+  },
+  {
+   "key": "box_of_sanitary_napkins__zqinib",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/22 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/22 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    }
+   ],
+   "object_note": "wide box, both pads on side faces, fingers end above bottom"
+  },
+  {
+   "key": "box_of_shampoo__bclpiq",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/5: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "tall box hangs from top-edge pinch; every candidate one-sided"
+  },
+  {
+   "key": "box_of_shampoo__jccyom",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "tall box hangs from top-edge pinch; every candidate one-sided"
+  },
+  {
+   "key": "box_of_shampoo__nijidu",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "tall box hangs from top-edge pinch; every candidate one-sided"
+  },
+  {
+   "key": "box_of_shampoo__tzghev",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/5: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/6: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/5: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "tall box hangs from top-edge pinch; every candidate one-sided"
+  },
+  {
+   "key": "box_of_tissues__ntbrtz",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 75mm pack, 50/26 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 75mm pack, 47/30 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 75mm pack, 50/27 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 75mm pack, 50/26 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 75mm pack, 50/26 asymmetric but closed"
+    }
+   ],
+   "object_note": "soft pack lying x_down, both pads on side faces, fingertips well above bottom"
+  },
+  {
+   "key": "box_of_tissues__uglbjc",
+   "n_rows": 5,
+   "grasps": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 75mm pack, 50/27 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 75mm pack, 50/26 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 75mm pack, 50/26 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 75mm pack, 50/26 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 75mm pack, 50/26 asymmetric but closed"
+    }
+   ],
+   "object_note": "soft pack lying x_down, both pads on side faces, fingertips well above bottom"
+  }
+ ]
+}

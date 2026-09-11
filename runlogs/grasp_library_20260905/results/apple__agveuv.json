@@ -1,0 +1,196 @@
+{
+ "task": "object_scaling",
+ "category": "apple",
+ "model": "agveuv",
+ "key": "apple__agveuv",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.0872168197631836,
+  0.07436501693725586,
+  0.0743514518737793
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "apple",
+   "model": "agveuv"
+  },
+  "task": "object_scaling",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 500,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    0.001,
+    0.0,
+    0.0001
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0266
+   ],
+   "score": 18.869,
+   "meta": {
+    "com_perp": 0.00187,
+    "width": 0.07367,
+    "antipodal": 0.98226,
+    "coverage": 1.0,
+    "clearance": 0.00984,
+    "tilt_deg": 89.58139,
+    "graspgen_conf": 0.90075
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/apple__agveuv/g0_v1.png",
+    "v2": "/tmp/glib/frames/apple__agveuv/g0_v2.png",
+    "v3": "/tmp/glib/frames/apple__agveuv/g0_v3.png",
+    "wrist": "/tmp/glib/frames/apple__agveuv/g0_wrist.png"
+   },
+   "t_s": 3.21
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0255
+   ],
+   "score": 18.8663,
+   "meta": {
+    "com_perp": 0.00208,
+    "width": 0.07348,
+    "antipodal": 0.97736,
+    "coverage": 1.0,
+    "clearance": 0.0103,
+    "tilt_deg": 84.15009,
+    "graspgen_conf": 0.91243
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/apple__agveuv/g1_v1.png",
+    "v2": "/tmp/glib/frames/apple__agveuv/g1_v2.png",
+    "v3": "/tmp/glib/frames/apple__agveuv/g1_v3.png",
+    "wrist": "/tmp/glib/frames/apple__agveuv/g1_wrist.png"
+   },
+   "t_s": 3.25
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.023
+   ],
+   "score": 18.8277,
+   "meta": {
+    "com_perp": 0.00236,
+    "width": 0.07164,
+    "antipodal": 0.98828,
+    "coverage": 1.0,
+    "clearance": 0.00989,
+    "tilt_deg": 82.48354,
+    "graspgen_conf": 0.92626
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/apple__agveuv/g2_v1.png",
+    "v2": "/tmp/glib/frames/apple__agveuv/g2_v2.png",
+    "v3": "/tmp/glib/frames/apple__agveuv/g2_v3.png",
+    "wrist": "/tmp/glib/frames/apple__agveuv/g2_wrist.png"
+   },
+   "t_s": 3.25
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0264
+   ],
+   "score": 18.8202,
+   "meta": {
+    "com_perp": 0.0016,
+    "width": 0.0735,
+    "antipodal": 0.96315,
+    "coverage": 1.0,
+    "clearance": 0.00794,
+    "tilt_deg": 86.44293,
+    "graspgen_conf": 0.90511
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/apple__agveuv/g3_v1.png",
+    "v2": "/tmp/glib/frames/apple__agveuv/g3_v2.png",
+    "v3": "/tmp/glib/frames/apple__agveuv/g3_v3.png",
+    "wrist": "/tmp/glib/frames/apple__agveuv/g3_wrist.png"
+   },
+   "t_s": 3.25
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0272
+   ],
+   "score": 18.8058,
+   "meta": {
+    "com_perp": 0.00265,
+    "width": 0.07351,
+    "antipodal": 0.97663,
+    "coverage": 1.0,
+    "clearance": 0.0108,
+    "tilt_deg": 111.85768,
+    "graspgen_conf": 0.92794
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/apple__agveuv/g4_v1.png",
+    "v2": "/tmp/glib/frames/apple__agveuv/g4_v2.png",
+    "v3": "/tmp/glib/frames/apple__agveuv/g4_v3.png",
+    "wrist": "/tmp/glib/frames/apple__agveuv/g4_wrist.png"
+   },
+   "t_s": 3.25
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 20.8
+}

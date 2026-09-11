@@ -1,0 +1,87 @@
+{
+ "category": "sliding_door",
+ "model": "tprpvb",
+ "key": "sliding_door__tprpvb",
+ "aabb_extent": [
+  0.04686523601412773,
+  1.6798710823059082,
+  2.3442740440368652
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0109,
+   -0.8399,
+   -0.0452
+  ],
+  "bbox_max": [
+   0.0109,
+   0.8399,
+   0.0452
+  ],
+  "n_pieces": 1
+ },
+ "joints": [
+  {
+   "joint": "j_movingpart",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "movingpart",
+   "outward_normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "face_s": 0.0485,
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "hinge_point_obj": null,
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.8177558779716492,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.0234,
+    -0.0485,
+    -2.2991
+   ],
+   "link_bbox_max": [
+    0.0235,
+    0.8399,
+    0.0039
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.0,
+     -0.0485,
+     -0.0311
+    ],
+    "pinch_axis": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     0.0,
+     -1.0,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "ungraspable"
+  }
+ ]
+}

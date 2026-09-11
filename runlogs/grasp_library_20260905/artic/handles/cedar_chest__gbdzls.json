@@ -1,0 +1,91 @@
+{
+ "category": "cedar_chest",
+ "model": "gbdzls",
+ "key": "cedar_chest__gbdzls",
+ "aabb_extent": [
+  0.40189844369888306,
+  0.19576171040534973,
+  0.14490890502929688
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.2011,
+   -0.0982,
+   -0.0458
+  ],
+  "bbox_max": [
+   0.2008,
+   0.0976,
+   0.0732
+  ],
+  "n_pieces": 8
+ },
+ "joints": [
+  {
+   "joint": "j_up",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "up",
+   "outward_normal": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "face_s": 0.0991,
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "hinge_point_obj": [
+    -0.19422,
+    -0.04595,
+    0.06695
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.7978605628013611,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.2009,
+    -0.098,
+    0.0516
+   ],
+   "link_bbox_max": [
+    0.1984,
+    0.0975,
+    0.0991
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     0.1634,
+     0.0193,
+     0.0803
+    ],
+    "pinch_axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "approach_dir": [
+     -0.9991,
+     -0.0,
+     -0.0435
+    ],
+    "width": 0.0475,
+    "exposed": true,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     -0.0373,
+     -0.0,
+     0.9993
+    ]
+   },
+   "sub_links": [],
+   "status": "edge"
+  }
+ ]
+}

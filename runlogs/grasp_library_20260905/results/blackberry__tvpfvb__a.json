@@ -1,0 +1,232 @@
+{
+ "task": "configuration_matching",
+ "relation": null,
+ "category": "blackberry",
+ "model": "tvpfvb",
+ "key": "blackberry__tvpfvb__a",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "attachment_free",
+ "bbox": [
+  0.027516056060791015,
+  0.028799259185791015,
+  0.02584761619567871
+ ],
+ "ready": true,
+ "round": 3,
+ "candidates_meta": {
+  "object": {
+   "category": "blackberry",
+   "model": "tvpfvb"
+  },
+  "task": "configuration_matching",
+  "constraint": "attachment_free",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_attachment_free",
+  "log": {
+   "n_sampled": 6000,
+   "n_tilt": 724,
+   "n_width_antipodal": 511,
+   "n_table": 282,
+   "n_collision": 282,
+   "n_sweep": 282,
+   "n_lever": 282,
+   "n_attachment_free": 282,
+   "n_selected": 12,
+   "com": [
+    -0.0002,
+    -0.0001,
+    0.0002
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0295,
+    0.0
+   ],
+   "score": 13.2208,
+   "meta": {
+    "com_perp": 5e-05,
+    "width": 0.02696,
+    "antipodal": 0.94751,
+    "coverage": 1.0,
+    "clearance": 0.03471,
+    "tilt_deg": 16.28359,
+    "attach_dist": 0.04807,
+    "attach_side": -0.00664
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/blackberry__tvpfvb__a/g0_v1.png",
+    "v2": "/tmp/glib/frames/blackberry__tvpfvb__a/g0_v2.png",
+    "v3": "/tmp/glib/frames/blackberry__tvpfvb__a/g0_v3.png",
+    "wrist": "/tmp/glib/frames/blackberry__tvpfvb__a/g0_wrist.png"
+   },
+   "t_s": 3.37
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 12.9828,
+   "meta": {
+    "com_perp": 0.00015,
+    "width": 0.02617,
+    "antipodal": 0.94281,
+    "coverage": 1.0,
+    "clearance": 0.03456,
+    "tilt_deg": 23.45406,
+    "attach_dist": 0.04855,
+    "attach_side": -0.05999
+   },
+   "frames": {},
+   "t_s": 5.15
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0289,
+    0.0
+   ],
+   "score": 12.8798,
+   "meta": {
+    "com_perp": 0.00047,
+    "width": 0.0271,
+    "antipodal": 0.9898,
+    "coverage": 1.0,
+    "clearance": 0.03428,
+    "tilt_deg": 21.67341,
+    "attach_dist": 0.04589,
+    "attach_side": -0.21806
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/blackberry__tvpfvb__a/g2_v1.png",
+    "v2": "/tmp/glib/frames/blackberry__tvpfvb__a/g2_v2.png",
+    "v3": "/tmp/glib/frames/blackberry__tvpfvb__a/g2_v3.png",
+    "wrist": "/tmp/glib/frames/blackberry__tvpfvb__a/g2_wrist.png"
+   },
+   "t_s": 3.42
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.029,
+    0.0
+   ],
+   "score": 12.8134,
+   "meta": {
+    "com_perp": 0.00051,
+    "width": 0.02685,
+    "antipodal": 0.96751,
+    "coverage": 1.0,
+    "clearance": 0.03443,
+    "tilt_deg": 22.72808,
+    "attach_dist": 0.04835,
+    "attach_side": -0.0524
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/blackberry__tvpfvb__a/g3_v1.png",
+    "v2": "/tmp/glib/frames/blackberry__tvpfvb__a/g3_v2.png",
+    "v3": "/tmp/glib/frames/blackberry__tvpfvb__a/g3_v3.png",
+    "wrist": "/tmp/glib/frames/blackberry__tvpfvb__a/g3_wrist.png"
+   },
+   "t_s": 3.41
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0305,
+    0.0
+   ],
+   "score": 12.7032,
+   "meta": {
+    "com_perp": 0.00096,
+    "width": 0.02727,
+    "antipodal": 0.96281,
+    "coverage": 1.0,
+    "clearance": 0.03368,
+    "tilt_deg": 11.12649,
+    "attach_dist": 0.04395,
+    "attach_side": -0.13062
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/blackberry__tvpfvb__a/g4_v1.png",
+    "v2": "/tmp/glib/frames/blackberry__tvpfvb__a/g4_v2.png",
+    "v3": "/tmp/glib/frames/blackberry__tvpfvb__a/g4_v3.png",
+    "wrist": "/tmp/glib/frames/blackberry__tvpfvb__a/g4_wrist.png"
+   },
+   "t_s": 3.41
+  },
+  {
+   "grasp": "grasp_5",
+   "idx": 5,
+   "ag_attached": true,
+   "attached_step": 13,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0287,
+    0.0
+   ],
+   "score": 12.5938,
+   "meta": {
+    "com_perp": 0.00014,
+    "width": 0.02663,
+    "antipodal": 0.95212,
+    "coverage": 1.0,
+    "clearance": 0.03443,
+    "tilt_deg": 0.51615,
+    "attach_dist": 0.038,
+    "attach_side": -0.2052
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/blackberry__tvpfvb__a/g5_v1.png",
+    "v2": "/tmp/glib/frames/blackberry__tvpfvb__a/g5_v2.png",
+    "v3": "/tmp/glib/frames/blackberry__tvpfvb__a/g5_v3.png",
+    "wrist": "/tmp/glib/frames/blackberry__tvpfvb__a/g5_wrist.png"
+   },
+   "t_s": 3.42
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 28.0
+}

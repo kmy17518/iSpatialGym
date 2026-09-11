@@ -1,0 +1,210 @@
+{
+ "category": "bottom_cabinet",
+ "model": "hnxyev",
+ "key": "bottom_cabinet__hnxyev",
+ "aabb_extent": [
+  0.4026762843132019,
+  0.6955913305282593,
+  0.6365559697151184
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.1782,
+   -0.3719,
+   -0.3657
+  ],
+  "bbox_max": [
+   0.2066,
+   0.3237,
+   0.2583
+  ],
+  "n_pieces": 32
+ },
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "link_0",
+   "outward_normal": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "face_s": 0.2709,
+   "axis_dir_obj": [
+    0.010440000332891941,
+    -0.9999499917030334,
+    0.0005000000237487257
+   ],
+   "hinge_point_obj": [
+    -0.16589,
+    -0.02582,
+    0.25019
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5707961320877075,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.1721,
+    -0.3626,
+    0.2486
+   ],
+   "link_bbox_max": [
+    0.1934,
+    0.3147,
+    0.2709
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     0.156,
+     -0.1347,
+     0.2626
+    ],
+    "pinch_axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "approach_dir": [
+     -0.9985,
+     -0.0105,
+     -0.0541
+    ],
+    "width": 0.0192,
+    "exposed": true,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     -0.0385,
+     0.0001,
+     0.9993
+    ]
+   },
+   "sub_links": [],
+   "status": "edge"
+  },
+  {
+   "joint": "j_link_1",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "link_1",
+   "outward_normal": [
+    0.9999,
+    0.0104,
+    0.0084
+   ],
+   "face_s": 0.2008,
+   "axis_dir_obj": [
+    0.99991,
+    0.01044,
+    0.00844
+   ],
+   "hinge_point_obj": null,
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.32019370794296265,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.1448,
+    -0.3492,
+    -0.229
+   ],
+   "link_bbox_max": [
+    0.2245,
+    0.3041,
+    -0.1082
+   ],
+   "handles": [
+    {
+     "kind": "knob",
+     "contact": [
+      0.2146,
+      -0.2372,
+      -0.1717
+     ],
+     "pinch_axis": [
+      0.0104,
+      -0.9999,
+      0.0
+     ],
+     "approach_dir": [
+      -0.9999,
+      -0.0104,
+      -0.0084
+     ],
+     "width": 0.0355,
+     "length": 0.0364,
+     "depth": 0.0198,
+     "face_s": 0.2008,
+     "n_pieces": 2,
+     "pull_dir": [
+      0.9999,
+      0.0104,
+      0.0084
+     ]
+    },
+    {
+     "kind": "knob",
+     "contact": [
+      0.2101,
+      0.1899,
+      -0.1711
+     ],
+     "pinch_axis": [
+      0.0104,
+      -0.9999,
+      0.0
+     ],
+     "approach_dir": [
+      -0.9999,
+      -0.0104,
+      -0.0084
+     ],
+     "width": 0.0264,
+     "length": 0.0355,
+     "depth": 0.0198,
+     "face_s": 0.2008,
+     "n_pieces": 2,
+     "pull_dir": [
+      0.9999,
+      0.0104,
+      0.0084
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.1878,
+     -0.021,
+     -0.1432
+    ],
+    "pinch_axis": [
+     0.9999,
+     0.0104,
+     0.0084
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0293,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     0.9999,
+     0.0104,
+     0.0084
+    ]
+   },
+   "sub_links": [],
+   "status": "handle"
+  }
+ ]
+}

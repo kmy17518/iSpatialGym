@@ -1,0 +1,196 @@
+{
+ "task": "object_scaling",
+ "category": "lemon",
+ "model": "bmvxas",
+ "key": "lemon__bmvxas",
+ "pipeline": "graspgen",
+ "mode": "C",
+ "constraint": "floating",
+ "bbox": [
+  0.09080785369873047,
+  0.0643740234375,
+  0.06449267578125
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "lemon",
+   "model": "bmvxas"
+  },
+  "task": "object_scaling",
+  "constraint": "floating",
+  "pipeline": "graspgen",
+  "gripper": "r1pro_right",
+  "source": "graspgen_floating",
+  "log": {
+   "n_graspgen": 500,
+   "n_collision": 500,
+   "n_width": 500,
+   "n_selected": 12,
+   "mode": "C",
+   "com": [
+    -0.0004,
+    0.0,
+    -0.0
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": true,
+   "attached_step": 12,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0461,
+    0.0161
+   ],
+   "score": 19.2351,
+   "meta": {
+    "com_perp": 0.00063,
+    "width": 0.06442,
+    "antipodal": 0.96988,
+    "coverage": 1.0,
+    "clearance": 0.01022,
+    "tilt_deg": 89.47506,
+    "graspgen_conf": 0.94481
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/lemon__bmvxas/g0_v1.png",
+    "v2": "/tmp/glib/frames/lemon__bmvxas/g0_v2.png",
+    "v3": "/tmp/glib/frames/lemon__bmvxas/g0_v3.png",
+    "wrist": "/tmp/glib/frames/lemon__bmvxas/g0_wrist.png"
+   },
+   "t_s": 2.9
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0168
+   ],
+   "score": 19.2034,
+   "meta": {
+    "com_perp": 0.00138,
+    "width": 0.06336,
+    "antipodal": 0.98201,
+    "coverage": 1.0,
+    "clearance": 0.01182,
+    "tilt_deg": 113.33224,
+    "graspgen_conf": 0.961
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/lemon__bmvxas/g1_v1.png",
+    "v2": "/tmp/glib/frames/lemon__bmvxas/g1_v2.png",
+    "v3": "/tmp/glib/frames/lemon__bmvxas/g1_v3.png",
+    "wrist": "/tmp/glib/frames/lemon__bmvxas/g1_wrist.png"
+   },
+   "t_s": 2.86
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.05,
+    0.0168
+   ],
+   "score": 19.0556,
+   "meta": {
+    "com_perp": 0.00135,
+    "width": 0.06311,
+    "antipodal": 0.98274,
+    "coverage": 1.0,
+    "clearance": 0.00908,
+    "tilt_deg": 107.68211,
+    "graspgen_conf": 0.95235
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/lemon__bmvxas/g2_v1.png",
+    "v2": "/tmp/glib/frames/lemon__bmvxas/g2_v2.png",
+    "v3": "/tmp/glib/frames/lemon__bmvxas/g2_v3.png",
+    "wrist": "/tmp/glib/frames/lemon__bmvxas/g2_wrist.png"
+   },
+   "t_s": 2.87
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0287,
+    0.0375
+   ],
+   "score": 19.0417,
+   "meta": {
+    "com_perp": 0.00212,
+    "width": 0.06297,
+    "antipodal": 0.98919,
+    "coverage": 1.0,
+    "clearance": 0.01188,
+    "tilt_deg": 124.03514,
+    "graspgen_conf": 0.94967
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/lemon__bmvxas/g3_v1.png",
+    "v2": "/tmp/glib/frames/lemon__bmvxas/g3_v2.png",
+    "v3": "/tmp/glib/frames/lemon__bmvxas/g3_v3.png",
+    "wrist": "/tmp/glib/frames/lemon__bmvxas/g3_wrist.png"
+   },
+   "t_s": 2.86
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": true,
+   "attached_step": 11,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0417,
+    0.0243
+   ],
+   "score": 19.0415,
+   "meta": {
+    "com_perp": 0.00206,
+    "width": 0.06301,
+    "antipodal": 0.97506,
+    "coverage": 1.0,
+    "clearance": 0.01151,
+    "tilt_deg": 174.25523,
+    "graspgen_conf": 0.95976
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/lemon__bmvxas/g4_v1.png",
+    "v2": "/tmp/glib/frames/lemon__bmvxas/g4_v2.png",
+    "v3": "/tmp/glib/frames/lemon__bmvxas/g4_v3.png",
+    "wrist": "/tmp/glib/frames/lemon__bmvxas/g4_wrist.png"
+   },
+   "t_s": 2.82
+  }
+ ],
+ "n_valid": 5,
+ "error": null,
+ "t_model_s": 18.4
+}

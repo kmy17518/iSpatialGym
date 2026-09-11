@@ -1,0 +1,55 @@
+format: isaac_grasp
+format_version: 1.0
+object_frame: base_link
+gripper_frame: right_eef_link
+ispatialgym:
+  object:
+    category: toy_dice
+    model: zublep
+  task: object_scaling
+  constraint: floating
+  pipeline: graspgen
+  gripper: r1pro_right
+  source: graspgen_floating
+  log:
+    n_graspgen: 500
+    n_collision: 15
+    n_width: 15
+    n_lever: 1
+    n_selected: 1
+    mode: C
+    com:
+    - 0.0
+    - -0.0005
+    - 0.0005
+    rest_pose: canonical
+  rest_pose: canonical
+  rest_quat_wxyz:
+  - 1.0
+  - 0.0
+  - 0.0
+  - 0.0
+grasps:
+  grasp_0:
+    confidence: 13.8444
+    position:
+    - -0.026120257269163245
+    - -0.008065048347426662
+    - 0.025033997958748267
+    orientation:
+      w: 0.5844145662423628
+      xyz:
+      - -0.7057815058812675
+      - 0.29705730936552555
+      - 0.2684940142204955
+    pregrasp_cspace_position:
+      right_gripper_finger_joint1: 0.05
+      right_gripper_finger_joint2: 0.05
+    ispatialgym:
+      com_perp: 0.0415
+      width: 0.06774
+      antipodal: 0.70693
+      coverage: 0.5
+      clearance: 0.00149
+      tilt_deg: 80.05276
+      graspgen_conf: 0.76169
