@@ -613,13 +613,19 @@ schema validator (`ISGTroMeta.KNOWN_FIELDS`) stays strict.
 ## 7. Efficiency plan and what is measured
 
 - Per template: scene load (partial rooms), cuRobo planner build (`right_arm`, kinematics-only
-  `whole_body` / `right_arm_torso`), world load, reachability grid, camera solution. Reported
-  in `template_meta.json.timings`.
-- Per instance: number of candidate evaluations, renders, physics steps, wall time, reported in
-  the summary. Targets for v1: <= 20 s per table instance, <= 40 s per instance that needs
-  renders (camera relocalization, disembedding with occlusion), after the template warm-up.
+  `whole_body`; the torso embodiment only as a 0.2 s batched IK solver), world load,
+  reachability grid, camera solution. Reported in `template_meta.json.timings` together with
+  the IK / collision call counters of each phase (`*_kit`).
+- Per instance: wall time split into sample / apply / settle+validate / goal-check phases
+  (`summary.phase_s`) and the IK / collision counters (`summary.kit`).
+- Measured (RTX 4090, house_single_floor, 2 instances per template): scene load 35-45 s per
+  scene; template precompute 15-80 s cold, ~5 s with the on-disk cache (`ISPATIALGYM_SAMPLING_CACHE`);
+  instances 3-8 s (table tasks), 4 s (held object), 7 s (camera relocalization). The 15 test
+  problems take ~20 min cold end to end (v1.0: ~30 min) plus ~15 min for the reload validation.
 - Failure handling: an instance attempt that fails a check is discarded with its reason counted
-  (`summary.rejections`); `--max-attempts` bounds attempts per instance.
+  (`summary.rejections`); `--max-attempts` bounds attempts per instance. Attempts are made
+  productive where possible (disembedding falls back to an unoccluded instance when there is no
+  room for an occluder; distractors that occlude are re-drawn before the attempt is dropped).
 
 ## 8. Assumptions and open points
 

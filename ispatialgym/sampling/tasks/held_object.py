@@ -93,29 +93,35 @@ class HeldObjectSampler(TaskSampler):
         solution = None
         tried = 0
         pads = []
-        for depth, (translate, tilt) in [(d, t) for d in depths for t in trunks]:
+        rolls = [0, 15, -15, 30, -30, 45, -45, 60, -60, 75, -75, 90, -90]
+        # one batched IK call per trunk configuration (every call with new locked joints costs seconds): all depths and
+        # all 26 orientations of a trunk go into the same batch; candidates are ranked depth-first (largest depth, then
+        # the smallest roll) and the first collision-free solution wins
+        for translate, tilt in trunks:
             q0 = self.kit.q_at_base_pose(self.kit.q_config(arms="ready", translate=translate, tilt=tilt), x, y, yaw)
             cam = self.kit.camera_pose(q0)
             axis = self.world.camera_model.optical_axis(cam)
-            pad = G.t(cam[0]) + axis * depth
-            pads.append((depth, translate, tilt, [round(float(v), 2) for v in G.relative((pad, G.IDENTITY_QUAT), (th.tensor([x, y, self.floor_z_of_robot()]), G.quat_from_yaw(yaw)))[0]]))
-            for roll_deg in [0, 15, -15, 30, -30, 45, -45, 60, -60, 75, -75, 90, -90]:
-                for up_sign in (-1.0, 1.0):
-                    y_axis = th.tensor([0.0, 0.0, up_sign])
-                    y_axis = G.rotate(G.quat_about_axis(z, math.radians(roll_deg)), y_axis)
-                    y_axis = y_axis - th.dot(y_axis, z) * z
-                    y_axis = y_axis / th.linalg.norm(y_axis)
-                    x_axis = th.cross(y_axis, z, dim=0)
-                    quat = T.mat2quat(th.stack([x_axis, y_axis, z], dim=1))
-                    eef = pad - G.rotate(quat, th.tensor([0.0, 0.0, CONTACT_CENTER_Z]))
-                    tried += 1
-                    q = self.kit.ik((eef, quat), q0, arm=ARM)
-                    if q is None or not bool(self.kit.collision_free(q, margin=0.01)[0]):
-                        continue
-                    solution = (depth, translate, tilt, roll_deg, q, (eef, quat), cam, pad)
-                    break
-                if solution:
-                    break
+            cands = []
+            for depth in depths:
+                pad = G.t(cam[0]) + axis * depth
+                pads.append((depth, translate, tilt, [round(float(v), 2) for v in G.relative((pad, G.IDENTITY_QUAT), (th.tensor([x, y, self.floor_z_of_robot()]), G.quat_from_yaw(yaw)))[0]]))
+                for roll_deg in rolls:
+                    for up_sign in (-1.0, 1.0):
+                        y_axis = th.tensor([0.0, 0.0, up_sign])
+                        y_axis = G.rotate(G.quat_about_axis(z, math.radians(roll_deg)), y_axis)
+                        y_axis = y_axis - th.dot(y_axis, z) * z
+                        y_axis = y_axis / th.linalg.norm(y_axis)
+                        x_axis = th.cross(y_axis, z, dim=0)
+                        quat = T.mat2quat(th.stack([x_axis, y_axis, z], dim=1))
+                        eef = pad - G.rotate(quat, th.tensor([0.0, 0.0, CONTACT_CENTER_Z]))
+                        cands.append((depth, roll_deg, (eef, quat), pad))
+            tried += len(cands)
+            ok, q_out = self.kit.ik_batch_solve([c[2] for c in cands], q0, arm=ARM)
+            for (depth, roll_deg, pose, pad), s, q in zip(cands, ok.tolist(), q_out):
+                if not s or not bool(self.kit.collision_free(q, margin=0.01)[0]):
+                    continue
+                solution = (depth, translate, tilt, roll_deg, q.clone(), pose, cam, pad)
+                break
             if solution:
                 break
         if solution is None:
@@ -188,18 +194,6 @@ class HeldObjectSampler(TaskSampler):
     #: camera frame, so scaling keeps the camera where it is)
     ALLOW_TORSO = True
 
-    def _goal_ik(self, obj_goal: G.Pose, grasp, q_seed: th.Tensor) -> Optional[Tuple[th.Tensor, str]]:
-        eef = G.compose(obj_goal, grasp.pose)
-        with self.kit.ignoring([self.obj("target")]):
-            q = self.kit.ik(eef, q_seed, arm=ARM)
-            if q is not None:
-                return q, f"{ARM}_arm"
-            if self.ALLOW_TORSO:
-                q = self.kit.ik(eef, q_seed, arm=ARM, torso=True)
-                if q is not None:
-                    return q, f"{ARM}_arm_torso"
-        return None
-
     def _precompute_options(self):
         """Per library grasp: whether the held object is fully in view at the canonical hold, and which goal candidates
         are IK-feasible (right arm, else right arm + torso). Everything is expressed in the base frame, so the options
@@ -212,30 +206,48 @@ class HeldObjectSampler(TaskSampler):
         self.options: Dict[str, List[Dict[str, Any]]] = {}
         n_cand = int(self.gen("goal_candidates", 24))
         stats = {"grasps": len(self.grasps), "held_out_of_view": 0, "candidates": 0, "goal_out_of_view": 0, "ik_failed": 0, "feasible": 0}
+        # gather every (grasp, goal candidate) first, screen them in two batches (arm, then arm + torso for the arm
+        # failures) and run the exact solver only on the survivors
+        entries = []  # (grasp, goal, info)
         for g in self.grasps:
             obj_pose = self._object_pose(ref, g)
             if not self._visible_whole(cam, obj_pose):
                 stats["held_out_of_view"] += 1
                 continue
-            opts = []
             for goal, info in self._goal_candidates(rng, cam, obj_pose)[:n_cand]:
-                stats["candidates"] += 1
-                sol = self._goal_ik(goal, g, q_hold)
-                if sol is None:
-                    stats["ik_failed"] += 1
-                    continue
-                q_goal, emb = sol
-                # torso solutions move the head camera: visibility and the depth target refer to the goal-time camera
-                cam_goal = self.kit.camera_pose(q_goal)
-                if not self._visible_whole(cam_goal, goal):
-                    stats["goal_out_of_view"] += 1
-                    continue
-                q_rel = q_goal.clone()
-                q_rel[[self.kit.jidx[n] for n in M.BASE_VIRTUAL_JOINTS]] = 0.0
-                opts.append({"goal_in_base": G.relative(goal, base3), "cam_goal_in_base": G.relative(cam_goal, base3), "info": info, "emb": emb, "q_rel": q_rel})
-                stats["feasible"] += 1
-            if opts:
-                self.options[g.name] = opts
+                entries.append((g, goal, info))
+        stats["candidates"] = len(entries)
+        eefs = [G.compose(goal, g.pose) for g, goal, _ in entries]
+        # the batched solutions are used directly (same collision checker as the exact solver): exact torso IK costs
+        # ~0.7 s per call, the batch a few ms per pose
+        sols: List[Optional[Tuple[th.Tensor, str]]] = [None] * len(entries)
+        with self.kit.ignoring([self.obj("target")]):
+            arm_ok, arm_q = self.kit.ik_batch_solve(eefs, q_hold, arm=ARM)
+            for i, ok in enumerate(arm_ok.tolist()):
+                if ok:
+                    sols[i] = (arm_q[i].clone(), f"{ARM}_arm")
+            if self.ALLOW_TORSO:
+                idx = [i for i, s in enumerate(sols) if s is None]
+                if idx:
+                    t_ok, t_q = self.kit.ik_batch_solve([eefs[i] for i in idx], q_hold, arm=ARM, torso=True)
+                    for j, i in enumerate(idx):
+                        if bool(t_ok[j]):
+                            sols[i] = (t_q[j].clone(), f"{ARM}_arm_torso")
+        for (g, goal, info), sol in zip(entries, sols):
+            if sol is None:
+                stats["ik_failed"] += 1
+                continue
+            q_goal, emb = sol
+            # torso solutions move the head camera: visibility and the depth target refer to the goal-time camera
+            cam_goal = self.kit.camera_pose(q_goal)
+            if not self._visible_whole(cam_goal, goal):
+                stats["goal_out_of_view"] += 1
+                continue
+            q_rel = q_goal.clone()
+            q_rel[[self.kit.jidx[n] for n in M.BASE_VIRTUAL_JOINTS]] = 0.0
+            self.options.setdefault(g.name, []).append({"goal_in_base": G.relative(goal, base3), "cam_goal_in_base": G.relative(cam_goal, base3),
+                                                        "info": info, "emb": emb, "q_rel": q_rel})
+            stats["feasible"] += 1
         self.template_meta["goal_options"] = {**stats, "grasps_with_options": len(self.options)}
         if not self.options:
             raise Reject("goal_infeasible", f"no library grasp has a visible held pose with an IK-feasible goal ({stats})")
@@ -295,6 +307,7 @@ class HeldObjectSampler(TaskSampler):
         pose = draft.object_poses[tname]
         target.set_position_orientation(G.t(pose[0]), G.t(pose[1]))
         target.disable_gravity()
+        target.wake()  # sleeping bodies keep a stale render transform after a physics-side teleport
         target.keep_still()
         gname = draft.extras["grasps"][0]["grasp_name"]
         stats = self.grasp_stats.setdefault(gname, {"ok": 0, "failed": 0})
@@ -327,30 +340,32 @@ class HeldObjectSampler(TaskSampler):
         return next(g for g in self.grasps if g.name == name)
 
     def _establish_grasp(self, target, pose: G.Pose):
-        env = self.world.env
         state = ActionState(self.robot)
         state.hold_current()
         state.set_gripper(ARM, close=False)
+        # controller steps without rendering or observation reads (see SimWorld.control_step); assisted grasping runs
+        # inside the simulator step, so this is the grasp library's procedure minus the image pipeline
         for _ in range(8):
             target.set_position_orientation(G.t(pose[0]), G.t(pose[1]))
             target.keep_still()
-            env.step(state.action())
+            self.world.control_step(state.action())
         state.set_gripper(ARM, close=True)
         attached = False
         for _ in range(int(self.gen("grasp_close_steps", 60))):
             if self.robot._ag_obj_in_hand[ARM] is None:
                 target.keep_still()
-            env.step(state.action())
+            self.world.control_step(state.action())
             if self.robot._ag_obj_in_hand[ARM] is target:
                 attached = True
                 break
         if not attached:
             raise Reject("grasp_failed", "assisted grasping did not attach the object")
         target.enable_gravity()
-        for _ in range(30):
-            env.step(state.action())
+        self.world.control_step(state.action(), n=30)
         if self.robot._ag_obj_in_hand[ARM] is not target:
             raise Reject("grasp_failed", "object dropped after gravity was re-enabled")
+        self.robot.keep_still()
+        self.world.full_step(render=True)  # sync transforms / caches after the non-rendering control steps
         self.robot.keep_still()
         self.kit.sync_world()
 
@@ -363,8 +378,7 @@ class HeldObjectSampler(TaskSampler):
         state = ActionState(self.robot)
         state.hold_current()
         state.set_gripper(ARM, close=False)
-        for _ in range(10):
-            self.world.env.step(state.action())
+        self.world.control_step(state.action(), n=10)
 
     def on_reject(self, err: Reject):
         self._release()

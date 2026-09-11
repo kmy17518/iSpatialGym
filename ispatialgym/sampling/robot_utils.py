@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import math
+import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -52,6 +53,16 @@ class RobotKit:
         self.trunk_limits = (self.robot.joint_lower_limits[idx].clone(), self.robot.joint_upper_limits[idx].clone())
         self._trav_cache: Dict[int, th.Tensor] = {}
         self.floor_z = float(getattr(world, "floor_z", 0.0))
+        #: call / time counters for the expensive queries (reported per template in template_meta.timings.kit)
+        self.stats: Dict[str, float] = {"ik_calls": 0, "ik_s": 0.0, "ik_batch_calls": 0, "ik_batch_problems": 0, "ik_batch_s": 0.0,
+                                        "collision_calls": 0, "collision_configs": 0, "collision_s": 0.0}
+
+    def stats_snapshot(self) -> Dict[str, float]:
+        return dict(self.stats)
+
+    @staticmethod
+    def stats_delta(before: Dict[str, float], after: Dict[str, float]) -> Dict[str, float]:
+        return {k: round(after[k] - before.get(k, 0), 3) for k in after}
 
     # ------------------------------------------------------------------ configurations
 
@@ -176,14 +187,23 @@ class RobotKit:
             qs = qs.unsqueeze(0)
         if not sync:
             self._ensure_synced()
-        return ~self.backend.check_collision(qs, emb_name="whole_body", sync_world=sync, margin=margin)
+        t0 = time.time()
+        out = ~self.backend.check_collision(qs, emb_name="whole_body", sync_world=sync, margin=margin)
+        self.stats["collision_calls"] += 1
+        self.stats["collision_configs"] += int(qs.shape[0])
+        self.stats["collision_s"] += time.time() - t0
+        return out
 
     # ------------------------------------------------------------------ IK
 
     def ik(self, eef_pose: G.Pose, q_seed: th.Tensor, arm: str = "right", torso: bool = False) -> Optional[th.Tensor]:
         emb = f"{arm}_arm_torso" if torso else f"{arm}_arm"
         self._ensure_synced()
-        return self.backend.solve_ik(emb, {M.EEF_LINK[arm]: (G.t(eef_pose[0]), G.t(eef_pose[1]))}, q_seed=q_seed, sync_world=False)
+        t0 = time.time()
+        out = self.backend.solve_ik(emb, {M.EEF_LINK[arm]: (G.t(eef_pose[0]), G.t(eef_pose[1]))}, q_seed=q_seed, sync_world=False)
+        self.stats["ik_calls"] += 1
+        self.stats["ik_s"] += time.time() - t0
+        return out
 
     def reachable(self, eef_poses: Sequence[G.Pose], q_seed: th.Tensor, arm: str = "right", torso: bool = False, ignore_for_last=()) -> Optional[th.Tensor]:
         """Configuration reaching the *last* pose if every pose in the list is IK-feasible from ``q_seed``, else None.
@@ -236,18 +256,34 @@ class RobotKit:
                 out.append([(p - axis * pregrasp, q), (p, q)])
         return out
 
-    def ik_batch(self, poses: Sequence[G.Pose], q_seed: th.Tensor, arm: str = "right", batch_size: int = 64, ignore=()) -> th.Tensor:
+    def ik_batch(self, poses: Sequence[G.Pose], q_seed: th.Tensor, arm: str = "right", batch_size: int = 64, ignore=(), torso: bool = False) -> th.Tensor:
         """Screening IK for many eef poses at once (fewer seeds than :meth:`ik`); returns a bool mask.
 
         ``ignore``: objects whose collision meshes are disabled for these queries (e.g. the support surface for the
         final grasp pose, which the oracle approaches without collision checking); re-enabled afterwards.
+        ``torso``: use the arm + torso embodiment (single tool frame as well, so batching applies).
         """
+        return self.ik_batch_solve(poses, q_seed, arm=arm, batch_size=batch_size, ignore=ignore, torso=torso)[0]
+
+    def ik_batch_solve(self, poses: Sequence[G.Pose], q_seed: th.Tensor, arm: str = "right", batch_size: int = 64, ignore=(),
+                       torso: bool = False) -> Tuple[th.Tensor, th.Tensor]:
+        """Like :meth:`ik_batch` but also returns the solutions ``(success (N,), q (N, 28))`` (locked joints from
+        ``q_seed``). The screening solutions are collision-checked by the same checker as the exact solver, so callers
+        that need a configuration (not just feasibility) can use them directly and skip the exact solve.
+
+        Note: every call with a *different* set of locked-joint values (trunk configuration) re-derives the fixed
+        transforms of the batched solver, which costs a few seconds; group queries by trunk configuration."""
         if len(poses) == 0:
-            return th.zeros(0, dtype=th.bool)
+            return th.zeros(0, dtype=th.bool), th.zeros(0, 28)
         self._ensure_synced()
+        t0 = time.time()
+        emb = f"{arm}_arm_torso" if torso else f"{arm}_arm"
         with self.ignoring(ignore):
-            succ, _ = self.backend.solve_ik_batch(f"{arm}_arm", M.EEF_LINK[arm], list(poses), q_seed, batch_size=batch_size)
-        return succ
+            succ, q_out = self.backend.solve_ik_batch(emb, M.EEF_LINK[arm], list(poses), q_seed, batch_size=batch_size)
+        self.stats["ik_batch_calls"] += 1
+        self.stats["ik_batch_problems"] += len(poses)
+        self.stats["ik_batch_s"] += time.time() - t0
+        return succ, q_out
 
     def ignoring(self, objs):
         """Context manager: temporarily drop ``objs`` from the cuRobo collision world."""

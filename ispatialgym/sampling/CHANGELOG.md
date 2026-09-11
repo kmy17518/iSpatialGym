@@ -2,6 +2,34 @@
 
 Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampling_report_*.json`).
 
+## 1.1.0 (2026-09-11) - efficiency pass (same outputs, same checks)
+
+Profiling (`template_meta.timings.*_kit`, `summary.phase_s` / `summary.kit`, new in this version) showed three hot
+spots; each fix keeps the accuracy checks unchanged:
+
+- **On-disk cache for the IK precomputations** (`sampling/cache.py`, `$ISPATIALGYM_SAMPLING_CACHE`, default
+  `~/.cache/ispatialgym/sampling`, `off` to disable). Reach grids and grasp combination tables are keyed by the scene
+  (model + loaded rooms), the placed spawned objects, the stance, the lattice, the query poses and the IK settings.
+  Re-running a spec (more instances of an existing template) skips the IK entirely: IORS ontop template 80 s -> 17.5 s.
+- **Held-object precomputation uses the batched IK solver's solutions** instead of exact single solves, grouped by
+  trunk configuration (every new set of locked joints costs seconds). The torso embodiment now only needs its 0.2 s
+  batched solver instead of the 50-90 s planner build. Template precompute: object scaling 62 s -> 19 s, mental
+  rotation 232 s -> 20 s.
+- **Assisted-grasp establishment without the environment pipeline**: `robot.apply_action` + a non-rendering simulator
+  step (`SimWorld.control_step`) instead of `env.step`, which rendered and read six 1080^2 sensor buffers per step.
+  Held instance 7.2 s -> 4.0 s. Full steps that precede predicate evaluation keep rendering: the physics -> USD sync
+  that happens there is what refreshes the AABB-based predicates (a non-rendering variant made `Inside` fail).
+- Bodies teleported through the physics API are woken explicitly (`SimWorld.activate`, held-object placement,
+  disembedding drafts): a sleeping body keeps its old render transform and is then missing from segmentation renders.
+- Default reach translates are `[0.5, 0.75]` (deeper "sitting" translates never added a reachable cell on tables and
+  each costs a full IK pass); specs can still list more.
+- Disembedding: an occluded draw with no room in front of the target falls back to an unoccluded instance instead of
+  failing the attempt, and distractors that still occlude an unoccluded target are re-drawn (up to 3 times) before the
+  attempt is given up.
+
+Measured facts added: cuRobo's exact single IK is ~100 ms (arm) / ~750 ms (arm + torso) per call, while the batched
+12-seed solver costs a few ms per pose plus a fixed refresh per distinct trunk configuration.
+
 ## 1.0.0 (2026-09-11) - first complete version
 
 Everything in `ispatialgym/docs/instance_sampling_spec.md`:

@@ -109,7 +109,7 @@ class AttachmentSampler(TaskSampler):
             self.template_meta["grasp_key"] = key
         except (FileNotFoundError, ValueError) as e:
             raise Reject("spec", f"no grasp library entry for the male part: {e}")
-        translates = list(self.gen("reach_translates", [0.5, 0.75, 1.0, 1.25]))
+        translates = list(self.gen("reach_translates", self.DEFAULT_TRANSLATES))
         self.combos = self.grasp_combo_table(self.stance, self.cells, lambda xy, yaw: self._pose_on("male", xy, yaw, self.top.z), self.grasps, translates)
         keep = sorted(self.combos)
         if not keep:
@@ -185,7 +185,7 @@ class AttachmentSampler(TaskSampler):
                 continue
             if not self.frustum_ok(cam, self.hull_corners_world(self.hull["male"], pose), 0.05):
                 continue
-            tr_ok = self.reachable_poses(st, self.grasp_eef_poses(pose, g), [tr] + [t for t in self.gen("reach_translates", [0.5, 0.75, 1.0, 1.25]) if t != tr])
+            tr_ok = self.reachable_poses(st, self.grasp_eef_poses(pose, g), [tr] + [t for t in self.gen("reach_translates", self.DEFAULT_TRANSLATES) if t != tr])
             if tr_ok is None:
                 continue
             m_pose, chosen = pose, (g, tr_ok, yaw)

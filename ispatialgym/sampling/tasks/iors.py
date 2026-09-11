@@ -181,7 +181,7 @@ class IORSSampler(TaskSampler):
         # per-cell feasible (yaw, grasp, translate) combinations of the library grasps: sampling then never searches
         self.combos = {}
         if self.grasps:
-            translates = list(self.gen("reach_translates", [0.5, 0.75, 1.0, 1.25]))
+            translates = list(self.gen("reach_translates", self.DEFAULT_TRANSLATES))
             self.combos = self.grasp_combo_table(self.stance, self.cells, lambda xy, yaw: self._pose_on("target", xy, yaw, self.top.z),
                                                  self.grasps, translates)
             keep = sorted(self.combos)
@@ -226,7 +226,7 @@ class IORSSampler(TaskSampler):
         # target cell (reachable & visible lattice), then a (yaw, grasp) combination that is reachable there
         k = int(rng.integers(len(self.cells)))
         t_xy = self.cells[k]
-        translates = [self.reach_translates[k]] + [t for t in self.gen("reach_translates", [0.5, 0.75, 1.0, 1.25]) if t != self.reach_translates[k]]
+        translates = [self.reach_translates[k]] + [t for t in self.gen("reach_translates", self.DEFAULT_TRANSLATES) if t != self.reach_translates[k]]
         t_pose, chosen = None, None
         if self.grasps:
             combos = list(self.combos[k])

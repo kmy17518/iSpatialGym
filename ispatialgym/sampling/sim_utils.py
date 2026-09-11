@@ -187,8 +187,11 @@ class SimWorld:
         obj.keep_still()
 
     def activate(self, obj):
-        """Re-enable gravity for an object that has been placed."""
+        """Re-enable gravity for an object that has been placed. The body is woken explicitly: a sleeping body that was
+        teleported through the physics API keeps its old render transform (it is then absent from segmentation renders
+        although PhysX has it in view) until it is active during a rendering step."""
         obj.enable_gravity()
+        obj.wake()
         obj.keep_still()
 
     def park_robot(self, xy: Optional[th.Tensor] = None, floor_z: float = 0.0):
@@ -268,9 +271,25 @@ class SimWorld:
             for e in still:
                 e.keep_still()
 
-    def step(self, n: int = 1):
-        for _ in range(n):
+    def full_step(self, render: bool = True):
+        """One full simulator step. With ``render`` the physics -> USD/Fabric transform sync happens, which is what
+        refreshes the per-step object-state caches (AABBs, contacts, kinematic 'changed' flags): a non-rendering full
+        step leaves AABB-based predicates (Inside, OnTop) stale, so rendering stays on wherever predicates follow."""
+        with og.sim.render_on_step(render):
             og.sim.step()
+
+    def step(self, n: int = 1, render: bool = True):
+        for _ in range(n):
+            self.full_step(render)
+
+    def control_step(self, action: th.Tensor, n: int = 1):
+        """Apply a JoyLo action and step the simulator without rendering and without the environment's observation
+        pipeline (``env.step`` also reads and remaps six 1080^2 sensor buffers per step). Assisted grasping runs inside
+        the simulator step (``Robot.post_step``) on PhysX state, so grasps are established exactly as through
+        ``env.step``; callers that evaluate AABB-based predicates afterwards take one rendering :meth:`full_step`."""
+        for _ in range(n):
+            self.robot.apply_action(action)
+            self.full_step(render=False)
 
     def snapshot(self):
         return og.sim.dump_state(serialized=False)
@@ -345,7 +364,7 @@ class SimWorld:
             return True
         self.wake([obj])
         self.robot.keep_still()
-        og.sim.step()
+        self.full_step(render=True)
         if present():
             return True
         obj.visible = False
@@ -357,7 +376,7 @@ class SimWorld:
         p, q = obj.get_position_orientation()
         obj.set_position_orientation(p, q)
         obj.keep_still()
-        og.sim.step()
+        self.full_step(render=True)
         self.robot.keep_still()
         return present()
 
@@ -472,7 +491,7 @@ class SimWorld:
             if robot_still:
                 self.robot.keep_still()
         # one full step refreshes the per-step caches (AABBs, contacts) that step_physics leaves stale
-        og.sim.step()
+        self.full_step()
         if robot_still:
             self.robot.keep_still()
         return self.check_stability(ents)

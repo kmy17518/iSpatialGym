@@ -30,6 +30,7 @@ from ispatialgym.oracle import r1pro_model as M  # noqa: E402
 from ispatialgym.sampling import geometry as G  # noqa: E402
 from ispatialgym.sampling import knowledge as K  # noqa: E402
 from ispatialgym.sampling.bddl_writer import Bindings, Bound, build_problem  # noqa: E402
+from ispatialgym.sampling.cache import cache_get, cache_key, cache_put  # noqa: E402
 from ispatialgym.sampling.robot_utils import RobotKit, ViewSolution  # noqa: E402
 from ispatialgym.sampling.sim_utils import Reject, SimWorld, SupportTop  # noqa: E402
 from ispatialgym.sampling.spec import ModelChoice, ProblemSpec, SceneSpec, sha256_of_file, sha256_of_text  # noqa: E402
@@ -113,6 +114,10 @@ class TaskSampler:
     definition_id: int = 0
     #: settling steps and tolerances shared by all tasks
     DEFAULT_SETTLE_STEPS = 90
+    #: trunk translates tried for reaching ("sitting" levels). Measured on the R1Pro over a 0.80 m table: translates
+    #: beyond 0.75 never added a reachable cell and each one costs a full IK pass, so the default stops there
+    #: (``generation.reach_translates`` overrides, e.g. for low supports).
+    DEFAULT_TRANSLATES = [0.5, 0.75]
 
     def __init__(self, ctx: SamplerContext):
         self.ctx = ctx
@@ -146,6 +151,7 @@ class TaskSampler:
 
     def setup(self):
         t0 = time.time()
+        k0 = self.kit.stats_snapshot()
         self.bind_fixed_roles()
         self.spawn_roles()
         self.kit.sync_world()
@@ -155,10 +161,13 @@ class TaskSampler:
         self.template_meta["bddl_sha256"] = sha256_of_text(self.problem.text)
         self.build_scope()
         self.template_meta["timings"]["bind_spawn_s"] = time.time() - t0
+        k1 = self.kit.stats_snapshot()
+        self.template_meta["timings"]["bind_spawn_kit"] = self.kit.stats_delta(k0, k1)
         t1 = time.time()
         self.kit.sync_world()
         self.prepare_template()
         self.template_meta["timings"]["prepare_template_s"] = time.time() - t1
+        self.template_meta["timings"]["prepare_template_kit"] = self.kit.stats_delta(k1, self.kit.stats_snapshot())
         self.template_meta["bindings"] = [b.__dict__ for b in self.bindings.all()]
 
     def bind_fixed_roles(self):  # hook
@@ -251,7 +260,7 @@ class TaskSampler:
         stale, and sleeping objects are treated as unchanged by ``KinematicsMixin``."""
         self.world.wake(self.objects.values())
         self.robot.keep_still()
-        og.sim.step()
+        self.world.full_step()
         self.robot.keep_still()
         for e in self.scope.values():
             if isinstance(e, GroupEntity):
@@ -500,14 +509,21 @@ class TaskSampler:
                 seed = int(self.ctx.base_seed * 1000003 + index * 1009 + attempt)
                 rng = np.random.default_rng(seed)
                 t0 = time.time()
+                k0 = self.kit.stats_snapshot()
                 try:
                     draft = self.sample(rng)
+                    t_sample = time.time() - t0
                     self.apply_draft(draft)
+                    t_apply = time.time() - t0 - t_sample
                     self.settle_and_validate(draft)
+                    t_settle = time.time() - t0 - t_sample - t_apply
                     self.check_goal_feasible(draft)
                     if self.template_paths is None:
                         self.save_template()
                     draft.summary["wall_time_s"] = time.time() - t0
+                    draft.summary["phase_s"] = {"sample": round(t_sample, 2), "apply": round(t_apply, 2), "settle_validate": round(t_settle, 2),
+                                                "goal_check_and_write": round(time.time() - t0 - t_sample - t_apply - t_settle, 2)}
+                    draft.summary["kit"] = self.kit.stats_delta(k0, self.kit.stats_snapshot())
                     written.append(self.write_instance(draft, index, seed))
                     log.info("%s: instance %d written (attempt %d, %.1fs)", self.spec.name, index, attempt, time.time() - t0)
                     ok = True
@@ -551,7 +567,7 @@ class TaskSampler:
         ``focus_xy`` (or to the edge centre), then the free run behind the robot.
         """
         stand_off = float(self.gen("stand_off", 0.45)) if stand_off is None else stand_off
-        translates = list(self.gen("reach_translates", [0.5, 0.75, 1.0, 1.25])) if translates is None else list(translates)
+        translates = list(self.gen("reach_translates", self.DEFAULT_TRANSLATES)) if translates is None else list(translates)
         if M.DEFAULT_TRUNK_TRANSLATE not in translates:
             translates = [M.DEFAULT_TRUNK_TRANSLATE] + translates
         q0 = self.kit.q_config(arms=arms, translate=M.DEFAULT_TRUNK_TRANSLATE)
@@ -690,15 +706,44 @@ class TaskSampler:
         kept = [c for c in cells if top.contains(c, margin)]
         return th.stack(kept) if kept else th.zeros(0, 2)
 
+    def _cache_context(self, stance: Stance) -> Dict[str, Any]:
+        """Everything the collision world / IK setup depends on: the scene (model + loaded rooms fix the scene objects),
+        spawned objects that are already placed (e.g. trays), the stance and the IK settings."""
+        from ispatialgym.sampling.sim_utils import PARK_POSITION
+
+        placed = []
+        for o in self.world.spawned.values():
+            p, q = o.get_position_orientation()
+            if float(th.linalg.norm(p[:2] - PARK_POSITION[:2])) > 1.0:
+                placed.append((o.category, o.model, p, q))
+        return {
+            "scene": self.world.scene_model,
+            "rooms": sorted(self.world.rooms or []),
+            "base": list(stance.base_pose2d),
+            "arms": self.REACH_ARMS,
+            "ignore": sorted(o.name for o in self.grasp_ignore()),
+            "seeds": int(getattr(self.kit.backend, "batch_ik_seeds", 12)),
+            "floor_z": self.kit.floor_z,
+            "placed": placed,
+        }
+
     def reachable_cells(self, cells: th.Tensor, stance: Stance, z: float, translates=None, yaws=None, tilts=(0.0, 30.0)) -> Tuple[th.Tensor, List[Optional[float]]]:
-        translates = list(self.gen("reach_translates", [0.5, 0.75, 1.0, 1.25])) if translates is None else list(translates)
+        translates = list(self.gen("reach_translates", self.DEFAULT_TRANSLATES)) if translates is None else list(translates)
         translates = self.stance_free_translates(stance, translates)
         if not translates:
             return th.zeros(len(cells), dtype=th.bool), [None] * len(cells)
         yaw0 = stance.base_pose2d[2]
         yaws = [yaw0, yaw0 + math.pi / 2] if yaws is None else yaws
+        key = cache_key("reach_grid", {**self._cache_context(stance), "cells": cells, "z": z, "translates": translates, "yaws": list(yaws), "tilts": list(tilts)})
+        hit = cache_get(key)
+        if hit is not None and len(hit.get("mask", [])) == len(cells):
+            log.info("reach grid: cache hit (%d cells)", len(cells))
+            tr = [None if i is None else translates[int(i)] for i in hit["tr"]]
+            return th.tensor(hit["mask"], dtype=th.bool), tr
         q_seed = self.reach_seed(stance, translates[0])
-        return self.kit.reach_grid(q_seed, cells, z, yaws, translates, toward=stance.inward, tilts=tilts, ignore_for_grasp=self.grasp_ignore())
+        mask, tr = self.kit.reach_grid(q_seed, cells, z, yaws, translates, toward=stance.inward, tilts=tilts, ignore_for_grasp=self.grasp_ignore())
+        cache_put(key, {"mask": mask.tolist(), "tr": [None if t is None else translates.index(t) for t in tr]})
+        return mask, tr
 
     def grasp_ignore(self) -> List[Any]:
         """Objects ignored for the *grasp* pose collision check (the support: fingertips may touch / dip into it, the
@@ -708,7 +753,7 @@ class TaskSampler:
     def reachable_poses(self, stance: Stance, eef_poses: Sequence[G.Pose], translates=None, ignore_for_last=None) -> Optional[float]:
         """Exact (32-seed) check that every eef pose is IK-feasible from the stance at some collision-free translate
         (the last pose is checked with the support -- or ``ignore_for_last`` -- ignored)."""
-        translates = list(self.gen("reach_translates", [0.5, 0.75, 1.0, 1.25])) if translates is None else list(translates)
+        translates = list(self.gen("reach_translates", self.DEFAULT_TRANSLATES)) if translates is None else list(translates)
         ignore = self.grasp_ignore() if ignore_for_last is None else list(ignore_for_last)
         for tr in self.stance_free_translates(stance, translates):
             if self.kit.reachable(eef_poses, self.reach_seed(stance, tr), ignore_for_last=ignore) is not None:
@@ -727,6 +772,17 @@ class TaskSampler:
         table: Dict[int, List[Tuple[float, Any, float]]] = {}
         free_tr = self.stance_free_translates(stance, translates)
         ignore = self.grasp_ignore()
+        by_name = {g.name: g for g in grasps}
+        # the object pose per (cell, yaw) is what the eef poses derive from; the poses at yaw 0 pin down the height / rest
+        key = cache_key("grasp_combos", {**self._cache_context(stance), "cells": cells, "translates": list(translates), "yaws": yaws,
+                                         "grasps": [(g.key, g.name, g.position, g.quat) for g in grasps],
+                                         "poses0": [list(pose_at(c, 0.0)[0]) + list(pose_at(c, 0.0)[1]) for c in cells]})
+        hit = cache_get(key)
+        if hit is not None:
+            log.info("grasp combination table: cache hit (%d cells)", len(hit))
+            for i_str, lst in hit.items():
+                table[int(i_str)] = [(yaws[int(yi)], by_name[gn], float(translates[int(ti)])) for yi, gn, ti in lst if gn in by_name]
+            return table
         for tr in free_tr:
             q_seed = self.reach_seed(stance, tr)
             todo = [i for i in range(len(cells)) if i not in table]
@@ -745,6 +801,7 @@ class TaskSampler:
             for (i, yaw, g), s in zip(index, feas.tolist()):
                 if s:
                     table.setdefault(i, []).append((yaw, g, float(tr)))
+        cache_put(key, {str(i): [(yaws.index(yaw), g.name, list(translates).index(tr)) for yaw, g, tr in lst] for i, lst in table.items()})
         return table
 
     def coarse_cells(self, cells: th.Tensor, resolution: float, raster: float) -> th.Tensor:

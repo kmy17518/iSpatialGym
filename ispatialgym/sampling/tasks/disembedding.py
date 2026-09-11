@@ -352,7 +352,7 @@ class DisembeddingSampler(TaskSampler):
             self.template_meta["grasp_key"] = key
         except (FileNotFoundError, ValueError) as e:
             raise Reject("spec", f"no grasp library entry for the target: {e}")
-        translates = list(self.gen("reach_translates", [0.5, 0.75, 1.0, 1.25]))
+        translates = list(self.gen("reach_translates", self.DEFAULT_TRANSLATES))
         yaws = list(th.linspace(-math.pi, math.pi, 9)[:-1].tolist())
         self.combos = self.grasp_combo_table(self.stance, self.cells, lambda xy, yaw: self._pose_on("target", xy, yaw, self.src_floor.z), self.grasps, translates, yaws=yaws)
         # placement feasibility at the destination centre per (yaw, grasp) from the shifted stance
@@ -420,14 +420,14 @@ class DisembeddingSampler(TaskSampler):
             if not self.frustum_ok(cam, self.hull_corners_world(self.hull["target"], pose), 0.03):
                 fails["view"] += 1
                 continue
-            tr_ok = self.reachable_poses(st, self.grasp_eef_poses(pose, g), [tr] + [t for t in self.gen("reach_translates", [0.5, 0.75, 1.0, 1.25]) if t != tr])
+            tr_ok = self.reachable_poses(st, self.grasp_eef_poses(pose, g), [tr] + [t for t in self.gen("reach_translates", self.DEFAULT_TRANSLATES) if t != tr])
             if tr_ok is None:
                 fails["grasp_ik"] += 1
                 continue
             goal = self._pose_on("target", self.dst_centre, yaw, self.dst_floor.z)
             tr_place = self.place_ok[(yaw0, g.name)]
             tr_p = self.reachable_poses(self.place_stance, self.grasp_eef_poses(goal, g),
-                                        [tr_place] + [t for t in self.gen("reach_translates", [0.5, 0.75, 1.0, 1.25]) if t != tr_place],
+                                        [tr_place] + [t for t in self.gen("reach_translates", self.DEFAULT_TRANSLATES) if t != tr_place],
                                         ignore_for_last=self.grasp_ignore() + [self.obj("tray_dest")])
             if tr_p is None:
                 fails["place_ik"] += 1
@@ -452,9 +452,14 @@ class DisembeddingSampler(TaskSampler):
             o_yaw = float(rng.uniform(-math.pi, math.pi))
             base_xy, dist = self._front_position(occluder, o_yaw, t_pose, t_fp, to_cam)
             if base_xy is None:
-                raise Reject("occlusion", "no supported position on the camera ray in front of the target")
-            d.object_poses[occluder] = self._pose_on(occluder, base_xy, o_yaw, self.src_floor.z)
-            placed[occluder] = self.world.footprint(self.hull[occluder], d.object_poses[occluder])
+                if "occluded" in self.variant_overrides:
+                    raise Reject("occlusion", "no supported position on the camera ray in front of the target")
+                # no room in front of the target on this tray: produce an unoccluded instance instead of wasting the attempt
+                occluded, occluder = False, None
+                d.summary["occlusion_fallback"] = "no room in front of the target"
+            else:
+                d.object_poses[occluder] = self._pose_on(occluder, base_xy, o_yaw, self.src_floor.z)
+                placed[occluder] = self.world.footprint(self.hull[occluder], d.object_poses[occluder])
         for n in order:
             if n == occluder:
                 continue
@@ -473,8 +478,23 @@ class DisembeddingSampler(TaskSampler):
         if occluded and occluder is not None:
             self._tune_occluder(d, rng, occluder, tname, dnames, to_cam, occ)
         else:
+            max_ratio = float(occ.get("unoccluded_max_ratio", 0.10))
             ratio, vis, ref = self._occlusion(tname, dnames)
-            if ratio > float(occ.get("unoccluded_max_ratio", 0.10)):
+            # perspective (the camera looks down from above) lets a distractor beside the target still overlap it in the
+            # image: re-draw the distractor positions a few times before giving the attempt up
+            for _ in range(int(occ.get("unoccluded_redraws", 3))):
+                if ratio <= max_ratio or not dnames:
+                    break
+                placed = {tname: t_fp}
+                for n in dnames:
+                    pose = self._random_free_position(rng, n, placed, t_pose, to_cam, avoid_front=True)
+                    if pose is None:
+                        raise Reject("distractor_placement", f"no free position for {n}")
+                    d.object_poses[n] = pose
+                    placed[n] = self.world.footprint(self.hull[n], pose)
+                self._teleport(d)
+                ratio, vis, ref = self._occlusion(tname, dnames)
+            if ratio > max_ratio:
                 raise Reject("occlusion", f"unoccluded instance has ratio {ratio:.2f}")
             d.extras["initial_occlusion"] = self._occlusion_record(tname, dnames, occluded, ratio, vis, ref)
         goal = self._pose_on("target", self.dst_centre, G.yaw_of(t_pose[1]), self.dst_floor.z)
@@ -525,6 +545,7 @@ class DisembeddingSampler(TaskSampler):
         for name, pose in draft.object_poses.items():
             obj = self.objects[name]
             obj.set_position_orientation(G.t(pose[0]), G.t(pose[1]))
+            obj.wake()  # sleeping bodies keep a stale render transform after a physics-side teleport
             obj.keep_still()
         self.kit.apply(draft.robot_q, draft.base_pose2d)
         self.world.step_physics(1, still=[self.robot] + [self.objects[n] for n in draft.object_poses])
