@@ -329,6 +329,7 @@ class TaskSampler:
         holds, status = self.binary_goal_holds()
         if holds:
             raise Reject("goal_satisfied_at_init", str(status))
+        draft.summary["bddl_at_init"] = {"init_conditions_all_true": True, "goal": self.goal_report(status)}
         err = self.world.drift_after(free, steps=10)
         if err:
             raise Reject("drift", err)
@@ -372,7 +373,10 @@ class TaskSampler:
             if not holds:
                 failed = [c["bddl"] for c in self.goal_report(status) if not c["satisfied"] and "pose_settled" not in c["bddl"]]
                 raise Reject("goal_infeasible", f"unsatisfied {failed}; goal objects (pos, aabb lo, aabb hi) {settled}")
-            draft.summary["goal_check"] = {"settled_poses": {o.name: [o.get_position_orientation()[0].tolist(), o.get_position_orientation()[1].tolist()] for o in ents}}
+            draft.summary["goal_check"] = {
+                "settled_poses": {o.name: [o.get_position_orientation()[0].tolist(), o.get_position_orientation()[1].tolist()] for o in ents},
+                "goal": self.goal_report(status),  # every binary goal atom evaluated true at the teleported+settled goal
+            }
         finally:
             self.world.restore(state)
             self.world.keep_still(self.objects.values())
@@ -458,6 +462,10 @@ class TaskSampler:
         p, q = self.robot.get_position_orientation()
         robot_poses = {"robot": [{"position": p.tolist(), "orientation": q.tolist()}]}
         t0 = time.time()
+        # the template must equal the stable scene except for the task objects and the robot
+        n_reset = self.world.reset_scene_objects([o.name for o in self.objects.values()])
+        if n_reset:
+            log.warning("%s: %d non-task scene objects were reset right before saving the template", self.spec.name, n_reset)
         partial, full = self.world.save_template(self.ctx.out_dir, inst_to_name, robot_poses)
         self.template_paths = (partial, full)
         self.template_sha = sha256_of_file(full)
@@ -511,6 +519,12 @@ class TaskSampler:
                 t0 = time.time()
                 k0 = self.kit.stats_snapshot()
                 try:
+                    # every attempt starts from the stable scene: whatever physics did to non-task objects during the
+                    # previous attempt must not leak into this instance (or into the template)
+                    n_reset = self.world.reset_scene_objects([o.name for o in self.objects.values()])
+                    if n_reset:
+                        self.rejections["scene_reset"] = self.rejections.get("scene_reset", 0) + n_reset
+                        log.info("%s: %d non-task scene objects had drifted and were reset", self.spec.name, n_reset)
                     draft = self.sample(rng)
                     t_sample = time.time() - t0
                     self.apply_draft(draft)

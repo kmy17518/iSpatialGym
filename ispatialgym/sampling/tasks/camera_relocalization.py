@@ -155,6 +155,7 @@ class CameraRelocalizationSampler(TaskSampler):
                 failed = [c["bddl"] for c in self.goal_report(status) if not c["satisfied"]]
                 raise Reject("goal_infeasible", f"unsatisfied at the goal configuration: {failed}")
             draft.summary["goal_fk_error"] = {"position_m": err_p, "orientation_rad": err_o}
+            draft.summary["goal_check"] = {"goal": self.goal_report(status)}
         finally:
             self.world.restore(state)
             self.robot.keep_still()

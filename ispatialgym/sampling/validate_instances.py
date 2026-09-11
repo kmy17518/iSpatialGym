@@ -98,6 +98,26 @@ def validate_template(template_dir: str, extra_steps: int, check_goal: bool, pos
             "termination_config": {"max_steps": 10 ** 6},
         },
     }
+    # the template must equal the stable scene json except for the task objects and the robot
+    from ispatialgym.sampling.sim_utils import stable_scene_path
+
+    with open(stable_scene_path(meta["scene"])) as f:
+        stable_reg = json.load(f)["state"]["registry"]["object_registry"]
+    with open(os.path.join(template_dir, "template.json")) as f:
+        tmpl_reg = json.load(f)["state"]["registry"]["object_registry"]
+    task_names = set(meta.get("inst_to_name", {}).values())
+    devs = {}
+    for name, st in tmpl_reg.items():
+        if name in task_names or name not in stable_reg or "root_link" not in st:
+            continue
+        dp = float(th.linalg.norm(th.tensor(st["root_link"]["pos"]) - th.tensor(stable_reg[name]["root_link"]["pos"])))
+        da = _quat_angle(st["root_link"]["ori"], stable_reg[name]["root_link"]["ori"])
+        if dp > 1e-3 or da > 5e-3:
+            devs[name] = {"pos": round(dp, 4), "ang": round(da, 4)}
+    results["template_scene_deviations"] = devs
+    if devs:
+        log.warning("%s: %d non-task scene objects differ from the stable scene json: %s", problem, len(devs), dict(list(devs.items())[:5]))
+
     t0 = time.time()
     env = og.Environment(configs=cfg)
     results["scene_load_s"] = time.time() - t0
@@ -132,6 +152,9 @@ def validate_template(template_dir: str, extra_steps: int, check_goal: bool, pos
             cur = robot.get_joint_positions()
             jerr = max([abs(float(cur[names.index(n)]) - float(v)) for n, v in jp.items() if n in names] or [0.0])
             rec["checks"]["robot_joint_err"] = jerr
+            if devs:
+                rec["ok"] = False
+                rec["notes"].append(f"template differs from the stable scene json for {len(devs)} non-task objects (max {max(d['pos'] for d in devs.values()):.3f} m)")
             # init conditions
             ok_init, status = task.compiled_task.check_initial_conditions(task._evaluate_predicate)
             if not ok_init and constrained:

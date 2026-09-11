@@ -456,6 +456,15 @@ class HeldObjectSampler(TaskSampler):
             st = target.states[PoseReached]
             if not bool(st.get_value()):
                 raise Reject("goal_infeasible", f"pose_reached false at the goal configuration (errors {st.get_error()})")
+            # full goal expression at this configuration (no extra sim step: the assisted grasp must not be disturbed)
+            _, status = self.compiled.check_goal(self._evaluate)
+            report = self.goal_report(status)
+            failed = [c["bddl"] for c in report if not c["satisfied"] and "pose_settled" not in c["bddl"]]
+            if [f for f in failed if "grasped" not in f]:
+                raise Reject("goal_infeasible", f"unsatisfied at the goal configuration: {failed}")
+            if failed:  # AG bookkeeping after the teleport; the grasp itself was established in simulation at init
+                log.warning("%s: 'grasped' reads false right after the goal teleport: %s", self.spec.name, failed)
+            draft.summary["goal_check"] = {"goal": report}
             draft.summary["goal_self_occlusion"] = occ
         finally:
             self.world.restore(state)

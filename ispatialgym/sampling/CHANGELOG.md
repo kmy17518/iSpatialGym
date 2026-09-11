@@ -2,6 +2,30 @@
 
 Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampling_report_*.json`).
 
+## 1.2.0 (2026-09-11) - scene-reset guarantee, on-disk evidence, init renders
+
+- **Every attempt starts from the stable scene.** `SimWorld.reset_scene_objects` reloads the state of every non-task
+  scene object from the scene json before each attempt and right before `template.json` is written, so instances differ
+  from the scene json only in the task-relevant objects and the robot. Previously only the 5 cm / 0.05 rad
+  `check_scene_unchanged` guard existed; smaller creep did leak into templates (measured on the v1.1 outputs: a living
+  room floor lamp 3-5 mm off in four templates, everything else identical). Reset counts are logged
+  (`rejections.scene_reset`).
+- `validate_instances.py` compares every non-task object of `template.json` with the stable scene json (1 mm /
+  0.005 rad) and fails the template otherwise (`template_scene_deviations`).
+- Per-instance summaries now carry the BDDL truth tables: `bddl_at_init` (init conditions all true, every goal atom
+  with its value; the binary goal is false) and `goal_check.goal` (every binary goal atom true at the teleported and
+  settled goal). Held-object tasks evaluate the complete goal expression at the goal configuration as well (previously
+  `pose_reached` only); a `grasped` atom that reads false right after the teleport is logged, any other false atom
+  rejects the draft.
+- New `render_instances.py`: one PNG per instance in the BEHAVIOR replay layout (left wrist | head | right wrist on top,
+  the replay's over-the-shoulder external camera below) plus a per-problem contact sheet under `<out>/renders/`.
+  Objects the loader cannot restore yet (assisted grasps, hinge constraints) are posed from the TRO with gravity off.
+  30 / 30 v1.1 instances rendered and inspected.
+- Spec §3.3 corrected: the R1Pro articulation root (`base_footprint_x`) is anchored to the world by a fixed joint at
+  the creation pose and never moves while the simulator plays; `set_position_orientation` only rewrites the six
+  virtual joints (measured). The base sinks through the prismatic z joint when parked over an unloaded room, hence the
+  parking rule.
+
 ## 1.1.0 (2026-09-11) - efficiency pass (same outputs, same checks)
 
 Profiling (`template_meta.timings.*_kit`, `summary.phase_s` / `summary.kit`, new in this version) showed three hot

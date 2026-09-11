@@ -144,7 +144,13 @@ The TRO records the room list.
 - Objects never interpenetrate: 2D footprints keep >= 1 cm clearance (unless a task asks for
   contact), and nothing is placed inside the robot's or another object's AABB.
 - Placement uses stable rest orientations only: canonical up, or the grasp library's
-  `rest_quat_wxyz` for models that must lie on a side.
+  `rest_quat_wxyz` for models that must lie on a side, times a random yaw. This is narrower than
+  BEHAVIOR's kinematic sampler (`object_state_utils.sample_kinematics` →
+  `DatasetObject.sample_orientation`), which draws one of the asset's precomputed stable
+  orientations weighted by their probability and adds a random yaw. The restriction is
+  deliberate: the grasp library's poses are validated for the rest orientation, and the goal
+  predicates (`ontop`, `nextto`, ...) do not depend on it. Extending to the other stable
+  orientations would mean re-validating grasps per orientation.
 
 ### 3.3 Robot
 
@@ -164,12 +170,21 @@ The TRO records the room list.
   for non-floor links).
 - `robot_poses.robot[0]` (BEHAVIOR) and `robot_state.joint_positions` (the 22 real joints; the
   six virtual base joints are excluded) are written; the loader restores both.
-- Implementation facts: R1Pro's holonomic base is realised by six virtual joints under an
-  articulation root that never moves from the spawn pose, so "the base pose" is a joint vector
-  (`RobotKit.q_at_base_pose` always sets x / y / yaw *and* z / roll / pitch from the floor height).
-  cuRobo stores obstacles relative to that root at sync time; the sampler parks the robot on a
-  free cell of a **loaded** room (elsewhere there is no floor and the root would sink, shifting
-  the whole collision world) and re-syncs if the root moved more than 1 cm.
+- Implementation facts (OmniGibson `HolonomicBaseRobot`): the articulation root of R1Pro is the
+  mass-less virtual link `base_footprint_x`, anchored to the world by a fixed joint at the pose the
+  robot was *created* at (`PARK_POSITION` = (40, 40, 5) in the sampler and the validator); below it
+  the chain `base_footprint_{x,y,z,rx,ry,rz}_joint` leads to `base_footprint_link`, the link every
+  "robot pose" refers to. While the simulator plays, `robot.set_position_orientation()` does not move
+  the root: it converts the requested pose into the six virtual joint values (measured: root stays at
+  (40, 40, 5), base at (13.8, 1.8, 0) ⇒ x/y/z joints = (−26.2, −38.2, −5.0)). Consequently "the base
+  pose" is part of the joint vector (`RobotKit.q_at_base_pose` sets x / y / yaw *and* z / roll /
+  pitch from the floor height), the TRO stores the base as a world pose plus the 22 real joints, and
+  a loading process recomputes the virtual joints relative to *its own* root — the first and the
+  n-th instance loaded in a process go through exactly the same path. Gravity acts on the base
+  through the prismatic z joint: parked over a region without floor mesh (an unloaded room) the base
+  falls, which is why the sampler parks on a free cell of a **loaded** room. cuRobo stores obstacles
+  relative to the root at sync time; `RobotKit._ensure_synced` re-syncs if the root itself moved more
+  than 1 cm (a guard; with the fixed world joint this is not expected to trigger).
 
 ### 3.4 Camera model and visibility
 
@@ -213,6 +228,18 @@ For every instance:
    section 5.
 6. Write TRO + summary; `update_initial_file`/`reset` to the init state for the next instance.
 
+Scene reset (v1.2): before **every** attempt, and again right before `template.json` is written,
+`SimWorld.reset_scene_objects` reloads every non-task scene object (pose, velocities, joints)
+from the stable scene json. Instances therefore differ from the scene json only in the task
+objects and the robot, whatever physics did meanwhile (a task object nudging furniture, slow
+creep of the living-room floor lamp, ...). The 5 cm / 0.05 rad `check_scene_unchanged` guard is
+kept as a rejection criterion for gross disturbance during the instance's own settling.
+
+Evidence written per instance (`<iid>.summary.json`): `bddl_at_init` (init conditions all true,
+every goal atom with its truth value at init; the binary goal is false) and `goal_check.goal`
+(every binary goal atom true at the teleported and settled goal; `pose_settled` atoms are
+runtime-only and excluded).
+
 Kinematic predicates are cached per object pair and treat sleeping objects as unchanged, so the
 sampler wakes / re-places task objects before every predicate evaluation
 (`task_definition_and_evaluation.md`, "Caveat for scripted settling code").
@@ -224,7 +251,14 @@ false, no drift of any task object over 60 further steps, robot pose / joints eq
 and (informational) the binary goal after a plain teleport to the world-frame targets. Spawned
 objects carry `in_rooms` = the loaded rooms in the template, otherwise partial-room loading would
 skip them. Status for the test set: 29 / 29 instances pass (held-object `grasped` and hinge
-constraints are skipped until the loader restores them).
+constraints are skipped until the loader restores them). Since v1.2 it also diffs every non-task
+object of `template.json` against the stable scene json (1 mm / 0.005 rad).
+
+Visual check: `render_instances.py` loads every instance the same way and writes
+`<iid>-init.png` in the BEHAVIOR replay layout (`joylo/scripts/replay_data.py`: left wrist |
+head | right wrist on top, the replay's over-the-shoulder external camera on `base_link` below)
+plus a per-problem contact sheet in `<out>/renders/`. Grasped / hinged objects, which the loader
+cannot restore yet, are posed from the TRO with gravity disabled for the picture.
 
 ### 3.7 Reachability without trial and error
 

@@ -478,6 +478,30 @@ class SimWorld:
                 return f"scene object {o.name} rotated"
         return None
 
+    def reset_scene_objects(self, task_object_names: Iterable[str] = ()) -> int:
+        """Put every non-task scene object back into exactly the state of the stable scene json (pose, velocities,
+        joints). Called before every instance attempt and before a template is saved, so that instances differ from
+        the scene json only in the task-relevant objects and the robot, whatever physics did meanwhile (objects
+        nudged by a settling task object, slow creep of stacked furniture over thousands of steps, ...).
+        Returns the number of objects whose pose actually changed by more than 1 mm / 0.005 rad."""
+        from omnigibson.utils.python_utils import recursively_convert_to_torch
+
+        task_names = set(task_object_names) | set(self.spawned) | {self.robot.name}
+        ref = self.stable_scene["state"]["registry"]["object_registry"]
+        n_changed = 0
+        for o in self.scene.objects:
+            if o.name in task_names or o.name not in ref:
+                continue
+            r = ref[o.name]["root_link"]
+            p, q = o.get_position_orientation()
+            moved = float(th.linalg.norm(p - th.tensor(r["pos"]))) > 0.001 or G.quat_angle(q, th.tensor(r["ori"])) > 0.005
+            if moved:
+                n_changed += 1
+            if moved or o.n_joints > 0:  # articulated scene objects (doors, drawers) can drift in their joints too
+                o.load_state(recursively_convert_to_torch(copy.deepcopy(ref[o.name])), serialized=False)
+                o.keep_still()
+        return n_changed
+
     def settle(self, task_entities: Iterable, steps: int = 60, robot_still: bool = True) -> Optional[str]:
         """Let the task objects settle under physics (robot base held) and report residual motion."""
         ents = list(task_entities)

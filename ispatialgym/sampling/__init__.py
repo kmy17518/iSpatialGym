@@ -10,4 +10,4 @@ Modules that do not import OmniGibson (``knowledge``, ``spec``, ``bddl_writer``,
 ``grasp_library``) can be used and tested without a simulator.
 """
 
-SAMPLER_VERSION = "1.1.0"
+SAMPLER_VERSION = "1.2.0"
