@@ -84,7 +84,7 @@ def validate_template(template_dir: str, extra_steps: int, check_goal: bool, pos
         "robots": [
             M.joylo_robot_config(
                 "robot_r1",
-                obs_modalities=["rgb", "seg_instance"],
+                obs_modalities=["rgb"],  # no seg_instance: Isaac 5.1 synthetic-data graph crashes with the neighbouring rooms in view
                 sensor_config={"VisionSensor": {"sensor_kwargs": {"image_height": IMAGE_SIZE, "image_width": IMAGE_SIZE}}},
                 position=PARK_POSITION.tolist(),
             )
@@ -136,11 +136,13 @@ def validate_template(template_dir: str, extra_steps: int, check_goal: bool, pos
             task.load_tro_instance(env, tro=tro, settle_steps=25)
             scope = task.object_scope
             physical = {k: v for k, v in scope.items() if v is not None and not isinstance(v, GroupEntity)}
-            # kinematic predicates cache per step and treat sleeping objects as unchanged: wake + one full step
+            # kinematic predicates cache per step and treat sleeping objects as unchanged: wake + a few full steps (the
+            # robot needs to rest on the floor for `ontop agent floor`: its base starts a few mm above it)
             for ent in physical.values():
                 if hasattr(ent, "wake"):
                     ent.wake()
-            og.sim.step()
+            for _ in range(3):
+                og.sim.step()
             for ent in task.group_entities.values():
                 ent.invalidate()
             # robot pose / joints

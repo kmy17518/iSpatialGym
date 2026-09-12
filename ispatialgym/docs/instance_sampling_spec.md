@@ -128,9 +128,18 @@ the BDDL writer maps roles to instance names.
 
 Candidates: `house_single_floor`, `house_double_floor_upper`, `house_double_floor_lower`,
 `Rs_int`, `hotel_suite_large`, `restaurant_diner`, `office_cubicles_right` (2026 challenge
-`<scene>_stable.json`). A template loads only `load_room_instances` = rooms of the bound fixed
-objects + `scenes.<scene>.rooms`; walls, ceilings and doors always load (OmniGibson behaviour).
-The TRO records the room list.
+`<scene>_stable.json`). Rooms: the *task rooms* are `scenes.<scene>.rooms` + the rooms of the
+bound fixed objects; `template_meta.load_room_instances` (what evaluation, validation and
+rendering load) adds their **neighbours** - room instances whose segmentation-map footprint lies
+within 0.6 m of a task room (shared wall or doorway; `SimWorld.adjacent`, outdoor rooms such as
+gardens excluded) - so that walls, doors and furniture seen through doorways and windows exist
+instead of sky. Walls, ceilings and doors of the loaded rooms always load (OmniGibson
+behaviour). The sampler itself loads the task rooms only (`template_meta.sampled_with_rooms`;
+`ISG_LOAD_ADJACENT=1` changes that): its `seg_instance` measurement renders crash Isaac Sim 5.1's
+synthetic-data graph on house_single_floor as soon as the kitchen or the garden come into view,
+and the neighbours' objects never occlude a tabletop target nor collide with a stance inside the
+task room (cuRobo obstacles are limited to the task rooms' extent + 1 m anyway). Category-based
+fixed roles bind to task-room objects only. The TRO records the room list.
 
 ### 3.2 Support and placement
 
@@ -230,7 +239,10 @@ For every instance:
 
 Scene reset (v1.2): before **every** attempt, and again right before `template.json` is written,
 `SimWorld.reset_scene_objects` reloads every non-task scene object (pose, velocities, joints)
-from the stable scene json. Instances therefore differ from the scene json only in the task
+from the stable scene json. Every template also starts from a clean world (v1.3): scene objects
+reset and the robot parked with tucked arms at the room's free centre before the fixed roles are
+bound - left at the previous template's stance, its untucked arms hover over the table and the
+support raster's downward rays hit them (cells wrongly "occupied"). Instances therefore differ from the scene json only in the task
 objects and the robot, whatever physics did meanwhile (a task object nudging furniture, slow
 creep of the living-room floor lamp, ...). The 5 cm / 0.05 rad `check_scene_unchanged` guard is
 kept as a rejection criterion for gross disturbance during the instance's own settling.
@@ -245,10 +257,12 @@ sampler wakes / re-places task objects before every predicate evaluation
 (`task_definition_and_evaluation.md`, "Caveat for scripted settling code").
 
 A separate `validate_instances.py` reloads every template + TRO in a fresh process
-(`InteractiveTraversableScene(scene_file=template, load_room_instances=...)` with the JoyLo robot
-from the config + `ISpatialGymTask.load_tro_instance`) and checks: `:init` true, binary goal
-false, no drift of any task object over 60 further steps, robot pose / joints equal to the TRO,
-and (informational) the binary goal after a plain teleport to the world-frame targets. Spawned
+(`InteractiveTraversableScene(scene_file=template, load_room_instances=...)` - task rooms plus
+neighbours, rgb sensors only - with the JoyLo robot from the config +
+`ISpatialGymTask.load_tro_instance`, three settling steps so that the robot rests on the floor)
+and checks: `:init` true, binary goal false, no drift of any task object over 60 further steps,
+robot pose / joints equal to the TRO, and (informational) the binary goal after a plain teleport
+to the world-frame targets. Spawned
 objects carry `in_rooms` = the loaded rooms in the template, otherwise partial-room loading would
 skip them. Status for the test set: 29 / 29 instances pass (held-object `grasped` and hinge
 constraints are skipped until the loader restores them). Since v1.2 it also diffs every non-task
@@ -390,13 +404,22 @@ Shared init ("held object"):
    beyond the right arm at every trunk. The solver therefore also walks `init_depth_fallbacks`
    (0.50, 0.45, 0.40, 0.35 m) and `hold_trunks`; the test objects hold at depth 0.50, trunk
    (0.5, 0), roll 15 deg. The realised depth goes to `template_meta.hold`.
-2. Grasp: a library grasp `g` (eef pose in object frame, `T_obj_eef`) is chosen per instance
-   from the reviewer-ok rows. The object is teleported to `T_eef(H) * inv(T_obj_eef)` with
-   gravity disabled and kept still, the gripper closes for up to 60 control steps, assisted
-   grasping must attach (`robot._ag_obj_in_hand["right"] is obj`), gravity is re-enabled and the
-   object must still be held after 30 steps. The realised `T_eef^-1 T_obj` is written to
-   `grasps[0].object_pose_in_eef_frame`; the finger joint positions at attachment go into
-   `robot_state`.
+2. Grasp: a library grasp `g` (eef pose in object frame, `T_obj_eef`) is chosen per instance,
+   reviewer-clean rows before `one_finger`-flagged ones. The object is teleported to
+   `T_eef(H) * inv(T_obj_eef)` with gravity disabled and kept still. The gripper is **not** simply
+   commanded to close (v1.0-1.2): the two R1Pro finger drives are unequal, the first pad shoves
+   the free object into the other pad and the realised grasp ends 1-3 cm / 9-14 deg from the
+   validated pose with one pad off the object (the library's `one_finger` artefact: slanted
+   bottle, gap on the toy figure). Since v1.3 each finger is advanced 1 mm per control step
+   (`finger_step_m`, teleport + matching drive target) until it touches the object, the contact
+   opening is held with a 4 mm press (`finger_press_m`; assisted grasping reads the *current*
+   contacts when it creates the joint, both pads must touch for `m.GRASP_WINDOW`), the object is
+   re-posed every step until the joint exists, then gravity is re-enabled and the object must
+   still be held after 30 steps; the fingers are left at the contact positions. Measured:
+   `summary.grasp_realised` = object pose in the eef frame within 0.3-4 mm / ~1 deg of the
+   library pose, gravity adds < 1 mm. Grasps whose pads cannot both reach the object are
+   rejected (`grasp_failed`). The realised `T_eef^-1 T_obj` is written to
+   `grasps[0].object_pose_in_eef_frame`; the finger joint positions go into `robot_state`.
 3. Self-occlusion: `seg_instance` renders with and without the robot hidden give
    `visible / reference` pixel ratios of the object; both init and goal configurations need
    `>= 40 %` visible (i.e. `<= 60 %` occluded by arm / gripper) and the whole object inside the
@@ -408,11 +431,12 @@ tested for IK (`right_arm`, else `right_arm_torso`; embodiment recorded) and for
 from the **goal-time** camera (torso solutions move the head); the feasible ones are kept with
 their 28-D solution. An instance draws a base pose, a grasp (grasps whose assisted grasp attached
 before are preferred: AG attachment fails for some library rows in this arm posture) and one
-option, re-checks whole-body collision at that base, then establishes the grasp. Because assisted
-grasping pulls the object into the pads (up to a few cm / 0.2 rad), the goal object pose and
-the target are re-derived from the **realised** eef->object transform and the goal
-configuration's eef FK; the goal check poses arm + object together, takes one physics step, and
-verifies visibility, self-occlusion and `PoseReached` (`grasped` is not re-evaluated there).
+option, re-checks whole-body collision at that base, then establishes the grasp. The goal object
+pose and the target are re-derived from the **realised** eef->object transform (mm from the
+library pose since v1.3) and the goal configuration's eef FK; the goal check poses arm + object
+together, takes one physics step, and verifies visibility, self-occlusion, `PoseReached` and the
+full goal expression (a `grasped` atom reading false right after the teleport is logged, not
+rejected).
 
 Object scaling goal: depth `d1` on a 5 cm grid over `generation.goal_depth_range` (default
 [0.35, 0.85] m) with `|d1 - d0| >= generation.min_depth_change` (default 0.10 m), nearest first;
@@ -432,14 +456,21 @@ rad), equivalences empty unless the spec lists them.
 1. Two trays on the support, long axes parallel to the support's x/y axes, equally distant from
    the front edge (`generation.tray_edge_offset`, default 0.08 m from the front edge to the tray's
    near edge), fully supported. Source tray centred in front of the robot; destination tray to
-   the side, as far out as the support allows (a 99 deg camera sees more table than most tables
-   offer). The **base yaw** is then turned away from the destination (bisection, <= 60 deg) until
-   exactly `generation.dest_visible_width` (default 0.04 m) of the destination tray's top face
-   is inside the image; the source tray stays fully in view (5 % margin) and at least a quarter
-   of its floor keeps a target-sized box in view. On narrow edges the robot and the source tray
-   move off the edge centre (`generation.source_lateral_offsets`) so that the destination has
-   room on the other side. A seg render confirms the destination is visible but small
-   (`dest_max_visible_fraction` of the source tray's pixels).
+   the side. Stance search order (v1.3): round 1 keeps the robot **square to the edge** and, for
+   every edge (spec's `table_front_edge` first, then by length) and source lateral offset
+   (`generation.source_lateral_offsets`), bisects the destination tray's *lateral* position
+   between the closest non-overlapping and the furthest supported position until exactly
+   `generation.dest_visible_width` (default 0.04 m) of its top face is inside the image. Round 2
+   (fallback, logged as a warning, `template_meta.yaw_adjust_deg`) puts the tray at the furthest
+   position and turns the **base yaw** away from it (bisection, <= 60 deg) instead. In both
+   rounds the source tray stays fully in view (5 % margin), at least a quarter of its floor keeps
+   a target-sized box in view, a seg render confirms the destination is visible but small
+   (`dest_max_visible_fraction` of the source tray's pixels), and the grasp / placement
+   feasibility tables of step 2 must be non-empty - a stance whose placement pose is blocked
+   (chairs) falls through to the next option. On the test dining table the chair-free ends are
+   the only usable edges and offer no lateral room, so the 10.5 deg yaw fallback is what makes
+   "destination barely visible" satisfiable there; a chair-free long edge or counter gives a
+   square stance.
 2. Robot: canonical table stance (3.8) in front of the source tray, untucked arms (compact
    `ready` arms if the untucked hands collide with the trays), standing trunk preferred
    (`view_prefer_translate` 0; the optical axis may miss the tray centre by up to
@@ -452,7 +483,11 @@ rad), equivalences empty unless the spec lists them.
    of a template share the set): `n_distractors ~ U{1..max}` with
    `max = min(generation.max_distractors, |pool|)`; with probability
    `generation.same_category_prob` the pool is `roles.same_category_pool` (target category,
-   other models), otherwise `roles.distractor_pool`; unique models. `generation.templates_per_scene`
+   other models), otherwise `roles.distractor_pool`; unique models. The draw stops when the
+   canonical footprints (1 cm margin) of target + distractors would exceed
+   `generation.distractor_area_fraction` (0.45) of the source tray's footprint
+   (`template_meta.distractors.footprint_fraction`) - three large boxes on a 30 x 44 cm tray
+   failed every placement. `generation.templates_per_scene`
    replicates the template (`__v1`, `__v2`, ...) so that several sets are drawn.
    Layout per instance: target at a reachable cell with a random yaw (from the grasp combination
    table, also required to be placeable at the destination centre from the laterally shifted

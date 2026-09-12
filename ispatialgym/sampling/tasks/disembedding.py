@@ -21,6 +21,7 @@ import torch as th
 
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling import grasp_library as GL
+from ispatialgym.sampling import knowledge as K
 from ispatialgym.sampling.bddl_writer import GROUP_NAMES
 from ispatialgym.sampling.sim_utils import Reject, SupportTop
 from ispatialgym.sampling.spec import ModelChoice
@@ -66,12 +67,35 @@ class DisembeddingSampler(TaskSampler):
             raise Reject("spec", "empty distractor pool")
         n_max = min(int(self.gen("max_distractors", 3)), len(pool))
         n = int(rng.integers(1, n_max + 1))
-        picks = [pool[i] for i in rng.permutation(len(pool))[:n]]
+        order = [pool[i] for i in rng.permutation(len(pool))]
+        # the set must fit on the source tray with the target: footprints (canonical bounding boxes, 1 cm margin) may
+        # not exceed ``distractor_area_fraction`` of the tray floor (otherwise every instance fails placement); the
+        # draw drops to smaller distractors / fewer of them
+        tray = self.choices["tray_source"]
+        tray_bb = K.canonical_bbox(tray.model) or [0.4, 0.3, 0.05]
+        budget = float(self.gen("distractor_area_fraction", 0.45)) * tray_bb[0] * tray_bb[1]
+
+        def area(c):
+            bb = K.canonical_bbox(c.model) or [0.1, 0.1, 0.1]
+            return (bb[0] + 0.02) * (bb[1] + 0.02)
+
+        used = area(target)
+        picks = []
+        for c in order:
+            if len(picks) >= n:
+                break
+            if used + area(c) <= budget:
+                picks.append(c)
+                used += area(c)
+        if not picks:
+            picks = [min(order, key=area)]
         for c in picks:
             self.spawn_role("distractors", c)
-        self.template_meta["distractors"] = {"same_category": bool(same), "models": [c.tag for c in picks]}
+        self.template_meta["distractors"] = {"same_category": bool(same), "models": [c.tag for c in picks], "requested": n,
+                                             "footprint_fraction": round(used / (tray_bb[0] * tray_bb[1]), 2)}
 
     def prepare_bindings(self):
+        self._load_grasps()
         for role in ("target", "tray_source", "tray_dest"):
             self._measure(role, self.obj(role))
         for b in self.bindings.many("distractors"):
@@ -149,29 +173,41 @@ class DisembeddingSampler(TaskSampler):
     def _try_support_arms(self, table, arms: str):
         self.kit.sync_world()
         top = self.support_top(table)
-        stance0 = self.choose_stance(top, preferred_edge=self.scene_spec.fixed.get("table_front_edge"), arms=arms)
+        log.info("%s: support %s z %.3f, %d free cells, occupants %s", self.spec.name, top.name, top.z, int(top.free.sum()), top.occupants)
+        pref = self.scene_spec.fixed.get("table_front_edge")
+        edge_names = [pref] if pref else []
+        edge_names += [n for n, _, _, _ in sorted(top.edges(), key=lambda e: -e[3]) if n not in edge_names]
         # both trays must fit side by side along the front edge; on narrow edges the robot (and the source tray in
-        # front of it) moves off the edge centre so that the destination tray has room on the other side
+        # front of it) moves off the edge centre so that the destination tray has room on the other side. Round 1
+        # requires the robot square to the edge (destination "barely visible" by its lateral position alone) on any
+        # edge; round 2 allows the base-yaw fallback.
         errors = []
-        for s_lat in self.gen("source_lateral_offsets", [0.0, 0.25, -0.25, 0.35, -0.35]):
-            try:
-                if s_lat == 0.0:
-                    stance = stance0
-                else:
-                    focus = stance0.edge_mid + stance0.tangent * float(s_lat)
-                    stance = self.choose_stance(top, focus_xy=focus, preferred_edge=stance0.edge_name, arms=arms)
-                    if abs(getattr(stance, "lateral", 0.0) - float(s_lat)) > 0.08:
-                        raise Reject("no_stance", f"no stance near lateral {s_lat:+.2f} on edge {stance0.edge_name}")
-                self._try_support_stance(table, top, stance, arms)
-                self.template_meta["source_lateral_offset"] = float(s_lat)
-                return
-            except Reject as e:
-                errors.append(f"lateral {s_lat:+.2f}: {e}")
-                for o in self.world.spawned.values():
-                    self.world.park(o, list(self.world.spawned).index(o.name))
+        for allow_yaw in (False, True):
+            for edge in edge_names:
+                try:
+                    stance0 = self.choose_stance(top, preferred_edge=edge, arms=arms)
+                except Reject as e:
+                    errors.append(f"edge {edge}: {e}")
+                    continue
+                for s_lat in self.gen("source_lateral_offsets", [0.0, 0.25, -0.25, 0.35, -0.35]):
+                    try:
+                        if s_lat == 0.0:
+                            stance = stance0
+                        else:
+                            focus = stance0.edge_mid + stance0.tangent * float(s_lat)
+                            stance = self.choose_stance(top, focus_xy=focus, preferred_edge=stance0.edge_name, arms=arms)
+                            if abs(getattr(stance, "lateral", 0.0) - float(s_lat)) > 0.08:
+                                raise Reject("no_stance", f"no stance near lateral {s_lat:+.2f} on edge {stance0.edge_name}")
+                        self._try_support_stance(table, top, stance, arms, allow_yaw=allow_yaw)
+                        self.template_meta["source_lateral_offset"] = float(s_lat)
+                        return
+                    except Reject as e:
+                        errors.append(f"edge {edge} lateral {s_lat:+.2f}{' (yaw allowed)' if allow_yaw else ''}: {e}")
+                        for o in self.world.spawned.values():
+                            self.world.park(o, list(self.world.spawned).index(o.name))
         raise Reject("support", "; ".join(errors))
 
-    def _try_support_stance(self, table, top, stance, arms: str):
+    def _try_support_stance(self, table, top, stance, arms: str, allow_yaw: bool = True):
         src, dst = self.obj("tray_source"), self.obj("tray_dest")
         # source tray: centred on the robot's centre line, near edge tray_edge_offset behind the front edge
         yaw_s = self._tray_yaw("tray_source", stance)
@@ -179,8 +215,12 @@ class DisembeddingSampler(TaskSampler):
         half_depth_s = float((fp0 @ stance.inward).abs().max())
         depth_s = float(self.gen("tray_edge_offset", 0.08)) + half_depth_s
         s_pose = self._pose_on("tray_source", stance.world(depth_s, 0.0), yaw_s, top.z)
+        log.debug("%s: stance edge %s lateral %.3f base %s; source tray depth %.3f at %s (yaw %.2f)", self.spec.name, stance.edge_name,
+                  float(getattr(stance, "lateral", 0.0)), [round(v, 3) for v in stance.base_pose2d], depth_s, [round(float(v), 3) for v in s_pose[0]], yaw_s)
         if not top.polygon_supported(self.world.footprint(self.hull["tray_source"], s_pose)):
-            raise Reject("support", "source tray not fully supported at the canonical position")
+            fp = self.world.footprint(self.hull["tray_source"], s_pose)
+            raise Reject("support", f"source tray not fully supported at the canonical position (stance lateral {float(getattr(stance, 'lateral', 0.0)):+.2f}, "
+                                    f"footprint u {float((fp @ stance.tangent).min()):.2f}..{float((fp @ stance.tangent).max()):.2f} vs support {top.local_bounds()})")
         src.set_position_orientation(*s_pose)
         self.world.activate(src)
         self.world.step_physics(30, still=[self.robot])
@@ -227,73 +267,115 @@ class DisembeddingSampler(TaskSampler):
         if not dest_options:
             raise Reject("support", f"no lateral room for the destination tray on either side (support bounds {top.local_bounds()})")
         chosen = None
-        diag = {"views": len(views), "collision_free": int(free.sum()), "src_in_view": 0, "yaw_search_failed": 0, "yaw_collision": 0, "yaw_src_out": 0}
+        diag = {"views": len(views), "collision_free": int(free.sum()), "src_in_view": 0, "lateral_out_of_range": 0, "yaw_search_failed": 0,
+                "yaw_collision": 0, "yaw_src_out": 0}
         x0, y0, yaw0 = stance.base_pose2d
-        for v, q, f in zip(views, qs, free.tolist()):
-            if not f:
-                continue
-            cam = self.kit.camera_pose(q)
-            if not self.frustum_ok(cam, src_corners, 0.05):
-                continue
-            diag["src_in_view"] += 1
-            for side, sign, lat_c in dest_options:
-                d_pose = self._pose_on("tray_dest", stance.world(depth_d, lat_c), yaw_d, top.z)
-                # point `w` inside the tray's inner edge, at the tray's top: must land exactly on the image border
-                p_w = stance.world(depth_d, lat_c - sign * (half_lat_d - w))
-                p_w = th.tensor([float(p_w[0]), float(p_w[1]), top.z + d_top_off])
-                bound = self.world.camera_model.width if side == "right" else 0.0
+        l_min = half_lat_s + half_lat_d + 0.04
+        bound_of = {"right": self.world.camera_model.width, "left": 0.0}
 
-                def g(psi):
-                    cam_psi = self.kit.camera_pose(self.kit.q_at_base_pose(q, x0, y0, yaw0 + psi))
-                    uv, depth = self.world.camera_model.project(cam_psi, p_w.unsqueeze(0))
-                    return (float(uv[0, 0]) - bound) * (1.0 if side == "right" else -1.0), cam_psi
+        def border_gap(cam_pose, side, sign, lat):
+            """Signed image-border distance of the point `w` inside the destination tray's inner edge (at the tray top):
+            <= 0 while at least `w` of the tray is inside the image, > 0 once less than `w` shows."""
+            p_w = stance.world(depth_d, lat - sign * (half_lat_d - w))
+            p_w = th.tensor([float(p_w[0]), float(p_w[1]), top.z + d_top_off])
+            uv, _ = self.world.camera_model.project(cam_pose, p_w.unsqueeze(0))
+            return (float(uv[0, 0]) - bound_of[side]) * (1.0 if side == "right" else -1.0)
 
-                # turning away from the destination pushes the tray toward the border: the tray on the robot's right
-                # (sign < 0) leaves the image when the base yaws left (+psi)
-                lo, hi = 0.0, -sign * math.radians(float(self.gen("max_yaw_adjust_deg", 60.0)))
-                g_lo, _ = g(lo)
-                g_hi, _ = g(hi)
-                if g_lo > 0:  # already less than `w` visible: turn toward the tray instead
-                    lo, hi = -hi, 0.0
-                    g_lo, g_hi = g(lo)[0], g_lo
-                if not (g_lo <= 0 <= g_hi):
-                    diag["yaw_search_failed"] += 1
+        # pass 1: robot square to the edge (no yaw change); the destination tray's lateral position is bisected between
+        # the closest non-overlapping and the furthest supported position until exactly `w` of it is inside the image.
+        # pass 2 (fallback, e.g. table ends with no lateral room): tray at the furthest position and the *base yaw*
+        # turned away from it until only `w` remains in view.
+        for yaw_mode in ((False, True) if allow_yaw else (False,)):
+            for v, q, f in zip(views, qs, free.tolist()):
+                if not f:
                     continue
-                for _ in range(14):
-                    mid = 0.5 * (lo + hi)
-                    gm, _ = g(mid)
-                    if gm <= 0:
-                        lo, g_lo = mid, gm
-                    else:
-                        hi, g_hi = mid, gm
-                psi = 0.5 * (lo + hi)
-                q_psi = self.kit.q_at_base_pose(q, x0, y0, yaw0 + psi)
-                cam_psi = self.kit.camera_pose(q_psi)
-                # the whole source tray must stay inside the image after the yaw adjustment, and the target must fit
-                # somewhere on it: at least a quarter of the floor cells keep a target-sized box fully in view
-                if not self.frustum_ok(cam_psi, src_corners, 0.05):
-                    diag["yaw_src_out"] += 1
+                cam = self.kit.camera_pose(q)
+                if not self.frustum_ok(cam, src_corners, 0.05):
                     continue
-                vis = self.visible_cells(floor_cells, cam_psi, src_floor.z, self.height["target"], 0.03, self.radius["target"])
-                if float(vis.float().mean()) < 0.25:
-                    diag["yaw_src_out"] += 1
-                    continue
-                if not bool(self.kit.collision_free(q_psi, margin=0.01)[0]):
-                    diag["yaw_collision"] += 1
-                    continue
-                chosen = (v, q_psi, cam_psi, side, d_pose, lat_c, psi)
-                break
+                if not yaw_mode:
+                    diag["src_in_view"] += 1
+                    vis = self.visible_cells(floor_cells, cam, src_floor.z, self.height["target"], 0.03, self.radius["target"])
+                    if float(vis.float().mean()) < 0.25:
+                        continue
+                for side, sign, lat_c in dest_options:
+                    l_max = abs(lat_c)
+                    if not yaw_mode:
+                        g_lo, g_hi = border_gap(cam, side, sign, sign * l_min), border_gap(cam, side, sign, sign * l_max)
+                        if not (g_lo <= 0 <= g_hi):  # even the furthest position shows more than `w` (or the closest less)
+                            diag["lateral_out_of_range"] += 1
+                            continue
+                        lo, hi = l_min, l_max
+                        for _ in range(16):
+                            mid = 0.5 * (lo + hi)
+                            if border_gap(cam, side, sign, sign * mid) <= 0:
+                                lo = mid
+                            else:
+                                hi = mid
+                        lat = sign * 0.5 * (lo + hi)
+                        d_pose = self._pose_on("tray_dest", stance.world(depth_d, lat), yaw_d, top.z)
+                        if not top.polygon_supported(self.world.footprint(self.hull["tray_dest"], d_pose)):
+                            diag["lateral_out_of_range"] += 1
+                            continue
+                        chosen = (v, q, cam, side, d_pose, lat, 0.0)
+                        break
+                    d_pose = self._pose_on("tray_dest", stance.world(depth_d, lat_c), yaw_d, top.z)
+
+                    def g(psi):
+                        cam_psi = self.kit.camera_pose(self.kit.q_at_base_pose(q, x0, y0, yaw0 + psi))
+                        return border_gap(cam_psi, side, sign, lat_c), cam_psi
+
+                    # turning away from the destination pushes the tray toward the border: the tray on the robot's right
+                    # (sign < 0) leaves the image when the base yaws left (+psi)
+                    lo, hi = 0.0, -sign * math.radians(float(self.gen("max_yaw_adjust_deg", 60.0)))
+                    g_lo, _ = g(lo)
+                    g_hi, _ = g(hi)
+                    if g_lo > 0:  # already less than `w` visible: turn toward the tray instead
+                        lo, hi = -hi, 0.0
+                        g_lo, g_hi = g(lo)[0], g_lo
+                    if not (g_lo <= 0 <= g_hi):
+                        diag["yaw_search_failed"] += 1
+                        continue
+                    for _ in range(14):
+                        mid = 0.5 * (lo + hi)
+                        gm, _ = g(mid)
+                        if gm <= 0:
+                            lo, g_lo = mid, gm
+                        else:
+                            hi, g_hi = mid, gm
+                    psi = 0.5 * (lo + hi)
+                    q_psi = self.kit.q_at_base_pose(q, x0, y0, yaw0 + psi)
+                    cam_psi = self.kit.camera_pose(q_psi)
+                    # the whole source tray must stay inside the image after the yaw adjustment, and the target must fit
+                    # somewhere on it: at least a quarter of the floor cells keep a target-sized box fully in view
+                    if not self.frustum_ok(cam_psi, src_corners, 0.05):
+                        diag["yaw_src_out"] += 1
+                        continue
+                    vis = self.visible_cells(floor_cells, cam_psi, src_floor.z, self.height["target"], 0.03, self.radius["target"])
+                    if float(vis.float().mean()) < 0.25:
+                        diag["yaw_src_out"] += 1
+                        continue
+                    if not bool(self.kit.collision_free(q_psi, margin=0.01)[0]):
+                        diag["yaw_collision"] += 1
+                        continue
+                    chosen = (v, q_psi, cam_psi, side, d_pose, lat_c, psi)
+                    break
+                if chosen:
+                    break
             if chosen:
                 break
         if chosen is None:
             raise Reject("support", f"no view / side keeps the source tray in view with the destination tray barely visible ({diag}; source tray at depth "
                                     f"{depth_s:.2f}, dest options {[(s, round(l, 2)) for s, _, l in dest_options]}, support bounds {top.local_bounds()})")
         v, q, cam, side, d_pose, lat_c, psi = chosen
-        # the stance keeps its position and edge frame; only the base yaw (and the camera) changed
+        # the stance keeps its position and edge frame; only the base yaw (and the camera) may have changed (pass 2)
         stance.base_pose2d = (x0, y0, yaw0 + psi)
         stance.view, stance.q_stance = v, q
         stance.view.cam_pose = cam
         self.template_meta["yaw_adjust_deg"] = math.degrees(psi)
+        self.template_meta["dest_lateral_m"] = float(lat_c)
+        if abs(psi) > 1e-6:
+            log.warning("%s: no lateral position keeps the destination tray barely visible with the robot square to the edge %s; base yaw turned %.1f deg",
+                        self.spec.name, stance.edge_name, math.degrees(psi))
         dst.set_position_orientation(*d_pose)
         self.world.activate(dst)
         self.world.step_physics(30, still=[self.robot])
@@ -343,8 +425,13 @@ class DisembeddingSampler(TaskSampler):
         self.template_meta.update({"support": top.to_json(), "stance": stance.to_json(), "place_stance": place_stance.to_json(), "dest_side": side,
                                    "dest_pixels": px_d, "source_pixels": px_s, "src_floor_cells": int(src_floor.free.sum()), "dst_floor_cells": int(dst_floor.free.sum()),
                                    "n_reachable_cells": int(mask.sum())})
+        self._reach_tables()
 
     def prepare_template(self):
+        # grasps were loaded in prepare_bindings and the grasp / placement tables computed with the stance
+        self.template_meta.update({"n_grasp_cells": len(self.cells), "n_place_combos": len(self.place_ok)})
+
+    def _load_grasps(self):
         choice = self.choices["target"]
         try:
             key = GL.resolve_key(choice.category, choice.model, choice.grasp_key, ["floating", "tabletop"])
@@ -352,11 +439,15 @@ class DisembeddingSampler(TaskSampler):
             self.template_meta["grasp_key"] = key
         except (FileNotFoundError, ValueError) as e:
             raise Reject("spec", f"no grasp library entry for the target: {e}")
+
+    def _reach_tables(self):
+        """Grasp combination table over the source tray cells plus placement feasibility at the destination centre from
+        the shifted stance; keeps only cells with a (yaw, grasp) that is both graspable and placeable. Part of the stance
+        search: a stance without such a combination is rejected and the next edge / lateral option is tried."""
         translates = list(self.gen("reach_translates", self.DEFAULT_TRANSLATES))
         yaws = list(th.linspace(-math.pi, math.pi, 9)[:-1].tolist())
-        self.combos = self.grasp_combo_table(self.stance, self.cells, lambda xy, yaw: self._pose_on("target", xy, yaw, self.src_floor.z), self.grasps, translates, yaws=yaws)
-        # placement feasibility at the destination centre per (yaw, grasp) from the shifted stance
-        self.place_ok: Dict[Tuple[float, str], float] = {}
+        combos = self.grasp_combo_table(self.stance, self.cells, lambda xy, yaw: self._pose_on("target", xy, yaw, self.src_floor.z), self.grasps, translates, yaws=yaws)
+        place_ok: Dict[Tuple[float, str], float] = {}
         pairs, index = [], []
         for yaw in yaws:
             goal = self._pose_on("target", self.dst_centre, yaw, self.dst_floor.z)
@@ -366,11 +457,11 @@ class DisembeddingSampler(TaskSampler):
         for tr in self.stance_free_translates(self.place_stance, translates):
             feas = self.kit.pairs_feasible(pairs, self.reach_seed(self.place_stance, tr), ignore_for_grasp=self.grasp_ignore() + [self.obj("tray_dest")])
             for (yaw, gname), s in zip(index, feas.tolist()):
-                if s and (yaw, gname) not in self.place_ok:
-                    self.place_ok[(yaw, gname)] = float(tr)
+                if s and (yaw, gname) not in place_ok:
+                    place_ok[(yaw, gname)] = float(tr)
         keep = {}
-        for i, lst in self.combos.items():
-            good = [(yaw, g, tr) for (yaw, g, tr) in lst if (yaw, g.name) in self.place_ok]
+        for i, lst in combos.items():
+            good = [(yaw, g, tr) for (yaw, g, tr) in lst if (yaw, g.name) in place_ok]
             if good:
                 keep[i] = good
         if not keep:
@@ -378,7 +469,7 @@ class DisembeddingSampler(TaskSampler):
         idx = sorted(keep)
         self.cells = self.cells[idx]
         self.combos = {j: keep[i] for j, i in enumerate(idx)}
-        self.template_meta.update({"n_grasp_cells": len(idx), "n_place_combos": len(self.place_ok)})
+        self.place_ok = place_ok
 
     def grasp_ignore(self):
         return [self.objects[b.name] for b in self.bindings.roles.get("table", [])] + [self.obj("tray_source")]

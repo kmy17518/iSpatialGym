@@ -53,6 +53,31 @@ def stable_scene_path(scene_model: str) -> str:
     return os.path.join(get_dataset_path("2026-challenge-task-instances"), "scenes", scene_model, "json", f"{scene_model}_stable.json")
 
 
+def adjacent_rooms(scene_model: str, rooms: Sequence[str], reach_m: float = 0.6) -> List[str]:
+    """Room instances that share a wall / doorway with any of ``rooms``: the scene's room instance segmentation map is
+    dilated by ``reach_m`` (walls are 10-30 cm thick) and every other room instance the dilated mask touches counts.
+    Only the map PNGs are read, so this can run before the scene is loaded."""
+    from omnigibson.maps.segmentation_map import SegmentationMap
+    from omnigibson.utils.asset_utils import get_scene_path
+
+    seg = SegmentationMap(scene_dir=get_scene_path(scene_model), map_resolution=0.1)
+    ids = [seg.room_ins_name_to_ins_id[r] for r in rooms if r in seg.room_ins_name_to_ins_id]
+    if not ids:
+        return []
+    mask = th.zeros_like(seg.room_ins_map, dtype=th.bool)
+    for i in ids:
+        mask |= seg.room_ins_map == i
+    k = 2 * int(round(reach_m / seg.map_resolution)) + 1
+    dilated = th.nn.functional.max_pool2d(mask.float()[None, None], k, stride=1, padding=k // 2)[0, 0] > 0.5
+    touched = th.unique(seg.room_ins_map[dilated]).tolist()
+    # outdoor "rooms" (garden: foliage with opacity maps, pool water, ~150 instanced meshes) crash Isaac Sim 5.1's
+    # synthetic-data graph when seen through the windows and when their prims are hidden (bisected on
+    # house_single_floor); they are excluded by name (``ISG_ADJACENT_EXCLUDE``, comma separated substrings)
+    exclude = tuple(s for s in os.environ.get("ISG_ADJACENT_EXCLUDE", "garden,patio,backyard,yard,pool").split(",") if s)
+    names = sorted(seg.room_ins_id_to_ins_name[int(i)] for i in touched if int(i) in seg.room_ins_id_to_ins_name and int(i) not in ids and int(i) != 0)
+    return [n for n in names if not any(s in n for s in exclude)]
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # Environment
 # ----------------------------------------------------------------------------------------------------------------
@@ -61,14 +86,28 @@ def stable_scene_path(scene_model: str) -> str:
 class SimWorld:
     """One OmniGibson environment (scene + R1Pro) plus the helpers every task sampler needs."""
 
-    def __init__(self, scene_model: str, rooms: Optional[Sequence[str]], robot_name: str = "robot_r1", image_size: int = IMAGE_SIZE):
+    def __init__(self, scene_model: str, rooms: Optional[Sequence[str]], robot_name: str = "robot_r1", image_size: int = IMAGE_SIZE,
+                 load_adjacent: Optional[bool] = None):
         # macros lock once they have been read (second SimWorld in one process after og.clear())
         for name, value in (("ENABLE_OBJECT_STATES", True), ("USE_GPU_DYNAMICS", False), ("ENABLE_TRANSITION_RULES", False)):
             if getattr(gm, name) != value:
                 with gm.unlocked():
                     setattr(gm, name, value)
         self.scene_model = scene_model
+        #: ``rooms``: where the task takes place (stances, spawned objects, parking). ``adjacent``: their neighbours
+        #: (shared wall / doorway), so that walls, doors and furniture seen through doorways and windows exist at
+        #: evaluation time (no sky through missing walls). ``eval_rooms`` (rooms + adjacent) is what templates record as
+        #: ``load_room_instances``. Whether the *sampler* itself loads the neighbours is ``load_adjacent``
+        #: (``ISG_LOAD_ADJACENT``, default off): the sampler renders ``seg_instance`` for its measurements and Isaac Sim
+        #: 5.1's synthetic-data graph segfaults on house_single_floor as soon as the kitchen / garden are in view (and
+        #: when their prims are hidden); with only the task rooms loaded it has been stable for hours. The sampler's
+        #: measurements do not depend on the neighbours (their objects never occlude a tabletop target).
         self.rooms = list(rooms) if rooms else None
+        if load_adjacent is None:
+            load_adjacent = os.environ.get("ISG_LOAD_ADJACENT", "0") == "1"
+        self.adjacent = adjacent_rooms(scene_model, self.rooms) if self.rooms else []
+        self.eval_rooms = (self.rooms + [r for r in self.adjacent if r not in self.rooms]) if self.rooms else None
+        self.loaded_rooms = self.eval_rooms if load_adjacent else self.rooms
         self.robot_name = robot_name
         self.stable_path = stable_scene_path(scene_model)
         with open(self.stable_path) as f:
@@ -81,7 +120,7 @@ class SimWorld:
                 "scene_file": self.stable_path,
                 "seg_map_resolution": 0.1,
                 "trav_map_resolution": 0.1,
-                "load_room_instances": self.rooms,
+                "load_room_instances": self.loaded_rooms,
             },
             "robots": [
                 M.joylo_robot_config(
@@ -121,7 +160,32 @@ class SimWorld:
             log.info("hidden for rendering: %s", [o.name for o in self.render_hidden])
         self.load_time = time.time() - t0
         self.robot_visible = True
-        log.info("scene %s loaded (%d objects, rooms=%s) in %.1fs", scene_model, self.n_scene_objects, self.rooms, self.load_time)
+        # collision-world relevance: the task rooms' floor extent plus a margin. Neighbouring rooms are loaded for what
+        # the cameras see through doorways and windows; their furniture is not an obstacle for a robot working here.
+        self.task_bounds = None
+        if self.rooms:
+            los, his = [], []
+            for o in self.scene.objects:
+                if o.category == "floors" and set(o.in_rooms or []) & set(self.rooms):
+                    lo, hi = o.aabb
+                    los.append(lo)
+                    his.append(hi)
+            if los:
+                m = float(os.environ.get("ISG_OBSTACLE_MARGIN_M", "1.0"))
+                self.task_bounds = (th.stack(los).min(dim=0).values - m, th.stack(his).max(dim=0).values + m)
+                self.task_bounds[1][2] = 10.0  # everything above the floor (ceilings, wall-mounted objects)
+        n_obst = sum(1 for o in self.scene.objects if self.obstacle_filter(o))
+        log.info("scene %s loaded (%d objects, %d collision-relevant, rooms=%s, adjacent=%s) in %.1fs", scene_model, self.n_scene_objects, n_obst,
+                 self.rooms, self.adjacent, self.load_time)
+
+    def obstacle_filter(self, obj) -> bool:
+        """Whether ``obj`` is loaded into the IK collision world: spawned task objects always, scene objects when their
+        AABB intersects the task rooms' extent (walls / doors / furniture of neighbours near a doorway included)."""
+        if self.task_bounds is None or obj.name in self.spawned or obj is self.robot:
+            return True
+        lo, hi = obj.aabb
+        blo, bhi = self.task_bounds
+        return bool(((hi >= blo) & (lo <= bhi)).all())
 
     # ------------------------------------------------------------------ objects
 

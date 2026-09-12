@@ -47,6 +47,8 @@ class RobotKit:
         self.world = world
         self.robot = world.robot
         self.backend = R1ProCuRobo(self.robot, prebuild=prebuild)
+        if hasattr(world, "obstacle_filter"):
+            self.backend.obstacle_filter = world.obstacle_filter
         self.jidx = self.backend._jidx
         self.cam_in_zed = camera_offset_in_zed(self.robot, world.cam_key)
         idx = self.robot.trunk_control_idx
@@ -350,17 +352,33 @@ class RobotKit:
             self._trav_cache[floor] = trav._erode_trav_map(th.clone(trav.floor_map[floor]), robot=self.robot)
         return self._trav_cache[floor]
 
-    def trav_free(self, xy, floor: int = 0, eroded: bool = False) -> bool:
+    #: radius of the base footprint that must lie inside the task rooms (R1Pro chassis half-diagonal ~0.33 m)
+    BASE_ROOM_RADIUS = 0.33
+
+    def trav_free(self, xy, floor: int = 0, eroded: bool = False, in_task_rooms: bool = False) -> bool:
         """Whether ``xy`` is on free floor. ``eroded=True`` uses the navigation map (robot footprint + margin); the
         default un-eroded map only asserts that there is floor to stand on (stances next to furniture are validated
-        with the whole-body collision check instead)."""
+        with the whole-body collision check instead). With ``in_task_rooms`` the whole base footprint must also lie
+        inside the task rooms (open-plan boundaries such as dining / living room otherwise let the base rest on two
+        ``floors`` objects; ``ontop agent floor`` still evaluates true for the floor under the base centre once the
+        robot has settled, so this is off by default - it removed every disembedding stance on the test table)."""
         trav = self.world.scene.trav_map
         m = self.eroded_trav_map(floor) if eroded else trav.floor_map[floor]
-        ij = trav.world_to_map(G.t(xy)[:2])
+        p = G.t(xy)[:2]
+        ij = trav.world_to_map(p)
         i, j = int(ij[0]), int(ij[1])
         if i < 0 or j < 0 or i >= m.shape[0] or j >= m.shape[1]:
             return False
-        return bool(m[i, j] == 255)
+        if not bool(m[i, j] == 255):
+            return False
+        rooms = getattr(self.world, "rooms", None)
+        if in_task_rooms and rooms:
+            seg = self.world.scene.seg_map
+            r = self.BASE_ROOM_RADIUS
+            for d in (th.tensor([0.0, 0.0]), th.tensor([r, 0.0]), th.tensor([-r, 0.0]), th.tensor([0.0, r]), th.tensor([0.0, -r])):
+                if seg.get_room_instance_by_point(p + d) not in rooms:
+                    return False
+        return True
 
     def geodesic(self, a_xy, b_xy, floor: int = 0):
         trav = self.world.scene.trav_map

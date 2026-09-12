@@ -152,6 +152,15 @@ class TaskSampler:
     def setup(self):
         t0 = time.time()
         k0 = self.kit.stats_snapshot()
+        # the previous template in this world may have nudged furniture within the 5 cm tolerance after its last reset
+        # (goal teleports, the stop / play cycle of object removal); the stance search must see the stable scene
+        n_reset = self.world.reset_scene_objects()
+        if n_reset:
+            log.info("%s: %d scene objects reset before the template setup", self.spec.name, n_reset)
+        # and the robot must be out of the way: left at the previous template's stance, its untucked arms hover over
+        # the table and the support raster's downward rays hit them (seen: 32 cells of the dining table "occupied",
+        # the source tray then had no supported position at the only usable end)
+        self.world.park_robot(self.world.robot_park_xy, floor_z=self.world.floor_z)
         self.bind_fixed_roles()
         self.spawn_roles()
         self.kit.sync_world()
@@ -224,7 +233,10 @@ class TaskSampler:
         if isinstance(req, list):
             return [self.world.obj(n) for n in req]
         cats = list((req or {}).get("category", default_categories)) if isinstance(req, dict) or req is None else []
-        out = [o for o in self.world.scene.objects if o.category in cats and o.name in self.world.scene_object_names]
+        # category candidates come from the task rooms only (neighbouring rooms are loaded for their walls / furniture)
+        rooms = set(self.world.rooms or [])
+        out = [o for o in self.world.scene.objects if o.category in cats and o.name in self.world.scene_object_names
+               and (not rooms or set(o.in_rooms or []) & rooms)]
         return sorted(out, key=lambda o: o.name)
 
     def build_scope(self):
@@ -415,7 +427,9 @@ class TaskSampler:
             "floor": 0,
             "template_path": "../template.json",
             "template_sha256": self.template_sha,
-            "load_room_instances": list(self.world.rooms or []),
+            "load_room_instances": list(self.world.eval_rooms or []),  # task rooms + neighbours (what evaluation loads)
+            "task_rooms": list(self.world.rooms or []),
+            "sampled_with_rooms": list(self.world.loaded_rooms or []),
             "required_scene_objects": sorted({b.scene_object_name for b in self.bindings.all() if b.scene_object_name in self.world.scene_object_names}),
         }
 
@@ -478,7 +492,9 @@ class TaskSampler:
             "template_sha256": self.template_sha,
             "template_path": full,
             "template_partial_path": partial,
-            "load_room_instances": list(self.world.rooms or []),
+            "load_room_instances": list(self.world.eval_rooms or []),
+            "task_rooms": list(self.world.rooms or []),
+            "sampled_with_rooms": list(self.world.loaded_rooms or []),
             "problem": self.spec.name,
             "alias": self.problem.alias,
             "choices": {r: c.__dict__ for r, c in self.choices.items()},
@@ -732,7 +748,7 @@ class TaskSampler:
                 placed.append((o.category, o.model, p, q))
         return {
             "scene": self.world.scene_model,
-            "rooms": sorted(self.world.rooms or []),
+            "rooms": sorted(self.world.loaded_rooms or []),
             "base": list(stance.base_pose2d),
             "arms": self.REACH_ARMS,
             "ignore": sorted(o.name for o in self.grasp_ignore()),

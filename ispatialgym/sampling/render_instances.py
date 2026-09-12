@@ -32,7 +32,8 @@ from PIL import Image  # noqa: E402
 
 log = logging.getLogger("ispatialgym.render")
 
-CAM_RES = 384  # side of each robot camera tile in the sheet
+CAM_RES = 640  # side of each robot camera tile in the sheet (``--res``); 384 with 4 iterations looked blurred
+RENDER_ITERS = 10  # frames rendered after a teleport before the sensors are read (``--render-iters``)
 
 
 def _to_uint8(img: th.Tensor) -> np.ndarray:
@@ -46,13 +47,15 @@ def _tile(arr: np.ndarray, w: int, h: int) -> np.ndarray:
     return np.asarray(Image.fromarray(arr).resize((w, h), Image.BILINEAR))
 
 
-def compose(left, head, right, external) -> np.ndarray:
-    top = np.concatenate([_tile(left, CAM_RES, CAM_RES), _tile(head, CAM_RES, CAM_RES), _tile(right, CAM_RES, CAM_RES)], axis=1)
-    bottom = _tile(external, 3 * CAM_RES, 2 * CAM_RES)
+def compose(left, head, right, external, res: int = CAM_RES) -> np.ndarray:
+    top = np.concatenate([_tile(left, res, res), _tile(head, res, res), _tile(right, res, res)], axis=1)
+    bottom = _tile(external, 3 * res, 2 * res)
     return np.concatenate([top, bottom], axis=0)
 
 
-def render_template(template_dir: str, robot_name: str = "robot_r1"):
+def render_template(template_dir: str, robot_name: str = "robot_r1", res: int = None, render_iters: int = None):
+    res = CAM_RES if res is None else int(res)
+    render_iters = RENDER_ITERS if render_iters is None else int(render_iters)
     import omnigibson as og
     from omnigibson.macros import gm
 
@@ -80,7 +83,7 @@ def render_template(template_dir: str, robot_name: str = "robot_r1"):
             "name": "external_sensor0",
             "relative_prim_path": f"/controllable__r1pro__{robot_name}/base_link/external_sensor0",
             "modalities": ["rgb"],
-            "sensor_kwargs": {"image_height": CAM_RES * 2, "image_width": CAM_RES * 3, "horizontal_aperture": 40.0},
+            "sensor_kwargs": {"image_height": res * 2, "image_width": res * 3, "horizontal_aperture": 40.0},
             "position": th.tensor([-0.4, 0.0, 2.0], dtype=th.float32),
             "orientation": th.tensor([0.2706, -0.2706, -0.6533, 0.6533], dtype=th.float32),
             "pose_frame": "parent",
@@ -98,7 +101,7 @@ def render_template(template_dir: str, robot_name: str = "robot_r1"):
             M.joylo_robot_config(
                 robot_name,
                 obs_modalities=["rgb"],
-                sensor_config={"VisionSensor": {"sensor_kwargs": {"image_height": CAM_RES, "image_width": CAM_RES}}},
+                sensor_config={"VisionSensor": {"sensor_kwargs": {"image_height": res, "image_width": res}}},
                 position=PARK_POSITION.tolist(),
             )
         ],
@@ -141,11 +144,11 @@ def render_template(template_dir: str, robot_name: str = "robot_r1"):
                 ent.keep_still()
             robot.keep_still()
             og.sim.step_physics()
-            for _ in range(4):
+            for _ in range(render_iters):
                 og.sim.render()
             obs, _ = robot.get_obs()
             ext_obs, _ = external.get_obs()
-            sheet = compose(_to_uint8(obs[left_key]["rgb"]), _to_uint8(obs[head_key]["rgb"]), _to_uint8(obs[right_key]["rgb"]), _to_uint8(ext_obs["rgb"]))
+            sheet = compose(_to_uint8(obs[left_key]["rgb"]), _to_uint8(obs[head_key]["rgb"]), _to_uint8(obs[right_key]["rgb"]), _to_uint8(ext_obs["rgb"]), res)
             out = path.replace("-tro_state.json", "-init.png")
             Image.fromarray(sheet).save(out)
             written.append(out)
@@ -162,6 +165,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--out", required=True)
     parser.add_argument("--problem", action="append", default=None)
+    parser.add_argument("--res", type=int, default=CAM_RES, help="side of each robot camera tile")
+    parser.add_argument("--render-iters", type=int, default=RENDER_ITERS)
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args(argv)
     logging.basicConfig(level=args.log_level, format="[%(levelname)s %(name)s] %(message)s", stream=sys.stdout, force=True)
@@ -176,7 +181,7 @@ def main(argv=None):
             for tdir in sorted(glob.glob(os.path.join(problem_dir, "*"))):
                 if os.path.exists(os.path.join(tdir, "template_meta.json")):
                     try:
-                        written = render_template(tdir)
+                        written = render_template(tdir, res=args.res, render_iters=args.render_iters)
                     except Exception as e:  # noqa: BLE001
                         traceback.print_exc()
                         log.error("template %s failed: %r", tdir, e)

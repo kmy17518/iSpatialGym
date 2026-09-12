@@ -254,6 +254,9 @@ class R1ProCuRobo:
         self._world_mesh_names: set = set()
         self._disabled_obstacles: set = set()
         self._attached: Dict[str, dict] = {}  # arm -> info
+        #: optional ``callable(obj) -> bool``: scene objects for which it returns False are never loaded as obstacles
+        #: (e.g. furniture of neighbouring rooms that only exists for rendering; the mesh cache holds ``mesh_cache_size``)
+        self.obstacle_filter = None
 
         self._entries: Dict[str, _PlannerEntry] = {}
         self._kin_entries: Dict[str, _PlannerEntry] = {}
@@ -426,6 +429,8 @@ class R1ProCuRobo:
         rp, rq = self.root_pose()
         for obj in self.robot.scene.objects:
             if obj is self.robot or getattr(obj, "visual_only", False) or obj.name in ignore:
+                continue
+            if self.obstacle_filter is not None and not self.obstacle_filter(obj):
                 continue
             for link in obj.links.values():
                 for cm in link.collision_meshes.values():

@@ -2,6 +2,56 @@
 
 Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampling_report_*.json`).
 
+## 1.3.0 (2026-09-12) - realised grasps, neighbouring rooms, square disembedding stances
+
+- **Held-object grasps are realised at the library pose.** Previously the gripper was simply commanded to close on
+  the free-floating object: the two R1Pro finger drives are not equally strong, the first pad shoved the object into
+  the other pad and the object ended 1-3 cm / 9-14 deg away from the validated grasp with one pad off the object (the
+  library's `one_finger` artefact; visible as a slanted bottle / gap on the toy figure). `_establish_grasp` now advances
+  each finger by 1 mm per step until it touches the object (object kept still), holds the contact opening with a 4 mm
+  press while the assisted-grasp window elapses, and leaves the fingers at the contact positions. Measured: object
+  pose in the eef frame within 0.3-4 mm / 1 deg of the library pose (`summary.grasp_realised`), fingers symmetric
+  (e.g. [0.021, 0.016]). Reviewer-flagged (`one_finger`) grasps are only used when no clean grasp has an option;
+  grasps whose pads cannot both reach the object are rejected (`grasp_failed`) and the per-template statistics steer
+  away from them.
+- **Neighbouring rooms.** `SimWorld.adjacent` (rooms sharing a wall / doorway with the task rooms, from the scene's
+  room-instance map dilated by 0.6 m; outdoor rooms excluded) is recorded as `template_meta.load_room_instances`
+  together with the task rooms, so evaluation, validation and rendering load the neighbours (walls and furniture
+  behind doorways and windows instead of sky). The sampler itself keeps loading the task rooms only
+  (`ISG_LOAD_ADJACENT=1` to change): Isaac Sim 5.1's synthetic-data graph segfaults on house_single_floor as soon as
+  the kitchen or garden are in the head camera's `seg_instance` view (and when their prims are hidden); bisected with
+  probes, not fixable from our side. `validate_instances.py` renders rgb only for the same reason. Category-based
+  fixed roles (tables, paintings) are restricted to the task rooms; cuRobo obstacles are filtered to the task rooms'
+  extent + 1 m (`SimWorld.obstacle_filter`, `R1ProCuRobo.obstacle_filter`) - with the neighbours loaded the mesh cache
+  (2048) overflowed.
+- **Disembedding.** Round 1 of the stance search keeps the robot square to the edge on every edge (preferred first,
+  then by length) and bisects the destination tray's *lateral* position until exactly `dest_visible_width` of it is in
+  view; the base-yaw fallback is round 2 and is logged as a warning (`template_meta.yaw_adjust_deg`). The grasp /
+  placement feasibility tables are now part of the stance acceptance, so a stance whose placement pose is blocked
+  (chairs along the long edges of the dining table) falls through instead of failing the template. The distractor set
+  is drawn within a footprint budget (`distractor_area_fraction` 0.45 of the source tray) - replicated templates used
+  to fail every placement with three large boxes. On the test dining table the ends are the only chair-free edges and
+  the 10.5 deg yaw fallback is still what makes "destination barely visible" satisfiable.
+- `render_instances.py` defaults: 640 px tiles and 10 render iterations (384 px / 4 iterations looked blurred; the
+  RTX real-time denoiser needs a few frames after a teleport).
+- Template setup starts from a clean world: non-task scene objects are reset and the robot is parked (tucked, room
+  centre) before the fixed roles are bound. Left at the previous template's stance, the robot's untucked arms hovered
+  over the table and the support raster's downward rays hit them (32 "occupied" cells on the dining table), so the
+  disembedding source tray had no supported position after the attachment template - a template-order dependence
+  present since v1.0.
+- `validate_instances.py` steps three times before evaluating `:init` (the robot base starts a few mm above the floor
+  and `ontop agent floor` needs the contact; with the neighbours loaded the disembedding stance, whose rear wheels
+  rest on the living-room floor across the open-plan boundary, read false after one step and true after three).
+  `RobotKit.trav_free(in_task_rooms=True)` can additionally require the whole base footprint inside the task rooms
+  (off by default: it removed every disembedding stance on the test table).
+- Spec: §3.2 notes that BEHAVIOR's `sample_kinematics` orientation sampling reduces to canonical-up + yaw for the
+  2026 assets (every `metadata.json` has `orientations: []`), §3.3 robot facts, §5.2 grasp realisation, §5.3 stance
+  search order.
+- Status: all 15 problems sample (30 / 30 instances, 7 min of template time after the scene loads); reload
+  validation with the neighbouring rooms 28 / 30. Open: the two disembedding instances report the destination tray
+  drifting 1.2 cm / 2.6 deg over 60 steps when the neighbours are loaded (identical tray poses validated with zero
+  drift in v1.1 with the task room only) - to be probed for a neighbouring-room prim touching the tray.
+
 ## 1.2.0 (2026-09-11) - scene-reset guarantee, on-disk evidence, init renders
 
 - **Every attempt starts from the stable scene.** `SimWorld.reset_scene_objects` reloads the state of every non-task

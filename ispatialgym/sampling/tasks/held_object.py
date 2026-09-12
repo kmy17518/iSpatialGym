@@ -48,6 +48,7 @@ class HeldObjectSampler(TaskSampler):
         self.eef_in_base: Optional[G.Pose] = None
         self.room = None
         self.grasp_stats: Dict[str, Dict[str, int]] = {}
+        self.grasp_debug: Dict[str, Any] = {}
 
     # ------------------------------------------------------------------ template
 
@@ -260,10 +261,12 @@ class HeldObjectSampler(TaskSampler):
         base3 = self._base_pose3d(base2d)
         q_init = self.kit.q_at_base_pose(self.q_hold_rel, *base2d)
         cam = G.compose(base3, self.cam_in_base)
-        # grasps whose assisted grasp attached before are preferred (per-template statistics), ties in random order
+        # reviewer-clean grasps (both pads on the object) before tolerated ``one_finger`` ones; among those, grasps whose
+        # assisted grasp attached before are preferred (per-template statistics), ties in random order
         names = list(self.options)
         names = [names[i] for i in rng.permutation(len(names))]
-        names.sort(key=lambda n: self.grasp_stats.get(n, {}).get("failed", 0) - 2 * self.grasp_stats.get(n, {}).get("ok", 0))
+        flagged = {g.name for g in self.grasps if g.flags or g.verdict != "ok"}
+        names.sort(key=lambda n: (n in flagged, self.grasp_stats.get(n, {}).get("failed", 0) - 2 * self.grasp_stats.get(n, {}).get("ok", 0)))
         chosen = None
         for gname in names[:4]:
             g = next(x for x in self.grasps if x.name == gname)
@@ -317,6 +320,7 @@ class HeldObjectSampler(TaskSampler):
             stats["failed"] += 1
             raise
         stats["ok"] += 1
+        draft.summary["grasp_realised"] = dict(self.grasp_debug)
         # the realised object pose (assisted grasping pulls the object into the pads, up to a few cm / 0.2 rad) and the
         # closed finger positions; the goal is re-derived from the realised eef->object transform so that the object at
         # the goal is exactly where the hand at the goal configuration carries it
@@ -339,31 +343,117 @@ class HeldObjectSampler(TaskSampler):
         name = draft.extras["grasps"][0]["grasp_name"]
         return next(g for g in self.grasps if g.name == name)
 
+    def _finger_joints(self):
+        """Gripper joint indices of ``ARM`` paired with the finger link each one moves (``JointPrim.body1``)."""
+        gidx = [int(i) for i in self.robot.gripper_control_idx[ARM].tolist()]
+        names = list(self.robot.joints.keys())
+        finger_paths = {l.prim_path for l in self.robot.finger_links[ARM]}
+        pairs = []
+        for i in gidx:
+            body1 = str(self.robot.joints[names[i]].body1)
+            link = next((p for p in finger_paths if p == body1 or p.endswith(body1.split("/")[-1])), None)
+            pairs.append((i, link))
+        if any(l is None for _, l in pairs) or len({l for _, l in pairs}) != len(pairs):
+            pairs = [(i, p) for i, p in zip(gidx, sorted(finger_paths))]  # positional fallback
+        return pairs
+
     def _establish_grasp(self, target, pose: G.Pose):
+        """Close the gripper on the object at the library pose without moving the object.
+
+        OmniGibson's assisted grasp attaches once both finger links touch the object for ``m.GRASP_WINDOW``. With the
+        plain closing command the two R1Pro finger drives are not equally strong: the first pad to touch shoves the
+        free object into the other pad, so the object ends up off-centre and rotated by a few degrees and 1-3 cm
+        relative to the validated grasp (grasp library README, ``one_finger``). Here each finger is instead advanced by
+        ``finger_step_m`` per step (teleport + matching drive target) until it touches the object; the object is kept
+        still, the gripper command then holds the contact opening while the grasp window elapses, and the fingers are
+        left at the contact positions in the saved state.
+        """
         state = ActionState(self.robot)
         state.hold_current()
-        state.set_gripper(ARM, close=False)
-        # controller steps without rendering or observation reads (see SimWorld.control_step); assisted grasping runs
-        # inside the simulator step, so this is the grasp library's procedure minus the image pipeline
+        pairs = self._finger_joints()
+        gidx = th.tensor([i for i, _ in pairs], dtype=th.long)
+        lo, hi = self.robot.joint_lower_limits[gidx], self.robot.joint_upper_limits[gidx]
+        target_paths = {l.prim_path for l in target.links.values()}
+
+        def cmd_for(q):  # smooth gripper controller: [-1, 1] -> [lower, upper] joint position target (both fingers)
+            return float(th.clamp(2.0 * (q.mean() - lo.mean()) / (hi.mean() - lo.mean()) - 1.0, -1.0, 1.0))
+
+        def touching():
+            _, links = self.robot._find_gripper_contacts(ARM)
+            touched = set()
+            for p in target_paths:
+                touched |= set(links.get(p, ()))
+            return [path in touched for _, path in pairs]
+
+        q = hi.clone()
+        state.gripper_cmd[ARM] = cmd_for(q)
         for _ in range(8):
             target.set_position_orientation(G.t(pose[0]), G.t(pose[1]))
             target.keep_still()
+            self.robot.set_joint_positions(q, indices=gidx, drive=False)
             self.world.control_step(state.action())
-        state.set_gripper(ARM, close=True)
+        step = float(self.gen("finger_step_m", 0.001))
+        contact = touching()
+        for _ in range(int(float((hi - lo).max()) / step) + 10):
+            if all(contact):
+                break
+            moved = False
+            for k in range(len(pairs)):
+                if not contact[k] and float(q[k]) > float(lo[k]) + 1e-4:
+                    q[k] = max(float(lo[k]), float(q[k]) - step)
+                    moved = True
+            if not moved:
+                raise Reject("grasp_failed", f"fingers closed without both pads touching the object (contact {contact})")
+            self.robot.set_joint_positions(q, indices=gidx, drive=False)
+            state.gripper_cmd[ARM] = cmd_for(q)
+            target.keep_still()
+            self.world.control_step(state.action())
+            contact = touching()
+        if not all(contact):
+            raise Reject("grasp_failed", f"pads not both in contact after closing (contact {contact})")
+        q_contact = q.clone()
+        # press: the drives aim a few mm past the contact positions so that both pads stay in contact for the whole
+        # grasp window (assisted grasping reads the *current* finger contacts when it creates the joint; pads parked
+        # exactly at the surface lose contact as PhysX resolves the penetration). The object is re-posed every step
+        # until the joint exists, so the press does not move it.
+        press = float(self.gen("finger_press_m", 0.004))
+        state.gripper_cmd[ARM] = cmd_for(th.clamp(q_contact - press, min=lo))
         attached = False
-        for _ in range(int(self.gen("grasp_close_steps", 60))):
+        for _ in range(int(self.gen("grasp_close_steps", 90))):
             if self.robot._ag_obj_in_hand[ARM] is None:
+                target.set_position_orientation(G.t(pose[0]), G.t(pose[1]))
                 target.keep_still()
             self.world.control_step(state.action())
             if self.robot._ag_obj_in_hand[ARM] is target:
                 attached = True
                 break
         if not attached:
-            raise Reject("grasp_failed", "assisted grasping did not attach the object")
+            raise Reject("grasp_failed", "assisted grasping did not attach the object (both pads in contact)")
+
+        def offset_now():
+            eef = tuple(x.float() for x in self.robot.eef_links[ARM].get_position_orientation())
+            return G.relative(tuple(x.float() for x in target.get_position_orientation()), eef)
+
+        eef0 = tuple(x.float() for x in self.robot.eef_links[ARM].get_position_orientation())
+        lib_rel = G.relative(pose, eef0)  # library pose of the object in the eef frame (object was posed from it)
+        rel_attach = offset_now()
+        # put the fingers back on the object surface and hold there (the assisted-grasp joint now carries the object)
+        self.robot.set_joint_positions(q_contact, indices=gidx, drive=False)
+        state.gripper_cmd[ARM] = cmd_for(q_contact)
         target.enable_gravity()
         self.world.control_step(state.action(), n=30)
         if self.robot._ag_obj_in_hand[ARM] is not target:
             raise Reject("grasp_failed", "object dropped after gravity was re-enabled")
+        rel_grav = offset_now()
+        self.grasp_debug = {
+            "attach_vs_library_mm": 1000 * float(th.linalg.norm(rel_attach[0] - lib_rel[0])),
+            "gravity_vs_attach_mm": 1000 * float(th.linalg.norm(rel_grav[0] - rel_attach[0])),
+            "gravity_vs_library_mm": 1000 * float(th.linalg.norm(rel_grav[0] - lib_rel[0])),
+            "gravity_vs_library_deg": math.degrees(G.quat_angle(rel_grav[1], lib_rel[1])),
+            "finger_q_contact": q_contact.tolist(),
+        }
+        log.info("%s: grasp realised: %s", self.spec.name, {k: (round(v, 1) if isinstance(v, float) else v) for k, v in self.grasp_debug.items()})
+        self.robot.set_joint_positions(q_contact, indices=gidx, drive=False)  # pads on the object in the saved state
         self.robot.keep_still()
         self.world.full_step(render=True)  # sync transforms / caches after the non-rendering control steps
         self.robot.keep_still()
@@ -409,7 +499,12 @@ class HeldObjectSampler(TaskSampler):
             vis = self.world.object_pixels(target)
             ref = self.world.object_pixels(target, hidden=[self.robot])
         if ref == 0:
-            raise Reject("seg_missing", f"{target.name} has no instance-segmentation pixels even with the robot hidden")
+            cam = self.world.camera_pose()
+            p = target.get_position_orientation()[0].float()
+            uv, depth = self.world.camera_model.project(cam, p.unsqueeze(0))
+            _, mapping = self.world.seg_instance()
+            raise Reject("seg_missing", f"{target.name} has no instance-segmentation pixels even with the robot hidden (visible={target.visible}, "
+                                        f"centre uv {[round(float(v)) for v in uv[0]]} depth {float(depth[0]):.2f}, {len(mapping)} labels: {sorted(mapping.values())[:12]})")
         return {"visible_pixels": int(vis), "reference_pixels": int(ref), "ratio": 1.0 - vis / max(ref, 1)}
 
     def check_goal_feasible(self, draft: Draft):
