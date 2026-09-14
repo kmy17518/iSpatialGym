@@ -1,0 +1,165 @@
+{
+ "scene": "Rs_int",
+ "table": "bottom_cabinet_slgzfc_0",
+ "category": "bottom_cabinet",
+ "model": "slgzfc",
+ "rooms": [
+  "entryway_0"
+ ],
+ "partner": null,
+ "problem": "disembedding-0",
+ "inventory": {
+  "top_z": 0.845,
+  "bbox_x": 0.523,
+  "bbox_y": 1.085,
+  "bbox_z": 0.839,
+  "verdict": "keep"
+ },
+ "n_requested": 1,
+ "max_attempts": 8,
+ "started": "2026-09-11 20:13:19",
+ "precheck": {
+  "aabb": [
+   [
+    1.33,
+    1.652,
+    0.006
+   ],
+   [
+    1.853,
+    2.738,
+    0.845
+   ]
+  ],
+  "support": {
+   "name": "bottom_cabinet_slgzfc_0",
+   "z": 0.8444994688034058,
+   "yaw": -3.141591787338257,
+   "local_bounds": [
+    -1.8401092290878296,
+    -1.3601082563400269,
+    -2.722384214401245,
+    -1.6623839139938354
+   ],
+   "n_free_cells": 1350,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     1.36,
+     2.192
+    ],
+    "length": 1.06
+   },
+   {
+    "name": "-u",
+    "mid": [
+     1.84,
+     2.192
+    ],
+    "length": 1.06
+   },
+   {
+    "name": "+v",
+    "mid": [
+     1.6,
+     1.662
+    ],
+    "length": 0.48
+   },
+   {
+    "name": "-v",
+    "mid": [
+     1.6,
+     2.722
+    ],
+    "length": 0.48
+   }
+  ],
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    1.360106348991394,
+    2.192385196685791
+   ],
+   "inward": [
+    1.0,
+    8.662515256219194e-07
+   ],
+   "tangent": [
+    -8.662515256219194e-07,
+    1.0
+   ],
+   "base_pose2d": [
+    0.9101063013076782,
+    2.2857182025909424,
+    8.662515256217028e-07
+   ],
+   "edge_depth": 0.44999995827674866,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.3500000238418579,
+    "axis_angle": 0.04721388502865839
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 0.8
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "yaw_adjust_deg": -4.411010742187499,
+  "dest_lateral_m": 0.5787209868431091,
+  "distractors": {
+   "same_category": false,
+   "models": [
+    "box_of_rice-fvulow",
+    "box_of_shampoo-bclpiq",
+    "box_of_cane_sugar-gpbobo"
+   ],
+   "requested": 3,
+   "footprint_fraction": 0.38
+  },
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/Rs_int/Rs_int__bottom_cabinet_slgzfc_0__disembedding-0__s2",
+ "setup_s": 15.9,
+ "reject_reason": "no_support",
+ "error": "[no_support] bottom_cabinet_slgzfc_0: [support] untucked: [support] edge +u lateral +0.00: [support] no lateral room for the destination tray on either side (support bounds (-1.8401092290878296, -1.3601082563400269, -2.722384214401245, -1.6623839139938354)); edge +u lateral +0.25: [support] no view / side keeps the source tray in view with the destination tray barely visible ({'views': 40, 'collision_free': 8, 'src_in_view': 8, 'lateral_out_of_range': 8, 'yaw_search_failed': 0, 'yaw_collision': 0, 'yaw_src_out': 0}; source tray at depth 0.23, dest options [('right', -0.58)], support bounds (-1.8401092290878296, -1.3601082563400269, -2.722384214401245, -1.6623839139938354)); edge +u lateral -0.25: [support] no view / side keeps the source tray in view with the destination tray barely visible ({'views': 40, 'collision_free': 3, 'src_in_view': 3, 'lateral_out_of_range': 3, 'yaw_search_failed': 0, 'yaw_collision': 0, 'yaw_src_out': 0}; source tray at depth 0.23, dest options [('left', 0.58)], support bounds (-1.8401092290878296, -1.3601082563400269, -2.722384214401245, -1.6623839139938354)); edge +u lateral +0.35: [support] no view / side keeps the source tray in view with the destination tray barely visible ({'views': 40, 'collision_free': 8, 'src_in_view': 8, 'lateral_out_of_range': 8, 'yaw_search_failed': 0, 'yaw_collision': 0, 'yaw_src_out': 0}; source tray at depth 0.23, dest options [('right', -0.58)], support bounds (-1.8401092290878296, -1.3601082563400269, -2.722384214401245, -1.6623839139938354)); edge +u lateral -0.35: [support] no view / side keeps the source tray in view with the destination tray barely visible ({'views': 40, 'collision_free': 3, 'src_in_view': 3, 'lateral_out_of_range': 3, 'yaw_search_failed': 0, 'yaw_collision': 0, 'yaw_src_out': 0}; source tray at depth 0.23, dest options [('left', 0.58)], support bounds (-1.8401092290878296, -1.3601082563400269, -2.722384214401245, -1.6623839139938354)); edge -u: [no_stance] no traversable stance around",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 15.4,
+   "run_s": null
+  },
+  {
+   "seed": 1000,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 15.4,
+   "run_s": null
+  },
+  {
+   "seed": 2000,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 15.9,
+   "run_s": null
+  }
+ ],
+ "job_s": 51.1,
+ "finished": "2026-09-11 20:14:10"
+}

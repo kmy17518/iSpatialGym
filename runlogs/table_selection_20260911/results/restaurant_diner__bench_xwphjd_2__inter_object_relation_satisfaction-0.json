@@ -1,0 +1,141 @@
+{
+ "scene": "restaurant_diner",
+ "table": "bench_xwphjd_2",
+ "category": "bench",
+ "model": "xwphjd",
+ "rooms": [
+  "dining_room_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-0",
+ "inventory": {
+  "top_z": 0.952,
+  "bbox_x": 0.664,
+  "bbox_y": 1.241,
+  "bbox_z": 0.952,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:28:17",
+ "precheck": {
+  "aabb": [
+   [
+    0.049,
+    -0.72,
+    -0.005
+   ],
+   [
+    1.294,
+    -0.048,
+    0.956
+   ]
+  ],
+  "support": {
+   "name": "bench_xwphjd_2",
+   "z": 0.39706292748451233,
+   "yaw": 1.5707964897155762,
+   "local_bounds": [
+    -0.6104131937026978,
+    -0.07041322439908981,
+    -1.2788182497024536,
+    -0.05881813168525696
+   ],
+   "n_free_cells": 1427,
+   "occupants": [
+    "fixed_window_iueiur_0"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     0.669,
+     -0.07
+    ],
+    "length": 1.22
+   },
+   {
+    "name": "-u",
+    "mid": [
+     0.669,
+     -0.61
+    ],
+    "length": 1.22
+   },
+   {
+    "name": "+v",
+    "mid": [
+     0.059,
+     -0.34
+    ],
+    "length": 0.54
+   },
+   {
+    "name": "-v",
+    "mid": [
+     1.279,
+     -0.34
+    ],
+    "length": 0.54
+   }
+  ],
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    0.058818187564611435,
+    -0.3404132127761841
+   ],
+   "inward": [
+    1.0,
+    1.6292068494294654e-07
+   ],
+   "tangent": [
+    -1.6292068494294654e-07,
+    1.0
+   ],
+   "base_pose2d": [
+    -0.3911817967891693,
+    -0.36041325330734253,
+    1.629206849429451e-07
+   ],
+   "edge_depth": 0.44999998807907104,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.1754823342649647
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.2
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "view_arms": "untucked",
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/restaurant_diner/restaurant_diner__bench_xwphjd_2__inter_object_relation_satisfaction-0",
+ "setup_s": 3.9,
+ "reject_reason": "no_support",
+ "error": "[no_support] bench_xwphjd_2: [no_stance] stand_off 0.45 edge None: [unreachable] no reachable cell on the support; stand_off 0.35 edge None: [unreachable] no reachable cell on the support; stand_off 0.55 edge None: [unreachable] no reachable cell on the support; stand_off 0.65 edge None: [unreachable] no reachable cell on the support",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 3.9,
+   "run_s": null
+  }
+ ],
+ "job_s": 5.4,
+ "finished": "2026-09-12 02:28:24"
+}

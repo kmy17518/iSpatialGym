@@ -1,0 +1,35 @@
+{
+ "category": "bottle_of_lime_juice",
+ "model": "ouuhaa",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_lime_juice__ouuhaa__y0.png",
+   "drift_m": 0.0051,
+   "tilt_deg": 2.7,
+   "on_tray": true,
+   "settled_z": 0.1078,
+   "seg_pixels": 19400,
+   "aabb_extent": [
+    0.084,
+    0.079,
+    0.306
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_lime_juice__ouuhaa__y1.png",
+   "drift_m": 0.004,
+   "tilt_deg": 2.0,
+   "on_tray": true,
+   "settled_z": 0.1076
+  }
+ },
+ "stable": true,
+ "visible": true
+}

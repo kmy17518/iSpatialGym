@@ -1,0 +1,624 @@
+{
+ "group": "disembedding__toy_dice__r1",
+ "task": "disembedding",
+ "category": "toy_dice",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "Tabletop task: the object rests among other objects on a table / tray and is picked from its resting pose. It must settle stably on a flat surface (it must not roll or topple). The best single grasp matters most.",
+ "candidates": [
+  {
+   "model": "cmqtch",
+   "key": "toy_dice__cmqtch",
+   "strip": "/tmp/glib/strips/toy_dice__cmqtch.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch 43/0; V1 partly occluded, V2-V4 fine"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch at 30 deg tilt, fingers 43/0"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    41,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "eqwazv",
+   "key": "toy_dice__eqwazv",
+   "strip": "/tmp/glib/strips/toy_dice__eqwazv.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt about pinch axis, pads still flush"
+    }
+   ],
+   "object_note": "Fingers read 43/0 but cube sits centred between flush pads; fingertips flush with bottom face",
+   "bbox_mm": [
+    41,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "bjrxkj",
+   "key": "toy_dice__bjrxkj",
+   "strip": "/tmp/glib/strips/toy_dice__bjrxkj.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt about pinch axis, pads still flush"
+    }
+   ],
+   "object_note": "Fingers read 43/0 but cube sits centred between flush pads; fingertips flush with bottom face",
+   "bbox_mm": [
+    41,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "hbkqqp",
+   "key": "toy_dice__hbkqqp",
+   "strip": "/tmp/glib/strips/toy_dice__hbkqqp.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch at 30 deg tilt, fingers 43/0"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    41,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ievnsq",
+   "key": "toy_dice__ievnsq",
+   "strip": "/tmp/glib/strips/toy_dice__ievnsq.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt about pinch axis, pads still flush"
+    }
+   ],
+   "object_note": "Fingers read 43/0 but cube sits centred between flush pads; fingertips flush with bottom face",
+   "bbox_mm": [
+    41,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "akguod",
+   "key": "toy_dice__akguod",
+   "strip": "/tmp/glib/strips/toy_dice__akguod.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt about pinch axis, pads still flush"
+    }
+   ],
+   "object_note": "Fingers read 43/0 but cube sits centred between flush pads; fingertips flush with bottom face",
+   "bbox_mm": [
+    41,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "gcevml",
+   "key": "toy_dice__gcevml",
+   "strip": "/tmp/glib/strips/toy_dice__gcevml.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch at 30 deg tilt, fingers 43/0"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    42,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "kmagva",
+   "key": "toy_dice__kmagva",
+   "strip": "/tmp/glib/strips/toy_dice__kmagva.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt about pinch axis, pads still flush"
+    }
+   ],
+   "object_note": "Fingers read 43/0 but cube sits centred between flush pads; fingertips flush with bottom face",
+   "bbox_mm": [
+    41,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "krpdji",
+   "key": "toy_dice__krpdji",
+   "strip": "/tmp/glib/strips/toy_dice__krpdji.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt about pinch axis, pads still flush"
+    }
+   ],
+   "object_note": "Fingers read 43/0 but cube sits centred between flush pads; fingertips flush with bottom face",
+   "bbox_mm": [
+    41,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "mqvaaa",
+   "key": "toy_dice__mqvaaa",
+   "strip": "/tmp/glib/strips/toy_dice__mqvaaa.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred face pinch, fingers 43/0"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch at 30 deg tilt, fingers 43/0"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    41,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "rbzyrv",
+   "key": "toy_dice__rbzyrv",
+   "strip": "/tmp/glib/strips/toy_dice__rbzyrv.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt about pinch axis, pads still flush"
+    }
+   ],
+   "object_note": "Fingers read 43/0 but cube sits centred between flush pads; fingertips flush with bottom face",
+   "bbox_mm": [
+    41,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "xfqqhh",
+   "key": "toy_dice__xfqqhh",
+   "strip": "/tmp/glib/strips/toy_dice__xfqqhh.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face-to-face pinch, tips flush with bottom"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt about pinch axis, pads still flush"
+    }
+   ],
+   "object_note": "Fingers read 43/0 but cube sits centred between flush pads; fingertips flush with bottom face",
+   "bbox_mm": [
+    41,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

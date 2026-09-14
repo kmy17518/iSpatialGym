@@ -1,0 +1,283 @@
+{
+ "group": "IORS__hard_candy__r1",
+ "task": "IORS",
+ "category": "hard_candy",
+ "round": 1,
+ "relation": "inside",
+ "partner": "hingeless_jar",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "ojznyf",
+   "key": "hard_candy__ojznyf",
+   "strip": "/tmp/glib/strips/hard_candy__ojznyf.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body between fingertips, both pads on wrapper"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch, body partly below tips, both touch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "left pad touches only at fingertip; right pad full"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "candy at very fingertip, both tips touch wrapper"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "candy at fingertip, lower half below tips"
+    }
+   ],
+   "object_note": "12 mm wrapped candy pinched at fingertip edge; pinch axis above body (width inf) yet pads touch",
+   "bbox_mm": [
+    21,
+    55,
+    21
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop_insert"
+  },
+  {
+   "model": "vwegtt",
+   "key": "hard_candy__vwegtt",
+   "strip": "/tmp/glib/strips/hard_candy__vwegtt.png",
+   "n_valid": 5,
+   "n_clean": 2,
+   "n_clean_strict": 2,
+   "flags": [
+    "fragile",
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "fragile",
+      "one_finger"
+     ],
+     "note": "lengthwise pinch on wrapper twists (50 mm); finger stuck at 50"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "fragile",
+      "one_finger"
+     ],
+     "note": "lengthwise pinch on wrapper twists; finger stuck at 50"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "fragile",
+      "one_finger"
+     ],
+     "note": "lengthwise pinch on wrapper twists; finger stuck at 50"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "cross pinch at fingertips, both pads touch body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "cross pinch at fingertips, both pads touch body"
+    }
+   ],
+   "object_note": "3 of 5 grasps squeeze the crinkled wrapper ends along the candy axis instead of the body",
+   "bbox_mm": [
+    25,
+    55,
+    21
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop_insert"
+  },
+  {
+   "model": "vyxhmv",
+   "key": "hard_candy__vyxhmv",
+   "strip": "/tmp/glib/strips/hard_candy__vyxhmv.png",
+   "n_valid": 5,
+   "n_clean": 4,
+   "n_clean_strict": 4,
+   "flags": [
+    "fragile"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body between fingertips, both pads touch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch, both pads touch body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body at fingertips, wrapper twist hangs below"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch, both pads touch"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "fragile"
+     ],
+     "note": "diagonal 41 mm pinch: pad on wrapper twist, tip on body"
+    }
+   ],
+   "object_note": "small wrapped candy; rows 1-4 are marginal fingertip pinches with contact, row 5 catches the wrapper",
+   "bbox_mm": [
+    23,
+    55,
+    21
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop_insert"
+  },
+  {
+   "model": "qptjgv",
+   "key": "hard_candy__qptjgv",
+   "strip": "/tmp/glib/strips/hard_candy__qptjgv.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body between fingertips, both pads touch wrapper"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "right pad touches only at fingertip"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch, both pads touch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "candy at very fingertip, wrapper end hangs below"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "candy at very fingertip, both tips touch"
+    }
+   ],
+   "object_note": "tabletop candy pinched at pad edges; marginal but visual contact on both sides in every row",
+   "bbox_mm": [
+    22,
+    55,
+    23
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop_insert"
+  },
+  {
+   "model": "yuatcg",
+   "key": "hard_candy__yuatcg",
+   "strip": "/tmp/glib/strips/hard_candy__yuatcg.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body between fingertips, both pads on wrapper"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "right pad full, left pad touches at fingertip"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on body and wrapper fold; antipodal 0.23"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads partly on wrapper folds; antipodal 0.07"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body at fingertips, both pads touch"
+    }
+   ],
+   "object_note": "wrapped candy pinched at fingertips; low antipodal scores come from centre ray hitting wrapper",
+   "bbox_mm": [
+    23,
+    55,
+    24
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop_insert"
+  }
+ ],
+ "excluded": []
+}

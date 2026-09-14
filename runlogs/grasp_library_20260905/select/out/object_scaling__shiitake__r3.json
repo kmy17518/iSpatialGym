@@ -1,0 +1,27 @@
+{
+  "group": "object_scaling__shiitake__r3",
+  "task": "object_scaling",
+  "category": "shiitake",
+  "round": 3,
+  "relation": null,
+  "n_candidates": 3,
+  "n_opened": 3,
+  "candidates": [
+    {"model": "lrejyh", "key": "shiitake__lrejyh__f", "G": 5, "T": 3, "V": 5, "R": 1, "score": 24,
+     "note": "Detailed shiitake (cap, cream gills, stem); rows 1,2,3,5 two-tip pinches at 15-24 mm on cap or stem, row 4 one-finger 49/0; B at 0 throughout."},
+    {"model": "iwrtus", "key": "shiitake__iwrtus__f", "G": 4, "T": 3, "V": 4, "R": 1, "score": 20,
+     "note": "Rounder blobby brown cap; all rows 41-49/0 one-finger closures pressing mushroom on idle pad, tilts 82-95 similar; row 3 antipodal 0.39 poor."},
+    {"model": "oirawt", "key": "shiitake__oirawt__f", "G": 4, "T": 3, "V": 5, "R": 1, "score": 22,
+     "note": "Speckled cap, long stem, sharp texture; diverse tilts 57-142 but rows 1-4 are 45-50/0 one-finger closures, row 4 antipodal 0.72; row 5 true two-tip pinch."}
+  ],
+  "selected": [
+    {"model": "lrejyh", "key": "shiitake__lrejyh__f", "rank": 1,
+     "reason": "Only candidate whose pinches are genuinely two-sided (finger A moves to 36-39); diverse cap and stem holds, best-detailed asset; widths 15-24 mm are smallish."},
+    {"model": "oirawt", "key": "shiitake__oirawt__f", "rank": 2,
+     "reason": "Second by score and visually distinct (speckled cap, long stem); diverse orientations and 25-30 mm widths, but four rows depend on one-finger closure against the idle pad."}
+  ],
+  "alternate": {"model": "iwrtus", "key": "shiitake__iwrtus__f"},
+  "short": false,
+  "warnings": ["Small category (47-52 mm): one finger bottoms out at 0 in every row of every candidate; grasps hold only at the fingertips."],
+  "confidence": "medium"
+}

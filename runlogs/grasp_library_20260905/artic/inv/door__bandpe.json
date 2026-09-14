@@ -1,0 +1,138 @@
+{
+ "category": "door",
+ "model": "bandpe",
+ "key": "door__bandpe",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  1.3021951913833618
+ ],
+ "aabb_extent": [
+  0.14624886214733124,
+  1.4231499433517456,
+  2.0749239921569824
+ ],
+ "aabb_min_rel_root": [
+  -0.0931856781244278,
+  -0.7134864330291748,
+  -1.3021951913833618
+ ],
+ "aabb_max_rel_root": [
+  0.05306318774819374,
+  0.7096635103225708,
+  0.7727288007736206
+ ],
+ "link_tags": {
+  "base_link": [],
+  "leaf0": [],
+  "leaf1": []
+ },
+ "openable_joint_ids": [],
+ "joints": [
+  {
+   "joint": "j_leaf0",
+   "type": "RevoluteJoint",
+   "child_link": "leaf0",
+   "lower": 0.0,
+   "upper": 1.5708482265472412,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    -0.03897,
+    0.61309,
+    -0.38263
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "hinge_point_obj": [
+    -0.03897,
+    0.61309,
+    3.93988
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/door__bandpe__leaf0.obj",
+   "n_pieces": 8,
+   "link_bbox_min": [
+    -0.0932,
+    -0.6216,
+    -1.2607
+   ],
+   "link_bbox_max": [
+    -0.0093,
+    -0.0049,
+    0.7156
+   ],
+   "link_tags": [],
+   "sub_links": []
+  },
+  {
+   "joint": "j_leaf1",
+   "type": "RevoluteJoint",
+   "child_link": "leaf1",
+   "lower": 0.0,
+   "upper": 1.570744514465332,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    -0.03861,
+    -0.61675,
+    -0.38259
+   ],
+   "link_quat_obj": [
+    -0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    -0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    -0.03861,
+    -0.61675,
+    -0.38259
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/door__bandpe__leaf1.obj",
+   "n_pieces": 8,
+   "link_bbox_min": [
+    -0.093,
+    0.001,
+    -1.2565
+   ],
+   "link_bbox_max": [
+    -0.0091,
+    0.6178,
+    0.7198
+   ],
+   "link_tags": [],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0478,
+   -0.7135,
+   -1.3022
+  ],
+  "bbox_max": [
+   0.0531,
+   0.7097,
+   0.7727
+  ],
+  "n_pieces": 9
+ }
+}

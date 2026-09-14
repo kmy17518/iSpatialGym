@@ -1,0 +1,23 @@
+{
+  "category": "plant_pot_stand",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "plant_pot_stand/dylpyb",
+      "V": 3,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 11,
+      "valid": true,
+      "note": "Ornate wrought-iron tiered stand with three empty basket holders and top plate, uniform light grey; 0.26 x 0.56 x 0.83 m; wiry, feet, stable."
+    }
+  ],
+  "picks": ["plant_pot_stand/dylpyb"],
+  "alternate": null,
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int", "restaurant_diner", "office_cubicles_right"],
+  "category_verdict": "weak",
+  "category_note": "Single grey scrollwork plant stand without plants, 0.26 x 0.56 x 0.83 m on four feet. Plausible in living rooms, corridors, diner and office but normally against a wall; flat grey look, open wiry geometry and borderline footprint."
+}

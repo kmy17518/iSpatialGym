@@ -1,0 +1,37 @@
+{
+  "group": "mental_rotation__mallet__r3",
+  "task": "mental_rotation",
+  "category": "mallet",
+  "round": 3,
+  "relation": null,
+  "n_candidates": 1,
+  "n_opened": 1,
+  "candidates": [
+    {
+      "model": "wpswgw",
+      "key": "mallet__wpswgw__f",
+      "G": 4,
+      "T": 3,
+      "V": 3,
+      "R": 1,
+      "score": 18,
+      "note": "Three clean collar/handle pinches beside the head at mirrored horizontal and diagonal poses, row 3 borderline, row 2 gap (28 vs 9 mm); flat-shaded mallet."
+    }
+  ],
+  "selected": [
+    {
+      "model": "wpswgw",
+      "key": "mallet__wpswgw__f",
+      "rank": 1,
+      "reason": "Only candidate; rows 1, 4, 5 are natural handle-next-to-head grasps at visibly different orientations, enough for in-hand rotation; recognisable mallet despite plain materials."
+    }
+  ],
+  "alternate": null,
+  "short": true,
+  "warnings": [
+    "Only 1 candidate in the group; fewer than 2 models selectable.",
+    "wpswgw: row 2 is not clean (pads stop 28 mm apart on a 9 mm section, antipodal 0.29); row 3 collar pinch is borderline; prefer rows 1, 4, 5.",
+    "Flat-shaded asset with an untextured grey head and faceted handle; all grasps sit 62-69 mm from CoM and one finger closes to 0 mm."
+  ],
+  "confidence": "medium"
+}

@@ -1,0 +1,35 @@
+{
+ "category": "bottle_of_rum",
+ "model": "bnvoux",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_rum__bnvoux__y0.png",
+   "drift_m": 0.0063,
+   "tilt_deg": 4.7,
+   "on_tray": true,
+   "settled_z": 0.0754,
+   "seg_pixels": 11178,
+   "aabb_extent": [
+    0.056,
+    0.099,
+    0.188
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_rum__bnvoux__y1.png",
+   "drift_m": 0.007,
+   "tilt_deg": 5.4,
+   "on_tray": true,
+   "settled_z": 0.0754
+  }
+ },
+ "stable": true,
+ "visible": true
+}

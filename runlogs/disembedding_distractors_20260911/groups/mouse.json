@@ -1,0 +1,27 @@
+{
+  "category": "mouse",
+  "n_models": 7,
+  "pages_opened": [
+    "grids/same/mouse__p1.png",
+    "grids/same/mouse__p2.png"
+  ],
+  "groups": [
+    {
+      "members": ["cduwda", "pljjtu"],
+      "reason": "Identical white 12x7x4 mice: same domed shape, shading and small dark sensor dot in every crop.",
+      "confidence": "high"
+    },
+    {
+      "members": ["fjljxp", "ihpnjx"],
+      "reason": "Exact geometry duplicates; identical white flat egg-shaped mice in every crop.",
+      "confidence": "high"
+    }
+  ],
+  "unusable": [
+    {
+      "model": "oydobn",
+      "reason": "3x2x1 cm, 273 px dark blob; does not read as a mouse."
+    }
+  ],
+  "notes": "pljjtu reports 0 segmentation px at yaw 0 although it renders normally - check its mask before use. The two white pairs (cduwda/pljjtu: 12x7x4 domed with dark dot; fjljxp/ihpnjx: 11x6x3 flat egg, ~20% smaller) are the closest non-merged groups; merge them if that margin is too thin. eosngb is a boxy metallic bar, reads as a low-profile mouse."
+}

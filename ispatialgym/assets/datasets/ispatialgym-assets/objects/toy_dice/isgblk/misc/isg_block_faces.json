@@ -1,0 +1,35 @@
+{
+  "faces": {
+    "+z": "red",
+    "-z": "blue",
+    "+x": "white",
+    "-x": "yellow",
+    "+y": "blue|yellow",
+    "-y": "red|white"
+  },
+  "opposite_pairs": [
+    [
+      "+z",
+      "-z"
+    ],
+    [
+      "+x",
+      "-x"
+    ],
+    [
+      "+y",
+      "-y"
+    ]
+  ],
+  "tile_up_axis": {
+    "+z": "+y",
+    "-z": "+y",
+    "+x": "+z",
+    "-x": "+z",
+    "+y": "+z",
+    "-y": "+z"
+  },
+  "mass_kg": 0.0069,
+  "edge_m": 0.0254,
+  "source_urdf": "/home/minyeongk/Desktop/projects/ispatialgym/ispatialgym/assets/objects/kohs_block/model/isgblk/isgblk.urdf"
+}

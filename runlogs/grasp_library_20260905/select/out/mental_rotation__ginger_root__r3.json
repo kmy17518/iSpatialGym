@@ -1,0 +1,53 @@
+{
+  "group": "mental_rotation__ginger_root__r3",
+  "task": "mental_rotation",
+  "category": "ginger_root",
+  "round": 3,
+  "relation": null,
+  "n_candidates": 2,
+  "n_opened": 2,
+  "candidates": [
+    {
+      "model": "izvukv",
+      "key": "ginger_root__izvukv__f",
+      "G": 4,
+      "T": 3,
+      "V": 3,
+      "R": 1,
+      "score": 18,
+      "note": "Five fingertip pinches of a small 22-27 mm root at CoM, four similar poses; one finger bottoms at 0; smooth blobby root, less obviously ginger."
+    },
+    {
+      "model": "wqcasl",
+      "key": "ginger_root__wqcasl__f",
+      "G": 5,
+      "T": 3,
+      "V": 4,
+      "R": 1,
+      "score": 22,
+      "note": "Five firm body/lobe pinches within 6 mm of CoM at different orientations; rows 4-5 low antipodal but seated; typical lobed ginger hand, good skin texture."
+    }
+  ],
+  "selected": [
+    {
+      "model": "wqcasl",
+      "key": "ginger_root__wqcasl__f",
+      "rank": 1,
+      "reason": "Best grasp set: five clean centred pinches on different lobes and tilts, giving the in-hand diversity mental rotation needs; most recognisable ginger shape and texture."
+    },
+    {
+      "model": "izvukv",
+      "key": "ginger_root__izvukv__f",
+      "rank": 2,
+      "reason": "Only other candidate; all pinches sit at CoM with both tips touching, and its small compact shape differs from the lobed pick, but fingertip grips are less robust."
+    }
+  ],
+  "alternate": null,
+  "short": true,
+  "warnings": [
+    "Group has only 2 candidates; both selected.",
+    "Both models: one finger closes fully to 0 mm on every row (small object pressed against the other pad), so robustness is borderline.",
+    "izvukv is a small 49 x 70 x 39 mm root held at the fingertips with a 22-27 mm pinch and limited pose diversity."
+  ],
+  "confidence": "medium"
+}

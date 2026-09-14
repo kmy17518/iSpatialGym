@@ -1,0 +1,20 @@
+{
+  "key": "bottom_cabinet_no_top__ufhpbn",
+  "category": "bottom_cabinet_no_top",
+  "model": "ufhpbn",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_0",
+      "kind": "drawer",
+      "chosen": "A",
+      "pinch": "horizontal_bar",
+      "motion": "pull",
+      "graspable": true,
+      "handle_description": "Horizontal bar pull (~82 mm, protrudes ~31 mm) near the top of the tall pull-out front; A on the bar, B is its end post.",
+      "height_concern": "",
+      "confidence": "high"
+    }
+  ],
+  "object_note": "Single tall pantry pull-out with shelves; heuristic correct. B is only the bar's mounting post, so A (the bar itself) is the grasp. Handle at ~0.88 m."
+}

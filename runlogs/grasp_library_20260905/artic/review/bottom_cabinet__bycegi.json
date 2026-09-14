@@ -1,0 +1,20 @@
+{
+  "key": "bottom_cabinet__bycegi",
+  "category": "bottom_cabinet",
+  "model": "bycegi",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_0",
+      "kind": "door",
+      "chosen": "C",
+      "pinch": "vertical_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Thin vertical wire pull near the free -y edge; C is the bar middle, A/B its end posts; hinge on +y side.",
+      "height_concern": "",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Single tall door; heuristic correct and on the right side. Wire pull standoff is shallow (~15 mm), so only fingertips get behind the bar."
+}

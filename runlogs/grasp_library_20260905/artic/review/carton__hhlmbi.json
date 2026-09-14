@@ -1,0 +1,20 @@
+{
+  "key": "carton__hhlmbi",
+  "category": "carton",
+  "model": "hhlmbi",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link0",
+      "kind": "flap",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "lift",
+      "graspable": false,
+      "handle_description": "No handle; shoebox-style lid skirt sits flush over the box walls, overhanging only ~4 mm, nothing to hook a fingertip under.",
+      "height_concern": "lid edge at ~0.12 m, below 0.25 m",
+      "confidence": "high"
+    }
+  ],
+  "object_note": "Small storage box with a skirted lid hinged at the back; lid rises when opened. Heuristic's ungraspable status is right. Oval hand-hole belongs to the box body, not the lid."
+}

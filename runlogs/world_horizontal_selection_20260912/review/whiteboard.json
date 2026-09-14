@@ -1,0 +1,54 @@
+{
+  "category": "whiteboard",
+  "task": "wa2",
+  "n_models": 3,
+  "n_opened": 3,
+  "models": [
+    {
+      "model": "bqqmtc",
+      "V": 4,
+      "L": 2,
+      "H": 2,
+      "score": 14,
+      "valid": true,
+      "front_axis": "+x",
+      "level_axis": "y",
+      "up_axis": "+z",
+      "symmetric_180": false,
+      "thin_axis": "x",
+      "note": "Drawn charts and text, marker tray at bottom, 0.88 m wide; content shows mirrored from behind. Best whiteboard."
+    },
+    {
+      "model": "gvkgsi",
+      "V": 3,
+      "L": 2,
+      "H": 1,
+      "score": 11,
+      "valid": true,
+      "front_axis": "+x",
+      "level_axis": "y",
+      "up_axis": "+z",
+      "symmetric_180": false,
+      "thin_axis": "x",
+      "note": "Plain grey board with small bottom tray, 2 cm thin; back face missing (hollow outline from behind); 1.23 m wide, borderline."
+    },
+    {
+      "model": "onhspt",
+      "V": 4,
+      "L": 3,
+      "H": 0,
+      "score": 14,
+      "valid": false,
+      "front_axis": "+x",
+      "level_axis": "y",
+      "up_axis": "+z",
+      "symmetric_180": false,
+      "thin_axis": "x",
+      "note": "Clean 3.19 m wide classroom board with tray; very readable level but far too wide to hang."
+    }
+  ],
+  "picks": ["bqqmtc", "gvkgsi"],
+  "alternate": null,
+  "category_verdict": "good",
+  "category_note": "Landscape boards with a bottom marker tray giving a clear level and up cue. Only bqqmtc has drawn content; gvkgsi is a plain hollow-backed 1.23 m board, onhspt is a 3.2 m classroom board."
+}

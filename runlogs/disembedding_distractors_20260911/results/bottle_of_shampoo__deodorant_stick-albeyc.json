@@ -1,0 +1,144 @@
+{
+ "target_category": "bottle_of_shampoo",
+ "target_model": "stjjjm",
+ "target_key": "bottle_of_shampoo__stjjjm__t",
+ "category": "deodorant_stick",
+ "model": "albeyc",
+ "kind": "diff",
+ "tier": 1,
+ "started": "2026-09-12 11:39:25",
+ "template": {
+  "support": {
+   "name": "breakfast_table_rhjoby_0",
+   "z": 0.8126288652420044,
+   "yaw": 1.5683633089065552,
+   "local_bounds": [
+    2.9351236820220947,
+    4.095314979553223,
+    -8.733710289001465,
+    -5.830993175506592
+   ],
+   "n_free_cells": 8465,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-v",
+   "edge_mid": [
+    8.742237091064453,
+    3.493959426879883
+   ],
+   "inward": [
+    -0.9999970197677612,
+    0.002433015499264002
+   ],
+   "tangent": [
+    -0.002433015499264002,
+    -0.9999970197677612
+   ],
+   "base_pose2d": [
+    9.19143295288086,
+    3.1627700328826904,
+    3.1391596356403797
+   ],
+   "edge_depth": 0.4500003159046173,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.4000000059604645,
+    "axis_angle": 0.17426821528692096
+   }
+  },
+  "place_stance": {
+   "edge": "-v",
+   "edge_mid": [
+    8.742237091064453,
+    3.493959426879883
+   ],
+   "inward": [
+    -0.9999970197677612,
+    0.002433015499264002
+   ],
+   "tangent": [
+    -0.002433015499264002,
+    -0.9999970197677612
+   ],
+   "base_pose2d": [
+    9.192228317260742,
+    3.489799976348877,
+    3.1391596356403797
+   ],
+   "edge_depth": 0.45000001788139343
+  },
+  "view_arms": "untucked",
+  "yaw_adjust_deg": 0.0,
+  "dest_lateral_m": -0.6540619313676734,
+  "dest_side": "right",
+  "source_lateral_offset": 0.35,
+  "n_reachable_cells": 22,
+  "n_grasp_cells": 12,
+  "n_place_combos": 31,
+  "distractors": {
+   "same_category": true,
+   "pool": "same_category",
+   "requested_pool": "same_category",
+   "fallback": null,
+   "models": [
+    "bottle_of_shampoo-dvrzmy"
+   ],
+   "requested": 1,
+   "pool_size": 1,
+   "pool_categories": [
+    "bottle_of_shampoo"
+   ],
+   "lookalikes_excluded": [],
+   "footprint_fraction": 0.11
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 291.11,
+   "prepare_template_s": 0.14
+  },
+  "setup_s": 291.2
+ },
+ "footprint_fraction_with_target": 0.082,
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {},
+ "instances": [
+  {
+   "summary": "/tmp/isg_dis_distractors/bottle_of_shampoo-stjjjm__deodorant_stick-albeyc/instances/disembedding-0__bottle_of_shampoo-stjjjm__deodorant_stick-albeyc__0000.summary.json",
+   "wall_time_s": 4.8,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    9.19143295288086,
+    3.1627700328826904,
+    3.1391596356403797
+   ],
+   "trunk": [
+    0.749999987042469,
+    -0.40000003576278687
+   ],
+   "occluded_variant": false,
+   "grasp": {
+    "key": "bottle_of_shampoo__stjjjm__t",
+    "name": "grasp_1",
+    "translate": 0.5,
+    "place_translate": 0.5,
+    "yaw": 1.4302734327787867
+   },
+   "dest_pixels": 15360,
+   "source_pixels": 110304,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.4000000059604645
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_dis_distractors/bottle_of_shampoo-stjjjm__deodorant_stick-albeyc",
+ "job_s": 6.2,
+ "finished": "2026-09-12 11:39:31",
+ "occluded_variant": false,
+ "occlusion_ratio": null
+}

@@ -1,0 +1,488 @@
+{
+ "group": "mental_rotation__statue__r1",
+ "task": "mental_rotation",
+ "category": "statue",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "tuldri",
+   "key": "statue__tuldri",
+   "strip": "/tmp/glib/strips/statue__tuldri.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid pinch on elephant body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
+    }
+   ],
+   "object_note": "Reported width often differs from pad gap; centreline measurement through thin section, pads on wider body",
+   "bbox_mm": [
+    64,
+    47,
+    70
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "wrtqik",
+   "key": "statue__wrtqik",
+   "strip": "/tmp/glib/strips/statue__wrtqik.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid pinch on statue body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    73,
+    83,
+    268
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "oxgpfk",
+   "key": "statue__oxgpfk",
+   "strip": "/tmp/glib/strips/statue__oxgpfk.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid pinch on bird body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "solid body pinch, both pads touching"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    231,
+    43,
+    153
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ihagjy",
+   "key": "statue__ihagjy",
+   "strip": "/tmp/glib/strips/statue__ihagjy.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down pinch on box base sides"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down pinch on box base sides"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down pinch on box base sides"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down pinch on box base sides"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down pinch on box base sides"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    58,
+    121,
+    191
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "cxsvwj",
+   "key": "statue__cxsvwj",
+   "strip": "/tmp/glib/strips/statue__cxsvwj.png",
+   "n_valid": 5,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "end_grasp",
+    "fragile"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "figure torso pinched, heavy block base 82mm away"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "figure body pinched, base hangs 89mm away"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp",
+      "fragile"
+     ],
+     "note": "thin 15mm limb pinched, base 100mm away"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "figure limbs pinched, base hangs 84mm away"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp",
+      "fragile"
+     ],
+     "note": "7mm limb pinched, low antipodal, base 94mm away"
+    }
+   ],
+   "object_note": "Thin metallic figure on heavy rectangular block; no grasp on the block itself",
+   "bbox_mm": [
+    237,
+    103,
+    322
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "noykhv",
+   "key": "statue__noykhv",
+   "strip": "/tmp/glib/strips/statue__noykhv.png",
+   "n_valid": 5,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "end_grasp",
+    "fragile",
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp",
+      "one_finger"
+     ],
+     "note": "tentacle pinch, fingers 49/0, mantle 118mm away"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "tentacle pinch 122mm from mantle CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp",
+      "fragile"
+     ],
+     "note": "12mm tentacle tip, antipodal 0.49, CoM 118mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp",
+      "fragile"
+     ],
+     "note": "15mm tentacle pinch, mantle 127mm away"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp",
+      "fragile"
+     ],
+     "note": "15mm tentacle pinch, mantle 125mm away"
+    }
+   ],
+   "object_note": "Octopus statue; all grasps on tentacles far from heavy mantle",
+   "bbox_mm": [
+    318,
+    161,
+    147
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ponfvo",
+   "key": "statue__ponfvo",
+   "strip": "/tmp/glib/strips/statue__ponfvo.png",
+   "n_valid": 5,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "end_grasp"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "edge of thin base plate, branch 96mm away"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "edge of thin base plate, CoM 92mm away"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "edge of thin base plate, CoM 102mm away"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "plate corner pinch, CoM 111mm away"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "plate edge pinch, CoM 115mm away"
+    }
+   ],
+   "object_note": "Branch mounted on thin 14mm plate; every grasp pinches the plate edge at long lever arm",
+   "bbox_mm": [
+    488,
+    181,
+    236
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "qbfkek",
+   "key": "statue__qbfkek",
+   "strip": "/tmp/glib/strips/statue__qbfkek.png",
+   "n_valid": 5,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "end_grasp"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "small lobe pinched, heavy body 132mm away"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "small lobe pinched, body 132mm away"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "small lobe pinched, body 134mm away"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "small lobe pinched, body 143mm away"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "small lobe pinched, body 147mm away"
+    }
+   ],
+   "object_note": "Large grey statue; all grasps on one 31mm protrusion 130+mm from CoM",
+   "bbox_mm": [
+    342,
+    249,
+    447
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": [
+  {
+   "model": "wqseas",
+   "key": "statue__wqseas",
+   "reason": "no candidates"
+  },
+  {
+   "model": "iqaldl",
+   "key": "statue__iqaldl",
+   "reason": "no candidates"
+  }
+ ]
+}

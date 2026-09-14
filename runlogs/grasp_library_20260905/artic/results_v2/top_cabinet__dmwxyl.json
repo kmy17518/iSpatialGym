@@ -1,0 +1,82 @@
+{
+ "key": "top_cabinet__dmwxyl",
+ "category": "top_cabinet",
+ "model": "dmwxyl",
+ "scene": "house_double_floor_lower",
+ "host": "top_cabinet_tynnnw_0",
+ "host_rank": 0,
+ "host_model": "tynnnw",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [8.037215232849121, -0.6118080615997314, 1.4948209524154663]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [8.037215232849121, -0.6118080615997314, 1.4948209524154663]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    8.037,
+    -0.612,
+    1.495
+   ],
+   "handle_height_above_floor": 1.49,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 0,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 4
+   }
+  },
+  {
+   "joint": "j_link_1",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     7.449,
+     0.136,
+     -0.056
+    ],
+    "translate": 0.5,
+    "sign": -1.0
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: planning: [planning] no collision-free base path to (7.509643077850342, 0.28538113832473755, -0.061175573617219925) {'curobo_status': 'IK failed: goal pose unreachable for the active joints (best pose error 0.0 mm / 0.190 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad) [start configuration is in collision]'}",
+    "sign -1: planning: [planning] no collision-free base path to (7.449440002441406, 0.13590329885482788, -0.0563812293112278) {'curobo_status': 'IK failed: goal pose unreachable for the active joints (best pose error 0.0 mm / 0.062 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad) [start configuration is in collision]'}"
+   ],
+   "error": "planning: [planning] no collision-free base path to (7.449440002441406, 0.13590329885482788, -0.0563812293112278) {'curobo_status': 'IK failed: goal pose unreachable for the active joints (best pose error 0.0 mm / 0.062 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad) [start configuration is in collision]'}",
+   "contact_world": [
+    8.037,
+    -0.098,
+    1.495
+   ],
+   "handle_height_above_floor": 1.49
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.715,
+  2.507,
+  1.415
+ ],
+ "time_s": 120.7
+}

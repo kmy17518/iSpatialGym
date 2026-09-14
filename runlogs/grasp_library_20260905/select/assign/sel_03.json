@@ -1,0 +1,9 @@
+{
+ "assignment": "sel_03",
+ "groups": [
+  "/tmp/glib/select/groups/disembedding__bottle_of_wine__r2.json",
+  "/tmp/glib/select/groups/disembedding__box_of_cereal__r1.json",
+  "/tmp/glib/select/groups/mental_rotation__garlic_clove__r2.json"
+ ],
+ "n_strips": 34
+}

@@ -1,0 +1,40 @@
+{
+ "group": "configuration_matching__wreath__r1",
+ "task": "configuration_matching",
+ "category": "wreath",
+ "round": 1,
+ "relation": null,
+ "n_candidates": 1,
+ "n_opened": 1,
+ "candidates": [
+  {
+   "model": "rkrxno",
+   "key": "wreath__rkrxno",
+   "G": 0,
+   "T": 1,
+   "V": 3,
+   "R": 0,
+   "score": 7,
+   "note": "Sparse wiry wreath, flat yellow leaves, low-poly red berries; single grasp clamps 87 mm loose foliage, antipodal 0.12, coverage 0, attach point 24 mm away."
+  }
+ ],
+ "selected": [
+  {
+   "model": "rkrxno",
+   "key": "wreath__rkrxno",
+   "rank": 1,
+   "reason": "Fallback pick: sole candidate with n_clean 0; its only grasp squeezes loose foliage next to the attach point, so it is not a sound test instance.",
+   "partners": [
+    "recreational_vehicle/doiucd [type displaywall]",
+    "wall_nail/wlnail [type displaywall]"
+   ]
+  }
+ ],
+ "alternate": null,
+ "short": true,
+ "warnings": [
+  "Hard-exclusion fallback: rkrxno has no clean grasp (fragile foliage pinch, antipodal 0.12, coverage 0.00) and was selected only because the group has no other candidate; only 1 model selectable.",
+  "Pads clamp across the ring thickness 24 mm from the attach point, so the back (mating) face is partly covered."
+ ],
+ "confidence": "low"
+}

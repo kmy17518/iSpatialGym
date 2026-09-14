@@ -1,0 +1,35 @@
+{
+ "category": "magazine",
+ "model": "ymfwaz",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/magazine__ymfwaz__y0.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.1,
+   "on_tray": true,
+   "settled_z": 0.0066,
+   "seg_pixels": 18527,
+   "aabb_extent": [
+    0.219,
+    0.161,
+    0.012
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/magazine__ymfwaz__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0063
+  }
+ },
+ "stable": true,
+ "visible": true
+}

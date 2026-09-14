@@ -1,0 +1,9 @@
+{
+  "category": "notebook",
+  "pages_opened": ["grids/pool_other/notebook__p1.png", "grids/pool_other/notebook__p2.png"],
+  "n_models": 18,
+  "exclude": [
+    {"model": "folderal/zwhewa", "reason": "decorative wire basket with foliage, not stationery; clearly unrelated to a notebook (name-matched to folder)"}
+  ],
+  "notes": "Books, magazines, notepads, folder and game boxes are intact, textured and lie flat as expected for such items. hardback/acaxtl and notepad/oaikde are plain white slabs but still read as book/pad. box_of_cookies/apjokz (tier 2) is a weak semantic match but box-shaped like the game boxes, kept."
+}

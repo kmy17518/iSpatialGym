@@ -1,0 +1,101 @@
+[
+  {
+    "id": "ice_cube__c1",
+    "category": "ice_cube",
+    "verdict": "exact_same",
+    "exact_groups": [["czbfpm", "dueotq", "lkirej", "pjgror", "ujmgkb", "xupugj"]],
+    "geometry_note": "All six are the same rounded, slightly irregular cube; only tessellation density differs (3k-8k verts); silhouettes match in all views.",
+    "texture_note": "All fully transparent glassy ice material with identical refraction look; no colour or surface differences visible.",
+    "confidence": "medium"
+  },
+  {
+    "id": "box_of_cereal__c2",
+    "category": "box_of_cereal",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Identical rectangular cereal box; same dimensions and footprint for all four models.",
+    "texture_note": "Four Dorset Cereals flavour prints: dark grey/yellow, dark grey/pink-blue, mint green, cream/yellow; every label differs.",
+    "confidence": "high"
+  },
+  {
+    "id": "bottle_of_wine__c1",
+    "category": "bottle_of_wine",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Same wine bottle mesh (1888 faces), identical silhouette and round footprint.",
+    "texture_note": "ivuvbv green glass, cream label; pgfplm green glass, white bordered label; xzipsi clear glass without label.",
+    "confidence": "high"
+  },
+  {
+    "id": "lily__c1",
+    "category": "lily",
+    "verdict": "exact_same",
+    "exact_groups": [["jfeimu", "jtouad", "relerp"]],
+    "geometry_note": "Same lily spray: two open blooms, one bud, identical leaf arrangement; jtouad differs only by a few faces.",
+    "texture_note": "All white petals, yellow stamens, dark green leaves; rendered colours match within noise despite high thumb_dist.",
+    "confidence": "high"
+  },
+  {
+    "id": "bell_pepper__c1",
+    "category": "bell_pepper",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Identical bell pepper mesh with stem; same vertex/face counts and volume.",
+    "texture_note": "ggurxn is orange-red, ihctxa bright yellow; green stems look the same.",
+    "confidence": "high"
+  },
+  {
+    "id": "bottle_of_milk__c1",
+    "category": "bottle_of_milk",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Same low-poly faceted milk bottle (43 verts), same size and footprint.",
+    "texture_note": "ddvsgl red cap with red MILK/Chinese print; utfsmp white cap, plain cream body with only faint partial red mark.",
+    "confidence": "high"
+  },
+  {
+    "id": "box_of_cookies__c2",
+    "category": "box_of_cookies",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Identical flat square box (16 verts, 12 faces), same size.",
+    "texture_note": "Same cookie artwork in two colourways: hdgsxz pale blue/white with yellow swirls, jtalxs orange/yellow.",
+    "confidence": "high"
+  },
+  {
+    "id": "cherry_tomato__c1",
+    "category": "cherry_tomato",
+    "verdict": "exact_same",
+    "exact_groups": [["dqvtgm", "iydznu"]],
+    "geometry_note": "Same ovoid cherry tomato; same vertex/face count and volume; only orientation differs.",
+    "texture_note": "Identical red tomato texture (thumb_dist 0); rendered colours match.",
+    "confidence": "high"
+  },
+  {
+    "id": "lemon__c2",
+    "category": "lemon",
+    "verdict": "exact_same",
+    "exact_groups": [["bmvxas", "pqweio"]],
+    "geometry_note": "Same lemon mesh (2078 faces), same volume; identical nub and stem-scar placement.",
+    "texture_note": "Same yellow peel with dark stem scar; rendered mean colours match within 1%, thumb_dist likely UV-layout artefact.",
+    "confidence": "high"
+  },
+  {
+    "id": "pencil_holder__c2",
+    "category": "pencil_holder",
+    "verdict": "exact_same",
+    "exact_groups": [["jyetcl", "taixcy"]],
+    "geometry_note": "Same tapered rectangular open-top holder; taixcy stored rotated 90 degrees; near-identical volume and area.",
+    "texture_note": "Same pale beige wood with grey veining outside and darker brown interior; rendered colours match.",
+    "confidence": "high"
+  },
+  {
+    "id": "vegetable_peeler__c1",
+    "category": "vegetable_peeler",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Same Y-shaped peeler with swivel blade and handle hole; only tiny vertex-count difference.",
+    "texture_note": "njgqao cream/peach handle with orange edge; wqtpjz dark navy handle with light blue edge; blades same.",
+    "confidence": "high"
+  }
+]

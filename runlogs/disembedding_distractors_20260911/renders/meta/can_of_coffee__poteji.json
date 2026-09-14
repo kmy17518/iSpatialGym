@@ -1,0 +1,35 @@
+{
+ "category": "can_of_coffee",
+ "model": "poteji",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/can_of_coffee__poteji__y0.png",
+   "drift_m": 0.0233,
+   "tilt_deg": 13.4,
+   "on_tray": true,
+   "settled_z": 0.0988,
+   "seg_pixels": 13841,
+   "aabb_extent": [
+    0.08,
+    0.103,
+    0.199
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/can_of_coffee__poteji__y1.png",
+   "drift_m": 0.0212,
+   "tilt_deg": 12.3,
+   "on_tray": true,
+   "settled_z": 0.0985
+  }
+ },
+ "stable": true,
+ "visible": true
+}

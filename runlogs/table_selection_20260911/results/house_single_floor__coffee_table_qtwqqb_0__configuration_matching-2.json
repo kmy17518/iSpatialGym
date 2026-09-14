@@ -1,0 +1,25 @@
+{
+ "scene": "house_single_floor",
+ "table": "coffee_table_qtwqqb_0",
+ "category": "coffee_table",
+ "model": "qtwqqb",
+ "rooms": [
+  "living_room_1"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.478,
+  "bbox_x": 0.874,
+  "bbox_y": 1.739,
+  "bbox_z": 0.469,
+  "verdict": "low"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 00:20:06",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

@@ -1,0 +1,100 @@
+{
+ "category": "top_cabinet",
+ "model": "oztrra",
+ "key": "top_cabinet__oztrra",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.11719547212123871
+ ],
+ "aabb_extent": [
+  0.22413167357444763,
+  0.5713762640953064,
+  0.2323072999715805
+ ],
+ "aabb_min_rel_root": [
+  -0.08243162930011749,
+  -0.2856901288032532,
+  -0.11719547212123871
+ ],
+ "aabb_max_rel_root": [
+  0.14170004427433014,
+  0.2856861352920532,
+  0.1151118278503418
+ ],
+ "link_tags": {
+  "base_link": [],
+  "link_0": [
+   "openable"
+  ]
+ },
+ "openable_joint_ids": [
+  [
+   1,
+   "j_link_0"
+  ]
+ ],
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "type": "RevoluteJoint",
+   "child_link": "link_0",
+   "lower": 0.0,
+   "upper": 1.57063627243042,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.11098,
+    -1e-05,
+    0.10861
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.11098,
+    -0.01933,
+    0.10861
+   ],
+   "measured_angle": 0.2496,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/top_cabinet__oztrra__link_0.obj",
+   "n_pieces": 4,
+   "link_bbox_min": [
+    0.108,
+    -0.2836,
+    -0.1161
+   ],
+   "link_bbox_max": [
+    0.1417,
+    0.2836,
+    0.11
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0824,
+   -0.2857,
+   -0.1172
+  ],
+  "bbox_max": [
+   0.1135,
+   0.2857,
+   0.1151
+  ],
+  "n_pieces": 8
+ }
+}

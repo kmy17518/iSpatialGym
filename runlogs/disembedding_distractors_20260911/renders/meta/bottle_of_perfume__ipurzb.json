@@ -1,0 +1,35 @@
+{
+ "category": "bottle_of_perfume",
+ "model": "ipurzb",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_perfume__ipurzb__y0.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0589,
+   "seg_pixels": 7759,
+   "aabb_extent": [
+    0.067,
+    0.066,
+    0.153
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_perfume__ipurzb__y1.png",
+   "drift_m": 0.0002,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0589
+  }
+ },
+ "stable": true,
+ "visible": true
+}

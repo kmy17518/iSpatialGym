@@ -1,0 +1,27 @@
+{
+ "scene": "house_double_floor_upper",
+ "table": "bottom_cabinet_no_top_ncgmqr_0",
+ "category": "bottom_cabinet_no_top",
+ "model": "ncgmqr",
+ "rooms": [
+  "bedroom_2"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.697,
+  "bbox_x": 0.624,
+  "bbox_y": 0.417,
+  "bbox_z": 0.696,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "swivel_chair_iiihwn_0"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:16:43",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

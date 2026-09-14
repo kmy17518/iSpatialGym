@@ -1,0 +1,146 @@
+{
+ "target_category": "bottle_of_wine",
+ "target_model": "lacaoa",
+ "target_key": "bottle_of_wine__lacaoa__t",
+ "category": "bottle_of_wine",
+ "model": "vecadn",
+ "kind": "same",
+ "tier": null,
+ "started": "2026-09-12 11:46:55",
+ "template": {
+  "support": {
+   "name": "breakfast_table_rhjoby_0",
+   "z": 0.8126288652420044,
+   "yaw": 1.568378210067749,
+   "local_bounds": [
+    2.935019016265869,
+    4.095209121704102,
+    -8.733802795410156,
+    -5.831103324890137
+   ],
+   "n_free_cells": 8465,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-v",
+   "edge_mid": [
+    8.742277145385742,
+    3.4939844608306885
+   ],
+   "inward": [
+    -0.999997079372406,
+    0.002418114338070154
+   ],
+   "tangent": [
+    -0.002418114338070154,
+    -0.999997079372406
+   ],
+   "base_pose2d": [
+    9.19147777557373,
+    3.162802219390869,
+    3.139174536902444
+   ],
+   "edge_depth": 0.45000016689300537,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.4000000059604645,
+    "axis_angle": 0.17426924658057197
+   }
+  },
+  "place_stance": {
+   "edge": "-v",
+   "edge_mid": [
+    8.742277145385742,
+    3.4939844608306885
+   ],
+   "inward": [
+    -0.999997079372406,
+    0.002418114338070154
+   ],
+   "tangent": [
+    -0.002418114338070154,
+    -0.999997079372406
+   ],
+   "base_pose2d": [
+    9.192268371582031,
+    3.4898321628570557,
+    3.139174536902444
+   ],
+   "edge_depth": 0.44999995827674866
+  },
+  "view_arms": "untucked",
+  "yaw_adjust_deg": 0.0,
+  "dest_lateral_m": -0.6540619905865788,
+  "dest_side": "right",
+  "source_lateral_offset": 0.35,
+  "n_reachable_cells": 15,
+  "n_grasp_cells": 5,
+  "n_place_combos": 31,
+  "distractors": {
+   "same_category": true,
+   "pool": "same_category",
+   "requested_pool": "same_category",
+   "fallback": null,
+   "models": [
+    "bottle_of_wine-wcokej"
+   ],
+   "requested": 1,
+   "pool_size": 1,
+   "pool_categories": [
+    "bottle_of_wine"
+   ],
+   "lookalikes_excluded": [],
+   "footprint_fraction": 0.15
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 182.44,
+   "prepare_template_s": 0.14
+  },
+  "setup_s": 182.6
+ },
+ "footprint_fraction_with_target": 0.142,
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {
+  "unstable_init": 1
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_dis_distractors/bottle_of_wine-lacaoa__bottle_of_wine-vecadn/instances/disembedding-0__bottle_of_wine-lacaoa__bottle_of_wine-vecadn__0000.summary.json",
+   "wall_time_s": 4.6,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    9.19147777557373,
+    3.162802219390869,
+    3.139174536902444
+   ],
+   "trunk": [
+    0.749999987042469,
+    -0.40000003576278687
+   ],
+   "occluded_variant": false,
+   "grasp": {
+    "key": "bottle_of_wine__lacaoa__t",
+    "name": "grasp_2",
+    "translate": 0.5,
+    "place_translate": 0.5,
+    "yaw": -0.7473031874815688
+   },
+   "dest_pixels": 15363,
+   "source_pixels": 96447,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.4000000059604645
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_dis_distractors/bottle_of_wine-lacaoa__bottle_of_wine-vecadn",
+ "job_s": 8.3,
+ "finished": "2026-09-12 11:47:04",
+ "occluded_variant": false,
+ "occlusion_ratio": null
+}

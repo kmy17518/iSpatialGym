@@ -1,0 +1,115 @@
+{
+ "scene": "restaurant_diner",
+ "table": "bench_xwphjd_3",
+ "category": "bench",
+ "model": "xwphjd",
+ "rooms": [
+  "dining_room_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-1",
+ "inventory": {
+  "top_z": 0.952,
+  "bbox_x": 0.664,
+  "bbox_y": 1.241,
+  "bbox_z": 0.952,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:29:04",
+ "precheck": {
+  "aabb": [
+   [
+    -1.001,
+    -9.775,
+    -0.005
+   ],
+   [
+    -0.328,
+    -8.53,
+    0.956
+   ]
+  ],
+  "support": {
+   "name": "bench_xwphjd_3",
+   "z": 0.3970634341239929,
+   "yaw": 0.0,
+   "local_bounds": [
+    -0.9105526804924011,
+    -0.35055264830589294,
+    -9.765419960021973,
+    -8.54542064666748
+   ],
+   "n_free_cells": 1415,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -0.351,
+     -9.155
+    ],
+    "length": 1.22
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -0.911,
+     -9.155
+    ],
+    "length": 1.22
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -0.631,
+     -8.545
+    ],
+    "length": 0.56
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -0.631,
+     -9.765
+    ],
+    "length": 0.56
+   }
+  ],
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    -0.6305526494979858,
+    -8.54542064666748
+   ],
+   "inward": [
+    0.0,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    0.0
+   ],
+   "base_pose2d": [
+    -0.6605526804924011,
+    -8.095420837402344,
+    -1.5707963267948966
+   ],
+   "edge_depth": 0.4499998092651367,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.7999999523162842,
+    "axis_angle": 0.24748906293868864
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.0
+ },
+ "status": "skipped",
+ "reason": "inter_object_relation_satisfaction-0 found no stance / no reachable cell on the support top at any stand-off"
+}

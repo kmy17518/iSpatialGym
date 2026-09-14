@@ -1,0 +1,71 @@
+{
+ "scene": "restaurant_diner",
+ "table": "commercial_kitchen_table_vxvtec_0",
+ "rooms": [
+  "kitchen_0"
+ ],
+ "removed_chairs": [],
+ "aabb": [
+  [
+   -9.687,
+   -4.983,
+   0.004
+  ],
+  [
+   -8.882,
+   -2.177,
+   0.871
+  ]
+ ],
+ "support": {
+  "name": "commercial_kitchen_table_vxvtec_0",
+  "z": 0.8705011606216431,
+  "yaw": 2.2155717260829988e-07,
+  "local_bounds": [
+   -9.676952362060547,
+   -8.896952629089355,
+   -4.972622394561768,
+   -2.192622423171997
+  ],
+  "n_free_cells": 5600,
+  "occupants": [],
+  "resolution": 0.02
+ },
+ "edges": [
+  {
+   "name": "+u",
+   "mid": [
+    -8.897,
+    -3.583
+   ],
+   "length": 2.78
+  },
+  {
+   "name": "-u",
+   "mid": [
+    -9.677,
+    -3.583
+   ],
+   "length": 2.78
+  },
+  {
+   "name": "+v",
+   "mid": [
+    -9.287,
+    -2.193
+   ],
+   "length": 0.78
+  },
+  {
+   "name": "-v",
+   "mid": [
+    -9.287,
+    -4.973
+   ],
+   "length": 0.78
+  }
+ ],
+ "stance": null,
+ "stance_error": "[stance_collision] untucked: [no_stance] no collision-free stance around commercial_kitchen_table_vxvtec_0",
+ "precheck_s": 1.3
+}

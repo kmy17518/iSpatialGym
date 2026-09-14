@@ -1,0 +1,53 @@
+{
+ "category": "tortilla_chips",
+ "model": "dlkrgq",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0,
+  180.0,
+  270.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/tortilla_chips__dlkrgq__y0.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0076,
+   "seg_pixels": 2753,
+   "aabb_extent": [
+    0.094,
+    0.08,
+    0.02
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/tortilla_chips__dlkrgq__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0074
+  },
+  "y2": {
+   "yaw_deg": 180.0,
+   "png": "renders/tortilla_chips__dlkrgq__y2.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0076
+  },
+  "y3": {
+   "yaw_deg": 270.0,
+   "png": "renders/tortilla_chips__dlkrgq__y3.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.0074
+  }
+ },
+ "stable": true,
+ "visible": true
+}

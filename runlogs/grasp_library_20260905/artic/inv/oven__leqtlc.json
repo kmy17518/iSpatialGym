@@ -1,0 +1,103 @@
+{
+ "category": "oven",
+ "model": "leqtlc",
+ "key": "oven__leqtlc",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.2624645531177521
+ ],
+ "aabb_extent": [
+  0.5268529653549194,
+  0.5039840340614319,
+  0.49473387002944946
+ ],
+ "aabb_min_rel_root": [
+  -0.23935170471668243,
+  -0.25186073780059814,
+  -0.2624645531177521
+ ],
+ "aabb_max_rel_root": [
+  0.2875012457370758,
+  0.25212329626083374,
+  0.2322693169116974
+ ],
+ "link_tags": {
+  "base_link": [],
+  "dof_rootd_aa001_r": [
+   "openable"
+  ],
+  "glass": [
+   "glass"
+  ]
+ },
+ "openable_joint_ids": [
+  [
+   1,
+   "j_dof_rootd_aa001_r"
+  ]
+ ],
+ "joints": [
+  {
+   "joint": "j_dof_rootd_aa001_r",
+   "type": "RevoluteJoint",
+   "child_link": "dof_rootd_aa001_r",
+   "lower": 0.0,
+   "upper": 1.496047019958496,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.24703,
+    0.00026,
+    -0.16617
+   ],
+   "link_quat_obj": [
+    -0.0,
+    0.0,
+    -0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    -0.005350000225007534,
+    0.9999899864196777,
+    -9.000000136438757e-05
+   ],
+   "hinge_point_obj": [
+    0.24703,
+    0.00026,
+    -0.16617
+   ],
+   "measured_angle": 0.2504,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/oven__leqtlc__dof_rootd_aa001_r.obj",
+   "n_pieces": 7,
+   "link_bbox_min": [
+    0.2351,
+    -0.1938,
+    -0.1777
+   ],
+   "link_bbox_max": [
+    0.2875,
+    0.1967,
+    0.1247
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.2394,
+   -0.2519,
+   -0.2625
+  ],
+  "bbox_max": [
+   0.2657,
+   0.2521,
+   0.2323
+  ],
+  "n_pieces": 6
+ }
+}

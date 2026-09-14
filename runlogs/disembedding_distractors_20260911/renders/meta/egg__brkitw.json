@@ -1,0 +1,35 @@
+{
+ "category": "egg",
+ "model": "brkitw",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/egg__brkitw__y0.png",
+   "drift_m": 0.0092,
+   "tilt_deg": 21.9,
+   "on_tray": true,
+   "settled_z": 0.0251,
+   "seg_pixels": 1898,
+   "aabb_extent": [
+    0.069,
+    0.055,
+    0.054
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/egg__brkitw__y1.png",
+   "drift_m": 0.0102,
+   "tilt_deg": 21.8,
+   "on_tray": true,
+   "settled_z": 0.0251
+  }
+ },
+ "stable": false,
+ "visible": true
+}

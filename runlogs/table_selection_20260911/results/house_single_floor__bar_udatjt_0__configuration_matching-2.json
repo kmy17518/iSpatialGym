@@ -1,0 +1,25 @@
+{
+ "scene": "house_single_floor",
+ "table": "bar_udatjt_0",
+ "category": "bar",
+ "model": "udatjt",
+ "rooms": [
+  "kitchen_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 1.052,
+  "bbox_x": 1.145,
+  "bbox_y": 2.994,
+  "bbox_z": 1.051,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 00:00:48",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

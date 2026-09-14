@@ -1,0 +1,20 @@
+{
+  "key": "cedar_chest__gbdzls",
+  "category": "cedar_chest",
+  "model": "gbdzls",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_up",
+      "kind": "flap",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "lift",
+      "graspable": false,
+      "handle_description": "No handle; flat trunk lid ~48 mm thick, skirt flush with the body, no lip to get a finger under; lock hasp at front centre",
+      "height_concern": "grasp spot ~0.13 m above floor, below 0.25 m",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Small flat trunk 0.14 m tall, lid hinged at -x rising at +x. F marks the free edge, but that edge is flush with the body; no pinch possible."
+}

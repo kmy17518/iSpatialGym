@@ -1,0 +1,243 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "desk_mdhelw_1",
+ "category": "desk",
+ "model": "mdhelw",
+ "rooms": [
+  "private_office_2"
+ ],
+ "partner": null,
+ "problem": "disembedding-0",
+ "inventory": {
+  "top_z": 0.77,
+  "bbox_x": 0.9,
+  "bbox_y": 2.781,
+  "bbox_z": 0.77,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "swivel_chair_gfixyb_2",
+  "swivel_chair_gfixyb_3",
+  "swivel_chair_lhkkri_3"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 00:22:43",
+ "precheck": {
+  "aabb": [
+   [
+    14.777,
+    -8.848,
+    -0.016
+   ],
+   [
+    17.588,
+    -7.917,
+    0.785
+   ]
+  ],
+  "support": {
+   "name": "desk_mdhelw_1",
+   "z": 0.7852810621261597,
+   "yaw": 1.570802092552185,
+   "local_bounds": [
+    -8.83796501159668,
+    -7.9379496574401855,
+    -17.56705665588379,
+    -14.7870512008667
+   ],
+   "n_free_cells": 6439,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     16.177,
+     -7.938
+    ],
+    "length": 2.78
+   },
+   {
+    "name": "-u",
+    "mid": [
+     16.177,
+     -8.838
+    ],
+    "length": 2.78
+   },
+   {
+    "name": "+v",
+    "mid": [
+     14.787,
+     -8.388
+    ],
+    "length": 0.9
+   },
+   {
+    "name": "-v",
+    "mid": [
+     17.567,
+     -8.388
+    ],
+    "length": 0.9
+   }
+  ],
+  "stance": {
+   "edge": "-v",
+   "edge_mid": [
+    17.56710433959961,
+    -8.387856483459473
+   ],
+   "inward": [
+    -1.0,
+    -5.765757123299409e-06
+   ],
+   "tangent": [
+    5.765757123299409e-06,
+    -1.0
+   ],
+   "base_pose2d": [
+    18.017105102539062,
+    -8.387853622436523,
+    -3.14158688783267
+   ],
+   "edge_depth": 0.4500007629394531,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.6000000238418579,
+    "axis_angle": 0.00505082589260511
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 4.6
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "support": {
+   "name": "desk_mdhelw_1",
+   "z": 0.7852810621261597,
+   "yaw": 1.570802092552185,
+   "local_bounds": [
+    -8.83796501159668,
+    -7.9379496574401855,
+    -17.56705665588379,
+    -14.7870512008667
+   ],
+   "n_free_cells": 6439,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-u",
+   "edge_mid": [
+    16.177104949951172,
+    -8.837871551513672
+   ],
+   "inward": [
+    -5.765757123299409e-06,
+    1.0
+   ],
+   "tangent": [
+    -1.0,
+    -5.765757123299409e-06
+   ],
+   "base_pose2d": [
+    16.524065017700195,
+    -9.287869453430176,
+    1.5708020925520199
+   ],
+   "edge_depth": 0.4499998986721039,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.14205522182129368
+   }
+  },
+  "place_stance": {
+   "edge": "-u",
+   "edge_mid": [
+    16.177104949951172,
+    -8.837871551513672
+   ],
+   "inward": [
+    -5.765757123299409e-06,
+    1.0
+   ],
+   "tangent": [
+    -1.0,
+    -5.765757123299409e-06
+   ],
+   "base_pose2d": [
+    17.254215240478516,
+    -9.28786563873291,
+    1.5708020925520199
+   ],
+   "edge_depth": 0.4500002861022949
+  },
+  "yaw_adjust_deg": 0.0,
+  "dest_lateral_m": -0.7301492914557137,
+  "dest_side": "right",
+  "n_reachable_cells": 5,
+  "distractors": {
+   "same_category": false,
+   "pool": "other_category",
+   "requested_pool": "other_category",
+   "fallback": null,
+   "models": [
+    "bottle_of_milk-czblzn"
+   ],
+   "requested": 1,
+   "pool_size": 47,
+   "pool_categories": [
+    "bottle_of_milk",
+    "box_of_baking_mix",
+    "box_of_butter",
+    "box_of_cane_sugar",
+    "box_of_cookies",
+    "box_of_granola_bars",
+    "box_of_oatmeal",
+    "box_of_rice",
+    "box_of_shampoo",
+    "carton_of_milk"
+   ],
+   "lookalikes_excluded": [
+    "box_of_cereal/qirvmd"
+   ],
+   "footprint_fraction": 0.22
+  },
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/office_cubicles_right/office_cubicles_right__desk_mdhelw_1__disembedding-0__s1",
+ "setup_s": 209.2,
+ "reject_reason": "no_support",
+ "error": "[no_support] desk_mdhelw_1: [support] untucked: [support] edge +u lateral +0.00: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge +u lateral +0.25: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge +u lateral -0.25: [unreachable] no reachable cell on the source tray; edge +u lateral +0.35: [unreachable] no reachable cell on the source tray; edge +u lateral -0.35: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge -u lateral +0.00: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge -u lateral +0.25: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge -u lateral -0.25: [unreachable] no reachable cell on the source tray; edge -u lateral +0.35: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge -u lateral -0.35: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge +v: [no_stance] no collision-free stance around desk_mdhelw_1; edge -v lateral +0.00: [support] no lateral room for the destination tray on either side (support bounds (-8.83796501159668, -7.9379496574401855, -17.56705665588379, -14.7870512008667)); edge -v lateral +0.25: [support] no lateral room for the destination tray on either side (support bounds (-8.83796501159668, -7.9379496574401855, -17.56705665588379, -14.7870512008667)); edge -v lateral -0.25: [support] no lateral room for the destination tray on either side (support bounds (-8.83796501159668, -7.9379496574401855, -17.56705665588379, -14.7870512008667)); edge -v lateral +0.35: [no_stance] no stance near lateral +0.35 on edge -v; edge -v lateral -0.35: [no_stance] no stance near lateral -0.35 on ",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 233.1,
+   "run_s": null
+  },
+  {
+   "seed": 1000,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 209.2,
+   "run_s": null
+  }
+ ],
+ "job_s": 445.9,
+ "finished": "2026-09-12 00:31:09"
+}

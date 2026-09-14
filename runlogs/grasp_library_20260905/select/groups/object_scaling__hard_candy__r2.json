@@ -1,0 +1,267 @@
+{
+ "group": "object_scaling__hard_candy__r2",
+ "task": "object_scaling",
+ "category": "hard_candy",
+ "round": 2,
+ "relation": null,
+ "partner": "wrapped, mirror-symmetric",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. Rotationally symmetric bodies are preferred for this task.",
+ "candidates": [
+  {
+   "model": "ojznyf",
+   "key": "hard_candy__ojznyf__f",
+   "strip": "/tmp/glib/strips/hard_candy__ojznyf__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    21,
+    55,
+    21
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "vwegtt",
+   "key": "hard_candy__vwegtt__f",
+   "strip": "/tmp/glib/strips/hard_candy__vwegtt__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    25,
+    55,
+    21
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "vyxhmv",
+   "key": "hard_candy__vyxhmv__f",
+   "strip": "/tmp/glib/strips/hard_candy__vyxhmv__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    23,
+    55,
+    21
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "qptjgv",
+   "key": "hard_candy__qptjgv__f",
+   "strip": "/tmp/glib/strips/hard_candy__qptjgv__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    22,
+    55,
+    23
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "yuatcg",
+   "key": "hard_candy__yuatcg__f",
+   "strip": "/tmp/glib/strips/hard_candy__yuatcg__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingertip pinch on candy body, both pads touching"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    23,
+    55,
+    24
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

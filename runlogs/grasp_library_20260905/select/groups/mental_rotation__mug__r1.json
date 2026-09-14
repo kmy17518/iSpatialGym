@@ -1,0 +1,526 @@
+{
+ "group": "mental_rotation__mug__r1",
+ "task": "mental_rotation",
+ "category": "mug",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "fapsrj",
+   "key": "mug__fapsrj",
+   "strip": "/tmp/glib/strips/mug__fapsrj.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    87,
+    113,
+    70
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ehnmxj",
+   "key": "mug__ehnmxj",
+   "strip": "/tmp/glib/strips/mug__ehnmxj.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    87,
+    113,
+    70
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "lgxhsc",
+   "key": "mug__lgxhsc",
+   "strip": "/tmp/glib/strips/mug__lgxhsc.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle loop pinch; width metric is bar thickness"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle loop pinch, mug hangs"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch from base side; one finger stayed open, both touch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, tilted; both pads on body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim lip pinch, low antipodal 0.51 but closed"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    77,
+    105,
+    85
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ppzttc",
+   "key": "mug__ppzttc",
+   "strip": "/tmp/glib/strips/mug__ppzttc.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle bar pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch from base side; one finger stayed open, both touch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near base, both pads on wall"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near rim, both pads on wall"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle bar pinch, low antipodal but closed"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    81,
+    109,
+    80
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ycbmug",
+   "key": "mug__ycbmug",
+   "strip": "/tmp/glib/strips/mug__ycbmug.png",
+   "n_valid": 5,
+   "n_clean": 4,
+   "n_clean_strict": 4,
+   "flags": [
+    "gap"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch; fingers 9 mm wider than wall"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch; fingers 9 mm wider than wall"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "fingers 23 mm apart on 3 mm wall; pads not on wall"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch; fingers 9 mm wider than wall"
+    }
+   ],
+   "object_note": "fingers stop 7-20 mm wider than the thin enamel wall; rim collision hull likely thicker than visual",
+   "bbox_mm": [
+    93,
+    117,
+    81
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "jgethp",
+   "key": "mug__jgethp",
+   "strip": "/tmp/glib/strips/mug__jgethp.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on wide cup"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, cup hangs tilted"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    113,
+    137,
+    64
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "waqrdy",
+   "key": "mug__waqrdy",
+   "strip": "/tmp/glib/strips/mug__waqrdy.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on tapered mug; fingertip contact only"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on tapered mug; fingertip contact only"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch"
+    }
+   ],
+   "object_note": "tapered body: pads converge only at fingertips for base-side grasps",
+   "bbox_mm": [
+    82,
+    118,
+    135
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ppdqbj",
+   "key": "mug__ppdqbj",
+   "strip": "/tmp/glib/strips/mug__ppdqbj.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch next to handle"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    88,
+    129,
+    100
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "yxaapv",
+   "key": "mug__yxaapv",
+   "strip": "/tmp/glib/strips/mug__yxaapv.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    91,
+    128,
+    124
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ntgftr",
+   "key": "mug__ntgftr",
+   "strip": "/tmp/glib/strips/mug__ntgftr.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, symmetric 7/2"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    106,
+    144,
+    96
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

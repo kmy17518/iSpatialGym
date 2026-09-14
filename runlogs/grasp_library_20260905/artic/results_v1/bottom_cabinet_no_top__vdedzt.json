@@ -1,0 +1,43 @@
+{
+ "key": "bottom_cabinet_no_top__vdedzt",
+ "category": "bottom_cabinet_no_top",
+ "model": "vdedzt",
+ "scene": "house_single_floor",
+ "host": "bottom_cabinet_no_top_gjrero_2",
+ "host_rank": 2,
+ "host_model": "gjrero",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": null,
+   "contact_world": [
+    24.196,
+    -0.292,
+    0.743
+   ],
+   "handle_height_above_floor": 0.738
+  }
+ ],
+ "error": "ValueError('Cannot add mesh, cache is full (2048 meshes)')",
+ "previous_hosts": [
+  "bottom_cabinet_no_top_gjrero_1",
+  "bottom_cabinet_no_top_gjrero_0"
+ ],
+ "scale": [
+  1.465,
+  1.585,
+  1.469
+ ]
+}

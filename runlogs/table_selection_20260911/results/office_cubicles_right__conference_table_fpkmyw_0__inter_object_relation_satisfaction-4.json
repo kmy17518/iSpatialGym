@@ -1,0 +1,460 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "conference_table_fpkmyw_0",
+ "category": "conference_table",
+ "model": "fpkmyw",
+ "rooms": [
+  "meeting_room_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-4",
+ "inventory": {
+  "top_z": 0.67,
+  "bbox_x": 1.493,
+  "bbox_y": 3.392,
+  "bbox_z": 0.67,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "swivel_chair_ucawqa_0",
+  "swivel_chair_ucawqa_1",
+  "swivel_chair_ucawqa_2",
+  "swivel_chair_ucawqa_3",
+  "swivel_chair_ucawqa_4",
+  "swivel_chair_ucawqa_5",
+  "swivel_chair_ucawqa_6",
+  "swivel_chair_ucawqa_7",
+  "swivel_chair_ucawqa_8",
+  "swivel_chair_ucawqa_9"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 23:43:56",
+ "precheck": {
+  "aabb": [
+   [
+    5.47,
+    11.736,
+    -0.012
+   ],
+   [
+    6.998,
+    15.152,
+    0.681
+   ]
+  ],
+  "support": {
+   "name": "conference_table_fpkmyw_0",
+   "z": 0.6736651659011841,
+   "yaw": 0.0,
+   "local_bounds": [
+    5.479757308959961,
+    6.979757308959961,
+    11.746005058288574,
+    15.146004676818848
+   ],
+   "n_free_cells": 12996,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     6.98,
+     13.446
+    ],
+    "length": 3.4
+   },
+   {
+    "name": "-u",
+    "mid": [
+     5.48,
+     13.446
+    ],
+    "length": 3.4
+   },
+   {
+    "name": "+v",
+    "mid": [
+     6.23,
+     15.146
+    ],
+    "length": 1.5
+   },
+   {
+    "name": "-v",
+    "mid": [
+     6.23,
+     11.746
+    ],
+    "length": 1.5
+   }
+  ],
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    6.229757308959961,
+    15.146004676818848
+   ],
+   "inward": [
+    0.0,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    0.0
+   ],
+   "base_pose2d": [
+    6.229757308959961,
+    15.596004486083984,
+    -1.5707963267948966
+   ],
+   "edge_depth": 0.4499998092651367,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.12651526343923564
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 2.3
+ },
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {
+  "goal_infeasible": 1
+ },
+ "template_meta": {
+  "support": {
+   "name": "conference_table_fpkmyw_0",
+   "z": 0.6736651659011841,
+   "yaw": 0.0,
+   "local_bounds": [
+    5.479757308959961,
+    6.979757308959961,
+    11.746005058288574,
+    15.146004676818848
+   ],
+   "n_free_cells": 12996,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    6.229757308959961,
+    15.146004676818848
+   ],
+   "inward": [
+    0.0,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    0.0
+   ],
+   "base_pose2d": [
+    6.229757308959961,
+    15.596004486083984,
+    -1.5707963267948966
+   ],
+   "edge_depth": 0.4499998092651367,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.08270329632731298
+   }
+  },
+  "view_arms": "untucked",
+  "n_reachable_cells": 12,
+  "n_region_cells": 595,
+  "n_visible_cells": 595,
+  "stand_off": 0.45,
+  "edge": null,
+  "load_room_instances": [
+   "meeting_room_0",
+   "conference_hall_0",
+   "corridor_0"
+  ],
+  "task_rooms": [
+   "meeting_room_0"
+  ],
+  "rejections": {
+   "goal_infeasible": 1
+  },
+  "n_written": 1,
+  "scene_variant": {
+   "scene_file": "../../scene_variants/office_cubicles_right__74a006fdaa.json",
+   "removed_objects": [
+    "swivel_chair_ucawqa_0",
+    "swivel_chair_ucawqa_1",
+    "swivel_chair_ucawqa_2",
+    "swivel_chair_ucawqa_3",
+    "swivel_chair_ucawqa_4",
+    "swivel_chair_ucawqa_5",
+    "swivel_chair_ucawqa_6",
+    "swivel_chair_ucawqa_7",
+    "swivel_chair_ucawqa_8",
+    "swivel_chair_ucawqa_9"
+   ],
+   "freed_footprints": {
+    "free": [
+     [
+      [
+       5.417725563049316,
+       14.946662902832031
+      ],
+      [
+       5.417725563049316,
+       14.379962921142578
+      ],
+      [
+       4.865025520324707,
+       14.379962921142578
+      ],
+      [
+       4.865025520324707,
+       14.946662902832031
+      ]
+     ],
+     [
+      [
+       5.417725086212158,
+       14.136903762817383
+      ],
+      [
+       5.417725086212158,
+       13.57020378112793
+      ],
+      [
+       4.865025043487549,
+       13.57020378112793
+      ],
+      [
+       4.865025043487549,
+       14.136903762817383
+      ]
+     ],
+     [
+      [
+       5.417724609375,
+       13.327146530151367
+      ],
+      [
+       5.417724609375,
+       12.760446548461914
+      ],
+      [
+       4.865024566650391,
+       12.760446548461914
+      ],
+      [
+       4.865024566650391,
+       13.327146530151367
+      ]
+     ],
+     [
+      [
+       5.417722702026367,
+       12.517386436462402
+      ],
+      [
+       5.417722702026367,
+       11.95068645477295
+      ],
+      [
+       4.865022659301758,
+       11.95068645477295
+      ],
+      [
+       4.865022659301758,
+       12.517386436462402
+      ]
+     ],
+     [
+      [
+       7.047040939331055,
+       14.323537826538086
+      ],
+      [
+       7.047039985656738,
+       14.890237808227539
+      ],
+      [
+       7.599740028381348,
+       14.890237808227539
+      ],
+      [
+       7.599740982055664,
+       14.323537826538086
+      ]
+     ],
+     [
+      [
+       7.0470404624938965,
+       13.513781547546387
+      ],
+      [
+       7.04703950881958,
+       14.08048152923584
+      ],
+      [
+       7.5997395515441895,
+       14.08048152923584
+      ],
+      [
+       7.599740505218506,
+       13.513781547546387
+      ]
+     ],
+     [
+      [
+       7.047039985656738,
+       12.704024314880371
+      ],
+      [
+       7.047039985656738,
+       13.270724296569824
+      ],
+      [
+       7.599740028381348,
+       13.270724296569824
+      ],
+      [
+       7.599740028381348,
+       12.704024314880371
+      ]
+     ],
+     [
+      [
+       7.0470380783081055,
+       11.89426040649414
+      ],
+      [
+       7.047039985656738,
+       12.460960388183594
+      ],
+      [
+       7.599740028381348,
+       12.460958480834961
+      ],
+      [
+       7.599738121032715,
+       11.894258499145508
+      ]
+     ],
+     [
+      [
+       6.569116592407227,
+       15.128622055053711
+      ],
+      [
+       6.002686023712158,
+       15.111149787902832
+      ],
+      [
+       5.985645294189453,
+       15.66358757019043
+      ],
+      [
+       6.5520758628845215,
+       15.681059837341309
+      ]
+     ],
+     [
+      [
+       5.944053649902344,
+       11.943414688110352
+      ],
+      [
+       6.510752201080322,
+       11.942075729370117
+      ],
+      [
+       6.50944709777832,
+       11.38937759399414
+      ],
+      [
+       5.942748546600342,
+       11.390716552734375
+      ]
+     ]
+    ],
+    "block": [
+     [
+      [
+       6.984020233154297,
+       15.151620864868164
+      ],
+      [
+       6.984020233154297,
+       11.759820938110352
+      ],
+      [
+       5.49082088470459,
+       11.759820938110352
+      ],
+      [
+       5.49082088470459,
+       15.151620864868164
+      ]
+     ]
+    ]
+   }
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 12.36,
+   "prepare_template_s": 0.29,
+   "save_template_s": 0.08
+  }
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_table_sel/office_cubicles_right/office_cubicles_right__conference_table_fpkmyw_0__inter_object_relation_satisfaction-4/instances/inter_object_relation_satisfaction-4__office_cubicles_right__conference_table_fpkmyw_0__inter_object_relation_satisfaction-4__0000.summary.json",
+   "wall_time_s": 4.6,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    6.229757308959961,
+    15.596004486083984,
+    -1.5707963267948966
+   ],
+   "trunk": [
+    0.0,
+    -0.8999999761581421
+   ],
+   "grasp": {
+    "key": null,
+    "translate": 0.5,
+    "yaw": -1.451899684877167
+   },
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_table_sel/office_cubicles_right/office_cubicles_right__conference_table_fpkmyw_0__inter_object_relation_satisfaction-4",
+ "bound_table": "conference_table_fpkmyw_0",
+ "setup_s": 12.6,
+ "run_s": 11.1,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "ok",
+   "n_written": 1,
+   "rejections": {
+    "goal_infeasible": 1
+   },
+   "reject_reason": null,
+   "setup_s": 12.6,
+   "run_s": 11.1
+  }
+ ],
+ "job_s": 24.9,
+ "finished": "2026-09-11 23:44:21"
+}

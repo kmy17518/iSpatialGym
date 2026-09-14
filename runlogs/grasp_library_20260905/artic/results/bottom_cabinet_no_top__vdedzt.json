@@ -1,0 +1,100 @@
+{
+ "key": "bottom_cabinet_no_top__vdedzt",
+ "category": "bottom_cabinet_no_top",
+ "model": "vdedzt",
+ "scene": "house_single_floor",
+ "host": "bottom_cabinet_no_top_gjrero_0",
+ "host_rank": 0,
+ "host_model": "gjrero",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     23.646,
+     1.722,
+     0.0
+    ],
+    "translate": 0.5,
+    "sign": 1.0,
+    "orientation": "front_down45"
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [24.196020126342773, 1.7220072746276855, 0.7428297400474548]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [24.196020126342773, 1.7220072746276855, 0.7428297400474548]})",
+    "sign +1: collision: [collision] trunk motion would collide (sample 1) {'translate': 0.5, 'tilt': None}"
+   ],
+   "error": "collision: [collision] trunk motion would collide (sample 1) {'translate': 0.5, 'tilt': None}",
+   "contact_world": [
+    24.196,
+    1.722,
+    0.743
+   ],
+   "handle_height_above_floor": 0.738,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 0,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0
+   }
+  },
+  {
+   "joint": "j_link_1",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     23.646,
+     1.627,
+     0.0
+    ],
+    "translate": 0.5,
+    "sign": 1.0,
+    "orientation": "front_down45"
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [24.195873260498047, 1.626571536064148, 0.7395976781845093]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [24.195873260498047, 1.626571536064148, 0.7395976781845093]})",
+    "sign +1: collision: [collision] trunk motion would collide (sample 1) {'translate': 0.5, 'tilt': None}"
+   ],
+   "error": "collision: [collision] trunk motion would collide (sample 1) {'translate': 0.5, 'tilt': None}",
+   "contact_world": [
+    24.196,
+    1.627,
+    0.74
+   ],
+   "handle_height_above_floor": 0.734,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 0,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.465,
+  1.585,
+  1.469
+ ],
+ "time_s": 787.4
+}

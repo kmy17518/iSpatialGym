@@ -1,0 +1,3072 @@
+{
+ "scene": "office_cubicles_right",
+ "room": "meeting_room_0",
+ "target": "painting/dacihj",
+ "started": "2026-09-11 23:37:14",
+ "spot_step_m": 0.25,
+ "patch_sizes_m": [
+  0.4,
+  0.6,
+  0.8,
+  1.0,
+  1.2
+ ],
+ "load_s": 49.0,
+ "walls": [
+  "walls_dmcumz_0",
+  "walls_mxsagj_0",
+  "walls_tsqvif_0",
+  "walls_tuiizs_0",
+  "walls_wlvcmv_0",
+  "walls_wxbrqm_0",
+  "walls_zrvgii_0"
+ ],
+ "floor": "floors_tucopb_0",
+ "setup_s": 597.0,
+ "spot_stride": 1,
+ "n_ray_origins": 231,
+ "n_spots": 90,
+ "n_target_ok": 56,
+ "n_viable": 39,
+ "regions": [
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/glass",
+   "normal": [
+    0.0,
+    -1.0
+   ],
+   "p0": [
+    4.9,
+    17.162
+   ],
+   "p1": [
+    7.039,
+    17.162
+   ],
+   "length_m": 2.39,
+   "hang_z": 1.45,
+   "n_spots": 10,
+   "max_patch_m": 1.0,
+   "n_bases": 57,
+   "n_reach": 29,
+   "spot_indices": [
+    29,
+    36,
+    43,
+    72,
+    5,
+    14,
+    21,
+    28,
+    69,
+    35
+   ],
+   "id": "r00",
+   "validated": true,
+   "tested": true
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "normal": [
+    -1.0,
+    0.0
+   ],
+   "p0": [
+    8.148,
+    16.445
+   ],
+   "p1": [
+    8.148,
+    15.186
+   ],
+   "length_m": 1.51,
+   "hang_z": 1.45,
+   "n_spots": 6,
+   "max_patch_m": 1.0,
+   "n_bases": 31,
+   "n_reach": 17,
+   "spot_indices": [
+    20,
+    67,
+    27,
+    55,
+    34,
+    70
+   ],
+   "id": "r01",
+   "validated": false,
+   "tested": true
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "normal": [
+    -1.0,
+    0.0
+   ],
+   "p0": [
+    8.148,
+    11.829
+   ],
+   "p1": [
+    8.148,
+    10.688
+   ],
+   "length_m": 1.39,
+   "hang_z": 1.45,
+   "n_spots": 6,
+   "max_patch_m": 1.0,
+   "n_bases": 24,
+   "n_reach": 14,
+   "spot_indices": [
+    39,
+    46,
+    1,
+    24,
+    45,
+    54
+   ],
+   "id": "r02",
+   "validated": true,
+   "tested": true
+  },
+  {
+   "wall_name": "walls_wlvcmv_0",
+   "wall_link": "/World/scene_0/walls_wlvcmv_0/base_link",
+   "normal": [
+    1.0,
+    0.0
+   ],
+   "p0": [
+    4.298,
+    15.907
+   ],
+   "p1": [
+    4.298,
+    16.02
+   ],
+   "length_m": 0.36,
+   "hang_z": 1.45,
+   "n_spots": 2,
+   "max_patch_m": 0.6,
+   "n_bases": 12,
+   "n_reach": 6,
+   "spot_indices": [
+    48,
+    61
+   ],
+   "id": "r03",
+   "validated": false,
+   "tested": false
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "normal": [
+    1.0,
+    0.0
+   ],
+   "p0": [
+    3.848,
+    10.868
+   ],
+   "p1": [
+    3.848,
+    12.852
+   ],
+   "length_m": 2.23,
+   "hang_z": 1.45,
+   "n_spots": 9,
+   "max_patch_m": 1.2,
+   "n_bases": 42,
+   "n_reach": 21,
+   "spot_indices": [
+    7,
+    17,
+    32,
+    23,
+    16,
+    31,
+    50,
+    38,
+    53
+   ],
+   "id": "r04",
+   "validated": true,
+   "tested": true
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "normal": [
+    1.0,
+    0.0
+   ],
+   "p0": [
+    3.848,
+    13.452
+   ],
+   "p1": [
+    3.848,
+    14.527
+   ],
+   "length_m": 1.32,
+   "hang_z": 1.45,
+   "n_spots": 6,
+   "max_patch_m": 1.2,
+   "n_bases": 16,
+   "n_reach": 9,
+   "spot_indices": [
+    58,
+    49,
+    71,
+    30,
+    80,
+    68
+   ],
+   "id": "r05",
+   "validated": false,
+   "tested": false
+  }
+ ],
+ "instances": [
+  {
+   "n_written": 0,
+   "rejections": {
+    "scene_reset": 1,
+    "too_few_visible": 5,
+    "grasp_unreachable": 1
+   },
+   "run_s": 67.9,
+   "work_dir": "/tmp/isg_wall_survey/office_cubicles_right/office_cubicles_right__meeting_room_0/r00_spot14",
+   "n_bases_full": 6,
+   "region": "r00",
+   "spot": 14,
+   "wall_name": "walls_dmcumz_0",
+   "point": [
+    6.139,
+    17.162,
+    1.45
+   ]
+  },
+  {
+   "n_written": 0,
+   "rejections": {
+    "too_few_visible": 5,
+    "grasp_unreachable": 1
+   },
+   "run_s": 58.2,
+   "work_dir": "/tmp/isg_wall_survey/office_cubicles_right/office_cubicles_right__meeting_room_0/r00_spot36",
+   "n_bases_full": 6,
+   "region": "r00",
+   "spot": 36,
+   "wall_name": "walls_dmcumz_0",
+   "point": [
+    5.2,
+    17.162,
+    1.45
+   ]
+  },
+  {
+   "n_written": 0,
+   "rejections": {
+    "too_few_visible": 4,
+    "grasp_unreachable": 2
+   },
+   "run_s": 51.9,
+   "work_dir": "/tmp/isg_wall_survey/office_cubicles_right/office_cubicles_right__meeting_room_0/r00_spot43",
+   "n_bases_full": 7,
+   "region": "r00",
+   "spot": 43,
+   "wall_name": "walls_dmcumz_0",
+   "point": [
+    5.5,
+    17.162,
+    1.45
+   ]
+  },
+  {
+   "n_written": 1,
+   "rejections": {},
+   "run_s": 11.6,
+   "work_dir": "/tmp/isg_wall_survey/office_cubicles_right/office_cubicles_right__meeting_room_0/r00_spot28",
+   "n_bases_full": 7,
+   "instance": {
+    "base_pose2d": [
+     6.36229133605957,
+     16.28931999206543,
+     1.163552824012708
+    ],
+    "trunk": [
+     0.49999997408493785,
+     0.44999995827674866
+    ],
+    "deviation_deg": -35.20982690344867,
+    "arc": {
+     "radius": 0.9198027849197388,
+     "yaw": 1.163552824012708
+    },
+    "view": {
+     "translate": 0.5,
+     "tilt": 0.44999998807907104
+    },
+    "push_reach_translates": {
+     "init": 0.25,
+     "goal": 0.5
+    },
+    "visible_objects": [
+     "walls_dmcumz_0",
+     "target_painting_dacihj_0",
+     "ceilings_ylcryq_0",
+     "floors_tucopb_0",
+     "walls_tuiizs_0"
+    ],
+    "wall_time_s": 11.573501825332642,
+    "summary": "/tmp/isg_wall_survey/office_cubicles_right/office_cubicles_right__meeting_room_0/r00_spot28/instances/world_alignment-1__office_cubicles_right__meeting_room_0__0000.summary.json",
+    "n_visible_objects": 5
+   },
+   "region": "r00",
+   "spot": 28,
+   "wall_name": "walls_dmcumz_0",
+   "point": [
+    6.739,
+    17.162,
+    1.45
+   ]
+  },
+  {
+   "n_written": 0,
+   "rejections": {
+    "too_few_visible": 3,
+    "grasp_unreachable": 3
+   },
+   "run_s": 78.0,
+   "work_dir": "/tmp/isg_wall_survey/office_cubicles_right/office_cubicles_right__meeting_room_0/r04_spot16",
+   "n_bases_full": 2,
+   "region": "r04",
+   "spot": 16,
+   "wall_name": "walls_wxbrqm_0",
+   "point": [
+    3.848,
+    11.988,
+    1.45
+   ]
+  },
+  {
+   "n_written": 0,
+   "rejections": {
+    "grasp_unreachable": 4,
+    "too_few_visible": 2
+   },
+   "run_s": 33.0,
+   "work_dir": "/tmp/isg_wall_survey/office_cubicles_right/office_cubicles_right__meeting_room_0/r04_spot7",
+   "n_bases_full": 4,
+   "region": "r04",
+   "spot": 7,
+   "wall_name": "walls_wxbrqm_0",
+   "point": [
+    3.848,
+    10.868,
+    1.45
+   ]
+  },
+  {
+   "n_written": 1,
+   "rejections": {
+    "too_few_visible": 1
+   },
+   "run_s": 21.1,
+   "work_dir": "/tmp/isg_wall_survey/office_cubicles_right/office_cubicles_right__meeting_room_0/r04_spot32",
+   "n_bases_full": 6,
+   "instance": {
+    "base_pose2d": [
+     4.681020736694336,
+     11.352312088012695,
+     -3.141592653589793
+    ],
+    "trunk": [
+     0.749999987042469,
+     0.6499999761581421
+    ],
+    "deviation_deg": -43.75289042097883,
+    "arc": {
+     "radius": 0.8003458976745605,
+     "yaw": -3.141592653589793
+    },
+    "view": {
+     "translate": 0.75,
+     "tilt": 0.6499999761581421
+    },
+    "push_reach_translates": {
+     "init": 0.0,
+     "goal": 0.0
+    },
+    "visible_objects": [
+     "target_painting_dacihj_0",
+     "ceilings_ylcryq_0",
+     "walls_wxbrqm_0",
+     "door_ggcyib_5",
+     "walls_mxsagj_0"
+    ],
+    "wall_time_s": 7.906691551208496,
+    "summary": "/tmp/isg_wall_survey/office_cubicles_right/office_cubicles_right__meeting_room_0/r04_spot32/instances/world_alignment-1__office_cubicles_right__meeting_room_0__0000.summary.json",
+    "n_visible_objects": 5
+   },
+   "region": "r04",
+   "spot": 32,
+   "wall_name": "walls_wxbrqm_0",
+   "point": [
+    3.848,
+    11.352,
+    1.45
+   ]
+  },
+  {
+   "n_written": 0,
+   "rejections": {
+    "grasp_unreachable": 6
+   },
+   "run_s": 4.2,
+   "work_dir": "/tmp/isg_wall_survey/office_cubicles_right/office_cubicles_right__meeting_room_0/r04_spot50",
+   "n_bases_full": 1,
+   "region": "r04",
+   "spot": 50,
+   "wall_name": "walls_wxbrqm_0",
+   "point": [
+    3.848,
+    12.252,
+    1.45
+   ]
+  },
+  {
+   "n_written": 0,
+   "rejections": {
+    "too_few_visible": 4,
+    "grasp_unreachable": 2
+   },
+   "run_s": 55.3,
+   "work_dir": "/tmp/isg_wall_survey/office_cubicles_right/office_cubicles_right__meeting_room_0/r01_spot55",
+   "n_bases_full": 7,
+   "region": "r01",
+   "spot": 55,
+   "wall_name": "walls_tuiizs_0",
+   "point": [
+    8.148,
+    15.703,
+    1.45
+   ]
+  },
+  {
+   "n_written": 0,
+   "rejections": {
+    "too_few_visible": 5,
+    "grasp_unreachable": 1
+   },
+   "run_s": 28.5,
+   "work_dir": "/tmp/isg_wall_survey/office_cubicles_right/office_cubicles_right__meeting_room_0/r01_spot67",
+   "n_bases_full": 6,
+   "region": "r01",
+   "spot": 67,
+   "wall_name": "walls_tuiizs_0",
+   "point": [
+    8.148,
+    16.225,
+    1.45
+   ]
+  },
+  {
+   "n_written": 1,
+   "rejections": {},
+   "run_s": 6.3,
+   "work_dir": "/tmp/isg_wall_survey/office_cubicles_right/office_cubicles_right__meeting_room_0/r02_spot24",
+   "n_bases_full": 7,
+   "instance": {
+    "base_pose2d": [
+     7.275380611419678,
+     11.546490669250488,
+     -0.40724350278218857
+    ],
+    "trunk": [
+     0.49999997408493785,
+     0.44999995827674866
+    ],
+    "deviation_deg": -35.20982690344867,
+    "arc": {
+     "radius": 0.9198032021522522,
+     "yaw": -0.40724350278218857
+    },
+    "view": {
+     "translate": 0.5,
+     "tilt": 0.44999998807907104
+    },
+    "push_reach_translates": {
+     "init": 0.25,
+     "goal": 0.5
+    },
+    "visible_objects": [
+     "target_painting_dacihj_0",
+     "ceilings_ylcryq_0",
+     "floors_tucopb_0",
+     "walls_tuiizs_0",
+     "fixed_window_pehsjf_0",
+     "walls_tsqvif_0"
+    ],
+    "wall_time_s": 6.318372011184692,
+    "summary": "/tmp/isg_wall_survey/office_cubicles_right/office_cubicles_right__meeting_room_0/r02_spot24/instances/world_alignment-1__office_cubicles_right__meeting_room_0__0000.summary.json",
+    "n_visible_objects": 6
+   },
+   "region": "r02",
+   "spot": 24,
+   "wall_name": "walls_tuiizs_0",
+   "point": [
+    8.148,
+    11.17,
+    1.45
+   ]
+  }
+ ],
+ "spots": [
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    10.3,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -10.300000190734863,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 0
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    11.4114,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -11.411369323730469,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 8,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 5,
+   "reach_s": 15.0,
+   "viable": true,
+   "idx": 1
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    12.6947,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -12.694666862487793,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 0,
+   "n_bases": 0,
+   "n_reach": 0,
+   "reject": "no_arc_base",
+   "idx": 2
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    14.4477,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -14.447686195373535,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 0,
+   "n_bases": 0,
+   "n_reach": 0,
+   "reject": "no_arc_base",
+   "idx": 3
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/base_link",
+   "point": [
+    7.894,
+    17.0446,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 7.894012928009033,
+   "flat": {
+    "0.4": true,
+    "0.6": false
+   },
+   "max_patch_m": 0.4,
+   "target_ok": false,
+   "idx": 4
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/glass",
+   "point": [
+    5.8386,
+    17.1616,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 5.838566780090332,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 9,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 5,
+   "reach_s": 22.8,
+   "viable": true,
+   "idx": 5
+  },
+  {
+   "wall_name": "walls_wlvcmv_0",
+   "wall_link": "/World/scene_0/walls_wlvcmv_0/base_link",
+   "point": [
+    4.0,
+    15.5353,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 3.999999761581421,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 6
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    10.8684,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 10.868437767028809,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 6,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 5,
+   "reach_s": 28.0,
+   "viable": true,
+   "idx": 7
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    10.5638,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 10.563813209533691,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": false
+   },
+   "max_patch_m": 0.8,
+   "target_ok": true,
+   "n_bases_all": 0,
+   "n_bases": 0,
+   "n_reach": 0,
+   "reject": "no_arc_base",
+   "idx": 8
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    10.4523,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 10.452312469482422,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": false
+   },
+   "max_patch_m": 0.6,
+   "target_ok": true,
+   "n_bases_all": 0,
+   "n_bases": 0,
+   "n_reach": 0,
+   "reject": "no_arc_base",
+   "idx": 9
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    10.2121,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 10.21206283569336,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 10
+  },
+  {
+   "wall_name": "walls_mxsagj_0",
+   "wall_link": "/World/scene_0/walls_mxsagj_0/base_link",
+   "point": [
+    3.8876,
+    10.1053,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "yaw_bucket": 6,
+   "tangent_t": -3.8876149654388428,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 11
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    14.1477,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -14.147686004638672,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 0,
+   "n_bases": 0,
+   "n_reach": 0,
+   "reject": "no_arc_base",
+   "idx": 12
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    16.9644,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -16.964387893676758,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 13
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/glass",
+   "point": [
+    6.1386,
+    17.1616,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 6.138566970825195,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 9,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 5,
+   "reach_s": 11.6,
+   "viable": true,
+   "idx": 14
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/glass",
+   "point": [
+    4.3,
+    17.1616,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 4.300000190734863,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 15
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    11.9881,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 11.988052368164062,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 4,
+   "n_bases": 4,
+   "n_reach": 2,
+   "n_reach_tested": 4,
+   "reach_s": 39.3,
+   "viable": true,
+   "idx": 16
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    11.0834,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 11.083427429199219,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 9,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 5,
+   "reach_s": 12.5,
+   "viable": true,
+   "idx": 17
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    12.3483,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -12.348257064819336,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 0,
+   "n_bases": 0,
+   "n_reach": 0,
+   "reject": "no_arc_base",
+   "idx": 18
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    13.8477,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -13.847685813903809,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 0,
+   "n_bases": 0,
+   "n_reach": 0,
+   "reject": "no_arc_base",
+   "idx": 19
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    16.4448,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -16.444772720336914,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": false
+   },
+   "max_patch_m": 1.0,
+   "target_ok": true,
+   "n_bases_all": 3,
+   "n_bases": 3,
+   "n_reach": 2,
+   "n_reach_tested": 3,
+   "reach_s": 9.1,
+   "viable": true,
+   "idx": 20
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/glass",
+   "point": [
+    6.4386,
+    17.1616,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 6.438567161560059,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 9,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 5,
+   "reach_s": 26.6,
+   "viable": true,
+   "idx": 21
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    13.1077,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 13.107666015625,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 2,
+   "n_bases": 2,
+   "n_reach": 0,
+   "n_reach_tested": 2,
+   "reach_s": 10.9,
+   "reject": "goal_corner_unreachable",
+   "idx": 22
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    11.603,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 11.603042602539062,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 8,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 5,
+   "reach_s": 26.5,
+   "viable": true,
+   "idx": 23
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    11.1702,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -11.170214653015137,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 9,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 5,
+   "reach_s": 16.3,
+   "viable": true,
+   "idx": 24
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    12.1751,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -12.17505168914795,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 0,
+   "n_bases": 0,
+   "n_reach": 0,
+   "reject": "no_arc_base",
+   "idx": 25
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    13.5477,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -13.547685623168945,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 0,
+   "n_bases": 0,
+   "n_reach": 0,
+   "reject": "no_arc_base",
+   "idx": 26
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    15.9252,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -15.92515754699707,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 9,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 5,
+   "reach_s": 24.5,
+   "viable": true,
+   "idx": 27
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/glass",
+   "point": [
+    6.7386,
+    17.1616,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 6.738567352294922,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 9,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 5,
+   "reach_s": 23.0,
+   "viable": true,
+   "idx": 28
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/glass",
+   "point": [
+    4.9,
+    17.1616,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 4.900000095367432,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 3,
+   "n_bases": 3,
+   "n_reach": 2,
+   "n_reach_tested": 3,
+   "reach_s": 9.0,
+   "viable": true,
+   "idx": 29
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    14.2273,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 14.227280616760254,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 3,
+   "n_bases": 3,
+   "n_reach": 2,
+   "n_reach_tested": 3,
+   "reach_s": 6.7,
+   "viable": true,
+   "idx": 30
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    12.1227,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 12.122657775878906,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 4,
+   "n_bases": 4,
+   "n_reach": 2,
+   "n_reach_tested": 4,
+   "reach_s": 36.4,
+   "viable": true,
+   "idx": 31
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    11.3523,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 11.352312088012695,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 9,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 5,
+   "reach_s": 18.6,
+   "viable": true,
+   "idx": 32
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    13.2477,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -13.247685432434082,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 0,
+   "n_bases": 0,
+   "n_reach": 0,
+   "reject": "no_arc_base",
+   "idx": 33
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    15.4055,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -15.40554141998291,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 7,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 4,
+   "reach_s": 21.5,
+   "viable": true,
+   "idx": 34
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/glass",
+   "point": [
+    7.0386,
+    17.1616,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 7.038567543029785,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": false
+   },
+   "max_patch_m": 1.0,
+   "target_ok": true,
+   "n_bases_all": 6,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 4,
+   "reach_s": 30.1,
+   "viable": true,
+   "idx": 35
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/glass",
+   "point": [
+    5.2,
+    17.1616,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 5.200000286102295,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 9,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 5,
+   "reach_s": 14.6,
+   "viable": true,
+   "idx": 36
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    15.3469,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 15.34689712524414,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 37
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    12.6423,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 12.642273902893066,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 3,
+   "n_bases": 3,
+   "n_reach": 2,
+   "n_reach_tested": 3,
+   "reach_s": 4.1,
+   "viable": true,
+   "idx": 38
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    11.8286,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -11.828641891479492,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 1,
+   "n_bases": 1,
+   "n_reach": 1,
+   "n_reach_tested": 1,
+   "reach_s": 1.7,
+   "viable": true,
+   "idx": 39
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    12.9477,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -12.947686195373535,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 0,
+   "n_bases": 0,
+   "n_reach": 0,
+   "reject": "no_arc_base",
+   "idx": 40
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    14.8859,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -14.885927200317383,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 0,
+   "n_bases": 0,
+   "n_reach": 0,
+   "reject": "no_arc_base",
+   "idx": 41
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/glass",
+   "point": [
+    7.3386,
+    17.1616,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 7.33856725692749,
+   "flat": {
+    "0.4": true,
+    "0.6": false
+   },
+   "max_patch_m": 0.4,
+   "target_ok": false,
+   "idx": 42
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/glass",
+   "point": [
+    5.5,
+    17.1616,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 5.499999523162842,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 9,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 5,
+   "reach_s": 11.0,
+   "viable": true,
+   "idx": 43
+  },
+  {
+   "wall_name": "walls_wlvcmv_0",
+   "wall_link": "/World/scene_0/walls_wlvcmv_0/base_link",
+   "point": [
+    4.0972,
+    15.5353,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 4.097193717956543,
+   "flat": {
+    "0.4": true,
+    "0.6": false
+   },
+   "max_patch_m": 0.4,
+   "target_ok": false,
+   "idx": 44
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    10.9291,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -10.929060935974121,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 8,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 6,
+   "reach_s": 22.3,
+   "viable": true,
+   "idx": 45
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    11.6554,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -11.655436515808105,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 3,
+   "n_bases": 3,
+   "n_reach": 2,
+   "n_reach_tested": 3,
+   "reach_s": 7.9,
+   "viable": true,
+   "idx": 46
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/base_link",
+   "point": [
+    7.6072,
+    17.0446,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 7.607217788696289,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 47
+  },
+  {
+   "wall_name": "walls_wlvcmv_0",
+   "wall_link": "/World/scene_0/walls_wlvcmv_0/base_link",
+   "point": [
+    4.2977,
+    15.9067,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 15.90670394897461,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": false
+   },
+   "max_patch_m": 0.6,
+   "target_ok": true,
+   "n_bases_all": 17,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 4,
+   "reach_s": 16.2,
+   "viable": true,
+   "idx": 48
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    13.6815,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 13.681504249572754,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 2,
+   "n_bases": 2,
+   "n_reach": 1,
+   "n_reach_tested": 2,
+   "reach_s": 1.8,
+   "viable": true,
+   "idx": 49
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    12.2523,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 12.252313613891602,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 4,
+   "n_bases": 4,
+   "n_reach": 1,
+   "n_reach_tested": 4,
+   "reach_s": 7.1,
+   "viable": true,
+   "idx": 50
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    13.3271,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -13.327080726623535,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 0,
+   "n_bases": 0,
+   "n_reach": 0,
+   "reject": "no_arc_base",
+   "idx": 51
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/glass",
+   "point": [
+    4.5614,
+    17.1616,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 4.561432361602783,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": false
+   },
+   "max_patch_m": 0.6,
+   "target_ok": true,
+   "n_bases_all": 0,
+   "n_bases": 0,
+   "n_reach": 0,
+   "reject": "no_arc_base",
+   "idx": 52
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    12.8523,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 12.852313041687012,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 3,
+   "n_bases": 3,
+   "n_reach": 2,
+   "n_reach_tested": 3,
+   "reach_s": 4.4,
+   "viable": true,
+   "idx": 53
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    10.6879,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -10.687906265258789,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": false
+   },
+   "max_patch_m": 1.0,
+   "target_ok": true,
+   "n_bases_all": 2,
+   "n_bases": 2,
+   "n_reach": 2,
+   "n_reach_tested": 2,
+   "reach_s": 11.7,
+   "viable": true,
+   "idx": 54
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    15.7028,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -15.702834129333496,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 9,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 5,
+   "reach_s": 11.6,
+   "viable": true,
+   "idx": 55
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    15.2403,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 15.240349769592285,
+   "flat": {
+    "0.4": true,
+    "0.6": false
+   },
+   "max_patch_m": 0.4,
+   "target_ok": false,
+   "idx": 56
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    14.5832,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -14.583219528198242,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 0,
+   "n_bases": 0,
+   "n_reach": 0,
+   "reject": "no_arc_base",
+   "idx": 57
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    13.4523,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 13.452312469482422,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 3,
+   "n_bases": 3,
+   "n_reach": 2,
+   "n_reach_tested": 3,
+   "reach_s": 3.2,
+   "viable": true,
+   "idx": 58
+  },
+  {
+   "wall_name": "walls_wlvcmv_0",
+   "wall_link": "/World/scene_0/walls_wlvcmv_0/base_link",
+   "point": [
+    4.2774,
+    15.5353,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 4.27737283706665,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 59
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/glass",
+   "point": [
+    7.6,
+    17.1616,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 7.59999942779541,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 60
+  },
+  {
+   "wall_name": "walls_wlvcmv_0",
+   "wall_link": "/World/scene_0/walls_wlvcmv_0/base_link",
+   "point": [
+    4.2977,
+    16.0198,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 16.019771575927734,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": false
+   },
+   "max_patch_m": 0.8,
+   "target_ok": true,
+   "n_bases_all": 14,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 4,
+   "reach_s": 10.2,
+   "viable": true,
+   "idx": 61
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    10.1532,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -10.15324878692627,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 62
+  },
+  {
+   "wall_name": "walls_wlvcmv_0",
+   "wall_link": "/World/scene_0/walls_wlvcmv_0/base_link",
+   "point": [
+    4.2977,
+    16.5394,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 16.53938865661621,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 63
+  },
+  {
+   "wall_name": "walls_tsqvif_0",
+   "wall_link": "/World/scene_0/walls_tsqvif_0/base_link",
+   "point": [
+    8.0837,
+    10.1163,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "yaw_bucket": 6,
+   "tangent_t": -8.083658218383789,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 64
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/base_link",
+   "point": [
+    8.0208,
+    17.0446,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 8.020807266235352,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 65
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    16.7448,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -16.74477195739746,
+   "flat": {
+    "0.4": true,
+    "0.6": false
+   },
+   "max_patch_m": 0.4,
+   "target_ok": false,
+   "idx": 66
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    16.2252,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -16.225156784057617,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 8,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 5,
+   "reach_s": 7.7,
+   "viable": true,
+   "idx": 67
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    14.5273,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 14.527280807495117,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 3,
+   "n_bases": 3,
+   "n_reach": 2,
+   "n_reach_tested": 3,
+   "reach_s": 5.8,
+   "viable": true,
+   "idx": 68
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/glass",
+   "point": [
+    6.9582,
+    17.1616,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 6.958182334899902,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 6,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 3,
+   "reach_s": 11.9,
+   "viable": true,
+   "idx": 69
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    15.1859,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -15.18592643737793,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 4,
+   "n_bases": 4,
+   "n_reach": 3,
+   "n_reach_tested": 4,
+   "reach_s": 15.8,
+   "viable": true,
+   "idx": 70
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    13.9815,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 13.981504440307617,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 3,
+   "n_bases": 3,
+   "n_reach": 1,
+   "n_reach_tested": 3,
+   "reach_s": 10.3,
+   "viable": true,
+   "idx": 71
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/glass",
+   "point": [
+    5.5418,
+    17.1616,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 5.541817665100098,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 9,
+   "n_bases": 6,
+   "n_reach": 3,
+   "n_reach_tested": 5,
+   "reach_s": 10.1,
+   "viable": true,
+   "idx": 72
+  },
+  {
+   "wall_name": "walls_wlvcmv_0",
+   "wall_link": "/World/scene_0/walls_wlvcmv_0/base_link",
+   "point": [
+    4.2977,
+    16.3198,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 16.319772720336914,
+   "flat": {
+    "0.4": true,
+    "0.6": false
+   },
+   "max_patch_m": 0.4,
+   "target_ok": false,
+   "idx": 73
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/base_link",
+   "point": [
+    4.1792,
+    17.0446,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 4.179191589355469,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 74
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/base_link",
+   "point": [
+    7.6023,
+    17.1394,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -17.139385223388672,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 75
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    14.8273,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 14.827281951904297,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 1,
+   "n_bases": 1,
+   "n_reach": 0,
+   "n_reach_tested": 1,
+   "reach_s": 0.8,
+   "reject": "goal_corner_unreachable",
+   "idx": 76
+  },
+  {
+   "wall_name": "walls_wlvcmv_0",
+   "wall_link": "/World/scene_0/walls_wlvcmv_0/base_link",
+   "point": [
+    4.2977,
+    15.5805,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 15.58054256439209,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 77
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/glass",
+   "point": [
+    4.2026,
+    17.1616,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 4.202587127685547,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 78
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/base_link",
+   "point": [
+    4.2023,
+    17.085,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 17.0849666595459,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 79
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    14.3077,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 14.307665824890137,
+   "flat": {
+    "0.4": true,
+    "0.6": true,
+    "0.8": true,
+    "1.0": true,
+    "1.2": true
+   },
+   "max_patch_m": 1.2,
+   "target_ok": true,
+   "n_bases_all": 2,
+   "n_bases": 2,
+   "n_reach": 1,
+   "n_reach_tested": 2,
+   "reach_s": 5.0,
+   "viable": true,
+   "idx": 80
+  },
+  {
+   "wall_name": "walls_dmcumz_0",
+   "wall_link": "/World/scene_0/walls_dmcumz_0/base_link",
+   "point": [
+    3.8554,
+    17.0446,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "yaw_bucket": 18,
+   "tangent_t": 3.8553707599639893,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 81
+  },
+  {
+   "wall_name": "walls_wxbrqm_0",
+   "wall_link": "/World/scene_0/walls_wxbrqm_0/base_link",
+   "point": [
+    3.8477,
+    15.503,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 15.503043174743652,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 82
+  },
+  {
+   "wall_name": "walls_zrvgii_0",
+   "wall_link": "/World/scene_0/walls_zrvgii_0/base_link",
+   "point": [
+    3.8477,
+    16.8396,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 16.839603424072266,
+   "flat": {
+    "0.4": true,
+    "0.6": false
+   },
+   "max_patch_m": 0.4,
+   "target_ok": false,
+   "idx": 83
+  },
+  {
+   "wall_name": "walls_tuiizs_0",
+   "wall_link": "/World/scene_0/walls_tuiizs_0/base_link",
+   "point": [
+    8.1477,
+    17.0215,
+    1.45
+   ],
+   "normal": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 12,
+   "tangent_t": -17.021461486816406,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 84
+  },
+  {
+   "wall_name": "walls_zrvgii_0",
+   "wall_link": "/World/scene_0/walls_zrvgii_0/base_link",
+   "point": [
+    3.8477,
+    17.0004,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 17.00037384033203,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 85
+  },
+  {
+   "wall_name": "walls_zrvgii_0",
+   "wall_link": "/World/scene_0/walls_zrvgii_0/base_link",
+   "point": [
+    3.8477,
+    16.7054,
+    1.45
+   ],
+   "normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "yaw_bucket": 0,
+   "tangent_t": 16.705427169799805,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 86
+  },
+  {
+   "wall_name": "walls_wlvcmv_0",
+   "wall_link": "/World/scene_0/walls_wlvcmv_0/base_link",
+   "point": [
+    3.9227,
+    16.5553,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "yaw_bucket": 6,
+   "tangent_t": -3.9226536750793457,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 87
+  },
+  {
+   "wall_name": "walls_wlvcmv_0",
+   "wall_link": "/World/scene_0/walls_wlvcmv_0/base_link",
+   "point": [
+    4.012,
+    16.5553,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "yaw_bucket": 6,
+   "tangent_t": -4.011965274810791,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 88
+  },
+  {
+   "wall_name": "walls_wlvcmv_0",
+   "wall_link": "/World/scene_0/walls_wlvcmv_0/base_link",
+   "point": [
+    4.2553,
+    16.5553,
+    1.45
+   ],
+   "normal": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "yaw_bucket": 6,
+   "tangent_t": -4.255343914031982,
+   "flat": {
+    "0.4": false
+   },
+   "max_patch_m": null,
+   "target_ok": false,
+   "idx": 89
+  }
+ ],
+ "template_meta": {
+  "timings": {
+   "bind_spawn_s": 596.5219631195068,
+   "bind_spawn_kit": {
+    "ik_calls": 755,
+    "ik_s": 198.342,
+    "ik_batch_calls": 0,
+    "ik_batch_problems": 0,
+    "ik_batch_s": 0.0,
+    "collision_calls": 56,
+    "collision_configs": 1395,
+    "collision_s": 2.805
+   },
+   "prepare_template_s": 0.4944615364074707,
+   "prepare_template_kit": {
+    "ik_calls": 0,
+    "ik_s": 0.0,
+    "ik_batch_calls": 0,
+    "ik_batch_problems": 0,
+    "ik_batch_s": 0.0,
+    "collision_calls": 0,
+    "collision_configs": 0,
+    "collision_s": 0.0
+   },
+   "save_template_s": 0.09561729431152344
+  },
+  "rejections": {},
+  "n_written": 1
+ },
+ "status": "ok",
+ "room_s": 1458.5
+}

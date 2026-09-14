@@ -1,0 +1,307 @@
+{
+ "scene": "restaurant_diner",
+ "table": "pedestal_table_nlfgwe_1",
+ "category": "pedestal_table",
+ "model": "nlfgwe",
+ "rooms": [
+  "dining_room_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-3",
+ "inventory": {
+  "top_z": 0.77,
+  "bbox_x": 1.074,
+  "bbox_y": 1.074,
+  "bbox_z": 0.766,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "straight_chair_nntxvr_4",
+  "straight_chair_nntxvr_5"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:39:07",
+ "precheck": {
+  "aabb": [
+   [
+    0.214,
+    -4.702,
+    -0.001
+   ],
+   [
+    1.299,
+    -3.617,
+    0.777
+   ]
+  ],
+  "support": {
+   "name": "pedestal_table_nlfgwe_1",
+   "z": 0.775708794593811,
+   "yaw": -0.00025463104248046875,
+   "local_bounds": [
+    0.2246776968240738,
+    1.2846978902816772,
+    -4.691641330718994,
+    -3.6316161155700684
+   ],
+   "n_free_cells": 2222,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     1.284,
+     -4.162
+    ],
+    "length": 1.06
+   },
+   {
+    "name": "-u",
+    "mid": [
+     0.224,
+     -4.162
+    ],
+    "length": 1.06
+   },
+   {
+    "name": "+v",
+    "mid": [
+     0.754,
+     -3.632
+    ],
+    "length": 1.06
+   },
+   {
+    "name": "-v",
+    "mid": [
+     0.753,
+     -4.692
+    ],
+    "length": 1.06
+   }
+  ],
+  "stance": {
+   "edge": "-u",
+   "edge_mid": [
+    0.22361800074577332,
+    -4.161685466766357
+   ],
+   "inward": [
+    0.9999999403953552,
+    -0.00025463104248046875
+   ],
+   "tangent": [
+    0.00025463104248046875,
+    0.9999999403953552
+   ],
+   "base_pose2d": [
+    -0.22638195753097534,
+    -4.161571025848389,
+    -0.00025463105215449346
+   ],
+   "edge_depth": 0.44999995827674866,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.6499999761581421,
+    "axis_angle": 0.01834820095769941
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 6.3
+ },
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {
+  "scene_reset": 2,
+  "partner_placement": 1
+ },
+ "template_meta": {
+  "support": {
+   "name": "pedestal_table_nlfgwe_1",
+   "z": 0.7757038474082947,
+   "yaw": -0.0002627372741699219,
+   "local_bounds": [
+    0.22471094131469727,
+    1.2847318649291992,
+    -4.691623687744141,
+    -3.6315979957580566
+   ],
+   "n_free_cells": 2222,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-u",
+   "edge_mid": [
+    0.22361750900745392,
+    -4.1616692543029785
+   ],
+   "inward": [
+    0.9999999403953552,
+    -0.0002627372741699219
+   ],
+   "tangent": [
+    0.0002627372741699219,
+    0.9999999403953552
+   ],
+   "base_pose2d": [
+    -0.22638244926929474,
+    -4.161550998687744,
+    -0.00026273728378462257
+   ],
+   "edge_depth": 0.44999995827674866,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.5,
+    "axis_angle": 0.01744901861167532
+   }
+  },
+  "view_arms": "untucked",
+  "n_reachable_cells": 5,
+  "n_grasp_cells": 5,
+  "n_grasp_combos": 51,
+  "n_region_cells": 578,
+  "n_visible_cells": 338,
+  "stand_off": 0.45,
+  "edge": null,
+  "load_room_instances": [
+   "dining_room_0",
+   "bar_0",
+   "corridor_0",
+   "kitchen_0"
+  ],
+  "task_rooms": [
+   "dining_room_0"
+  ],
+  "rejections": {
+   "scene_reset": 2,
+   "partner_placement": 1
+  },
+  "n_written": 1,
+  "scene_variant": {
+   "scene_file": "../../scene_variants/restaurant_diner__08d455bcd3.json",
+   "removed_objects": [
+    "straight_chair_nntxvr_4",
+    "straight_chair_nntxvr_5"
+   ],
+   "freed_footprints": {
+    "free": [
+     [
+      [
+       0.5556669235229492,
+       -4.716896057128906
+      ],
+      [
+       1.0409669876098633,
+       -4.7168731689453125
+      ],
+      [
+       1.040995478630066,
+       -5.321773529052734
+      ],
+      [
+       0.5556954741477966,
+       -5.321796417236328
+      ]
+     ],
+     [
+      [
+       0.8604580163955688,
+       -3.6145644187927246
+      ],
+      [
+       0.4044283628463745,
+       -3.7805557250976562
+      ],
+      [
+       0.19752955436706543,
+       -3.21213960647583
+      ],
+      [
+       0.6535592079162598,
+       -3.0461483001708984
+      ]
+     ]
+    ],
+    "block": [
+     [
+      [
+       1.2933108806610107,
+       -3.6224019527435303
+      ],
+      [
+       1.2930376529693604,
+       -4.696201801300049
+      ],
+      [
+       0.21923786401748657,
+       -4.695928573608398
+      ],
+      [
+       0.2195109724998474,
+       -3.622128963470459
+      ]
+     ]
+    ]
+   }
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 44.61,
+   "prepare_template_s": 0.7,
+   "save_template_s": 0.07
+  }
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_table_sel/restaurant_diner/restaurant_diner__pedestal_table_nlfgwe_1__inter_object_relation_satisfaction-3/instances/inter_object_relation_satisfaction-3__restaurant_diner__pedestal_table_nlfgwe_1__inter_object_relation_satisfaction-3__0000.summary.json",
+   "wall_time_s": 5.3,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    -0.22638244926929474,
+    -4.161550998687744,
+    -0.00026273728378462257
+   ],
+   "trunk": [
+    0.749999987042469,
+    -0.4999999403953552
+   ],
+   "grasp": {
+    "key": "spatula__hkvsep__t",
+    "name": "grasp_2",
+    "translate": 0.5,
+    "yaw": 0.8777558043839512
+   },
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.5
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_table_sel/restaurant_diner/restaurant_diner__pedestal_table_nlfgwe_1__inter_object_relation_satisfaction-3",
+ "bound_table": "pedestal_table_nlfgwe_1",
+ "setup_s": 45.3,
+ "run_s": 7.0,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "ok",
+   "n_written": 1,
+   "rejections": {
+    "scene_reset": 2,
+    "partner_placement": 1
+   },
+   "reject_reason": null,
+   "setup_s": 45.3,
+   "run_s": 7.0
+  }
+ ],
+ "job_s": 55.5,
+ "finished": "2026-09-12 01:40:02"
+}

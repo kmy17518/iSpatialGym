@@ -1,0 +1,30 @@
+{
+  "category": "mirror",
+  "task": "wa1",
+  "n_models": 6,
+  "n_opened": 6,
+  "models": [
+    {"model": "catitv", "V": 2, "U": 1, "H": 0, "score": 6, "valid": false,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "Full-length 1.91 m tall black slab 6 mm thick; mirror glass omitted so it is a featureless black rectangle; too tall."},
+    {"model": "ddmyjg", "V": 2, "U": 1, "H": 0, "score": 6, "valid": false,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "2.57 m wide mirror: hollow see-through frame from the front (glass omitted), dark back panel; plain frame, far too wide."},
+    {"model": "edxfnt", "V": 2, "U": 1, "H": 2, "score": 8, "valid": false,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "0.78x0.57 m black rectangle, back face missing (only an edge line from -x); plain, no readable up."},
+    {"model": "ffoudz", "V": 2, "U": 1, "H": 0, "score": 6, "valid": false,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "2.20 m tall black slab 6 mm thick; featureless, too tall for the wall task."},
+    {"model": "jpktmn", "V": 2, "U": 2, "H": 0, "score": 8, "valid": false,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "1.89x1.25 m black panel with grey shelf/base block at the bottom (+x side); shelf gives up but it is 15 cm deep and too wide."},
+    {"model": "jtgjha", "V": 2, "U": 1, "H": 0, "score": 6, "valid": false,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "2.06 m tall black slab; featureless black rectangle, too tall."}
+  ],
+  "picks": [],
+  "alternate": null,
+  "category_verdict": "drop",
+  "category_note": "All six mirrors render as black or hollow rectangles (reflective glass omitted), five exceed 1.3 m (full-length or wide vanity mirrors) and none has a readable up. Category is symmetric by nature; not usable."
+}

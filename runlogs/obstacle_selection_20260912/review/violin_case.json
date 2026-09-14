@@ -1,0 +1,28 @@
+{
+  "category": "violin_case",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "jlasop",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Black violin case lying flat with handle and latches, 0.30 x 0.65 x 0.13 m; dark but detailed; low."
+    }
+  ],
+  "picks": ["jlasop"],
+  "alternate": null,
+  "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+  ],
+  "category_verdict": "weak",
+  "category_note": "One case lying flat: 0.65 m long but only 0.13 m high, so borderline in both size dimensions; credible floor clutter in a house bedroom or living room, N=2; single model."
+}

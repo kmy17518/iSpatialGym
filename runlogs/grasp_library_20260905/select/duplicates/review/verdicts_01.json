@@ -1,0 +1,110 @@
+[
+  {
+    "id": "marker__c1",
+    "category": "marker",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "All ten are the same capped marker mesh (1408 faces each); identical silhouette and footprint in every view.",
+    "texture_note": "Black body on all; cap colours differ per model: grey, tan, pale pink, cyan, orange, pink, lime, yellow, purple, red.",
+    "confidence": "high"
+  },
+  {
+    "id": "pencil__c1",
+    "category": "pencil",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Same sharpened hexagonal pencil mesh (11760 faces) for all six; only tessellation/vertex count differs.",
+    "texture_note": "Body colours differ: maroon, yellow, black, cream/white, olive green, cyan. No two share a colour.",
+    "confidence": "high"
+  },
+  {
+    "id": "box_of_tissues__c1",
+    "category": "box_of_tissues",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Identical soft-pack tissue bag mesh (130 verts/124 faces) with the same pillow-like footprint for all four.",
+    "texture_note": "Four different prints: purple brand pack, blue daisy pack, cream pack with red Chinese text, teal/white circle-logo pack.",
+    "confidence": "high"
+  },
+  {
+    "id": "box_of_granola_bars__c1",
+    "category": "box_of_granola_bars",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Same thin rectangular Doves Farm box mesh (1536 faces, identical volume/area) for all three.",
+    "texture_note": "Different flavour artwork: Butter flapjack (orange), Crispy chocolate & rice (brown), Apple & sultana flapjack (green).",
+    "confidence": "high"
+  },
+  {
+    "id": "pencil__c2",
+    "category": "pencil",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Same coloured-pencil mesh (11760 faces) with sharpened tip for all three; same proportions in every view.",
+    "texture_note": "Body colours differ: blue, red, pink/magenta. Same wooden tip and lead on all.",
+    "confidence": "high"
+  },
+  {
+    "id": "bottle_of_beer__c3",
+    "category": "bottle_of_beer",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Same long-neck beer bottle mesh (15512 faces) with gold cap; identical silhouette and round footprint.",
+    "texture_note": "Both dark green glass, but labels differ: red round BEER emblem vs brown label with owl/figure artwork.",
+    "confidence": "high"
+  },
+  {
+    "id": "bottle_of_shampoo__c2",
+    "category": "bottle_of_shampoo",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Same cylindrical white bottle with light-blue screw cap; identical silhouette, footprint and volume, different tessellation.",
+    "texture_note": "Same label layout but accent colour differs: yellow text on lvvkhx vs blue text on stjjjm; swatches differ too.",
+    "confidence": "medium"
+  },
+  {
+    "id": "box_of_sanitary_napkins__c3",
+    "category": "box_of_sanitary_napkins",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Identical rounded soft-pack box mesh (142 verts/204 faces), same volume and footprint.",
+    "texture_note": "Same Sofy brand design and text but pink/white colour scheme (cmnpuv) vs light-blue/white scheme (mxdefq).",
+    "confidence": "high"
+  },
+  {
+    "id": "garlic_clove__c2",
+    "category": "garlic_clove",
+    "verdict": "exact_same",
+    "exact_groups": [["faeyay", "flcbrn"]],
+    "geometry_note": "Same crescent-shaped clove, identical vertex/face counts, volume and pose in all three views.",
+    "texture_note": "Identical pinkish-brown skin texture; swatches and renders indistinguishable (thumb_dist ~0).",
+    "confidence": "high"
+  },
+  {
+    "id": "lemon__c4",
+    "category": "lemon",
+    "verdict": "exact_same",
+    "exact_groups": [["ovbcff", "peqwoa"]],
+    "geometry_note": "Same ovoid lemon mesh with small stem nub; identical volume/area and pose, only vertex count differs slightly.",
+    "texture_note": "Same bright yellow dimpled peel and dark stem end; swatches identical. High thumb_dist likely UV layout only.",
+    "confidence": "high"
+  },
+  {
+    "id": "sandal__c1",
+    "category": "sandal",
+    "verdict": "exact_same",
+    "exact_groups": [["dfkzbd", "vwbomj"]],
+    "geometry_note": "Same clog-style sandal: wooden wedge heel, tan footbed, two crossed straps with buckle; identical footprint and volume.",
+    "texture_note": "Same red leather straps with flower cut-outs, tan insole, brown sole; buckle visibility differs only by render angle.",
+    "confidence": "medium"
+  },
+  {
+    "id": "video_game__c2",
+    "category": "video_game",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Both are standard thin Nintendo 3DS game cases with rounded corners; near-identical proportions, minor tessellation differences.",
+    "texture_note": "Cover art differs: Pokemon (red/black Yveltal) on ckugyi vs yellow Mario game cover on lfdpse.",
+    "confidence": "high"
+  }
+]

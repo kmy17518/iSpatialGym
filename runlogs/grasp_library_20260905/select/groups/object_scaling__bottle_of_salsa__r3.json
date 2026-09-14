@@ -1,0 +1,193 @@
+{
+ "group": "object_scaling__bottle_of_salsa__r3",
+ "task": "object_scaling",
+ "category": "bottle_of_salsa",
+ "round": 3,
+ "relation": null,
+ "partner": "",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. Rotationally symmetric bodies are preferred for this task.",
+ "candidates": [
+  {
+   "model": "dvxotd",
+   "key": "bottle_of_salsa__dvxotd__f",
+   "strip": "/tmp/glib/strips/bottle_of_salsa__dvxotd__f.png",
+   "n_valid": 5,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "end_grasp"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "base-rim pinch, pads 71 mm vs 31 mm chord, antipodal 0.70"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "neck floats between pads; pads on shoulder/cap rim, body 91 mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "base-end pinch, lower pad half on body, CoM 58 mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pinch line at base edge (16 mm chord), body hangs 80 mm"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "cap/shoulder rim pinch, neck floats, body 91 mm away"
+    }
+   ],
+   "object_note": "tall 72 mm bottle; all grasps at cap or base end, pads 61-72 mm apart vs 16-34 mm chord",
+   "bbox_mm": [
+    72,
+    72,
+    250
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "mavope",
+   "key": "bottle_of_salsa__mavope__f",
+   "strip": "/tmp/glib/strips/bottle_of_salsa__mavope__f.png",
+   "n_valid": 4,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "end_grasp"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "cap/neck end pinch, pads on shoulder rim, body 100 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "neck pinch line, pads stop on shoulder rim, body 86 mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "cap/neck end pinch, body 100 mm away"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "shoulder-edge pinch, antipodal 0.59, body 88 mm away"
+    }
+   ],
+   "object_note": "tall dark bottle; pads 54-70 mm apart vs 30-50 mm pinch-line chord, body wider than pads hangs below fingertips",
+   "bbox_mm": [
+    72,
+    72,
+    250
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "nafwlf",
+   "key": "bottle_of_salsa__nafwlf__f",
+   "strip": "/tmp/glib/strips/bottle_of_salsa__nafwlf__f.png",
+   "n_valid": 5,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "end_grasp"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "neck floats (37 mm) between 70 mm pads; shoulder-rim contact only"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "neck floats between pads, contact on cap/shoulder rim, body 86 mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "cap/neck end pinch, body 93 mm away"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "cap/neck end pinch, body 90 mm away"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "cap/neck end pinch, body 96 mm away"
+    }
+   ],
+   "object_note": "pads never reach the 34-40 mm neck; they stop on cap/shoulder at 61-70 mm, so contact is rim-edge only",
+   "bbox_mm": [
+    72,
+    72,
+    250
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

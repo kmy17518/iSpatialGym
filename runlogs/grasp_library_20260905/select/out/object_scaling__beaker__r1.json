@@ -1,0 +1,45 @@
+{
+  "group": "object_scaling__beaker__r1",
+  "task": "object_scaling",
+  "category": "beaker",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 10,
+  "n_opened": 10,
+  "candidates": [
+    {"model": "dtjmai", "key": "beaker__dtjmai", "G": 0, "T": 1, "V": 2, "R": 0, "score": 5,
+     "note": "White hemispherical bowl, not a beaker; all rows straddle a 3-5 mm wall with 16-19 mm openings, inner pad off the wall (hull fills cavity)."},
+    {"model": "fxrsyi", "key": "beaker__fxrsyi", "G": 4, "T": 2, "V": 2, "R": 1, "score": 15,
+     "note": "46x46x66 mm dark-brown square box with white interior, not a beaker; all rows 44/0 face-to-face clamps, one finger fully closed; flat colour."},
+    {"model": "jdijek", "key": "beaker__jdijek", "G": 4, "T": 3, "V": 3, "R": 2, "score": 19,
+     "note": "Plain white 78 mm tapered tumbler; five clean full-diameter body pinches (63-64 mm) but only two pose families (tilt ~175 and ~150); flat untextured."},
+    {"model": "rhohgs", "key": "beaker__rhohgs", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Frosted pale-blue glass tumbler (same mesh); five clean 63-65 mm body pinches in two pose families, three rows 50/x one-finger; realistic translucent material."},
+    {"model": "uobdoq", "key": "beaker__uobdoq", "G": 4, "T": 3, "V": 3, "R": 2, "score": 19,
+     "note": "Plain light-grey matte tumbler (same mesh); five clean 63-65 mm body pinches, tilts ~150 and ~175 only; flat untextured surface."},
+    {"model": "zycgen", "key": "beaker__zycgen", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Chrome steel tumbler (same mesh); rows 1-2 two-sided 46/27, 44/32 pinches, rows 3-5 50/x; two pose families; reflection shows stair-step aliasing in V4."},
+    {"model": "fyrkzs", "key": "beaker__fyrkzs", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Chrome steel tumbler, looks identical to zycgen; four of five rows 50/x one-finger clamps, row 3 two-sided 46/28; two pose families; minor V4 aliasing."},
+    {"model": "exzsal", "key": "beaker__exzsal", "G": 1, "T": 2, "V": 3, "R": 0, "score": 10,
+     "note": "Cream faceted 95 mm cup; every row a 6-7/0 rim pinch on a 5 mm wall, CoM 38-57 mm below the pads; low-poly, flat colour."},
+    {"model": "effbnc", "key": "beaker__effbnc", "G": 2, "T": 2, "V": 4, "R": 1, "score": 15,
+     "note": "Octagonal brushed-steel beaker 123x146 mm, body too wide for the gripper; all rows 15-17/0 rim-lip pinches (11-13 mm), CoM 49-54 mm below; good texture."},
+    {"model": "sfvswx", "key": "beaker__sfvswx", "G": 1, "T": 2, "V": 2, "R": 0, "score": 8,
+     "note": "Dark-grey low-poly 126x146 mm beaker, flat untextured facets; all rows 8-9/0 rim pinches on a 5-8 mm wall, CoM 69-75 mm below the pads."}
+  ],
+  "selected": [
+    {"model": "rhohgs", "key": "beaker__rhohgs", "rank": 1,
+     "reason": "Top score; five clean full-diameter body pinches at 63-65 mm with low CoM offset, rotationally symmetric; realistic frosted pale-blue glass tumbler with no texture artefacts."},
+    {"model": "zycgen", "key": "beaker__zycgen", "rank": 2,
+     "reason": "Tied score; two genuine two-sided pinches plus three sensible one-finger clamps on the same symmetric body; chrome steel finish gives a clearly different look from the frosted glass #1."}
+  ],
+  "alternate": {"model": "fyrkzs", "key": "beaker__fyrkzs"},
+  "short": false,
+  "warnings": [
+    "jdijek, rhohgs, uobdoq, zycgen and fyrkzs share bbox 78x78x81 and are the same tapered-tumbler mesh with different materials; zycgen and fyrkzs look identical (both chrome).",
+    "All five tumblers offer only two pose families (tilt ~150 and ~177), so G is capped at 4 for limited in-hand diversity.",
+    "exzsal, effbnc and sfvswx are held only by rim pinches (5-13 mm walls, CoM 38-75 mm below the pads), scored as not clean per the fragile-rim/end-pinch rule; dtjmai bowl has no clean row and is not selectable."
+  ],
+  "confidence": "medium"
+}

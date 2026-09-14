@@ -1,0 +1,35 @@
+{
+ "category": "coaster",
+ "model": "arjpcz",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/coaster__arjpcz__y0.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0008,
+   "seg_pixels": 4244,
+   "aabb_extent": [
+    0.104,
+    0.104,
+    0.001
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/coaster__arjpcz__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0008
+  }
+ },
+ "stable": true,
+ "visible": true
+}

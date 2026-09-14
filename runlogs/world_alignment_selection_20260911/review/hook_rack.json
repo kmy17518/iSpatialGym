@@ -1,0 +1,26 @@
+{
+ "category": "hook_rack",
+ "task": "wa1",
+ "n_models": 1,
+ "n_opened": 1,
+ "models": [
+  {
+   "model": "mdnfjr",
+   "V": 3,
+   "U": 2,
+   "H": 1,
+   "score": 11,
+   "valid": true,
+   "front_axis": "+x",
+   "up_axis": "+z",
+   "thin_axis": "x",
+   "note": "Thin black rail 0.96 m long, 4 small hooks hanging down (-z), end posts up; hooks give up but are tiny; 0.96 m borderline wide."
+  }
+ ],
+ "picks": [
+  "mdnfjr"
+ ],
+ "alternate": null,
+ "category_verdict": "weak",
+ "category_note": "Single thin black coat-hook rail; a normal wall item and hooks-down reads as upright, but the cue is small, the geometry is sparse and it nearly fills the 0.6-0.95 m camera view."
+}

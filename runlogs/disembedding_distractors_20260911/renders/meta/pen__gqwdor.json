@@ -1,0 +1,35 @@
+{
+ "category": "pen",
+ "model": "gqwdor",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/pen__gqwdor__y0.png",
+   "drift_m": 0.0014,
+   "tilt_deg": 18.7,
+   "on_tray": true,
+   "settled_z": 0.0043,
+   "seg_pixels": 849,
+   "aabb_extent": [
+    0.187,
+    0.01,
+    0.009
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/pen__gqwdor__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0046
+  }
+ },
+ "stable": true,
+ "visible": true
+}

@@ -1,0 +1,68 @@
+{
+ "key": "oven__nkxhvf",
+ "category": "oven",
+ "model": "nkxhvf",
+ "scene": "Rs_int",
+ "host": "oven_wuinhm_0",
+ "host_rank": 0,
+ "host_model": "wuinhm",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_3",
+   "kind": "flap",
+   "grasp_source": "review:A",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [-1.3387898206710815, 2.024595260620117, 0.5091527104377747]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [-1.3387898206710815, 2.024595260620117, 0.5091527104377747]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    -1.339,
+    2.025,
+    0.509
+   ],
+   "handle_height_above_floor": 0.504
+  },
+  {
+   "joint": "j_link_4",
+   "kind": "flap",
+   "grasp_source": "review:A",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [-1.3345613479614258, 2.0247387886047363, 0.8410499095916748]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [-1.3345613479614258, 2.0247387886047363, 0.8410499095916748]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    -1.335,
+    2.025,
+    0.841
+   ],
+   "handle_height_above_floor": 0.836
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.282,
+  1.237,
+  1.239
+ ],
+ "time_s": 11.2
+}

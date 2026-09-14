@@ -1,0 +1,246 @@
+{
+ "group": "IORS__brussels_sprouts__r3",
+ "task": "IORS",
+ "category": "brussels_sprouts",
+ "round": 3,
+ "relation": "inside",
+ "partner": "bowl",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "mbkrxe",
+   "key": "brussels_sprouts__mbkrxe__i",
+   "strip": "/tmp/glib/strips/brussels_sprouts__mbkrxe__i.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "43/0 asymmetric but firmly closed across sprout"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "46/0 asymmetric but closed across sprout"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "43/0 asymmetric but closed across sprout"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "46/0 asymmetric but closed, tilt 23 deg"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "42/17 asymmetric but closed; 57 mm long-axis pinch"
+    }
+   ],
+   "object_note": "All rows bottom one finger at 0 but no idle open-limit finger; both pads on sprout.",
+   "bbox_mm": [
+    58,
+    43,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop_insert"
+  },
+  {
+   "model": "vdamtq",
+   "key": "brussels_sprouts__vdamtq__i",
+   "strip": "/tmp/glib/strips/brussels_sprouts__vdamtq__i.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "49/0: sprout against near-open finger, ~24 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "48/0: sprout against near-open finger, ~23 mm off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "49/0: sprout against near-open finger, ~24 mm off-centre; tilt 22"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "49/0: sprout against near-open finger, ~24 mm off-centre; tilt 28"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "49/0: sprout against near-open finger, ~24 mm off-centre; tilt 28"
+    }
+   ],
+   "object_note": "Every row has one finger idle at 48-49 and the other at 0; sprout entirely in one half of opening.",
+   "bbox_mm": [
+    67,
+    48,
+    46
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop_insert"
+  },
+  {
+   "model": "hkwyzk",
+   "key": "brussels_sprouts__hkwyzk__i",
+   "strip": "/tmp/glib/strips/brussels_sprouts__hkwyzk__i.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 1,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "40/12 asymmetric but closed, ~14 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: sprout pushed against open finger, ~24 mm off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: sprout pushed against open finger, ~24 mm off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/5: sprout pushed against open finger, ~22 mm off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: sprout pushed against open finger, ~24 mm off-centre"
+    }
+   ],
+   "object_note": "Top-down pinches across 50 mm sprout; rows 2-5 have idle open-limit finger.",
+   "bbox_mm": [
+    64,
+    50,
+    56
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop_insert"
+  },
+  {
+   "model": "siodbb",
+   "key": "brussels_sprouts__siodbb__i",
+   "strip": "/tmp/glib/strips/brussels_sprouts__siodbb__i.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 2,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/1: sprout pushed against open finger, ~24 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "46/6 asymmetric, both fingers moved, firmly closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/8: sprout pushed against open finger, ~20 mm off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "38/25 near-symmetric pinch across 60 mm"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/14: sprout against open finger, ~17 mm off-centre, borderline"
+    }
+   ],
+   "object_note": "Row 3 rendered from a different camera yaw but clearly a two-pad pinch.",
+   "bbox_mm": [
+    64,
+    52,
+    54
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop_insert"
+  }
+ ],
+ "excluded": []
+}

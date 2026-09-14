@@ -1,0 +1,11 @@
+format: isaac_grasp
+format_version: 1.0
+object_frame: base_link
+gripper_frame: right_eef_link
+ispatialgym:
+  object:
+    category: half_apple_pie
+    model: grcock
+  gripper: r1pro_right
+  source: graspgen_franka_panda_table_top5
+grasps: {}

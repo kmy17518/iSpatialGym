@@ -1,0 +1,59 @@
+{
+ "key": "dishwasher__ynrhuk",
+ "category": "dishwasher",
+ "model": "ynrhuk",
+ "scene": "house_single_floor",
+ "host": "dishwasher_ynrhuk_0",
+ "host_rank": 0,
+ "host_model": "ynrhuk",
+ "swap": false,
+ "joints": [
+  {
+   "joint": "j_link_2",
+   "kind": "flap",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     7.36,
+     -1.128,
+     -1.565
+    ],
+    "translate": 0.5,
+    "sign": 1.0,
+    "orientation": "front"
+   },
+   "reachable": true,
+   "ag": true,
+   "dq": 0.3768,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": true,
+   "base_shifts": 0,
+   "steps": [
+    "stance ok (teleported)",
+    "grasped",
+    "pull chunk 1: base follow failed: [planning] no collision-free base path to (7.359656810760498, -1.0494287014007568, -1.5646467208862305) {'curobo_status': 'IK failed: goal pose is kinematically reachable but blocked by world obstacles (best pose error with obstacles 599.4 mm / 1.039 rad; converges once obstacles are ignored) [start configuration is in collision]'}",
+    "pull chunk 2: base follow failed: [planning] no collision-free base path to (7.359656810760498, -0.9731158018112183, -1.5646467208862305) {'curobo_status': 'IK failed: goal pose is kinematically reachable but blocked by world obstacles (best pose error with obstacles 317.2 mm / 0.966 rad; converges once obstacles are ignored) [start configuration is in collision]'}",
+    "pull chunk 3: base follow failed: [planning] no collision-free base path to (7.359656810760498, -0.9006564617156982, -1.5646467208862305) {'curobo_status': 'IK failed: goal pose reachable (16/32 seeds converge) but every converged solution violates collision or joint-limit constraints (0/32 seeds feasible overall) [start configuration is in collision]'}",
+    "pull chunk 4: base follow failed: [planning] no collision-free base path to (7.359656810760498, -0.8332904577255249, -1.5646467208862305) {'curobo_status': 'IK failed: goal pose is kinematically reachable but blocked by world obstacles (best pose error with obstacles 70.5 mm / 0.027 rad; converges once obstacles are ignored) [start configuration is in collision]'}",
+    "pull chunk 4: base shift failed: [planning] no collision-free base path to (7.359650611877441, -0.9783424139022827, -1.5647187232971191) {'curobo_status': 'IK failed: goal pose reachable (26/32 seeds converge) but every converged solution violates collision or joint-limit constraints (0/32 seeds feasible overall) [start configuration is in collision]'}",
+    "pull chunk 4: arm+base could not follow"
+   ],
+   "error": null,
+   "contact_world": [
+    7.162,
+    -1.58,
+    0.762
+   ],
+   "handle_height_above_floor": 0.757
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.06,
+  1.105,
+  1.062
+ ],
+ "time_s": 148.6
+}

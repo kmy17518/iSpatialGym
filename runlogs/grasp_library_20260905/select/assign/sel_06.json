@@ -1,0 +1,10 @@
+{
+ "assignment": "sel_06",
+ "groups": [
+  "/tmp/glib/select/groups/mental_rotation__toy_figure__r1.json",
+  "/tmp/glib/select/groups/mental_rotation__walker__r1.json",
+  "/tmp/glib/select/groups/IORS__french_fries__r1.json",
+  "/tmp/glib/select/groups/IORS__baguette__r3.json"
+ ],
+ "n_strips": 34
+}

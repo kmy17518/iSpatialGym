@@ -1,0 +1,267 @@
+{
+ "group": "mental_rotation__potato__r2",
+ "task": "mental_rotation",
+ "category": "potato",
+ "round": 2,
+ "relation": null,
+ "partner": "same floating grasps as object scaling",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "ljfitc",
+   "key": "potato__ljfitc",
+   "strip": "/tmp/glib/strips/potato__ljfitc.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    76,
+    60,
+    58
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "lqjear",
+   "key": "potato__lqjear",
+   "strip": "/tmp/glib/strips/potato__lqjear.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    77,
+    60,
+    61
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "bpwohr",
+   "key": "potato__bpwohr",
+   "strip": "/tmp/glib/strips/potato__bpwohr.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, both pads on potato"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, near symmetric"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    81,
+    69,
+    64
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "reczhi",
+   "key": "potato__reczhi",
+   "strip": "/tmp/glib/strips/potato__reczhi.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "symmetric body pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    106,
+    73,
+    77
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ngjeog",
+   "key": "potato__ngjeog",
+   "strip": "/tmp/glib/strips/potato__ngjeog.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on large potato"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    84,
+    76,
+    79
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

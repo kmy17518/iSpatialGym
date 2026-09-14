@@ -1,0 +1,30 @@
+{
+ "reviewer": "rev_06",
+ "task": "wa2",
+ "categories": [
+  "baseball_bat",
+  "golf_club",
+  "fishing_rod",
+  "skateboard_deck",
+  "longboard",
+  "guitar",
+  "trumpet",
+  "violin",
+  "tennis_racket",
+  "wall_mounted_light"
+ ],
+ "grids": [
+  "renders/grids/baseball_bat_00.png",
+  "renders/grids/fishing_rod_00.png",
+  "renders/grids/golf_club_00.png",
+  "renders/grids/guitar_00.png",
+  "renders/grids/longboard_00.png",
+  "renders/grids/skateboard_deck_00.png",
+  "renders/grids/tennis_racket_00.png",
+  "renders/grids/trumpet_00.png",
+  "renders/grids/violin_00.png",
+  "renders/grids/wall_mounted_light_00.png",
+  "renders/grids/wall_mounted_light_01.png"
+ ],
+ "n_models": 18
+}

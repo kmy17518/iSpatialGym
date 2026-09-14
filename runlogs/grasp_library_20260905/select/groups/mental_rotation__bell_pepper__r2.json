@@ -1,0 +1,271 @@
+{
+ "group": "mental_rotation__bell_pepper__r2",
+ "task": "mental_rotation",
+ "category": "bell_pepper",
+ "round": 2,
+ "relation": null,
+ "partner": "same floating grasps as object scaling",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "ukkycp",
+   "key": "bell_pepper__ukkycp",
+   "strip": "/tmp/glib/strips/bell_pepper__ukkycp.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch 63 mm across lobes, CoM 3 mm, both pads touch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch 60 mm across lobes, CoM 3 mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch 58 mm across lobes, coverage 0.75"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch 61 mm across lobes, CoM 3 mm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch 63 mm across lobes, coverage 0.75"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    94,
+    64,
+    69
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ggurxn",
+   "key": "bell_pepper__ggurxn",
+   "strip": "/tmp/glib/strips/bell_pepper__ggurxn.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch 59 mm across lobes, CoM 1 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch 59 mm across lobes, CoM 2 mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch 62 mm across lobes, tilt 37"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch 59 mm, tangent lobe contact on one side, both touch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch 59 mm across lobes, CoM 6 mm, full coverage"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    94,
+    66,
+    65
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ihctxa",
+   "key": "bell_pepper__ihctxa",
+   "strip": "/tmp/glib/strips/bell_pepper__ihctxa.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across lobes, CoM 1 mm, coverage 0.75"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across lobes, CoM 2 mm, coverage 0.50"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across lobes, CoM 4 mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across lobes, CoM 3 mm, coverage 0.50"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across lobes, CoM 7 mm, full coverage"
+    }
+   ],
+   "object_note": "width metric 10-13 mm reflects hollow shell walls; pads visibly span the ~60 mm body",
+   "bbox_mm": [
+    94,
+    66,
+    65
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "uqcenz",
+   "key": "bell_pepper__uqcenz",
+   "strip": "/tmp/glib/strips/bell_pepper__uqcenz.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "full-width body pinch 59 mm, CoM 14 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch near stem end, pads span ~50 mm, coverage 1.0"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch, pads span ~60 mm, antipodal 0.78, full coverage"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch, pads span ~47 mm, CoM 23 mm, coverage 1.0"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch, pads span ~53 mm, CoM 23 mm, coverage 1.0"
+    }
+   ],
+   "object_note": "width metric 36-45 mm underestimates: measured pad gap in rows 2-5 is 80-100% of row 1, full coverage",
+   "bbox_mm": [
+    106,
+    78,
+    72
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "wszvwc",
+   "key": "bell_pepper__wszvwc",
+   "strip": "/tmp/glib/strips/bell_pepper__wszvwc.png",
+   "n_valid": 5,
+   "n_clean": 4,
+   "n_clean_strict": 4,
+   "flags": [
+    "end_grasp"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch 69 mm across lobes, antipodal 0.96"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch 69 mm, coverage 0.50, stem toward camera"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads span widest lobes; antipodal 0.22 / coverage 0.25 metrics pessimistic"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch 71 mm, full coverage, antipodal 0.36"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "fingertips hooked on stem-end shoulders, coverage 0.00, CoM 39 mm"
+    }
+   ],
+   "object_note": "row 5 hangs pepper from stem-end shoulders by fingertips only; rows 3-4 low antipodal but pads span widest section",
+   "bbox_mm": [
+    108,
+    80,
+    82
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

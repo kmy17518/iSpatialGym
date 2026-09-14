@@ -1,0 +1,43 @@
+{
+  "category": "poinsettia",
+  "task": "obst",
+  "n_models": 3,
+  "n_opened": 3,
+  "models": [
+    {
+      "model": "poinsettia/eefcsd",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Red poinsettia in round mottled blue-grey pot with flat base; 0.27 x 0.28 x 0.25 m; clean plant, pot texture slightly murky."
+    },
+    {
+      "model": "poinsettia/peeehg",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Wide red poinsettia in low striped bowl pot; 0.34 x 0.33 x 0.26 m; clean; bowl bottom looks rounded, may rock but stays put."
+    },
+    {
+      "model": "poinsettia/qdcipo",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Red poinsettia in tall tapered black-white diagonal-striped pot with flat base; 0.21 x 0.21 x 0.28 m; sharp, complete."
+    }
+  ],
+  "picks": ["poinsettia/qdcipo", "poinsettia/eefcsd"],
+  "alternate": "poinsettia/peeehg",
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int", "restaurant_diner", "hotel_suite_large", "office_cubicles_right"],
+  "category_verdict": "good",
+  "category_note": "Three clean potted poinsettias, 0.21-0.34 m footprint and ~0.25-0.28 m tall, upright in flat-bottomed pots (one low bowl). A potted plant on the floor is unremarkable in every scene; small but above the base height, camera sees it."
+}

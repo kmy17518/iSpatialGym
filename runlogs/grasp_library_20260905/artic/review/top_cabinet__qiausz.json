@@ -1,0 +1,31 @@
+{
+  "key": "top_cabinet__qiausz",
+  "category": "top_cabinet",
+  "model": "qiausz",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_dof_rootd_ba001_r",
+      "kind": "door",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "swing",
+      "graspable": false,
+      "handle_description": "No handle; thin (9 mm) raised-panel door hinged at outer left (-y) edge; free centre edge not exposed, nothing to pinch",
+      "height_concern": "",
+      "confidence": "medium"
+    },
+    {
+      "joint": "j_dof_rootd_bb001_r",
+      "kind": "door",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "swing",
+      "graspable": false,
+      "handle_description": "No handle; thin (9 mm) raised-panel door hinged at outer right (+y) edge; free centre edge not exposed, nothing to pinch",
+      "height_concern": "",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Small two-door cabinet; doors are handle-less 9 mm raised-panel leaves meeting at centre; heuristic 'ungraspable' agreed; no knobs visible in render."
+}

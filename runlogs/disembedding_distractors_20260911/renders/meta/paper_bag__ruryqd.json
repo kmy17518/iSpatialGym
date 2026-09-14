@@ -1,0 +1,35 @@
+{
+ "category": "paper_bag",
+ "model": "ruryqd",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/paper_bag__ruryqd__y0.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1006,
+   "seg_pixels": 42506,
+   "aabb_extent": [
+    0.117,
+    0.204,
+    0.201
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/paper_bag__ruryqd__y1.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.1,
+   "on_tray": true,
+   "settled_z": 0.1004
+  }
+ },
+ "stable": true,
+ "visible": true
+}

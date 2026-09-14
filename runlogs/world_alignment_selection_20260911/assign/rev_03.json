@@ -1,0 +1,134 @@
+[
+ {
+  "category": "calculator",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/calculator_00.png"
+  ]
+ },
+ {
+  "category": "dartboard",
+  "task": "wa1",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/dartboard_00.png"
+  ]
+ },
+ {
+  "category": "eyeglasses",
+  "task": "wa0",
+  "n_models": 2,
+  "grids": [
+   "renders/grids/eyeglasses_00.png"
+  ]
+ },
+ {
+  "category": "griddle_pan",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/griddle_pan_00.png"
+  ]
+ },
+ {
+  "category": "letter",
+  "task": "wa0",
+  "n_models": 16,
+  "grids": [
+   "renders/grids/letter_00.png",
+   "renders/grids/letter_01.png",
+   "renders/grids/letter_02.png",
+   "renders/grids/letter_03.png",
+   "renders/grids/letter_04.png",
+   "renders/grids/letter_05.png"
+  ]
+ },
+ {
+  "category": "open_end_wrench",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/open_end_wrench_00.png"
+  ]
+ },
+ {
+  "category": "pencil_case",
+  "task": "wa0",
+  "n_models": 3,
+  "grids": [
+   "renders/grids/pencil_case_00.png"
+  ]
+ },
+ {
+  "category": "putty_knife",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/putty_knife_00.png"
+  ]
+ },
+ {
+  "category": "skates",
+  "task": "wa0",
+  "n_models": 2,
+  "grids": [
+   "renders/grids/skates_00.png"
+  ]
+ },
+ {
+  "category": "thermostat",
+  "task": "wa1",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/thermostat_00.png"
+  ]
+ },
+ {
+  "category": "towel_rack",
+  "task": "wa1",
+  "n_models": 6,
+  "grids": [
+   "renders/grids/towel_rack_00.png",
+   "renders/grids/towel_rack_01.png"
+  ]
+ },
+ {
+  "category": "umbrella",
+  "task": "wa1",
+  "n_models": 5,
+  "grids": [
+   "renders/grids/umbrella_00.png",
+   "renders/grids/umbrella_01.png"
+  ]
+ },
+ {
+  "category": "video_game",
+  "task": "wa0",
+  "n_models": 12,
+  "grids": [
+   "renders/grids/video_game_00.png",
+   "renders/grids/video_game_01.png",
+   "renders/grids/video_game_02.png",
+   "renders/grids/video_game_03.png"
+  ]
+ },
+ {
+  "category": "wall_clock",
+  "task": "wa1",
+  "n_models": 7,
+  "grids": [
+   "renders/grids/wall_clock_00.png",
+   "renders/grids/wall_clock_01.png",
+   "renders/grids/wall_clock_02.png"
+  ]
+ },
+ {
+  "category": "wok",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/wok_00.png"
+  ]
+ }
+]

@@ -1,0 +1,26 @@
+{
+  "category": "power_washer",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "pkhrip",
+      "V": 4,
+      "N": 1,
+      "S": 1,
+      "rest_ok": true,
+      "score": 11,
+      "valid": false,
+      "note": "Upright orange/black pressure washer on two rear wheels with handle and side-mounted lance, 0.25 x 0.66 x 0.82 m; clean; lance sets the footprint."
+    }
+  ],
+  "picks": [],
+  "alternate": null,
+  "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower"
+  ],
+  "category_verdict": "drop",
+  "category_note": "Single garage tool: a wheeled pressure washer with a protruding lance, 0.66 m wide, 0.82 m tall, stable. Plausible only in a garage; odd mid-path in any room or corridor of these scenes. No valid model."
+}

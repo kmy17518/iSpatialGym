@@ -1,0 +1,63 @@
+{
+  "category": "wicker_basket",
+  "task": "obst",
+  "n_models": 5,
+  "n_opened": 5,
+  "models": [
+    {
+      "model": "dgkhyn",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Low oval dark wicker basket, open, no handles, detailed weave scan; 0.26 x 0.41 x 0.19 m, height borderline low."
+    },
+    {
+      "model": "drxfmr",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Round tapered dark wicker basket with two side handles, open top, detailed weave; 0.39 x 0.41 x 0.43 m."
+    },
+    {
+      "model": "jqfftz",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Cube-shaped dark brown woven storage basket with handle slots, small white patch on one rim; 0.31 x 0.31 x 0.28 m."
+    },
+    {
+      "model": "tsjvyu",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Round lighter-brown wicker basket with two loop handles, open top, clean weave; 0.39 x 0.41 x 0.43 m."
+    },
+    {
+      "model": "unasxd",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Duplicate of dgkhyn: identical low oval wicker basket, 0.26 x 0.41 x 0.19 m, height borderline low."
+    }
+  ],
+  "picks": ["drxfmr", "jqfftz"],
+  "alternate": "tsjvyu",
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int", "hotel_suite_large"],
+  "category_verdict": "good",
+  "category_note": "Five well-scanned wicker baskets 0.26-0.41 m wide; round handled ones 0.43 m tall, cube 0.28 m, two identical low ovals 0.19 m. Natural laundry/storage clutter in homes and hotel; dgkhyn/unasxd are duplicates."
+}

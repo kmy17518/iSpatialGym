@@ -1,0 +1,224 @@
+{
+ "scene": "restaurant_diner",
+ "table": "pedestal_table_nlfgwe_0",
+ "category": "pedestal_table",
+ "model": "nlfgwe",
+ "rooms": [
+  "dining_room_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-3",
+ "inventory": {
+  "top_z": 0.77,
+  "bbox_x": 1.074,
+  "bbox_y": 1.074,
+  "bbox_z": 0.766,
+  "verdict": "keep"
+ },
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 22:14:37",
+ "precheck": {
+  "aabb": [
+   [
+    -3.901,
+    1.581,
+    -0.001
+   ],
+   [
+    -2.816,
+    2.666,
+    0.775
+   ]
+  ],
+  "support": {
+   "name": "pedestal_table_nlfgwe_0",
+   "z": 0.7752547860145569,
+   "yaw": -6.67572021484375e-06,
+   "local_bounds": [
+    -3.890556573867798,
+    -2.8305561542510986,
+    1.5905671119689941,
+    2.6505677700042725
+   ],
+   "n_free_cells": 2222,
+   "occupants": [
+    "straight_chair_nntxvr_0"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -2.831,
+     2.121
+    ],
+    "length": 1.06
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -3.891,
+     2.121
+    ],
+    "length": 1.06
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -3.361,
+     2.651
+    ],
+    "length": 1.06
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -3.361,
+     1.591
+    ],
+    "length": 1.06
+   }
+  ],
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    -2.8305420875549316,
+    2.1205861568450928
+   ],
+   "inward": [
+    -1.0,
+    6.67572021484375e-06
+   ],
+   "tangent": [
+    -6.67572021484375e-06,
+    -1.0
+   ],
+   "base_pose2d": [
+    -2.380542039871216,
+    2.1205830574035645,
+    3.1415859778695783
+   ],
+   "edge_depth": 0.4500000476837158,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.6499999761581421,
+    "axis_angle": 0.014814463064702391
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.3
+ },
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {},
+ "template_meta": {
+  "support": {
+   "name": "pedestal_table_nlfgwe_0",
+   "z": 0.7752548456192017,
+   "yaw": -8.58306884765625e-06,
+   "local_bounds": [
+    -3.8905651569366455,
+    -2.8305647373199463,
+    1.5905742645263672,
+    2.6505751609802246
+   ],
+   "n_free_cells": 2222,
+   "occupants": [
+    "straight_chair_nntxvr_0"
+   ],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    -2.8305466175079346,
+    2.1205990314483643
+   ],
+   "inward": [
+    -1.0,
+    8.58306884765625e-06
+   ],
+   "tangent": [
+    -8.58306884765625e-06,
+    -1.0
+   ],
+   "base_pose2d": [
+    -2.3805465698242188,
+    2.1205952167510986,
+    3.141584070520946
+   ],
+   "edge_depth": 0.4500000476837158,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.6499999761581421,
+    "axis_angle": 0.014810438961979136
+   }
+  },
+  "view_arms": "untucked",
+  "n_reachable_cells": 9,
+  "n_grasp_cells": 8,
+  "load_room_instances": [
+   "dining_room_0",
+   "bar_0",
+   "corridor_0",
+   "kitchen_0"
+  ],
+  "task_rooms": [
+   "dining_room_0"
+  ],
+  "rejections": {},
+  "n_written": 1,
+  "timings": {
+   "bind_spawn_s": 16.02,
+   "prepare_template_s": 41.84,
+   "save_template_s": 0.07
+  }
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_table_sel/restaurant_diner/restaurant_diner__pedestal_table_nlfgwe_0__configuration_matching-3/instances/configuration_matching-3__restaurant_diner__pedestal_table_nlfgwe_0__configuration_matching-3__0000.summary.json",
+   "wall_time_s": 13.8,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    -2.3805465698242188,
+    2.1205952167510986,
+    3.141584070520946
+   ],
+   "trunk": [
+    0.749999987042469,
+    -0.6500000357627869
+   ],
+   "grasp": {
+    "key": "cap__xxqyrt",
+    "name": "grasp_1",
+    "translate": 0.5,
+    "yaw": -0.7853981852531433
+   },
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.6499999761581421
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_table_sel/restaurant_diner/restaurant_diner__pedestal_table_nlfgwe_0__configuration_matching-3",
+ "bound_table": "pedestal_table_nlfgwe_0",
+ "setup_s": 57.9,
+ "run_s": 13.8,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "ok",
+   "n_written": 1,
+   "rejections": {},
+   "reject_reason": null,
+   "setup_s": 57.9,
+   "run_s": 13.8
+  }
+ ],
+ "job_s": 73.9,
+ "finished": "2026-09-11 22:15:51"
+}

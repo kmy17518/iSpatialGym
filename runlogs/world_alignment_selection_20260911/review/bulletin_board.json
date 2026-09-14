@@ -1,0 +1,38 @@
+{
+ "category": "bulletin_board",
+ "task": "wa1",
+ "n_models": 2,
+ "n_opened": 2,
+ "models": [
+  {
+   "model": "ayaoal",
+   "V": 4,
+   "U": 2,
+   "H": 1,
+   "score": 13,
+   "valid": true,
+   "up_axis": "+y",
+   "front_axis": "+z",
+   "thin_axis": "z",
+   "note": "Cork board with black frame, pinned photos and a world map all upright toward +y; 1.08 m across (borderline)."
+  },
+  {
+   "model": "rjlpsy",
+   "V": 4,
+   "U": 1,
+   "H": 1,
+   "score": 11,
+   "valid": false,
+   "up_axis": "+y",
+   "front_axis": "+z",
+   "thin_axis": "z",
+   "note": "Empty cork board with black frame, 1.07 m; symmetric rectangle, no up cue."
+  }
+ ],
+ "picks": [
+  "ayaoal"
+ ],
+ "alternate": null,
+ "category_verdict": "weak",
+ "category_note": "Framed cork boards ~0.75x1.08 m lying flat; only the one with pinned photos has a readable up, and both are slightly large for the head camera."
+}

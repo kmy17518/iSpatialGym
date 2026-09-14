@@ -1,0 +1,16 @@
+{
+  "category": "jar_of_bath_salt",
+  "n_models": 2,
+  "pages_opened": [
+    "grids/same/jar_of_bath_salt__p1.png"
+  ],
+  "groups": [
+    {
+      "members": ["dtrjxi", "erglwp"],
+      "reason": "Same 7x7x7 square beige jar with black round lid, same pixel count; only a subtle beige-vs-cream body shade differs, invisible at this size.",
+      "confidence": "high"
+    }
+  ],
+  "unusable": [],
+  "notes": "Only two models; both tiny (~4.4k px, blurry) and effectively identical at every yaw, so neither can serve as the other's distractor. erglwp is marked excluded in the grasp-library selection."
+}

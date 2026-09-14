@@ -1,0 +1,24 @@
+{
+ "category": "thermostat",
+ "task": "wa1",
+ "n_models": 1,
+ "n_opened": 1,
+ "models": [
+  {
+   "model": "jophec",
+   "V": 4,
+   "U": 3,
+   "H": 0,
+   "score": 14,
+   "valid": false,
+   "up_axis": "-x",
+   "front_axis": "+z",
+   "thin_axis": "z",
+   "note": "grey digital thermostat 0.10x0.15 m; display '72' and +/- buttons read upright from +x; 0.147 m is under the size floor"
+  }
+ ],
+ "picks": [],
+ "alternate": null,
+ "category_verdict": "drop",
+ "category_note": "Single grey digital thermostat lying flat (face +z, text up = -x). Display and buttons make the up obvious, but it is only 0.147 m across (H=0) and a rigidly mounted device is odd as a swinging wall item."
+}

@@ -1,0 +1,20 @@
+{
+  "key": "dishwasher__cgugie",
+  "category": "dishwasher",
+  "model": "cgugie",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_0",
+      "kind": "flap",
+      "chosen": "A",
+      "pinch": "horizontal_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Horizontal bar across upper door, 23 mm thick, 41 mm proud; A mid-bar, B/C its thin end brackets. Bottom hinge, folds down toward viewer.",
+      "height_concern": "",
+      "confidence": "high"
+    }
+  ],
+  "object_note": "Clean case; A correct. Red dot on the fixed control panel is a model button, not a marker."
+}

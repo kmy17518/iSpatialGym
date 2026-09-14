@@ -1,0 +1,35 @@
+{
+ "category": "apple",
+ "model": "bwteqh",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/apple__bwteqh__y0.png",
+   "drift_m": 0.0214,
+   "tilt_deg": 37.3,
+   "on_tray": true,
+   "settled_z": 0.0321,
+   "seg_pixels": 3031,
+   "aabb_extent": [
+    0.063,
+    0.072,
+    0.07
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/apple__bwteqh__y1.png",
+   "drift_m": 0.0213,
+   "tilt_deg": 37.4,
+   "on_tray": true,
+   "settled_z": 0.032
+  }
+ },
+ "stable": false,
+ "visible": true
+}

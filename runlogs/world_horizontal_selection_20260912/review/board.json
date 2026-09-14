@@ -1,0 +1,26 @@
+{
+  "category": "board",
+  "task": "wa2",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "fxugbm",
+      "V": 4,
+      "L": 2,
+      "H": 1,
+      "score": 13,
+      "valid": true,
+      "front_axis": "+z",
+      "level_axis": "y",
+      "up_axis": "+x",
+      "symmetric_180": true,
+      "thin_axis": "z",
+      "note": "Thin plywood-look sheet 0.74x1.12 m, clean single mesh, slightly ragged edge; aspect 1.5 so level edge only moderately readable; long edge 1.12 m borderline."
+    }
+  ],
+  "picks": ["fxugbm"],
+  "alternate": null,
+  "category_verdict": "weak",
+  "category_note": "Single plywood-like sheet 0.74x1.12x0.014 m, clean and textured; aspect ~1.5 makes the level edge subtle and 1.12 m long edge is borderline for the camera. Only one model."
+}

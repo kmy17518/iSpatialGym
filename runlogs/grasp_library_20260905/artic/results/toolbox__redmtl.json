@@ -1,0 +1,48 @@
+{
+ "key": "toolbox__redmtl",
+ "category": "toolbox",
+ "model": "redmtl",
+ "aabb_extent": [
+  0.2679709792137146,
+  0.6182060241699219,
+  0.3523434102535248
+ ],
+ "support": "table",
+ "joints": [
+  {
+   "joint": "j_lid",
+   "kind": "flap",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     0.605,
+     0.347,
+     -0.005
+    ],
+    "translate": 0.5,
+    "sign": 1.0,
+    "orientation": "front"
+   },
+   "ag": true,
+   "dq": 0.5949,
+   "dq_target": 0.785,
+   "opened": true,
+   "open_state": true,
+   "steps": [
+    "stance ok",
+    "grasped",
+    "pull chunk 5: base shift failed: [planning] no collision-free base path to (0.5860264301300049, 0.4629479646682739, -0.0032896995544433594) {'curobo_status': 'IK failed: goal pose reachable (23/32 seeds converge) but every converged solution violates collision or joint-limit constraints (0/32 seeds feasible overall) [start configuration is in collision]'}",
+    "pull chunk 5: arm+base could not follow"
+   ],
+   "error": null,
+   "contact_world": [
+    1.254,
+    -0.006,
+    1.092
+   ],
+   "handle_height": 1.092
+  }
+ ],
+ "error": null,
+ "time_s": 24.1
+}

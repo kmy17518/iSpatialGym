@@ -1,0 +1,20 @@
+{
+  "key": "toolbox__redmtl",
+  "category": "toolbox",
+  "model": "redmtl",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_lid",
+      "kind": "flap",
+      "chosen": "A",
+      "pinch": "horizontal_bar",
+      "motion": "lift",
+      "graspable": true,
+      "handle_description": "Top-mounted carry bar (22 mm thick, 70 mm proud) centred on the rear-hinged lid; B and C are the bar's end mounts.",
+      "height_concern": "",
+      "confidence": "high"
+    }
+  ],
+  "object_note": "Good detection. A is the bar middle, B/C its end brackets; lid hinges at the rear and lifts. Two front latches are visible and may hold the lid shut."
+}

@@ -1,0 +1,6 @@
+{"key": "openable_window__eyvzfu", "joint": "j_movingpart", "feasible": true,
+ "proposal": {"face": "right_edge", "a": 1.0, "b": 0.36, "pinch": "thickness", "approach": "right", "depth_mm": 20,
+              "expected_motion": "slide"},
+ "alternative": {"face": "right_edge", "a": 1.0, "b": 0.36, "pinch": "horizontal", "approach": "front", "depth_mm": 20, "expected_motion": "slide"},
+ "note": "Small L-shaped latch lever (~110 mm tall, ~19 mm thick, ~28 mm off leaf face) beside the leading stile; straddle its leg, pull.",
+ "confidence": "low"}

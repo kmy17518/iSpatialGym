@@ -1,0 +1,50 @@
+{
+  "category": "gift_box",
+  "task": "obst",
+  "n_models": 3,
+  "n_opened": 3,
+  "models": [
+    {
+      "model": "mfalrc",
+      "V": 5,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Red patterned cube with gold ribbon and bow, 0.20 x 0.19 x 0.19 m; sharp texture; slightly low."
+    },
+    {
+      "model": "pnprrx",
+      "V": 4,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Grey cylindrical box with dark-red ribbon and bow standing on its end, 0.24 x 0.18 x 0.28 m; plain but clean."
+    },
+    {
+      "model": "wpmksn",
+      "V": 3,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 11,
+      "valid": true,
+      "note": "Plain white tapered box with red polka dots, no lid or ribbon, blank top; 0.18 x 0.18 x 0.15 m; small."
+    }
+  ],
+  "picks": ["mfalrc", "pnprrx"],
+  "alternate": "wpmksn",
+  "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large",
+    "office_cubicles_right"
+  ],
+  "category_verdict": "weak",
+  "category_note": "Small wrapped presents ~0.2 m, fine textures, all stable. Credible floor clutter in a living room, bedroom or hotel suite but not a typical mid-path object; small size and N=2 cap the category."
+}

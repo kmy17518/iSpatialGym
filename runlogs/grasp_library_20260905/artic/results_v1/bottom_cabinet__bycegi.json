@@ -1,0 +1,16 @@
+{
+ "key": "bottom_cabinet__bycegi",
+ "category": "bottom_cabinet",
+ "model": "bycegi",
+ "scene": "Rs_int",
+ "host": "bottom_cabinet_bamfsz_0",
+ "host_rank": 2,
+ "host_model": "bamfsz",
+ "swap": true,
+ "joints": [],
+ "error": "AssertionError('Object with name o_bottom_cabinet__bycegi already exists in scene!')",
+ "previous_hosts": [
+  "bottom_cabinet_bamfsz_1",
+  "bottom_cabinet_dajebq_0"
+ ]
+}

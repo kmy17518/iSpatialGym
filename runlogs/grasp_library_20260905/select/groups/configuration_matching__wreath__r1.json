@@ -1,0 +1,45 @@
+{
+ "group": "configuration_matching__wreath__r1",
+ "task": "configuration_matching",
+ "category": "wreath",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "Attachment task: the object is picked from a table and attached to its partner. The pads must leave the mating side of the object completely free.",
+ "candidates": [
+  {
+   "model": "rkrxno",
+   "key": "wreath__rkrxno",
+   "strip": "/tmp/glib/strips/wreath__rkrxno.png",
+   "n_valid": 1,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "fragile",
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger",
+      "fragile"
+     ],
+     "note": "pad at open limit; clamps loose foliage, antipodal 0.12"
+    }
+   ],
+   "object_note": "single grasp spans 87 mm of foliage, coverage 0; attach point only 24 mm away",
+   "bbox_mm": [
+    200,
+    198,
+    42
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "attachment_free"
+  }
+ ],
+ "excluded": []
+}

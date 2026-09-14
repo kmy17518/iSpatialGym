@@ -1,0 +1,6 @@
+{"key": "hinged_jar__jnjtrl", "joint": "j_lid", "feasible": false,
+ "proposal": {"face": "outer", "a": 0.5, "b": 0.5, "pinch": "horizontal", "approach": "above", "depth_mm": 5,
+              "expected_motion": "swing"},
+ "alternative": null,
+ "note": "Plain ~100 mm lid disc at gripper's 97 mm limit; rim flush with neck flange, no undercut; wire clamp latches it. Nothing pinchable.",
+ "confidence": "medium"}

@@ -1,0 +1,601 @@
+{
+ "group": "IORS__toy_figure__r2",
+ "task": "IORS",
+ "category": "toy_figure",
+ "round": 2,
+ "relation": "under",
+ "partner": "under bed (small under big)",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "psfkaj",
+   "key": "toy_figure__psfkaj__t",
+   "strip": "/tmp/glib/strips/toy_figure__psfkaj__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "claw pinch near body (CoM 26 mm), plush hangs"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on claw tip, CoM 50 mm away; plush hangs, borderline"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "claw pinch near body (CoM 31 mm), plush hangs"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pincer pinch, full coverage, CoM 55 mm away; borderline"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "claw pinch, CoM 44 mm away; plush hangs"
+    }
+   ],
+   "object_note": "plush crab, ~90 mm body; all rows hold a claw/arm (14-17 mm), body dangles; borderline but not flagged",
+   "bbox_mm": [
+    139,
+    167,
+    60
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "usnnxe",
+   "key": "toy_figure__usnnxe__t",
+   "strip": "/tmp/glib/strips/toy_figure__usnnxe__t.png",
+   "n_valid": 1,
+   "n_clean": 1,
+   "n_clean_strict": 1,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "arm pinch 47 mm wide, body hangs; arm widens toward body"
+    }
+   ],
+   "object_note": "large plush starfish; single grasp holds one arm 60 mm from centre with full pad coverage",
+   "bbox_mm": [
+    187,
+    197,
+    63
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "lfxygp",
+   "key": "toy_figure__lfxygp__t",
+   "strip": "/tmp/glib/strips/toy_figure__lfxygp__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [
+    "unsure"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near CoM; 39/0 asymmetric but firmly closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near CoM; 40/0 asymmetric but firmly closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "pads ~66 mm apart vs 42 mm body; dorsal fin likely pinched"
+    },
+    {
+     "rank": 4,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "pads ~66 mm apart vs 36 mm body; dorsal fin likely pinched"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near CoM; 43/0 asymmetric but closed"
+    }
+   ],
+   "object_note": "rigid shark; rows 3-4 approach from flank with finger spacing far above body height, pad contact unverifiable",
+   "bbox_mm": [
+    150,
+    128,
+    64
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "kitqln",
+   "key": "toy_figure__kitqln__t",
+   "strip": "/tmp/glib/strips/toy_figure__kitqln__t.png",
+   "n_valid": 1,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "end_grasp"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pinches 12 mm ear/knob 78 mm from CoM; large plush dangles"
+    }
+   ],
+   "object_note": "large lying animal plush; only grasp holds a tiny head protrusion far from centre of mass",
+   "bbox_mm": [
+    217,
+    237,
+    68
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "dgphap",
+   "key": "toy_figure__dgphap__t",
+   "strip": "/tmp/glib/strips/toy_figure__dgphap__t.png",
+   "n_valid": 4,
+   "n_clean": 4,
+   "n_clean_strict": 4,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "88 mm head/body pinch, both pads on body (50/43)"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "88 mm head/body pinch, 25-deg tilt, both pads on body (50/43)"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "limb pinch near body (21 mm), full coverage, plush hangs"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "limb pinch near body (21 mm), full coverage, 33-deg tilt"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    162,
+    138,
+    69
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "nncqfn",
+   "key": "toy_figure__nncqfn__t",
+   "strip": "/tmp/glib/strips/toy_figure__nncqfn__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 2,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/8: plush pushed against open finger, ~20 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "symmetric torso pinch (24/36), both pads on plush"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "torso pinch; idle finger at 50 (50/17), ~16 mm off-centre, borderline"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/8: plush pushed against open finger, ~20 mm off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/12: plush pushed against open finger, ~18 mm off-centre"
+    }
+   ],
+   "object_note": "raccoon plush 55 mm torso; body pinches near CoM, but rows 1,4,5 keep one finger at 50",
+   "bbox_mm": [
+    150,
+    73,
+    101
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "acymin",
+   "key": "toy_figure__acymin__t",
+   "strip": "/tmp/glib/strips/toy_figure__acymin__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "torso pinch at CoM, both pads closed on body (22/0)"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "torso pinch near CoM (25/0), full coverage"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on upper body/limb base, CoM 38 mm, coverage 0.75"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on upper body/limb base, CoM 38 mm, 32-deg tilt"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "limb pinch 14 mm wide, CoM 57 mm away, full coverage; borderline"
+    }
+   ],
+   "object_note": "spiky multi-limbed figure; rows 1-2 torso, rows 3-5 progressively further out on limbs, all pads closed",
+   "bbox_mm": [
+    151,
+    95,
+    75
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "gyrsew",
+   "key": "toy_figure__gyrsew__t",
+   "strip": "/tmp/glib/strips/toy_figure__gyrsew__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: head pushed fully against open finger, ~24 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/1: head pushed fully against open finger, ~24 mm off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: head pushed fully against open finger, ~24 mm off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/2: head pushed fully against open finger, ~23 mm off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: head pushed fully against open finger, ~24 mm off-centre"
+    }
+   ],
+   "object_note": "toy turtle; every row pinches the ~50 mm head, one finger fully open, other at closed limit",
+   "bbox_mm": [
+    150,
+    109,
+    76
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "cqeowc",
+   "key": "toy_figure__cqeowc__t",
+   "strip": "/tmp/glib/strips/toy_figure__cqeowc__t.png",
+   "n_valid": 5,
+   "n_clean": 3,
+   "n_clean_strict": 0,
+   "flags": [
+    "end_grasp",
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 42/0: toy against one pad, ~20 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 42/0: toy against one pad, ~20 mm off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 43/0: toy against one pad, ~20 mm off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pinch on thin tail tip, CoM 61 mm away"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pinch on thin tail tip, CoM 60 mm away"
+    }
+   ],
+   "object_note": "elongated robot-dinosaur; rows 1-3 strongly asymmetric body pinches, rows 4-5 hold the tail end",
+   "bbox_mm": [
+    112,
+    154,
+    79
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "cobfpg",
+   "key": "toy_figure__cobfpg__t",
+   "strip": "/tmp/glib/strips/toy_figure__cobfpg__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "torso pinch, both pads on body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "torso pinch, both pads on body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "torso pinch, both pads on body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "torso pinch, mild tilt"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "torso pinch, both pads on body"
+    }
+   ],
+   "object_note": "wide (72 mm) figure; one finger stays at 50 in all rows but offset only ~12 mm, firmly held",
+   "bbox_mm": [
+    149,
+    135,
+    80
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "fekpjq",
+   "key": "toy_figure__fekpjq__t",
+   "strip": "/tmp/glib/strips/toy_figure__fekpjq__t.png",
+   "n_valid": 3,
+   "n_clean": 3,
+   "n_clean_strict": 3,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on thick dorsal fin directly above CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across fish"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across fish"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    103,
+    114,
+    83
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "gqspnb",
+   "key": "toy_figure__gqspnb__t",
+   "strip": "/tmp/glib/strips/toy_figure__gqspnb__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, near CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, near CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, tilt 39 deg acceptable"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across head/upper body, bulky part"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    150,
+    108,
+    87
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

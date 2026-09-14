@@ -1,0 +1,31 @@
+{
+  "key": "top_cabinet__dmwxyl",
+  "category": "top_cabinet",
+  "model": "dmwxyl",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_0",
+      "kind": "door",
+      "chosen": "A",
+      "pinch": "horizontal_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Bow pull along the bottom edge of the right door, 17 mm thick, 21 mm proud; fingers close vertically. Hinge on the outer right edge.",
+      "height_concern": "Pull at about 0.04 m if floor-standing as rendered; fine wall-mounted.",
+      "confidence": "high"
+    },
+    {
+      "joint": "j_link_1",
+      "kind": "door",
+      "chosen": "A",
+      "pinch": "horizontal_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Bow pull along the bottom edge of the left door (17 mm thick, 21 mm proud); B is its hinge-side end mount.",
+      "height_concern": "Pull at about 0.04 m if floor-standing as rendered; fine wall-mounted.",
+      "confidence": "high"
+    }
+  ],
+  "object_note": "Two-door wall cabinet with horizontal bow pulls at the bottom of each door; both A markers are correct, B is just an end mount. Zoom panels show all markers."
+}

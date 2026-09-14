@@ -1,0 +1,109 @@
+{
+ "task": "IORS",
+ "category": "sunflower",
+ "model": "rkwubf",
+ "key": "sunflower__rkwubf",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "flower_stem_top",
+ "bbox": [
+  0.1955006561279297,
+  0.08531410980224609,
+  0.07160421943664551
+ ],
+ "ready": true,
+ "candidates_meta": {
+  "object": {
+   "category": "sunflower",
+   "model": "rkwubf"
+  },
+  "task": "IORS",
+  "constraint": "flower_stem_top",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_flower_stem_top",
+  "log": {
+   "n_sampled": 6000,
+   "n_tilt": 735,
+   "n_width_antipodal": 418,
+   "n_table": 396,
+   "n_collision": 293,
+   "n_flower": 2,
+   "stem_len": 0.198,
+   "n_selected": 2,
+   "com": [
+    0.0071,
+    0.0014,
+    0.0007
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 8.9442,
+   "meta": {
+    "com_perp": 0.018,
+    "width": 0.0062,
+    "antipodal": 0.2367,
+    "coverage": 0.0,
+    "clearance": 0.00845,
+    "tilt_deg": 17.37429,
+    "stem_t": 0.29912,
+    "pinch_across": 0.17918
+   },
+   "frames": {},
+   "t_s": 4.99
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": true,
+   "attached_step": 14,
+   "held_after_gravity": true,
+   "placement_push_m": 0.0043,
+   "finger_q": [
+    0.01,
+    0.0
+   ],
+   "score": 7.5544,
+   "meta": {
+    "com_perp": 0.04693,
+    "width": 0.00576,
+    "antipodal": 0.26099,
+    "coverage": 0.5,
+    "clearance": 0.00897,
+    "tilt_deg": 32.77034,
+    "stem_t": 0.44782,
+    "pinch_across": 0.00211
+   },
+   "frames": {
+    "v1": "/tmp/glib/frames/sunflower__rkwubf/g1_v1.png",
+    "v2": "/tmp/glib/frames/sunflower__rkwubf/g1_v2.png",
+    "v3": "/tmp/glib/frames/sunflower__rkwubf/g1_v3.png",
+    "wrist": "/tmp/glib/frames/sunflower__rkwubf/g1_wrist.png"
+   },
+   "t_s": 3.21
+  }
+ ],
+ "n_valid": 1,
+ "error": null,
+ "t_model_s": 10.4
+}

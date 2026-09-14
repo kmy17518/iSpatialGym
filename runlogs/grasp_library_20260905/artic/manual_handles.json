@@ -1,0 +1,982 @@
+{
+ "sliding_door__tprpvb": {
+  "j_movingpart": {
+   "kind": "edge_manual",
+   "contact": [
+    0.0,
+    -0.0135,
+    -1.15
+   ],
+   "pinch_axis": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "approach_dir": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "pull_dir": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "width": 0.047,
+   "note": "reviewer: pinch the panel's leading vertical edge at mid-height (no handle)"
+  }
+ },
+ "blender__eyedvd": {
+  "j_lid": {
+   "use": "F",
+   "note": "reviewer: marker A is a hinge tab; pinch the lid's front edge"
+  }
+ },
+ "door__aleker": {
+  "j_door1": {
+   "skip": "vertical pull bars exist only in the visual mesh (leaf collision hull has no handle) - asset issue"
+  },
+  "j_door2": {
+   "skip": "vertical pull bars exist only in the visual mesh (leaf collision hull has no handle) - asset issue"
+  },
+  "j_door3": {
+   "skip": "vertical pull bars exist only in the visual mesh (leaf collision hull has no handle) - asset issue"
+  },
+  "j_door4": {
+   "skip": "vertical pull bars exist only in the visual mesh (leaf collision hull has no handle) - asset issue"
+  }
+ },
+ "door__dqnbsj": {
+  "j_leaf": {
+   "skip": "1 m vertical pull bar only in the visual mesh; leaf edge 140 mm thick - asset issue"
+  }
+ },
+ "bottom_cabinet__gvtucm": {
+  "j_link_0": {
+   "skip": "round-2 review: infeasible - Flush 11 mm sliding panel on inner track; leading edge hidden behind outer door,"
+  },
+  "j_link_1": {
+   "skip": "round-2 review: infeasible - Flush 11 mm sliding panel; free vertical edge only 11 mm proud of inner door, ba"
+  },
+  "j_link_2": {
+   "skip": "round-2 review: infeasible - Flush wooden sliding panel on outer track; edges enclosed by rails and inner doo"
+  },
+  "j_link_3": {
+   "skip": "round-2 review: infeasible - Flush wooden sliding panel on inner track; leading edge behind outer door, top/b"
+  }
+ },
+ "bottom_cabinet__songes": {
+  "j_bottomdrawer": {
+   "skip": "round-2 review: infeasible - Thin 6 cm bar pull top-centre of recessed panel, ~6 mm proud, within frame plane"
+  },
+  "j_middledrawer": {
+   "skip": "round-2 review: infeasible - Thin 6 cm bar pull top-centre of recessed panel, ~6 mm proud, within frame plane"
+  },
+  "j_topdrawer": {
+   "skip": "round-2 review: infeasible - Thin 6 cm bar pull top-centre of recessed panel, ~6 mm proud, within frame plane"
+  }
+ },
+ "bottom_cabinet_no_top__qohxjq": {
+  "j_link_0": {
+   "kind": "review2_outer",
+   "contact": [
+    0.2631,
+    0.0007,
+    -0.1409
+   ],
+   "pinch_axis": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "approach_dir": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "pull_dir": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "pull",
+   "alternative": null
+  },
+  "j_link_1": {
+   "kind": "review2_outer",
+   "contact": [
+    0.2636,
+    0.0004,
+    0.0625
+   ],
+   "pinch_axis": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "approach_dir": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "pull_dir": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "pull",
+   "alternative": null
+  }
+ },
+ "carton__causya": {
+  "j_link_0": {
+   "skip": "round-2 review: infeasible - Marked face is empty air: flap bbox displaced ~0.3 m from visual lid, frame unus"
+  }
+ },
+ "carton__cdmmwy": {
+  "j_left_lid": {
+   "skip": "round-2 review: infeasible - Paper-thin (~1 mm) flap, free edge flush against other flap at centre seam, no l"
+  },
+  "j_right_lid": {
+   "skip": "round-2 review: infeasible - Paper-thin (~1 mm) flap, free edge flush against other flap at centre seam, no l"
+  }
+ },
+ "carton__hhlmbi": {
+  "j_link0": {
+   "skip": "round-2 review: infeasible - Only spot: front skirt edge, lid top vs skirt bottom; skirt overhangs box wall ~"
+  }
+ },
+ "carton__libote": {
+  "j_link0": {
+   "skip": "round-2 review: infeasible - Only spot: front skirt edge between lid top and skirt bottom; rim overhangs box "
+  }
+ },
+ "carton__ylrxhe": {
+  "j_link0": {
+   "skip": "round-2 review: infeasible - Right-hinged 20 mm flap; free edge butts the other flap at the centre seam with "
+  },
+  "j_link1": {
+   "skip": "round-2 review: infeasible - Left-hinged 20 mm flap; free edge butts the other flap at the centre seam with n"
+  }
+ },
+ "cedar_chest__fwstpx": {
+  "j_up": {
+   "skip": "round-2 review: infeasible - Domed lid hinged at back; skirt flush with body on all sides, straps and hasp to"
+  }
+ },
+ "cedar_chest__gbdzls": {
+  "j_up": {
+   "skip": "round-2 review: infeasible - Flat 48 mm lid, skirt flush with body all round, no lip or knob; 200 mm width ex"
+  }
+ },
+ "clothes_dryer__fhtvuq": {
+  "j_link_0": {
+   "kind": "review2_outer",
+   "contact": [
+    0.3349,
+    0.1366,
+    -0.0004
+   ],
+   "pinch_axis": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "approach_dir": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "pull_dir": [
+    0.9985,
+    -0.0542,
+    0.0
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "pull",
+   "alternative": null
+  }
+ },
+ "clothes_dryer__smcyys": {
+  "j_dof_rootd_aa001_r": {
+   "kind": "review2_outer",
+   "contact": [
+    0.2986,
+    -0.0007,
+    0.1744
+   ],
+   "pinch_axis": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "approach_dir": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "pull_dir": [
+    0.9993,
+    -0.0387,
+    0.0
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "pull",
+   "alternative": {
+    "kind": "review2_outer",
+    "contact": [
+     0.2986,
+     -0.0007,
+     -0.192
+    ],
+    "pinch_axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "approach_dir": [
+     -1.0,
+     -0.0,
+     -0.0
+    ],
+    "pull_dir": [
+     0.9993,
+     -0.0387,
+     0.0
+    ],
+    "width": 0.03,
+    "depth": 0.03,
+    "note": "",
+    "expected_motion": "pull"
+   }
+  }
+ },
+ "clothes_dryer__wivnic": {
+  "j_dof_rootd_aa001_r": {
+   "kind": "review2_outer",
+   "contact": [
+    0.2628,
+    0.2049,
+    -0.0231
+   ],
+   "pinch_axis": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "approach_dir": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "pull_dir": [
+    0.9947,
+    0.1026,
+    0.0
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "pull",
+   "alternative": {
+    "kind": "review2_outer",
+    "contact": [
+     0.2628,
+     0.0063,
+     0.172
+    ],
+    "pinch_axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "approach_dir": [
+     -1.0,
+     -0.0,
+     -0.0
+    ],
+    "pull_dir": [
+     0.9829,
+     0.184,
+     0.0
+    ],
+    "width": 0.03,
+    "depth": 0.03,
+    "note": "",
+    "expected_motion": "pull"
+   }
+  }
+ },
+ "clothes_dryer__xsuyua": {
+  "j_link_0": {
+   "skip": "round-2 review: infeasible - Wide black bezel nearly flush with cabinet, bowl centre ~300 mm across; no lip, "
+  }
+ },
+ "clothes_dryer__zlmnfg": {
+  "j_link_0": {
+   "kind": "review2_outer",
+   "contact": [
+    0.2789,
+    0.2046,
+    0.0896
+   ],
+   "pinch_axis": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "approach_dir": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "pull_dir": [
+    0.9999,
+    -0.0118,
+    0.0
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "pull",
+   "alternative": {
+    "kind": "review2_outer",
+    "contact": [
+     0.2789,
+     0.0004,
+     0.2939
+    ],
+    "pinch_axis": [
+     0.0,
+     0.0,
+     1.0
+    ],
+    "approach_dir": [
+     -1.0,
+     -0.0,
+     -0.0
+    ],
+    "pull_dir": [
+     0.9998,
+     -0.0218,
+     0.0
+    ],
+    "width": 0.03,
+    "depth": 0.03,
+    "note": "",
+    "expected_motion": "pull"
+   }
+  }
+ },
+ "cooler__pnkiag": {
+  "j_lid": {
+   "kind": "review2_outer",
+   "contact": [
+    0.0022,
+    0.2382,
+    0.2984
+   ],
+   "pinch_axis": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "approach_dir": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "pull_dir": [
+    -0.2029,
+    0.0,
+    0.9792
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "lift",
+   "alternative": {
+    "kind": "review2_outer",
+    "contact": [
+     0.0022,
+     -0.2397,
+     0.2984
+    ],
+    "pinch_axis": [
+     -1.0,
+     -0.0,
+     -0.0
+    ],
+    "approach_dir": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "pull_dir": [
+     -0.2029,
+     0.0,
+     0.9792
+    ],
+    "width": 0.03,
+    "depth": 0.03,
+    "note": "",
+    "expected_motion": "lift"
+   }
+  }
+ },
+ "dishwasher__dugpby": {
+  "j_link_0": {
+   "skip": "round-2 review: infeasible - Flush 90 mm slab set inside the cabinet opening; all four edges enclosed, plain "
+  }
+ },
+ "dishwasher__znfvmj": {
+  "j_link_2": {
+   "skip": "round-2 review: infeasible - Only a recessed pull pocket (a 0.5, b 0.87): a cavity to hook, no lip to pinch; "
+  }
+ },
+ "door__adejun": {
+  "j_left_leaf": {
+   "skip": "round-2 review: infeasible - Glazed leaf: stiles/top rail butt jamb, head or other leaf; mid rail ~150 mm exc"
+  },
+  "j_right_leaf": {
+   "skip": "round-2 review: infeasible - Glazed leaf: stiles/top rail butt jamb, head or other leaf; mid rail ~150 mm exc"
+  }
+ },
+ "door__bandpe": {
+  "j_leaf0": {
+   "kind": "review2_outer",
+   "contact": [
+    -0.0832,
+    -0.3071,
+    0.1622
+   ],
+   "pinch_axis": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "approach_dir": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "pull_dir": [
+    0.9988,
+    -0.048,
+    0.0
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "push",
+   "alternative": {
+    "kind": "review2_outer",
+    "contact": [
+     -0.0832,
+     -0.4366,
+     0.2611
+    ],
+    "pinch_axis": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "approach_dir": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "pull_dir": [
+     0.9991,
+     -0.0421,
+     0.0
+    ],
+    "width": 0.03,
+    "depth": 0.03,
+    "note": "",
+    "expected_motion": "push"
+   }
+  },
+  "j_leaf1": {
+   "kind": "review2_outer",
+   "contact": [
+    -0.113,
+    0.1552,
+    -0.3672
+   ],
+   "pinch_axis": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "approach_dir": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "pull_dir": [
+    0.9954,
+    0.0959,
+    0.0
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "push",
+   "alternative": null
+  }
+ },
+ "door__chonxi": {
+  "j_link_0": {
+   "kind": "review2_outer",
+   "contact": [
+    0.0643,
+    0.2656,
+    -0.1967
+   ],
+   "pinch_axis": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "approach_dir": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "pull_dir": [
+    -0.9809,
+    0.1945,
+    0.0
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "push",
+   "alternative": null
+  }
+ },
+ "door__cvvumy": {
+  "j_left_leaf": {
+   "skip": "round-2 review: infeasible - Pull door; only a ~100x290 mm recessed pull pocket near the meeting edge. No lip"
+  },
+  "j_right_leaf": {
+   "skip": "round-2 review: infeasible - Pull door; only a ~100x290 mm recessed pull pocket near the meeting edge. No lip"
+  }
+ },
+ "fridge__hzgqdn": {
+  "j_link_0": {
+   "skip": "round-2 review: infeasible - Flush slab, no handle or lip; free edge is 213 mm thick, far beyond the 97 mm op"
+  }
+ },
+ "fridge__lleghp": {
+  "j_shelf0": {
+   "kind": "review2_outer",
+   "contact": [
+    0.1985,
+    -0.0001,
+    0.4478
+   ],
+   "pinch_axis": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "approach_dir": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "pull_dir": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "pull",
+   "alternative": null
+  },
+  "j_shelf1": {
+   "kind": "review2_outer",
+   "contact": [
+    0.1985,
+    -0.0001,
+    -0.3599
+   ],
+   "pinch_axis": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "approach_dir": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "pull_dir": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "pull",
+   "alternative": null
+  },
+  "j_shelf2": {
+   "kind": "review2_outer",
+   "contact": [
+    0.1985,
+    -0.0001,
+    -0.0906
+   ],
+   "pinch_axis": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "approach_dir": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "pull_dir": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "pull",
+   "alternative": null
+  },
+  "j_shelf3": {
+   "kind": "review2_outer",
+   "contact": [
+    0.1985,
+    -0.0001,
+    0.1785
+   ],
+   "pinch_axis": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "approach_dir": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "pull_dir": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "pull",
+   "alternative": null
+  }
+ },
+ "hinged_jar__jnjtrl": {
+  "j_lid": {
+   "skip": "round-2 review: infeasible - Plain ~100 mm lid disc at gripper's 97 mm limit; rim flush with neck flange, no "
+  }
+ },
+ "openable_window__dpngol": {
+  "j_left_leaf": {
+   "skip": "round-2 review: infeasible - Only the 17 mm leading stile could be clamped, but its back face nearly touches "
+  },
+  "j_right_leaf": {
+   "skip": "round-2 review: infeasible - Only the 17 mm leading stile could be clamped, but its back face nearly touches "
+  }
+ },
+ "openable_window__eyvzfu": {
+  "j_movingpart": {
+   "kind": "review2_right_edge",
+   "contact": [
+    0.0928,
+    1.1585,
+    -0.3719
+   ],
+   "pinch_axis": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "approach_dir": [
+    -1.0,
+    -0.0,
+    0.0
+   ],
+   "pull_dir": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "slide",
+   "alternative": {
+    "kind": "review2_right_edge",
+    "contact": [
+     0.0928,
+     1.1585,
+     -0.3719
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     -0.0
+    ],
+    "approach_dir": [
+     -0.0,
+     1.0,
+     -0.0
+    ],
+    "pull_dir": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "width": 0.03,
+    "depth": 0.03,
+    "note": "",
+    "expected_motion": "slide"
+   }
+  }
+ },
+ "openable_window__qdkcdn": {
+  "j_dof_rootd_aa002_t": {
+   "skip": "round-2 review: infeasible - Flush 50 mm wooden sash recessed behind the frame; every edge in a track or agai"
+  }
+ },
+ "recycling_bin__mdojox": {
+  "j_link_2": {
+   "skip": "round-2 review: infeasible - Lid skirt sits flush on the body's flared rim; front edge has no lip or undercut"
+  }
+ },
+ "recycling_bin__nuoypc": {
+  "j_link_2": {
+   "skip": "round-2 review: infeasible - Front skirt rests directly on the body's rim flange; no gap for a lower pad and "
+  }
+ },
+ "recycling_bin__pdmzhv": {
+  "j_link_2": {
+   "skip": "round-2 review: infeasible - Front lip flush with body face; only relief is the raised lid border with a shal"
+  }
+ },
+ "sliding_door__hgcxno": {
+  "j_left_leaf": {
+   "kind": "review2_right_edge",
+   "contact": [
+    -0.1405,
+    0.6102,
+    -0.8254
+   ],
+   "pinch_axis": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "approach_dir": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "pull_dir": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "slide",
+   "alternative": {
+    "kind": "review2_outer",
+    "contact": [
+     -0.0974,
+     1.1477,
+     -0.8254
+    ],
+    "pinch_axis": [
+     -1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     -0.0,
+     -1.0,
+     -0.0
+    ],
+    "pull_dir": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "width": 0.03,
+    "depth": 0.03,
+    "note": "",
+    "expected_motion": "slide"
+   }
+  },
+  "j_right_leaf": {
+   "kind": "review2_left_edge",
+   "contact": [
+    -0.1372,
+    -0.517,
+    -0.8253
+   ],
+   "pinch_axis": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "approach_dir": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "pull_dir": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "slide",
+   "alternative": {
+    "kind": "review2_outer",
+    "contact": [
+     -0.0996,
+     -1.052,
+     -0.8253
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     -0.0
+    ],
+    "approach_dir": [
+     -0.0,
+     1.0,
+     -0.0
+    ],
+    "pull_dir": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "width": 0.03,
+    "depth": 0.03,
+    "note": "",
+    "expected_motion": "slide"
+   }
+  }
+ },
+ "sliding_door__lrvyvc": {
+  "j_movingpart": {
+   "skip": "round-2 review: infeasible - Leaf end face ~160 mm and frame members ~120-160 mm wide both exceed the 97 mm o"
+  }
+ },
+ "top_cabinet__dhguym": {
+  "j_link_1": {
+   "skip": "round-2 review: infeasible - Flush inset door; only relief is the 18 mm moulding step. A fingertip could hook"
+  }
+ },
+ "top_cabinet__nkrgez": {
+  "j_link_0": {
+   "skip": "round-2 review: infeasible - Flush plank door inset in the tower's face frame; free left (inner) edge butts f"
+  },
+  "j_link_1": {
+   "skip": "round-2 review: infeasible - Flush plank door inset in the tower's face frame; free right (inner) edge butts "
+  }
+ },
+ "top_cabinet__qiausz": {
+  "j_dof_rootd_ba001_r": {
+   "skip": "round-2 review: infeasible - 9 mm overlay door; edges covered by top slab, face-frame stile and floor; raised"
+  },
+  "j_dof_rootd_bb001_r": {
+   "skip": "round-2 review: infeasible - 9 mm overlay door; edges covered by top slab, face-frame stile and floor; raised"
+  }
+ },
+ "top_cabinet__twjqua": {
+  "j_link_0": {
+   "kind": "review2_right_edge",
+   "contact": [
+    0.1252,
+    0.1112,
+    -0.0166
+   ],
+   "pinch_axis": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "approach_dir": [
+    -1.0,
+    -0.0,
+    0.0
+   ],
+   "pull_dir": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "width": 0.03,
+   "depth": 0.03,
+   "note": "",
+   "expected_motion": "slide",
+   "alternative": {
+    "kind": "review2_right_edge",
+    "contact": [
+     0.1252,
+     0.1112,
+     -0.0166
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     -0.0
+    ],
+    "approach_dir": [
+     -0.0,
+     1.0,
+     -0.0
+    ],
+    "pull_dir": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "width": 0.03,
+    "depth": 0.03,
+    "note": "",
+    "expected_motion": "slide"
+   }
+  }
+ },
+ "violin_case__jlasop": {
+  "j_lid": {
+   "skip": "round-2 review: infeasible - Lid rim sits flush on the base rim all round; smooth domed lid with no lip or kn"
+  }
+ }
+}

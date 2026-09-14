@@ -1,0 +1,35 @@
+{
+ "category": "candle_holder",
+ "model": "svqdrl",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/candle_holder__svqdrl__y0.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1225,
+   "seg_pixels": 37023,
+   "aabb_extent": [
+    0.141,
+    0.14,
+    0.275
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/candle_holder__svqdrl__y1.png",
+   "drift_m": 0.0006,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1225
+  }
+ },
+ "stable": true,
+ "visible": true
+}

@@ -1,0 +1,35 @@
+{
+ "category": "bottle_of_soy_sauce",
+ "model": "afxisg",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_soy_sauce__afxisg__y0.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0918,
+   "seg_pixels": 12635,
+   "aabb_extent": [
+    0.099,
+    0.099,
+    0.208
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_soy_sauce__afxisg__y1.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0918
+  }
+ },
+ "stable": true,
+ "visible": true
+}

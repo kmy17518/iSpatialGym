@@ -1,0 +1,349 @@
+{
+ "group": "object_scaling__toy_dice__r2",
+ "task": "object_scaling",
+ "category": "toy_dice",
+ "round": 2,
+ "relation": null,
+ "partner": "cube",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. Rotationally symmetric bodies are preferred for this task.",
+ "candidates": [
+  {
+   "model": "nmhsvp",
+   "key": "toy_dice__nmhsvp__f",
+   "strip": "/tmp/glib/strips/toy_dice__nmhsvp__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch, cube rotated about pinch axis"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    41,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "wyxlhc",
+   "key": "toy_dice__wyxlhc__f",
+   "strip": "/tmp/glib/strips/toy_dice__wyxlhc__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    41,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "cmqtch",
+   "key": "toy_dice__cmqtch__f",
+   "strip": "/tmp/glib/strips/toy_dice__cmqtch__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube, 2 mm offset"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube, 2 mm offset"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    41,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "eqwazv",
+   "key": "toy_dice__eqwazv__f",
+   "strip": "/tmp/glib/strips/toy_dice__eqwazv__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    41,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "bjrxkj",
+   "key": "toy_dice__bjrxkj__f",
+   "strip": "/tmp/glib/strips/toy_dice__bjrxkj__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across cube at CoM"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    41,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "hbkqqp",
+   "key": "toy_dice__hbkqqp__f",
+   "strip": "/tmp/glib/strips/toy_dice__hbkqqp__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on opposite cube faces, both touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on opposite cube faces, both touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on opposite cube faces, both touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on opposite cube faces, both touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on opposite cube faces, both touching"
+    }
+   ],
+   "object_note": "fingers end 43/0 (object pushed to closed-limit finger); pad gap matches 42 mm width",
+   "bbox_mm": [
+    41,
+    41,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": [
+  {
+   "model": "qtcfxi",
+   "key": "toy_dice__qtcfxi__f",
+   "reason": "no AG-valid grasp"
+  },
+  {
+   "model": "dupdoy",
+   "key": "toy_dice__dupdoy__f",
+   "reason": "no AG-valid grasp"
+  },
+  {
+   "model": "haqumx",
+   "key": "toy_dice__haqumx__f",
+   "reason": "no AG-valid grasp"
+  },
+  {
+   "model": "pzbapa",
+   "key": "toy_dice__pzbapa__f",
+   "reason": "no AG-valid grasp"
+  },
+  {
+   "model": "zublep",
+   "key": "toy_dice__zublep__f",
+   "reason": "no AG-valid grasp"
+  },
+  {
+   "model": "meyqyk",
+   "key": "toy_dice__meyqyk__f",
+   "reason": "no AG-valid grasp"
+  }
+ ]
+}

@@ -1,0 +1,15 @@
+{
+  "category": "hairbrush",
+  "task": "wa0",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {"model": "bdylnb", "V": 4, "O": 3, "F": 2, "score": 16, "valid": true,
+     "long_axis": "x", "front_axis": "-x", "rest_ok": true,
+     "note": "wooden paddle hairbrush 0.24 x 0.05 x 0.03 m lying bristles-up, handle at -x, head at +x; mirror-symmetric so handle end defines the yaw"}
+  ],
+  "picks": ["bdylnb"],
+  "alternate": null,
+  "category_verdict": "weak",
+  "category_note": "One wooden hairbrush, 0.24 m long, 5 cm wide, resting on its back with bristles up. Handle-vs-head silhouette is obvious from above; narrow object; only one model."
+}

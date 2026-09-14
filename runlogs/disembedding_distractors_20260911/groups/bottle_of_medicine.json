@@ -1,0 +1,10 @@
+{
+  "category": "bottle_of_medicine",
+  "n_models": 8,
+  "pages_opened": ["grids/same/bottle_of_medicine__p1.png", "grids/same/bottle_of_medicine__p2.png"],
+  "groups": [],
+  "unusable": [
+    {"model": "hvocpc", "reason": "tall thin orange rectangular carton (4x4x11), not a bottle"}
+  ],
+  "notes": "All seven bottles share one 5x5x9 shape with white cap; text unreadable at ~40 px, label colour is the only cue. Closest pairs, judged distinguishable by hue/lightness: syfpak (bright red) vs egondf (dark maroon, white back panel); zfbnjh (navy) vs kasbsy (royal blue) vs qqsukh (pale blue); fmfwng (black with blue band) vs zfbnjh. Pair these with care."
+}

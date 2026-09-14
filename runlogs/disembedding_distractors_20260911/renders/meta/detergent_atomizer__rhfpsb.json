@@ -1,0 +1,35 @@
+{
+ "category": "detergent_atomizer",
+ "model": "rhfpsb",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/detergent_atomizer__rhfpsb__y0.png",
+   "drift_m": 0.0268,
+   "tilt_deg": 10.5,
+   "on_tray": true,
+   "settled_z": 0.1467,
+   "seg_pixels": 17187,
+   "aabb_extent": [
+    0.086,
+    0.095,
+    0.265
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/detergent_atomizer__rhfpsb__y1.png",
+   "drift_m": 0.0272,
+   "tilt_deg": 10.6,
+   "on_tray": true,
+   "settled_z": 0.1467
+  }
+ },
+ "stable": true,
+ "visible": true
+}

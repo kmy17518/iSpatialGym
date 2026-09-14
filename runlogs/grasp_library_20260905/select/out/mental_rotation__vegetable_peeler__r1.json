@@ -1,0 +1,53 @@
+{
+  "group": "mental_rotation__vegetable_peeler__r1",
+  "task": "mental_rotation",
+  "category": "vegetable_peeler",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 2,
+  "n_opened": 2,
+  "candidates": [
+    {
+      "model": "wqtpjz",
+      "key": "vegetable_peeler__wqtpjz",
+      "G": 2,
+      "T": 3,
+      "V": 4,
+      "R": 0,
+      "score": 15,
+      "note": "Only top handle pinch (6 mm) natural; row 2 pinches 4 mm blade arm, rows 3-4 clamp Y-head with antipodal 0.05-0.16; clean faceted blue Y-peeler."
+    },
+    {
+      "model": "njgqao",
+      "key": "vegetable_peeler__njgqao",
+      "G": 4,
+      "T": 3,
+      "V": 4,
+      "R": 1,
+      "score": 20,
+      "note": "Five handle/junction pinches with antipodal 0.71-0.99 at tilts 83-174, both pads seated; three rows on 6-12 mm flat handle; clean orange Y-peeler, faceted."
+    }
+  ],
+  "selected": [
+    {
+      "model": "njgqao",
+      "key": "vegetable_peeler__njgqao",
+      "rank": 1,
+      "reason": "All five grasps are natural handle or Y-junction pinches with strong antipodal contact and diverse tilts; complete orange/yellow textures, clearly a peeler."
+    },
+    {
+      "model": "wqtpjz",
+      "key": "vegetable_peeler__wqtpjz",
+      "rank": 2,
+      "reason": "Only other candidate; clean asset whose blue colour differs from pick 1, but only the top handle pinch is sound; the rest clamp the head or blade arm."
+    }
+  ],
+  "alternate": null,
+  "short": true,
+  "warnings": [
+    "Group has only 2 candidates; both selected.",
+    "wqtpjz: weak grasp set - row 2 pinches the 4 mm blade arm, rows 3-4 clamp across the Y-head with antipodal 0.05-0.16 and row 4 has coverage 0.50; pinch widths 4-6 mm on three rows.",
+    "Both peelers are flat (6 mm) at the top handle pinch and one finger closes to 0 mm on every row, so robustness is borderline to marginal."
+  ],
+  "confidence": "medium"
+}

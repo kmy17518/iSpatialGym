@@ -1,0 +1,35 @@
+{
+ "category": "table_knife",
+ "model": "lrdmpf",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/table_knife__lrdmpf__y0.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 2.3,
+   "on_tray": true,
+   "settled_z": 0.0017,
+   "seg_pixels": 736,
+   "aabb_extent": [
+    0.137,
+    0.015,
+    0.003
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/table_knife__lrdmpf__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.8,
+   "on_tray": true,
+   "settled_z": 0.0017
+  }
+ },
+ "stable": true,
+ "visible": true
+}

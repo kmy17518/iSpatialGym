@@ -1,0 +1,50 @@
+{
+ "key": "dishwasher__xlmier",
+ "category": "dishwasher",
+ "model": "xlmier",
+ "scene": "Rs_int",
+ "host": "dishwasher_xlmier_0",
+ "host_rank": 0,
+ "host_model": "xlmier",
+ "swap": false,
+ "joints": [
+  {
+   "joint": "j_link_1",
+   "kind": "flap",
+   "grasp_source": "review:A",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [-1.4966562986373901, 3.206598997116089, 1.2151561975479126]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [-1.4966562986373901, 3.206598997116089, 1.2151561975479126]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    -1.497,
+    3.207,
+    1.215
+   ],
+   "handle_height_above_floor": 1.21,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 0,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.202,
+  1.124,
+  0.756
+ ],
+ "time_s": 22.5
+}

@@ -101,7 +101,13 @@ def validate_template(template_dir: str, extra_steps: int, check_goal: bool, pos
     # the template must equal the stable scene json except for the task objects and the robot
     from ispatialgym.sampling.sim_utils import stable_scene_path
 
-    with open(stable_scene_path(meta["scene"])) as f:
+    # templates made from a scene variant (chairs removed) are compared against that variant
+    sv = meta.get("scene_variant") or {}
+    ref_path = os.path.normpath(os.path.join(template_dir, sv["scene_file"])) if sv.get("scene_file") else stable_scene_path(meta["scene"])
+    if not os.path.exists(ref_path):
+        log.warning("%s: scene variant %s not found, comparing against the stable scene", problem, ref_path)
+        ref_path = stable_scene_path(meta["scene"])
+    with open(ref_path) as f:
         stable_reg = json.load(f)["state"]["registry"]["object_registry"]
     with open(os.path.join(template_dir, "template.json")) as f:
         tmpl_reg = json.load(f)["state"]["registry"]["object_registry"]
@@ -121,6 +127,9 @@ def validate_template(template_dir: str, extra_steps: int, check_goal: bool, pos
     t0 = time.time()
     env = og.Environment(configs=cfg)
     results["scene_load_s"] = time.time() - t0
+    from ispatialgym.sampling.scene_variants import patch_trav_map_from_meta
+
+    results["trav_cells_freed"] = patch_trav_map_from_meta(env.scene, meta)  # what evaluation must do as well
     task = env.task
     robot = env.robots[0]
     for path in tros:

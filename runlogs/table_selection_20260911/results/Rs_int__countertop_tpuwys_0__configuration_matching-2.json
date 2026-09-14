@@ -1,0 +1,29 @@
+{
+ "scene": "Rs_int",
+ "table": "countertop_tpuwys_0",
+ "category": "countertop",
+ "model": "tpuwys",
+ "rooms": [
+  "kitchen_0",
+  "living_room_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 1.079,
+  "bbox_x": 0.328,
+  "bbox_y": 1.805,
+  "bbox_z": 0.042,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "straight_chair_eospnr_0",
+  "straight_chair_eospnr_1"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:39:02",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

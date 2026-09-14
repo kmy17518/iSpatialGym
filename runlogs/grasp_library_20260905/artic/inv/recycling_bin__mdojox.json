@@ -1,0 +1,93 @@
+{
+ "category": "recycling_bin",
+ "model": "mdojox",
+ "key": "recycling_bin__mdojox",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.44700300693511963
+ ],
+ "aabb_extent": [
+  0.5804529786109924,
+  0.5266072750091553,
+  0.8852239847183228
+ ],
+ "aabb_min_rel_root": [
+  -0.3190101087093353,
+  -0.26328736543655396,
+  -0.44700300693511963
+ ],
+ "aabb_max_rel_root": [
+  0.2614428699016571,
+  0.2633199095726013,
+  0.4382209777832031
+ ],
+ "link_tags": {
+  "base_link": [],
+  "link_0": [],
+  "link_1": [],
+  "link_2": []
+ },
+ "openable_joint_ids": [],
+ "joints": [
+  {
+   "joint": "j_link_2",
+   "type": "RevoluteJoint",
+   "child_link": "link_2",
+   "lower": 0.0,
+   "upper": 3.124138116836548,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    -0.30074,
+    -0.0001,
+    0.39311
+   ],
+   "link_quat_obj": [
+    -0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    -0.30074,
+    -0.01079,
+    0.39311
+   ],
+   "measured_angle": 0.2368,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/recycling_bin__mdojox__link_2.obj",
+   "n_pieces": 1,
+   "link_bbox_min": [
+    -0.3153,
+    -0.211,
+    0.3773
+   ],
+   "link_bbox_max": [
+    0.2245,
+    0.211,
+    0.4382
+   ],
+   "link_tags": [],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.319,
+   -0.2633,
+   -0.447
+  ],
+  "bbox_max": [
+   0.2614,
+   0.2633,
+   0.4103
+  ],
+  "n_pieces": 8
+ }
+}

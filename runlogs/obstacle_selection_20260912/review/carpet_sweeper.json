@@ -1,0 +1,23 @@
+{
+  "category": "carpet_sweeper",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "carpet_sweeper/xboreo",
+      "V": 4,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Black manual carpet sweeper: small wheeled head with thin near-vertical stick handle and loop grip; 0.25 x 0.28 x 0.83 m; clean, very dark."
+    }
+  ],
+  "picks": ["carpet_sweeper/xboreo"],
+  "alternate": null,
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int", "hotel_suite_large", "restaurant_diner"],
+  "category_verdict": "weak",
+  "category_note": "One clean, very dark sweeper standing upright on its small wheeled head with a thin 0.8 m handle. Plausible cleaning gear in homes, hotel and diner, but normally leans on a wall; the thin stick is a slight obstacle."
+}

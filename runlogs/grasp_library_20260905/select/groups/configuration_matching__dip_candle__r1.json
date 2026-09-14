@@ -1,0 +1,216 @@
+{
+ "group": "configuration_matching__dip_candle__r1",
+ "task": "configuration_matching",
+ "category": "dip_candle",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "Attachment task: the object is picked from a table and attached to its partner. The pads must leave the mating side of the object completely free.",
+ "candidates": [
+  {
+   "model": "ghctun",
+   "key": "dip_candle__ghctun",
+   "strip": "/tmp/glib/strips/dip_candle__ghctun.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "horizontal candle pinched across middle; both ends free"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, base end free"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, base end free"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, base end free"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, base end free"
+    }
+   ],
+   "object_note": "short candle; pads fully enclose the 23 mm body (gap 24)",
+   "bbox_mm": [
+    22,
+    22,
+    122
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "attachment_free"
+  },
+  {
+   "model": "mxjejs",
+   "key": "dip_candle__mxjejs",
+   "strip": "/tmp/glib/strips/dip_candle__mxjejs.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "held at very wick tip (20 mm); candle hangs vertically"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "held at wick end, candle hangs, base free"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "held at wick end, candle hangs, base free"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wick-end hold at 30 deg; long lever arm but holds"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wick-end hold at 30 deg; long lever arm but holds"
+    }
+   ],
+   "object_note": "very long taper candle held by top 30 mm; lever arm 130+ mm, natural for base-first insertion",
+   "bbox_mm": [
+    25,
+    25,
+    310
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "attachment_free"
+  },
+  {
+   "model": "poexjo",
+   "key": "dip_candle__poexjo",
+   "strip": "/tmp/glib/strips/dip_candle__poexjo.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body pinch, base hangs free"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "antipodal 0.78 on tapered body; both pads touch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "horizontal candle pinched near middle; both ends free"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body pinch, base hangs free"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body pinch, base hangs free"
+    }
+   ],
+   "object_note": "tapered candle; pads slightly wider than visual width (hull margin) but contact visible",
+   "bbox_mm": [
+    25,
+    29,
+    167
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "attachment_free"
+  },
+  {
+   "model": "gbaons",
+   "key": "dip_candle__gbaons",
+   "strip": "/tmp/glib/strips/dip_candle__gbaons.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "held just above middle; base free 67 mm below pads"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "near-identical body pinch, base free"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "near-identical body pinch, base free"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "near-identical body pinch, base free"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "near-identical body pinch, base free"
+    }
+   ],
+   "object_note": "all five candidates are essentially the same 30-deg side pinch of the candle body",
+   "bbox_mm": [
+    37,
+    37,
+    127
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "attachment_free"
+  }
+ ],
+ "excluded": []
+}

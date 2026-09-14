@@ -1,0 +1,38 @@
+{
+ "category": "radio",
+ "task": "wa0",
+ "n_models": 2,
+ "n_opened": 2,
+ "models": [
+  {
+   "model": "vgioak",
+   "V": 3,
+   "O": 2,
+   "F": 1,
+   "score": 11,
+   "valid": true,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Marshall speaker leaning on a dark red wedge stand behind it (-x); logo faces +x; odd composite, 0.18 m tall."
+  },
+  {
+   "model": "wxnicr",
+   "V": 5,
+   "O": 2,
+   "F": 0,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Red retro radio with handle, dial on the +x face, antenna at -x; 0.235 m tall exceeds the height limit."
+  }
+ ],
+ "picks": [
+  "vgioak"
+ ],
+ "alternate": null,
+ "category_verdict": "weak",
+ "category_note": "vgioak is a Marshall speaker with an odd wedge stand (0.18 m tall, valid but marginal); wxnicr is a nice red retro radio 0.32 m wide but 0.235 m tall (too tall for the table rule). Fronts face +x."
+}

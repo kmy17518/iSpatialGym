@@ -1,0 +1,216 @@
+{
+ "group": "disembedding__carton_of_milk__r1",
+ "task": "disembedding",
+ "category": "carton_of_milk",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "Tabletop task: the object rests among other objects on a table / tray and is picked from its resting pose. It must settle stably on a flat surface (it must not roll or topple). The best single grasp matters most.",
+ "candidates": [
+  {
+   "model": "kklgxk",
+   "key": "carton_of_milk__kklgxk",
+   "strip": "/tmp/glib/strips/carton_of_milk__kklgxk.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Top pinch across 45 mm carton, fingers 47/0 both touch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Top pinch across carton width, both pads flat"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Top pinch across carton width, both pads flat"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Top pinch across carton width, both pads flat"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Top pinch across carton width, both pads flat"
+    }
+   ],
+   "object_note": "Carton off-centre in gripper (47/0) but firmly pinched across full width near top.",
+   "bbox_mm": [
+    45,
+    66,
+    149
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "xmugpm",
+   "key": "carton_of_milk__xmugpm",
+   "strip": "/tmp/glib/strips/carton_of_milk__xmugpm.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down grasp on body below gable"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down grasp on body below gable"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down grasp high on body, CoM 79 mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down grasp high on body, CoM 79 mm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down grasp on body below gable"
+    }
+   ],
+   "object_note": "Tall 1 L carton; pads on 84 mm body just under gable, fingers far above bottom.",
+   "bbox_mm": [
+    84,
+    123,
+    218
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "kszoro",
+   "key": "carton_of_milk__kszoro",
+   "strip": "/tmp/glib/strips/carton_of_milk__kszoro.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down grasp on upper body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down grasp on upper body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down grasp on upper body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down grasp on upper body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down grasp on upper body, CoM 66 mm"
+    }
+   ],
+   "object_note": "Fingers stay well above bottom face; full coverage on flat faces.",
+   "bbox_mm": [
+    84,
+    123,
+    181
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "atyqub",
+   "key": "carton_of_milk__atyqub",
+   "strip": "/tmp/glib/strips/carton_of_milk__atyqub.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down grasp on body below gable"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down grasp on body below gable"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down grasp on body below gable"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down grasp on body below gable"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down grasp on body below gable"
+    }
+   ],
+   "object_note": "Fingers far above bottom face; near-identical grasps, 50/37 closure with carton filling gripper.",
+   "bbox_mm": [
+    86,
+    106,
+    152
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

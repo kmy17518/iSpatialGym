@@ -1,0 +1,84 @@
+{
+  "group": "mental_rotation__hook__r1",
+  "task": "mental_rotation",
+  "category": "hook",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 5,
+  "n_opened": 5,
+  "candidates": [
+    {
+      "model": "yfikis",
+      "key": "hook__yfikis",
+      "G": 5,
+      "T": 3,
+      "V": 3,
+      "R": 0,
+      "score": 19,
+      "note": "Tiny 44x66 mm bent 6 mm rod hook; 5 clean rod pinches near CoM (antipodal 0.98+, coverage 1.0) at visibly different orientations; plain grey, thin."
+    },
+    {
+      "model": "ddbsdk",
+      "key": "hook__ddbsdk",
+      "G": 4,
+      "T": 3,
+      "V": 3,
+      "R": 1,
+      "score": 18,
+      "note": "Small white plastic disc-base J-hook; stem, disc-edge and J-bend pinches (5-12 mm), row 5 antipodal 0.14 not clean; flat untextured white."
+    },
+    {
+      "model": "wmvozo",
+      "key": "hook__wmvozo",
+      "G": 2,
+      "T": 2,
+      "V": 2,
+      "R": 0,
+      "score": 10,
+      "note": "31 mm chrome suction-disc hook; all rows pinch the thin disc rim, antipodal 0.17-0.36, near-duplicates; nearly rotationally symmetric, tiny outlier."
+    },
+    {
+      "model": "akwlam",
+      "key": "hook__akwlam",
+      "G": 1,
+      "T": 3,
+      "V": 2,
+      "R": 1,
+      "score": 10,
+      "note": "Flat plate hook; pads land on 3 mm plate edges at fingertips, coverage 0-0.25, row 5 skewed; flat untextured grey/white plate."
+    },
+    {
+      "model": "hewhtl",
+      "key": "hook__hewhtl",
+      "G": 4,
+      "T": 3,
+      "V": 4,
+      "R": 0,
+      "score": 19,
+      "note": "Mottled rustic-iron plate with curled wire hook, 108 mm; 5 clean face pinches on 6 mm plate near top edge/corner, plate hangs 30 mm below."
+    }
+  ],
+  "selected": [
+    {
+      "model": "hewhtl",
+      "key": "hook__hewhtl",
+      "rank": 1,
+      "reason": "Tied top score; larger, textured, clearly readable asymmetric hook with five clean face pinches (top edge, corner, tilt 108). Only 6 mm plate at pinch."
+    },
+    {
+      "model": "yfikis",
+      "key": "hook__yfikis",
+      "rank": 2,
+      "reason": "Tied top score, visually distinct from the plate hook; five solid rod pinches at different orientations. Very small object, 6 mm rod (R=0)."
+    }
+  ],
+  "alternate": {
+    "model": "ddbsdk",
+    "key": "hook__ddbsdk"
+  },
+  "short": false,
+  "warnings": [
+    "Every hook is pinched on a 6-12 mm feature, so robustness is marginal group-wide; yfikis is tiny (44x66 mm) and may be hard to read in camera; wmvozo and akwlam unusable."
+  ],
+  "confidence": "medium"
+}

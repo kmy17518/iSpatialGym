@@ -1,0 +1,110 @@
+[
+  {
+    "id": "bottle_of_pop__c1",
+    "category": "bottle_of_pop",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "All nine share the same 1140-face soda bottle mesh (cap, shoulder, petaloid base); identical volume and area.",
+    "texture_note": "Nine distinct labels/caps: Cream Soda pink, Crystal lime, two grey Diet colas, black Sugar cola, Spring Hills green, Iced Tea blue, Citrus orange, red cola.",
+    "confidence": "high"
+  },
+  {
+    "id": "bottle_of_essential_oil__c1",
+    "category": "bottle_of_essential_oil",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Same small dropper bottle with ribbed black cap in all five rows; only tessellation differs.",
+    "texture_note": "Five different label colours: green, orange, lavender/purple, yellow, teal; same label layout otherwise.",
+    "confidence": "high"
+  },
+  {
+    "id": "bottle_of_beer__c1",
+    "category": "bottle_of_beer",
+    "verdict": "texture_variants",
+    "exact_groups": [["crfcwo", "meqliv"]],
+    "geometry_note": "Same green stubby beer bottle with gold cap in all three; identical volume/area, near-identical vertex counts.",
+    "texture_note": "crfcwo and meqliv share the teal 'Good Beer' hexagon label (meqliv rotated about vertical axis); zbsxro has a yellow 'IPA' label.",
+    "confidence": "medium"
+  },
+  {
+    "id": "cellulose_tape_dispenser__c1",
+    "category": "cellulose_tape_dispenser",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Same desktop tape dispenser body with grey tape roll in all three; identical footprint and volume.",
+    "texture_note": "budhaz lemon yellow, fetnry noticeably more golden/orange yellow (consistent across views), yyekns grey/white body.",
+    "confidence": "medium"
+  },
+  {
+    "id": "apple__c1",
+    "category": "apple",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Same apple mesh with stem, 2201 faces, identical volume and area.",
+    "texture_note": "agveuv is a green apple, omzprq a red apple; agveuv front-oblique renders as a black disc (likely artifact).",
+    "confidence": "high"
+  },
+  {
+    "id": "bottle_of_black_pepper__c1",
+    "category": "bottle_of_black_pepper",
+    "verdict": "exact_same",
+    "exact_groups": [["ydzzrv", "zybfok"]],
+    "geometry_note": "Same glass jar with flat grey lid, 5102 faces, identical volume/area; only vertex count differs.",
+    "texture_note": "Grey lid, clear glass, dark pepper fill look identical; sampled fill colour matches within 1-2 RGB units.",
+    "confidence": "high"
+  },
+  {
+    "id": "box_of_cereal__c3",
+    "category": "box_of_cereal",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Same rectangular cereal box, 1536 faces, identical dimensions.",
+    "texture_note": "hosfhj white 'Fibre flakes' print, qirvmd dark brown 'Cocoa rice' print; same brand layout.",
+    "confidence": "high"
+  },
+  {
+    "id": "box_of_yogurt__c1",
+    "category": "box_of_yogurt",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Same low-poly tapered yogurt cup with lid, 163 faces, identical volume.",
+    "texture_note": "jkemqc blue/white swirl print with lettering; znhjgm plain white/beige print.",
+    "confidence": "high"
+  },
+  {
+    "id": "hard_candy__c1",
+    "category": "hard_candy",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Both are wrapped candies with twisted fan ends, 160 faces, same volume; fold and body roundness differ slightly.",
+    "texture_note": "qptjgv pink wrapper with confetti dots; yuatcg red/yellow/blue patchwork wrapper. Clearly different prints.",
+    "confidence": "medium"
+  },
+  {
+    "id": "mug__c1",
+    "category": "mug",
+    "verdict": "exact_same",
+    "exact_groups": [["ehnmxj", "fapsrj"]],
+    "geometry_note": "Same white coffee mug with loop handle, 3144 faces, identical volume/area and footprint.",
+    "texture_note": "Both plain white glaze with faint grey marbling; sampled render colours identical despite differing swatch means.",
+    "confidence": "high"
+  },
+  {
+    "id": "soda_cup__c1",
+    "category": "soda_cup",
+    "verdict": "texture_variants",
+    "exact_groups": [],
+    "geometry_note": "Same red party-cup silhouette with rim and ridge lines; very different tessellation (4194 vs 19996 faces).",
+    "texture_note": "fsfsas pale salmon-red with mottled streaks; lpanoc saturated uniform orange-red; both white rim/interior.",
+    "confidence": "high"
+  },
+  {
+    "id": "walker__c1",
+    "category": "walker",
+    "verdict": "exact_same",
+    "exact_groups": [["fdklhj", "xnpimz"]],
+    "geometry_note": "Same slip-on shoe (tan upper, white sole, dark lining); xnpimz stored in a different orientation, slightly different tessellation.",
+    "texture_note": "Tan leather, grey sole and dark lining colours match exactly in sampled renders; no visible print differences.",
+    "confidence": "high"
+  }
+]

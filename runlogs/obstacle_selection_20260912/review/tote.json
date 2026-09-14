@@ -1,0 +1,23 @@
+{
+  "category": "tote",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "bnkjle",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Dark brown leather tote standing upright, two handles, open top with grey lining; good textures; 0.34 x 0.24 x 0.47 m."
+    }
+  ],
+  "picks": ["bnkjle"],
+  "alternate": null,
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int", "restaurant_diner", "hotel_suite_large", "office_cubicles_right"],
+  "category_verdict": "weak",
+  "category_note": "Single model: a large upright leather tote 0.47 m tall. A bag set down on the floor is unremarkable in homes, hotel, office or diner, but only one model, so weak."
+}

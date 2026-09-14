@@ -1,0 +1,27 @@
+{
+ "scene": "hotel_suite_large",
+ "table": "desk_ohjotf_0",
+ "category": "desk",
+ "model": "ohjotf",
+ "rooms": [
+  "bedroom_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.671,
+  "bbox_x": 0.554,
+  "bbox_y": 1.638,
+  "bbox_z": 0.668,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "armchair_hfydou_0"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:02:03",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

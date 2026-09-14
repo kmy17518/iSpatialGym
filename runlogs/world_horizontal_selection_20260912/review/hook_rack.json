@@ -1,0 +1,26 @@
+{
+  "category": "hook_rack",
+  "task": "wa2",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "mdnfjr",
+      "V": 4,
+      "L": 3,
+      "H": 1,
+      "score": 15,
+      "valid": true,
+      "front_axis": "+x",
+      "level_axis": "y",
+      "up_axis": "+z",
+      "symmetric_180": false,
+      "thin_axis": "x",
+      "note": "Thin black rail 0.96 m with five small hooks hanging down and end brackets at -x; clean but slightly over 0.9 m."
+    }
+  ],
+  "picks": ["mdnfjr"],
+  "alternate": null,
+  "category_verdict": "weak",
+  "category_note": "Single model: a 0.96 m thin black hook rail with hanging hooks; reads level instantly but only one candidate and length just over the 0.9 m limit."
+}

@@ -1,0 +1,183 @@
+{
+ "category": "chopping_board",
+ "task": "wa0",
+ "n_models": 14,
+ "n_opened": 14,
+ "models": [
+  {
+   "model": "afwefw",
+   "V": 5,
+   "O": 1,
+   "F": 2,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Plain dark rounded rectangular board 0.25x0.37; symmetric, no yaw cue beyond the long axis."
+  },
+  {
+   "model": "akgegh",
+   "V": 5,
+   "O": 1,
+   "F": 2,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Light wood board with juice groove and bowed long edges; symmetric."
+  },
+  {
+   "model": "ayegwd",
+   "V": 4,
+   "O": 1,
+   "F": 2,
+   "score": 12,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Thin dark board/tray with wire handles at both +y and -y ends; symmetric."
+  },
+  {
+   "model": "cptayn",
+   "V": 5,
+   "O": 1,
+   "F": 2,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Plain dark rounded board 0.20x0.30; symmetric."
+  },
+  {
+   "model": "drjnag",
+   "V": 5,
+   "O": 1,
+   "F": 2,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Thick nearly square butcher block with a centred light stripe along y; symmetric."
+  },
+  {
+   "model": "gaxhrw",
+   "V": 5,
+   "O": 1,
+   "F": 2,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Plain dark rounded board with faint groove, near duplicate of cptayn; symmetric."
+  },
+  {
+   "model": "iocgzv",
+   "V": 4,
+   "O": 1,
+   "F": 2,
+   "score": 12,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Rustic board with side grooves and comb notches on both +y and -y edges; symmetric."
+  },
+  {
+   "model": "ktxcvz",
+   "V": 5,
+   "O": 1,
+   "F": 2,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Dark board with juice groove; symmetric."
+  },
+  {
+   "model": "mqsqhl",
+   "V": 4,
+   "O": 1,
+   "F": 1,
+   "score": 11,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Large plain rustic board 0.56 m long; symmetric; borderline size."
+  },
+  {
+   "model": "mwmzzv",
+   "V": 5,
+   "O": 1,
+   "F": 2,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Dark board with groove, near duplicate of ktxcvz; symmetric."
+  },
+  {
+   "model": "ozrzrr",
+   "V": 5,
+   "O": 1,
+   "F": 2,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Plain medium-brown board 0.27x0.36; symmetric."
+  },
+  {
+   "model": "psabiv",
+   "V": 5,
+   "O": 2,
+   "F": 2,
+   "score": 16,
+   "valid": true,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Plank board with one lighter plank right of centre (+x side): unique yaw but subtle cue."
+  },
+  {
+   "model": "sygezm",
+   "V": 4,
+   "O": 3,
+   "F": 2,
+   "score": 16,
+   "valid": true,
+   "long_axis": "y",
+   "front_axis": "+y",
+   "rest_ok": true,
+   "note": "Rustic board with handle slot at +y end; obvious asymmetric silhouette; thin 0.012 m."
+  },
+  {
+   "model": "uzeftd",
+   "V": 4,
+   "O": 1,
+   "F": 0,
+   "score": 10,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Huge thick block 0.78x0.35x0.10 m, symmetric; too long and thick for the table."
+  }
+ ],
+ "picks": [
+  "sygezm",
+  "psabiv"
+ ],
+ "alternate": null,
+ "category_verdict": "weak",
+ "category_note": "Mostly plain rectangular wooden boards 0.2-0.4 m, symmetric (180-degree ambiguity). Only sygezm (handle slot at +y) and psabiv (off-centre light plank) give a unique yaw; front for the symmetric boards is arbitrary."
+}

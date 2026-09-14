@@ -1,0 +1,144 @@
+{
+ "target_category": "box_of_cereal",
+ "target_model": "iucshm",
+ "target_key": "box_of_cereal__iucshm",
+ "category": "box_of_cereal",
+ "model": "dkhgxn",
+ "kind": "same",
+ "tier": null,
+ "started": "2026-09-12 12:12:53",
+ "template": {
+  "support": {
+   "name": "breakfast_table_rhjoby_0",
+   "z": 0.8126287460327148,
+   "yaw": 1.5684680938720703,
+   "local_bounds": [
+    2.934345006942749,
+    4.094574928283691,
+    -8.734139442443848,
+    -5.831493377685547
+   ],
+   "n_free_cells": 8467,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-v",
+   "edge_mid": [
+    8.742298126220703,
+    3.4941153526306152
+   ],
+   "inward": [
+    -0.9999973177909851,
+    0.0023282307665795088
+   ],
+   "tangent": [
+    -0.0023282307665795088,
+    -0.9999973177909851
+   ],
+   "base_pose2d": [
+    9.1915283203125,
+    3.1629536151885986,
+    3.1392644207852634
+   ],
+   "edge_depth": 0.45000001788139343,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.4000000059604645,
+    "axis_angle": 0.17430980600669085
+   }
+  },
+  "place_stance": {
+   "edge": "-v",
+   "edge_mid": [
+    8.742298126220703,
+    3.4941153526306152
+   ],
+   "inward": [
+    -0.9999973177909851,
+    0.0023282307665795088
+   ],
+   "tangent": [
+    -0.0023282307665795088,
+    -0.9999973177909851
+   ],
+   "base_pose2d": [
+    9.192289352416992,
+    3.4899823665618896,
+    3.1392644207852634
+   ],
+   "edge_depth": 0.4499996602535248
+  },
+  "view_arms": "untucked",
+  "yaw_adjust_deg": 0.0,
+  "dest_lateral_m": -0.654059065191086,
+  "dest_side": "right",
+  "source_lateral_offset": 0.35,
+  "n_reachable_cells": 6,
+  "n_grasp_cells": 1,
+  "n_place_combos": 29,
+  "distractors": {
+   "same_category": true,
+   "pool": "same_category",
+   "requested_pool": "same_category",
+   "fallback": null,
+   "models": [
+    "box_of_cereal-ykuyqb"
+   ],
+   "requested": 1,
+   "pool_size": 1,
+   "pool_categories": [
+    "box_of_cereal"
+   ],
+   "lookalikes_excluded": [],
+   "footprint_fraction": 0.18
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 99.95,
+   "prepare_template_s": 0.13
+  },
+  "setup_s": 100.1
+ },
+ "footprint_fraction_with_target": 0.247,
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {},
+ "instances": [
+  {
+   "summary": "/tmp/isg_dis_distractors/box_of_cereal-iucshm__box_of_cereal-dkhgxn/instances/disembedding-0__box_of_cereal-iucshm__box_of_cereal-dkhgxn__0000.summary.json",
+   "wall_time_s": 4.8,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    9.1915283203125,
+    3.1629536151885986,
+    3.1392644207852634
+   ],
+   "trunk": [
+    0.749999987042469,
+    -0.40000003576278687
+   ],
+   "occluded_variant": false,
+   "grasp": {
+    "key": "box_of_cereal__iucshm",
+    "name": "grasp_1",
+    "translate": 0.5,
+    "place_translate": 0.5,
+    "yaw": -3.2626090385403135
+   },
+   "dest_pixels": 15378,
+   "source_pixels": 55241,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.4000000059604645
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_dis_distractors/box_of_cereal-iucshm__box_of_cereal-dkhgxn",
+ "job_s": 6.3,
+ "finished": "2026-09-12 12:12:59",
+ "occluded_variant": false,
+ "occlusion_ratio": null
+}

@@ -1,0 +1,35 @@
+{
+ "category": "zucchini",
+ "model": "yhhkxf",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/zucchini__yhhkxf__y0.png",
+   "drift_m": 0.01,
+   "tilt_deg": 26.2,
+   "on_tray": true,
+   "settled_z": 0.021,
+   "seg_pixels": 3218,
+   "aabb_extent": [
+    0.138,
+    0.052,
+    0.047
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/zucchini__yhhkxf__y1.png",
+   "drift_m": 0.0015,
+   "tilt_deg": 4.5,
+   "on_tray": true,
+   "settled_z": 0.0221
+  }
+ },
+ "stable": false,
+ "visible": true
+}

@@ -1,0 +1,28 @@
+{
+  "category": "plastic_bag",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "fwxfpe",
+      "V": 3,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 12,
+      "valid": true,
+      "note": "Upright filled grey carrier bag with handles, 0.17 x 0.31 x 0.39 m; uniform grey but wrinkled geometry ok; narrow rounded base, may settle tilted."
+    }
+  ],
+  "picks": ["fwxfpe"],
+  "alternate": null,
+  "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner"
+  ],
+  "category_verdict": "weak",
+  "category_note": "Single plain grey shopping bag standing upright, 0.39 m tall but only 0.17 m thin; plausible kitchen/entryway clutter yet small and flimsy-looking, and its rounded base may tip after the drop. Marginal obstacle."
+}

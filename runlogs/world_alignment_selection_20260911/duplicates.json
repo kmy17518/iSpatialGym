@@ -1,0 +1,641 @@
+{
+ "clusters": [
+  {
+   "id": "bag_of_chips__wa4",
+   "category": "bag_of_chips",
+   "models": [
+    "jphwer",
+    "uevvib"
+   ],
+   "exact_groups": [],
+   "pairs": [
+    {
+     "a": "jphwer",
+     "b": "uevvib",
+     "tier": "same_shape",
+     "same_textures": false
+    }
+   ]
+  },
+  {
+   "id": "board_game__wa14",
+   "category": "board_game",
+   "models": [
+    "nfewft",
+    "twkglv"
+   ],
+   "exact_groups": [],
+   "pairs": [
+    {
+     "a": "nfewft",
+     "b": "twkglv",
+     "tier": "same_shape",
+     "same_textures": false
+    }
+   ]
+  },
+  {
+   "id": "catalog__wa1",
+   "category": "catalog",
+   "models": [
+    "aygcnt",
+    "deirql"
+   ],
+   "exact_groups": [],
+   "pairs": [
+    {
+     "a": "aygcnt",
+     "b": "deirql",
+     "tier": "same_shape",
+     "same_textures": false
+    }
+   ]
+  },
+  {
+   "id": "comic_book__wa1",
+   "category": "comic_book",
+   "models": [
+    "nekxsh",
+    "qkczyc",
+    "scycof",
+    "vzejnl",
+    "xmbxfm"
+   ],
+   "exact_groups": [],
+   "pairs": [
+    {
+     "a": "nekxsh",
+     "b": "qkczyc",
+     "tier": "same_shape",
+     "same_textures": false
+    },
+    {
+     "a": "nekxsh",
+     "b": "scycof",
+     "tier": "same_shape",
+     "same_textures": false
+    },
+    {
+     "a": "nekxsh",
+     "b": "vzejnl",
+     "tier": "same_shape",
+     "same_textures": false
+    },
+    {
+     "a": "nekxsh",
+     "b": "xmbxfm",
+     "tier": "same_shape",
+     "same_textures": false
+    },
+    {
+     "a": "qkczyc",
+     "b": "scycof",
+     "tier": "same_shape",
+     "same_textures": false
+    },
+    {
+     "a": "qkczyc",
+     "b": "vzejnl",
+     "tier": "same_shape",
+     "same_textures": false
+    },
+    {
+     "a": "qkczyc",
+     "b": "xmbxfm",
+     "tier": "same_shape",
+     "same_textures": false
+    },
+    {
+     "a": "scycof",
+     "b": "vzejnl",
+     "tier": "same_shape",
+     "same_textures": false
+    },
+    {
+     "a": "scycof",
+     "b": "xmbxfm",
+     "tier": "same_shape",
+     "same_textures": false
+    },
+    {
+     "a": "vzejnl",
+     "b": "xmbxfm",
+     "tier": "same_shape",
+     "same_textures": false
+    }
+   ]
+  },
+  {
+   "id": "fire_extinguisher__wa2",
+   "category": "fire_extinguisher",
+   "models": [
+    "jgdvdl",
+    "noepez"
+   ],
+   "exact_groups": [],
+   "pairs": [
+    {
+     "a": "jgdvdl",
+     "b": "noepez",
+     "tier": "same_shape",
+     "same_textures": false
+    }
+   ]
+  },
+  {
+   "id": "frying_pan__wa4",
+   "category": "frying_pan",
+   "models": [
+    "aewpzn",
+    "snvhlz"
+   ],
+   "exact_groups": [],
+   "pairs": [
+    {
+     "a": "aewpzn",
+     "b": "snvhlz",
+     "tier": "same_shape",
+     "same_textures": false
+    }
+   ]
+  },
+  {
+   "id": "gym_shoe__wa10",
+   "category": "gym_shoe",
+   "models": [
+    "pblxfp",
+    "rcozpq"
+   ],
+   "exact_groups": [],
+   "pairs": [
+    {
+     "a": "pblxfp",
+     "b": "rcozpq",
+     "tier": "same_shape",
+     "same_textures": false
+    }
+   ]
+  },
+  {
+   "id": "gym_shoe__wa12",
+   "category": "gym_shoe",
+   "models": [
+    "picdro",
+    "ugbxip"
+   ],
+   "exact_groups": [],
+   "pairs": [
+    {
+     "a": "picdro",
+     "b": "ugbxip",
+     "tier": "same_shape",
+     "same_textures": false
+    }
+   ]
+  },
+  {
+   "id": "gym_shoe__wa13",
+   "category": "gym_shoe",
+   "models": [
+    "hwrvmy",
+    "ukkqib"
+   ],
+   "exact_groups": [],
+   "pairs": [
+    {
+     "a": "hwrvmy",
+     "b": "ukkqib",
+     "tier": "same_shape",
+     "same_textures": false
+    }
+   ]
+  },
+  {
+   "id": "magazine__wa2",
+   "category": "magazine",
+   "models": [
+    "ajitiv",
+    "tfovwy"
+   ],
+   "exact_groups": [],
+   "pairs": [
+    {
+     "a": "ajitiv",
+     "b": "tfovwy",
+     "tier": "same_shape",
+     "same_textures": false
+    }
+   ]
+  },
+  {
+   "id": "painting__wa7",
+   "category": "painting",
+   "models": [
+    "gardkz",
+    "ifdzgs"
+   ],
+   "exact_groups": [],
+   "pairs": [
+    {
+     "a": "gardkz",
+     "b": "ifdzgs",
+     "tier": "same_shape",
+     "same_textures": false
+    }
+   ]
+  },
+  {
+   "id": "paper_towel_dispenser__wa1",
+   "category": "paper_towel_dispenser",
+   "models": [
+    "jacqxv",
+    "lahuhb"
+   ],
+   "exact_groups": [],
+   "pairs": [
+    {
+     "a": "jacqxv",
+     "b": "lahuhb",
+     "tier": "same_shape",
+     "same_textures": false
+    }
+   ]
+  },
+  {
+   "id": "paperback_book__wa6",
+   "category": "paperback_book",
+   "models": [
+    "bisnup",
+    "hrtflt",
+    "ixwtnb",
+    "jhaltj",
+    "phsgun"
+   ],
+   "exact_groups": [],
+   "pairs": [
+    {
+     "a": "bisnup",
+     "b": "ixwtnb",
+     "tier": "same_shape",
+     "same_textures": false
+    },
+    {
+     "a": "bisnup",
+     "b": "jhaltj",
+     "tier": "same_shape",
+     "same_textures": false
+    },
+    {
+     "a": "bisnup",
+     "b": "phsgun",
+     "tier": "same_shape",
+     "same_textures": false
+    },
+    {
+     "a": "hrtflt",
+     "b": "ixwtnb",
+     "tier": "same_shape",
+     "same_textures": false
+    },
+    {
+     "a": "ixwtnb",
+     "b": "jhaltj",
+     "tier": "same_shape",
+     "same_textures": false
+    },
+    {
+     "a": "ixwtnb",
+     "b": "phsgun",
+     "tier": "same_shape",
+     "same_textures": false
+    },
+    {
+     "a": "jhaltj",
+     "b": "phsgun",
+     "tier": "same_shape",
+     "same_textures": false
+    }
+   ]
+  },
+  {
+   "id": "picture__wa9",
+   "category": "picture",
+   "models": [
+    "alwmys",
+    "jmvdxm"
+   ],
+   "exact_groups": [],
+   "pairs": [
+    {
+     "a": "alwmys",
+     "b": "jmvdxm",
+     "tier": "same_shape",
+     "same_textures": false
+    }
+   ]
+  },
+  {
+   "id": "signpost__wa3",
+   "category": "signpost",
+   "models": [
+    "mexzmk",
+    "mlvfbp"
+   ],
+   "exact_groups": [],
+   "pairs": [
+    {
+     "a": "mexzmk",
+     "b": "mlvfbp",
+     "tier": "same_shape",
+     "same_textures": false
+    }
+   ]
+  }
+ ],
+ "flags": {
+  "bag_of_chips/jphwer": {
+   "cluster": "bag_of_chips__wa4",
+   "exact": [],
+   "same_geometry": [
+    "uevvib"
+   ]
+  },
+  "bag_of_chips/uevvib": {
+   "cluster": "bag_of_chips__wa4",
+   "exact": [],
+   "same_geometry": [
+    "jphwer"
+   ]
+  },
+  "board_game/nfewft": {
+   "cluster": "board_game__wa14",
+   "exact": [],
+   "same_geometry": [
+    "twkglv"
+   ]
+  },
+  "board_game/twkglv": {
+   "cluster": "board_game__wa14",
+   "exact": [],
+   "same_geometry": [
+    "nfewft"
+   ]
+  },
+  "catalog/aygcnt": {
+   "cluster": "catalog__wa1",
+   "exact": [],
+   "same_geometry": [
+    "deirql"
+   ]
+  },
+  "catalog/deirql": {
+   "cluster": "catalog__wa1",
+   "exact": [],
+   "same_geometry": [
+    "aygcnt"
+   ]
+  },
+  "comic_book/nekxsh": {
+   "cluster": "comic_book__wa1",
+   "exact": [],
+   "same_geometry": [
+    "qkczyc",
+    "scycof",
+    "vzejnl",
+    "xmbxfm"
+   ]
+  },
+  "comic_book/qkczyc": {
+   "cluster": "comic_book__wa1",
+   "exact": [],
+   "same_geometry": [
+    "nekxsh",
+    "scycof",
+    "vzejnl",
+    "xmbxfm"
+   ]
+  },
+  "comic_book/scycof": {
+   "cluster": "comic_book__wa1",
+   "exact": [],
+   "same_geometry": [
+    "nekxsh",
+    "qkczyc",
+    "vzejnl",
+    "xmbxfm"
+   ]
+  },
+  "comic_book/vzejnl": {
+   "cluster": "comic_book__wa1",
+   "exact": [],
+   "same_geometry": [
+    "nekxsh",
+    "qkczyc",
+    "scycof",
+    "xmbxfm"
+   ]
+  },
+  "comic_book/xmbxfm": {
+   "cluster": "comic_book__wa1",
+   "exact": [],
+   "same_geometry": [
+    "nekxsh",
+    "qkczyc",
+    "scycof",
+    "vzejnl"
+   ]
+  },
+  "fire_extinguisher/jgdvdl": {
+   "cluster": "fire_extinguisher__wa2",
+   "exact": [],
+   "same_geometry": [
+    "noepez"
+   ]
+  },
+  "fire_extinguisher/noepez": {
+   "cluster": "fire_extinguisher__wa2",
+   "exact": [],
+   "same_geometry": [
+    "jgdvdl"
+   ]
+  },
+  "frying_pan/aewpzn": {
+   "cluster": "frying_pan__wa4",
+   "exact": [],
+   "same_geometry": [
+    "snvhlz"
+   ]
+  },
+  "frying_pan/snvhlz": {
+   "cluster": "frying_pan__wa4",
+   "exact": [],
+   "same_geometry": [
+    "aewpzn"
+   ]
+  },
+  "gym_shoe/pblxfp": {
+   "cluster": "gym_shoe__wa10",
+   "exact": [],
+   "same_geometry": [
+    "rcozpq"
+   ]
+  },
+  "gym_shoe/rcozpq": {
+   "cluster": "gym_shoe__wa10",
+   "exact": [],
+   "same_geometry": [
+    "pblxfp"
+   ]
+  },
+  "gym_shoe/picdro": {
+   "cluster": "gym_shoe__wa12",
+   "exact": [],
+   "same_geometry": [
+    "ugbxip"
+   ]
+  },
+  "gym_shoe/ugbxip": {
+   "cluster": "gym_shoe__wa12",
+   "exact": [],
+   "same_geometry": [
+    "picdro"
+   ]
+  },
+  "gym_shoe/hwrvmy": {
+   "cluster": "gym_shoe__wa13",
+   "exact": [],
+   "same_geometry": [
+    "ukkqib"
+   ]
+  },
+  "gym_shoe/ukkqib": {
+   "cluster": "gym_shoe__wa13",
+   "exact": [],
+   "same_geometry": [
+    "hwrvmy"
+   ]
+  },
+  "magazine/ajitiv": {
+   "cluster": "magazine__wa2",
+   "exact": [],
+   "same_geometry": [
+    "tfovwy"
+   ]
+  },
+  "magazine/tfovwy": {
+   "cluster": "magazine__wa2",
+   "exact": [],
+   "same_geometry": [
+    "ajitiv"
+   ]
+  },
+  "painting/gardkz": {
+   "cluster": "painting__wa7",
+   "exact": [],
+   "same_geometry": [
+    "ifdzgs"
+   ]
+  },
+  "painting/ifdzgs": {
+   "cluster": "painting__wa7",
+   "exact": [],
+   "same_geometry": [
+    "gardkz"
+   ]
+  },
+  "paper_towel_dispenser/jacqxv": {
+   "cluster": "paper_towel_dispenser__wa1",
+   "exact": [],
+   "same_geometry": [
+    "lahuhb"
+   ]
+  },
+  "paper_towel_dispenser/lahuhb": {
+   "cluster": "paper_towel_dispenser__wa1",
+   "exact": [],
+   "same_geometry": [
+    "jacqxv"
+   ]
+  },
+  "paperback_book/bisnup": {
+   "cluster": "paperback_book__wa6",
+   "exact": [],
+   "same_geometry": [
+    "hrtflt",
+    "ixwtnb",
+    "jhaltj",
+    "phsgun"
+   ]
+  },
+  "paperback_book/hrtflt": {
+   "cluster": "paperback_book__wa6",
+   "exact": [],
+   "same_geometry": [
+    "bisnup",
+    "ixwtnb",
+    "jhaltj",
+    "phsgun"
+   ]
+  },
+  "paperback_book/ixwtnb": {
+   "cluster": "paperback_book__wa6",
+   "exact": [],
+   "same_geometry": [
+    "bisnup",
+    "hrtflt",
+    "jhaltj",
+    "phsgun"
+   ]
+  },
+  "paperback_book/jhaltj": {
+   "cluster": "paperback_book__wa6",
+   "exact": [],
+   "same_geometry": [
+    "bisnup",
+    "hrtflt",
+    "ixwtnb",
+    "phsgun"
+   ]
+  },
+  "paperback_book/phsgun": {
+   "cluster": "paperback_book__wa6",
+   "exact": [],
+   "same_geometry": [
+    "bisnup",
+    "hrtflt",
+    "ixwtnb",
+    "jhaltj"
+   ]
+  },
+  "picture/alwmys": {
+   "cluster": "picture__wa9",
+   "exact": [],
+   "same_geometry": [
+    "jmvdxm"
+   ]
+  },
+  "picture/jmvdxm": {
+   "cluster": "picture__wa9",
+   "exact": [],
+   "same_geometry": [
+    "alwmys"
+   ]
+  },
+  "signpost/mexzmk": {
+   "cluster": "signpost__wa3",
+   "exact": [],
+   "same_geometry": [
+    "mlvfbp"
+   ]
+  },
+  "signpost/mlvfbp": {
+   "cluster": "signpost__wa3",
+   "exact": [],
+   "same_geometry": [
+    "mexzmk"
+   ]
+  }
+ },
+ "n_models": 194,
+ "errors": {}
+}

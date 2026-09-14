@@ -1,0 +1,33 @@
+{
+  "category": "water_cooler",
+  "task": "obst",
+  "n_models": 2,
+  "n_opened": 2,
+  "models": [
+    {
+      "model": "essxzr",
+      "V": 3,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 12,
+      "valid": true,
+      "note": "Dark grey floor-standing dispenser, tapered body, front recess with red/blue buttons, no bottle; header z 1.074 m (hint said 1.489); flat shading."
+    },
+    {
+      "model": "nqmdal",
+      "V": 4,
+      "N": 1,
+      "S": 2,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Boxy grey countertop-style dispenser with taps, display and drip tray; good textures; 0.46 x 0.43 x 0.55 m; squat appliance odd on a floor."
+    }
+  ],
+  "picks": ["essxzr"],
+  "alternate": null,
+  "natural_scenes": ["office_cubicles_right", "restaurant_diner"],
+  "category_verdict": "weak",
+  "category_note": "Two dispensers: a 1.07 m tall floor unit (valid, but naturally against a wall) and a 0.55 m countertop unit that looks out of place on a floor. Office corridor or diner only; N=2 at best."
+}

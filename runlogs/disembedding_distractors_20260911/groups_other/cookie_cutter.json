@@ -1,0 +1,10 @@
+{
+  "category": "cookie_cutter",
+  "pages_opened": ["grids/pool_other/cookie_cutter__p1.png", "grids/pool_other/cookie_cutter__p2.png"],
+  "n_models": 25,
+  "exclude": [
+    {"model": "cap/arskxc", "reason": "White/black blocky shape; does not read as a cap or any everyday object."},
+    {"model": "peppermint/pbrxfe", "reason": "Tiny green blob over a ghostly translucent wrapper; does not read as an object."}
+  ],
+  "notes": "Other 23 tiles (tape rolls, coaster, corks, cookies, biscuit, cupcake, buns, dice, metal caps) are intact and upright. watch/ghobzn is a small C-shaped band, plausible, kept. hamburger_bun/fqxumh renders fine but its tile reports a missing segmentation label, worth checking in the pipeline."
+}

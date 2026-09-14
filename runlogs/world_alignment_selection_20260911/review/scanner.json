@@ -1,0 +1,15 @@
+{
+  "category": "scanner",
+  "task": "wa0",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {"model": "juzkjp", "V": 4, "O": 2, "F": 2, "score": 14, "valid": true,
+     "long_axis": "x", "front_axis": "+x", "rest_ok": true,
+     "note": "flatbed scanner 0.31 x 0.22 x 0.06 m, black lid with grey bezel; bezel widens toward +x (front panel), silhouette itself is a plain rectangle"}
+  ],
+  "picks": ["juzkjp"],
+  "alternate": null,
+  "category_verdict": "weak",
+  "category_note": "One flatbed scanner, 0.31 x 0.22 m, 6 cm high, dark lid. Yaw is unique but only via the wider front bezel (no visible buttons/text), and there is a single model."
+}

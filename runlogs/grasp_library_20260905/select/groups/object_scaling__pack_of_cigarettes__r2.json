@@ -1,0 +1,624 @@
+{
+ "group": "object_scaling__pack_of_cigarettes__r2",
+ "task": "object_scaling",
+ "category": "pack_of_cigarettes",
+ "round": 2,
+ "relation": null,
+ "partner": "box",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. Rotationally symmetric bodies are preferred for this task.",
+ "candidates": [
+  {
+   "model": "tngixy",
+   "key": "pack_of_cigarettes__tngixy__f",
+   "strip": "/tmp/glib/strips/pack_of_cigarettes__tngixy__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across 55 mm, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, fingers 40/17, centred"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across 55 mm, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across 55 mm, both pads touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, CoM offset 20 mm, full pad contact"
+    }
+   ],
+   "object_note": "rows 1,3-5 fingers 50/4-5: box rests on fully-open finger; pad gap equals width, both pads touch",
+   "bbox_mm": [
+    125,
+    55,
+    80
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "kienyo",
+   "key": "pack_of_cigarettes__kienyo__f",
+   "strip": "/tmp/glib/strips/pack_of_cigarettes__kienyo__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across 55 mm, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across 55 mm, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across 55 mm, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body pinch, CoM offset 18 mm, full pad contact"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body pinch, CoM offset 16 mm, full pad contact"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    125,
+    55,
+    80
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ohpqua",
+   "key": "pack_of_cigarettes__ohpqua__f",
+   "strip": "/tmp/glib/strips/pack_of_cigarettes__ohpqua__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across 55 mm, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across 55 mm, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across 55 mm, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across 55 mm, both pads touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body pinch, CoM offset 18 mm, full pad contact"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    125,
+    55,
+    80
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "wjfbhw",
+   "key": "pack_of_cigarettes__wjfbhw__f",
+   "strip": "/tmp/glib/strips/pack_of_cigarettes__wjfbhw__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across 55 mm, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across 55 mm, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across 55 mm, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body pinch, CoM offset 19 mm, full pad contact"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body pinch, CoM offset 22 mm, full pad contact"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    126,
+    58,
+    80
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ajphvf",
+   "key": "pack_of_cigarettes__ajphvf__f",
+   "strip": "/tmp/glib/strips/pack_of_cigarettes__ajphvf__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch, CoM offset 12 mm, middle third"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    110,
+    55,
+    16
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "dthkix",
+   "key": "pack_of_cigarettes__dthkix__f",
+   "strip": "/tmp/glib/strips/pack_of_cigarettes__dthkix__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch, CoM offset 12 mm, middle third"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch, CoM offset 14 mm, long pad contact"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    110,
+    55,
+    16
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "wpmpcf",
+   "key": "pack_of_cigarettes__wpmpcf__f",
+   "strip": "/tmp/glib/strips/pack_of_cigarettes__wpmpcf__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch, CoM offset 7 mm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch, CoM offset 13 mm, long pad contact"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    110,
+    55,
+    16
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ppbmak",
+   "key": "pack_of_cigarettes__ppbmak__f",
+   "strip": "/tmp/glib/strips/pack_of_cigarettes__ppbmak__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch, CoM offset 11 mm, middle third"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    110,
+    55,
+    16
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ipmejr",
+   "key": "pack_of_cigarettes__ipmejr__f",
+   "strip": "/tmp/glib/strips/pack_of_cigarettes__ipmejr__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, near centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, near centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, near centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch, CoM offset 11 mm, middle third"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch, CoM offset 16 mm, long pad contact"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    110,
+    55,
+    16
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "qldhnm",
+   "key": "pack_of_cigarettes__qldhnm__f",
+   "strip": "/tmp/glib/strips/pack_of_cigarettes__qldhnm__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch, CoM offset 15 mm, long pad contact"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    110,
+    55,
+    16
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "hmhqkq",
+   "key": "pack_of_cigarettes__hmhqkq__f",
+   "strip": "/tmp/glib/strips/pack_of_cigarettes__hmhqkq__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch, CoM offset 16 mm, long pad contact"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    110,
+    55,
+    16
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "cfmlhf",
+   "key": "pack_of_cigarettes__cfmlhf__f",
+   "strip": "/tmp/glib/strips/pack_of_cigarettes__cfmlhf__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch across 16 mm, centred"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch, CoM offset 11 mm, middle third"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch, CoM offset 15 mm, long pad contact"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat-face pinch, CoM offset 15 mm, long pad contact"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    110,
+    55,
+    16
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

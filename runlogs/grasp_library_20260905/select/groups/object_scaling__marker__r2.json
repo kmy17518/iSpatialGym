@@ -1,0 +1,457 @@
+{
+ "group": "object_scaling__marker__r2",
+ "task": "object_scaling",
+ "category": "marker",
+ "round": 2,
+ "relation": null,
+ "partner": "rod",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. Rotationally symmetric bodies are preferred for this task.",
+ "candidates": [
+  {
+   "model": "zvvovh",
+   "key": "marker__zvvovh__f",
+   "strip": "/tmp/glib/strips/marker__zvvovh__f.png",
+   "n_valid": 4,
+   "n_clean": 4,
+   "n_clean_strict": 4,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "oblique mid-barrel pinch, lower coverage but firm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, CoM offset 4 mm"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    154,
+    17,
+    15
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "jlvneb",
+   "key": "marker__jlvneb__f",
+   "strip": "/tmp/glib/strips/marker__jlvneb__f.png",
+   "n_valid": 2,
+   "n_clean": 2,
+   "n_clean_strict": 2,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "oblique mid-barrel pinch, firm"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    164,
+    18,
+    15
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "erhlbb",
+   "key": "marker__erhlbb__f",
+   "strip": "/tmp/glib/strips/marker__erhlbb__f.png",
+   "n_valid": 3,
+   "n_clean": 2,
+   "n_clean_strict": 2,
+   "flags": [
+    "penetration"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "fingers closed to 6 mm on 15 mm barrel"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    }
+   ],
+   "object_note": "row 2: collision hull much thinner than visual mesh at mid-barrel (pads 6 mm apart, body 15 mm)",
+   "bbox_mm": [
+    164,
+    19,
+    15
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "zmimhb",
+   "key": "marker__zmimhb__f",
+   "strip": "/tmp/glib/strips/marker__zmimhb__f.png",
+   "n_valid": 2,
+   "n_clean": 2,
+   "n_clean_strict": 2,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    127,
+    15,
+    15
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "tcsmqv",
+   "key": "marker__tcsmqv__f",
+   "strip": "/tmp/glib/strips/marker__tcsmqv__f.png",
+   "n_valid": 1,
+   "n_clean": 1,
+   "n_clean_strict": 1,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    134,
+    21,
+    15
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "rsxbso",
+   "key": "marker__rsxbso__f",
+   "strip": "/tmp/glib/strips/marker__rsxbso__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    167,
+    18,
+    18
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "hmlofs",
+   "key": "marker__hmlofs__f",
+   "strip": "/tmp/glib/strips/marker__hmlofs__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    187,
+    18,
+    18
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "qemval",
+   "key": "marker__qemval__f",
+   "strip": "/tmp/glib/strips/marker__qemval__f.png",
+   "n_valid": 4,
+   "n_clean": 4,
+   "n_clean_strict": 4,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "small marker, mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    100,
+    13,
+    13
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "kjxpdi",
+   "key": "marker__kjxpdi__f",
+   "strip": "/tmp/glib/strips/marker__kjxpdi__f.png",
+   "n_valid": 4,
+   "n_clean": 4,
+   "n_clean_strict": 4,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, CoM offset 4 mm"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    108,
+    15,
+    13
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "slgheo",
+   "key": "marker__slgheo__f",
+   "strip": "/tmp/glib/strips/marker__slgheo__f.png",
+   "n_valid": 3,
+   "n_clean": 3,
+   "n_clean_strict": 3,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, CoM offset 5 mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, CoM offset 5 mm"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    154,
+    18,
+    14
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "mcpkkq",
+   "key": "marker__mcpkkq__f",
+   "strip": "/tmp/glib/strips/marker__mcpkkq__f.png",
+   "n_valid": 1,
+   "n_clean": 1,
+   "n_clean_strict": 1,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-barrel pinch, both pads touching"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    154,
+    17,
+    14
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": [
+  {
+   "model": "nqxveo",
+   "key": "marker__nqxveo__f",
+   "reason": "no AG-valid grasp"
+  }
+ ]
+}

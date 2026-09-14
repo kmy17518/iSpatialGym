@@ -1,0 +1,53 @@
+{
+ "category": "bottle_of_pop",
+ "model": "sevoto",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0,
+  180.0,
+  270.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_pop__sevoto__y0.png",
+   "drift_m": 0.0006,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.0741,
+   "seg_pixels": 5972,
+   "aabb_extent": [
+    0.059,
+    0.059,
+    0.171
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_pop__sevoto__y1.png",
+   "drift_m": 0.0007,
+   "tilt_deg": 0.6,
+   "on_tray": true,
+   "settled_z": 0.0741
+  },
+  "y2": {
+   "yaw_deg": 180.0,
+   "png": "renders/bottle_of_pop__sevoto__y2.png",
+   "drift_m": 0.0006,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.0741
+  },
+  "y3": {
+   "yaw_deg": 270.0,
+   "png": "renders/bottle_of_pop__sevoto__y3.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0741
+  }
+ },
+ "stable": true,
+ "visible": true
+}

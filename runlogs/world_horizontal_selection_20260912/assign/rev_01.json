@@ -1,0 +1,23 @@
+{
+ "reviewer": "rev_01",
+ "task": "wa2",
+ "categories": [
+  "towel_rack",
+  "hook_rack",
+  "hanger",
+  "handle",
+  "wall_mounted_loudspeaker",
+  "address"
+ ],
+ "grids": [
+  "renders/grids/address_00.png",
+  "renders/grids/handle_00.png",
+  "renders/grids/hanger_00.png",
+  "renders/grids/hanger_01.png",
+  "renders/grids/hook_rack_00.png",
+  "renders/grids/towel_rack_00.png",
+  "renders/grids/towel_rack_01.png",
+  "renders/grids/wall_mounted_loudspeaker_00.png"
+ ],
+ "n_models": 16
+}

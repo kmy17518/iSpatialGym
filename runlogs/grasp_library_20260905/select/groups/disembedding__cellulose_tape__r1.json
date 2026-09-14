@@ -1,0 +1,165 @@
+{
+ "group": "disembedding__cellulose_tape__r1",
+ "task": "disembedding",
+ "category": "cellulose_tape",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "Tabletop task: the object rests among other objects on a table / tray and is picked from its resting pose. It must settle stably on a flat surface (it must not roll or topple). The best single grasp matters most.",
+ "candidates": [
+  {
+   "model": "sklkyc",
+   "key": "cellulose_tape__sklkyc",
+   "strip": "/tmp/glib/strips/cellulose_tape__sklkyc.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch across flat roll at 30 deg, fingers 50/1"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch across flat roll at 30 deg"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch across flat roll at 30 deg"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch, roll seen edge-on between fingertips"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch, roll seen edge-on between fingertips"
+    }
+   ],
+   "object_note": "Width inf: pinch line above flat roll; fingers 50/0 span roll diameter.",
+   "bbox_mm": [
+    50,
+    50,
+    9
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "gchdhk",
+   "key": "cellulose_tape__gchdhk",
+   "strip": "/tmp/glib/strips/cellulose_tape__gchdhk.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch across flat roll (~48 mm), both fingertips"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch across flat roll at 30 deg"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch across flat roll at 30 deg"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch across flat roll at 30 deg"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Vertical rim pinch, fingers 48/0 both touch"
+    }
+   ],
+   "object_note": "Width inf: pinch line above flat roll; fingertip pads pinch rim.",
+   "bbox_mm": [
+    50,
+    50,
+    17
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "kavsnx",
+   "key": "cellulose_tape__kavsnx",
+   "strip": "/tmp/glib/strips/cellulose_tape__kavsnx.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch across 60 mm roll, both pads touch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch across 60 mm roll, both pads touch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch at 30 deg, both pads touch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Rim pinch at 30 deg, both pads touch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Off-centre chord pinch (CoM 21 mm off axis), pad corners"
+    }
+   ],
+   "object_note": "Rank 5 pinches a chord near roll edge; would self-centre or hold, non-optimal only.",
+   "bbox_mm": [
+    62,
+    62,
+    22
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

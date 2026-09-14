@@ -1,0 +1,176 @@
+{
+ "scene": "Rs_int",
+ "table": "bottom_cabinet_bamfsz_1",
+ "category": "bottom_cabinet",
+ "model": "bamfsz",
+ "rooms": [
+  "living_room_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-3",
+ "inventory": {
+  "top_z": 0.725,
+  "bbox_x": 0.419,
+  "bbox_y": 0.449,
+  "bbox_z": 0.691,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 15,
+ "started": "2026-09-12 04:23:23",
+ "precheck": {
+  "aabb": [
+   [
+    -1.94,
+    -0.692,
+    0.03
+   ],
+   [
+    -1.511,
+    -0.231,
+    0.728
+   ]
+  ],
+  "support": {
+   "name": "bottom_cabinet_bamfsz_1",
+   "z": 0.7282692193984985,
+   "yaw": 0.015032581984996796,
+   "local_bounds": [
+    -1.9404091835021973,
+    -1.5538380146026611,
+    -0.6582976579666138,
+    -0.21263518929481506
+   ],
+   "n_free_cells": 435,
+   "occupants": [
+    "pot_plant_udqjui_0"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -1.547,
+     -0.459
+    ],
+    "length": 0.446
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -1.934,
+     -0.465
+    ],
+    "length": 0.446
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -1.744,
+     -0.239
+    ],
+    "length": 0.387
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -1.737,
+     -0.684
+    ],
+    "length": 0.387
+   }
+  ],
+  "stance": null,
+  "stance_error": "[stance_collision] untucked: [stance_collision] no collision-free viewing trunk configuration (43 candidates)",
+  "precheck_s": 2.1
+ },
+ "status": "no_instances",
+ "n_written": 0,
+ "rejections": {
+  "target_placement": 15
+ },
+ "template_meta": {
+  "support": {
+   "name": "bottom_cabinet_bamfsz_1",
+   "z": 0.7282692193984985,
+   "yaw": 0.015032581984996796,
+   "local_bounds": [
+    -1.9404091835021973,
+    -1.5538380146026611,
+    -0.6582976579666138,
+    -0.21263518929481506
+   ],
+   "n_free_cells": 435,
+   "occupants": [
+    "pot_plant_udqjui_0"
+   ],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    -1.5471165180206299,
+    -0.45877450704574585
+   ],
+   "inward": [
+    -0.9998869895935059,
+    -0.01503201574087143
+   ],
+   "tangent": [
+    0.01503201574087143,
+    -0.9998869895935059
+   ],
+   "base_pose2d": [
+    -0.9971786737442017,
+    -0.45050689578056335,
+    -3.126560071332019
+   ],
+   "edge_depth": 0.5499999523162842,
+   "view": {
+    "translate": 0.25,
+    "tilt": -0.75,
+    "axis_angle": 0.001794060110804788
+   }
+  },
+  "view_arms": "untucked",
+  "n_reachable_cells": 2,
+  "n_grasp_cells": 2,
+  "n_grasp_combos": 13,
+  "n_region_cells": 160,
+  "n_visible_cells": 160,
+  "stand_off": 0.55,
+  "edge": null,
+  "rejections": {
+   "target_placement": 15
+  },
+  "n_written": 0,
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 2.81,
+   "prepare_template_s": 0.76
+  }
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/Rs_int/Rs_int__bottom_cabinet_bamfsz_1__inter_object_relation_satisfaction-3",
+ "bound_table": "bottom_cabinet_bamfsz_1",
+ "setup_s": 3.6,
+ "run_s": 0.5,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "no_instances",
+   "n_written": 0,
+   "rejections": {
+    "target_placement": 15
+   },
+   "reject_reason": null,
+   "setup_s": 3.6,
+   "run_s": 0.5
+  }
+ ],
+ "job_s": 5.2,
+ "finished": "2026-09-12 04:23:28"
+}

@@ -1,0 +1,31 @@
+{
+  "key": "openable_window__dpngol",
+  "category": "openable_window",
+  "model": "dpngol",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_left_leaf",
+      "kind": "drawer",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "slide",
+      "graspable": false,
+      "handle_description": "No handle; bare 17 mm sliding leaf frame, back face nearly touching the fixed frame, edges captured in tracks; nothing to pinch.",
+      "height_concern": "Heuristic top-edge spot at ~2.06 m, above reach",
+      "confidence": "medium"
+    },
+    {
+      "joint": "j_right_leaf",
+      "kind": "drawer",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "slide",
+      "graspable": false,
+      "handle_description": "No handle; bare 17 mm sliding leaf frame, back face nearly touching the fixed frame, edges captured in tracks; nothing to pinch.",
+      "height_concern": "Heuristic top-edge spot at ~2.06 m, above reach",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Huge thin two-leaf slider; strip framing poor (overview/zooms show frame close-ups). Heuristic correctly found nothing graspable; top-edge fallbacks sit inside the head track."
+}

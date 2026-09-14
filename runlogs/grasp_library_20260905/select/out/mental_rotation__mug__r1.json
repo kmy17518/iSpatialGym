@@ -1,0 +1,46 @@
+{
+  "group": "mental_rotation__mug__r1",
+  "task": "mental_rotation",
+  "category": "mug",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 10,
+  "n_opened": 10,
+  "candidates": [
+    {"model": "fapsrj", "key": "mug__fapsrj", "G": 3, "T": 3, "V": 4, "R": 0, "score": 17,
+     "note": "Plain white stackable mug; five near-identical rim pinches from above (7-8 mm wall, 11/0), upright hang; clean but no in-hand diversity."},
+    {"model": "ehnmxj", "key": "mug__ehnmxj", "G": 3, "T": 3, "V": 4, "R": 0, "score": 17,
+     "note": "Same plain white stackable mug as fapsrj; five near-duplicate rim pinches (7-10 mm wall), upright hang; clean, thin, no diversity."},
+    {"model": "lgxhsc", "key": "mug__lgxhsc", "G": 4, "T": 3, "V": 4, "R": 1, "score": 20,
+     "note": "White mug with flat strap handle; two handle pinches, two full body pinches upside-down (50/27), one thin rim lip pinch (antipodal 0.51)."},
+    {"model": "ppzttc", "key": "mug__ppzttc", "G": 4, "T": 3, "V": 5, "R": 1, "score": 22,
+     "note": "Olive mug with red/green floral texture, crisp; handle bar pinches, body pinches near base and rim; three distinct regions, all rows hold cleanly."},
+    {"model": "ycbmug", "key": "mug__ycbmug", "G": 2, "T": 3, "V": 5, "R": 0, "score": 17,
+     "note": "Red speckled enamel YCB mug, crisp texture; rim-only pinches whose fingers stop 6-20 mm wider than the 3-5 mm wall (hull gap), row 4 flagged."},
+    {"model": "jgethp", "key": "mug__jgethp", "G": 3, "T": 3, "V": 3, "R": 0, "score": 15,
+     "note": "Wide shallow white teacup (137x64 mm), not a mug shape; five near-duplicate rim pinches on 6-10 mm rim, cup hangs tilted 15-26 deg."},
+    {"model": "waqrdy", "key": "mug__waqrdy", "G": 4, "T": 3, "V": 3, "R": 1, "score": 18,
+     "note": "Tall tapered white 135 mm mug, pitcher-like; two upside-down base pinches with fingertip-only contact (50/24), three handle pinches (13-16 mm)."},
+    {"model": "ppdqbj", "key": "mug__ppdqbj", "G": 3, "T": 3, "V": 4, "R": 0, "score": 17,
+     "note": "Glossy solid-red tall mug with square handle, clean geometry; five near-duplicate rim pinches (8-9 mm wall, 10-12/0), upright hang."},
+    {"model": "yxaapv", "key": "mug__yxaapv", "G": 3, "T": 3, "V": 4, "R": 0, "score": 17,
+     "note": "White flared latte mug (124 mm tall), plain glossy material; five near-duplicate rim pinches (8-11 mm), upright hang; clean, no diversity."},
+    {"model": "ntgftr", "key": "mug__ntgftr", "G": 3, "T": 3, "V": 4, "R": 0, "score": 17,
+     "note": "Large plain white classic mug (106x96 mm); five near-duplicate rim pinches on 6-7 mm rim (10/0, 7/2), upright hang; clean, no diversity."}
+  ],
+  "selected": [
+    {"model": "ppzttc", "key": "mug__ppzttc", "rank": 1,
+     "reason": "Highest score; only textured mug (olive floral) and the only set with three distinct clean grasp regions (handle, body near base, body near rim) for in-hand transform diversity."},
+    {"model": "lgxhsc", "key": "mug__lgxhsc", "rank": 2,
+     "reason": "Second score (20); white strap-handle mug contrasts the olive #1 and offers handle, full-body upside-down and rim grasps; two rows weak (coverage 0.25, antipodal 0.51)."}
+  ],
+  "alternate": {"model": "waqrdy", "key": "mug__waqrdy"},
+  "short": false,
+  "warnings": [
+    "7 of 10 candidates (fapsrj, ehnmxj, ycbmug, jgethp, ppdqbj, yxaapv, ntgftr) offer only rim pinches from above on a 3-11 mm wall: near-duplicate upright poses, so G is capped at 3 and R=0; poor in-hand diversity for mental_rotation.",
+    "ycbmug: fingers stop 6-20 mm wider than the thin enamel wall (collision hull thicker than the visual), so its rim rows are not counted clean despite the crisp texture.",
+    "Shape outliers: jgethp is a wide shallow teacup (137x64 mm) and waqrdy a tall tapered 135 mm pitcher-like mug; fapsrj and ehnmxj look like the same asset.",
+    "Only ppzttc and lgxhsc have full body pinches; both rely on one-finger closures (50/2x) for them, and their handle/rim pinches are 4-9 mm thin."
+  ],
+  "confidence": "medium"
+}

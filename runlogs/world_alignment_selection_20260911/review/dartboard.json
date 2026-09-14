@@ -1,0 +1,26 @@
+{
+ "category": "dartboard",
+ "task": "wa1",
+ "n_models": 1,
+ "n_opened": 1,
+ "models": [
+  {
+   "model": "zjenlc",
+   "V": 5,
+   "U": 2,
+   "H": 2,
+   "score": 16,
+   "valid": true,
+   "up_axis": "-x",
+   "front_axis": "+z",
+   "thin_axis": "z",
+   "note": "flat 0.45 m board with crisp rim numerals; 20 sits at -x in the top view; numerals are the only asymmetry"
+  }
+ ],
+ "picks": [
+  "zjenlc"
+ ],
+ "alternate": null,
+ "category_verdict": "weak",
+ "category_note": "Classic dartboard 0.45 m across, 17 mm thick, lying flat (face +z, up = -x). Up is readable only from the rim numerals (20 on top) against a 20-fold symmetric pattern; single model."
+}

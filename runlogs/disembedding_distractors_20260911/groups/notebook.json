@@ -1,0 +1,24 @@
+{
+  "category": "notebook",
+  "n_models": 15,
+  "pages_opened": [
+    "grids/same/notebook__p1.png",
+    "grids/same/notebook__p2.png",
+    "grids/same/notebook__p3.png",
+    "grids/same/notebook__p4.png"
+  ],
+  "groups": [
+    {
+      "members": ["dlhxxl", "zkpswz"],
+      "reason": "Same 12x9x2 cm black hardcover with elastic band and white page block; identical appearance at all four yaws",
+      "confidence": "high"
+    }
+  ],
+  "unusable": [
+    {
+      "model": "xdnswn",
+      "reason": "Label reports 0 segmentation px at yaw 0 although rendered; near-untextured dark-grey slab"
+    }
+  ],
+  "notes": "Closest non-grouped pairs: zkmmnf vs dlhxxl/zkpswz (thinner plain slab, no band); eijrqw vs xdnswn (eijrqw shows a silver spiral at all yaws); jxabmj vs xhigou (both open sketchbooks with face sketches; xhigou has black cover rim, purple ink). xdnswn render looks fine but label reports 0 segmentation px."
+}

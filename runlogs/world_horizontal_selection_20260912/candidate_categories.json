@@ -1,0 +1,1212 @@
+{
+ "towel_rack": {
+  "group": "wall",
+  "why": "horizontal bar on brackets; world-vertical round-1 category (weak there: no readable up)",
+  "n_total": 7,
+  "n_ready": 6,
+  "rendered": [
+   "crivoa",
+   "kqrmrh",
+   "nhlijv",
+   "pqhsry",
+   "qedffr",
+   "quznqx"
+  ],
+  "bbox": {
+   "crivoa": [
+    0.041,
+    0.474,
+    0.041
+   ],
+   "kqrmrh": [
+    0.058,
+    0.474,
+    0.063
+   ],
+   "nhlijv": [
+    0.137,
+    0.526,
+    0.792
+   ],
+   "pqhsry": [
+    0.057,
+    0.474,
+    0.083
+   ],
+   "qedffr": [
+    0.14,
+    0.5,
+    1.669
+   ],
+   "quznqx": [
+    0.019,
+    0.407,
+    0.03
+   ]
+  }
+ },
+ "hook_rack": {
+  "group": "wall",
+  "why": "0.96 m rail with hooks",
+  "n_total": 1,
+  "n_ready": 1,
+  "rendered": [
+   "mdnfjr"
+  ],
+  "bbox": {
+   "mdnfjr": [
+    0.054,
+    0.956,
+    0.132
+   ]
+  }
+ },
+ "shelf": {
+  "group": "wall",
+  "why": "floating / bracket wall shelves (models <= 1.5 m long; shelving units excluded)",
+  "n_total": 29,
+  "n_ready": 24,
+  "rendered": [
+   "adgrkb",
+   "apiaid",
+   "cyckht",
+   "hrfwyd",
+   "ibrbnl",
+   "iruewm",
+   "kxvbui",
+   "notszn",
+   "qrmiur",
+   "wiiyfk",
+   "wvkefp",
+   "xogqqm",
+   "xrnzjv",
+   "zadqqv"
+  ],
+  "bbox": {
+   "adgrkb": [
+    0.328,
+    0.755,
+    0.289
+   ],
+   "apiaid": [
+    0.288,
+    1.49,
+    0.012
+   ],
+   "cyckht": [
+    0.185,
+    0.286,
+    0.048
+   ],
+   "hrfwyd": [
+    0.183,
+    0.267,
+    0.048
+   ],
+   "ibrbnl": [
+    0.328,
+    0.916,
+    0.289
+   ],
+   "iruewm": [
+    0.4,
+    0.602,
+    0.04
+   ],
+   "kxvbui": [
+    0.541,
+    1.241,
+    0.048
+   ],
+   "notszn": [
+    0.259,
+    1.106,
+    0.164
+   ],
+   "qrmiur": [
+    0.14,
+    0.555,
+    0.04
+   ],
+   "wiiyfk": [
+    0.592,
+    1.397,
+    0.107
+   ],
+   "wvkefp": [
+    0.592,
+    0.902,
+    0.107
+   ],
+   "xogqqm": [
+    0.31,
+    0.856,
+    0.098
+   ],
+   "xrnzjv": [
+    0.328,
+    0.418,
+    0.289
+   ],
+   "zadqqv": [
+    0.328,
+    0.513,
+    0.289
+   ]
+  }
+ },
+ "bookcase_shelf": {
+  "group": "wall",
+  "why": "single shelf plank 0.74 x 0.26 m",
+  "n_total": 1,
+  "n_ready": 1,
+  "rendered": [
+   "ymtnqa"
+  ],
+  "bbox": {
+   "ymtnqa": [
+    0.26,
+    0.74,
+    0.023
+   ]
+  }
+ },
+ "wall_mounted_tv": {
+  "group": "wall",
+  "why": "landscape screens 0.56-1.32 m wide (world-vertical drop: 180-deg ambiguity does not matter for level)",
+  "n_total": 20,
+  "n_ready": 15,
+  "rendered": [
+   "bfehsl",
+   "cwdngq",
+   "dxyfxf",
+   "gffrzl",
+   "ggfznh",
+   "leeqgt",
+   "ovzajm",
+   "sodbbr",
+   "ylvjhb"
+  ],
+  "bbox": {
+   "bfehsl": [
+    0.201,
+    1.107,
+    1.007
+   ],
+   "cwdngq": [
+    0.02,
+    1.312,
+    0.767
+   ],
+   "dxyfxf": [
+    0.06,
+    0.901,
+    0.518
+   ],
+   "gffrzl": [
+    0.053,
+    1.128,
+    0.73
+   ],
+   "ggfznh": [
+    0.072,
+    0.559,
+    0.372
+   ],
+   "leeqgt": [
+    0.068,
+    1.318,
+    0.772
+   ],
+   "ovzajm": [
+    0.068,
+    1.318,
+    0.772
+   ],
+   "sodbbr": [
+    0.06,
+    0.901,
+    0.518
+   ],
+   "ylvjhb": [
+    0.1,
+    0.925,
+    0.6
+   ]
+  }
+ },
+ "whiteboard": {
+  "group": "wall",
+  "why": "landscape boards with a marker tray",
+  "n_total": 3,
+  "n_ready": 3,
+  "rendered": [
+   "bqqmtc",
+   "gvkgsi",
+   "onhspt"
+  ],
+  "bbox": {
+   "bqqmtc": [
+    0.047,
+    0.875,
+    0.61
+   ],
+   "gvkgsi": [
+    0.02,
+    1.233,
+    0.729
+   ],
+   "onhspt": [
+    0.084,
+    3.19,
+    0.965
+   ]
+  }
+ },
+ "bulletin_board": {
+  "group": "wall",
+  "why": "landscape cork boards ~1.08 x 0.75 m",
+  "n_total": 2,
+  "n_ready": 2,
+  "rendered": [
+   "ayaoal",
+   "rjlpsy"
+  ],
+  "bbox": {
+   "ayaoal": [
+    0.756,
+    1.083,
+    0.048
+   ],
+   "rjlpsy": [
+    0.738,
+    1.07,
+    0.025
+   ]
+  }
+ },
+ "address": {
+  "group": "wall",
+  "why": "house address plaque 0.58 x 0.16 m",
+  "n_total": 1,
+  "n_ready": 1,
+  "rendered": [
+   "pbfbxj"
+  ],
+  "bbox": {
+   "pbfbxj": [
+    0.036,
+    0.577,
+    0.161
+   ]
+  }
+ },
+ "decorative_sign": {
+  "group": "wall",
+  "why": "cut-out word signs (LOVE, Welcome HOME): text baseline; world-vertical round 1",
+  "n_total": 3,
+  "n_ready": 3,
+  "rendered": [
+   "hgonwj",
+   "rypeha",
+   "xzsmxq"
+  ],
+  "bbox": {
+   "hgonwj": [
+    0.06,
+    0.604,
+    0.485
+   ],
+   "rypeha": [
+    0.024,
+    0.334,
+    0.13
+   ],
+   "xzsmxq": [
+    0.067,
+    0.925,
+    0.602
+   ]
+  }
+ },
+ "signpost": {
+  "group": "wall",
+  "why": "wide indoor text / pictogram plates; world-vertical round 1",
+  "n_total": 10,
+  "n_ready": 7,
+  "rendered": [
+   "axhlim",
+   "ivvjfv",
+   "mexzmk",
+   "mlvfbp",
+   "sdsfzw",
+   "vvjtkv",
+   "vwhtlm"
+  ],
+  "bbox": {
+   "axhlim": [
+    0.03,
+    0.164,
+    0.221
+   ],
+   "ivvjfv": [
+    0.052,
+    0.408,
+    0.118
+   ],
+   "mexzmk": [
+    0.025,
+    0.225,
+    0.152
+   ],
+   "mlvfbp": [
+    0.026,
+    0.226,
+    0.152
+   ],
+   "sdsfzw": [
+    0.0,
+    0.194,
+    0.194
+   ],
+   "vvjtkv": [
+    0.041,
+    0.503,
+    0.171
+   ],
+   "vwhtlm": [
+    0.022,
+    0.626,
+    0.266
+   ]
+  }
+ },
+ "license_plate": {
+  "group": "wall",
+  "why": "0.31 x 0.16 m plates with text (aspect 2); world-vertical round 2",
+  "n_total": 5,
+  "n_ready": 5,
+  "rendered": [
+   "hjdaqn",
+   "naclac",
+   "nuqnlr",
+   "nwfbxn",
+   "yepdrj"
+  ],
+  "bbox": {
+   "hjdaqn": [
+    0.308,
+    0.155,
+    0.004
+   ],
+   "naclac": [
+    0.308,
+    0.155,
+    0.004
+   ],
+   "nuqnlr": [
+    0.308,
+    0.155,
+    0.004
+   ],
+   "nwfbxn": [
+    0.308,
+    0.155,
+    0.004
+   ],
+   "yepdrj": [
+    0.308,
+    0.155,
+    0.004
+   ]
+  }
+ },
+ "hanger": {
+  "group": "wall",
+  "why": "clothes hangers: level bar under a hook; world-vertical round 1",
+  "n_total": 7,
+  "n_ready": 6,
+  "rendered": [
+   "agrpio",
+   "anobre",
+   "ffecvd",
+   "lymqks",
+   "nadesv",
+   "nagryh"
+  ],
+  "bbox": {
+   "agrpio": [
+    0.232,
+    0.426,
+    0.04
+   ],
+   "anobre": [
+    0.229,
+    0.436,
+    0.003
+   ],
+   "ffecvd": [
+    0.241,
+    0.441,
+    0.077
+   ],
+   "lymqks": [
+    0.261,
+    0.471,
+    0.05
+   ],
+   "nadesv": [
+    0.257,
+    0.435,
+    0.06
+   ],
+   "nagryh": [
+    0.235,
+    0.437,
+    0.018
+   ]
+  }
+ },
+ "air_conditioner": {
+  "group": "wall",
+  "why": "wall split unit 0.88 x 0.30 x 0.21 m",
+  "n_total": 1,
+  "n_ready": 1,
+  "rendered": [
+   "pekain"
+  ],
+  "bbox": {
+   "pekain": [
+    0.3,
+    0.875,
+    0.205
+   ]
+  }
+ },
+ "wall_mounted_light": {
+  "group": "wall",
+  "why": "vanity light bars 0.62 m and sconces",
+  "n_total": 11,
+  "n_ready": 6,
+  "rendered": [
+   "bkaivt",
+   "bxsyxf",
+   "etqbld",
+   "jhpygl",
+   "trxlgu",
+   "wcnxct"
+  ],
+  "bbox": {
+   "bkaivt": [
+    0.199,
+    0.615,
+    0.161
+   ],
+   "bxsyxf": [
+    0.189,
+    0.215,
+    0.215
+   ],
+   "etqbld": [
+    0.133,
+    0.079,
+    0.502
+   ],
+   "jhpygl": [
+    0.206,
+    0.62,
+    0.181
+   ],
+   "trxlgu": [
+    0.159,
+    0.119,
+    0.281
+   ],
+   "wcnxct": [
+    0.421,
+    0.142,
+    0.558
+   ]
+  }
+ },
+ "radiator": {
+  "group": "wall",
+  "why": "wall panel radiators (tall vertical models excluded)",
+  "n_total": 16,
+  "n_ready": 15,
+  "rendered": [
+   "arfdpk",
+   "arsjbe",
+   "cbjgea",
+   "dwmloz",
+   "jlhyiq",
+   "jxrlul",
+   "lnvush",
+   "wntwxx",
+   "xnoiwp",
+   "zgjthd",
+   "znmvtw"
+  ],
+  "bbox": {
+   "arfdpk": [
+    0.055,
+    0.356,
+    0.155
+   ],
+   "arsjbe": [
+    0.071,
+    1.274,
+    0.757
+   ],
+   "cbjgea": [
+    0.182,
+    0.938,
+    0.598
+   ],
+   "dwmloz": [
+    0.045,
+    0.356,
+    0.216
+   ],
+   "jlhyiq": [
+    0.275,
+    0.708,
+    0.698
+   ],
+   "jxrlul": [
+    0.23,
+    0.708,
+    0.699
+   ],
+   "lnvush": [
+    0.182,
+    0.708,
+    0.701
+   ],
+   "wntwxx": [
+    0.044,
+    0.356,
+    0.181
+   ],
+   "xnoiwp": [
+    0.071,
+    1.25,
+    0.757
+   ],
+   "zgjthd": [
+    0.195,
+    0.708,
+    0.7
+   ],
+   "znmvtw": [
+    0.275,
+    0.938,
+    0.495
+   ]
+  }
+ },
+ "range_hood": {
+  "group": "wall",
+  "why": "wall hoods 0.72-1.05 m wide (thick; likely H <= 1)",
+  "n_total": 9,
+  "n_ready": 7,
+  "rendered": [
+   "beanpv",
+   "duqgcu",
+   "iqbpie",
+   "lejkwg",
+   "uokzpw",
+   "ylsdmp"
+  ],
+  "bbox": {
+   "beanpv": [
+    0.307,
+    1.053,
+    0.019
+   ],
+   "duqgcu": [
+    0.475,
+    0.717,
+    0.717
+   ],
+   "iqbpie": [
+    0.475,
+    0.716,
+    0.541
+   ],
+   "lejkwg": [
+    0.61,
+    0.92,
+    0.103
+   ],
+   "uokzpw": [
+    0.302,
+    1.052,
+    0.012
+   ],
+   "ylsdmp": [
+    0.475,
+    0.717,
+    0.263
+   ]
+  }
+ },
+ "frame": {
+  "group": "wall",
+  "why": "plain frames 1.46-1.76 m (over the size limit; kept for the record)",
+  "n_total": 2,
+  "n_ready": 2,
+  "rendered": [
+   "argijo",
+   "trhhqo"
+  ],
+  "bbox": {
+   "argijo": [
+    1.459,
+    0.713,
+    0.093
+   ],
+   "trhhqo": [
+    1.76,
+    0.989,
+    0.059
+   ]
+  }
+ },
+ "board": {
+  "group": "wall",
+  "why": "plywood board 1.12 x 0.74 m",
+  "n_total": 1,
+  "n_ready": 1,
+  "rendered": [
+   "fxugbm"
+  ],
+  "bbox": {
+   "fxugbm": [
+    0.74,
+    1.117,
+    0.014
+   ]
+  }
+ },
+ "picture": {
+  "group": "wall",
+  "why": "landscape framed prints (aspect >= 1.3 subset); world-vertical round 1",
+  "n_total": 85,
+  "n_ready": 46,
+  "rendered": [
+   "chfljy",
+   "cltbty",
+   "etixod",
+   "fhkzlm",
+   "hffaxw",
+   "hhxttu",
+   "jpfyrq",
+   "qavxsz",
+   "szpupz",
+   "watgtj",
+   "wfdvzv",
+   "ytxhyl"
+  ],
+  "bbox": {
+   "chfljy": [
+    0.9,
+    0.6,
+    0.032
+   ],
+   "cltbty": [
+    0.457,
+    0.686,
+    0.016
+   ],
+   "etixod": [
+    0.406,
+    0.686,
+    0.016
+   ],
+   "fhkzlm": [
+    1.028,
+    0.686,
+    0.016
+   ],
+   "hffaxw": [
+    0.658,
+    0.494,
+    0.04
+   ],
+   "hhxttu": [
+    0.457,
+    0.686,
+    0.016
+   ],
+   "jpfyrq": [
+    0.505,
+    0.686,
+    0.016
+   ],
+   "qavxsz": [
+    0.429,
+    0.686,
+    0.016
+   ],
+   "szpupz": [
+    0.385,
+    0.686,
+    0.016
+   ],
+   "watgtj": [
+    0.775,
+    0.495,
+    0.021
+   ],
+   "wfdvzv": [
+    0.457,
+    0.686,
+    0.016
+   ],
+   "ytxhyl": [
+    1.028,
+    0.686,
+    0.016
+   ]
+  }
+ },
+ "painting": {
+  "group": "wall",
+  "why": "landscape paintings (aspect >= 1.3 subset); world-vertical round 1 (pinned)",
+  "n_total": 39,
+  "n_ready": 36,
+  "rendered": [
+   "ejhanr",
+   "fwuole",
+   "gardkz",
+   "qvmegb",
+   "tpmcuj",
+   "xlzxry"
+  ],
+  "bbox": {
+   "ejhanr": [
+    0.028,
+    1.039,
+    0.697
+   ],
+   "fwuole": [
+    0.023,
+    1.129,
+    0.828
+   ],
+   "gardkz": [
+    0.007,
+    0.324,
+    0.237
+   ],
+   "qvmegb": [
+    0.016,
+    0.886,
+    0.637
+   ],
+   "tpmcuj": [
+    0.016,
+    0.713,
+    0.493
+   ],
+   "xlzxry": [
+    0.02,
+    0.771,
+    0.546
+   ]
+  }
+ },
+ "poster": {
+  "group": "wall",
+  "why": "portrait movie poster 0.62 x 0.89 m (horizontal = short edge / title baseline)",
+  "n_total": 1,
+  "n_ready": 1,
+  "rendered": [
+   "dsrcyt"
+  ],
+  "bbox": {
+   "dsrcyt": [
+    0.01,
+    0.618,
+    0.888
+   ]
+  }
+ },
+ "baseball_bat": {
+  "group": "rod",
+  "why": "0.75-0.81 m bats (wall display racks)",
+  "n_total": 2,
+  "n_ready": 2,
+  "rendered": [
+   "spcxrt",
+   "yalgei"
+  ],
+  "bbox": {
+   "spcxrt": [
+    0.755,
+    0.054,
+    0.054
+   ],
+   "yalgei": [
+    0.813,
+    0.066,
+    0.067
+   ]
+  }
+ },
+ "golf_club": {
+  "group": "rod",
+  "why": "1.0 m club",
+  "n_total": 1,
+  "n_ready": 1,
+  "rendered": [
+   "egsojb"
+  ],
+  "bbox": {
+   "egsojb": [
+    1.001,
+    0.078,
+    0.029
+   ]
+  }
+ },
+ "fishing_rod": {
+  "group": "rod",
+  "why": "1.33 m rod (wall rod racks; over the 1.3 m limit)",
+  "n_total": 1,
+  "n_ready": 1,
+  "rendered": [
+   "zhmrtc"
+  ],
+  "bbox": {
+   "zhmrtc": [
+    1.332,
+    0.125,
+    0.102
+   ]
+  }
+ },
+ "skateboard_deck": {
+  "group": "rod",
+  "why": "1.04 m deck with trucks (horizontal wall display); configuration_matching-3 category",
+  "n_total": 1,
+  "n_ready": 1,
+  "rendered": [
+   "tgfidu"
+  ],
+  "bbox": {
+   "tgfidu": [
+    0.264,
+    1.044,
+    0.106
+   ]
+  }
+ },
+ "longboard": {
+  "group": "rod",
+  "why": "1.04 m longboard",
+  "n_total": 1,
+  "n_ready": 1,
+  "rendered": [
+   "osdbnt"
+  ],
+  "bbox": {
+   "osdbnt": [
+    0.327,
+    1.044,
+    0.149
+   ]
+  }
+ },
+ "guitar": {
+  "group": "rod",
+  "why": "1.04 m guitars (horizontal wall hangers exist); world-vertical round 1",
+  "n_total": 4,
+  "n_ready": 3,
+  "rendered": [
+   "cybisc",
+   "gysapt",
+   "hpqjrq"
+  ],
+  "bbox": {
+   "cybisc": [
+    1.042,
+    0.341,
+    0.05
+   ],
+   "gysapt": [
+    1.041,
+    0.279,
+    0.067
+   ],
+   "hpqjrq": [
+    1.041,
+    0.261,
+    0.035
+   ]
+  }
+ },
+ "trumpet": {
+  "group": "rod",
+  "why": "0.91 m trumpet (wall mount)",
+  "n_total": 1,
+  "n_ready": 1,
+  "rendered": [
+   "bafgow"
+  ],
+  "bbox": {
+   "bafgow": [
+    0.911,
+    0.254,
+    0.161
+   ]
+  }
+ },
+ "violin": {
+  "group": "rod",
+  "why": "0.60 m violin; world-vertical not selected",
+  "n_total": 1,
+  "n_ready": 1,
+  "rendered": [
+   "rgwsac"
+  ],
+  "bbox": {
+   "rgwsac": [
+    0.603,
+    0.209,
+    0.103
+   ]
+  }
+ },
+ "tennis_racket": {
+  "group": "rod",
+  "why": "0.82 m racket; world-vertical not selected",
+  "n_total": 1,
+  "n_ready": 1,
+  "rendered": [
+   "rmvafy"
+  ],
+  "bbox": {
+   "rmvafy": [
+    0.819,
+    0.337,
+    0.028
+   ]
+  }
+ },
+ "rolling_pin": {
+  "group": "rod",
+  "why": "0.40-0.42 m pins (kitchen wall hooks)",
+  "n_total": 2,
+  "n_ready": 2,
+  "rendered": [
+   "mwrdae",
+   "smnklu"
+  ],
+  "bbox": {
+   "mwrdae": [
+    0.062,
+    0.417,
+    0.062
+   ],
+   "smnklu": [
+    0.055,
+    0.398,
+    0.055
+   ]
+  }
+ },
+ "ruler": {
+  "group": "rod",
+  "why": "0.33 m rulers (workshop wall hook); 0.12-0.17 m models excluded",
+  "n_total": 5,
+  "n_ready": 5,
+  "rendered": [
+   "rutqab",
+   "ujizkx",
+   "vmnaih"
+  ],
+  "bbox": {
+   "rutqab": [
+    0.028,
+    0.33,
+    0.024
+   ],
+   "ujizkx": [
+    0.026,
+    0.332,
+    0.001
+   ],
+   "vmnaih": [
+    0.026,
+    0.332,
+    0.001
+   ]
+  }
+ },
+ "drumstick": {
+  "group": "rod",
+  "why": "0.38-0.41 m sticks, 1 cm thick (display)",
+  "n_total": 2,
+  "n_ready": 2,
+  "rendered": [
+   "jauzlc",
+   "lkvzmj"
+  ],
+  "bbox": {
+   "jauzlc": [
+    0.375,
+    0.015,
+    0.014
+   ],
+   "lkvzmj": [
+    0.406,
+    0.012,
+    0.012
+   ]
+  }
+ },
+ "poker": {
+  "group": "rod",
+  "why": "0.66 m fireplace poker",
+  "n_total": 1,
+  "n_ready": 1,
+  "rendered": [
+   "rwypbs"
+  ],
+  "bbox": {
+   "rwypbs": [
+    0.664,
+    0.054,
+    0.03
+   ]
+  }
+ },
+ "axe": {
+  "group": "rod",
+  "why": "0.53 m axe (wall display)",
+  "n_total": 1,
+  "n_ready": 1,
+  "rendered": [
+   "plqyos"
+  ],
+  "bbox": {
+   "plqyos": [
+    0.535,
+    0.204,
+    0.041
+   ]
+  }
+ },
+ "umbrella": {
+  "group": "rod",
+  "why": "0.5-1.0 m closed umbrellas; world-vertical round 2",
+  "n_total": 5,
+  "n_ready": 5,
+  "rendered": [
+   "cqfbku",
+   "frpfnc",
+   "hdfkbc",
+   "ziqzqo",
+   "zxnjwz"
+  ],
+  "bbox": {
+   "cqfbku": [
+    0.503,
+    0.178,
+    0.099
+   ],
+   "frpfnc": [
+    0.712,
+    0.127,
+    0.069
+   ],
+   "hdfkbc": [
+    0.939,
+    0.07,
+    0.07
+   ],
+   "ziqzqo": [
+    0.813,
+    0.114,
+    0.07
+   ],
+   "zxnjwz": [
+    1.027,
+    0.073,
+    0.076
+   ]
+  }
+ },
+ "handle": {
+  "group": "rod",
+  "why": "0.62 x 0.13 m bar handle (grab bar?)",
+  "n_total": 1,
+  "n_ready": 1,
+  "rendered": [
+   "apdvez"
+  ],
+  "bbox": {
+   "apdvez": [
+    0.127,
+    0.623,
+    0.039
+   ]
+  }
+ },
+ "rake": {
+  "group": "rod",
+  "why": "garden rake 1.02 m (garage wall)",
+  "n_total": 2,
+  "n_ready": 2,
+  "rendered": [
+   "jjetot",
+   "yadqbu"
+  ],
+  "bbox": {
+   "jjetot": [
+    1.023,
+    0.401,
+    0.034
+   ],
+   "yadqbu": [
+    1.405,
+    0.569,
+    0.115
+   ]
+  }
+ },
+ "shovel": {
+  "group": "rod",
+  "why": "0.74 m shovel (garage wall)",
+  "n_total": 1,
+  "n_ready": 1,
+  "rendered": [
+   "guynvr"
+  ],
+  "bbox": {
+   "guynvr": [
+    0.737,
+    0.147,
+    0.065
+   ]
+  }
+ },
+ "wall_mounted_loudspeaker": {
+  "group": "wall",
+  "why": "0.31 m speaker / soundbar",
+  "n_total": 2,
+  "n_ready": 1,
+  "rendered": [
+   "wxkuww"
+  ],
+  "bbox": {
+   "wxkuww": [
+    0.146,
+    0.137,
+    0.308
+   ]
+  }
+ }
+}

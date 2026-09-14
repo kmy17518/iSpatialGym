@@ -1,0 +1,55 @@
+{
+ "key": "sliding_door__tprpvb",
+ "category": "sliding_door",
+ "model": "tprpvb",
+ "scene": "house_single_floor",
+ "host": "sliding_door_tprpvb_1",
+ "host_rank": 2,
+ "host_model": "tprpvb",
+ "swap": false,
+ "joints": [
+  {
+   "joint": "j_movingpart",
+   "kind": "drawer",
+   "grasp_source": "manual",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.15,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [20.203441619873047, 14.228894233703613, 1.1600362062454224]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [20.203441619873047, 14.228894233703613, 1.1600362062454224]})",
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [20.203441619873047, 14.228894233703613, 1.1600362062454224]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [20.203441619873047, 14.228894233703613, 1.1600362062454224]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    20.203,
+    14.229,
+    1.16
+   ],
+   "handle_height_above_floor": 1.155,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 0,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 4
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [
+  "sliding_door_lrvyvc_0",
+  "sliding_door_tprpvb_0"
+ ],
+ "scale": [
+  1.001,
+  1.063,
+  1.0
+ ],
+ "time_s": 185.5
+}

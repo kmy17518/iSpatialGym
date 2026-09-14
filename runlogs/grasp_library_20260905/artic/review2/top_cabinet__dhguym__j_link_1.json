@@ -1,0 +1,5 @@
+{"key": "top_cabinet__dhguym", "joint": "j_link_1", "feasible": false,
+ "proposal": {"face": "outer", "a": 0.88, "b": 0.5, "pinch": "horizontal", "approach": "front", "depth_mm": 15, "expected_motion": "swing"},
+ "alternative": null,
+ "note": "Flush inset door; only relief is the 18 mm moulding step. A fingertip could hook the right (free) stile step and pull, no opposing surface.",
+ "confidence": "medium"}

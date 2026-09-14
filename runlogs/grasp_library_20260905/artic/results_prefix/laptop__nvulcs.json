@@ -1,0 +1,49 @@
+{
+ "key": "laptop__nvulcs",
+ "category": "laptop",
+ "model": "nvulcs",
+ "aabb_extent": [
+  0.2033853679895401,
+  0.26767677068710327,
+  0.01992025226354599
+ ],
+ "support": "table",
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "flap",
+   "grasp_source": "review:F",
+   "stance": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [1.170699954032898, 0.03920000046491623, 0.7663866281509399]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [1.170699954032898, 0.03920000046491623, 0.7663866281509399]})"
+   ],
+   "error": "unreachable: no stance",
+   "contact_world": [
+    1.171,
+    0.039,
+    0.766
+   ],
+   "handle_height": 0.766,
+   "diag_stance": {
+    "probed": 12,
+    "collision_free": 7,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 2,
+    "handle_height": 0.766,
+    "approach": [
+     1.0,
+     -0.0,
+     -0.0
+    ]
+   }
+  }
+ ],
+ "error": null,
+ "time_s": 9.7
+}

@@ -21,11 +21,32 @@ env/
 # Logs / caches
 *.log
 .cache/
+.pytest_cache/
 
-# Separate nested repo (StanfordVL/BEHAVIOR-1K)
+# Separate nested repo (kmy17518/BEHAVIOR-1K fork, branch `ispatialgym`; cloned by setup.sh)
 Behavior-1K/
 
-# Generated task instances (ispatialgym.sampling default output) and sampler probes
-datasets/
+# Separate nested repo (project website), not part of this package
+ispatialgym/behavior-vision-suite.github.io/
+
+# Generated task instances (ispatialgym.sampling default output, repo-root datasets/ only) and sampler probes
+/datasets/
 sampling_report_*.json
 validation_report_*.json
+
+# Run logs: keep the small data the sampler reads (grasp library yaml/json, selection csv/json, scripts, notes)
+# but not the rendered frames / strips / videos (GBs of images).
+runlogs/**/*.png
+runlogs/**/*.jpg
+runlogs/**/*.jpeg
+runlogs/**/*.gif
+runlogs/**/*.mp4
+runlogs/**/*.webm
+runlogs/**/*.npy
+runlogs/**/*.npz
+runlogs/**/*.pt
+runlogs/**/*.pth
+runlogs/**/*.pkl
+runlogs/**/*.usd
+runlogs/**/*.usda
+runlogs/**/*.usdc

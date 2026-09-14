@@ -1,0 +1,52 @@
+{
+ "key": "oven__rwuazb",
+ "category": "oven",
+ "model": "rwuazb",
+ "scene": "house_double_floor_lower",
+ "host": "oven_ffitak_0",
+ "host_rank": 0,
+ "host_model": "ffitak",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_dof_rootd_aa001_r",
+   "kind": "flap",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     7.11,
+     -0.02,
+     -1.571
+    ],
+    "translate": 0.5,
+    "sign": 1.0
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "stance ok",
+    "sign +1: grasp: [grasp] o_oven__rwuazb not in hand after closing gripper {'in_hand': None}"
+   ],
+   "error": "grasp: [grasp] o_oven__rwuazb not in hand after closing gripper {'in_hand': None}",
+   "contact_world": [
+    6.91,
+    -0.42,
+    0.669
+   ],
+   "handle_height_above_floor": 0.663
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.12,
+  1.126,
+  1.106
+ ],
+ "time_s": 64.8
+}

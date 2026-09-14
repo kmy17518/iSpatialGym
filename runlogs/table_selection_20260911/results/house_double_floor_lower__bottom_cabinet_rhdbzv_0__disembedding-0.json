@@ -1,0 +1,174 @@
+{
+ "scene": "house_double_floor_lower",
+ "table": "bottom_cabinet_rhdbzv_0",
+ "category": "bottom_cabinet",
+ "model": "rhdbzv",
+ "rooms": [
+  "living_room_0"
+ ],
+ "partner": null,
+ "problem": "disembedding-0",
+ "inventory": {
+  "top_z": 0.413,
+  "bbox_x": 0.406,
+  "bbox_y": 2.338,
+  "bbox_z": 0.413,
+  "verdict": "low"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:09:54",
+ "precheck": {
+  "aabb": [
+   [
+    6.015,
+    3.321,
+    0.0
+   ],
+   [
+    6.42,
+    5.659,
+    0.413
+   ]
+  ],
+  "support": {
+   "name": "bottom_cabinet_rhdbzv_0",
+   "z": 0.41331279277801514,
+   "yaw": -3.141592264175415,
+   "local_bounds": [
+    -6.404558181762695,
+    -6.044557571411133,
+    -5.651133060455322,
+    -3.3311331272125244
+   ],
+   "n_free_cells": 2223,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     6.045,
+     4.491
+    ],
+    "length": 2.32
+   },
+   {
+    "name": "-u",
+    "mid": [
+     6.405,
+     4.491
+    ],
+    "length": 2.32
+   },
+   {
+    "name": "+v",
+    "mid": [
+     6.225,
+     3.331
+    ],
+    "length": 0.36
+   },
+   {
+    "name": "-v",
+    "mid": [
+     6.225,
+     5.651
+    ],
+    "length": 0.36
+   }
+  ],
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    6.0445556640625,
+    4.491135597229004
+   ],
+   "inward": [
+    1.0,
+    3.8941436741879443e-07
+   ],
+   "tangent": [
+    -3.8941436741879443e-07,
+    1.0
+   ],
+   "base_pose2d": [
+    5.594555854797363,
+    4.491135597229004,
+    3.8941436741877473e-07
+   ],
+   "edge_depth": 0.4499998092651367,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.13959433873025784
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.1
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "distractors": {
+   "same_category": false,
+   "pool": "other_category",
+   "requested_pool": "other_category",
+   "fallback": null,
+   "models": [
+    "box_of_shampoo-bclpiq"
+   ],
+   "requested": 1,
+   "pool_size": 47,
+   "pool_categories": [
+    "bottle_of_milk",
+    "box_of_baking_mix",
+    "box_of_butter",
+    "box_of_cane_sugar",
+    "box_of_cookies",
+    "box_of_granola_bars",
+    "box_of_oatmeal",
+    "box_of_rice",
+    "box_of_shampoo",
+    "carton_of_milk"
+   ],
+   "lookalikes_excluded": [
+    "box_of_cereal/qirvmd"
+   ],
+   "footprint_fraction": 0.18
+  },
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/house_double_floor_lower/house_double_floor_lower__bottom_cabinet_rhdbzv_0__disembedding-0__s1",
+ "setup_s": 3.5,
+ "reject_reason": "no_support",
+ "error": "[no_support] bottom_cabinet_rhdbzv_0: [support] untucked: [support] edge +u lateral +0.00: [support] source tray not fully supported at the canonical position (stance lateral +0.00, footprint u 4.27..4.71 vs support (-6.404558181762695, -6.044557571411133, -5.651133060455322, -3.3311331272125244)); edge +u lateral +0.25: [support] source tray not fully supported at the canonical position (stance lateral +0.20, footprint u 4.47..4.91 vs support (-6.404558181762695, -6.044557571411133, -5.651133060455322, -3.3311331272125244)); edge +u lateral -0.25: [support] source tray not fully supported at the canonical position (stance lateral -0.20, footprint u 4.07..4.51 vs support (-6.404558181762695, -6.044557571411133, -5.651133060455322, -3.3311331272125244)); edge +u lateral +0.35: [support] source tray not fully supported at the canonical position (stance lateral +0.30, footprint u 4.58..5.01 vs support (-6.404558181762695, -6.044557571411133, -5.651133060455322, -3.3311331272125244)); edge +u lateral -0.35: [support] source tray not fully supported at the canonical position (stance lateral -0.30, footprint u 3.97..4.41 vs support (-6.404558181762695, -6.044557571411133, -5.651133060455322, -3.3311331272125244)); edge -u: [no_stance] no collision-free stance around bottom_cabinet_rhdbzv_0; edge +v: [no_stance] no collision-free stance around bottom_cabinet_rhdbzv_0; edge -v: [no_stance] no traversable stance around bottom_cabinet_rhdbzv_0; edge +u lateral +0.00 (yaw allowed): [support] source tray not fully supported at the canonical position (stance lateral +0.00, footprint u 4.27..4.71 vs support (-6.404558181762695, -6.044557571411133, -5.651133060455322, -3.3311331272125244)); edge +u lateral +0.25 (yaw allowed): [support] source tray not fully supported at the canonical position (stance lateral +0.20, footprint u 4.47..4.91 vs support (-6.404558181762695, -6.044557571411133, -5.651133060455322, -3.3311331272125244)); edge +u lateral -0.25 (yaw allowed): [support] so",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 4.4,
+   "run_s": null
+  },
+  {
+   "seed": 1000,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 3.5,
+   "run_s": null
+  }
+ ],
+ "job_s": 11.9,
+ "finished": "2026-09-12 02:10:06"
+}

@@ -1,0 +1,241 @@
+{
+ "scene": "house_single_floor",
+ "table": "bar_udatjt_0",
+ "category": "bar",
+ "model": "udatjt",
+ "rooms": [
+  "kitchen_0"
+ ],
+ "partner": null,
+ "problem": "disembedding-0",
+ "inventory": {
+  "top_z": 1.052,
+  "bbox_x": 1.145,
+  "bbox_y": 2.994,
+  "bbox_z": 1.051,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 23:31:19",
+ "precheck": {
+  "aabb": [
+   [
+    5.789,
+    -0.305,
+    0.001
+   ],
+   [
+    8.786,
+    0.848,
+    1.052
+   ]
+  ],
+  "support": {
+   "name": "bar_udatjt_0",
+   "z": 1.0505356788635254,
+   "yaw": -1.5733394622802734,
+   "local_bounds": [
+    -0.8629434704780579,
+    0.2797994017601013,
+    5.796337127685547,
+    8.77922534942627
+   ],
+   "n_free_cells": 8605,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     7.287,
+     -0.298
+    ],
+    "length": 2.983
+   },
+   {
+    "name": "-u",
+    "mid": [
+     7.29,
+     0.844
+    ],
+    "length": 2.983
+   },
+   {
+    "name": "+v",
+    "mid": [
+     8.78,
+     0.269
+    ],
+    "length": 1.143
+   },
+   {
+    "name": "-v",
+    "mid": [
+     5.797,
+     0.277
+    ],
+    "length": 1.143
+   }
+  ],
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    8.779938697814941,
+    0.26924437284469604
+   ],
+   "inward": [
+    -0.9999967813491821,
+    0.0025431327521800995
+   ],
+   "tangent": [
+    -0.0025431327521800995,
+    -0.9999967813491821
+   ],
+   "base_pose2d": [
+    9.229937553405762,
+    0.26809996366500854,
+    3.139049518134753
+   ],
+   "edge_depth": 0.4500003159046173,
+   "view": {
+    "translate": 0.75,
+    "tilt": 0.10000002384185791,
+    "axis_angle": 0.0004882812548506386
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 8.0
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "support": {
+   "name": "bar_udatjt_0",
+   "z": 1.0505356788635254,
+   "yaw": -1.5733394622802734,
+   "local_bounds": [
+    -0.8629432320594788,
+    0.2797996401786804,
+    5.796337127685547,
+    8.77922534942627
+   ],
+   "n_free_cells": 8605,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-v",
+   "edge_mid": [
+    5.797060012817383,
+    0.2768300175666809
+   ],
+   "inward": [
+    0.9999967813491821,
+    -0.0025431327521800995
+   ],
+   "tangent": [
+    0.0025431327521800995,
+    0.9999967813491821
+   ],
+   "base_pose2d": [
+    5.347878932952881,
+    0.5993448495864868,
+    0.146221043036786
+   ],
+   "edge_depth": 0.4499998092651367,
+   "view": {
+    "translate": 0.75,
+    "tilt": 0.15000002086162567,
+    "axis_angle": 0.12555886652452
+   }
+  },
+  "place_stance": {
+   "edge": "-v",
+   "edge_mid": [
+    5.797060012817383,
+    0.2768300175666809
+   ],
+   "inward": [
+    0.9999967813491821,
+    -0.0025431327521800995
+   ],
+   "tangent": [
+    0.0025431327521800995,
+    0.9999967813491821
+   ],
+   "base_pose2d": [
+    5.346203804016113,
+    -0.059374213218688965,
+    -0.0025431354550402253
+   ],
+   "edge_depth": 0.44999974966049194
+  },
+  "yaw_adjust_deg": 8.5235595703125,
+  "dest_lateral_m": -0.6587212085723877,
+  "dest_side": "right",
+  "n_reachable_cells": 9,
+  "distractors": {
+   "same_category": false,
+   "pool": "other_category",
+   "requested_pool": "other_category",
+   "fallback": null,
+   "models": [
+    "box_of_baking_mix-ltccey",
+    "box_of_baking_mix-xcxrek",
+    "carton_of_milk-kklgxk"
+   ],
+   "requested": 3,
+   "pool_size": 47,
+   "pool_categories": [
+    "bottle_of_milk",
+    "box_of_baking_mix",
+    "box_of_butter",
+    "box_of_cane_sugar",
+    "box_of_cookies",
+    "box_of_granola_bars",
+    "box_of_oatmeal",
+    "box_of_rice",
+    "box_of_shampoo",
+    "carton_of_milk"
+   ],
+   "lookalikes_excluded": [
+    "box_of_cereal/qirvmd"
+   ],
+   "footprint_fraction": 0.3
+  },
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/house_single_floor/house_single_floor__bar_udatjt_0__disembedding-0__s1",
+ "setup_s": 507.5,
+ "reject_reason": "no_support",
+ "error": "[no_support] bar_udatjt_0: [support] untucked: [support] edge +u lateral +0.00: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge +u lateral +0.25: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge +u lateral -0.25: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge +u lateral +0.35: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge +u lateral -0.35: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge -u: [no_stance] no collision-free stance around bar_udatjt_0; edge +v lateral +0.00: [support] no lateral room for the destination tray on either side (support bounds (-0.8629432320594788, 0.2797996401786804, 5.796337127685547, 8.77922534942627)); edge +v lateral +0.25: [support] no view / side keeps the source tray in view with the destination tray barely visible ({'views': 40, 'collision_free': 2, 'src_in_view': 2, 'lateral_out_of_range': 2, 'yaw_search_failed': 0, 'yaw_collision': 0, 'yaw_src_out': 0}; source tray at depth 0.23, dest options [('right', -0.54)], support bounds (-0.8629432320594788, 0.2797996401786804, 5.796337127685547, 8.77922534942627)); edge +v lateral -0.25: [support] no view / side keeps the source tray in view with the destination tray barely visible ({'views': 40, 'collision_free': 2, 'src_in_view': 2, 'lateral_out_of_range': 2, 'yaw_search_failed': 0, 'yaw_collision': 0, 'yaw_src_out': 0}; source tray at depth 0.23, dest options [('left', 0.54)], support bounds (-0.8629432320594788, 0.2797996401786804, 5.796337127685547, 8.77922534942627)); edge +v lateral +0.35: [support] no view / side keeps the source tray in view with the destination tray barely visible ({'views': 40, 'collision_free': 2, 'src_in_view': 2, 'later",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 588.4,
+   "run_s": null
+  },
+  {
+   "seed": 1000,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 507.5,
+   "run_s": null
+  }
+ ],
+ "job_s": 1109.7,
+ "finished": "2026-09-11 23:51:16"
+}

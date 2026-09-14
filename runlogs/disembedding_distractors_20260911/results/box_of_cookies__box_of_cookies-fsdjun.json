@@ -1,0 +1,11 @@
+{
+ "target_category": "box_of_cookies",
+ "target_model": "apjokz",
+ "category": "box_of_cookies",
+ "model": "fsdjun",
+ "kind": "same",
+ "status": "setup_failed",
+ "error": "[no_support] [no_support] breakfast_table_rhjoby_0: [support] untucked: [support] edge +u: [no_stance] no collision-free stance around breakfast_table_rhjoby_0; edge -u lateral +0.00: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge -u lateral +0.25: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge -u lateral -0.25: [unreachable] no reachable cell on the source tray; edge -u lateral +0.35: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge -u lateral -0.35: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge +v lateral +0.00: [support] no lateral room for the destination tray on either side (support bounds (2.935955762863159, 4.096156120300293, -8.733049392700195, -5.830251216888428)); edge +v lateral +0.25: [support] no view / side keeps the source tray in view with the destination tray barely visible ({'views': 40, 'collision_free': 10, 'src_in_view': 10, 'lateral_out_of_range': 10, 'yaw_search_failed': 0, 'yaw_collision': 0, 'yaw_src_out': 0}; source tray at depth 0.23, dest options [('right', -0.56)], support bounds (2.935955762863159, 4.096156120300293, -8.733049392700195, -5.830251216888428)); edge +v lateral -0.25: [support] no view / side keeps the source tray in view with the destination tray barely visible ({'views': 40, 'collision_free': 10, 'src_in_view': 10, 'lateral_out_of_range': 10, 'yaw_search_failed': 0, 'yaw_collision': 0, 'yaw_src_out': 0}; source tray at depth 0.23, dest options [('left', 0.58)], support bounds (2.935955762863159, 4.096156120300293, -8.733049392700195, -5.830251216888428)); edge +v lateral +0.35: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge +v lateral -0.35: [support] source tray not fully suppor",
+ "n_written": 0,
+ "setup_s": 245.5
+}

@@ -1,0 +1,50 @@
+{
+ "key": "fridge__dszchb",
+ "category": "fridge",
+ "model": "dszchb",
+ "scene": "house_single_floor",
+ "host": "fridge_dszchb_0",
+ "host_rank": 0,
+ "host_model": "dszchb",
+ "swap": false,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [8.084980964660645, -1.5925527811050415, 1.1218551397323608]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [8.084980964660645, -1.5925527811050415, 1.1218551397323608]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    8.085,
+    -1.593,
+    1.122
+   ],
+   "handle_height_above_floor": 1.117,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 6,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 3
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.029,
+  0.962,
+  1.021
+ ],
+ "time_s": 189.7
+}

@@ -1,0 +1,58 @@
+{
+  "category": "rocking_chair",
+  "task": "obst",
+  "n_models": 4,
+  "n_opened": 4,
+  "models": [
+    {
+      "model": "drpbxj",
+      "V": 5,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Dark wooden slat-back rocker with maroon seat cushion, 0.60 x 0.46 x 0.66 m; clean; rests on curved rockers."
+    },
+    {
+      "model": "tjaphm",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "All-black wooden rocker, 0.64 x 0.42 x 0.65 m; flat dark render hides detail but geometry intact."
+    },
+    {
+      "model": "wkduul",
+      "V": 5,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Brown wooden slat-back rocker, 0.67 x 0.44 x 0.73 m; clean, recognisable."
+    },
+    {
+      "model": "zgmspi",
+      "V": 5,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Modern grey shell rocker on wire base and wooden runners, 0.79 x 0.61 x 0.75 m; clean; largest footprint."
+    }
+  ],
+  "picks": ["drpbxj", "zgmspi"],
+  "alternate": "wkduul",
+  "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+  ],
+  "category_verdict": "weak",
+  "category_note": "Four clean rocking chairs, all valid but 0.60-0.79 m wide (borderline) and furniture normally kept in place beside other furniture, so N=2. Rockers rest stably but may rock when dropped."
+}

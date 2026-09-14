@@ -1,0 +1,42 @@
+{
+  "category": "bottle_of_wine",
+  "n_models": 27,
+  "pages_opened": [
+    "grids/same/bottle_of_wine__p1.png",
+    "grids/same/bottle_of_wine__p2.png",
+    "grids/same/bottle_of_wine__p3.png",
+    "grids/same/bottle_of_wine__p4.png",
+    "grids/same/bottle_of_wine__p5.png",
+    "grids/same/bottle_of_wine__p6.png",
+    "grids/same/bottle_of_wine__p7.png"
+  ],
+  "groups": [
+    {
+      "members": ["lacaoa", "njoeiz"],
+      "reason": "Identical dark champagne bottles with full gold-foil neck, same height and pixel count (geom cluster c2); no label difference visible at any yaw.",
+      "confidence": "high"
+    },
+    {
+      "members": ["ivuvbv", "pgfplm", "qvsnjo"],
+      "reason": "Same 7x7x24 dark-green Bordeaux bottle with pale (white/cream-gold) foil cap; only a one-sided paper label differs, hidden at yaws 90/180.",
+      "confidence": "medium"
+    },
+    {
+      "members": ["hnkiog", "vecadn"],
+      "reason": "Dark (green / near-black) Bordeaux bottle, red foil cap, cream label on one side only; 24 vs 27 cm, same look when label faces away.",
+      "confidence": "medium"
+    },
+    {
+      "members": ["wcokej", "jdqahn"],
+      "reason": "Dark grey-green Burgundy-shape bottle with tan cork, ~24-25 cm; only faint low-contrast label patches, indistinguishable at every yaw.",
+      "confidence": "medium"
+    }
+  ],
+  "unusable": [
+    {
+      "model": "bmudli",
+      "reason": "Settles at 16 deg tilt; visibly leaning in every crop, looks toppled / broken base."
+    }
+  ],
+  "notes": "ynfvhg, pgfplm, tisclo render fine but report 0 segmentation px at yaw 0 (check seg ids). Borderline pairs kept apart: yaxufs vs lacaoa/njoeiz (same gold-foil champagne look, ~18% taller); klbwkf vs xzipsi (both clear glass, klbwkf has black cap); oldpru vs oslewp (glossy black, different neck/cap). fzuiwy is matte near-uniform dark grey but reads as a bottle."
+}

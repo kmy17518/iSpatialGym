@@ -1,0 +1,471 @@
+{
+ "group": "object_scaling__can_of_soda__r1",
+ "task": "object_scaling",
+ "category": "can_of_soda",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. Rotationally symmetric bodies are preferred for this task.",
+ "candidates": [
+  {
+   "model": "opivig",
+   "key": "can_of_soda__opivig",
+   "strip": "/tmp/glib/strips/can_of_soda__opivig.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp"
+    }
+   ],
+   "object_note": "Red can; all centred body grasps.",
+   "bbox_mm": [
+    63,
+    63,
+    114
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "bfrzvk",
+   "key": "can_of_soda__bfrzvk",
+   "strip": "/tmp/glib/strips/can_of_soda__bfrzvk.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp across diameter"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp, CoM 17 mm"
+    }
+   ],
+   "object_note": "All rows close 50/xx (can pushed against open finger) but both pads visibly contact the can.",
+   "bbox_mm": [
+    66,
+    70,
+    125
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ttxyui",
+   "key": "can_of_soda__ttxyui",
+   "strip": "/tmp/glib/strips/can_of_soda__ttxyui.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp, CoM 38 mm on tall can"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp, CoM 53 mm, pads on body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp toward end, CoM 72 mm, full coverage"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top grasp along can axis near end, pads on body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top grasp along can axis near end, pads on body"
+    }
+   ],
+   "object_note": "Tall (~210 mm) faceted can; end-region grasps still have full pad coverage on cylinder.",
+   "bbox_mm": [
+    74,
+    74,
+    194
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "itolcg",
+   "key": "can_of_soda__itolcg",
+   "strip": "/tmp/glib/strips/can_of_soda__itolcg.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp, CoM 17 mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp, CoM 20 mm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp, CoM 23 mm"
+    }
+   ],
+   "object_note": "Orange can; all centred body grasps, both pads contact.",
+   "bbox_mm": [
+    75,
+    75,
+    135
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "wbrrad",
+   "key": "can_of_soda__wbrrad",
+   "strip": "/tmp/glib/strips/can_of_soda__wbrrad.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp, antipodal 0.90"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp, CoM 19 mm"
+    }
+   ],
+   "object_note": "Red faceted can; all centred body grasps.",
+   "bbox_mm": [
+    75,
+    75,
+    150
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "lugwcz",
+   "key": "can_of_soda__lugwcz",
+   "strip": "/tmp/glib/strips/can_of_soda__lugwcz.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp, CoM 25 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp, CoM 33 mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp toward end, CoM 44 mm, full coverage"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp toward end, CoM 46 mm, full coverage"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp toward end, CoM 47 mm, full coverage"
+    }
+   ],
+   "object_note": "Textured can; grasps toward one end but pads fully on body.",
+   "bbox_mm": [
+    76,
+    76,
+    127
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "xmjfcg",
+   "key": "can_of_soda__xmjfcg",
+   "strip": "/tmp/glib/strips/can_of_soda__xmjfcg.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred body grasp"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp, CoM 31 mm"
+    }
+   ],
+   "object_note": "Gold can; all body grasps with full coverage.",
+   "bbox_mm": [
+    78,
+    78,
+    148
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "frewxk",
+   "key": "can_of_soda__frewxk",
+   "strip": "/tmp/glib/strips/can_of_soda__frewxk.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp, CoM 26 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp, CoM 42 mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp, CoM 40 mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp, CoM 43 mm, antipodal 0.86"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp near bottom end, CoM 51 mm, pads on body"
+    }
+   ],
+   "object_note": "White can; all body grasps, full pad coverage, 50/xx closure artifact.",
+   "bbox_mm": [
+    80,
+    80,
+    150
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "evcxlr",
+   "key": "can_of_soda__evcxlr",
+   "strip": "/tmp/glib/strips/can_of_soda__evcxlr.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp, CoM 23 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp, CoM 25 mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp, CoM 34 mm, antipodal 0.86"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp toward end, CoM 40 mm, full coverage"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body grasp toward end, CoM 44 mm, full coverage"
+    }
+   ],
+   "object_note": "Large faceted can; grasps drift toward one end but pads stay fully on cylindrical body.",
+   "bbox_mm": [
+    81,
+    81,
+    130
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

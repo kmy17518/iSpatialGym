@@ -1,0 +1,103 @@
+{
+ "category": "blender",
+ "model": "eyedvd",
+ "key": "blender__eyedvd",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.07593608647584915
+ ],
+ "aabb_extent": [
+  0.17623218894004822,
+  0.15930040180683136,
+  0.364931583404541
+ ],
+ "aabb_min_rel_root": [
+  -0.08321111649274826,
+  -0.06836068630218506,
+  -0.07593608647584915
+ ],
+ "aabb_max_rel_root": [
+  0.09302107989788055,
+  0.0909397155046463,
+  0.28899550437927246
+ ],
+ "link_tags": {
+  "base_link": [],
+  "glass": [
+   "glass"
+  ],
+  "lid": [
+   "openable"
+  ]
+ },
+ "openable_joint_ids": [
+  [
+   2,
+   "j_lid"
+  ]
+ ],
+ "joints": [
+  {
+   "joint": "j_lid",
+   "type": "RevoluteJoint",
+   "child_link": "lid",
+   "lower": 0.0,
+   "upper": 2.143458604812622,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    -0.01757,
+    0.0638,
+    0.25833
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    -0.01757,
+    0.0638,
+    0.25833
+   ],
+   "measured_angle": 0.2225,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/blender__eyedvd__lid.obj",
+   "n_pieces": 32,
+   "link_bbox_min": [
+    -0.0742,
+    -0.0566,
+    0.2276
+   ],
+   "link_bbox_max": [
+    0.039,
+    0.0587,
+    0.289
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0832,
+   -0.0684,
+   -0.0759
+  ],
+  "bbox_max": [
+   0.093,
+   0.0685,
+   0.1179
+  ],
+  "n_pieces": 4
+ }
+}

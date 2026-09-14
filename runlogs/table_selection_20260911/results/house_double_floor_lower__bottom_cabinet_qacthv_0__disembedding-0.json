@@ -1,0 +1,178 @@
+{
+ "scene": "house_double_floor_lower",
+ "table": "bottom_cabinet_qacthv_0",
+ "category": "bottom_cabinet",
+ "model": "qacthv",
+ "rooms": [
+  "bathroom_0"
+ ],
+ "partner": null,
+ "problem": "disembedding-0",
+ "inventory": {
+  "top_z": 0.798,
+  "bbox_x": 0.482,
+  "bbox_y": 1.137,
+  "bbox_z": 0.798,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:04:26",
+ "precheck": {
+  "aabb": [
+   [
+    -3.061,
+    -0.982,
+    -0.009
+   ],
+   [
+    -1.912,
+    -0.487,
+    0.807
+   ]
+  ],
+  "support": {
+   "name": "bottom_cabinet_qacthv_0",
+   "z": 0.8061590194702148,
+   "yaw": 1.5707948207855225,
+   "local_bounds": [
+    -0.9517868161201477,
+    -0.511785089969635,
+    1.9313918352127075,
+    3.0313925743103027
+   ],
+   "n_free_cells": 725,
+   "occupants": [
+    "drop_in_sink_hecjnt_0"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -2.481,
+     -0.512
+    ],
+    "length": 1.1
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -2.481,
+     -0.952
+    ],
+    "length": 1.1
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -3.031,
+     -0.732
+    ],
+    "length": 0.44
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -1.931,
+     -0.732
+    ],
+    "length": 0.44
+   }
+  ],
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    -2.4813928604125977,
+    -0.5117813348770142
+   ],
+   "inward": [
+    -1.5060094256114098e-06,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    -1.5060094256114098e-06
+   ],
+   "base_pose2d": [
+    -2.4813921451568604,
+    -0.061781346797943115,
+    -1.5707978328043222
+   ],
+   "edge_depth": 0.44999998807907104,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.08188829350918886
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.2
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "distractors": {
+   "same_category": false,
+   "pool": "other_category",
+   "requested_pool": "other_category",
+   "fallback": null,
+   "models": [
+    "box_of_baking_mix-ltccey",
+    "box_of_baking_mix-xcxrek",
+    "carton_of_milk-kklgxk"
+   ],
+   "requested": 3,
+   "pool_size": 47,
+   "pool_categories": [
+    "bottle_of_milk",
+    "box_of_baking_mix",
+    "box_of_butter",
+    "box_of_cane_sugar",
+    "box_of_cookies",
+    "box_of_granola_bars",
+    "box_of_oatmeal",
+    "box_of_rice",
+    "box_of_shampoo",
+    "carton_of_milk"
+   ],
+   "lookalikes_excluded": [
+    "box_of_cereal/qirvmd"
+   ],
+   "footprint_fraction": 0.3
+  },
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/house_double_floor_lower/house_double_floor_lower__bottom_cabinet_qacthv_0__disembedding-0__s1",
+ "setup_s": 3.8,
+ "reject_reason": "no_support",
+ "error": "[no_support] bottom_cabinet_qacthv_0: [support] untucked: [support] edge +u lateral +0.00: [support] source tray not fully supported at the canonical position (stance lateral +0.00, footprint u -2.70..-2.26 vs support (-0.9517868161201477, -0.511785089969635, 1.9313918352127075, 3.0313925743103027)); edge +u lateral +0.25: [support] source tray not fully supported at the canonical position (stance lateral +0.20, footprint u -2.50..-2.06 vs support (-0.9517868161201477, -0.511785089969635, 1.9313918352127075, 3.0313925743103027)); edge +u lateral -0.25: [support] source tray not fully supported at the canonical position (stance lateral -0.20, footprint u -2.90..-2.46 vs support (-0.9517868161201477, -0.511785089969635, 1.9313918352127075, 3.0313925743103027)); edge +u lateral +0.35: [no_stance] no stance near lateral +0.35 on edge +u; edge +u lateral -0.35: [support] source tray not fully supported at the canonical position (stance lateral -0.30, footprint u -3.00..-2.56 vs support (-0.9517868161201477, -0.511785089969635, 1.9313918352127075, 3.0313925743103027)); edge -u: [no_stance] no collision-free stance around bottom_cabinet_qacthv_0; edge +v: [no_stance] no collision-free stance around bottom_cabinet_qacthv_0; edge -v: [no_stance] no traversable stance around bottom_cabinet_qacthv_0; edge +u lateral +0.00 (yaw allowed): [support] source tray not fully supported at the canonical position (stance lateral +0.00, footprint u -2.70..-2.26 vs support (-0.9517868161201477, -0.511785089969635, 1.9313918352127075, 3.0313925743103027)); edge +u lateral +0.25 (yaw allowed): [support] source tray not fully supported at the canonical position (stance lateral +0.20, footprint u -2.50..-2.06 vs support (-0.9517868161201477, -0.511785089969635, 1.9313918352127075, 3.0313925743103027)); edge +u lateral -0.25 (yaw allowed): [support] source tray not fully supported at the canonical position (stance lateral -0.20, footprint u -2.90..-2.46 vs support (-0.9517868161201477, -0.5117",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 3.7,
+   "run_s": null
+  },
+  {
+   "seed": 1000,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 3.8,
+   "run_s": null
+  }
+ ],
+ "job_s": 11.3,
+ "finished": "2026-09-12 02:04:37"
+}

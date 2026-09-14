@@ -1,0 +1,20 @@
+{
+  "key": "hinged_jar__gqtsam",
+  "category": "hinged_jar",
+  "model": "gqtsam",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_cap",
+      "kind": "flap",
+      "chosen": "F",
+      "pinch": "edge",
+      "motion": "lift",
+      "graspable": true,
+      "handle_description": "No handle; pinch the lid's overhanging front (+x) free edge across its 17 mm thickness. Lid hinged at the back (-x); release wire clamp first.",
+      "height_concern": "lid edge ~0.09 m above object base",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Clip-top glass jar. Overview panel is mis-framed (object tiny), zoom is fine. F at the lid's free front edge is right; lid flips up and back about the rear hinge."
+}

@@ -1,0 +1,39 @@
+{
+  "group": "object_scaling__shampoo_dispenser__r2",
+  "task": "object_scaling",
+  "category": "shampoo_dispenser",
+  "round": 2,
+  "relation": null,
+  "n_candidates": 7,
+  "n_opened": 7,
+  "candidates": [
+    {"model": "thurmw", "key": "shampoo_dispenser__thurmw__f", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "White cube dispenser, chrome pump; five clean body pinches in four distinct pump orientations; plain but clean asset, not rotationally symmetric."},
+    {"model": "zoyyia", "key": "shampoo_dispenser__zoyyia__f", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Glossy black cube dispenser, chrome pump; five clean 50/0 body pinches, four distinct orientations; dark reflective body, clean geometry."},
+    {"model": "nrthyl", "key": "shampoo_dispenser__nrthyl__f", "G": 4, "T": 3, "V": 3, "R": 2, "score": 19,
+     "note": "Tall glossy black block, chrome pump; five clean pinches but only two mirrored poses (pump left/right); nearly featureless dark body in wrist views."},
+    {"model": "ndrvvm", "key": "shampoo_dispenser__ndrvvm__f", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Mirror-chrome cylinder with pump; five clean mid-length pinches in two flipped poses; rotationally symmetric, highly reflective body."},
+    {"model": "eblcnw", "key": "shampoo_dispenser__eblcnw__f", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Brushed-steel cylinder, knurled collar, pump; five clean mid-length pinches (57 mm) in two flipped poses; rotationally symmetric, legible finish."},
+    {"model": "kkbhzw", "key": "shampoo_dispenser__kkbhzw__f", "G": 3, "T": 3, "V": 3, "R": 2, "score": 17,
+     "note": "Flat-white untextured shampoo bottle, 74 mm wide; all pinches near base end (CoM offset ~60 mm), only two poses."},
+    {"model": "eywylh", "key": "shampoo_dispenser__eywylh__f", "G": 0, "T": 1, "V": 4, "R": 1, "score": 10,
+     "note": "White faceted bottle, chrome collar; every row pinches the 16 mm pump knob with the 89 mm body hanging 80+ mm away."}
+  ],
+  "selected": [
+    {"model": "thurmw", "key": "shampoo_dispenser__thurmw__f", "rank": 1,
+     "reason": "Highest score: five clean body pinches with four visibly different orientations, legible white body, 44 mm pinch comfortably in range."},
+    {"model": "eblcnw", "key": "shampoo_dispenser__eblcnw__f", "rank": 2,
+     "reason": "Within 2 points of zoyyia but looks different from #1 (steel cylinder vs cube) and is rotationally symmetric as the task prefers; five clean pinches."}
+  ],
+  "alternate": {"model": "zoyyia", "key": "shampoo_dispenser__zoyyia__f"},
+  "short": false,
+  "warnings": [
+    "zoyyia ties #1 on score (23) but is the same cube shape in black; eblcnw (21) taken as #2 for shape diversity and rotational symmetry.",
+    "Cylinders (ndrvvm, eblcnw) show only two flipped in-hand poses each, so G capped at 4 for diversity.",
+    "eywylh not selectable: all five grasps pinch the pump knob, no clean row."
+  ],
+  "confidence": "medium"
+}

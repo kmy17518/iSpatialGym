@@ -1,0 +1,84 @@
+{
+  "group": "mental_rotation__soup_ladle__r1",
+  "task": "mental_rotation",
+  "category": "soup_ladle",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 5,
+  "n_opened": 5,
+  "candidates": [
+    {
+      "model": "gxsrhh",
+      "key": "soup_ladle__gxsrhh",
+      "G": 2,
+      "T": 3,
+      "V": 3,
+      "R": 1,
+      "score": 14,
+      "note": "Chrome ladle, blade handle, faceted bowl; fingers stop at 24 mm so rows 1/3 (6-7 mm edge) lack contact; rows 4/5 duplicate 20-22 mm pinches."
+    },
+    {
+      "model": "tmdqpb",
+      "key": "soup_ladle__tmdqpb",
+      "G": 3,
+      "T": 3,
+      "V": 2,
+      "R": 1,
+      "score": 14,
+      "note": "Chrome ball bowl on flat-grey untextured paddle handle; row 1 gap (antipodal 0.06), row 2 antipodal 0.33; rows 3-5 clean identical 14 mm handle pinches."
+    },
+    {
+      "model": "rqnufc",
+      "key": "soup_ladle__rqnufc",
+      "G": 4,
+      "T": 3,
+      "V": 3,
+      "R": 2,
+      "score": 19,
+      "note": "Chrome ladle, low-poly faceted bowl/rod; 5 handle pinches 14-20 mm spread along handle (CoM 50-176), row 5 tip hold antipodal 0.67; 4-8 mm margins."
+    },
+    {
+      "model": "hgvzdm",
+      "key": "soup_ladle__hgvzdm",
+      "G": 5,
+      "T": 3,
+      "V": 3,
+      "R": 2,
+      "score": 21,
+      "note": "Matte dark-grey smooth ladle; 5 clean handle pinches 15-20 mm from neck (CoM 5) to mid-handle, antipodal 0.81-0.99, varied orientations; uniform untextured grey."
+    },
+    {
+      "model": "cfzneb",
+      "key": "soup_ladle__cfzneb",
+      "G": 5,
+      "T": 3,
+      "V": 4,
+      "R": 2,
+      "score": 23,
+      "note": "Polished chrome ladle, smooth round handle and bowl; 5 clean 19-23 mm handle pinches at tilts 35-115 with visibly different in-hand poses; snug finger stops."
+    }
+  ],
+  "selected": [
+    {
+      "model": "cfzneb",
+      "key": "soup_ladle__cfzneb",
+      "rank": 1,
+      "reason": "Highest score: five clean robust 19-23 mm handle pinches at diverse tilts, snug finger stops, smooth chrome geometry clearly recognisable as a ladle."
+    },
+    {
+      "model": "hgvzdm",
+      "key": "soup_ladle__hgvzdm",
+      "rank": 2,
+      "reason": "Second score and visually distinct (matte dark grey vs chrome); five clean handle pinches from neck to mid-handle with high antipodality."
+    }
+  ],
+  "alternate": {
+    "model": "rqnufc",
+    "key": "soup_ladle__rqnufc"
+  },
+  "short": false,
+  "warnings": [
+    "hgvzdm is a uniform flat-grey material (plausible silicone ladle, but no texture detail); gxsrhh and tmdqpb have collision-hull gaps on thin handle sections."
+  ],
+  "confidence": "high"
+}

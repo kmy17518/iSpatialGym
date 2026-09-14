@@ -1,0 +1,64 @@
+{
+  "key": "fridge__lleghp",
+  "category": "fridge",
+  "model": "lleghp",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_door",
+      "kind": "door",
+      "chosen": "B",
+      "pinch": "vertical_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Slim vertical bar handle (~20 cm) on the door frame's free left edge at mid-height; A/C are its end mounts. Hinge on the right (+y).",
+      "height_concern": "",
+      "confidence": "high"
+    },
+    {
+      "joint": "j_shelf0",
+      "kind": "drawer",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "pull",
+      "graspable": false,
+      "handle_description": "Top sliding wire shelf, inside the cabinet behind the closed glass door; 13 mm front wire pinchable from above only once the door is open.",
+      "height_concern": "shelf front at ~1.62 m, above 1.5 m",
+      "confidence": "medium"
+    },
+    {
+      "joint": "j_shelf1",
+      "kind": "drawer",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "pull",
+      "graspable": false,
+      "handle_description": "Bottom sliding wire shelf, inside the cabinet behind the closed glass door; 13 mm front wire pinchable from above only once the door is open.",
+      "height_concern": "",
+      "confidence": "medium"
+    },
+    {
+      "joint": "j_shelf2",
+      "kind": "drawer",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "pull",
+      "graspable": false,
+      "handle_description": "Lower-middle sliding wire shelf, inside the cabinet behind the closed glass door; 13 mm front wire pinchable from above only once the door is open.",
+      "height_concern": "",
+      "confidence": "medium"
+    },
+    {
+      "joint": "j_shelf3",
+      "kind": "drawer",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "pull",
+      "graspable": false,
+      "handle_description": "Upper-middle sliding wire shelf, inside the cabinet behind the closed glass door; 13 mm front wire pinchable from above only once the door is open.",
+      "height_concern": "",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Door handle correctly found: B bar with A/C end mounts. The four prismatic 'drawers' are wire shelves inside the glass door, unreachable while closed; shelf0 is above 1.5 m."
+}

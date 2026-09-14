@@ -1,0 +1,36 @@
+{
+  "group": "IORS__canned_food__r2",
+  "task": "IORS",
+  "category": "canned_food",
+  "round": 2,
+  "relation": "ontop",
+  "n_candidates": 5,
+  "n_opened": 5,
+  "candidates": [
+    {"model": "byakrm", "key": "canned_food__byakrm__t", "G": 5, "T": 3, "V": 3, "R": 1, "score": 20,
+     "note": "Five identical 50/4 closures: 54 mm can pressed against open pad, 22 mm off-centre, both pads on upper body, upright; faceted low-poly can, blurry label."},
+    {"model": "ycbspm", "key": "canned_food__ycbspm__t", "G": 5, "T": 2, "V": 5, "R": 2, "score": 24,
+     "note": "Five clean body pinches on the SPAM can (50/9, ~20 mm off-centre); rows 1/4 upright, rows 2/3/5 tilt the can 30 deg. Sharp recognisable label."},
+    {"model": "foetdd", "key": "canned_food__foetdd__t", "G": 5, "T": 3, "V": 2, "R": 2, "score": 19,
+     "note": "Five clean 50/14 lid-band pinches on a tall pasta box hanging upright, bottom free; sharp textures, but a spaghetti box is not canned food."},
+    {"model": "qhgdys", "key": "canned_food__qhgdys__t", "G": 5, "T": 3, "V": 3, "R": 2, "score": 21,
+     "note": "Five clean 50/22 body pinches near the top of a 70 mm can, upright, ~14 mm off-centre; tall green can, faceted geometry and blurry label."},
+    {"model": "acgdtc", "key": "canned_food__acgdtc__t", "G": 3, "T": 1, "V": 3, "R": 1, "score": 14,
+     "note": "Three shoulder pinches on an 87-89 mm jar (fills the gripper); hangs 25-31 deg tilted, rows 2-3 half coverage; dark faceted jar, sharp lid label."}
+  ],
+  "selected": [
+    {"model": "ycbspm", "key": "canned_food__ycbspm__t", "rank": 1,
+     "reason": "Top score: clean upright body pinch on the top row, bottom free, 53-56 mm width with 9 mm finger margin; sharp SPAM label, immediately recognisable canned food."},
+    {"model": "qhgdys", "key": "canned_food__qhgdys__t", "rank": 2,
+     "reason": "Second score (21) and within 2 of byakrm; five clean upright body pinches at 70 mm, bottom free; tall green cylinder differs in shape and colour from the SPAM pick."}
+  ],
+  "alternate": {"model": "byakrm", "key": "canned_food__byakrm__t"},
+  "short": false,
+  "warnings": [
+    "Every row in this group is a one-finger closure (50/x): the object sits 14-22 mm off the gripper centre against the open pad; byakrm's closing finger stops at 4 mm (little margin).",
+    "ycbspm rows 2, 3 and 5 hold the can tilted 30 deg; use rows 1 or 4 for placing.",
+    "foetdd is a plastic spaghetti box, not a can (V=2, outlier for the category).",
+    "acgdtc hangs 25-31 deg tilted in all grasps and nearly fills the gripper opening (87-89 mm); poor for placing."
+  ],
+  "confidence": "medium"
+}

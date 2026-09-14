@@ -2,6 +2,113 @@
 
 Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampling_report_*.json`).
 
+## 1.5.0 (unreleased) - one arm pose per task, scene variants without chairs, goal check without the robot
+
+- **World horizontal (`world_alignment-2`, alias `world_horizontal`)**: new problem (BDDL template
+  `world_alignment/problem2.bddl`, `bddl_writer`, `WorldHorizontalSampler` in `tasks/world_alignment.py`, spec entry,
+  docs spec §5.9 / `task_bddl_formats.md` §6c). Same wall hinge, arc and pushing rules as world vertical; the target
+  is an elongated wall item whose long axis / reference edge must end up **level**. Differences: the optional
+  `generation.level_axis` is checked against the frame derived from `front_axis` / `up_axis`;
+  `generation.symmetric_180` (bool or per-model dict) adds the half turn about the front axis to the target's
+  `orientation_equivalences` (a plain bar is level either way); the flat-patch / front-clearance tests use the
+  extents swept by the object between the largest init tilt and level (`generation.swept_patch`, default true;
+  `template_meta.swept_dims`), because a tilted 1 m rail needs a 1.0 x 0.8 m clear patch, not 1.06 x 0.23 m.
+  `_HingedSampler.axis_param` now builds on `target_param` (same per-model lookup for non-axis values).
+- **Data**: `runlogs/world_horizontal_selection_20260912` - object rounds 1-3 for world horizontal (135 candidate
+  models of 40 elongated wall / rod categories, 134 rendered, 8 reviewers, `review_contract.md` with V / L / H scores,
+  `selection.md`: 18 categories / 69 valid models), recorded in `select/task_object_selection.csv` (+ xlsx / html) as
+  `world_alignment-2 (world_horizontal)` target / wall / floor rows; the wall rows reuse the 78 validated regions of
+  the 1.4.1 survey, annotated with the picks whose swept extent fits each region. Test spec pins
+  `towel_rack/{kqrmrh, crivoa}`; smoke-tested on the Rs_int entryway region (towel bar and hook rail, one instance
+  each, renders in the runlog's `smoke/`).
+- **Disembedding occluded instances were impossible**: `_tune_occluder` looked the target's hull / radius up under
+  its BDDL instance name (they are stored under the role key `target`) and treated the trays as obstacles, so every
+  occluded draw raised `KeyError` (all 11 generated disembedding instances so far are unoccluded). Found by the
+  distractor validation (`runlogs/disembedding_distractors_20260911`); fixed.
+- **`generation.init_arms`** (default `untucked`, BEHAVIOR's reset pose) fixes the init arm configuration per task;
+  every sampler routes through `TaskSampler.init_arms()` (camera relocalization used tucked, the held tasks' free arm
+  used ready before). `generation.view_arm_fallbacks` is empty by default: no silent fallback to `ready`, a stance that
+  collides with the chosen arm pose rejects the template instead, so all instances of a task share the arm pose.
+  `template_meta.init_arms` records it. Within a template the whole robot configuration except the base is identical
+  across instances (trunk translate / tilt come from the template's view solution).
+- **Scene variants** (`sampling/scene_variants.py`). Table tasks (a fixed `table` role, or
+  `generation.remove_chairs_near_tables: true`) sample in the stable scene minus the chairs within
+  `generation.chair_distance` (1.0 m) of the work table(s) (`CHAIR_CATEGORIES`; `generation.chair_categories`
+  overrides). The variant json is written to `<out>/scene_variants/<scene>__<hash>.json` and is the scene file the
+  sampler loads, templates are merged from it (`template.json` has no chairs) and the reload checks compare against
+  it. The traversability PNG is baked with the furniture, so the removed objects' footprints (canonical bounding box,
+  yaw, `base_link_offset`) are freed in the loaded map where `floor_trav_no_obj_0.png` has floor and re-blocked under
+  remaining objects (the table); `template_meta.scene_variant.freed_footprints` records them and
+  `scene_variants.patch_trav_map_from_meta(scene, meta)` applies the same patch at evaluation time (the validator
+  does; the oracle's base planner must, or it treats the chair spots as blocked). On the test dining table 6
+  `straight_chair`s are removed (64 traversability cells freed outside the table footprint); the disembedding stance
+  is then square to the edge (`yaw_adjust_deg` 0) and the two v1.3 validation failures are gone - the destination
+  tray had been resting against the back of `straight_chair_jgoolz_1` (probe: the only non-table object within 2 cm
+  of the tray), which only showed as drift with the neighbouring rooms loaded.
+- Disembedding places the target on the destination tray at the reachable floor cell closest to the tray centre
+  (`template_meta.dest_place_offset_m`) instead of exactly the centre: the arm's reach over a table is a narrow band
+  at a fixed depth from the edge and whether it crosses the centre depends on the tray's depth; every long-edge stance
+  had failed with `unreachable` because of it.
+- The generic goal check parks the robot (tucked, room centre) while the goal objects are teleported and settled:
+  the goal must be feasible *excluding* the robot, and a hand hovering where the goal object lands ejects it. Seen
+  in disembedding after the chairs were removed: the square stance put the destination tray 0.65 m to the right,
+  exactly under the right hand of a 51 deg forward-tilted torso, and 54 of 55 goal checks threw the box on the floor.
+  Disembedding records whether a hand hovers in the column above a tray (`template_meta.hands_over_tray`;
+  `generation.require_hands_clear` turns it into a rejection - on the 1.16 m table end with 1.2 m of untucked arm span
+  it rejects every stance, so it is off by default).
+- Neighbouring rooms: gardens are no longer excluded (`ISG_ADJACENT_EXCLUDE` default empty) - rgb rendering with the
+  garden loaded is fine, only the sampler's `seg_instance` renders crash with it in view. A "load the neighbours but
+  hide their prims" sampler mode was tried and dropped: hiding ~200 prims leaves the instance-segmentation annotator
+  with no labels at all (every pixel `unlabelled`), re-creating the annotator does not recover it. The remaining way
+  to keep a base off open-plan room boundaries is `RobotKit.trav_free(in_task_rooms=True)` (opt-in).
+
+## 1.4.1 (2026-09-11) - world alignment: per-category object frames, spec wall regions
+
+- **World vertical (`world_alignment-1`)**: the hung object's frame is no longer assumed to be "thin x, upright";
+  `generation.front_axis` (axis out of the wall, default `+x`) and the new `generation.up_axis` (default `+z`) define
+  it, and both (like the table-surface `front_axis` / `long_axis`) accept a dict keyed by `<category>/<model>`,
+  `<category>` or `default`. `_hang_quat` maps (front, side, up) onto (wall normal, wall tangent, world up);
+  `_object_dims` measures thickness / width / height along those axes. Behaviour for the default frame (paintings)
+  is unchanged. Needed by the round 1-3 world-vertical categories whose canonical frame lies flat (picture,
+  license_plate, guitar, hanger, dartboard, fire_extinguisher, ...; frames per model in
+  `runlogs/world_alignment_selection_20260911/selection.md`).
+- **Spec wall restriction**: `scenes.<scene>.fixed.wall` (allowed wall object names) and
+  `scenes.<scene>.fixed.wall_regions` (surveyed segments `{room, wall, p0, p1, normal, hang_z}`) restrict / seed the
+  wall spots; without them the 24-ray search from the room centre is used as before. When several walls of a room
+  have usable spots, the template now binds the wall with the most spots (was: the first hit).
+- **Data**: `runlogs/world_alignment_selection_20260911` - object rounds 1-3 for both world-alignment problems
+  (pyrender renders of 459 models in their canonical frame, 8 reviewers, `review_contract.md`, `selection.md`) and
+  the wall survey of every indoor room of the 7 scenes (`wall_candidates.{json,md}`, `maps/`), recorded in
+  `select/task_object_selection.csv` (+ xlsx / html).
+
+## 1.4.0 (2026-09-12) - disembedding distractor pools per target category, look-alike exclusion
+
+- **Spec: `distractors` section replaces the `same_category_pool` / `distractor_pool` roles** of `disembedding-0`
+  (`spec.DistractorSpec`, spec §2.2 / §5.3). `pools.<category>.same_category` lists the models of that category that may
+  be drawn as same-category distractors, `pools.<category>.other_categories` names the categories whose pools form the
+  other-category pool, `lookalike_groups` lists `<category>/<model>` sets that cannot be told apart from the robot's
+  initial view, `families` documents how `other_categories` were derived. The loader checks that every pooled model
+  is a ready model of its category, that `other_categories` reference pools, that look-alike members are pooled (or
+  targets) and that every target category has a pool. `ProblemSpec.distractor_spec()` parses the section lazily from
+  `raw` for scripts that rebuild a `ProblemSpec` field by field (`validate_tables.py`).
+- **Sampler**: for a target `C/m` the same-category pool is `pools[C].same_category` minus `m` **and minus every model
+  that shares a look-alike group with `m`**; the other-category pool is the union of the pools of
+  `pools[C].other_categories`, again minus look-alikes (groups may cross categories). An empty requested pool falls
+  back to the other one (logged; `template_meta.distractors.fallback`). `--variant same_category` /
+  `--variant other_category` force the pool. `template_meta.distractors` records pool, requested pool, pool size,
+  pool categories and the excluded look-alikes next to the drawn models.
+- **Data**: `runlogs/grasp_library_20260905/scripts/build_disembedding_pools.py` builds the section for all 39
+  disembedding categories (242 pooled models = every AG-valid disembedding model except one V<=1 asset; 5 visual
+  families: cartons, packs, bottles, vessels, small_items; 55 look-alike groups = the exact-duplicate groups of
+  `select/duplicates.md` plus same-shape variants that differ only by a small print / label / shade, judged on the
+  cluster renders and grasp strips) and records everything in `select/disembedding_distractor_pools.json` and in
+  the `same_category_pool` / `distractor_pool` rows of `select/task_object_selection.csv` (+ xlsx / html; every
+  disembedding target row carries its pool sizes in `pair` and a `LOOK-ALIKE` flag in `duplicates`).
+  Same-category pools that are always empty (single-model `jar_of_bath_salt`; `toy_dice`, `cookie_cutter`,
+  `tortilla_chips`, whose members all look alike at ~20-30 px) always fall back to the other-category pool.
+- `sample_instances.py` replicates templates (`templates_per_scene`) for problems with a `distractors` section (the
+  pool roles that used to trigger the replication are gone).
+
 ## 1.3.0 (2026-09-12) - realised grasps, neighbouring rooms, square disembedding stances
 
 - **Held-object grasps are realised at the library pose.** Previously the gripper was simply commanded to close on

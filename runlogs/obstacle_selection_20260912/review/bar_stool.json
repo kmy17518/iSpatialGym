@@ -1,0 +1,27 @@
+{
+  "category": "bar_stool",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "haaiau",
+      "V": 3,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Pedestal stool with round wooden base and bowl-shaped seat tilted ~45 deg (odd shape), 0.52 x 0.59 x 0.77 m; textured, footprint borderline."
+    }
+  ],
+  "picks": ["haaiau"],
+  "alternate": null,
+  "natural_scenes": [
+    "restaurant_diner",
+    "house_single_floor",
+    "house_double_floor_lower"
+  ],
+  "category_verdict": "weak",
+  "category_note": "Single model: a pedestal bar stool whose dish seat is tilted, looking more like a design chair than a diner stool; 0.59 m footprint borderline. Natural pulled out at a diner bar or kitchen island."
+}

@@ -1,0 +1,55 @@
+{
+ "key": "toolbox__redmtl",
+ "category": "toolbox",
+ "model": "redmtl",
+ "aabb_extent": [
+  0.2679709792137146,
+  0.6182060241699219,
+  0.3523434102535248
+ ],
+ "support": "table",
+ "joints": [
+  {
+   "joint": "j_lid",
+   "kind": "flap",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     0.599,
+     0.203,
+     0.005
+    ],
+    "translate": 0.5,
+    "sign": -1.0
+   },
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "steps": [
+    "sign +1: planning: [planning] no collision-free base path to (0.5992541909217834, 0.20326106250286102, 0.005451055243611336) {'curobo_status': 'IK failed: goal pose reachable (8/32 seeds converge) but every converged solution violates collision or joint-limit constraints (13/32 seeds feasible overall)'}",
+    "sign -1: planning: [planning] no collision-free base path to (0.5992557406425476, 0.20326626300811768, 0.005443054251372814) {'curobo_status': 'IK failed: goal pose reachable (11/32 seeds converge) but every converged solution violates collision or joint-limit constraints (14/32 seeds feasible overall)'}"
+   ],
+   "error": "planning: [planning] no collision-free base path to (0.5992557406425476, 0.20326626300811768, 0.005443054251372814) {'curobo_status': 'IK failed: goal pose reachable (11/32 seeds converge) but every converged solution violates collision or joint-limit constraints (14/32 seeds feasible overall)'}",
+   "contact_world": [
+    1.25,
+    0.007,
+    1.092
+   ],
+   "handle_height": 1.092,
+   "diag": {
+    "eef_pos_err_mm": 820.0,
+    "eef_ang_err_deg": 60.5,
+    "finger_q_mm": [
+     50,
+     50
+    ],
+    "gripper_contacts": [],
+    "contact_links": {}
+   }
+  }
+ ],
+ "error": null,
+ "time_s": 2.9
+}

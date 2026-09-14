@@ -1,0 +1,35 @@
+{
+ "category": "saucer",
+ "model": "vghfkh",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/saucer__vghfkh__y0.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0056,
+   "seg_pixels": null,
+   "aabb_extent": [
+    0.145,
+    0.146,
+    0.013
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/saucer__vghfkh__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0056
+  }
+ },
+ "stable": true,
+ "visible": null
+}

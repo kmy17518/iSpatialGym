@@ -1,0 +1,35 @@
+{
+ "category": "sugar_syrup_bottle",
+ "model": "kdlbbq",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/sugar_syrup_bottle__kdlbbq__y0.png",
+   "drift_m": 0.0133,
+   "tilt_deg": 8.5,
+   "on_tray": true,
+   "settled_z": 0.0873,
+   "seg_pixels": 13863,
+   "aabb_extent": [
+    0.091,
+    0.094,
+    0.267
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/sugar_syrup_bottle__kdlbbq__y1.png",
+   "drift_m": 0.0125,
+   "tilt_deg": 8.2,
+   "on_tray": true,
+   "settled_z": 0.0872
+  }
+ },
+ "stable": true,
+ "visible": true
+}

@@ -1,0 +1,197 @@
+{
+ "scene": "hotel_suite_large",
+ "table": "desk_ohjotf_0",
+ "category": "desk",
+ "model": "ohjotf",
+ "rooms": [
+  "bedroom_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-0",
+ "inventory": {
+  "top_z": 0.671,
+  "bbox_x": 0.554,
+  "bbox_y": 1.638,
+  "bbox_z": 0.668,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "armchair_hfydou_0"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 15,
+ "started": "2026-09-12 04:20:58",
+ "precheck": {
+  "aabb": [
+   [
+    -1.274,
+    -4.894,
+    -0.006
+   ],
+   [
+    0.381,
+    -4.323,
+    0.68
+   ]
+  ],
+  "support": {
+   "name": "desk_ohjotf_0",
+   "z": 0.6792532801628113,
+   "yaw": 1.570794701576233,
+   "local_bounds": [
+    -4.883538722991943,
+    -4.323536396026611,
+    -0.3760008215904236,
+    1.2640000581741333
+   ],
+   "n_free_cells": 2403,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -0.444,
+     -4.324
+    ],
+    "length": 1.64
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -0.444,
+     -4.884
+    ],
+    "length": 1.64
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -1.264,
+     -4.604
+    ],
+    "length": 0.56
+   },
+   {
+    "name": "-v",
+    "mid": [
+     0.376,
+     -4.604
+    ],
+    "length": 0.56
+   }
+  ],
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    -1.264007568359375,
+    -4.6035356521606445
+   ],
+   "inward": [
+    1.0,
+    -1.625218715162191e-06
+   ],
+   "tangent": [
+    1.625218715162191e-06,
+    1.0
+   ],
+   "base_pose2d": [
+    -1.7140076160430908,
+    -4.633535861968994,
+    -1.6252187151607602e-06
+   ],
+   "edge_depth": 0.44999998807907104,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.8499999642372131,
+    "axis_angle": 0.0003452669847162036
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.3
+ },
+ "status": "no_instances",
+ "n_written": 0,
+ "rejections": {
+  "scene_reset": 15,
+  "layout": 15
+ },
+ "template_meta": {
+  "support": {
+   "name": "desk_ohjotf_0",
+   "z": 0.679253339767456,
+   "yaw": 1.5707969665527344,
+   "local_bounds": [
+    -4.883543968200684,
+    -4.323543071746826,
+    -0.3759908676147461,
+    1.2640094757080078
+   ],
+   "n_free_cells": 2403,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    -1.264006495475769,
+    -4.603544235229492
+   ],
+   "inward": [
+    1.0,
+    6.397578431460715e-07
+   ],
+   "tangent": [
+    -6.397578431460715e-07,
+    1.0
+   ],
+   "base_pose2d": [
+    -1.7140064239501953,
+    -4.633544921875,
+    6.397578431459843e-07
+   ],
+   "edge_depth": 0.44999995827674866,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.7999999523162842,
+    "axis_angle": 0.00808251485048447
+   }
+  },
+  "view_arms": "untucked",
+  "n_reachable_cells": 7,
+  "edge": 0.025398889556527138,
+  "rejections": {
+   "scene_reset": 15,
+   "layout": 15
+  },
+  "n_written": 0,
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 18.82,
+   "prepare_template_s": 0.19
+  }
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/hotel_suite_large/hotel_suite_large__desk_ohjotf_0__configuration_matching-0",
+ "bound_table": "desk_ohjotf_0",
+ "setup_s": 19.0,
+ "run_s": 0.5,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "no_instances",
+   "n_written": 0,
+   "rejections": {
+    "scene_reset": 15,
+    "layout": 15
+   },
+   "reject_reason": null,
+   "setup_s": 19.0,
+   "run_s": 0.5
+  }
+ ],
+ "job_s": 20.8,
+ "finished": "2026-09-12 04:21:53"
+}

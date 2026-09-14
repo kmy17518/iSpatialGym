@@ -1,0 +1,39 @@
+{
+ "category": "eyeglasses",
+ "task": "wa0",
+ "n_models": 2,
+ "n_opened": 2,
+ "models": [
+  {
+   "model": "gphhuu",
+   "V": 3,
+   "O": 2,
+   "F": 1,
+   "score": 11,
+   "valid": true,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "black sunglasses; temples cross/converge behind the frame (odd pose); footprint nearly square 0.12x0.13 m"
+  },
+  {
+   "model": "ujauoy",
+   "V": 4,
+   "O": 3,
+   "F": 2,
+   "score": 16,
+   "valid": true,
+   "long_axis": "x",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "round dark sunglasses, straight parallel temples; clear glasses silhouette from above, lenses face +x"
+  }
+ ],
+ "picks": [
+  "ujauoy",
+  "gphhuu"
+ ],
+ "alternate": null,
+ "category_verdict": "weak",
+ "category_note": "Open sunglasses standing on lens bottoms and temple tips, 0.12-0.15 m, lenses toward +x. Front is readable but objects are small, near-square in footprint and fragile; one model has crossed temples."
+}

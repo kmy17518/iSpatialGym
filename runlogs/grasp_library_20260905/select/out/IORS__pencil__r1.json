@@ -1,0 +1,48 @@
+{
+  "group": "IORS__pencil__r1",
+  "task": "IORS",
+  "category": "pencil",
+  "round": 1,
+  "relation": "nextto",
+  "n_candidates": 12,
+  "n_opened": 12,
+  "candidates": [
+    {"model": "lykqoh", "key": "pencil__lykqoh__s", "G": 5, "T": 3, "V": 5, "R": 1, "score": 24,
+     "note": "Five clean mid-shaft pinches, tilt 17-26, CoM 0-5 mm; indigo hex pencil, sharp wood-cone tip, small gold text, well shaded."},
+    {"model": "rzscao", "key": "pencil__rzscao__s", "G": 5, "T": 3, "V": 5, "R": 1, "score": 24,
+     "note": "Five clean mid-shaft pinches, top row tilt 4 CoM 1, rows 4-5 CoM 8-10 mm; vivid magenta colouring pencil, pink core, gold text."},
+    {"model": "mvmxfo", "key": "pencil__mvmxfo__s", "G": 5, "T": 3, "V": 4, "R": 1, "score": 22,
+     "note": "Five mid-shaft pinches; row 3 skewed (22 mm opening on 14 mm, no gap seen); black body renders as near-flat silhouette in wrist camera."},
+    {"model": "gbzzcg", "key": "pencil__gbzzcg__s", "G": 5, "T": 3, "V": 5, "R": 1, "score": 24,
+     "note": "Five clean mid-shaft pinches, tilt 18-28, CoM 3-5 mm, width 16; bright royal-blue colouring pencil, blue core, sharp facets."},
+    {"model": "jntybl", "key": "pencil__jntybl__s", "G": 5, "T": 3, "V": 5, "R": 1, "score": 24,
+     "note": "Five clean mid-shaft pinches, rows 4-5 tilt 33-36, CoM 0-3 mm, width 17; classic red hex pencil, wood-cone tip, gold text."},
+    {"model": "vpzhth", "key": "pencil__vpzhth__s", "G": 5, "T": 3, "V": 5, "R": 1, "score": 24,
+     "note": "Five clean mid-shaft pinches, tilt 16-23, CoM 0-3 mm; olive-green hex pencil, wood-cone tip, gold text; colour slightly dull."},
+    {"model": "lruiot", "key": "pencil__lruiot__s", "G": 5, "T": 3, "V": 5, "R": 1, "score": 24,
+     "note": "Five clean mid-shaft pinches, row 4 tilt 36, CoM 1-3 mm, width 15; bright blue rounder body, flat shading in wrist view, gold text."},
+    {"model": "heqkmr", "key": "pencil__heqkmr__s", "G": 5, "T": 3, "V": 5, "R": 1, "score": 24,
+     "note": "Five clean mid-shaft pinches, tilt 21-24, CoM 0-6 mm; dark maroon hex pencil, facets and tip still legible, gold text."},
+    {"model": "fnlbpu", "key": "pencil__fnlbpu__s", "G": 5, "T": 3, "V": 5, "R": 1, "score": 24,
+     "note": "Five clean mid-shaft pinches, row 4 tilt 34, CoM 2-5 mm, width 17-18 (fattest variant); dark navy hex pencil, facets visible but dim."},
+    {"model": "vedvit", "key": "pencil__vedvit__s", "G": 5, "T": 3, "V": 4, "R": 1, "score": 22,
+     "note": "Five clean mid-shaft pinches, tilt 6-29, CoM 0-4 mm; pale unpainted-wood pencil, very low contrast, lead tip barely distinguishable from cone."},
+    {"model": "vvofwr", "key": "pencil__vvofwr__s", "G": 5, "T": 3, "V": 5, "R": 1, "score": 24,
+     "note": "Five clean mid-shaft pinches, tilt 15-25, row 5 CoM 10 mm; bright cyan hex pencil, wood-cone tip with dark point, no text."},
+    {"model": "hmawzy", "key": "pencil__hmawzy__s", "G": 5, "T": 3, "V": 5, "R": 1, "score": 24,
+     "note": "Five clean mid-shaft pinches, tilt 4-33, CoM 1-2 mm; archetypal yellow hex pencil, detailed wood-grain cone and graphite point."}
+  ],
+  "selected": [
+    {"model": "hmawzy", "key": "pencil__hmawzy__s", "rank": 1,
+     "reason": "Nine-way tie at 24; chosen as the archetypal yellow graphite pencil with the best top row (tilt 4, CoM 1), all rows CoM <= 2 mm. SCALED x[1.0, 3.231, 4.998]."},
+    {"model": "rzscao", "key": "pencil__rzscao__s", "rank": 2,
+     "reason": "Tied at 24; vivid magenta colouring pencil contrasts strongly with yellow #1, top row tilt 4 / CoM 1, 16 mm width. SCALED x[1.0, 3.867, 5.113]."}
+  ],
+  "alternate": {"model": "gbzzcg", "key": "pencil__gbzzcg__s"},
+  "short": false,
+  "warnings": [
+    "All twelve are SCALED variants (cross-section ~x3.2-4.2 / ~x5.0); every row is an asymmetric closure with one finger at 0 mm on a 14-18 mm pinch, so R=1 group-wide.",
+    "Nine candidates tie at 24; #1/#2 chosen by representativeness and colour contrast. mvmxfo row 3 opens 22 mm on a 14 mm pencil (skewed pinch, no visible gap)."
+  ],
+  "confidence": "medium"
+}

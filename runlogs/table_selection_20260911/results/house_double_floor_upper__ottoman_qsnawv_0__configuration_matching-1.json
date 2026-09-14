@@ -1,0 +1,115 @@
+{
+ "scene": "house_double_floor_upper",
+ "table": "ottoman_qsnawv_0",
+ "category": "ottoman",
+ "model": "qsnawv",
+ "rooms": [
+  "bedroom_1"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-1",
+ "inventory": {
+  "top_z": 0.437,
+  "bbox_x": 0.452,
+  "bbox_y": 0.453,
+  "bbox_z": 0.438,
+  "verdict": "low"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:12:42",
+ "precheck": {
+  "aabb": [
+   [
+    4.329,
+    1.131,
+    -0.002
+   ],
+   [
+    4.824,
+    1.631,
+    0.438
+   ]
+  ],
+  "support": {
+   "name": "ottoman_qsnawv_0",
+   "z": 0.4345727860927582,
+   "yaw": -1.396256923675537,
+   "local_bounds": [
+    -0.7804920077323914,
+    -0.3437498211860657,
+    4.531405448913574,
+    4.96467399597168
+   ],
+   "n_free_cells": 469,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     4.616,
+     1.163
+    ],
+    "length": 0.433
+   },
+   {
+    "name": "-u",
+    "mid": [
+     4.54,
+     1.593
+    ],
+    "length": 0.433
+   },
+   {
+    "name": "+v",
+    "mid": [
+     4.792,
+     1.416
+    ],
+    "length": 0.437
+   },
+   {
+    "name": "-v",
+    "mid": [
+     4.365,
+     1.34
+    ],
+    "length": 0.437
+   }
+  ],
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    4.616207122802734,
+    1.163045883178711
+   ],
+   "inward": [
+    -0.17365455627441406,
+    0.9848066568374634
+   ],
+   "tangent": [
+    -0.9848066568374634,
+    -0.17365455627441406
+   ],
+   "base_pose2d": [
+    4.706076145172119,
+    0.6533926725387573,
+    1.7453357240449978
+   ],
+   "edge_depth": 0.517516016960144,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.0016914560684037987
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 0.4
+ },
+ "status": "skipped",
+ "reason": "inter_object_relation_satisfaction-0 found no stance / no reachable cell on the support top at any stand-off"
+}

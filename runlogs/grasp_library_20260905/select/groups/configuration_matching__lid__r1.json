@@ -1,0 +1,341 @@
+{
+ "group": "configuration_matching__lid__r1",
+ "task": "configuration_matching",
+ "category": "lid",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "Attachment task: the object is picked from a table and attached to its partner. The pads must leave the mating side of the object completely free.",
+ "candidates": [
+  {
+   "model": "pwgbsb",
+   "key": "lid__pwgbsb",
+   "strip": "/tmp/glib/strips/lid__pwgbsb.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "finger stuck at 50; knob not pinched, lid pushed"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "finger stuck at 50; lid tilted against open finger"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "finger stuck at 50; lid tilted against open finger"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "finger stuck at 50; lid tilted against open finger"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "finger stuck at 50; lid tilted against open finger"
+    }
+   ],
+   "object_note": "knob pinch never realised; one finger stays fully open and the lid is pushed/tilted against it",
+   "bbox_mm": [
+    90,
+    90,
+    22
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "attachment_free"
+  },
+  {
+   "model": "tnwisp",
+   "key": "lid__tnwisp",
+   "strip": "/tmp/glib/strips/lid__tnwisp.png",
+   "n_valid": 5,
+   "n_clean": 4,
+   "n_clean_strict": 4,
+   "flags": [
+    "gap"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "knob not reached; fingers 50/47 sit on lid rim"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "knob pinched 27/0, off-centre but firm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "knob pinched 27/0, firm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "knob pinched 27/0, firm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "knob pinched 27/0, firm"
+    }
+   ],
+   "object_note": "knob grasps fine; rank 1 barely closes and holds the thin rim at full opening",
+   "bbox_mm": [
+    95,
+    95,
+    27
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "attachment_free"
+  },
+  {
+   "model": "ugfmpq",
+   "key": "lid__ugfmpq",
+   "strip": "/tmp/glib/strips/lid__ugfmpq.png",
+   "n_valid": 5,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "gap"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "5 mm fin untouched; fingers 50/41 stop on rim"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "fin untouched; fingers 50/41 stop on rim"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "fin untouched; fingers 50/38, CoM offset 16"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "fin untouched; fingers 50/41 stop on rim"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "fin untouched; fingers 50/41 stop on rim"
+    }
+   ],
+   "object_note": "fin never pinched: fingers stop ~90 mm apart on lid rim at 30 deg tilt; collision hull likely convex",
+   "bbox_mm": [
+    89,
+    89,
+    30
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "attachment_free"
+  },
+  {
+   "model": "zkderg",
+   "key": "lid__zkderg",
+   "strip": "/tmp/glib/strips/lid__zkderg.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 1,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "finger stuck at 50; knob stem not pinched"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "knob cap pinched 33/0, lid hangs from knob"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/28; lid wedged tilted, knob unpinched"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "finger stuck at 50; lid tilted against it"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "finger stuck at 50; lid tilted against it"
+    }
+   ],
+   "object_note": "only rank 2 closes on the knob; other rows push the lid against the open finger",
+   "bbox_mm": [
+    76,
+    76,
+    33
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "attachment_free"
+  },
+  {
+   "model": "qhlsdq",
+   "key": "lid__qhlsdq",
+   "strip": "/tmp/glib/strips/lid__qhlsdq.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "box lid held across sides, both pads touch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side grasp, tilt 30, open face free"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side grasp, 10 mm off CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side grasp, tilt 30, firm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side grasp 25 mm off CoM, still central"
+    }
+   ],
+   "object_note": "tapered box lid; fingers stop at 50/42 (~90 mm) on flared rim, nominal 70 mm",
+   "bbox_mm": [
+    90,
+    90,
+    70
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "attachment_free"
+  }
+ ],
+ "excluded": [
+  {
+   "model": "haxrqc",
+   "key": "lid__haxrqc",
+   "reason": "no candidates"
+  },
+  {
+   "model": "wjrwer",
+   "key": "lid__wjrwer",
+   "reason": "no candidates"
+  },
+  {
+   "model": "mdowoz",
+   "key": "lid__mdowoz",
+   "reason": "no candidates"
+  },
+  {
+   "model": "picclm",
+   "key": "lid__picclm",
+   "reason": "no candidates"
+  },
+  {
+   "model": "aybgkm",
+   "key": "lid__aybgkm",
+   "reason": "no AG-valid grasp"
+  },
+  {
+   "model": "ckgilb",
+   "key": "lid__ckgilb",
+   "reason": "no candidates"
+  },
+  {
+   "model": "sihkub",
+   "key": "lid__sihkub",
+   "reason": "no AG-valid grasp"
+  }
+ ]
+}

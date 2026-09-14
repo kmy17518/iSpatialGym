@@ -1,0 +1,35 @@
+{
+ "category": "bottle_of_soda",
+ "model": "eqyqlx",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_soda__eqyqlx__y0.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0884,
+   "seg_pixels": 9310,
+   "aabb_extent": [
+    0.07,
+    0.06,
+    0.224
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_soda__eqyqlx__y1.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0884
+  }
+ },
+ "stable": true,
+ "visible": true
+}

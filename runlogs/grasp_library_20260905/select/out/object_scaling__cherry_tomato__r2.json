@@ -1,0 +1,31 @@
+{
+  "group": "object_scaling__cherry_tomato__r2",
+  "task": "object_scaling",
+  "category": "cherry_tomato",
+  "round": 2,
+  "relation": null,
+  "n_candidates": 5,
+  "n_opened": 5,
+  "candidates": [
+    {"model": "dqvtgm", "key": "cherry_tomato__dqvtgm__f", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Five clean centred 19 mm fingertip pinches (CoM 0-1 mm, antipodal 0.94-1.0), tilts 86-151 give three orientations; flattened oval 32x19x24 grape shape, plain red, faceted."},
+    {"model": "iydznu", "key": "cherry_tomato__iydznu__f", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Five clean centred pinches, two contact axes (23 and 19 mm) but only two approach groups (tilt ~160 / ~93); oval 31x24x20 red tomato, faceted."},
+    {"model": "eukpfb", "key": "cherry_tomato__eukpfb__f", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Five clean 21 mm centred pinches, CoM 0-1 mm, tilts 112-172 clearly varied; elongated 35x22x22 grape tomato, round cross-section, plain red, faceted."},
+    {"model": "hmsqrh", "key": "cherry_tomato__hmsqrh__f", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Five clean 21-22 mm pinches but all tilt 81-93 with identical contact, near-duplicate poses (G capped); oval 36x27x22 red tomato, faceted."},
+    {"model": "dqjuub", "key": "cherry_tomato__dqjuub__f", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Five clean centred 32-34 mm pinches, CoM 0 mm, conf 0.99; tilts 111-117 plus one 145, limited pose variety. Round dark-red tomato, best-looking asset."}
+  ],
+  "selected": [
+    {"model": "dqjuub", "key": "cherry_tomato__dqjuub__f", "rank": 1,
+     "reason": "Tied top score; the only truly round, rotationally symmetric tomato (round-2 target shape), largest and most robust 32-34 mm pinch, cleanest textured asset."},
+    {"model": "eukpfb", "key": "cherry_tomato__eukpfb__f", "rank": 2,
+     "reason": "Tied with dqvtgm; chosen for five distinct approach tilts and round 22 mm cross-section, and its bright-red elongated look differs from the dark round #1."}
+  ],
+  "alternate": {"model": "dqvtgm", "key": "cherry_tomato__dqvtgm__f"},
+  "short": false,
+  "warnings": ["All grasps are 19-36/0 one-finger fingertip presses on 19-34 mm objects; four of five candidates are oval grape-style tomatoes rather than round."],
+  "confidence": "medium"
+}

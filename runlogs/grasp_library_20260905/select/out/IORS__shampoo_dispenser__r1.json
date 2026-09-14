@@ -1,0 +1,38 @@
+{
+  "group": "IORS__shampoo_dispenser__r1",
+  "task": "IORS",
+  "category": "shampoo_dispenser",
+  "round": 1,
+  "relation": "ontop",
+  "n_candidates": 7,
+  "n_opened": 7,
+  "candidates": [
+    {"model": "thurmw", "key": "shampoo_dispenser__thurmw", "G": 4, "T": 3, "V": 3, "R": 2, "score": 19,
+     "note": "Row 1 symmetric 24/25 pinch on 44 mm box; rows 2-5 are 49/0 pushes with box between pads. Plain untextured white box with chrome pump."},
+    {"model": "zoyyia", "key": "shampoo_dispenser__zoyyia", "G": 5, "T": 3, "V": 3, "R": 2, "score": 21,
+     "note": "Rows 1-2 proper two-sided body pinches below the pump, rows 3-5 one-finger pushes still held; black glossy box, tan smeared patches on body."},
+    {"model": "nrthyl", "key": "shampoo_dispenser__nrthyl", "G": 3, "T": 3, "V": 3, "R": 2, "score": 17,
+     "note": "Top row skewed 62 mm diagonal hold on 48 mm box; row 2 clean symmetric pinch; rows 3-5 one-finger pushes. Black glossy box, tan patches."},
+    {"model": "ndrvvm", "key": "shampoo_dispenser__ndrvvm", "G": 2, "T": 3, "V": 4, "R": 2, "score": 17,
+     "note": "All five rows identical 50/x neck holds at the very top, 60 mm above CoM, bottle hangs vertically; mirror-chrome cylinder, clean geometry."},
+    {"model": "eblcnw", "key": "shampoo_dispenser__eblcnw", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Rows 1-4 one-finger 50/x holds on upper body, bottle pressed to open pad but held; row 5 pad on spout. Brushed-steel cylinder, clean."},
+    {"model": "kkbhzw", "key": "shampoo_dispenser__kkbhzw", "G": 4, "T": 3, "V": 3, "R": 2, "score": 19,
+     "note": "Row 1 shoulder hold, row 2 two-sided neck pinch, rows 3-4 neck holds hanging vertically, row 5 weak; plain white tall bottle, black wrist view."},
+    {"model": "eywylh", "key": "shampoo_dispenser__eywylh", "G": 3, "T": 3, "V": 4, "R": 1, "score": 18,
+     "note": "Top row skewed 70 mm hold on 84 mm body (not clean); rows 2-5 shoulder holds nearly filling gripper (82-85 mm). White bottle, chrome bands."}
+  ],
+  "selected": [
+    {"model": "zoyyia", "key": "shampoo_dispenser__zoyyia", "rank": 1,
+     "reason": "Only candidate with two proper two-sided body pinches (rows 1-2) below the pump, bottom free for placing; black glossy box, texture slightly smeared but usable."},
+    {"model": "kkbhzw", "key": "shampoo_dispenser__kkbhzw", "rank": 2,
+     "reason": "Tied at 19 with thurmw/eblcnw; chosen for appearance contrast with the black box: tall white archetypal pump bottle with a clean shoulder hold and a two-sided neck pinch."}
+  ],
+  "alternate": {"model": "thurmw", "key": "shampoo_dispenser__thurmw"},
+  "short": false,
+  "warnings": [
+    "Most rows in this group are 50/x one-finger assisted closures; only zoyyia, thurmw, nrthyl (row 2) and kkbhzw (row 2) show a genuine two-sided pinch.",
+    "zoyyia and nrthyl bodies show tan smeared patches that may be texture-mapping artefacts; kkbhzw row-1 wrist view is fully black (camera inside the wide body), eywylh row-5 wrist view is a camera-in-marker artefact."
+  ],
+  "confidence": "medium"
+}

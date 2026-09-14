@@ -1,0 +1,35 @@
+{
+ "category": "deodorant_atomizer",
+ "model": "utjfug",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/deodorant_atomizer__utjfug__y0.png",
+   "drift_m": 0.0006,
+   "tilt_deg": 0.4,
+   "on_tray": true,
+   "settled_z": 0.0749,
+   "seg_pixels": 4444,
+   "aabb_extent": [
+    0.042,
+    0.041,
+    0.152
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/deodorant_atomizer__utjfug__y1.png",
+   "drift_m": 0.0006,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.0749
+  }
+ },
+ "stable": true,
+ "visible": true
+}

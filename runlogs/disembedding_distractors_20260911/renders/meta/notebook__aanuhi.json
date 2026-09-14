@@ -1,0 +1,53 @@
+{
+ "category": "notebook",
+ "model": "aanuhi",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0,
+  180.0,
+  270.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/notebook__aanuhi__y0.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.4,
+   "on_tray": true,
+   "settled_z": 0.014,
+   "seg_pixels": 11429,
+   "aabb_extent": [
+    0.151,
+    0.12,
+    0.029
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/notebook__aanuhi__y1.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0141
+  },
+  "y2": {
+   "yaw_deg": 180.0,
+   "png": "renders/notebook__aanuhi__y2.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.014
+  },
+  "y3": {
+   "yaw_deg": 270.0,
+   "png": "renders/notebook__aanuhi__y3.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0141
+  }
+ },
+ "stable": true,
+ "visible": true
+}

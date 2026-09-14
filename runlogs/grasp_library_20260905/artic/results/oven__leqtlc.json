@@ -1,0 +1,67 @@
+{
+ "key": "oven__leqtlc",
+ "category": "oven",
+ "model": "leqtlc",
+ "scene": "house_double_floor_lower",
+ "host": "oven_ffitak_0",
+ "host_rank": 0,
+ "host_model": "ffitak",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_dof_rootd_aa001_r",
+   "kind": "flap",
+   "grasp_source": "review:C",
+   "stance": {
+    "base": [
+     7.114,
+     -0.005,
+     -1.571
+    ],
+    "translate": 0.5,
+    "sign": 1.0,
+    "orientation": "front_down45"
+   },
+   "reachable": true,
+   "ag": true,
+   "dq": 0.5963,
+   "dq_target": 0.785,
+   "opened": true,
+   "open_state": true,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [6.913875102996826, -0.4552273750305176, 0.6266921162605286]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [6.913875102996826, -0.4552273750305176, 0.6266921162605286]})",
+    "stance ok (teleported)",
+    "grasped",
+    "pull chunk 1: base follow failed: [planning] no collision-free base path to (7.113293170928955, 0.027544774115085602, -1.5722708702087402) {'curobo_status': 'IK failed: goal pose is kinematically reachable but blocked by world obstacles (best pose error with obstacles 397.6 mm / 0.775 rad; converges once obstacles are ignored) [start configuration is in collision]'}",
+    "pull chunk 2: base follow failed: [planning] no collision-free base path to (7.113126277923584, 0.05898568779230118, -1.5722708702087402) {'curobo_status': 'IK failed: goal pose reachable (8/32 seeds converge) but every converged solution violates collision or joint-limit constraints (0/32 seeds feasible overall) [start configuration is in collision]'}",
+    "pull chunk 3: base follow failed: [planning] no collision-free base path to (7.112968921661377, 0.08860920369625092, -1.5722708702087402) {'curobo_status': 'IK failed: goal pose is kinematically reachable but blocked by world obstacles (best pose error with obstacles 0.0 mm / 0.011 rad; converges once obstacles are ignored) [start configuration is in collision]'}",
+    "pull chunk 4: base follow failed: [planning] no collision-free base path to (7.1128249168396, 0.11590846627950668, -1.5722708702087402) {'curobo_status': 'IK failed: goal pose reachable (1/32 seeds converge) but every converged solution violates collision or joint-limit constraints (0/32 seeds feasible overall) [start configuration is in collision]'}",
+    "pull chunk 5: base follow failed: [planning] no collision-free base path to (7.112695693969727, 0.14041636884212494, -1.5722708702087402) {'curobo_status': 'IK failed: goal pose reachable (15/32 seeds converge) but every converged solution violates collision or joint-limit constraints (0/32 seeds feasible overall) [start configuration is in collision]'}",
+    "pull chunk 6: base follow failed: [planning] no collision-free base path to (7.112584114074707, 0.16171357035636902, -1.5722708702087402) {'curobo_status': 'IK failed: goal pose is kinematically reachable but blocked by world obstacles (best pose error with obstacles 0.0 mm / 0.792 rad; converges once obstacles are ignored) [start configuration is in collision]'}"
+   ],
+   "error": null,
+   "contact_world": [
+    6.914,
+    -0.455,
+    0.627
+   ],
+   "handle_height_above_floor": 0.621,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 4,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.12,
+  1.195,
+  1.186
+ ],
+ "time_s": 140.2
+}

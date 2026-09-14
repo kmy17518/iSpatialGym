@@ -1,0 +1,79 @@
+{
+  "category": "pillow",
+  "task": "obst",
+  "n_models": 6,
+  "n_opened": 6,
+  "models": [
+    {
+      "model": "byzkkw",
+      "V": 4,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Plain grey square cushion lying flat, 0.47 x 0.47 x 0.22 m; clean, unremarkable."
+    },
+    {
+      "model": "dmnvmr",
+      "V": 4,
+      "N": 2,
+      "S": 0,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Blue/grey striped rectangular pillow with crumpled corners, 0.60 x 0.81 x 0.24 m; footprint just over 0.80 m."
+    },
+    {
+      "model": "gitbli",
+      "V": 4,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Grey-brown waffle-knit cushion, slightly curled, 0.39 x 0.51 x 0.23 m; clean."
+    },
+    {
+      "model": "gksezx",
+      "V": 4,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Grey pillow with blue floral applique on top, 0.39 x 0.42 x 0.21 m; decoration a little busy but intact."
+    },
+    {
+      "model": "ilcleb",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Dark patterned flat cushion, 0.34 x 0.48 x 0.16 m; clean but low."
+    },
+    {
+      "model": "kqjtnx",
+      "V": 3,
+      "N": 2,
+      "S": 0,
+      "rest_ok": true,
+      "score": 10,
+      "valid": false,
+      "note": "Large black body pillow with splayed corners, 0.71 x 1.0 x 0.23 m; dark and shapeless; too big."
+    }
+  ],
+  "picks": ["byzkkw", "gksezx"],
+  "alternate": "gitbli",
+  "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+  ],
+  "category_verdict": "weak",
+  "category_note": "Pillows lying flat, ~0.4-0.5 m across and only ~0.22 m high; four usable. Credible floor clutter in bedrooms, living rooms and the hotel suite but never more than N=2, and low for the camera."
+}

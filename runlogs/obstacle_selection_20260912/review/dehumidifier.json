@@ -1,0 +1,23 @@
+{
+  "category": "dehumidifier",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "dehumidifier/ppadfd",
+      "V": 4,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Grey boxy dehumidifier with front grille, top handle and rear drain; 0.30 x 0.39 x 0.59 m; textures somewhat flat but complete."
+    }
+  ],
+  "picks": ["dehumidifier/ppadfd"],
+  "alternate": null,
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int", "office_cubicles_right"],
+  "category_verdict": "weak",
+  "category_note": "One grey portable dehumidifier, ideal obstacle size and stable on a flat base. Plausible floor appliance in a house, flat or office but normally parked against a wall (N=2); only one model."
+}

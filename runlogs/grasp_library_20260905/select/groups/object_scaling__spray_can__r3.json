@@ -1,0 +1,159 @@
+{
+ "group": "object_scaling__spray_can__r3",
+ "task": "object_scaling",
+ "category": "spray_can",
+ "round": 3,
+ "relation": null,
+ "partner": "",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. Rotationally symmetric bodies are preferred for this task.",
+ "candidates": [
+  {
+   "model": "tehmzy",
+   "key": "spray_can__tehmzy__f",
+   "strip": "/tmp/glib/strips/spray_can__tehmzy__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body diameter pinch at CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body diameter pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body diameter pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body diameter pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body diameter pinch"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    40,
+    40,
+    151
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "buxqkr",
+   "key": "spray_can__buxqkr__f",
+   "strip": "/tmp/glib/strips/spray_can__buxqkr__f.png",
+   "n_valid": 4,
+   "n_clean": 4,
+   "n_clean_strict": 4,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body diameter pinch at CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body diameter pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body diameter pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, attach slower but firm"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    41,
+    40,
+    151
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "bgalkx",
+   "key": "spray_can__bgalkx__f",
+   "strip": "/tmp/glib/strips/spray_can__bgalkx__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "65 mm body diameter pinch at CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body diameter pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body diameter pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body diameter pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body diameter pinch, CoM 17 mm fine"
+    }
+   ],
+   "object_note": "one finger stays at 50 for this 65 mm can; both pads touch",
+   "bbox_mm": [
+    62,
+    63,
+    232
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

@@ -1,0 +1,261 @@
+{
+ "group": "disembedding__tablefork__r2",
+ "task": "disembedding",
+ "category": "tablefork",
+ "round": 2,
+ "relation": null,
+ "partner": "lies flat",
+ "requirements": "Tabletop task: the object rests among other objects on a table / tray and is picked from its resting pose. It must settle stably on a flat surface (it must not roll or topple). The best single grasp matters most.",
+ "candidates": [
+  {
+   "model": "uodzrq",
+   "key": "tablefork__uodzrq__t",
+   "strip": "/tmp/glib/strips/tablefork__uodzrq__t.png",
+   "n_valid": 4,
+   "n_clean": 4,
+   "n_clean_strict": 4,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch 12 mm from CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch 16 mm from CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "thin neck pinch, 6 mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "thin neck pinch, tilt 24 deg"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    189,
+    24,
+    12
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "hktwlm",
+   "key": "tablefork__hktwlm__t",
+   "strip": "/tmp/glib/strips/tablefork__hktwlm__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch, 17 mm wide"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch, tilt 26 deg"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across tine base, handle free"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tine-base pinch, tilt 38 deg"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "widest shoulder pinch 52 mm from CoM, full coverage"
+    }
+   ],
+   "object_note": "heavy ornate handle shifts CoM; head grasps in rows 3-5 are near geometric centre",
+   "bbox_mm": [
+    183,
+    25,
+    12
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "yuihyg",
+   "key": "tablefork__yuihyg__t",
+   "strip": "/tmp/glib/strips/tablefork__yuihyg__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch at CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch near CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, tilt 21 deg"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, tilt 34 deg"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, tilt 32 deg"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    233,
+    30,
+    16
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "pqrtkc",
+   "key": "tablefork__pqrtkc__t",
+   "strip": "/tmp/glib/strips/tablefork__pqrtkc__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch at CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch near CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch 10 mm from CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch near CoM"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, tilt 30 deg"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    201,
+    28,
+    20
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "flexrc",
+   "key": "tablefork__flexrc__t",
+   "strip": "/tmp/glib/strips/tablefork__flexrc__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch at CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch at CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch 17 mm from CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, tilt 30 deg"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch 23 mm from CoM"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    201,
+    28,
+    21
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

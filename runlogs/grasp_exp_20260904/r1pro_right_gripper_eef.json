@@ -1,0 +1,270 @@
+{
+ "open_q": 0.05,
+ "closed_q": 0.0,
+ "spheres_open": [
+  {
+   "link": "right_gripper_link",
+   "center": [
+    -0.0,
+    -0.0,
+    -0.097
+   ],
+   "radius": 0.04
+  },
+  {
+   "link": "right_gripper_link",
+   "center": [
+    -0.015,
+    -0.042,
+    -0.0675
+   ],
+   "radius": 0.015
+  },
+  {
+   "link": "right_gripper_link",
+   "center": [
+    0.015,
+    -0.042,
+    -0.0675
+   ],
+   "radius": 0.015
+  },
+  {
+   "link": "right_gripper_link",
+   "center": [
+    -0.015,
+    0.042,
+    -0.0675
+   ],
+   "radius": 0.015
+  },
+  {
+   "link": "right_gripper_link",
+   "center": [
+    0.015,
+    0.042,
+    -0.0675
+   ],
+   "radius": 0.015
+  },
+  {
+   "link": "right_arm_link7",
+   "center": [
+    0.0005,
+    0.0,
+    -0.15565
+   ],
+   "radius": 0.035
+  },
+  {
+   "link": "right_gripper_finger_link1",
+   "center": [
+    9e-05,
+    0.05845,
+    -0.03811
+   ],
+   "radius": 0.01
+  },
+  {
+   "link": "right_gripper_finger_link1",
+   "center": [
+    9e-05,
+    0.05745,
+    -0.01811
+   ],
+   "radius": 0.008
+  },
+  {
+   "link": "right_gripper_finger_link1",
+   "center": [
+    9e-05,
+    0.05545,
+    -0.00311
+   ],
+   "radius": 0.007
+  },
+  {
+   "link": "right_gripper_finger_link1",
+   "center": [
+    9e-05,
+    0.05345,
+    0.01189
+   ],
+   "radius": 0.005
+  },
+  {
+   "link": "right_gripper_finger_link2",
+   "center": [
+    -9e-05,
+    -0.05845,
+    -0.03811
+   ],
+   "radius": 0.01
+  },
+  {
+   "link": "right_gripper_finger_link2",
+   "center": [
+    -9e-05,
+    -0.05745,
+    -0.01811
+   ],
+   "radius": 0.008
+  },
+  {
+   "link": "right_gripper_finger_link2",
+   "center": [
+    -9e-05,
+    -0.05545,
+    -0.00311
+   ],
+   "radius": 0.007
+  },
+  {
+   "link": "right_gripper_finger_link2",
+   "center": [
+    -9e-05,
+    -0.05345,
+    0.01189
+   ],
+   "radius": 0.005
+  }
+ ],
+ "spheres_closed": [
+  {
+   "link": "right_gripper_link",
+   "center": [
+    -0.0,
+    -0.0,
+    -0.097
+   ],
+   "radius": 0.04
+  },
+  {
+   "link": "right_gripper_link",
+   "center": [
+    -0.015,
+    -0.042,
+    -0.0675
+   ],
+   "radius": 0.015
+  },
+  {
+   "link": "right_gripper_link",
+   "center": [
+    0.015,
+    -0.042,
+    -0.0675
+   ],
+   "radius": 0.015
+  },
+  {
+   "link": "right_gripper_link",
+   "center": [
+    -0.015,
+    0.042,
+    -0.0675
+   ],
+   "radius": 0.015
+  },
+  {
+   "link": "right_gripper_link",
+   "center": [
+    0.015,
+    0.042,
+    -0.0675
+   ],
+   "radius": 0.015
+  },
+  {
+   "link": "right_arm_link7",
+   "center": [
+    0.0005,
+    0.0,
+    -0.15565
+   ],
+   "radius": 0.035
+  },
+  {
+   "link": "right_gripper_finger_link1",
+   "center": [
+    9e-05,
+    0.00845,
+    -0.03811
+   ],
+   "radius": 0.01
+  },
+  {
+   "link": "right_gripper_finger_link1",
+   "center": [
+    9e-05,
+    0.00745,
+    -0.01811
+   ],
+   "radius": 0.008
+  },
+  {
+   "link": "right_gripper_finger_link1",
+   "center": [
+    9e-05,
+    0.00545,
+    -0.00311
+   ],
+   "radius": 0.007
+  },
+  {
+   "link": "right_gripper_finger_link1",
+   "center": [
+    9e-05,
+    0.00345,
+    0.01189
+   ],
+   "radius": 0.005
+  },
+  {
+   "link": "right_gripper_finger_link2",
+   "center": [
+    -9e-05,
+    -0.00845,
+    -0.03811
+   ],
+   "radius": 0.01
+  },
+  {
+   "link": "right_gripper_finger_link2",
+   "center": [
+    -9e-05,
+    -0.00745,
+    -0.01811
+   ],
+   "radius": 0.008
+  },
+  {
+   "link": "right_gripper_finger_link2",
+   "center": [
+    -9e-05,
+    -0.00545,
+    -0.00311
+   ],
+   "radius": 0.007
+  },
+  {
+   "link": "right_gripper_finger_link2",
+   "center": [
+    -9e-05,
+    -0.00345,
+    0.01189
+   ],
+   "radius": 0.005
+  }
+ ],
+ "eef_to_fingertip_lengths": {
+  "robot:right_gripper_finger_link1": 0.01880022883415222,
+  "robot:right_gripper_finger_link2": 0.018741101026535034
+ },
+ "pad_z_range": [
+  -0.03811,
+  0.01189
+ ],
+ "contact_center_z": -0.011859999999999999,
+ "max_opening": 0.0969
+}

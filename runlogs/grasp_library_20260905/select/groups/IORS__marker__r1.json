@@ -1,0 +1,600 @@
+{
+ "group": "IORS__marker__r1",
+ "task": "IORS",
+ "category": "marker",
+ "round": 1,
+ "relation": "nextto",
+ "partner": "colored_pencil",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "qemval",
+   "key": "marker__qemval",
+   "strip": "/tmp/glib/strips/marker__qemval.png",
+   "n_valid": 3,
+   "n_clean": 3,
+   "n_clean_strict": 3,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch on marker body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch on marker body, tilted approach"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch on marker body, tilted approach"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    100,
+    13,
+    13
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "kjxpdi",
+   "key": "marker__kjxpdi",
+   "strip": "/tmp/glib/strips/marker__kjxpdi.png",
+   "n_valid": 2,
+   "n_clean": 2,
+   "n_clean_strict": 2,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch on marker body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~35% along marker; fine"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    108,
+    15,
+    13
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "slgheo",
+   "key": "marker__slgheo",
+   "strip": "/tmp/glib/strips/marker__slgheo.png",
+   "n_valid": 5,
+   "n_clean": 4,
+   "n_clean_strict": 4,
+   "flags": [
+    "end_grasp"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred pinch; closed 11 mm on 16 mm body, slight sink"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "marker dangles 33 deg from pads near rear end; metrics disagree"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch near middle of marker body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~44% along marker; fine"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at cap/body junction, ~33% from cap end"
+    }
+   ],
+   "object_note": "grasp 2 render shows marker rotated in pad plane; likely moved during closing",
+   "bbox_mm": [
+    154,
+    18,
+    14
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "mcpkkq",
+   "key": "marker__mcpkkq",
+   "strip": "/tmp/glib/strips/marker__mcpkkq.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch on marker body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch on marker body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch near middle, cap side"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~40% along marker; fine"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~40% along marker; fine"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    154,
+    17,
+    14
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "mznenj",
+   "key": "marker__mznenj",
+   "strip": "/tmp/glib/strips/marker__mznenj.png",
+   "n_valid": 3,
+   "n_clean": 2,
+   "n_clean_strict": 2,
+   "flags": [
+    "end_grasp",
+    "penetration"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at cap/body junction near middle"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on body, inside middle third"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp",
+      "penetration"
+     ],
+     "note": "pads on rear tip (~13% from end); closed 6 of 13 mm"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    154,
+    17,
+    14
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "xakoic",
+   "key": "marker__xakoic",
+   "strip": "/tmp/glib/strips/marker__xakoic.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch on marker body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch on marker body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch near middle, cap side"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~40% along marker; fine"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~40% along marker; fine"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    154,
+    17,
+    14
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "vrjwkg",
+   "key": "marker__vrjwkg",
+   "strip": "/tmp/glib/strips/marker__vrjwkg.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch on marker body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~40% along marker; fine"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch near middle, cap side"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at cap/body junction near middle"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on cap end of body, ~37% from end"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    154,
+    17,
+    14
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ablbdc",
+   "key": "marker__ablbdc",
+   "strip": "/tmp/glib/strips/marker__ablbdc.png",
+   "n_valid": 5,
+   "n_clean": 4,
+   "n_clean_strict": 4,
+   "flags": [
+    "end_grasp"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch on marker body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch on marker body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch on marker body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch near middle on thinner section (13 mm)"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pads on last ~2 cm of marker; rest cantilevered"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    154,
+    18,
+    14
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "oyjbhy",
+   "key": "marker__oyjbhy",
+   "strip": "/tmp/glib/strips/marker__oyjbhy.png",
+   "n_valid": 4,
+   "n_clean": 3,
+   "n_clean_strict": 3,
+   "flags": [
+    "penetration"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch on marker body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch near middle of marker body"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "closed 7 mm on 14 mm marker; pads sink into body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~23-28% from rear end; acceptable, not extreme"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    154,
+    17,
+    14
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "gldosk",
+   "key": "marker__gldosk",
+   "strip": "/tmp/glib/strips/marker__gldosk.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at cap/body junction, ~35% from cap end"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~35% along marker; fine"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~31% along marker; edge of middle third"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at cap/body junction near middle"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on body just past cap, near middle"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    154,
+    18,
+    14
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "vjjsul",
+   "key": "marker__vjjsul",
+   "strip": "/tmp/glib/strips/marker__vjjsul.png",
+   "n_valid": 5,
+   "n_clean": 4,
+   "n_clean_strict": 4,
+   "flags": [
+    "end_grasp",
+    "penetration"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at cap/body junction, ~37% from cap end"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~37% along marker; fine"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp",
+      "penetration"
+     ],
+     "note": "pads at rear end of marker; closed 3 mm on 16 mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~37% along marker; fine"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on cap end of body, ~37% from end"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    154,
+    17,
+    14
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "bwwkmb",
+   "key": "marker__bwwkmb",
+   "strip": "/tmp/glib/strips/marker__bwwkmb.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch on marker body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch near middle, cap side"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "oblique pinch near middle; coverage 0.75 from 35 deg tilt"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at cap/body junction, ~35% from cap end"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch at cap junction ~30% from end; odd V1/V2 angle"
+    }
+   ],
+   "object_note": "grasp 5 V1/V2 rendered end-on (camera azimuth); V4 shows normal side pinch",
+   "bbox_mm": [
+    154,
+    18,
+    14
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

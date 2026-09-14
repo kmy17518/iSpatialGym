@@ -1,0 +1,20 @@
+{
+  "key": "clothes_dryer__xsuyua",
+  "category": "clothes_dryer",
+  "model": "xsuyua",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_0",
+      "kind": "door",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "swing",
+      "graspable": false,
+      "handle_description": "No handle; bowl-shaped porthole door 118 mm thick, black bezel nearly flush with the cabinet front, wide (~8 cm) rim, nothing to get fingertips behind",
+      "height_concern": "",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Front-loader style dryer, door hinged on -y (viewer-left) side swinging to +y. F marker is buried inside the bezel; door too thick and flush, heuristic 'ungraspable' is right."
+}

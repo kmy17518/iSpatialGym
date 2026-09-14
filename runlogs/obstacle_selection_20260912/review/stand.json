@@ -1,0 +1,63 @@
+{
+  "category": "stand",
+  "task": "obst",
+  "n_models": 5,
+  "n_opened": 5,
+  "models": [
+    {
+      "model": "stand/dbskvf",
+      "V": 1,
+      "N": 0,
+      "S": 0,
+      "rest_ok": false,
+      "score": 2,
+      "valid": false,
+      "note": "7.5 m long thin dark board standing on edge, 0.56 x 7.54 x 0.38 m; rail/shelf outlier, not a stand; balances on an edge."
+    },
+    {
+      "model": "stand/kwkcjq",
+      "V": 2,
+      "N": 1,
+      "S": 1,
+      "rest_ok": true,
+      "score": 7,
+      "valid": false,
+      "note": "Flat black L-bracket: base plate with upright back panel, 0.40 x 0.63 x 0.46 m; uniform black, not recognisable as furniture."
+    },
+    {
+      "model": "stand/oyenza",
+      "V": 2,
+      "N": 1,
+      "S": 1,
+      "rest_ok": true,
+      "score": 7,
+      "valid": false,
+      "note": "Duplicate of kwkcjq: flat black L-bracket base plate with upright panel, 0.40 x 0.63 x 0.46 m; uniform black."
+    },
+    {
+      "model": "stand/vyrick",
+      "V": 3,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 11,
+      "valid": true,
+      "note": "Black two-tier utility stand/cart on four legs with small casters, 0.61 x 0.76 x 0.89 m; uniform black, clean; borderline footprint."
+    },
+    {
+      "model": "stand/waxtja",
+      "V": 3,
+      "N": 1,
+      "S": 1,
+      "rest_ok": true,
+      "score": 9,
+      "valid": false,
+      "note": "Plain grey low square four-legged table, 0.60 x 0.60 x 0.37 m; looks untextured; furniture, odd in the middle of a path."
+    }
+  ],
+  "picks": ["stand/vyrick"],
+  "alternate": null,
+  "natural_scenes": ["hotel_suite_large", "office_cubicles_right", "house_single_floor", "house_double_floor_lower"],
+  "category_verdict": "weak",
+  "category_note": "Heterogeneous category: a 7.5 m rail, two black L-brackets, a grey low table and one black two-tier cart on casters; only the cart (0.76 m footprint, borderline) is usable, plausible in hotel or office."
+}

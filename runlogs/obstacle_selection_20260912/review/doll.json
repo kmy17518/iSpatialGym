@@ -1,0 +1,23 @@
+{
+  "category": "doll",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "doll/fhdgrp",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Rag doll in red dress sitting with legs stretched out, brown yarn hair, 0.45 x 0.37 x 0.35 m; complete textures; sits stably."
+    }
+  ],
+  "picks": ["doll/fhdgrp"],
+  "alternate": null,
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int"],
+  "category_verdict": "weak",
+  "category_note": "Large sitting rag doll ~0.45 x 0.37 x 0.35 m, clean and stable; a natural floor toy in a house or flat; only one model, so no pair."
+}

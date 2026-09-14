@@ -1,0 +1,53 @@
+{
+  "group": "mental_rotation__baby_shoe__r3",
+  "task": "mental_rotation",
+  "category": "baby_shoe",
+  "round": 3,
+  "relation": null,
+  "n_candidates": 2,
+  "n_opened": 2,
+  "candidates": [
+    {
+      "model": "tnbjlw",
+      "key": "baby_shoe__tnbjlw__f",
+      "G": 4,
+      "T": 3,
+      "V": 4,
+      "R": 2,
+      "score": 21,
+      "note": "Three solid body/toe-box pinches at inverted and upright orientations plus two thin sole-edge pinches (11 mm, 50/4, 50/2); clean pink star sneaker, flat-shaded but complete."
+    },
+    {
+      "model": "jzwnri",
+      "key": "baby_shoe__jzwnri__f",
+      "G": 3,
+      "T": 3,
+      "V": 4,
+      "R": 1,
+      "score": 18,
+      "note": "Good symmetric body pinch 46/20 and toe-box pinches, all upright and similar; two sideways collar-edge grips at 15 mm closing to 4 and 0 mm."
+    }
+  ],
+  "selected": [
+    {
+      "model": "tnbjlw",
+      "key": "baby_shoe__tnbjlw__f",
+      "rank": 1,
+      "reason": "Most diverse clean set: inverted body pinch, inverted and upright toe-box pinches, plus side grips; clean recognisable baby sneaker with complete textures."
+    },
+    {
+      "model": "jzwnri",
+      "key": "baby_shoe__jzwnri__f",
+      "rank": 2,
+      "reason": "Only other candidate; solid two-sided body pinch and toe-box grips, but clean rows share one upright approach and edge grips close to 0-4 mm."
+    }
+  ],
+  "alternate": null,
+  "short": true,
+  "warnings": [
+    "Group has only 2 candidates; both selected.",
+    "Both models are the same pink star sneaker design with identical bbox (127 x 66 x 64 mm), likely a left/right pair; appearance variety is minimal.",
+    "jzwnri: only about three clean rows and they share one approach direction; rows 3 and 5 pinch a 15 mm collar edge with fingers closing to 4 and 0 mm."
+  ],
+  "confidence": "medium"
+}

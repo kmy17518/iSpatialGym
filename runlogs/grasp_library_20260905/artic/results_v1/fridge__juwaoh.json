@@ -1,0 +1,16 @@
+{
+ "key": "fridge__juwaoh",
+ "category": "fridge",
+ "model": "juwaoh",
+ "scene": "restaurant_diner",
+ "host": "fridge_jtqazu_1",
+ "host_rank": 2,
+ "host_model": "jtqazu",
+ "swap": true,
+ "joints": [],
+ "error": "AttributeError(\"'NoneType' object has no attribute 'scene'\")",
+ "previous_hosts": [
+  "fridge_jtqazu_0",
+  "fridge_juwaoh_0"
+ ]
+}

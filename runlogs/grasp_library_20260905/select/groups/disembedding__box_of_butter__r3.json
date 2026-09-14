@@ -1,0 +1,114 @@
+{
+ "group": "disembedding__box_of_butter__r3",
+ "task": "disembedding",
+ "category": "box_of_butter",
+ "round": 3,
+ "relation": null,
+ "partner": "",
+ "requirements": "Tabletop task: the object rests among other objects on a table / tray and is picked from its resting pose. It must settle stably on a flat surface (it must not roll or topple). The best single grasp matters most.",
+ "candidates": [
+  {
+   "model": "mfjuil",
+   "key": "box_of_butter__mfjuil__t",
+   "strip": "/tmp/glib/strips/box_of_butter__mfjuil__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across 39 mm thickness near top edge"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across thickness near top edge"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt, pads still flat on faces"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt, pads still flat on faces"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt, pads still flat on faces"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    39,
+    149,
+    94
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "oixapu",
+   "key": "box_of_butter__oixapu__t",
+   "strip": "/tmp/glib/strips/box_of_butter__oixapu__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across 45 mm thickness near top edge"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across thickness near top edge"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across thickness near top edge"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across thickness near top edge"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt near top corner, pads flat on faces"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    45,
+    170,
+    108
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

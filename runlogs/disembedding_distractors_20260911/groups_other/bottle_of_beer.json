@@ -1,0 +1,9 @@
+{
+  "category": "bottle_of_beer",
+  "pages_opened": ["grids/pool_other/bottle_of_beer__p1.png", "grids/pool_other/bottle_of_beer__p2.png"],
+  "n_models": 20,
+  "exclude": [
+    {"model": "bottle_of_water/cytqio", "reason": "flat matte grey bottle, no label or material detail; looks untextured"}
+  ],
+  "notes": "All 20 are tier-1 bottles (pop, wine, water, champagne, sake, rum, whiskey, soda), all upright; small tilts (4-5 deg) are not toppled. bottle_of_champagne/mjpyvh is plain pale frosted but has a tinted cap and reads as a bottle, so kept. Clear glass whiskey bottles render transparent but recognisable."
+}

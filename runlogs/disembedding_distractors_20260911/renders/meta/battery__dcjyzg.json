@@ -1,0 +1,35 @@
+{
+ "category": "battery",
+ "model": "dcjyzg",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/battery__dcjyzg__y0.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.9,
+   "on_tray": true,
+   "settled_z": 0.0296,
+   "seg_pixels": 1577,
+   "aabb_extent": [
+    0.034,
+    0.034,
+    0.061
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/battery__dcjyzg__y1.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.7,
+   "on_tray": true,
+   "settled_z": 0.0296
+  }
+ },
+ "stable": true,
+ "visible": true
+}

@@ -1,0 +1,7 @@
+{
+  "category": "bottle_of_medicine",
+  "pages_opened": ["grids/pool_other/bottle_of_medicine__p1.png", "grids/pool_other/bottle_of_medicine__p2.png"],
+  "n_models": 21,
+  "exclude": [],
+  "notes": "All 21 intact, textured and upright. 18 spice bottles/jars share one near-identical mesh (grey cap, dark glass, chrome base) so visual variety is low; pumpkin_pie_spice has a ridged grinder cap, onion_powder is a cork-stoppered bottle. supplements and antihistamines are printed pill bottles, closest to the target but acceptable as related."
+}

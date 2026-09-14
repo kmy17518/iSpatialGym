@@ -1,0 +1,16 @@
+{
+ "key": "door__adejun",
+ "category": "door",
+ "model": "adejun",
+ "scene": "restaurant_diner",
+ "host": "door_cvvumy_0",
+ "host_rank": 2,
+ "host_model": "cvvumy",
+ "swap": true,
+ "joints": [],
+ "error": "AssertionError('Object with name o_door__adejun already exists in scene!')",
+ "previous_hosts": [
+  "door_mkcndz_0",
+  "door_adejun_0"
+ ]
+}

@@ -1,0 +1,29 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "desk_mdhelw_1",
+ "category": "desk",
+ "model": "mdhelw",
+ "rooms": [
+  "private_office_2"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.77,
+  "bbox_x": 0.9,
+  "bbox_y": 2.781,
+  "bbox_z": 0.77,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "swivel_chair_gfixyb_2",
+  "swivel_chair_gfixyb_3",
+  "swivel_chair_lhkkri_3"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 00:34:28",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

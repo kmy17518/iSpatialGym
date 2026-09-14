@@ -1,0 +1,20 @@
+{
+  "key": "recycling_bin__pdmzhv",
+  "category": "recycling_bin",
+  "model": "pdmzhv",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_2",
+      "kind": "flap",
+      "chosen": "F",
+      "pinch": "edge",
+      "motion": "lift",
+      "graspable": false,
+      "handle_description": "Handle-less lid hinged at the rear; F is the 12 mm front lip, flush with the body front face, nothing to get a fingertip under.",
+      "height_concern": "",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Blue wheelie bin, rear-hinged lid, no handle. Only fallback F at the front edge; ungraspable status is right, lid edge flush with the body and very thin."
+}

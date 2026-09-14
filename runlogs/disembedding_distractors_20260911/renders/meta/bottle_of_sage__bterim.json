@@ -1,0 +1,35 @@
+{
+ "category": "bottle_of_sage",
+ "model": "bterim",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_sage__bterim__y0.png",
+   "drift_m": 0.0018,
+   "tilt_deg": 2.5,
+   "on_tray": true,
+   "settled_z": 0.0427,
+   "seg_pixels": 3849,
+   "aabb_extent": [
+    0.06,
+    0.06,
+    0.072
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_sage__bterim__y1.png",
+   "drift_m": 0.0023,
+   "tilt_deg": 2.5,
+   "on_tray": true,
+   "settled_z": 0.0427
+  }
+ },
+ "stable": true,
+ "visible": true
+}

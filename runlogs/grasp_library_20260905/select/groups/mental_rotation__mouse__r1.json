@@ -1,0 +1,375 @@
+{
+ "group": "mental_rotation__mouse__r1",
+ "task": "mental_rotation",
+ "category": "mouse",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "oydobn",
+   "key": "mouse__oydobn",
+   "strip": "/tmp/glib/strips/mouse__oydobn.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tiny object fully between pads, both touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tiny object between pads, both touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads ~30mm apart vs 9mm width; object spans gap"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tiny object between pads, both touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tiny object between pads, both touching"
+    }
+   ],
+   "object_note": "Very small mouse model (~11mm); hard to see but pads visibly close on it",
+   "bbox_mm": [
+    31,
+    20,
+    11
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "fjljxp",
+   "key": "mouse__fjljxp",
+   "strip": "/tmp/glib/strips/mouse__fjljxp.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mouse body pinch, both pads touching"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mouse body pinch, both pads touching"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mouse body pinch, both pads touching"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mouse body pinch, both pads touching"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mouse body pinch, both pads touching"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    106,
+    59,
+    28
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ihpnjx",
+   "key": "mouse__ihpnjx",
+   "strip": "/tmp/glib/strips/mouse__ihpnjx.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across mouse height, CoM 3mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across mouse height, CoM 3mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across mouse height, CoM 10mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across mouse height, CoM 11mm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across mouse height, CoM 14mm"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    106,
+    59,
+    29
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "eosngb",
+   "key": "mouse__eosngb",
+   "strip": "/tmp/glib/strips/mouse__eosngb.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat head panel pinched near CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat head panel pinched, CoM 19mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "curved arc pinched, antipodal 0.47, light object"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "curved arc pinched, CoM 29mm, light object"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "curved arc pinched, CoM 29mm, firm"
+    }
+   ],
+   "object_note": "Arc-style thin curved mouse shell; light object, pinches not at the tail tip",
+   "bbox_mm": [
+    109,
+    54,
+    30
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "wwyopp",
+   "key": "mouse__wwyopp",
+   "strip": "/tmp/glib/strips/mouse__wwyopp.png",
+   "n_valid": 5,
+   "n_clean": 3,
+   "n_clean_strict": 3,
+   "flags": [
+    "end_grasp"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tail end pinch 16mm wide, CoM 33mm, light"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tail end pinch 16mm wide, CoM 34mm, light"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tail end pinch 16mm wide, CoM 35mm, light"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "very tip of thin tail (11mm), body 39mm away"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "very tip of thin tail (11mm), body 42mm away"
+    }
+   ],
+   "object_note": "Arc-style curved mouse; all grasps on the tail end, ranks 4-5 on the extreme tip",
+   "bbox_mm": [
+    117,
+    55,
+    37
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "cduwda",
+   "key": "mouse__cduwda",
+   "strip": "/tmp/glib/strips/mouse__cduwda.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "firm body pinch, asymmetric closure 39/0 but both pads touch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "firm body pinch, both pads on mouse"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "firm body pinch, both pads on mouse"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "firm body pinch, both pads on mouse"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "firm body pinch, both pads on mouse"
+    }
+   ],
+   "object_note": "All rows close one finger fully (x/0): mouse sits off gripper centreline but opening matches width.",
+   "bbox_mm": [
+    124,
+    69,
+    39
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "pljjtu",
+   "key": "mouse__pljjtu",
+   "strip": "/tmp/glib/strips/mouse__pljjtu.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "firm body pinch, opening 41 vs 38 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "firm body pinch, both pads on mouse"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "firm body pinch, both pads on mouse"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "firm body pinch, both pads on mouse"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "firm body pinch, both pads on mouse"
+    }
+   ],
+   "object_note": "Same x/0 asymmetric closure as cduwda; opening exceeds width by 2-3 mm only.",
+   "bbox_mm": [
+    119,
+    66,
+    39
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

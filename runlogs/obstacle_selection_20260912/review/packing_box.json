@@ -1,0 +1,23 @@
+{
+  "category": "packing_box",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "cjhskr",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Open box with inner flaps folded in, clean geometry but uniform light grey, not obviously cardboard; 0.38 x 0.47 x 0.22 m."
+    }
+  ],
+  "picks": ["cjhskr"],
+  "alternate": null,
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int", "office_cubicles_right"],
+  "category_verdict": "weak",
+  "category_note": "Single model: an open, flatly grey moving box 0.47 m wide and 0.22 m tall. A cardboard box is a very natural mid-path obstacle, but only one model exists and it reads as grey plastic."
+}

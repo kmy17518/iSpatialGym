@@ -1,0 +1,146 @@
+{
+ "target_category": "pencil_holder",
+ "target_model": "jyetcl",
+ "target_key": "pencil_holder__jyetcl__t",
+ "category": "coffee_cup",
+ "model": "dkxddg",
+ "kind": "diff",
+ "tier": 1,
+ "started": "2026-09-12 19:03:24",
+ "template": {
+  "support": {
+   "name": "breakfast_table_rhjoby_0",
+   "z": 0.8126289248466492,
+   "yaw": 1.568249225616455,
+   "local_bounds": [
+    2.9359424114227295,
+    4.096141815185547,
+    -8.733086585998535,
+    -5.83029317855835
+   ],
+   "n_free_cells": 8463,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-u",
+   "edge_mid": [
+    7.289144515991211,
+    2.9173855781555176
+   ],
+   "inward": [
+    0.002547098323702812,
+    0.9999967813491821
+   ],
+   "tangent": [
+    -0.9999967813491821,
+    0.002547098323702812
+   ],
+   "base_pose2d": [
+    7.488230228424072,
+    2.466876983642578,
+    1.5682492257812575
+   ],
+   "edge_depth": 0.4500000476837158,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.13419144146220063
+   }
+  },
+  "place_stance": {
+   "edge": "-u",
+   "edge_mid": [
+    7.289144515991211,
+    2.9173855781555176
+   ],
+   "inward": [
+    0.002547098323702812,
+    0.9999967813491821
+   ],
+   "tangent": [
+    -0.9999967813491821,
+    0.002547098323702812
+   ],
+   "base_pose2d": [
+    8.187366485595703,
+    2.4650962352752686,
+    1.5682492257812575
+   ],
+   "edge_depth": 0.45000001788139343
+  },
+  "view_arms": "untucked",
+  "yaw_adjust_deg": 0.0,
+  "dest_lateral_m": -0.6991389359008917,
+  "dest_side": "right",
+  "source_lateral_offset": 0.0,
+  "n_reachable_cells": 12,
+  "n_grasp_cells": 12,
+  "n_place_combos": 2,
+  "distractors": {
+   "same_category": true,
+   "pool": "same_category",
+   "requested_pool": "same_category",
+   "fallback": null,
+   "models": [
+    "pencil_holder-taixcy"
+   ],
+   "requested": 1,
+   "pool_size": 1,
+   "pool_categories": [
+    "pencil_holder"
+   ],
+   "lookalikes_excluded": [],
+   "footprint_fraction": 0.11
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 44.71,
+   "prepare_template_s": 0.14
+  },
+  "setup_s": 44.8
+ },
+ "footprint_fraction_with_target": 0.13,
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {
+  "target_placement": 1
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_dis_distractors/pencil_holder-jyetcl__coffee_cup-dkxddg/instances/disembedding-0__pencil_holder-jyetcl__coffee_cup-dkxddg__0000.summary.json",
+   "wall_time_s": 5.0,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    7.488230228424072,
+    2.466876983642578,
+    1.5682492257812575
+   ],
+   "trunk": [
+    0.0,
+    -0.8999999761581421
+   ],
+   "occluded_variant": false,
+   "grasp": {
+    "key": "pencil_holder__jyetcl__t",
+    "name": "grasp_4",
+    "translate": 0.5,
+    "place_translate": 0.5,
+    "yaw": 1.6520138009507614
+   },
+   "dest_pixels": 11424,
+   "source_pixels": 131608,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_dis_distractors/pencil_holder-jyetcl__coffee_cup-dkxddg",
+ "job_s": 8.0,
+ "finished": "2026-09-12 19:03:32",
+ "occluded_variant": false,
+ "occlusion_ratio": null
+}

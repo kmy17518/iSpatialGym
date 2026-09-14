@@ -1,0 +1,9 @@
+{
+  "category": "pencil_holder",
+  "pages_opened": ["grids/pool_other/pencil_holder__p1.png", "grids/pool_other/pencil_holder__p2.png"],
+  "n_models": 26,
+  "exclude": [
+    {"model": "can_of_coffee/poteji", "reason": "settles leaning 13 deg; can does not stand flat on the tray, unstable base"}
+  ],
+  "notes": "Others are upright, intact containers (mugs, beakers, cups, glasses, goblet, vases, jars, cans, canister, candle holder, toy box) or pencil cases lying flat as expected. beaker/jdijek, beaker/fyrkzs, vase/atgnsc, soda_cup/gnzegv and candle_holder/nygnlp are plain grey/white/black but shaded with clear rims and read as their category, so kept."
+}

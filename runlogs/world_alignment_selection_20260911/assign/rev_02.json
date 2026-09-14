@@ -1,0 +1,134 @@
+[
+ {
+  "category": "broom",
+  "task": "wa1",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/broom_00.png"
+  ]
+ },
+ {
+  "category": "chopping_board",
+  "task": "wa0",
+  "n_models": 14,
+  "grids": [
+   "renders/grids/chopping_board_00.png",
+   "renders/grids/chopping_board_01.png",
+   "renders/grids/chopping_board_02.png",
+   "renders/grids/chopping_board_03.png",
+   "renders/grids/chopping_board_04.png"
+  ]
+ },
+ {
+  "category": "clipboard",
+  "task": "wa0",
+  "n_models": 2,
+  "grids": [
+   "renders/grids/clipboard_00.png"
+  ]
+ },
+ {
+  "category": "comic_book",
+  "task": "wa0",
+  "n_models": 5,
+  "grids": [
+   "renders/grids/comic_book_00.png",
+   "renders/grids/comic_book_01.png"
+  ]
+ },
+ {
+  "category": "credit_card_terminal",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/credit_card_terminal_00.png"
+  ]
+ },
+ {
+  "category": "folder",
+  "task": "wa0",
+  "n_models": 6,
+  "grids": [
+   "renders/grids/folder_00.png",
+   "renders/grids/folder_01.png"
+  ]
+ },
+ {
+  "category": "goggles",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/goggles_00.png"
+  ]
+ },
+ {
+  "category": "hardback",
+  "task": "wa0",
+  "n_models": 16,
+  "grids": [
+   "renders/grids/hardback_00.png",
+   "renders/grids/hardback_01.png",
+   "renders/grids/hardback_02.png",
+   "renders/grids/hardback_03.png",
+   "renders/grids/hardback_04.png",
+   "renders/grids/hardback_05.png"
+  ]
+ },
+ {
+  "category": "magnifying_glass",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/magnifying_glass_00.png"
+  ]
+ },
+ {
+  "category": "map",
+  "task": "wa1",
+  "n_models": 3,
+  "grids": [
+   "renders/grids/map_00.png"
+  ]
+ },
+ {
+  "category": "power_strip",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/power_strip_00.png"
+  ]
+ },
+ {
+  "category": "radio",
+  "task": "wa0",
+  "n_models": 2,
+  "grids": [
+   "renders/grids/radio_00.png"
+  ]
+ },
+ {
+  "category": "receipt",
+  "task": "wa0",
+  "n_models": 5,
+  "grids": [
+   "renders/grids/receipt_00.png",
+   "renders/grids/receipt_01.png"
+  ]
+ },
+ {
+  "category": "tennis_racket",
+  "task": "wa1",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/tennis_racket_00.png"
+  ]
+ },
+ {
+  "category": "wire_cutter",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/wire_cutter_00.png"
+  ]
+ }
+]

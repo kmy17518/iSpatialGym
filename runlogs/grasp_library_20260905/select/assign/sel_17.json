@@ -1,0 +1,11 @@
+{
+ "assignment": "sel_17",
+ "groups": [
+  "/tmp/glib/select/groups/disembedding__teaspoon__r2.json",
+  "/tmp/glib/select/groups/mental_rotation__mouse__r1.json",
+  "/tmp/glib/select/groups/object_scaling__apple__r1.json",
+  "/tmp/glib/select/groups/object_scaling__canned_food__r1.json",
+  "/tmp/glib/select/groups/IORS__apple__r2.json"
+ ],
+ "n_strips": 34
+}

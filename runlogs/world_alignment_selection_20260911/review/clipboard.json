@@ -1,0 +1,39 @@
+{
+ "category": "clipboard",
+ "task": "wa0",
+ "n_models": 2,
+ "n_opened": 2,
+ "models": [
+  {
+   "model": "envjqe",
+   "V": 4,
+   "O": 3,
+   "F": 2,
+   "score": 16,
+   "valid": true,
+   "long_axis": "x",
+   "front_axis": "-x",
+   "rest_ok": true,
+   "note": "Clipboard with printed form; clip on the -x short edge, form text reads with its top at -x."
+  },
+  {
+   "model": "gmxyfo",
+   "V": 3,
+   "O": 2,
+   "F": 2,
+   "score": 12,
+   "valid": true,
+   "long_axis": "x",
+   "front_axis": "-x",
+   "rest_ok": true,
+   "note": "Plain black clipboard, clip on -x edge barely visible from the top; no print."
+  }
+ ],
+ "picks": [
+  "envjqe",
+  "gmxyfo"
+ ],
+ "alternate": null,
+ "category_verdict": "good",
+ "category_note": "Two 0.32x0.23x0.01 m clipboards, clip on the -x short edge (so front is along the long axis). envjqe has a printed form (strong cue); gmxyfo is plain black with a barely visible clip."
+}

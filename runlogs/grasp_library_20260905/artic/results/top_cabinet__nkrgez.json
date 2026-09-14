@@ -1,0 +1,52 @@
+{
+ "key": "top_cabinet__nkrgez",
+ "category": "top_cabinet",
+ "model": "nkrgez",
+ "scene": "house_double_floor_lower",
+ "host": "top_cabinet_tynnnw_1",
+ "host_rank": 1,
+ "host_model": "tynnnw",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "manual skip: round-2 review: infeasible - Flush plank door inset in the tower's face frame; free left (inner) edge butts f",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  },
+  {
+   "joint": "j_link_1",
+   "kind": "door",
+   "grasp_source": "manual skip: round-2 review: infeasible - Flush plank door inset in the tower's face frame; free right (inner) edge butts ",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "previous_hosts": [
+  "top_cabinet_tynnnw_0"
+ ],
+ "scale": [
+  1.942,
+  0.994,
+  1.061
+ ],
+ "time_s": 1.7
+}

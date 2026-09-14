@@ -1,0 +1,267 @@
+{
+ "group": "IORS__cherry_tomato__r1",
+ "task": "IORS",
+ "category": "cherry_tomato",
+ "round": 1,
+ "relation": "ontop",
+ "partner": "plate",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "dqvtgm",
+   "key": "cherry_tomato__dqvtgm",
+   "strip": "/tmp/glib/strips/cherry_tomato__dqvtgm.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Pinch across 18 mm width of upright oval tomato"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Pinch across short axis, 34 deg tilt, both pads"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Pinch across short axis, both pads touch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Pinch line near top; pads contact widest part (19 mm)"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Pinch line near top; pads contact widest part (19 mm)"
+    }
+   ],
+   "object_note": "Low antipodal scores in rows 4-5 reflect pinch line, actual pad contact is at body.",
+   "bbox_mm": [
+    32,
+    19,
+    24
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "iydznu",
+   "key": "cherry_tomato__iydznu",
+   "strip": "/tmp/glib/strips/cherry_tomato__iydznu.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diagonal pinch of oval, pads 29 mm, both touch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diagonal pinch, vertical approach, both pads touch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Short-axis pinch, pads 24 mm, both touch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Short-axis pinch, vertical approach, both touch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Lengthwise pinch at rounded ends (32 mm)"
+    }
+   ],
+   "object_note": "Width inf: pinch line above tomato, pad lower edges contact.",
+   "bbox_mm": [
+    31,
+    24,
+    20
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "eukpfb",
+   "key": "cherry_tomato__eukpfb",
+   "strip": "/tmp/glib/strips/cherry_tomato__eukpfb.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Short-axis pinch, pads 22 mm apart, both touch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Lengthwise pinch at rounded ends (35 mm); antipodal"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Short-axis pinch with pad lower edges, both touch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Short-axis pinch at 33 deg, both pads touch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Lengthwise pinch at rounded ends (35 mm); antipodal"
+    }
+   ],
+   "object_note": "Width inf rows: pinch line above tomato, pad lower edges contact; small light object.",
+   "bbox_mm": [
+    35,
+    22,
+    22
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "hmsqrh",
+   "key": "cherry_tomato__hmsqrh",
+   "strip": "/tmp/glib/strips/cherry_tomato__hmsqrh.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Lengthwise pinch at rounded ends (36 mm), both pads"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diagonal pinch of oval, pads 32 mm, both touch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Short-axis pinch, pads 27 mm, both touch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Lengthwise pinch at rounded ends, both pads"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Lengthwise pinch at rounded ends, both pads"
+    }
+   ],
+   "object_note": "Low antipodal scores are pinch-line metrics; pads contact widest extremes of oval.",
+   "bbox_mm": [
+    36,
+    27,
+    22
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "dqjuub",
+   "key": "cherry_tomato__dqjuub",
+   "strip": "/tmp/glib/strips/cherry_tomato__dqjuub.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch, fingers 35/0 match 33 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch, both pads on tomato"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch, both pads on tomato"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch, both pads on tomato"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch, both pads on tomato"
+    }
+   ],
+   "object_note": "Round tomato; all rows equivalent 30 deg side pinches.",
+   "bbox_mm": [
+    34,
+    34,
+    31
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

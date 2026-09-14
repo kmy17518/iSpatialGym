@@ -1,0 +1,43 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "bottom_cabinet_immwzb_4",
+ "category": "bottom_cabinet",
+ "model": "immwzb",
+ "rooms": [
+  "shared_office_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-3",
+ "inventory": {
+  "top_z": 0.712,
+  "bbox_x": 0.603,
+  "bbox_y": 0.395,
+  "bbox_z": 0.71,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "swivel_chair_ryznxk_4"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 00:53:51",
+ "precheck": {
+  "aabb": [
+   [
+    10.429,
+    -8.609,
+    0.003
+   ],
+   [
+    10.823,
+    -8.006,
+    0.711
+   ]
+  ],
+  "error": "RuntimeError(\"min(): Expected reduction dim to be specified for input.numel() == 0. Specify the reduction dim with the 'dim' argument.\")",
+  "precheck_s": 11.4
+ },
+ "status": "skipped",
+ "reason": "inter_object_relation_satisfaction-0 found no stance / no reachable cell on the support top at any stand-off (precheck: no stance either)"
+}

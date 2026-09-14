@@ -41,7 +41,8 @@ def rooms_for(problem: ProblemSpec, scene_spec: SceneSpec, stable_scene: dict) -
     rooms = list(scene_spec.rooms)
     init_info = stable_scene["objects_info"]["init_info"]
     for role, req in scene_spec.fixed.items():
-        names = req if isinstance(req, list) else []
+        # lists of scene object names; ``wall_regions`` is a list of dicts (surveyed wall segments) and is skipped
+        names = [n for n in req if isinstance(n, str)] if isinstance(req, list) else []
         for n in names:
             if n in init_info:
                 for r in init_info[n]["args"].get("in_rooms", []) or []:
@@ -50,6 +51,29 @@ def rooms_for(problem: ProblemSpec, scene_spec: SceneSpec, stable_scene: dict) -
         if isinstance(req, dict) and req.get("room") and req["room"] not in rooms:
             rooms.append(req["room"])
     return rooms
+
+
+def chairs_to_remove(problem: ProblemSpec, scene_spec: SceneSpec, stable_scene: dict, rooms: list) -> list:
+    """Chairs around the work table(s) of a table task (``generation.remove_chairs_near_tables``, default on when the
+    problem has a fixed ``table`` role; ``distance`` 1.0 m; ``chair_categories`` overrides the default list)."""
+    from ispatialgym.sampling import scene_variants as SV
+
+    if "table" not in scene_spec.fixed and problem.gen("remove_chairs_near_tables") is None:
+        return []
+    if problem.gen("remove_chairs_near_tables", True) is False:
+        return []
+    req = scene_spec.fixed.get("table")
+    if isinstance(req, list):
+        wanted = list(req)
+    elif isinstance(req, dict):
+        wanted = list(req.get("category", []))
+    else:
+        wanted = []
+    tables = SV.tables_in_rooms(stable_scene, rooms, wanted) if wanted else []
+    if not tables:
+        return []
+    cats = problem.gen("chair_categories") or SV.CHAIR_CATEGORIES
+    return SV.chairs_near_tables(stable_scene, rooms, tables, distance=float(problem.gen("chair_distance", 1.0)), categories=tuple(cats))
 
 
 def template_id_for(scene: str, choices: dict) -> str:
@@ -100,12 +124,20 @@ def main(argv=None):
                 with open(stable_scene_path(scene)) as f:
                     stable = json.load(f)
                 rooms = rooms_for(pspec, scene_spec, stable)
-                key = (scene, tuple(sorted(rooms)))
+                removed = chairs_to_remove(pspec, scene_spec, stable, rooms)
+                key = (scene, tuple(sorted(rooms)), tuple(removed))
                 if current_key != key:
                     try:
                         if current_world is not None:
                             og.clear()
-                        current_world = SimWorld(scene, rooms)
+                        variant = None
+                        if removed:
+                            from ispatialgym.sampling import scene_variants as SV
+
+                            vpath, _ = SV.write_variant(stable_scene_path(scene), removed, os.path.join(args.out, "scene_variants"))
+                            variant = {"path": vpath, "removed_objects": removed, "freed_footprints": SV.freed_footprints(stable, removed)}
+                            log.info("scene variant for %s: %d objects removed (%s)", scene, len(removed), removed)
+                        current_world = SimWorld(scene, rooms, scene_variant=variant)
                         current_kit = RobotKit(current_world, prebuild=("right_arm",))
                         current_key = key
                     except Exception as e:  # keep going with the next scene
@@ -115,9 +147,10 @@ def main(argv=None):
                         current_world, current_kit, current_key = None, None, None
                         continue
                 choices_list = pspec.template_choices(rng)
-                # specs with per-template random draws (``pick: "pool"`` roles) get several templates per model choice
+                # specs with per-template random draws (distractor pools, ``pick: "pool"`` roles) get several templates
+                # per model choice (``__v1``, ``__v2``, ...: another distractor set each)
                 want = pspec.gen("templates_per_scene")
-                if want and any(r.pick == "pool" for r in pspec.spawned_roles()) and choices_list:
+                if want and (pspec.distractor_spec() is not None or any(r.pick == "pool" for r in pspec.spawned_roles())) and choices_list:
                     base = list(choices_list)
                     while len(choices_list) < int(want):
                         choices_list.append(base[len(choices_list) % len(base)])

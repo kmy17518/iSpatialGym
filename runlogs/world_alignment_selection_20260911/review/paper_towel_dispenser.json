@@ -1,0 +1,27 @@
+{
+  "category": "paper_towel_dispenser",
+  "task": "wa1",
+  "n_models": 5,
+  "n_opened": 5,
+  "models": [
+    {"model": "jacqxv", "V": 3, "U": 2, "H": 1, "score": 11, "valid": true,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "grey folded-towel dispenser 0.33 x 0.40 m, 14.5 cm deep; plain surfaces, up read from the slot/keyhole at the bottom and tiny logo"},
+    {"model": "lahuhb", "V": 3, "U": 2, "H": 1, "score": 11, "valid": true,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "near-duplicate of jacqxv (same grey design, 14.3 cm deep); same subtle bottom-slot cue"},
+    {"model": "ovwdpz", "V": 4, "U": 3, "H": 0, "score": 14, "valid": false,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "black/grey automatic dispenser with a towel sheet hanging below, clear up cue and faint text; 21 cm deep, too thick per rubric"},
+    {"model": "tuvnnt", "V": 3, "U": 2, "H": 1, "score": 11, "valid": true,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "slimmer grey dispenser 0.28 x 0.40 m, 12.6 cm deep, same bottom slot/logo cue; plain grey surfaces"},
+    {"model": "zpfghl", "V": 3, "U": 1, "H": 1, "score": 9, "valid": false,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "plain black box 0.32 x 0.19 m with a grey underside; no readable up from the front; thickness 15.4 cm borderline"}
+  ],
+  "picks": ["jacqxv", "tuvnnt"],
+  "alternate": "lahuhb",
+  "category_verdict": "weak",
+  "category_note": "Wall-mounted restroom dispensers, 0.28-0.33 m wide, 0.19-0.44 m tall, 13-21 cm deep. Natural on a wall but boxy and thick; the upright cue is only a small slot/logo at the bottom on the plain grey units, so readability is marginal."
+}

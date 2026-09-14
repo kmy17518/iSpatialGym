@@ -1,0 +1,25 @@
+{
+  "category": "gym_shoe",
+  "task": "obst",
+  "n_models": 6,
+  "n_opened": 6,
+  "models": [
+    {"model": "gym_shoe/lqzooz", "V": 4, "N": 2, "S": 1, "rest_ok": true, "score": 13, "valid": true,
+     "note": "Dark grey running shoe with neon yellow sole and white stripes, 0.31 x 0.11 x 0.12 m; sharp textures, low height."},
+    {"model": "gym_shoe/mcfcwq", "V": 5, "N": 2, "S": 1, "rest_ok": true, "score": 15, "valid": true,
+     "note": "White retro sneaker with teal and red trim, 0.31 x 0.12 x 0.14 m; crisp textures, tallest of the set, clean sole."},
+    {"model": "gym_shoe/uuvwev", "V": 4, "N": 2, "S": 1, "rest_ok": true, "score": 13, "valid": true,
+     "note": "Black sneaker with orange stripes and yellow heel, 0.31 x 0.11 x 0.14 m; sharp; near-duplicate look of womypz."},
+    {"model": "gym_shoe/wfmrpw", "V": 4, "N": 2, "S": 1, "rest_ok": true, "score": 13, "valid": true,
+     "note": "Blue and black trail-style sneaker, 0.31 x 0.11 x 0.13 m; good textures, clean geometry."},
+    {"model": "gym_shoe/wkvcsn", "V": 3, "N": 2, "S": 1, "rest_ok": true, "score": 11, "valid": true,
+     "note": "Plain grey canvas low-top, smallest at 0.27 x 0.10 x 0.11 m; low-contrast texture, barely above the 0.10 m height floor."},
+    {"model": "gym_shoe/womypz", "V": 4, "N": 2, "S": 1, "rest_ok": true, "score": 13, "valid": true,
+     "note": "Black sneaker with orange stripes and yellow heel, 0.31 x 0.11 x 0.14 m; same look as uuvwev (other foot)."}
+  ],
+  "picks": ["gym_shoe/mcfcwq", "gym_shoe/uuvwev"],
+  "alternate": "gym_shoe/wfmrpw",
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int", "hotel_suite_large"],
+  "category_verdict": "weak",
+  "category_note": "Six well-textured single sneakers ~0.31 x 0.11 x 0.13 m, all resting on the sole. Credible floor clutter in bedrooms/entryways/hotel (N = 2), but only 0.11-0.14 m tall so size is borderline for every model."
+}

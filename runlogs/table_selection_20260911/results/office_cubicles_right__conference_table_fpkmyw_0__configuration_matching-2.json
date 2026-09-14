@@ -1,0 +1,36 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "conference_table_fpkmyw_0",
+ "category": "conference_table",
+ "model": "fpkmyw",
+ "rooms": [
+  "meeting_room_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.67,
+  "bbox_x": 1.493,
+  "bbox_y": 3.392,
+  "bbox_z": 0.67,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "swivel_chair_ucawqa_0",
+  "swivel_chair_ucawqa_1",
+  "swivel_chair_ucawqa_2",
+  "swivel_chair_ucawqa_3",
+  "swivel_chair_ucawqa_4",
+  "swivel_chair_ucawqa_5",
+  "swivel_chair_ucawqa_6",
+  "swivel_chair_ucawqa_7",
+  "swivel_chair_ucawqa_8",
+  "swivel_chair_ucawqa_9"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 23:44:46",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

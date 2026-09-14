@@ -1,0 +1,20 @@
+{
+  "key": "recycling_bin__mdojox",
+  "category": "recycling_bin",
+  "model": "mdojox",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_2",
+      "kind": "flap",
+      "chosen": "F",
+      "pinch": "edge",
+      "motion": "lift",
+      "graspable": false,
+      "handle_description": "Handle-less wheelie-bin lid hinged at the rear; F is the front edge, but it rests on the body rim/comb lip with no underside to reach.",
+      "height_concern": "",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Single rear-hinged lid, no handle. Only the fallback edge marker exists and the heuristic's ungraspable call is right: lid edge sits inside/on the body rim, no lip to pinch."
+}

@@ -1,0 +1,31 @@
+{
+  "group": "object_scaling__potato__r1",
+  "task": "object_scaling",
+  "category": "potato",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 5,
+  "n_opened": 5,
+  "candidates": [
+    {"model": "ljfitc", "key": "potato__ljfitc", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Five clean centred 56-60 mm body pinches (CoM 0-1 mm, conf 0.96-0.98), tilts 67-166 in three groups; photoreal yellow-brown oval potato. Two rows 50/5."},
+    {"model": "lqjear", "key": "potato__lqjear", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Five clean centred 58-61 mm pinches, CoM 0-1 mm, antipodal 0.95-0.98, tilts 19-168 widely spread; photoreal yellow potato with dark scars, same size as ljfitc."},
+    {"model": "bpwohr", "key": "potato__bpwohr", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Five clean centred 61-68 mm pinches incl. symmetric 43/27 row, tilts 13-175 in four groups; pale cream potato, washed-out skin, light patch/seam in V4."},
+    {"model": "reczhi", "key": "potato__reczhi", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Five clean 69-71 mm pinches, CoM 1-2 mm, row 1 symmetric 38/32, tilts 39-151; large 106 mm tan potato, clearly visible low-poly faceting in V4."},
+    {"model": "ngjeog", "key": "potato__ngjeog", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Five clean 73-75 mm pinches, CoM 1-4 mm, but only two approach groups (tilt 21-22 and 119-137); photoreal russet potato with dark blotches, near-round."}
+  ],
+  "selected": [
+    {"model": "lqjear", "key": "potato__lqjear", "rank": 1,
+     "reason": "Top score with the widest spread of clean centred grasps (tilt 19-168), highest antipodal values and well-centred closures; realistic textured potato of typical size."},
+    {"model": "bpwohr", "key": "potato__bpwohr", "rank": 2,
+     "reason": "Within 2 points of ljfitc, which looks nearly identical to #1; bpwohr's pale colour spans the category and it offers four distinct clean approach directions."}
+  ],
+  "alternate": {"model": "ljfitc", "key": "potato__ljfitc"},
+  "short": false,
+  "warnings": ["ljfitc ties lqjear at 25 but is a near-identical yellow oval potato, so it was passed over for #2 in favour of a different-looking candidate; ngjeog is equally strong visually but has only two grasp approach groups."],
+  "confidence": "medium"
+}

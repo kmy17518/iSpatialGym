@@ -1,0 +1,91 @@
+{
+ "category": "toolbox",
+ "model": "redmtl",
+ "key": "toolbox__redmtl",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.07977211475372314
+ ],
+ "aabb_extent": [
+  0.2679709792137146,
+  0.6182060241699219,
+  0.3523434102535248
+ ],
+ "aabb_min_rel_root": [
+  -0.12963217496871948,
+  -0.30906233191490173,
+  -0.07977211475372314
+ ],
+ "aabb_max_rel_root": [
+  0.13833880424499512,
+  0.30914366245269775,
+  0.27257129549980164
+ ],
+ "link_tags": {
+  "base_link": [],
+  "lid": []
+ },
+ "openable_joint_ids": [],
+ "joints": [
+  {
+   "joint": "j_lid",
+   "type": "RevoluteJoint",
+   "child_link": "lid",
+   "lower": 0.0,
+   "upper": 2.96705961227417,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    -0.12342,
+    0.00011,
+    0.1272
+   ],
+   "link_quat_obj": [
+    -0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "hinge_point_obj": [
+    -0.12342,
+    -0.4168,
+    0.1272
+   ],
+   "measured_angle": 0.2462,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/toolbox__redmtl__lid.obj",
+   "n_pieces": 16,
+   "link_bbox_min": [
+    -0.1247,
+    -0.3035,
+    0.121
+   ],
+   "link_bbox_max": [
+    0.1299,
+    0.3036,
+    0.2726
+   ],
+   "link_tags": [],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.1296,
+   -0.3091,
+   -0.0798
+  ],
+  "bbox_max": [
+   0.1383,
+   0.3091,
+   0.1315
+  ],
+  "n_pieces": 16
+ }
+}

@@ -1,0 +1,35 @@
+{
+ "category": "table_knife",
+ "model": "eebpap",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/table_knife__eebpap__y0.png",
+   "drift_m": 0.0036,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.003,
+   "seg_pixels": 2418,
+   "aabb_extent": [
+    0.265,
+    0.026,
+    0.006
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/table_knife__eebpap__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.003
+  }
+ },
+ "stable": true,
+ "visible": true
+}

@@ -1,0 +1,23 @@
+{
+  "category": "litter_box",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "litter_box/rwnakn",
+      "V": 5,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Covered litter box: beige hood, navy base, top handle, front opening with litter visible; 0.53 x 0.36 x 0.52 m; clean."
+    }
+  ],
+  "picks": ["litter_box/rwnakn"],
+  "alternate": null,
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int"],
+  "category_verdict": "weak",
+  "category_note": "One well-made hooded litter box, ideal size and stable. Natural on a house or flat floor (bathroom, utility, corridor) but normally against a wall (N=2); not for hotel, diner or office; single model."
+}

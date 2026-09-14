@@ -1,0 +1,81 @@
+{
+  "category": "carton",
+  "task": "obst",
+  "n_models": 6,
+  "n_opened": 6,
+  "models": [
+    {
+      "model": "causya",
+      "V": 2,
+      "N": 3,
+      "S": 0,
+      "rest_ok": true,
+      "score": 10,
+      "valid": false,
+      "note": "1.0 x 1.0 x 0.67 m plain grey-brown box; open lid flap floats detached above the body; far too big."
+    },
+    {
+      "model": "cdmmwy",
+      "V": 5,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 17,
+      "valid": true,
+      "note": "Closed brown shipping box with handling symbols, 0.23 x 0.31 x 0.19 m; sharp texture; low but not roll-over-able."
+    },
+    {
+      "model": "hhlmbi",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Small white lidded carton with dark lid band and symbols, 0.22 x 0.22 x 0.14 m; clean, plain; low."
+    },
+    {
+      "model": "libote",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Near-duplicate of hhlmbi: white lidded carton with dark band, 0.21 x 0.21 x 0.14 m; clean; low."
+    },
+    {
+      "model": "msfzpz",
+      "V": 3,
+      "N": 3,
+      "S": 0,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "1.2 x 1.0 x 0.78 m open moving box with splayed flaps, plain grey-brown; far too big for a corridor."
+    },
+    {
+      "model": "ylrxhe",
+      "V": 5,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 17,
+      "valid": true,
+      "note": "Closed brown cardboard box with magenta straps and hand holes, 0.63 x 0.64 x 0.50 m; sharp texture; slightly large footprint."
+    }
+  ],
+  "picks": ["cdmmwy", "ylrxhe"],
+  "alternate": "hhlmbi",
+  "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right"
+  ],
+  "category_verdict": "weak",
+  "category_note": "Cardboard boxes, the archetypal floor obstacle, natural in every scene. Sizes all miss the ideal band: three are 0.14-0.19 m low, two are ~1 m huge; cdmmwy (small) and ylrxhe (0.64 m) are usable."
+}

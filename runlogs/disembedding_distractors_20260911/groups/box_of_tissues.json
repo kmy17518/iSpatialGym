@@ -1,0 +1,10 @@
+{
+  "category": "box_of_tissues",
+  "n_models": 4,
+  "pages_opened": [
+    "grids/same/box_of_tissues__p1.png"
+  ],
+  "groups": [],
+  "unusable": [],
+  "notes": "All four share the same 11x13x7 geometry (cluster c1) but prints differ strongly at every yaw (blue/purple floral, white/mint floral, indigo with yellow 1600, cream with red stamps). Closest pair uglbjc vs ntbrtz: both bluish, but clearly different hue and graphics; kept apart."
+}

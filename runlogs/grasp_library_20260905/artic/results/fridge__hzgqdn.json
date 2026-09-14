@@ -1,0 +1,35 @@
+{
+ "key": "fridge__hzgqdn",
+ "category": "fridge",
+ "model": "hzgqdn",
+ "scene": "Rs_int",
+ "host": "fridge_xyejdx_0",
+ "host_rank": 0,
+ "host_model": "xyejdx",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "manual skip: round-2 review: infeasible - Flush slab, no handle or lip; free edge is 213 mm thick, far beyond the 97 mm op",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.137,
+  1.06,
+  1.67
+ ],
+ "time_s": 0.9
+}

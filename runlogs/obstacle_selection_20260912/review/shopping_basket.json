@@ -1,0 +1,17 @@
+{
+  "category": "shopping_basket",
+  "task": "obst",
+  "n_models": 2,
+  "n_opened": 2,
+  "models": [
+    {"model": "shopping_basket/nedrsh", "V": 3, "N": 2, "S": 1, "rest_ok": true, "score": 11, "valid": true,
+     "note": "Near-black tapered plastic tub without handles, 0.61 x 0.40 x 0.33 m; reads as a bus tub / storage crate, very dark; footprint borderline."},
+    {"model": "shopping_basket/vsxhsv", "V": 4, "N": 2, "S": 1, "rest_ok": true, "score": 13, "valid": true,
+     "note": "Dark red perforated supermarket basket with folded-down handles, 0.37 x 0.24 x 0.18 m; clearly a shopping basket, height borderline."}
+  ],
+  "picks": ["shopping_basket/vsxhsv", "shopping_basket/nedrsh"],
+  "alternate": null,
+  "natural_scenes": ["house_single_floor", "house_double_floor_lower", "Rs_int", "restaurant_diner"],
+  "category_verdict": "weak",
+  "category_note": "Two dark plastic baskets, both stable and flat-based. They are set-down items rather than mid-room objects in homes or a diner (N = 2); nedrsh is a wide 0.61 m tub, vsxhsv only 0.18 m tall: borderline size for both."
+}

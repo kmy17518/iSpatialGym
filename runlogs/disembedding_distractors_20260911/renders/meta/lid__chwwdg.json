@@ -1,0 +1,35 @@
+{
+ "category": "lid",
+ "model": "chwwdg",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/lid__chwwdg__y0.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0274,
+   "seg_pixels": 7371,
+   "aabb_extent": [
+    0.127,
+    0.127,
+    0.072
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/lid__chwwdg__y1.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0274
+  }
+ },
+ "stable": true,
+ "visible": true
+}

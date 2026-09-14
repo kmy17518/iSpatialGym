@@ -1,0 +1,124 @@
+{
+ "group": "IORS__bottle_of_supplements__r3",
+ "task": "IORS",
+ "category": "bottle_of_supplements",
+ "round": 3,
+ "relation": "under",
+ "partner": "tray under bottle (bottle grasped)",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "oqakev",
+   "key": "bottle_of_supplements__oqakev__t",
+   "strip": "/tmp/glib/strips/bottle_of_supplements__oqakev__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "50/17 idle finger, ~16 mm off-centre, borderline; shoulder pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "50/17 idle finger, ~16 mm off-centre, borderline; shoulder pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "50/17 idle finger, ~16 mm off-centre, borderline; shoulder pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "50/17 idle finger, ~16 mm off-centre, borderline; shoulder pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "50/17 idle finger, ~16 mm off-centre, borderline; shoulder pinch"
+    }
+   ],
+   "object_note": "Pads sit on ~65 mm shoulder bulge above the 56 mm body, so opening/width mismatch is shape, not gap.",
+   "bbox_mm": [
+    64,
+    64,
+    116
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "kgreql",
+   "key": "bottle_of_supplements__kgreql__t",
+   "strip": "/tmp/glib/strips/bottle_of_supplements__kgreql__t.png",
+   "n_valid": 5,
+   "n_clean": 4,
+   "n_clean_strict": 2,
+   "flags": [
+    "gap",
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "gap",
+      "one_finger"
+     ],
+     "note": "opening 56 mm vs 48 mm cylinder; idle finger 50/8, pad off"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "44/6 asymmetric but closed; upper-body pinch below cap"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "44/6 asymmetric but closed; upper-body pinch below cap"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: bottle pushed against open finger, ~24 mm off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "49/0: bottle against near-open finger, ~24 mm off-centre"
+    }
+   ],
+   "object_note": "Straight 48 mm cylinder; rows 2-5 close to 48 mm, row 1 stops 8 mm wider (gap inferred from numbers).",
+   "bbox_mm": [
+    74,
+    67,
+    137
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

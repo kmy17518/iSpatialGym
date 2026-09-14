@@ -1,0 +1,5953 @@
+{
+ "keyboard__hgtbot": {
+  "category": "keyboard",
+  "model": "hgtbot",
+  "bbox": [
+   0.1448,
+   0.4957,
+   0.0256
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "keyboard__injrgc": {
+  "category": "keyboard",
+  "model": "injrgc",
+  "bbox": [
+   0.1656,
+   0.4837,
+   0.0163
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "keyboard__jtdyix": {
+  "category": "keyboard",
+  "model": "jtdyix",
+  "bbox": [
+   0.1182,
+   0.4199,
+   0.0189
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "keyboard__kzcreb": {
+  "category": "keyboard",
+  "model": "kzcreb",
+  "bbox": [
+   0.149,
+   0.4299,
+   0.0326
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "keyboard__nddmmy": {
+  "category": "keyboard",
+  "model": "nddmmy",
+  "bbox": [
+   0.1422,
+   0.3395,
+   0.0297
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "keyboard__uwacaq": {
+  "category": "keyboard",
+  "model": "uwacaq",
+  "bbox": [
+   0.1815,
+   0.4773,
+   0.0158
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "tablet__kywsta": {
+  "category": "tablet",
+  "model": "kywsta",
+  "bbox": [
+   0.2484,
+   0.1787,
+   0.0087
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "calculator__kwmmty": {
+  "category": "calculator",
+  "model": "kwmmty",
+  "bbox": [
+   0.15,
+   0.1176,
+   0.0244
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "clipboard__envjqe": {
+  "category": "clipboard",
+  "model": "envjqe",
+  "bbox": [
+   0.323,
+   0.2323,
+   0.0103
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "clipboard__gmxyfo": {
+  "category": "clipboard",
+  "model": "gmxyfo",
+  "bbox": [
+   0.3233,
+   0.2326,
+   0.0103
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "chopping_board__afwefw": {
+  "category": "chopping_board",
+  "model": "afwefw",
+  "bbox": [
+   0.2494,
+   0.3741,
+   0.0189
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "chopping_board__akgegh": {
+  "category": "chopping_board",
+  "model": "akgegh",
+  "bbox": [
+   0.2367,
+   0.3061,
+   0.0189
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "chopping_board__ayegwd": {
+  "category": "chopping_board",
+  "model": "ayegwd",
+  "bbox": [
+   0.1641,
+   0.3061,
+   0.0149
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "chopping_board__cptayn": {
+  "category": "chopping_board",
+  "model": "cptayn",
+  "bbox": [
+   0.2,
+   0.3,
+   0.0185
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "chopping_board__drjnag": {
+  "category": "chopping_board",
+  "model": "drjnag",
+  "bbox": [
+   0.2527,
+   0.2816,
+   0.0515
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "chopping_board__gaxhrw": {
+  "category": "chopping_board",
+  "model": "gaxhrw",
+  "bbox": [
+   0.2,
+   0.3,
+   0.0185
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "chopping_board__iocgzv": {
+  "category": "chopping_board",
+  "model": "iocgzv",
+  "bbox": [
+   0.26,
+   0.36,
+   0.0307
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "chopping_board__ktxcvz": {
+  "category": "chopping_board",
+  "model": "ktxcvz",
+  "bbox": [
+   0.1957,
+   0.3061,
+   0.0183
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "chopping_board__mqsqhl": {
+  "category": "chopping_board",
+  "model": "mqsqhl",
+  "bbox": [
+   0.3456,
+   0.5625,
+   0.0214
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "chopping_board__mwmzzv": {
+  "category": "chopping_board",
+  "model": "mwmzzv",
+  "bbox": [
+   0.1957,
+   0.3061,
+   0.0183
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "chopping_board__ozrzrr": {
+  "category": "chopping_board",
+  "model": "ozrzrr",
+  "bbox": [
+   0.2681,
+   0.3594,
+   0.03
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "chopping_board__psabiv": {
+  "category": "chopping_board",
+  "model": "psabiv",
+  "bbox": [
+   0.29,
+   0.4,
+   0.0302
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "chopping_board__sygezm": {
+  "category": "chopping_board",
+  "model": "sygezm",
+  "bbox": [
+   0.221,
+   0.3306,
+   0.012
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "chopping_board__uzeftd": {
+  "category": "chopping_board",
+  "model": "uzeftd",
+  "bbox": [
+   0.3514,
+   0.7767,
+   0.1
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "cutting_board__aibvew": {
+  "category": "cutting_board",
+  "model": "aibvew",
+  "bbox": [
+   0.2304,
+   0.1648,
+   0.02
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "cutting_board__idmcgf": {
+  "category": "cutting_board",
+  "model": "idmcgf",
+  "bbox": [
+   0.4836,
+   0.5346,
+   0.0245
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "cutting_board__jfrbuz": {
+  "category": "cutting_board",
+  "model": "jfrbuz",
+  "bbox": [
+   0.4113,
+   0.241,
+   0.0203
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "cutting_board__nsvnai": {
+  "category": "cutting_board",
+  "model": "nsvnai",
+  "bbox": [
+   0.3633,
+   0.244,
+   0.03
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "cutting_board__tcdrzs": {
+  "category": "cutting_board",
+  "model": "tcdrzs",
+  "bbox": [
+   0.4,
+   0.28,
+   0.02
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hardback__acaxtl": {
+  "category": "hardback",
+  "model": "acaxtl",
+  "bbox": [
+   0.1961,
+   0.1418,
+   0.0174
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hardback__acbrnv": {
+  "category": "hardback",
+  "model": "acbrnv",
+  "bbox": [
+   0.2227,
+   0.1715,
+   0.0312
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hardback__aceozs": {
+  "category": "hardback",
+  "model": "aceozs",
+  "bbox": [
+   0.198,
+   0.1492,
+   0.0264
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hardback__acskbo": {
+  "category": "hardback",
+  "model": "acskbo",
+  "bbox": [
+   0.2375,
+   0.2011,
+   0.0266
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hardback__aesiym": {
+  "category": "hardback",
+  "model": "aesiym",
+  "bbox": [
+   0.205,
+   0.243,
+   0.0108
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "hardback__aewljo": {
+  "category": "hardback",
+  "model": "aewljo",
+  "bbox": [
+   0.3658,
+   0.2164,
+   0.0277
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hardback__agbqsy": {
+  "category": "hardback",
+  "model": "agbqsy",
+  "bbox": [
+   0.2132,
+   0.1685,
+   0.033
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hardback__ajpulw": {
+  "category": "hardback",
+  "model": "ajpulw",
+  "bbox": [
+   0.2594,
+   0.1601,
+   0.046
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hardback__atxzzy": {
+  "category": "hardback",
+  "model": "atxzzy",
+  "bbox": [
+   0.1512,
+   0.11,
+   0.0181
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hardback__axvnml": {
+  "category": "hardback",
+  "model": "axvnml",
+  "bbox": [
+   0.2692,
+   0.2016,
+   0.0141
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hardback__bcmzwo": {
+  "category": "hardback",
+  "model": "bcmzwo",
+  "bbox": [
+   0.2943,
+   0.2295,
+   0.0569
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hardback__bgtbdp": {
+  "category": "hardback",
+  "model": "bgtbdp",
+  "bbox": [
+   0.3089,
+   0.1481,
+   0.0116
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hardback__bklqfz": {
+  "category": "hardback",
+  "model": "bklqfz",
+  "bbox": [
+   0.2256,
+   0.1425,
+   0.0094
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hardback__bobmzf": {
+  "category": "hardback",
+  "model": "bobmzf",
+  "bbox": [
+   0.3654,
+   0.2133,
+   0.0213
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hardback__bpgluc": {
+  "category": "hardback",
+  "model": "bpgluc",
+  "bbox": [
+   0.2187,
+   0.1439,
+   0.0172
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hardback__bqvvvx": {
+  "category": "hardback",
+  "model": "bqvvvx",
+  "bbox": [
+   0.2318,
+   0.1693,
+   0.0305
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "paperback_book__aubynm": {
+  "category": "paperback_book",
+  "model": "aubynm",
+  "bbox": [
+   0.2926,
+   0.2244,
+   0.0084
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "paperback_book__bisnup": {
+  "category": "paperback_book",
+  "model": "bisnup",
+  "bbox": [
+   0.3049,
+   0.2195,
+   0.008
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "paperback_book__eqzjjk": {
+  "category": "paperback_book",
+  "model": "eqzjjk",
+  "bbox": [
+   0.3055,
+   0.2196,
+   0.0096
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "paperback_book__fvzdec": {
+  "category": "paperback_book",
+  "model": "fvzdec",
+  "bbox": [
+   0.307,
+   0.2222,
+   0.0092
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "paperback_book__hdhhqo": {
+  "category": "paperback_book",
+  "model": "hdhhqo",
+  "bbox": [
+   0.2219,
+   0.167,
+   0.003
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "paperback_book__hrtflt": {
+  "category": "paperback_book",
+  "model": "hrtflt",
+  "bbox": [
+   0.309,
+   0.2248,
+   0.0079
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "paperback_book__ixwtnb": {
+  "category": "paperback_book",
+  "model": "ixwtnb",
+  "bbox": [
+   0.3073,
+   0.2225,
+   0.008
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "paperback_book__jhaltj": {
+  "category": "paperback_book",
+  "model": "jhaltj",
+  "bbox": [
+   0.3049,
+   0.2195,
+   0.0079
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "paperback_book__ncjkcg": {
+  "category": "paperback_book",
+  "model": "ncjkcg",
+  "bbox": [
+   0.3073,
+   0.2225,
+   0.0072
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "paperback_book__phsgun": {
+  "category": "paperback_book",
+  "model": "phsgun",
+  "bbox": [
+   0.3049,
+   0.2195,
+   0.0079
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "paperback_book__vciijb": {
+  "category": "paperback_book",
+  "model": "vciijb",
+  "bbox": [
+   0.3052,
+   0.2195,
+   0.0077
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "paperback_book__wfcxjv": {
+  "category": "paperback_book",
+  "model": "wfcxjv",
+  "bbox": [
+   0.2892,
+   0.2199,
+   0.0084
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "paperback_book__xhibsy": {
+  "category": "paperback_book",
+  "model": "xhibsy",
+  "bbox": [
+   0.242,
+   0.1756,
+   0.006
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "paperback_book__xxknda": {
+  "category": "paperback_book",
+  "model": "xxknda",
+  "bbox": [
+   0.2092,
+   0.1657,
+   0.0159
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "paperback_book__xzxgfw": {
+  "category": "paperback_book",
+  "model": "xzxgfw",
+  "bbox": [
+   0.2767,
+   0.1595,
+   0.0053
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "paperback_book__ydarnr": {
+  "category": "paperback_book",
+  "model": "ydarnr",
+  "bbox": [
+   0.2378,
+   0.1806,
+   0.0049
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "magazine__ajitiv": {
+  "category": "magazine",
+  "model": "ajitiv",
+  "bbox": [
+   0.2167,
+   0.1582,
+   0.0101
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "magazine__ehdwsd": {
+  "category": "magazine",
+  "model": "ehdwsd",
+  "bbox": [
+   0.2702,
+   0.21,
+   0.0107
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "magazine__kjfxxx": {
+  "category": "magazine",
+  "model": "kjfxxx",
+  "bbox": [
+   0.2794,
+   0.2137,
+   0.0149
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "magazine__tfovwy": {
+  "category": "magazine",
+  "model": "tfovwy",
+  "bbox": [
+   0.2179,
+   0.1597,
+   0.0101
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "magazine__vvcrhu": {
+  "category": "magazine",
+  "model": "vvcrhu",
+  "bbox": [
+   0.2794,
+   0.2137,
+   0.0149
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "magazine__ymfwaz": {
+  "category": "magazine",
+  "model": "ymfwaz",
+  "bbox": [
+   0.2186,
+   0.1606,
+   0.0115
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "magazine__zfeoeu": {
+  "category": "magazine",
+  "model": "zfeoeu",
+  "bbox": [
+   0.311,
+   0.2277,
+   0.0072
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "catalog__aygcnt": {
+  "category": "catalog",
+  "model": "aygcnt",
+  "bbox": [
+   0.297,
+   0.2112,
+   0.0061
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "catalog__deirql": {
+  "category": "catalog",
+  "model": "deirql",
+  "bbox": [
+   0.297,
+   0.2112,
+   0.0061
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "catalog__uilzqm": {
+  "category": "catalog",
+  "model": "uilzqm",
+  "bbox": [
+   0.3038,
+   0.3948,
+   0.0158
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "catalog__zmidof": {
+  "category": "catalog",
+  "model": "zmidof",
+  "bbox": [
+   0.297,
+   0.21,
+   0.0002
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "comic_book__nekxsh": {
+  "category": "comic_book",
+  "model": "nekxsh",
+  "bbox": [
+   0.1939,
+   0.1304,
+   0.0156
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "comic_book__qkczyc": {
+  "category": "comic_book",
+  "model": "qkczyc",
+  "bbox": [
+   0.1939,
+   0.1304,
+   0.0156
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "comic_book__scycof": {
+  "category": "comic_book",
+  "model": "scycof",
+  "bbox": [
+   0.1939,
+   0.1304,
+   0.0156
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "comic_book__vzejnl": {
+  "category": "comic_book",
+  "model": "vzejnl",
+  "bbox": [
+   0.1939,
+   0.1304,
+   0.0156
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "comic_book__xmbxfm": {
+  "category": "comic_book",
+  "model": "xmbxfm",
+  "bbox": [
+   0.1955,
+   0.1327,
+   0.0156
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "letter__bdlpry": {
+  "category": "letter",
+  "model": "bdlpry",
+  "bbox": [
+   0.2198,
+   0.3146,
+   0.0117
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "letter__bswqmq": {
+  "category": "letter",
+  "model": "bswqmq",
+  "bbox": [
+   0.2175,
+   0.3073,
+   0.0306
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "letter__csncjv": {
+  "category": "letter",
+  "model": "csncjv",
+  "bbox": [
+   0.2291,
+   0.3189,
+   0.0231
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "letter__cvtjcy": {
+  "category": "letter",
+  "model": "cvtjcy",
+  "bbox": [
+   0.2205,
+   0.3082,
+   0.0508
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "letter__dyvllf": {
+  "category": "letter",
+  "model": "dyvllf",
+  "bbox": [
+   0.2175,
+   0.3162,
+   0.019
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "letter__esmoua": {
+  "category": "letter",
+  "model": "esmoua",
+  "bbox": [
+   0.2197,
+   0.3155,
+   0.0037
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "letter__fnaqcr": {
+  "category": "letter",
+  "model": "fnaqcr",
+  "bbox": [
+   0.2197,
+   0.3158,
+   0.0001
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "letter__igvnic": {
+  "category": "letter",
+  "model": "igvnic",
+  "bbox": [
+   0.2186,
+   0.3158,
+   0.0092
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "letter__jafvfh": {
+  "category": "letter",
+  "model": "jafvfh",
+  "bbox": [
+   0.2197,
+   0.3138,
+   0.0154
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "letter__jgnowc": {
+  "category": "letter",
+  "model": "jgnowc",
+  "bbox": [
+   0.2214,
+   0.3142,
+   0.0325
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "letter__oheufk": {
+  "category": "letter",
+  "model": "oheufk",
+  "bbox": [
+   0.2197,
+   0.3149,
+   0.0142
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "letter__pieqjf": {
+  "category": "letter",
+  "model": "pieqjf",
+  "bbox": [
+   0.2197,
+   0.3158,
+   0.0001
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "letter__pvuaxx": {
+  "category": "letter",
+  "model": "pvuaxx",
+  "bbox": [
+   0.2227,
+   0.3221,
+   0.0443
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "letter__qhqhwk": {
+  "category": "letter",
+  "model": "qhqhwk",
+  "bbox": [
+   0.2197,
+   0.3105,
+   0.0126
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "letter__qljxat": {
+  "category": "letter",
+  "model": "qljxat",
+  "bbox": [
+   0.2197,
+   0.3158,
+   0.0001
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "letter__qrykxc": {
+  "category": "letter",
+  "model": "qrykxc",
+  "bbox": [
+   0.2197,
+   0.3122,
+   0.0206
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "legal_document__mougvz": {
+  "category": "legal_document",
+  "model": "mougvz",
+  "bbox": [
+   0.3488,
+   0.2467,
+   0.0212
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "legal_document__qkrlsi": {
+  "category": "legal_document",
+  "model": "qkrlsi",
+  "bbox": [
+   0.3452,
+   0.2417,
+   0.0127
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "notepad__awcyha": {
+  "category": "notepad",
+  "model": "awcyha",
+  "bbox": [
+   0.1646,
+   0.3291,
+   0.0274
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "notepad__hirdfd": {
+  "category": "notepad",
+  "model": "hirdfd",
+  "bbox": [
+   0.2139,
+   0.3451,
+   0.0184
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "notepad__njeocp": {
+  "category": "notepad",
+  "model": "njeocp",
+  "bbox": [
+   0.2015,
+   0.2602,
+   0.0005
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "notepad__oaikde": {
+  "category": "notepad",
+  "model": "oaikde",
+  "bbox": [
+   0.1318,
+   0.1886,
+   0.004
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "notepad__rvevdj": {
+  "category": "notepad",
+  "model": "rvevdj",
+  "bbox": [
+   0.1329,
+   0.2571,
+   0.0185
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "notebook__aanuhi": {
+  "category": "notebook",
+  "model": "aanuhi",
+  "bbox": [
+   0.1513,
+   0.1195,
+   0.0275
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "notebook__bnsvvw": {
+  "category": "notebook",
+  "model": "bnsvvw",
+  "bbox": [
+   0.308,
+   0.2313,
+   0.0052
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "notebook__dlhxxl": {
+  "category": "notebook",
+  "model": "dlhxxl",
+  "bbox": [
+   0.1213,
+   0.0853,
+   0.0196
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "notebook__eijrqw": {
+  "category": "notebook",
+  "model": "eijrqw",
+  "bbox": [
+   0.205,
+   0.1262,
+   0.012
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "notebook__fckzgw": {
+  "category": "notebook",
+  "model": "fckzgw",
+  "bbox": [
+   0.1803,
+   0.2757,
+   0.0189
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "notebook__ffdjzp": {
+  "category": "notebook",
+  "model": "ffdjzp",
+  "bbox": [
+   0.2512,
+   0.1532,
+   0.0134
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "notebook__flpxdx": {
+  "category": "notebook",
+  "model": "flpxdx",
+  "bbox": [
+   0.3081,
+   0.2313,
+   0.0052
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "notebook__gqkaqu": {
+  "category": "notebook",
+  "model": "gqkaqu",
+  "bbox": [
+   0.1632,
+   0.1104,
+   0.008
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "notebook__hwhisw": {
+  "category": "notebook",
+  "model": "hwhisw",
+  "bbox": [
+   0.2956,
+   0.2263,
+   0.0111
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "notebook__ioaxit": {
+  "category": "notebook",
+  "model": "ioaxit",
+  "bbox": [
+   0.308,
+   0.2313,
+   0.0053
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "notebook__jxabmj": {
+  "category": "notebook",
+  "model": "jxabmj",
+  "bbox": [
+   0.13,
+   0.1694,
+   0.0141
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "notebook__jzwprb": {
+  "category": "notebook",
+  "model": "jzwprb",
+  "bbox": [
+   0.308,
+   0.2313,
+   0.0052
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "notebook__kchdrf": {
+  "category": "notebook",
+  "model": "kchdrf",
+  "bbox": [
+   0.308,
+   0.2313,
+   0.0052
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "notebook__ksxknp": {
+  "category": "notebook",
+  "model": "ksxknp",
+  "bbox": [
+   0.0681,
+   0.11,
+   0.0141
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "notebook__mtveio": {
+  "category": "notebook",
+  "model": "mtveio",
+  "bbox": [
+   0.3673,
+   0.2148,
+   0.0213
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "notebook__nxegkh": {
+  "category": "notebook",
+  "model": "nxegkh",
+  "bbox": [
+   0.308,
+   0.2313,
+   0.0052
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "mail__azunex": {
+  "category": "mail",
+  "model": "azunex",
+  "bbox": [
+   0.1299,
+   0.1999,
+   0.0005
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "mail__gvivdi": {
+  "category": "mail",
+  "model": "gvivdi",
+  "bbox": [
+   0.1405,
+   0.2751,
+   0.0035
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "mail__mbbwhn": {
+  "category": "mail",
+  "model": "mbbwhn",
+  "bbox": [
+   0.1311,
+   0.2707,
+   0.0034
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "mail__ojkepk": {
+  "category": "mail",
+  "model": "ojkepk",
+  "bbox": [
+   0.1325,
+   0.1909,
+   0.0034
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "mail__qpwlor": {
+  "category": "mail",
+  "model": "qpwlor",
+  "bbox": [
+   0.1325,
+   0.1909,
+   0.0027
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "newspaper__edarlp": {
+  "category": "newspaper",
+  "model": "edarlp",
+  "bbox": [
+   0.4133,
+   0.3058,
+   0.0057
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "newspaper__ukamcl": {
+  "category": "newspaper",
+  "model": "ukamcl",
+  "bbox": [
+   0.2893,
+   0.3906,
+   0.0071
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "paper_sheet__afdjfk": {
+  "category": "paper_sheet",
+  "model": "afdjfk",
+  "bbox": [
+   0.2179,
+   0.2791,
+   0.0299
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "paper_sheet__uqbipw": {
+  "category": "paper_sheet",
+  "model": "uqbipw",
+  "bbox": [
+   0.21,
+   0.29,
+   0.0005
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "folder__guhatz": {
+  "category": "folder",
+  "model": "guhatz",
+  "bbox": [
+   0.2859,
+   0.2024,
+   0.0326
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "folder__inkwmw": {
+  "category": "folder",
+  "model": "inkwmw",
+  "bbox": [
+   0.376,
+   0.2021,
+   0.0443
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "folder__lktggf": {
+  "category": "folder",
+  "model": "lktggf",
+  "bbox": [
+   0.2114,
+   0.1642,
+   0.0454
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "folder__piezyg": {
+  "category": "folder",
+  "model": "piezyg",
+  "bbox": [
+   0.2373,
+   0.2242,
+   0.061
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "folder__poqpux": {
+  "category": "folder",
+  "model": "poqpux",
+  "bbox": [
+   0.2379,
+   0.2247,
+   0.0635
+  ],
+  "n_meshes": 3,
+  "n_textured": 3,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "folder__wauyns": {
+  "category": "folder",
+  "model": "wauyns",
+  "bbox": [
+   0.226,
+   0.2127,
+   0.0055
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "folderal__ttldpx": {
+  "category": "folderal",
+  "model": "ttldpx",
+  "bbox": [
+   0.2211,
+   0.2299,
+   0.0199
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "folderal__zwhewa": {
+  "category": "folderal",
+  "model": "zwhewa",
+  "bbox": [
+   0.1824,
+   0.1813,
+   0.06
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "package__mvvnqm": {
+  "category": "package",
+  "model": "mvvnqm",
+  "bbox": [
+   0.201,
+   0.3006,
+   0.0361
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "board_game__eoywpy": {
+  "category": "board_game",
+  "model": "eoywpy",
+  "bbox": [
+   0.1329,
+   0.2226,
+   0.0292
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "board_game__frgdqh": {
+  "category": "board_game",
+  "model": "frgdqh",
+  "bbox": [
+   0.1335,
+   0.1974,
+   0.0338
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "board_game__fzyuip": {
+  "category": "board_game",
+  "model": "fzyuip",
+  "bbox": [
+   0.1337,
+   0.1616,
+   0.0443
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "board_game__gcfkqa": {
+  "category": "board_game",
+  "model": "gcfkqa",
+  "bbox": [
+   0.1336,
+   0.1987,
+   0.0443
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "board_game__gumkqh": {
+  "category": "board_game",
+  "model": "gumkqh",
+  "bbox": [
+   0.1336,
+   0.1972,
+   0.0337
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "board_game__ibzhzu": {
+  "category": "board_game",
+  "model": "ibzhzu",
+  "bbox": [
+   0.1336,
+   0.1975,
+   0.0273
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "board_game__iqfvfl": {
+  "category": "board_game",
+  "model": "iqfvfl",
+  "bbox": [
+   0.1337,
+   0.1337,
+   0.1329
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "board_game__lzslbu": {
+  "category": "board_game",
+  "model": "lzslbu",
+  "bbox": [
+   0.1336,
+   0.1987,
+   0.0337
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "board_game__nfewft": {
+  "category": "board_game",
+  "model": "nfewft",
+  "bbox": [
+   0.1336,
+   0.1009,
+   0.0309
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "board_game__ovttum": {
+  "category": "board_game",
+  "model": "ovttum",
+  "bbox": [
+   0.1337,
+   0.1985,
+   0.0275
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "board_game__phwwnx": {
+  "category": "board_game",
+  "model": "phwwnx",
+  "bbox": [
+   0.1336,
+   0.0688,
+   0.0692
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "board_game__qdkyzl": {
+  "category": "board_game",
+  "model": "qdkyzl",
+  "bbox": [
+   0.1336,
+   0.1022,
+   0.0269
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "board_game__qgvsnb": {
+  "category": "board_game",
+  "model": "qgvsnb",
+  "bbox": [
+   0.1334,
+   0.255,
+   0.0252
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "board_game__rgvkmy": {
+  "category": "board_game",
+  "model": "rgvkmy",
+  "bbox": [
+   0.1336,
+   0.1017,
+   0.0297
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "board_game__twkglv": {
+  "category": "board_game",
+  "model": "twkglv",
+  "bbox": [
+   0.1335,
+   0.1012,
+   0.0309
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "board_game__vbamua": {
+  "category": "board_game",
+  "model": "vbamua",
+  "bbox": [
+   0.2867,
+   0.1372,
+   0.0346
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "video_game__apjpos": {
+  "category": "video_game",
+  "model": "apjpos",
+  "bbox": [
+   0.0856,
+   0.0613,
+   0.0072
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "video_game__ceaxsd": {
+  "category": "video_game",
+  "model": "ceaxsd",
+  "bbox": [
+   0.0873,
+   0.0624,
+   0.0072
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "video_game__ckugyi": {
+  "category": "video_game",
+  "model": "ckugyi",
+  "bbox": [
+   0.0604,
+   0.0663,
+   0.0073
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "video_game__coiafo": {
+  "category": "video_game",
+  "model": "coiafo",
+  "bbox": [
+   0.0585,
+   0.0643,
+   0.0075
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "video_game__lfdpse": {
+  "category": "video_game",
+  "model": "lfdpse",
+  "bbox": [
+   0.0606,
+   0.0666,
+   0.0073
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "video_game__ppnzqm": {
+  "category": "video_game",
+  "model": "ppnzqm",
+  "bbox": [
+   0.0631,
+   0.0693,
+   0.0074
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "video_game__pujfzk": {
+  "category": "video_game",
+  "model": "pujfzk",
+  "bbox": [
+   0.0629,
+   0.0691,
+   0.0074
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "video_game__qsyyql": {
+  "category": "video_game",
+  "model": "qsyyql",
+  "bbox": [
+   0.0382,
+   0.0422,
+   0.0077
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "video_game__quzjuo": {
+  "category": "video_game",
+  "model": "quzjuo",
+  "bbox": [
+   0.0593,
+   0.0653,
+   0.0072
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "video_game__rzaxlj": {
+  "category": "video_game",
+  "model": "rzaxlj",
+  "bbox": [
+   0.0296,
+   0.0326,
+   0.0071
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "video_game__veodkq": {
+  "category": "video_game",
+  "model": "veodkq",
+  "bbox": [
+   0.0237,
+   0.0175,
+   0.0073
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "video_game__yyvkel": {
+  "category": "video_game",
+  "model": "yyvkel",
+  "bbox": [
+   0.0846,
+   0.0606,
+   0.0072
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "pizza_box__hvaucj": {
+  "category": "pizza_box",
+  "model": "hvaucj",
+  "bbox": [
+   0.3928,
+   0.4028,
+   0.0325
+  ],
+  "n_meshes": 2,
+  "n_textured": 2,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "box_of_chocolates__bdvkbh": {
+  "category": "box_of_chocolates",
+  "model": "bdvkbh",
+  "bbox": [
+   0.1937,
+   0.3,
+   0.0161
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "boxed_ink_cartridge__ltblou": {
+  "category": "boxed_ink_cartridge",
+  "model": "ltblou",
+  "bbox": [
+   0.1324,
+   0.0958,
+   0.0553
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "boxed_ink_cartridge__oepuip": {
+  "category": "boxed_ink_cartridge",
+  "model": "oepuip",
+  "bbox": [
+   0.112,
+   0.1092,
+   0.0232
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "boxed_ink_cartridge__oinelo": {
+  "category": "boxed_ink_cartridge",
+  "model": "oinelo",
+  "bbox": [
+   0.1116,
+   0.0539,
+   0.0177
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "game_console__anslwz": {
+  "category": "game_console",
+  "model": "anslwz",
+  "bbox": [
+   0.3009,
+   0.275,
+   0.0541
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "scanner__juzkjp": {
+  "category": "scanner",
+  "model": "juzkjp",
+  "bbox": [
+   0.31,
+   0.2182,
+   0.06
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "digital_scale__ccphiu": {
+  "category": "digital_scale",
+  "model": "ccphiu",
+  "bbox": [
+   0.25,
+   0.2291,
+   0.028
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "digital_scale__hfetby": {
+  "category": "digital_scale",
+  "model": "hfetby",
+  "bbox": [
+   0.2547,
+   0.2704,
+   0.1357
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "digital_scale__xwzzen": {
+  "category": "digital_scale",
+  "model": "xwzzen",
+  "bbox": [
+   0.34,
+   0.3426,
+   0.0206
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "credit_card_terminal__bqpanz": {
+  "category": "credit_card_terminal",
+  "model": "bqpanz",
+  "bbox": [
+   0.2111,
+   0.1258,
+   0.0709
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "portable_game_console__muwcnf": {
+  "category": "portable_game_console",
+  "model": "muwcnf",
+  "bbox": [
+   0.0846,
+   0.0957,
+   0.0148
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "hard_drive__ijibkm": {
+  "category": "hard_drive",
+  "model": "ijibkm",
+  "bbox": [
+   0.1169,
+   0.0816,
+   0.0192
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hard_drive__ubjbsm": {
+  "category": "hard_drive",
+  "model": "ubjbsm",
+  "bbox": [
+   0.1168,
+   0.0816,
+   0.0211
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "tray__coqeme": {
+  "category": "tray",
+  "model": "coqeme",
+  "bbox": [
+   0.1419,
+   0.2224,
+   0.0179
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "tray__glwebh": {
+  "category": "tray",
+  "model": "glwebh",
+  "bbox": [
+   0.2065,
+   0.166,
+   0.0251
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "tray__gsxbym": {
+  "category": "tray",
+  "model": "gsxbym",
+  "bbox": [
+   0.3062,
+   0.4373,
+   0.0305
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "tray__hbjdlb": {
+  "category": "tray",
+  "model": "hbjdlb",
+  "bbox": [
+   0.1767,
+   0.3902,
+   0.0421
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "tray__hjxczh": {
+  "category": "tray",
+  "model": "hjxczh",
+  "bbox": [
+   0.2,
+   0.35,
+   0.01
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "tray__huwhjg": {
+  "category": "tray",
+  "model": "huwhjg",
+  "bbox": [
+   0.685,
+   0.685,
+   0.046
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "tray__hvlfig": {
+  "category": "tray",
+  "model": "hvlfig",
+  "bbox": [
+   0.2725,
+   0.4367,
+   0.0185
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "tray__incirm": {
+  "category": "tray",
+  "model": "incirm",
+  "bbox": [
+   0.2755,
+   0.4953,
+   0.0744
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "tray__jpcflq": {
+  "category": "tray",
+  "model": "jpcflq",
+  "bbox": [
+   0.166,
+   0.302,
+   0.017
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "tray__mhhoga": {
+  "category": "tray",
+  "model": "mhhoga",
+  "bbox": [
+   0.3107,
+   0.4618,
+   0.0228
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "tray__mkdcha": {
+  "category": "tray",
+  "model": "mkdcha",
+  "bbox": [
+   0.4356,
+   0.1425,
+   0.013
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "tray__spopfj": {
+  "category": "tray",
+  "model": "spopfj",
+  "bbox": [
+   0.2443,
+   0.3246,
+   0.017
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "tray__thkphg": {
+  "category": "tray",
+  "model": "thkphg",
+  "bbox": [
+   0.4052,
+   0.2703,
+   0.0216
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "tray__txcjux": {
+  "category": "tray",
+  "model": "txcjux",
+  "bbox": [
+   0.4164,
+   0.6116,
+   0.0913
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "tray__uekqey": {
+  "category": "tray",
+  "model": "uekqey",
+  "bbox": [
+   0.3962,
+   0.565,
+   0.0206
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "tray__vxbtax": {
+  "category": "tray",
+  "model": "vxbtax",
+  "bbox": [
+   0.3266,
+   0.477,
+   0.0929
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "baking_sheet__yhurut": {
+  "category": "baking_sheet",
+  "model": "yhurut",
+  "bbox": [
+   0.2492,
+   0.4161,
+   0.0228
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "chopping_block__ekowsj": {
+  "category": "chopping_block",
+  "model": "ekowsj",
+  "bbox": [
+   0.3039,
+   0.2685,
+   0.0147
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "frying_pan__aewpzn": {
+  "category": "frying_pan",
+  "model": "aewpzn",
+  "bbox": [
+   0.5748,
+   0.3403,
+   0.104
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "frying_pan__cprjvq": {
+  "category": "frying_pan",
+  "model": "cprjvq",
+  "bbox": [
+   0.6378,
+   0.4081,
+   0.0998
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "frying_pan__jpzusm": {
+  "category": "frying_pan",
+  "model": "jpzusm",
+  "bbox": [
+   0.465,
+   0.2861,
+   0.0574
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "frying_pan__mhndon": {
+  "category": "frying_pan",
+  "model": "mhndon",
+  "bbox": [
+   0.543,
+   0.3341,
+   0.067
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "frying_pan__sfbdjn": {
+  "category": "frying_pan",
+  "model": "sfbdjn",
+  "bbox": [
+   0.4872,
+   0.2543,
+   0.0772
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "frying_pan__snvhlz": {
+  "category": "frying_pan",
+  "model": "snvhlz",
+  "bbox": [
+   0.5748,
+   0.3403,
+   0.1039
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "frying_pan__vycozd": {
+  "category": "frying_pan",
+  "model": "vycozd",
+  "bbox": [
+   0.5356,
+   0.2801,
+   0.1761
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "griddle_pan__ryvqep": {
+  "category": "griddle_pan",
+  "model": "ryvqep",
+  "bbox": [
+   0.3277,
+   0.1584,
+   0.0317
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "saucepan__fsinsu": {
+  "category": "saucepan",
+  "model": "fsinsu",
+  "bbox": [
+   0.2998,
+   0.1809,
+   0.0938
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "wok__pobfpe": {
+  "category": "wok",
+  "model": "pobfpe",
+  "bbox": [
+   0.3655,
+   0.2187,
+   0.1071
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "skimmer__wvmcce": {
+  "category": "skimmer",
+  "model": "wvmcce",
+  "bbox": [
+   0.3996,
+   0.111,
+   0.0349
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "skimmer__xocqxg": {
+  "category": "skimmer",
+  "model": "xocqxg",
+  "bbox": [
+   0.2853,
+   0.1145,
+   0.121
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "dustpan__espzwv": {
+  "category": "dustpan",
+  "model": "espzwv",
+  "bbox": [
+   0.2945,
+   0.144,
+   0.0253
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hairbrush__bdylnb": {
+  "category": "hairbrush",
+  "model": "bdylnb",
+  "bbox": [
+   0.24,
+   0.049,
+   0.0293
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "ripsaw__laysom": {
+  "category": "ripsaw",
+  "model": "laysom",
+  "bbox": [
+   0.3446,
+   0.0823,
+   0.0151
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "putty_knife__qmdkub": {
+  "category": "putty_knife",
+  "model": "qmdkub",
+  "bbox": [
+   0.2512,
+   0.1263,
+   0.0339
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "utility_knife__kridpz": {
+  "category": "utility_knife",
+  "model": "kridpz",
+  "bbox": [
+   0.2585,
+   0.0452,
+   0.0145
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "open_end_wrench__klnawb": {
+  "category": "open_end_wrench",
+  "model": "klnawb",
+  "bbox": [
+   0.2118,
+   0.0578,
+   0.0109
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "plier__zwzncq": {
+  "category": "plier",
+  "model": "zwzncq",
+  "bbox": [
+   0.154,
+   0.0448,
+   0.0088
+  ],
+  "n_meshes": 2,
+  "n_textured": 2,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "wire_cutter__ugbval": {
+  "category": "wire_cutter",
+  "model": "ugbval",
+  "bbox": [
+   0.1901,
+   0.0684,
+   0.0135
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "clamp__feswhy": {
+  "category": "clamp",
+  "model": "feswhy",
+  "bbox": [
+   0.2577,
+   0.1097,
+   0.0305
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "caliper__sngjmj": {
+  "category": "caliper",
+  "model": "sngjmj",
+  "bbox": [
+   0.2479,
+   0.0586,
+   0.0067
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "magnifying_glass__clyiol": {
+  "category": "magnifying_glass",
+  "model": "clyiol",
+  "bbox": [
+   0.2271,
+   0.1026,
+   0.0192
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hair_dryer__ylutzy": {
+  "category": "hair_dryer",
+  "model": "ylutzy",
+  "bbox": [
+   0.2645,
+   0.2489,
+   0.1115
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "electric_hand_mixer__prewfi": {
+  "category": "electric_hand_mixer",
+  "model": "prewfi",
+  "bbox": [
+   0.1906,
+   0.2934,
+   0.0828
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "stapler__kgnsas": {
+  "category": "stapler",
+  "model": "kgnsas",
+  "bbox": [
+   0.0874,
+   0.0182,
+   0.045
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "gym_shoe__arigtn": {
+  "category": "gym_shoe",
+  "model": "arigtn",
+  "bbox": [
+   0.2783,
+   0.1027,
+   0.1166
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "gym_shoe__hwrvmy": {
+  "category": "gym_shoe",
+  "model": "hwrvmy",
+  "bbox": [
+   0.3065,
+   0.1123,
+   0.1525
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "gym_shoe__kmcbym": {
+  "category": "gym_shoe",
+  "model": "kmcbym",
+  "bbox": [
+   0.306,
+   0.1084,
+   0.1431
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "gym_shoe__lmpdfa": {
+  "category": "gym_shoe",
+  "model": "lmpdfa",
+  "bbox": [
+   0.3065,
+   0.1132,
+   0.124
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "gym_shoe__lqzooz": {
+  "category": "gym_shoe",
+  "model": "lqzooz",
+  "bbox": [
+   0.3062,
+   0.1093,
+   0.124
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "gym_shoe__lwcwme": {
+  "category": "gym_shoe",
+  "model": "lwcwme",
+  "bbox": [
+   0.3065,
+   0.1141,
+   0.1329
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "gym_shoe__mcfcwq": {
+  "category": "gym_shoe",
+  "model": "mcfcwq",
+  "bbox": [
+   0.3065,
+   0.1153,
+   0.1431
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "gym_shoe__mjyyda": {
+  "category": "gym_shoe",
+  "model": "mjyyda",
+  "bbox": [
+   0.3059,
+   0.1211,
+   0.1742
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "gym_shoe__nahllg": {
+  "category": "gym_shoe",
+  "model": "nahllg",
+  "bbox": [
+   0.2787,
+   0.1001,
+   0.1166
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "gym_shoe__pblxfp": {
+  "category": "gym_shoe",
+  "model": "pblxfp",
+  "bbox": [
+   0.3028,
+   0.1275,
+   0.1742
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "gym_shoe__picdro": {
+  "category": "gym_shoe",
+  "model": "picdro",
+  "bbox": [
+   0.3065,
+   0.1149,
+   0.138
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "gym_shoe__qxecbh": {
+  "category": "gym_shoe",
+  "model": "qxecbh",
+  "bbox": [
+   0.3066,
+   0.1068,
+   0.1728
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "gym_shoe__rcozpq": {
+  "category": "gym_shoe",
+  "model": "rcozpq",
+  "bbox": [
+   0.3028,
+   0.1275,
+   0.1742
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "gym_shoe__rkikcm": {
+  "category": "gym_shoe",
+  "model": "rkikcm",
+  "bbox": [
+   0.2655,
+   0.0978,
+   0.1078
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "gym_shoe__ugbxip": {
+  "category": "gym_shoe",
+  "model": "ugbxip",
+  "bbox": [
+   0.3065,
+   0.1149,
+   0.138
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "gym_shoe__ukkqib": {
+  "category": "gym_shoe",
+  "model": "ukkqib",
+  "bbox": [
+   0.3065,
+   0.1123,
+   0.1525
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "skates__igyveo": {
+  "category": "skates",
+  "model": "igyveo",
+  "bbox": [
+   0.3348,
+   0.3688,
+   0.1524
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "skates__sjehwr": {
+  "category": "skates",
+  "model": "sjehwr",
+  "bbox": [
+   0.3445,
+   0.3703,
+   0.1383
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "sunglasses__gqawld": {
+  "category": "sunglasses",
+  "model": "gqawld",
+  "bbox": [
+   0.1406,
+   0.1399,
+   0.0512
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "sunglasses__nxfifs": {
+  "category": "sunglasses",
+  "model": "nxfifs",
+  "bbox": [
+   0.0305,
+   0.0952,
+   0.0245
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "sunglasses__qiwncl": {
+  "category": "sunglasses",
+  "model": "qiwncl",
+  "bbox": [
+   0.123,
+   0.1282,
+   0.0484
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "eyeglasses__gphhuu": {
+  "category": "eyeglasses",
+  "model": "gphhuu",
+  "bbox": [
+   0.1234,
+   0.1287,
+   0.0484
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "eyeglasses__ujauoy": {
+  "category": "eyeglasses",
+  "model": "ujauoy",
+  "bbox": [
+   0.1528,
+   0.139,
+   0.0507
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "goggles__wszdxi": {
+  "category": "goggles",
+  "model": "wszdxi",
+  "bbox": [
+   0.2187,
+   0.2313,
+   0.1116
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "wallet__lagjae": {
+  "category": "wallet",
+  "model": "lagjae",
+  "bbox": [
+   0.1287,
+   0.0886,
+   0.0305
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "toy_train__zdfhbw": {
+  "category": "toy_train",
+  "model": "zdfhbw",
+  "bbox": [
+   0.5535,
+   0.0521,
+   0.0662
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "chess_set__nzgefv": {
+  "category": "chess_set",
+  "model": "nzgefv",
+  "bbox": [
+   0.2775,
+   0.2775,
+   0.0648
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "chess_set__zncboj": {
+  "category": "chess_set",
+  "model": "zncboj",
+  "bbox": [
+   0.6719,
+   0.7462,
+   0.0322
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "desk_organizer__yidrel": {
+  "category": "desk_organizer",
+  "model": "yidrel",
+  "bbox": [
+   0.2002,
+   0.2791,
+   0.0684
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "power_strip__czvrku": {
+  "category": "power_strip",
+  "model": "czvrku",
+  "bbox": [
+   0.5508,
+   0.216,
+   0.0686
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "bag_of_chips__bryahw": {
+  "category": "bag_of_chips",
+  "model": "bryahw",
+  "bbox": [
+   0.2883,
+   0.2269,
+   0.1
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "bag_of_chips__dwkdko": {
+  "category": "bag_of_chips",
+  "model": "dwkdko",
+  "bbox": [
+   0.2897,
+   0.223,
+   0.0896
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "bag_of_chips__ennnjj": {
+  "category": "bag_of_chips",
+  "model": "ennnjj",
+  "bbox": [
+   0.2733,
+   0.2048,
+   0.0928
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "bag_of_chips__jphwer": {
+  "category": "bag_of_chips",
+  "model": "jphwer",
+  "bbox": [
+   0.2777,
+   0.2063,
+   0.0894
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "bag_of_chips__qstxpj": {
+  "category": "bag_of_chips",
+  "model": "qstxpj",
+  "bbox": [
+   0.2902,
+   0.2449,
+   0.0959
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "bag_of_chips__uevvib": {
+  "category": "bag_of_chips",
+  "model": "uevvib",
+  "bbox": [
+   0.2777,
+   0.2054,
+   0.089
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "bag_of_chips__wnuoym": {
+  "category": "bag_of_chips",
+  "model": "wnuoym",
+  "bbox": [
+   0.3166,
+   0.2335,
+   0.1254
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "carton_of_eggs__mimzbz": {
+  "category": "carton_of_eggs",
+  "model": "mimzbz",
+  "bbox": [
+   0.1448,
+   0.4003,
+   0.0825
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "carton_of_eggs__rixhgu": {
+  "category": "carton_of_eggs",
+  "model": "rixhgu",
+  "bbox": [
+   0.2627,
+   0.2529,
+   0.079
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "carton_of_eggs__stxfxb": {
+  "category": "carton_of_eggs",
+  "model": "stxfxb",
+  "bbox": [
+   0.2479,
+   0.2896,
+   0.0587
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "pack_of_bread__fckfij": {
+  "category": "pack_of_bread",
+  "model": "fckfij",
+  "bbox": [
+   0.1508,
+   0.3002,
+   0.0992
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "pack_of_bread__sfupqo": {
+  "category": "pack_of_bread",
+  "model": "sfupqo",
+  "bbox": [
+   0.2755,
+   0.1605,
+   0.1091
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "pack_of_bread__wjbnfu": {
+  "category": "pack_of_bread",
+  "model": "wjbnfu",
+  "bbox": [
+   0.248,
+   0.2356,
+   0.1255
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "pack_of_bread__yehtiv": {
+  "category": "pack_of_bread",
+  "model": "yehtiv",
+  "bbox": [
+   0.2459,
+   0.2294,
+   0.1369
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "mouse__cduwda": {
+  "category": "mouse",
+  "model": "cduwda",
+  "bbox": [
+   0.1242,
+   0.0694,
+   0.039
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "mouse__eosngb": {
+  "category": "mouse",
+  "model": "eosngb",
+  "bbox": [
+   0.1087,
+   0.054,
+   0.0298
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "mouse__fjljxp": {
+  "category": "mouse",
+  "model": "fjljxp",
+  "bbox": [
+   0.106,
+   0.0588,
+   0.0283
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "mouse__ihpnjx": {
+  "category": "mouse",
+  "model": "ihpnjx",
+  "bbox": [
+   0.1061,
+   0.0593,
+   0.0289
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "mouse__oydobn": {
+  "category": "mouse",
+  "model": "oydobn",
+  "bbox": [
+   0.0311,
+   0.0196,
+   0.0113
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "mouse__pljjtu": {
+  "category": "mouse",
+  "model": "pljjtu",
+  "bbox": [
+   0.1193,
+   0.0663,
+   0.039
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "mouse__wwyopp": {
+  "category": "mouse",
+  "model": "wwyopp",
+  "bbox": [
+   0.1168,
+   0.0553,
+   0.0373
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "laptop__nvulcs": {
+  "category": "laptop",
+  "model": "nvulcs",
+  "bbox": [
+   0.2034,
+   0.2677,
+   0.0199
+  ],
+  "n_meshes": 2,
+  "n_textured": 2,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "violin_case__jlasop": {
+  "category": "violin_case",
+  "model": "jlasop",
+  "bbox": [
+   0.3035,
+   0.6512,
+   0.1289
+  ],
+  "n_meshes": 2,
+  "n_textured": 2,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "pencil_case__acikzo": {
+  "category": "pencil_case",
+  "model": "acikzo",
+  "bbox": [
+   0.0629,
+   0.1934,
+   0.0575
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "pencil_case__cqxkgl": {
+  "category": "pencil_case",
+  "model": "cqxkgl",
+  "bbox": [
+   0.0589,
+   0.1557,
+   0.0598
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "pencil_case__otcmih": {
+  "category": "pencil_case",
+  "model": "otcmih",
+  "bbox": [
+   0.0651,
+   0.1968,
+   0.07
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "monitor__huvcgu": {
+  "category": "monitor",
+  "model": "huvcgu",
+  "bbox": [
+   0.1865,
+   0.4371,
+   0.391
+  ],
+  "n_meshes": 2,
+  "n_textured": 2,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "monitor__kmltvq": {
+  "category": "monitor",
+  "model": "kmltvq",
+  "bbox": [
+   0.1986,
+   0.62,
+   0.5172
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "monitor__mlyppp": {
+  "category": "monitor",
+  "model": "mlyppp",
+  "bbox": [
+   0.2016,
+   0.5675,
+   0.4377
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "monitor__nghyiv": {
+  "category": "monitor",
+  "model": "nghyiv",
+  "bbox": [
+   0.2027,
+   0.4955,
+   0.4562
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "monitor__qaacxt": {
+  "category": "monitor",
+  "model": "qaacxt",
+  "bbox": [
+   0.2064,
+   0.65,
+   0.5172
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "monitor__qvpbge": {
+  "category": "monitor",
+  "model": "qvpbge",
+  "bbox": [
+   0.2385,
+   0.8186,
+   0.4826
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "monitor__rbqanz": {
+  "category": "monitor",
+  "model": "rbqanz",
+  "bbox": [
+   0.1903,
+   0.3744,
+   0.3444
+  ],
+  "n_meshes": 2,
+  "n_textured": 2,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "monitor__wxhvqc": {
+  "category": "monitor",
+  "model": "wxhvqc",
+  "bbox": [
+   0.2028,
+   0.4954,
+   0.4553
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "monitor__xffisd": {
+  "category": "monitor",
+  "model": "xffisd",
+  "bbox": [
+   0.3284,
+   0.4531,
+   0.4489
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "monitor__xhxcyg": {
+  "category": "monitor",
+  "model": "xhxcyg",
+  "bbox": [
+   0.1825,
+   0.4785,
+   0.4559
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "alarm_clock__vqwovi": {
+  "category": "alarm_clock",
+  "model": "vqwovi",
+  "bbox": [
+   0.114,
+   0.114,
+   0.0883
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "radio__vgioak": {
+  "category": "radio",
+  "model": "vgioak",
+  "bbox": [
+   0.1748,
+   0.315,
+   0.1785
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "radio__wxnicr": {
+  "category": "radio",
+  "model": "wxnicr",
+  "bbox": [
+   0.1381,
+   0.3211,
+   0.2353
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "menu__keaqlh": {
+  "category": "menu",
+  "model": "keaqlh",
+  "bbox": [
+   0.3175,
+   0.2357,
+   0.0006
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "menu__ncfnii": {
+  "category": "menu",
+  "model": "ncfnii",
+  "bbox": [
+   0.2007,
+   0.0959,
+   0.0381
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "menu__qmypsm": {
+  "category": "menu",
+  "model": "qmypsm",
+  "bbox": [
+   0.315,
+   0.2222,
+   0.0006
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "menu__tissfg": {
+  "category": "menu",
+  "model": "tissfg",
+  "bbox": [
+   0.255,
+   0.1725,
+   0.1762
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "menu__ugplzr": {
+  "category": "menu",
+  "model": "ugplzr",
+  "bbox": [
+   0.2007,
+   0.0958,
+   0.0003
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "menu__wqhybr": {
+  "category": "menu",
+  "model": "wqhybr",
+  "bbox": [
+   0.2667,
+   0.181,
+   0.0006
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "receipt__hgnbjj": {
+  "category": "receipt",
+  "model": "hgnbjj",
+  "bbox": [
+   0.1272,
+   0.05,
+   0.0
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "receipt__qfaleu": {
+  "category": "receipt",
+  "model": "qfaleu",
+  "bbox": [
+   0.1961,
+   0.0975,
+   0.0111
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "receipt__rzrhlo": {
+  "category": "receipt",
+  "model": "rzrhlo",
+  "bbox": [
+   0.1999,
+   0.1046,
+   0.0197
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "receipt__xvfean": {
+  "category": "receipt",
+  "model": "xvfean",
+  "bbox": [
+   0.1278,
+   0.0519,
+   0.0067
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "receipt__zsxylm": {
+  "category": "receipt",
+  "model": "zsxylm",
+  "bbox": [
+   0.1961,
+   0.0971,
+   0.0057
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "platter__csanbr": {
+  "category": "platter",
+  "model": "csanbr",
+  "bbox": [
+   0.2173,
+   0.3448,
+   0.0166
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "platter__ekjpdj": {
+  "category": "platter",
+  "model": "ekjpdj",
+  "bbox": [
+   0.0972,
+   0.3403,
+   0.0195
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "platter__hnlivs": {
+  "category": "platter",
+  "model": "hnlivs",
+  "bbox": [
+   0.1587,
+   0.3403,
+   0.0245
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "platter__iadlti": {
+  "category": "platter",
+  "model": "iadlti",
+  "bbox": [
+   0.2595,
+   0.2616,
+   0.0369
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "platter__ieoasd": {
+  "category": "platter",
+  "model": "ieoasd",
+  "bbox": [
+   0.119,
+   0.2552,
+   0.0183
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "platter__kiiamx": {
+  "category": "platter",
+  "model": "kiiamx",
+  "bbox": [
+   0.1384,
+   0.3403,
+   0.0278
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "calendar__ydunsu": {
+  "category": "calendar",
+  "model": "ydunsu",
+  "bbox": [
+   0.0844,
+   0.3074,
+   0.1825
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "first_aid_kit__flctdz": {
+  "category": "first_aid_kit",
+  "model": "flctdz",
+  "bbox": [
+   0.1616,
+   0.1996,
+   0.0742
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "painting__dacihj": {
+  "category": "painting",
+  "model": "dacihj",
+  "bbox": [
+   0.0416,
+   0.5022,
+   0.4181
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "painting__ljabhq": {
+  "category": "painting",
+  "model": "ljabhq",
+  "bbox": [
+   0.0161,
+   0.5829,
+   0.5865
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "painting__cjrilr": {
+  "category": "painting",
+  "model": "cjrilr",
+  "bbox": [
+   0.05,
+   3.3103,
+   1.9287
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "painting__eexydp": {
+  "category": "painting",
+  "model": "eexydp",
+  "bbox": [
+   0.0161,
+   1.2183,
+   1.0187
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "painting__ejhanr": {
+  "category": "painting",
+  "model": "ejhanr",
+  "bbox": [
+   0.0283,
+   1.0385,
+   0.6968
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "painting__fmcgul": {
+  "category": "painting",
+  "model": "fmcgul",
+  "bbox": [
+   0.016,
+   0.271,
+   0.2501
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "painting__fmlmox": {
+  "category": "painting",
+  "model": "fmlmox",
+  "bbox": [
+   0.0288,
+   0.183,
+   0.1822
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "painting__fqlxxd": {
+  "category": "painting",
+  "model": "fqlxxd",
+  "bbox": [
+   0.0306,
+   1.4887,
+   1.0906
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "painting__fwuole": {
+  "category": "painting",
+  "model": "fwuole",
+  "bbox": [
+   0.0232,
+   1.1291,
+   0.8277
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "painting__fyoxcq": {
+  "category": "painting",
+  "model": "fyoxcq",
+  "bbox": [
+   0.016,
+   0.3587,
+   0.3191
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "painting__gardkz": {
+  "category": "painting",
+  "model": "gardkz",
+  "bbox": [
+   0.0067,
+   0.3239,
+   0.2373
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "painting__ggloob": {
+  "category": "painting",
+  "model": "ggloob",
+  "bbox": [
+   0.0184,
+   0.3,
+   0.2384
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "painting__ifdzgs": {
+  "category": "painting",
+  "model": "ifdzgs",
+  "bbox": [
+   0.0067,
+   0.2382,
+   0.3245
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "painting__jayvqq": {
+  "category": "painting",
+  "model": "jayvqq",
+  "bbox": [
+   0.0266,
+   0.2519,
+   0.3554
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "painting__jfkvxh": {
+  "category": "painting",
+  "model": "jfkvxh",
+  "bbox": [
+   0.0161,
+   1.0732,
+   0.8768
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "painting__jreujf": {
+  "category": "painting",
+  "model": "jreujf",
+  "bbox": [
+   0.0509,
+   1.367,
+   1.8078
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "picture__abtgvz": {
+  "category": "picture",
+  "model": "abtgvz",
+  "bbox": [
+   0.0879,
+   0.0958,
+   0.0
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "picture__alwmys": {
+  "category": "picture",
+  "model": "alwmys",
+  "bbox": [
+   0.6664,
+   0.5381,
+   0.0176
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "picture__bxpohm": {
+  "category": "picture",
+  "model": "bxpohm",
+  "bbox": [
+   0.8419,
+   0.6764,
+   0.0537
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "picture__bzmdxc": {
+  "category": "picture",
+  "model": "bzmdxc",
+  "bbox": [
+   0.072,
+   0.0612,
+   0.0
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "picture__chfljy": {
+  "category": "picture",
+  "model": "chfljy",
+  "bbox": [
+   0.9,
+   0.6,
+   0.032
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "picture__cltbty": {
+  "category": "picture",
+  "model": "cltbty",
+  "bbox": [
+   0.4574,
+   0.6858,
+   0.016
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "picture__dogydw": {
+  "category": "picture",
+  "model": "dogydw",
+  "bbox": [
+   0.6525,
+   0.5242,
+   0.0416
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "picture__etixod": {
+  "category": "picture",
+  "model": "etixod",
+  "bbox": [
+   0.4061,
+   0.6858,
+   0.016
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "picture__fanvpf": {
+  "category": "picture",
+  "model": "fanvpf",
+  "bbox": [
+   0.4574,
+   0.6858,
+   0.016
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "picture__fhkzlm": {
+  "category": "picture",
+  "model": "fhkzlm",
+  "bbox": [
+   1.0278,
+   0.6858,
+   0.016
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "picture__ggajdz": {
+  "category": "picture",
+  "model": "ggajdz",
+  "bbox": [
+   0.2573,
+   0.2133,
+   0.02
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "picture__gwricv": {
+  "category": "picture",
+  "model": "gwricv",
+  "bbox": [
+   0.4574,
+   0.6858,
+   0.016
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "picture__hffaxw": {
+  "category": "picture",
+  "model": "hffaxw",
+  "bbox": [
+   0.6581,
+   0.4936,
+   0.0405
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "picture__hhxttu": {
+  "category": "picture",
+  "model": "hhxttu",
+  "bbox": [
+   0.4574,
+   0.6858,
+   0.016
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "picture__jmvdxm": {
+  "category": "picture",
+  "model": "jmvdxm",
+  "bbox": [
+   0.6664,
+   0.5381,
+   0.0176
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "picture__jovfqj": {
+  "category": "picture",
+  "model": "jovfqj",
+  "bbox": [
+   0.3849,
+   0.3735,
+   0.0192
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "wall_clock__fnwzqj": {
+  "category": "wall_clock",
+  "model": "fnwzqj",
+  "bbox": [
+   0.0255,
+   0.3,
+   0.3
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_clock__fqvgny": {
+  "category": "wall_clock",
+  "model": "fqvgny",
+  "bbox": [
+   0.0654,
+   0.5675,
+   0.5692
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "wall_clock__jerval": {
+  "category": "wall_clock",
+  "model": "jerval",
+  "bbox": [
+   0.0477,
+   0.5637,
+   0.5637
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_clock__oqmbtp": {
+  "category": "wall_clock",
+  "model": "oqmbtp",
+  "bbox": [
+   0.0298,
+   0.6191,
+   0.3487
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_clock__przkmo": {
+  "category": "wall_clock",
+  "model": "przkmo",
+  "bbox": [
+   0.0231,
+   0.3069,
+   0.3077
+  ],
+  "n_meshes": 4,
+  "n_textured": 4,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "wall_clock__xevvel": {
+  "category": "wall_clock",
+  "model": "xevvel",
+  "bbox": [
+   0.0163,
+   0.3077,
+   0.3077
+  ],
+  "n_meshes": 3,
+  "n_textured": 3,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "wall_clock__zpctvp": {
+  "category": "wall_clock",
+  "model": "zpctvp",
+  "bbox": [
+   0.0423,
+   0.5345,
+   0.5344
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "poster__dsrcyt": {
+  "category": "poster",
+  "model": "dsrcyt",
+  "bbox": [
+   0.0102,
+   0.6175,
+   0.888
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "bulletin_board__ayaoal": {
+  "category": "bulletin_board",
+  "model": "ayaoal",
+  "bbox": [
+   0.7562,
+   1.0826,
+   0.0482
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "bulletin_board__rjlpsy": {
+  "category": "bulletin_board",
+  "model": "rjlpsy",
+  "bbox": [
+   0.7376,
+   1.0699,
+   0.0254
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "whiteboard__bqqmtc": {
+  "category": "whiteboard",
+  "model": "bqqmtc",
+  "bbox": [
+   0.0474,
+   0.8753,
+   0.6096
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "whiteboard__gvkgsi": {
+  "category": "whiteboard",
+  "model": "gvkgsi",
+  "bbox": [
+   0.0204,
+   1.2334,
+   0.7285
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "whiteboard__onhspt": {
+  "category": "whiteboard",
+  "model": "onhspt",
+  "bbox": [
+   0.0838,
+   3.1897,
+   0.9653
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "decorative_sign__hgonwj": {
+  "category": "decorative_sign",
+  "model": "hgonwj",
+  "bbox": [
+   0.06,
+   0.604,
+   0.4847
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "decorative_sign__rypeha": {
+  "category": "decorative_sign",
+  "model": "rypeha",
+  "bbox": [
+   0.0236,
+   0.3339,
+   0.1305
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "decorative_sign__xzsmxq": {
+  "category": "decorative_sign",
+  "model": "xzsmxq",
+  "bbox": [
+   0.0673,
+   0.9253,
+   0.6024
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "signpost__axhlim": {
+  "category": "signpost",
+  "model": "axhlim",
+  "bbox": [
+   0.0299,
+   0.1637,
+   0.2212
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "signpost__ivvjfv": {
+  "category": "signpost",
+  "model": "ivvjfv",
+  "bbox": [
+   0.0519,
+   0.4078,
+   0.1176
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "signpost__mexzmk": {
+  "category": "signpost",
+  "model": "mexzmk",
+  "bbox": [
+   0.0254,
+   0.2254,
+   0.1524
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "signpost__mlvfbp": {
+  "category": "signpost",
+  "model": "mlvfbp",
+  "bbox": [
+   0.0256,
+   0.2255,
+   0.1524
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "signpost__sdsfzw": {
+  "category": "signpost",
+  "model": "sdsfzw",
+  "bbox": [
+   0.0,
+   0.1937,
+   0.1937
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "signpost__vvjtkv": {
+  "category": "signpost",
+  "model": "vvjtkv",
+  "bbox": [
+   0.0413,
+   0.5025,
+   0.1708
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "signpost__vwhtlm": {
+  "category": "signpost",
+  "model": "vwhtlm",
+  "bbox": [
+   0.0225,
+   0.6261,
+   0.2665
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "grocery_sign__kyyjer": {
+  "category": "grocery_sign",
+  "model": "kyyjer",
+  "bbox": [
+   0.0476,
+   0.1705,
+   0.3222
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "canvas__adxquq": {
+  "category": "canvas",
+  "model": "adxquq",
+  "bbox": [
+   1.1499,
+   0.9637,
+   0.008
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "pegboard__jafivf": {
+  "category": "pegboard",
+  "model": "jafivf",
+  "bbox": [
+   0.4,
+   0.4571,
+   0.005
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "guitar__cybisc": {
+  "category": "guitar",
+  "model": "cybisc",
+  "bbox": [
+   1.0416,
+   0.3406,
+   0.0501
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "guitar__gysapt": {
+  "category": "guitar",
+  "model": "gysapt",
+  "bbox": [
+   1.0413,
+   0.2789,
+   0.0673
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "guitar__hpqjrq": {
+  "category": "guitar",
+  "model": "hpqjrq",
+  "bbox": [
+   1.0414,
+   0.2613,
+   0.0347
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "tennis_racket__rmvafy": {
+  "category": "tennis_racket",
+  "model": "rmvafy",
+  "bbox": [
+   0.8191,
+   0.3375,
+   0.0284
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "violin__rgwsac": {
+  "category": "violin",
+  "model": "rgwsac",
+  "bbox": [
+   0.6026,
+   0.2086,
+   0.103
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hanger__agrpio": {
+  "category": "hanger",
+  "model": "agrpio",
+  "bbox": [
+   0.2324,
+   0.4262,
+   0.0396
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "hanger__anobre": {
+  "category": "hanger",
+  "model": "anobre",
+  "bbox": [
+   0.2295,
+   0.4356,
+   0.0028
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "hanger__ffecvd": {
+  "category": "hanger",
+  "model": "ffecvd",
+  "bbox": [
+   0.2412,
+   0.4408,
+   0.0768
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "hanger__lymqks": {
+  "category": "hanger",
+  "model": "lymqks",
+  "bbox": [
+   0.2606,
+   0.4708,
+   0.0502
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "hanger__nadesv": {
+  "category": "hanger",
+  "model": "nadesv",
+  "bbox": [
+   0.2572,
+   0.4351,
+   0.0597
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "hanger__nagryh": {
+  "category": "hanger",
+  "model": "nagryh",
+  "bbox": [
+   0.2347,
+   0.4373,
+   0.0177
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "hook_rack__mdnfjr": {
+  "category": "hook_rack",
+  "model": "mdnfjr",
+  "bbox": [
+   0.0545,
+   0.9563,
+   0.1322
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "towel_rack__crivoa": {
+  "category": "towel_rack",
+  "model": "crivoa",
+  "bbox": [
+   0.0405,
+   0.474,
+   0.0406
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "towel_rack__kqrmrh": {
+  "category": "towel_rack",
+  "model": "kqrmrh",
+  "bbox": [
+   0.0576,
+   0.474,
+   0.0632
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "towel_rack__nhlijv": {
+  "category": "towel_rack",
+  "model": "nhlijv",
+  "bbox": [
+   0.1366,
+   0.5258,
+   0.7922
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "towel_rack__pqhsry": {
+  "category": "towel_rack",
+  "model": "pqhsry",
+  "bbox": [
+   0.0568,
+   0.474,
+   0.0828
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "towel_rack__qedffr": {
+  "category": "towel_rack",
+  "model": "qedffr",
+  "bbox": [
+   0.14,
+   0.5,
+   1.6687
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "towel_rack__quznqx": {
+  "category": "towel_rack",
+  "model": "quznqx",
+  "bbox": [
+   0.0191,
+   0.4074,
+   0.0298
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "valentine_wreath__xpbsof": {
+  "category": "valentine_wreath",
+  "model": "xpbsof",
+  "bbox": [
+   0.2016,
+   0.2411,
+   0.0464
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "picture_frame__brhofj": {
+  "category": "picture_frame",
+  "model": "brhofj",
+  "bbox": [
+   0.0771,
+   0.128,
+   0.1576
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "picture_frame__byaund": {
+  "category": "picture_frame",
+  "model": "byaund",
+  "bbox": [
+   0.176,
+   0.2022,
+   0.1407
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "picture_frame__fgsgpu": {
+  "category": "picture_frame",
+  "model": "fgsgpu",
+  "bbox": [
+   0.1144,
+   0.2157,
+   0.2701
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "picture_frame__guatvs": {
+  "category": "picture_frame",
+  "model": "guatvs",
+  "bbox": [
+   0.0723,
+   0.126,
+   0.1586
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "picture_frame__kncybf": {
+  "category": "picture_frame",
+  "model": "kncybf",
+  "bbox": [
+   0.0765,
+   0.1535,
+   0.2334
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "picture_frame__lsqclh": {
+  "category": "picture_frame",
+  "model": "lsqclh",
+  "bbox": [
+   0.1267,
+   0.2325,
+   0.3011
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "picture_frame__lxpxcf": {
+  "category": "picture_frame",
+  "model": "lxpxcf",
+  "bbox": [
+   0.1004,
+   0.175,
+   0.2201
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "picture_frame__nrviiu": {
+  "category": "picture_frame",
+  "model": "nrviiu",
+  "bbox": [
+   0.1261,
+   0.2037,
+   0.3003
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "picture_frame__vmyqsm": {
+  "category": "picture_frame",
+  "model": "vmyqsm",
+  "bbox": [
+   0.0924,
+   0.1558,
+   0.2317
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "picture_frame__yxmjdx": {
+  "category": "picture_frame",
+  "model": "yxmjdx",
+  "bbox": [
+   0.098,
+   0.1568,
+   0.228
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "paper_towel_dispenser__jacqxv": {
+  "category": "paper_towel_dispenser",
+  "model": "jacqxv",
+  "bbox": [
+   0.1446,
+   0.3267,
+   0.3973
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "paper_towel_dispenser__lahuhb": {
+  "category": "paper_towel_dispenser",
+  "model": "lahuhb",
+  "bbox": [
+   0.1435,
+   0.3267,
+   0.3972
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "paper_towel_dispenser__ovwdpz": {
+  "category": "paper_towel_dispenser",
+  "model": "ovwdpz",
+  "bbox": [
+   0.2133,
+   0.2988,
+   0.4432
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "paper_towel_dispenser__tuvnnt": {
+  "category": "paper_towel_dispenser",
+  "model": "tuvnnt",
+  "bbox": [
+   0.1264,
+   0.275,
+   0.3972
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "paper_towel_dispenser__zpfghl": {
+  "category": "paper_towel_dispenser",
+  "model": "zpfghl",
+  "bbox": [
+   0.1539,
+   0.3195,
+   0.1942
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_mounted_soap_dispenser__aofnyo": {
+  "category": "wall_mounted_soap_dispenser",
+  "model": "aofnyo",
+  "bbox": [
+   0.1291,
+   0.1299,
+   0.1941
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "wall_mounted_soap_dispenser__byjkkn": {
+  "category": "wall_mounted_soap_dispenser",
+  "model": "byjkkn",
+  "bbox": [
+   0.0591,
+   0.3722,
+   0.1662
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_mounted_soap_dispenser__zvslvk": {
+  "category": "wall_mounted_soap_dispenser",
+  "model": "zvslvk",
+  "bbox": [
+   0.1289,
+   0.1298,
+   0.194
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "wall_mounted_tv__aoqsbu": {
+  "category": "wall_mounted_tv",
+  "model": "aoqsbu",
+  "bbox": [
+   0.0872,
+   1.4704,
+   0.822
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_mounted_tv__bfehsl": {
+  "category": "wall_mounted_tv",
+  "model": "bfehsl",
+  "bbox": [
+   0.2006,
+   1.1072,
+   1.0067
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_mounted_tv__cwdngq": {
+  "category": "wall_mounted_tv",
+  "model": "cwdngq",
+  "bbox": [
+   0.0201,
+   1.3116,
+   0.7665
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_mounted_tv__dkpfys": {
+  "category": "wall_mounted_tv",
+  "model": "dkpfys",
+  "bbox": [
+   0.3952,
+   5.1581,
+   3.5254
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_mounted_tv__dxyfxf": {
+  "category": "wall_mounted_tv",
+  "model": "dxyfxf",
+  "bbox": [
+   0.0602,
+   0.9007,
+   0.5183
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_mounted_tv__gffrzl": {
+  "category": "wall_mounted_tv",
+  "model": "gffrzl",
+  "bbox": [
+   0.0531,
+   1.1282,
+   0.73
+  ],
+  "n_meshes": 2,
+  "n_textured": 2,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_mounted_tv__ggfznh": {
+  "category": "wall_mounted_tv",
+  "model": "ggfznh",
+  "bbox": [
+   0.0718,
+   0.5594,
+   0.3719
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_mounted_tv__leeqgt": {
+  "category": "wall_mounted_tv",
+  "model": "leeqgt",
+  "bbox": [
+   0.0679,
+   1.318,
+   0.7719
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_mounted_tv__ovzajm": {
+  "category": "wall_mounted_tv",
+  "model": "ovzajm",
+  "bbox": [
+   0.0679,
+   1.318,
+   0.7719
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_mounted_tv__pghmyr": {
+  "category": "wall_mounted_tv",
+  "model": "pghmyr",
+  "bbox": [
+   0.0361,
+   1.5181,
+   1.0362
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_mounted_tv__rifpjo": {
+  "category": "wall_mounted_tv",
+  "model": "rifpjo",
+  "bbox": [
+   0.0251,
+   1.6657,
+   1.0073
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_mounted_tv__sodbbr": {
+  "category": "wall_mounted_tv",
+  "model": "sodbbr",
+  "bbox": [
+   0.0602,
+   0.9007,
+   0.5183
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_mounted_tv__uvlqsl": {
+  "category": "wall_mounted_tv",
+  "model": "uvlqsl",
+  "bbox": [
+   0.0446,
+   1.449,
+   0.7899
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_mounted_tv__ylvjhb": {
+  "category": "wall_mounted_tv",
+  "model": "ylvjhb",
+  "bbox": [
+   0.1,
+   0.925,
+   0.6
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "wall_mounted_tv__zesqym": {
+  "category": "wall_mounted_tv",
+  "model": "zesqym",
+  "bbox": [
+   0.0361,
+   1.6409,
+   0.9667
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "fire_extinguisher__bejaeu": {
+  "category": "fire_extinguisher",
+  "model": "bejaeu",
+  "bbox": [
+   0.4183,
+   0.1919,
+   0.1472
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "fire_extinguisher__inqyom": {
+  "category": "fire_extinguisher",
+  "model": "inqyom",
+  "bbox": [
+   0.4234,
+   0.2193,
+   0.1837
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "fire_extinguisher__jgdvdl": {
+  "category": "fire_extinguisher",
+  "model": "jgdvdl",
+  "bbox": [
+   0.6373,
+   0.221,
+   0.1399
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "fire_extinguisher__noepez": {
+  "category": "fire_extinguisher",
+  "model": "noepez",
+  "bbox": [
+   0.6373,
+   0.221,
+   0.1406
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "fire_extinguisher__xqtkxb": {
+  "category": "fire_extinguisher",
+  "model": "xqtkxb",
+  "bbox": [
+   0.4304,
+   0.2001,
+   0.1345
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "thermostat__jophec": {
+  "category": "thermostat",
+  "model": "jophec",
+  "bbox": [
+   0.0971,
+   0.1474,
+   0.033
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "broom__tpyvbt": {
+  "category": "broom",
+  "model": "tpyvbt",
+  "bbox": [
+   0.2722,
+   0.085,
+   0.0301
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "umbrella__cqfbku": {
+  "category": "umbrella",
+  "model": "cqfbku",
+  "bbox": [
+   0.5033,
+   0.1781,
+   0.0994
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "umbrella__frpfnc": {
+  "category": "umbrella",
+  "model": "frpfnc",
+  "bbox": [
+   0.7116,
+   0.1266,
+   0.0686
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "umbrella__hdfkbc": {
+  "category": "umbrella",
+  "model": "hdfkbc",
+  "bbox": [
+   0.9395,
+   0.0699,
+   0.0699
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "umbrella__ziqzqo": {
+  "category": "umbrella",
+  "model": "ziqzqo",
+  "bbox": [
+   0.8128,
+   0.1136,
+   0.07
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "umbrella__zxnjwz": {
+  "category": "umbrella",
+  "model": "zxnjwz",
+  "bbox": [
+   1.0271,
+   0.0731,
+   0.0756
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "y",
+  "long_axis": "x"
+ },
+ "hat__avvknr": {
+  "category": "hat",
+  "model": "avvknr",
+  "bbox": [
+   0.4227,
+   0.453,
+   0.1898
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "hat__ldxyyc": {
+  "category": "hat",
+  "model": "ldxyyc",
+  "bbox": [
+   0.3747,
+   0.3313,
+   0.1686
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hat__wkrzep": {
+  "category": "hat",
+  "model": "wkrzep",
+  "bbox": [
+   0.412,
+   0.382,
+   0.1667
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "hat__zymxgw": {
+  "category": "hat",
+  "model": "zymxgw",
+  "bbox": [
+   0.412,
+   0.3713,
+   0.1635
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "map__fdtxut": {
+  "category": "map",
+  "model": "fdtxut",
+  "bbox": [
+   0.1955,
+   0.2383,
+   0.0
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "map__hsbtqi": {
+  "category": "map",
+  "model": "hsbtqi",
+  "bbox": [
+   0.072,
+   0.0813,
+   0.0
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "map__umftoc": {
+  "category": "map",
+  "model": "umftoc",
+  "bbox": [
+   1.1568,
+   2.1463,
+   0.0298
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "board__fxugbm": {
+  "category": "board",
+  "model": "fxugbm",
+  "bbox": [
+   0.7396,
+   1.1165,
+   0.0141
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "frame__argijo": {
+  "category": "frame",
+  "model": "argijo",
+  "bbox": [
+   1.4593,
+   0.7128,
+   0.093
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "frame__trhhqo": {
+  "category": "frame",
+  "model": "trhhqo",
+  "bbox": [
+   1.7602,
+   0.9891,
+   0.0587
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "dartboard__zjenlc": {
+  "category": "dartboard",
+  "model": "zjenlc",
+  "bbox": [
+   0.451,
+   0.451,
+   0.0168
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "license_plate__hjdaqn": {
+  "category": "license_plate",
+  "model": "hjdaqn",
+  "bbox": [
+   0.3078,
+   0.1555,
+   0.0041
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "license_plate__naclac": {
+  "category": "license_plate",
+  "model": "naclac",
+  "bbox": [
+   0.3078,
+   0.1555,
+   0.0041
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "license_plate__nuqnlr": {
+  "category": "license_plate",
+  "model": "nuqnlr",
+  "bbox": [
+   0.3078,
+   0.1555,
+   0.0041
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "license_plate__nwfbxn": {
+  "category": "license_plate",
+  "model": "nwfbxn",
+  "bbox": [
+   0.3078,
+   0.1555,
+   0.0039
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "license_plate__yepdrj": {
+  "category": "license_plate",
+  "model": "yepdrj",
+  "bbox": [
+   0.3078,
+   0.1555,
+   0.0041
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "skateboard_deck__tgfidu": {
+  "category": "skateboard_deck",
+  "model": "tgfidu",
+  "bbox": [
+   0.2643,
+   1.0439,
+   0.1062
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "y"
+ },
+ "wreath__rkrxno": {
+  "category": "wreath",
+  "model": "rkrxno",
+  "bbox": [
+   0.2002,
+   0.1978,
+   0.0417
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "holly_decoration__shmkir": {
+  "category": "holly_decoration",
+  "model": "shmkir",
+  "bbox": [
+   0.1225,
+   0.1109,
+   0.0681
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "antlers__nlsanr": {
+  "category": "antlers",
+  "model": "nlsanr",
+  "bbox": [
+   0.5607,
+   0.2907,
+   0.0349
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "antlers__ovwdwa": {
+  "category": "antlers",
+  "model": "ovwdwa",
+  "bbox": [
+   0.5547,
+   0.2406,
+   0.0419
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "z",
+  "long_axis": "x"
+ },
+ "mirror__catitv": {
+  "category": "mirror",
+  "model": "catitv",
+  "bbox": [
+   0.0058,
+   0.6235,
+   1.9079
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "mirror__ddmyjg": {
+  "category": "mirror",
+  "model": "ddmyjg",
+  "bbox": [
+   0.039,
+   2.5696,
+   0.9324
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "mirror__edxfnt": {
+  "category": "mirror",
+  "model": "edxfnt",
+  "bbox": [
+   0.0134,
+   0.7839,
+   0.5697
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "mirror__ffoudz": {
+  "category": "mirror",
+  "model": "ffoudz",
+  "bbox": [
+   0.0058,
+   0.8393,
+   2.2018
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "mirror__jpktmn": {
+  "category": "mirror",
+  "model": "jpktmn",
+  "bbox": [
+   0.1499,
+   1.8919,
+   1.2446
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "y"
+ },
+ "mirror__jtgjha": {
+  "category": "mirror",
+  "model": "jtgjha",
+  "bbox": [
+   0.02,
+   0.8138,
+   2.0575
+  ],
+  "n_meshes": 1,
+  "n_textured": 1,
+  "thin_axis": "x",
+  "long_axis": "z"
+ },
+ "windshield__akoadf": {
+  "category": "windshield",
+  "model": "akoadf",
+  "error": "RuntimeError('no visual mesh')"
+ },
+ "windshield__mdfijk": {
+  "category": "windshield",
+  "model": "mdfijk",
+  "error": "RuntimeError('no visual mesh')"
+ }
+}

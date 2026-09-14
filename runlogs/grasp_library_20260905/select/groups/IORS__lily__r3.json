@@ -1,0 +1,249 @@
+{
+ "group": "IORS__lily__r3",
+ "task": "IORS",
+ "category": "lily",
+ "round": 3,
+ "relation": "inside",
+ "partner": "vase (flower_stem_top)",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "yltekp",
+   "key": "lily__yltekp__fl",
+   "strip": "/tmp/glib/strips/lily__yltekp__fl.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem+leaf pinch high on stem, head close; 28/0 closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem+leaf pinch high on stem; 30/0 closed, tilt 38 deg"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch high; opening 24 vs 19 mm, minor hull mismatch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem+leaf pinch high on stem; 26/0 closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "clean 11 mm stem pinch high on stem, stem end free"
+    }
+   ],
+   "object_note": "All pinches just below the flower/leaf cluster with long stem end free; leaf sandwiched with stem in rows 1-4.",
+   "bbox_mm": [
+    470,
+    163,
+    93
+   ],
+   "scale": null,
+   "ready": false,
+   "pipeline": "a1",
+   "constraint": "flower_stem_top"
+  },
+  {
+   "model": "mohrqo",
+   "key": "lily__mohrqo__fl",
+   "strip": "/tmp/glib/strips/lily__mohrqo__fl.png",
+   "n_valid": 1,
+   "n_clean": 1,
+   "n_clean_strict": 1,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "clean 10 mm stem pinch near head, stem end free"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    462,
+    185,
+    105
+   ],
+   "scale": null,
+   "ready": false,
+   "pipeline": "a1",
+   "constraint": "flower_stem_top"
+  },
+  {
+   "model": "jfeimu",
+   "key": "lily__jfeimu__fl",
+   "strip": "/tmp/glib/strips/lily__jfeimu__fl.png",
+   "n_valid": 1,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "penetration"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "fingers closed to 5 mm through 18 mm stem/leaf section"
+    }
+   ],
+   "object_note": "Stem collision hull much thinner than visual mesh at the pinch (5/0 closure vs 18 mm width).",
+   "bbox_mm": [
+    425,
+    235,
+    172
+   ],
+   "scale": null,
+   "ready": false,
+   "pipeline": "a1",
+   "constraint": "flower_stem_top"
+  },
+  {
+   "model": "relerp",
+   "key": "lily__relerp__fl",
+   "strip": "/tmp/glib/strips/lily__relerp__fl.png",
+   "n_valid": 4,
+   "n_clean": 4,
+   "n_clean_strict": 4,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "clean 12 mm stem pinch just below head; 13/0 closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "clean 12 mm stem pinch below head, leaf beside; 13/0"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "clean 12 mm stem pinch below head; tilt 25 deg"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "clean 12 mm stem pinch just below head; 13/0 closed"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    425,
+    233,
+    172
+   ],
+   "scale": null,
+   "ready": false,
+   "pipeline": "a1",
+   "constraint": "flower_stem_top"
+  },
+  {
+   "model": "jtouad",
+   "key": "lily__jtouad__fl",
+   "strip": "/tmp/glib/strips/lily__jtouad__fl.png",
+   "n_valid": 1,
+   "n_clean": 1,
+   "n_clean_strict": 1,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch below leaves; opening 16.5 vs 13 mm, minor"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    424,
+    235,
+    173
+   ],
+   "scale": null,
+   "ready": false,
+   "pipeline": "a1",
+   "constraint": "flower_stem_top"
+  },
+  {
+   "model": "jobzwo",
+   "key": "lily__jobzwo__fl",
+   "strip": "/tmp/glib/strips/lily__jobzwo__fl.png",
+   "n_valid": 1,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "fragile",
+    "gap",
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "gap",
+      "fragile",
+      "one_finger"
+     ],
+     "note": "pads 47 mm apart on 17 mm stem; squeezing foliage cluster, 48/0"
+    }
+   ],
+   "object_note": "Grasp lands in middle of flower/leaf cluster (t 0.57); pads stop on coarse foliage hull, not the stem.",
+   "bbox_mm": [
+    467,
+    271,
+    173
+   ],
+   "scale": null,
+   "ready": false,
+   "pipeline": "a1",
+   "constraint": "flower_stem_top"
+  }
+ ],
+ "excluded": [
+  {
+   "model": "qqtrts",
+   "key": "lily__qqtrts__fl",
+   "reason": "no candidates"
+  },
+  {
+   "model": "pfodaq",
+   "key": "lily__pfodaq__fl",
+   "reason": "no candidates"
+  },
+  {
+   "model": "rygjjm",
+   "key": "lily__rygjjm__fl",
+   "reason": "no candidates"
+  },
+  {
+   "model": "qpqtlz",
+   "key": "lily__qpqtlz__fl",
+   "reason": "no candidates"
+  }
+ ]
+}

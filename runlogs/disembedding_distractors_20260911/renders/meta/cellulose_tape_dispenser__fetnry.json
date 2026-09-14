@@ -1,0 +1,35 @@
+{
+ "category": "cellulose_tape_dispenser",
+ "model": "fetnry",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/cellulose_tape_dispenser__fetnry__y0.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0274,
+   "seg_pixels": 3821,
+   "aabb_extent": [
+    0.113,
+    0.051,
+    0.069
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/cellulose_tape_dispenser__fetnry__y1.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0276
+  }
+ },
+ "stable": true,
+ "visible": true
+}

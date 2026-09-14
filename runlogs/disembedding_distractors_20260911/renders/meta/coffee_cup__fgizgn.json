@@ -1,0 +1,35 @@
+{
+ "category": "coffee_cup",
+ "model": "fgizgn",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/coffee_cup__fgizgn__y0.png",
+   "drift_m": 0.0002,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0327,
+   "seg_pixels": 3889,
+   "aabb_extent": [
+    0.096,
+    0.064,
+    0.072
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/coffee_cup__fgizgn__y1.png",
+   "drift_m": 0.0002,
+   "tilt_deg": 0.4,
+   "on_tray": true,
+   "settled_z": 0.0327
+  }
+ },
+ "stable": true,
+ "visible": true
+}

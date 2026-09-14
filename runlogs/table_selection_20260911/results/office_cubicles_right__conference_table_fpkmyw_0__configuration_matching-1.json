@@ -1,0 +1,150 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "conference_table_fpkmyw_0",
+ "category": "conference_table",
+ "model": "fpkmyw",
+ "rooms": [
+  "meeting_room_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-1",
+ "inventory": {
+  "top_z": 0.67,
+  "bbox_x": 1.493,
+  "bbox_y": 3.392,
+  "bbox_z": 0.67,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "swivel_chair_ucawqa_0",
+  "swivel_chair_ucawqa_1",
+  "swivel_chair_ucawqa_2",
+  "swivel_chair_ucawqa_3",
+  "swivel_chair_ucawqa_4",
+  "swivel_chair_ucawqa_5",
+  "swivel_chair_ucawqa_6",
+  "swivel_chair_ucawqa_7",
+  "swivel_chair_ucawqa_8",
+  "swivel_chair_ucawqa_9"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 23:44:21",
+ "precheck": {
+  "aabb": [
+   [
+    5.47,
+    11.736,
+    -0.012
+   ],
+   [
+    6.998,
+    15.152,
+    0.681
+   ]
+  ],
+  "support": {
+   "name": "conference_table_fpkmyw_0",
+   "z": 0.6736651659011841,
+   "yaw": 0.0,
+   "local_bounds": [
+    5.479757308959961,
+    6.979757308959961,
+    11.746005058288574,
+    15.146004676818848
+   ],
+   "n_free_cells": 12996,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     6.98,
+     13.446
+    ],
+    "length": 3.4
+   },
+   {
+    "name": "-u",
+    "mid": [
+     5.48,
+     13.446
+    ],
+    "length": 3.4
+   },
+   {
+    "name": "+v",
+    "mid": [
+     6.23,
+     15.146
+    ],
+    "length": 1.5
+   },
+   {
+    "name": "-v",
+    "mid": [
+     6.23,
+     11.746
+    ],
+    "length": 1.5
+   }
+  ],
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    6.229757308959961,
+    15.146004676818848
+   ],
+   "inward": [
+    0.0,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    0.0
+   ],
+   "base_pose2d": [
+    6.229757308959961,
+    15.596004486083984,
+    -1.5707963267948966
+   ],
+   "edge_depth": 0.4499998092651367,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.12651526343923564
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 2.3
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "view_arms": "untucked",
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/office_cubicles_right/office_cubicles_right__conference_table_fpkmyw_0__configuration_matching-1",
+ "setup_s": 24.5,
+ "reject_reason": "no_support",
+ "error": "[no_support] conference_table_fpkmyw_0: [unreachable] handle not reachable from any of 4 cells (e.g. handle at [6.15805721282959, 14.832605361938477, 1.0290371179580688], base (6.229757308959961, 15.696004867553711, -1.5707963267948966), translates [0.0, 0.25, 0.5])",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 24.5,
+   "run_s": null
+  }
+ ],
+ "job_s": 25.1,
+ "finished": "2026-09-11 23:44:46"
+}

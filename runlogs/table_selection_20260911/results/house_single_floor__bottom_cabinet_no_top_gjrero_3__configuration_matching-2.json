@@ -1,0 +1,25 @@
+{
+ "scene": "house_single_floor",
+ "table": "bottom_cabinet_no_top_gjrero_3",
+ "category": "bottom_cabinet_no_top",
+ "model": "gjrero",
+ "rooms": [
+  "utility_room_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.878,
+  "bbox_x": 0.657,
+  "bbox_y": 0.987,
+  "bbox_z": 0.879,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 00:21:48",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

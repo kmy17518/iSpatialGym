@@ -1,0 +1,100 @@
+{
+ "category": "clothes_dryer",
+ "model": "fhtvuq",
+ "key": "clothes_dryer__fhtvuq",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.2616801857948303
+ ],
+ "aabb_extent": [
+  0.6526610851287842,
+  0.607799768447876,
+  0.5226431488990784
+ ],
+ "aabb_min_rel_root": [
+  -0.30576589703559875,
+  -0.30326956510543823,
+  -0.2616801857948303
+ ],
+ "aabb_max_rel_root": [
+  0.34689515829086304,
+  0.30453017354011536,
+  0.26096296310424805
+ ],
+ "link_tags": {
+  "base_link": [],
+  "link_0": [
+   "openable"
+  ]
+ },
+ "openable_joint_ids": [
+  [
+   1,
+   "j_link_0"
+  ]
+ ],
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "type": "RevoluteJoint",
+   "child_link": "link_0",
+   "lower": 0.0,
+   "upper": 1.8975218534469604,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.31853,
+    -0.16531,
+    -0.00039
+   ],
+   "link_quat_obj": [
+    -0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    -0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    0.31853,
+    -0.16531,
+    -0.00039
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/clothes_dryer__fhtvuq__link_0.obj",
+   "n_pieces": 8,
+   "link_bbox_min": [
+    0.3046,
+    -0.1694,
+    -0.1505
+   ],
+   "link_bbox_max": [
+    0.3469,
+    0.1493,
+    0.1497
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.3058,
+   -0.3033,
+   -0.2617
+  ],
+  "bbox_max": [
+   0.3433,
+   0.3045,
+   0.261
+  ],
+  "n_pieces": 32
+ }
+}

@@ -1,0 +1,27 @@
+{
+  "group": "object_scaling__bottle_of_olive_oil__r3",
+  "task": "object_scaling",
+  "category": "bottle_of_olive_oil",
+  "round": 3,
+  "relation": null,
+  "n_candidates": 4,
+  "n_opened": 4,
+  "candidates": [
+    {"model": "luikop", "key": "bottle_of_olive_oil__luikop__f", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Small pale-yellow cylinder with readable dark 'dipping oil' label; five snug 42/0 mid-body pinches, one tilted 109 deg, label rotation varies."},
+    {"model": "cqycjk", "key": "bottle_of_olive_oil__cqycjk__f", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Tall cream wine-style bottle, crisp yellow-green label (reads 'honey apple', not clearly olive oil); five clean body holds at 60 and 90 deg tilts."},
+    {"model": "wztvie", "key": "bottle_of_olive_oil__wztvie__f", "G": 3, "T": 3, "V": 5, "R": 2, "score": 21,
+     "note": "Dark square glass bottle with olive-branch label, best category identity; five near-identical mid-body pinches, pads bear on body edges (48 mm gap vs 36 face)."},
+    {"model": "ksxqkk", "key": "bottle_of_olive_oil__ksxqkk__f", "G": 3, "T": 3, "V": 2, "R": 2, "score": 15,
+     "note": "Flat-grey faceted cone with paper tag, not recognisable as oil bottle; all rows pinch the base rim with cone wedged against palm, one pose."}
+  ],
+  "selected": [
+    {"model": "cqycjk", "key": "bottle_of_olive_oil__cqycjk__f", "rank": 1, "reason": "Highest score: five clean two-pad body holds spanning two distinct approach angles plus label rotations, on a clean, sharply textured tall bottle."},
+    {"model": "wztvie", "key": "bottle_of_olive_oil__wztvie__f", "rank": 2, "reason": "Tied with luikop at 21; dark square glass with olive-oil label contrasts most with the cream round pick and is the most representative asset."}
+  ],
+  "alternate": {"model": "luikop", "key": "bottle_of_olive_oil__luikop__f"},
+  "short": false,
+  "warnings": ["wztvie offers only one repeated pose with edge contact on its square body; cqycjk's label text is not olive oil, though the bottle shape is typical."],
+  "confidence": "medium"
+}

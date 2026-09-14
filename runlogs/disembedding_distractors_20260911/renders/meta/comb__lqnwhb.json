@@ -1,0 +1,35 @@
+{
+ "category": "comb",
+ "model": "lqnwhb",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/comb__lqnwhb__y0.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 3.3,
+   "on_tray": true,
+   "settled_z": 0.0009,
+   "seg_pixels": 274,
+   "aabb_extent": [
+    0.014,
+    0.052,
+    0.002
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/comb__lqnwhb__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 3.1,
+   "on_tray": true,
+   "settled_z": 0.0009
+  }
+ },
+ "stable": true,
+ "visible": true
+}

@@ -1,0 +1,103 @@
+{
+ "category": "openable_window",
+ "model": "qdkcdn",
+ "key": "openable_window__qdkcdn",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.4045095443725586
+ ],
+ "aabb_extent": [
+  0.12282466143369675,
+  1.3353126049041748,
+  0.8108730912208557
+ ],
+ "aabb_min_rel_root": [
+  -0.055654436349868774,
+  -0.6495782136917114,
+  -0.4045095443725586
+ ],
+ "aabb_max_rel_root": [
+  0.06717022508382797,
+  0.6857343316078186,
+  0.4063635468482971
+ ],
+ "link_tags": {
+  "base_link": [
+   "openablebothsides"
+  ],
+  "dof_rootd_aa001_t": [],
+  "glass1": [
+   "glass"
+  ],
+  "dof_rootd_aa002_t": [
+   "openable"
+  ],
+  "glass2": [
+   "glass"
+  ]
+ },
+ "openable_joint_ids": [
+  [
+   2,
+   "j_dof_rootd_aa002_t"
+  ]
+ ],
+ "joints": [
+  {
+   "joint": "j_dof_rootd_aa002_t",
+   "type": "PrismaticJoint",
+   "child_link": "dof_rootd_aa002_t",
+   "lower": 0.0,
+   "upper": 0.3961719274520874,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.03344,
+    -0.29726,
+    -0.00117
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "travel_per_unit": 1.0000002384185902,
+   "pieces_obj": "/tmp/glib/artic/inv/openable_window__qdkcdn__dof_rootd_aa002_t.obj",
+   "n_pieces": 1,
+   "link_bbox_min": [
+    0.0102,
+    -0.5854,
+    -0.3429
+   ],
+   "link_bbox_max": [
+    0.0568,
+    0.0295,
+    0.3406
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0557,
+   -0.6496,
+   -0.4045
+  ],
+  "bbox_max": [
+   0.0672,
+   0.6857,
+   0.4064
+  ],
+  "n_pieces": 6
+ }
+}

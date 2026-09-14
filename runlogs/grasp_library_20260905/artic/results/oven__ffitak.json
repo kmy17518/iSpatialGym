@@ -1,0 +1,115 @@
+{
+ "key": "oven__ffitak",
+ "category": "oven",
+ "model": "ffitak",
+ "scene": "house_single_floor",
+ "host": "oven_ffitak_0",
+ "host_rank": 0,
+ "host_model": "ffitak",
+ "swap": false,
+ "joints": [
+  {
+   "joint": "j_door",
+   "kind": "flap",
+   "grasp_source": "review:B",
+   "stance": {
+    "base": [
+     8.616,
+     -0.747,
+     -1.557
+    ],
+    "translate": 0.5,
+    "sign": -1.0,
+    "orientation": "front"
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "stance ok (teleported)",
+    "sign +1: planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 58.4 mm / 0.137 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)",
+    "stance ok (teleported)",
+    "sign -1: planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 17.0 mm / 0.027 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)"
+   ],
+   "error": "planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 17.0 mm / 0.027 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)",
+   "contact_world": [
+    8.426,
+    -1.55,
+    1.296
+   ],
+   "handle_height_above_floor": 1.291
+  },
+  {
+   "joint": "j_rack1",
+   "kind": "drawer",
+   "grasp_source": "review:F",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.111,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [8.430232048034668, -1.6369637250900269, 1.040613055229187]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [8.430232048034668, -1.6369637250900269, 1.040613055229187]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    8.43,
+    -1.637,
+    1.041
+   ],
+   "handle_height_above_floor": 1.035,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 0,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 3
+   }
+  },
+  {
+   "joint": "j_rack2",
+   "kind": "drawer",
+   "grasp_source": "review:F",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.111,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [8.430232048034668, -1.6369637250900269, 0.9293057918548584]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [8.430232048034668, -1.6369637250900269, 0.9293057918548584]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    8.43,
+    -1.637,
+    0.929
+   ],
+   "handle_height_above_floor": 0.924,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 0,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 4
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.0,
+  1.0,
+  1.0
+ ],
+ "time_s": 258.7
+}

@@ -1,0 +1,35 @@
+{
+ "category": "beer_glass",
+ "model": "rxscji",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/beer_glass__rxscji__y0.png",
+   "drift_m": 0.0002,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0439,
+   "seg_pixels": 4520,
+   "aabb_extent": [
+    0.06,
+    0.06,
+    0.088
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/beer_glass__rxscji__y1.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0439
+  }
+ },
+ "stable": true,
+ "visible": true
+}

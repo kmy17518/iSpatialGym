@@ -1,0 +1,446 @@
+{
+ "group": "IORS__french_fries__r1",
+ "task": "IORS",
+ "category": "french_fries",
+ "round": 1,
+ "relation": "under",
+ "partner": "platter under fries (fries grasped)",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "jhskfy",
+   "key": "french_fries__jhskfy__s",
+   "strip": "/tmp/glib/strips/french_fries__jhskfy__s.png",
+   "n_valid": 1,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "penetration"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "fingers closed to 4 mm on 15 mm fry; pads inside mesh"
+    }
+   ],
+   "object_note": "collision hull much thinner than scaled visual mesh",
+   "bbox_mm": [
+    83,
+    10,
+    8
+   ],
+   "scale": [
+    1.0,
+    2.055,
+    2.56
+   ],
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "nfgqwu",
+   "key": "french_fries__nfgqwu__s",
+   "strip": "/tmp/glib/strips/french_fries__nfgqwu__s.png",
+   "n_valid": 3,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "end_grasp"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "lengthwise squeeze on both tips of 8 cm fry; coverage 0.25"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "lengthwise squeeze on both tips; coverage 0.00"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "lengthwise squeeze on both tips; coverage 0.00"
+    }
+   ],
+   "object_note": "all grasps pinch the thin fry end-to-end along its length with near-zero pad coverage",
+   "bbox_mm": [
+    82,
+    11,
+    8
+   ],
+   "scale": [
+    1.0,
+    1.891,
+    2.458
+   ],
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "uqsuef",
+   "key": "french_fries__uqsuef__s",
+   "strip": "/tmp/glib/strips/french_fries__uqsuef__s.png",
+   "n_valid": 1,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "penetration"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "fingers fully closed (0/0) through 15 mm fry"
+    }
+   ],
+   "object_note": "collision hull much thinner than scaled visual mesh",
+   "bbox_mm": [
+    82,
+    9,
+    8
+   ],
+   "scale": [
+    1.0,
+    2.155,
+    2.458
+   ],
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "xzsoub",
+   "key": "french_fries__xzsoub__s",
+   "strip": "/tmp/glib/strips/french_fries__xzsoub__s.png",
+   "n_valid": 3,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "penetration"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "closed 8 mm on 19 mm fry; pads sink in"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "closed 2 mm on 16 mm fry; pads sink in"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "closed 5 mm on 17 mm fry; pads sink in"
+    }
+   ],
+   "object_note": "collision hull much thinner than scaled visual mesh",
+   "bbox_mm": [
+    59,
+    9,
+    8
+   ],
+   "scale": [
+    1.0,
+    2.176,
+    2.414
+   ],
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "oeterg",
+   "key": "french_fries__oeterg__s",
+   "strip": "/tmp/glib/strips/french_fries__oeterg__s.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "cross-section pinch at middle; closed 11 mm on 16 mm, mild"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "short chunky fry squeezed lengthwise by ends; coverage 0.5"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "short chunky fry squeezed lengthwise by ends; coverage 0.5"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "short chunky fry squeezed lengthwise by ends; coverage 0.5"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "short chunky fry squeezed lengthwise by ends; coverage 0.5"
+    }
+   ],
+   "object_note": "48 mm chunk fills gripper at open limit (50/0); both pads on fry ends",
+   "bbox_mm": [
+    49,
+    11,
+    8
+   ],
+   "scale": [
+    1.0,
+    1.871,
+    2.385
+   ],
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "kxpfcj",
+   "key": "french_fries__kxpfcj__s",
+   "strip": "/tmp/glib/strips/french_fries__kxpfcj__s.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred cross-section pinch on fry"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fry squeezed lengthwise by its ends; coverage 0.5"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fry squeezed lengthwise by its ends; coverage 0.5"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fry squeezed lengthwise by its ends; coverage 0.5"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "cross-section pinch near middle, fry hangs along approach"
+    }
+   ],
+   "object_note": "grasps 2-4 hold the 65 mm fry end-to-end; non-optimal but both pads seated",
+   "bbox_mm": [
+    67,
+    12,
+    9
+   ],
+   "scale": [
+    1.0,
+    1.646,
+    2.306
+   ],
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "xshwvn",
+   "key": "french_fries__xshwvn__s",
+   "strip": "/tmp/glib/strips/french_fries__xshwvn__s.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred cross-section pinch on curved fry"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred cross-section pinch on curved fry"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred cross-section pinch on curved fry"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "curved fry squeezed lengthwise by its tips; coverage 0.5"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "curved fry squeezed lengthwise by tips; finger at open limit"
+    }
+   ],
+   "object_note": "grasps 4-5 hold banana-shaped fry end-to-end (44-50 mm); both pads on tips",
+   "bbox_mm": [
+    59,
+    9,
+    12
+   ],
+   "scale": [
+    1.0,
+    2.227,
+    1.618
+   ],
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "kjqhuo",
+   "key": "french_fries__kjqhuo__s",
+   "strip": "/tmp/glib/strips/french_fries__kjqhuo__s.png",
+   "n_valid": 3,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "penetration"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "closed 7 mm on 12 mm fry; pads sink in"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "closed 5 mm on 18 mm fry; coverage 0.25"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "closed 2 mm on 11 mm fry; pads sink in"
+    }
+   ],
+   "object_note": "collision hull much thinner than scaled visual mesh",
+   "bbox_mm": [
+    79,
+    14,
+    9
+   ],
+   "scale": [
+    1.0,
+    1.446,
+    2.117
+   ],
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "xlkkxg",
+   "key": "french_fries__xlkkxg__s",
+   "strip": "/tmp/glib/strips/french_fries__xlkkxg__s.png",
+   "n_valid": 1,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "penetration"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "closed 4 mm on 15 mm fry; attached only at step 36"
+    }
+   ],
+   "object_note": "collision hull much thinner than scaled visual mesh",
+   "bbox_mm": [
+    65,
+    12,
+    10
+   ],
+   "scale": [
+    1.0,
+    1.657,
+    1.991
+   ],
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": [
+  {
+   "model": "jvhnyc",
+   "key": "french_fries__jvhnyc",
+   "reason": "no AG-valid grasp"
+  },
+  {
+   "model": "rremmp",
+   "key": "french_fries__rremmp",
+   "reason": "no AG-valid grasp"
+  }
+ ]
+}

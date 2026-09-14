@@ -1,0 +1,10 @@
+{
+  "category": "box_of_cookies",
+  "n_models": 11,
+  "pages_opened": ["grids/same/box_of_cookies__p1.png", "grids/same/box_of_cookies__p2.png", "grids/same/box_of_cookies__p3.png"],
+  "groups": [],
+  "unusable": [
+    {"model": "swilxz", "reason": "octagonal teal tub with ice-cream lid print; reads as an ice-cream tub, not a cookie box"}
+  ],
+  "notes": "No look-alikes. Closest pair nirfva/sjcnoq: both red ~21x19x5 flat boxes with orange print, but sjcnoq has one big orange sunburst plus grey-white side panels, nirfva scattered cookies on red. jtalxs/hdgsxz share geometry but orange vs light-blue. nnflsz reports 0 px at yaw 0 although clearly rendered - check its segmentation id."
+}

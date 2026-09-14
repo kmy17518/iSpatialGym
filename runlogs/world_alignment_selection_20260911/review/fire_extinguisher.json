@@ -1,0 +1,75 @@
+{
+  "category": "fire_extinguisher",
+  "task": "wa1",
+  "n_models": 5,
+  "n_opened": 5,
+  "models": [
+    {
+      "model": "bejaeu",
+      "V": 4,
+      "U": 3,
+      "H": 1,
+      "score": 15,
+      "valid": true,
+      "front_axis": "+z",
+      "up_axis": "+x",
+      "thin_axis": "z",
+      "note": "Red 0.42 m extinguisher lying along x, valve and handle at +x, hose along -y side; clean textures, 15 cm deep."
+    },
+    {
+      "model": "inqyom",
+      "V": 4,
+      "U": 3,
+      "H": 0,
+      "score": 14,
+      "valid": false,
+      "front_axis": "+z",
+      "up_axis": "+x",
+      "thin_axis": "z",
+      "note": "Dark red 0.42 m extinguisher with gauge and hose, handle at +x; detailed but 18 cm deep, too thick for a wall."
+    },
+    {
+      "model": "jgdvdl",
+      "V": 3,
+      "U": 3,
+      "H": 1,
+      "score": 13,
+      "valid": true,
+      "front_axis": "+z",
+      "up_axis": "+x",
+      "thin_axis": "z",
+      "note": "Long 0.64 m body with squashed 22 x 14 cm cross-section and strap, nozzle at +x; geometry looks flattened."
+    },
+    {
+      "model": "noepez",
+      "V": 3,
+      "U": 3,
+      "H": 1,
+      "score": 13,
+      "valid": true,
+      "front_axis": "+z",
+      "up_axis": "+x",
+      "thin_axis": "z",
+      "note": "Duplicate of jgdvdl: 0.64 m flattened body, nozzle at +x."
+    },
+    {
+      "model": "xqtkxb",
+      "V": 3,
+      "U": 3,
+      "H": 1,
+      "score": 13,
+      "valid": true,
+      "front_axis": "+z",
+      "up_axis": "+x",
+      "thin_axis": "z",
+      "note": "Dark red 0.43 m extinguisher, visibly octagonal low-poly body, valve at +x, hose along -y; 13.5 cm deep."
+    }
+  ],
+  "picks": [
+    "bejaeu",
+    "xqtkxb"
+  ],
+  "alternate": "jgdvdl",
+  "category_verdict": "good",
+  "category_note": "Red cylinders 0.42-0.64 m long, 0.14-0.18 m deep; the handle end makes the upright obvious. Canonical frame lies along x (top = +x, seen face = +z) so the sampler must re-orient it; hangability is borderline (bracket-mounted cylinder, not flat)."
+}

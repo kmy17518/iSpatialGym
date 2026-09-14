@@ -1,0 +1,113 @@
+{
+ "scene": "hotel_suite_large",
+ "table": "ottoman_hnmndv_1",
+ "category": "ottoman",
+ "model": "hnmndv",
+ "rooms": [
+  "bedroom_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-3",
+ "inventory": {
+  "top_z": 0.472,
+  "bbox_x": 0.452,
+  "bbox_y": 1.474,
+  "bbox_z": 0.47,
+  "verdict": "low"
+ },
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 22:28:28",
+ "precheck": {
+  "aabb": [
+   [
+    -0.103,
+    -1.028,
+    -0.006
+   ],
+   [
+    0.401,
+    0.482,
+    0.51
+   ]
+  ],
+  "support": {
+   "name": "ottoman_hnmndv_1",
+   "z": 0.49512210488319397,
+   "yaw": -0.023223876953125,
+   "local_bounds": [
+    -0.05230531096458435,
+    0.3703441619873047,
+    -0.9986178874969482,
+    0.4075067639350891
+   ],
+   "n_free_cells": 1298,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     0.363,
+     -0.304
+    ],
+    "length": 1.406
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -0.059,
+     -0.294
+    ],
+    "length": 1.406
+   },
+   {
+    "name": "+v",
+    "mid": [
+     0.168,
+     0.404
+    ],
+    "length": 0.423
+   },
+   {
+    "name": "-v",
+    "mid": [
+     0.136,
+     -1.002
+    ],
+    "length": 0.423
+   }
+  ],
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    0.168439581990242,
+    0.4037041664123535
+   ],
+   "inward": [
+    -0.023221788927912712,
+    -0.9997303485870361
+   ],
+   "tangent": [
+    0.9997303485870361,
+    -0.023221788927912712
+   ],
+   "base_pose2d": [
+    0.1808343231678009,
+    0.9373148083686829,
+    -1.5940202030452808
+   ],
+   "edge_depth": 0.5337545871734619,
+   "view": {
+    "translate": 0.5,
+    "tilt": -0.7999999523162842,
+    "axis_angle": 0.020876900929954353
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.7
+ },
+ "status": "skipped",
+ "reason": "inter_object_relation_satisfaction-0 found no stance / no reachable cell on the support top at any stand-off"
+}

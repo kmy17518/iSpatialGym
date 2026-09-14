@@ -1,0 +1,53 @@
+{
+  "group": "mental_rotation__high_heel__r3",
+  "task": "mental_rotation",
+  "category": "high_heel",
+  "round": 3,
+  "relation": null,
+  "n_candidates": 2,
+  "n_opened": 2,
+  "candidates": [
+    {
+      "model": "omckzr",
+      "key": "high_heel__omckzr__f",
+      "G": 4,
+      "T": 3,
+      "V": 4,
+      "R": 1,
+      "score": 20,
+      "note": "Five clean heel-post pinches (24-32 mm, antipodal 0.94-0.98), shoe hangs stably in two pose clusters; glossy black strappy sandal, brown sole, faceting; finger at 0."
+    },
+    {
+      "model": "htqifz",
+      "key": "high_heel__htqifz__f",
+      "G": 4,
+      "T": 3,
+      "V": 4,
+      "R": 1,
+      "score": 20,
+      "note": "Same shoe asset; five clean heel-post pinches (24-28 mm, antipodal 0.92-0.99), poses in two clusters (tilt 88-123), shoe hangs stably; one finger closes to 0."
+    }
+  ],
+  "selected": [
+    {
+      "model": "omckzr",
+      "key": "high_heel__omckzr__f",
+      "rank": 1,
+      "reason": "Tied on score; marginally wider heel contact, higher GraspGen confidence and slightly broader tilt range across five clean heel grasps on a clean recognisable sandal."
+    },
+    {
+      "model": "htqifz",
+      "key": "high_heel__htqifz__f",
+      "rank": 2,
+      "reason": "Only other candidate; equally clean heel-post grasps with full coverage and stable hang, same well-textured asset, so it is a safe second instance."
+    }
+  ],
+  "alternate": null,
+  "short": true,
+  "warnings": [
+    "Group has only 2 candidates; both selected.",
+    "Both models appear to be the same black strappy heel (identical bbox 197 x 84 x 181 mm); the pair adds no appearance variety.",
+    "All grasps pinch only the heel post 62-70 mm from CoM (handle-like), with one finger closing to 0 mm on every row; diversity comes only from tilt, not contact region."
+  ],
+  "confidence": "medium"
+}

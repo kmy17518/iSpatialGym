@@ -1,0 +1,33 @@
+{
+  "category": "box_of_fruit",
+  "task": "obst",
+  "n_models": 2,
+  "n_opened": 2,
+  "models": [
+    {
+      "model": "box_of_fruit/jsgbcz",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Brown cardboard produce box with Chinese fruit print, 0.40 x 0.53 x 0.15 m; small white blob on one side; only 15 cm tall."
+    },
+    {
+      "model": "box_of_fruit/jzfgwc",
+      "V": 5,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 17,
+      "valid": true,
+      "note": "White fruit-print gift carton 'Quality Fruit', 0.39 x 0.58 x 0.15 m; sharp textures, mirrored text on one side; only 15 cm tall."
+    }
+  ],
+  "picks": ["box_of_fruit/jzfgwc", "box_of_fruit/jsgbcz"],
+  "alternate": null,
+  "natural_scenes": ["house_single_floor", "house_double_floor_lower", "Rs_int", "restaurant_diner"],
+  "category_verdict": "weak",
+  "category_note": "Flat printed produce/gift cartons ~0.4 x 0.55 x 0.15 m, both clean and lying flat; natural as cardboard boxes in kitchen, garage or diner kitchen, but only 15 cm tall so size is borderline for both."
+}

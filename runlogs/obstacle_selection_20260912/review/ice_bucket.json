@@ -1,0 +1,30 @@
+{
+  "category": "ice_bucket",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "vlurir",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Grey galvanised metal pail with two ring handles, tapered, 0.34 x 0.41 x 0.39 m, flat bottom; reads as an ordinary bucket."
+    }
+  ],
+  "picks": [
+    "vlurir"
+  ],
+  "alternate": null,
+  "natural_scenes": [
+    "restaurant_diner",
+    "hotel_suite_large",
+    "house_single_floor",
+    "house_double_floor_lower"
+  ],
+  "category_verdict": "weak",
+  "category_note": "Single model: a plain metal bucket with ring handles, about 0.4 m wide and tall, stable; unremarkable as floor clutter in a diner, hotel or house. Only one model, so weak."
+}

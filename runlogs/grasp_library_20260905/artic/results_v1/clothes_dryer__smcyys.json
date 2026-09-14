@@ -1,0 +1,35 @@
+{
+ "key": "clothes_dryer__smcyys",
+ "category": "clothes_dryer",
+ "model": "smcyys",
+ "scene": "house_single_floor",
+ "host": "clothes_dryer_xsuyua_0",
+ "host_rank": 0,
+ "host_model": "xsuyua",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_dof_rootd_aa001_r",
+   "kind": "door",
+   "grasp_source": "review: No handle; raised ring rim sits against the front panel, no clearance behind it. Vertical block right of the door is cabinet latch hardware",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.189,
+  0.985,
+  1.181
+ ],
+ "time_s": 4.6
+}

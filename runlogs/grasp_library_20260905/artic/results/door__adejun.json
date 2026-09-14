@@ -1,0 +1,16 @@
+{
+ "key": "door__adejun",
+ "category": "door",
+ "model": "adejun",
+ "scene": "restaurant_diner",
+ "host": "door_cvvumy_0",
+ "host_rank": 2,
+ "host_model": "cvvumy",
+ "swap": true,
+ "joints": [],
+ "error": "RuntimeError('swap skipped: host/test aspect mismatch, scale factors [7.95, 0.1, 0.81]')",
+ "previous_hosts": [
+  "door_mkcndz_0",
+  "door_adejun_0"
+ ]
+}

@@ -1,0 +1,2947 @@
+{
+ "address": [
+  {
+   "task": "world_alignment-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "antlers": [
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "apple": [
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "axe": [
+  {
+   "task": "world_alignment-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "baby_shoe": [
+  {
+   "task": "mental_rotation-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "bag_of_chips": [
+  {
+   "task": "world_alignment-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "baguette": [
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "banana": [
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "bar_soap": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "baseball_bat": [
+  {
+   "task": "world_alignment-2",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "beaker": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "bed": [
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "beefsteak_tomato": [
+  {
+   "task": "object_scaling-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "beer_glass": [
+  {
+   "task": "inter_object_relation_satisfaction",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 2,
+   "role": "partner"
+  }
+ ],
+ "beeswax_candle": [
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "bell_pepper": [
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "blackberry": [
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "male"
+  }
+ ],
+ "blender": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "board_game": [
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 1,
+   "role": "spec:partner"
+  },
+  {
+   "task": "world_alignment-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "bookcase_baseboard": [
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "male"
+  }
+ ],
+ "bookcase_side": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "partner"
+  }
+ ],
+ "bottle_of_beer": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "spec:target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "bottle_of_black_pepper": [
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "bottle_of_catsup": [
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "bottle_of_essential_oil": [
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "bottle_of_medicine": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 2,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "bottle_of_milk": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "bottle_of_olive_oil": [
+  {
+   "task": "object_scaling-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "bottle_of_pop": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "bottle_of_sake": [
+  {
+   "task": "object_scaling-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "bottle_of_salsa": [
+  {
+   "task": "object_scaling-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "bottle_of_shampoo": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "bottle_of_supplements": [
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "bottle_of_water": [
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "bottle_of_wine": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "bottom_cabinet": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "bottom_cabinet_no_top": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 1,
+   "role": "artic"
+  }
+ ],
+ "bow": [
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "bowl": [
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 1,
+   "role": "spec:partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 2,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 3,
+   "role": "partner"
+  }
+ ],
+ "box_of_baking_mix": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  }
+ ],
+ "box_of_baking_powder": [
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "box_of_butter": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "box_of_cane_sugar": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  }
+ ],
+ "box_of_cereal": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "spec:target"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "box_of_coffee": [
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "box_of_cookies": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 2,
+   "role": "partner"
+  }
+ ],
+ "box_of_granola_bars": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "box_of_oatmeal": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "box_of_rice": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "box_of_sanitary_napkins": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "box_of_shampoo": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  }
+ ],
+ "box_of_tissues": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 2,
+   "role": "partner"
+  }
+ ],
+ "box_of_vegetable_juice": [
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "box_of_yogurt": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  }
+ ],
+ "boxed_ink_cartridge": [
+  {
+   "task": "world_alignment-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "briefcase": [
+  {
+   "task": "inter_object_relation_satisfaction",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "brussels_sprouts": [
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "bush": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "partner"
+  }
+ ],
+ "cabinet_base": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "partner"
+  }
+ ],
+ "cabinet_door": [
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "male"
+  }
+ ],
+ "calculator": [
+  {
+   "task": "world_alignment-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "can_of_baking_mix": [
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 1,
+   "role": "spec:target"
+  }
+ ],
+ "can_of_soda": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "candle_holder": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "canned_food": [
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 2,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 2,
+   "role": "partner"
+  }
+ ],
+ "cap": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "male"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "spec:male"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "carrot": [
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "carton": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 1,
+   "role": "artic"
+  }
+ ],
+ "carton_of_eggs": [
+  {
+   "task": "world_alignment-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "carton_of_milk": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "carving_knife": [
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "catalog": [
+  {
+   "task": "world_alignment-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "cedar_chest": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "cellulose_tape": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  }
+ ],
+ "cellulose_tape_dispenser": [
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "cherry_tomato": [
+  {
+   "task": "inter_object_relation_satisfaction",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "chili": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "chopping_board": [
+  {
+   "task": "world_alignment-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "cinnamon_stick": [
+  {
+   "task": "inter_object_relation_satisfaction",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "cleaver": [
+  {
+   "task": "mental_rotation-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "clipboard": [
+  {
+   "task": "world_alignment-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "clothes_dryer": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "coaster": [
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "coffee_cup": [
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "cola_bottle": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "colored_pencil": [
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "comic_book": [
+  {
+   "task": "world_alignment-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "conditioner_dispenser": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "cookie_cutter": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "cooler": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "cork": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "male"
+  }
+ ],
+ "couch": [
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "countertop": [
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 2,
+   "role": "partner"
+  }
+ ],
+ "crab": [
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "cutting_board": [
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 3,
+   "role": "partner"
+  }
+ ],
+ "dartboard": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "world_alignment-1",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "decorative_sign": [
+  {
+   "task": "world_alignment-1",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "world_alignment-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "desk": [
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "digital_scale": [
+  {
+   "task": "world_alignment-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "dip_candle": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "male"
+  }
+ ],
+ "dishwasher": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "door": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 1,
+   "role": "artic"
+  },
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "drill": [
+  {
+   "task": "mental_rotation-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "drumstick": [
+  {
+   "task": "world_alignment-2",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "fire_alarm": [
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "fire_extinguisher": [
+  {
+   "task": "world_alignment-1",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "first_aid_kit": [
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 3,
+   "role": "partner"
+  },
+  {
+   "task": "world_alignment-1",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "fishing_rod": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "partner"
+  }
+ ],
+ "french_fries": [
+  {
+   "task": "inter_object_relation_satisfaction",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "fridge": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 1,
+   "role": "artic"
+  }
+ ],
+ "frying_pan": [
+  {
+   "task": "world_alignment-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "gaming_controller": [
+  {
+   "task": "mental_rotation-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "garlic_clove": [
+  {
+   "task": "inter_object_relation_satisfaction",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "ginger_root": [
+  {
+   "task": "mental_rotation-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "guitar": [
+  {
+   "task": "world_alignment-1",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "world_alignment-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "gym_shoe": [
+  {
+   "task": "world_alignment-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "half_bagel": [
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "half_lime": [
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "hammer": [
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "hanger": [
+  {
+   "task": "world_alignment-1",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "world_alignment-2",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "hard_candy": [
+  {
+   "task": "inter_object_relation_satisfaction",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "hardback": [
+  {
+   "task": "world_alignment-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "high_heel": [
+  {
+   "task": "mental_rotation-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "hinged_jar": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 1,
+   "role": "artic"
+  }
+ ],
+ "hingeless_jar": [
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "holly_decoration": [
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "male"
+  }
+ ],
+ "hook": [
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "ice_cube": [
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "jar_of_bath_salt": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "jar_of_chilli_powder": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "jar_of_grains": [
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "jar_of_pepper_seasoning": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "jar_of_spaghetti_sauce": [
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "jar_of_tumeric": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "kettle": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "keyboard": [
+  {
+   "task": "world_alignment-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "world_alignment-0",
+   "round": 1,
+   "role": "spec:target"
+  }
+ ],
+ "kitchen_analog_scale": [
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "laptop": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "lemon": [
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 1,
+   "role": "spec:target"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "lemonade_bottle": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "spec:female"
+  }
+ ],
+ "letter": [
+  {
+   "task": "world_alignment-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "license_plate": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "world_alignment-1",
+   "round": 2,
+   "role": "target"
+  },
+  {
+   "task": "world_alignment-2",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "lid": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "male"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "light_bulb": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "male"
+  }
+ ],
+ "lily": [
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "magazine": [
+  {
+   "task": "world_alignment-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "mallet": [
+  {
+   "task": "mental_rotation-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "marker": [
+  {
+   "task": "inter_object_relation_satisfaction",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "menu": [
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "monitor": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "mouse": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "mug": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "newspaper": [
+  {
+   "task": "world_alignment-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "notebook": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "world_alignment-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "notepad": [
+  {
+   "task": "world_alignment-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "openable_window": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "orange": [
+  {
+   "task": "object_scaling-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "oven": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 1,
+   "role": "artic"
+  }
+ ],
+ "pack_of_cigarettes": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "pack_of_kielbasa": [
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 1,
+   "role": "spec:target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "painting": [
+  {
+   "task": "world_alignment-1",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "world_alignment-1",
+   "round": 1,
+   "role": "spec:target"
+  }
+ ],
+ "paper_cup": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "paper_towel_dispenser": [
+  {
+   "task": "world_alignment-1",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "paperback_book": [
+  {
+   "task": "world_alignment-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "parsnip": [
+  {
+   "task": "inter_object_relation_satisfaction",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "pear": [
+  {
+   "task": "object_scaling-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "pen": [
+  {
+   "task": "inter_object_relation_satisfaction",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "pencil": [
+  {
+   "task": "inter_object_relation_satisfaction",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "pencil_case": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  }
+ ],
+ "pencil_holder": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "pepper_shaker": [
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 3,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 3,
+   "role": "partner"
+  }
+ ],
+ "pickle": [
+  {
+   "task": "inter_object_relation_satisfaction",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "picture": [
+  {
+   "task": "world_alignment-1",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "world_alignment-2",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "picture_frame": [
+  {
+   "task": "world_alignment-1",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "pine_cone": [
+  {
+   "task": "object_scaling-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "plate": [
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 2,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 3,
+   "role": "partner"
+  }
+ ],
+ "platter": [
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 1,
+   "role": "spec:partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 3,
+   "role": "partner"
+  }
+ ],
+ "pop_case": [
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "poster": [
+  {
+   "task": "world_alignment-1",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "potato": [
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "quartz": [
+  {
+   "task": "inter_object_relation_satisfaction",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "radiator": [
+  {
+   "task": "world_alignment-2",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "recreational_vehicle": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "partner"
+  }
+ ],
+ "recycling_bin": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "rolling_pin": [
+  {
+   "task": "world_alignment-2",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "ruler": [
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "world_alignment-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "rum_bottle": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "salt_shaker": [
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 3,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 3,
+   "role": "partner"
+  }
+ ],
+ "sandal": [
+  {
+   "task": "inter_object_relation_satisfaction",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "saucepot": [
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "saucer": [
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 2,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 2,
+   "role": "partner"
+  }
+ ],
+ "shampoo_dispenser": [
+  {
+   "task": "inter_object_relation_satisfaction",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "shelf": [
+  {
+   "task": "world_alignment-2",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "shiitake": [
+  {
+   "task": "object_scaling-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "signpost": [
+  {
+   "task": "world_alignment-1",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "world_alignment-2",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "skateboard_deck": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "partner"
+  }
+ ],
+ "skateboard_wheel_assembly": [
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "male"
+  }
+ ],
+ "sliding_door": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "soap_dispenser": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "soda_cup": [
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "soda_water_bottle": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  }
+ ],
+ "soup_ladle": [
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 1,
+   "role": "spec:partner"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 2,
+   "role": "partner"
+  }
+ ],
+ "spatula": [
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 1,
+   "role": "spec:target"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "spray_can": [
+  {
+   "task": "object_scaling-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "stapler": [
+  {
+   "task": "mental_rotation-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "star_anise": [
+  {
+   "task": "inter_object_relation_satisfaction-3",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "statue": [
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "sunflower": [
+  {
+   "task": "inter_object_relation_satisfaction",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "table_lamp": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "tablefork": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "tablespoon": [
+  {
+   "task": "mental_rotation-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "teacup": [
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 2,
+   "role": "target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "teapot": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-4",
+   "round": 3,
+   "role": "partner"
+  }
+ ],
+ "teaspoon": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "tennis_ball": [
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "tomato_paste_can": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  }
+ ],
+ "tongs": [
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "toolbox": [
+  {
+   "task": "configuration_matching-1",
+   "round": 1,
+   "role": "spec:artic"
+  },
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 1,
+   "role": "artic"
+  },
+  {
+   "task": "configuration_matching-2",
+   "round": 1,
+   "role": "spec:artic"
+  },
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "toothbrush": [
+  {
+   "task": "mental_rotation-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "top_cabinet": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 1,
+   "role": "artic"
+  }
+ ],
+ "tortilla_chips": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  }
+ ],
+ "towel_rack": [
+  {
+   "task": "world_alignment-1",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "world_alignment-2",
+   "round": 1,
+   "role": "spec:target"
+  },
+  {
+   "task": "world_alignment-2",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "toy_dice": [
+  {
+   "task": "configuration_matching-0",
+   "round": 1,
+   "role": "blocks"
+  },
+  {
+   "task": "configuration_matching-0",
+   "round": 1,
+   "role": "spec:blocks"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  },
+  {
+   "task": "object_scaling-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "toy_figure": [
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 1,
+   "role": "spec:target"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "spec:target"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "tray": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "tray_source"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "tray_dest"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "spec:tray_source"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "spec:tray_dest"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 3,
+   "role": "partner"
+  }
+ ],
+ "trout": [
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 3,
+   "role": "male"
+  }
+ ],
+ "umbrella": [
+  {
+   "task": "world_alignment-2",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "world_alignment-1",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "under": [
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 2,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-1",
+   "round": 3,
+   "role": "partner"
+  }
+ ],
+ "valentine_wreath": [
+  {
+   "task": "world_alignment-1",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "vase": [
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 1,
+   "role": "partner"
+  },
+  {
+   "task": "inter_object_relation_satisfaction-2",
+   "round": 3,
+   "role": "partner"
+  }
+ ],
+ "vegetable_peeler": [
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "vidalia_onion": [
+  {
+   "task": "object_scaling-0",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "video_game": [
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "same_category_pool"
+  },
+  {
+   "task": "disembedding-0",
+   "round": 1,
+   "role": "distractor_pool"
+  }
+ ],
+ "vinegar_bottle": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "violin_case": [
+  {
+   "task": "configuration_matching-1/-2",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "walker": [
+  {
+   "task": "mental_rotation-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "wall_clock": [
+  {
+   "task": "world_alignment-1",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "wall_mounted_tv": [
+  {
+   "task": "world_alignment-2",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "wall_nail": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  }
+ ],
+ "water_bottle": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  }
+ ],
+ "webcam": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "male"
+  },
+  {
+   "task": "mental_rotation-0",
+   "round": 2,
+   "role": "target"
+  }
+ ],
+ "whiteboard": [
+  {
+   "task": "world_alignment-2",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "world_alignment-1",
+   "round": 3,
+   "role": "target"
+  }
+ ],
+ "wine_bottle": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "female"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "partner"
+  }
+ ],
+ "wineglass": [
+  {
+   "task": "object_scaling-0",
+   "round": 1,
+   "role": "target"
+  }
+ ],
+ "wreath": [
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "target"
+  },
+  {
+   "task": "configuration_matching-3",
+   "round": 1,
+   "role": "male"
+  }
+ ]
+}

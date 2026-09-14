@@ -1,0 +1,206 @@
+{
+ "group": "object_scaling__soda_cup__r1",
+ "task": "object_scaling",
+ "category": "soda_cup",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. Rotationally symmetric bodies are preferred for this task.",
+ "candidates": [
+  {
+   "model": "vicaqs",
+   "key": "soda_cup__vicaqs",
+   "strip": "/tmp/glib/strips/soda_cup__vicaqs.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 4,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch of body, both pads closed (43/27)"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch near base, 41/27"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/9: cup pressed against fully open pad"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch near base, 43/24"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on base end, both pads closed (40/27)"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    78,
+    78,
+    129
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "gnzegv",
+   "key": "soda_cup__gnzegv",
+   "strip": "/tmp/glib/strips/soda_cup__gnzegv.png",
+   "n_valid": 1,
+   "n_clean": 1,
+   "n_clean_strict": 1,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "base-end pinch on tall cup, ~35 mm pad overlap"
+    }
+   ],
+   "object_note": "only 1/12 candidates valid",
+   "bbox_mm": [
+    82,
+    82,
+    157
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "fsfsas",
+   "key": "soda_cup__fsfsas",
+   "strip": "/tmp/glib/strips/soda_cup__fsfsas.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "base-side pinch on tapered cup, fingertip contact"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "base-side pinch on tapered cup"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "base-side pinch, near symmetric"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across body near base"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tilted base-side pinch"
+    }
+   ],
+   "object_note": "tapered cup: parallel pads touch only at fingertips; width metric unreliable",
+   "bbox_mm": [
+    92,
+    92,
+    106
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "lpanoc",
+   "key": "soda_cup__lpanoc",
+   "strip": "/tmp/glib/strips/soda_cup__lpanoc.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 1,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/27: one pad never moved, cup off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/21: one pad never moved"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 48/23: off-centre pinch on 40 mm base"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "symmetric 41/28 pinch on tapered body"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/26: one pad never moved"
+    }
+   ],
+   "object_note": "4/5 grasps show the 50/small closure signature; tapered cup, pads meet flare",
+   "bbox_mm": [
+    92,
+    92,
+    106
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

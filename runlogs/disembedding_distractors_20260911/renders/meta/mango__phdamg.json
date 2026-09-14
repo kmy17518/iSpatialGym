@@ -1,0 +1,35 @@
+{
+ "category": "mango",
+ "model": "phdamg",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/mango__phdamg__y0.png",
+   "drift_m": 0.0134,
+   "tilt_deg": 18.0,
+   "on_tray": true,
+   "settled_z": 0.0398,
+   "seg_pixels": 6779,
+   "aabb_extent": [
+    0.119,
+    0.103,
+    0.09
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/mango__phdamg__y1.png",
+   "drift_m": 0.0148,
+   "tilt_deg": 17.9,
+   "on_tray": true,
+   "settled_z": 0.0398
+  }
+ },
+ "stable": true,
+ "visible": true
+}

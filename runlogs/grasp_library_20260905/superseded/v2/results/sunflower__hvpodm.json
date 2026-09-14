@@ -1,0 +1,19 @@
+{
+ "task": "IORS",
+ "category": "sunflower",
+ "model": "hvpodm",
+ "key": "sunflower__hvpodm",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "flower_stem_top",
+ "bbox": [
+  0.19879563903808595,
+  0.08001815032958984,
+  0.07212691497802734
+ ],
+ "ready": true,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

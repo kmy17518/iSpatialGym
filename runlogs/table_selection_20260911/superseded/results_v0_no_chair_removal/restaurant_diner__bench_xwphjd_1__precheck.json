@@ -1,0 +1,70 @@
+{
+ "scene": "restaurant_diner",
+ "table": "bench_xwphjd_1",
+ "rooms": [
+  "dining_room_0"
+ ],
+ "aabb": [
+  [
+   0.049,
+   1.537,
+   -0.005
+  ],
+  [
+   1.294,
+   2.21,
+   0.956
+  ]
+ ],
+ "support": {
+  "name": "bench_xwphjd_1",
+  "z": 0.39706292748451233,
+  "yaw": 1.5707964897155762,
+  "local_bounds": [
+   1.6472939252853394,
+   2.1872940063476562,
+   -1.2788186073303223,
+   -0.058818500488996506
+  ],
+  "n_free_cells": 1427,
+  "occupants": [],
+  "resolution": 0.02
+ },
+ "edges": [
+  {
+   "name": "+u",
+   "mid": [
+    0.669,
+    2.187
+   ],
+   "length": 1.22
+  },
+  {
+   "name": "-u",
+   "mid": [
+    0.669,
+    1.647
+   ],
+   "length": 1.22
+  },
+  {
+   "name": "+v",
+   "mid": [
+    0.059,
+    1.917
+   ],
+   "length": 0.54
+  },
+  {
+   "name": "-v",
+   "mid": [
+    1.279,
+    1.917
+   ],
+   "length": 0.54
+  }
+ ],
+ "stance": null,
+ "stance_error": "[stance_collision] untucked: [stance_collision] no collision-free viewing trunk configuration (29 candidates); ready: [no_stance] no collision-free stance around bench_xwphjd_1",
+ "precheck_s": 7.7
+}

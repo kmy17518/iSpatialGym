@@ -1,0 +1,20 @@
+{
+  "key": "dishwasher__dngvvi",
+  "category": "dishwasher",
+  "model": "dngvvi",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_0",
+      "kind": "flap",
+      "chosen": "F",
+      "pinch": "edge",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "No handle, flat panel; pinch door top edge (43 mm) from above, rear finger needs clearance behind it. Bottom hinge, folds toward viewer.",
+      "height_concern": "",
+      "confidence": "low"
+    }
+  ],
+  "object_note": "Handle-less integrated door; top edge is level with cabinet top, so clearance behind it is uncertain at strip resolution. Red dot top-right is a model feature."
+}

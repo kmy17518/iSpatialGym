@@ -1,0 +1,90 @@
+{
+ "scene": "hotel_suite_large",
+ "table": "nightstand_maeowc_0",
+ "category": "nightstand",
+ "model": "maeowc",
+ "rooms": [
+  "bedroom_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-4",
+ "inventory": {
+  "top_z": 0.451,
+  "bbox_x": 0.512,
+  "bbox_y": 0.616,
+  "bbox_z": 0.451,
+  "verdict": "low"
+ },
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 22:24:33",
+ "precheck": {
+  "aabb": [
+   [
+    -2.253,
+    -3.97,
+    -0.01
+   ],
+   [
+    -1.737,
+    -3.348,
+    0.448
+   ]
+  ],
+  "support": {
+   "name": "nightstand_maeowc_0",
+   "z": 0.44722843170166016,
+   "yaw": -0.00039005279541015625,
+   "local_bounds": [
+    -2.2420690059661865,
+    -1.7418352365493774,
+    -3.9612560272216797,
+    -3.3610610961914062
+   ],
+   "n_free_cells": 769,
+   "occupants": [
+    "table_lamp_uzrovn_1"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -1.743,
+     -3.66
+    ],
+    "length": 0.6
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -2.243,
+     -3.66
+    ],
+    "length": 0.6
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -1.993,
+     -3.36
+    ],
+    "length": 0.5
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -1.993,
+     -3.96
+    ],
+    "length": 0.5
+   }
+  ],
+  "stance": null,
+  "stance_error": "[stance_collision] untucked: [no_stance] no collision-free stance around nightstand_maeowc_0",
+  "precheck_s": 1.3
+ },
+ "status": "skipped",
+ "reason": "inter_object_relation_satisfaction-0 found no stance around the support at any stand-off (precheck: no stance either)"
+}

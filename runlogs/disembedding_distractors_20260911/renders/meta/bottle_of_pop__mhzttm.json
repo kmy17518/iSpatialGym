@@ -1,0 +1,53 @@
+{
+ "category": "bottle_of_pop",
+ "model": "mhzttm",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0,
+  180.0,
+  270.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_pop__mhzttm__y0.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0732,
+   "seg_pixels": 6902,
+   "aabb_extent": [
+    0.062,
+    0.062,
+    0.17
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_pop__mhzttm__y1.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.0733
+  },
+  "y2": {
+   "yaw_deg": 180.0,
+   "png": "renders/bottle_of_pop__mhzttm__y2.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0733
+  },
+  "y3": {
+   "yaw_deg": 270.0,
+   "png": "renders/bottle_of_pop__mhzttm__y3.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0733
+  }
+ },
+ "stable": true,
+ "visible": true
+}

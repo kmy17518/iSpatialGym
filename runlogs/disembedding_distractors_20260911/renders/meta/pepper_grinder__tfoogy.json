@@ -1,0 +1,35 @@
+{
+ "category": "pepper_grinder",
+ "model": "tfoogy",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/pepper_grinder__tfoogy__y0.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 0.4,
+   "on_tray": true,
+   "settled_z": 0.0637,
+   "seg_pixels": 3781,
+   "aabb_extent": [
+    0.044,
+    0.045,
+    0.141
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/pepper_grinder__tfoogy__y1.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 0.4,
+   "on_tray": true,
+   "settled_z": 0.0637
+  }
+ },
+ "stable": true,
+ "visible": true
+}

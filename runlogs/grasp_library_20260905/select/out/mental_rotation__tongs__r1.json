@@ -1,0 +1,27 @@
+{
+  "group": "mental_rotation__tongs__r1",
+  "task": "mental_rotation",
+  "category": "tongs",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 3,
+  "n_opened": 3,
+  "candidates": [
+    {"model": "gbjqyn", "key": "tongs__gbjqyn", "G": 4, "T": 3, "V": 3, "R": 1, "score": 18,
+     "note": "Thin wire-style tongs, flat light-grey finish; all rows one finger at 0, widths 5-18 mm, antipodal 0.52-0.67 rows 2-5; row 2 marginal."},
+    {"model": "igsklx", "key": "tongs__igsklx", "G": 5, "T": 3, "V": 3, "R": 1, "score": 20,
+     "note": "Flat paddle tongs, plain light-grey (likely untextured); 5 clean central pinches across both arms, 17-21 mm, antipodal/coverage 1.00, varied positions; one finger at 0."},
+    {"model": "rcpjld", "key": "tongs__rcpjld", "G": 5, "T": 3, "V": 4, "R": 1, "score": 22,
+     "note": "Small spoon-ended serving tongs (130 mm), textured grey-beige with logo; 5 clean hinge pinches at 15-16 mm, tilts 13-177 diverse; one finger at 0."}
+  ],
+  "selected": [
+    {"model": "rcpjld", "key": "tongs__rcpjld", "rank": 1,
+     "reason": "Highest score: five clean, well-opposed hinge pinches with varied in-hand orientation; the only clearly textured asset (logo, shading); width 16 mm adequate."},
+    {"model": "igsklx", "key": "tongs__igsklx", "rank": 2,
+     "reason": "Within 2 points of gbjqyn but stronger G (5 vs 4) and R; five perfect-contact central pinches along the arms; flat paddle shape contrasts with spoon-ended #1; finish looks untextured."}
+  ],
+  "alternate": {"model": "gbjqyn", "key": "tongs__gbjqyn"},
+  "short": false,
+  "warnings": ["igsklx and gbjqyn render as plain light grey - materials may be missing."],
+  "confidence": "medium"
+}

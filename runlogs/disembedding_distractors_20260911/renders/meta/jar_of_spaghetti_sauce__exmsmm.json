@@ -1,0 +1,35 @@
+{
+ "category": "jar_of_spaghetti_sauce",
+ "model": "exmsmm",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/jar_of_spaghetti_sauce__exmsmm__y0.png",
+   "drift_m": 0.0031,
+   "tilt_deg": 2.6,
+   "on_tray": true,
+   "settled_z": 0.061,
+   "seg_pixels": 9980,
+   "aabb_extent": [
+    0.087,
+    0.087,
+    0.13
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/jar_of_spaghetti_sauce__exmsmm__y1.png",
+   "drift_m": 0.0044,
+   "tilt_deg": 2.8,
+   "on_tray": true,
+   "settled_z": 0.0609
+  }
+ },
+ "stable": true,
+ "visible": true
+}

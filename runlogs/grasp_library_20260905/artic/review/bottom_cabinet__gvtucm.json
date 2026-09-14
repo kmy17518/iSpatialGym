@@ -1,0 +1,17 @@
+{
+  "key": "bottom_cabinet__gvtucm",
+  "category": "bottom_cabinet",
+  "model": "gvtucm",
+  "strip_opened": true,
+  "joints": [
+    {"joint": "j_link_0", "kind": "drawer", "chosen": "none", "pinch": "none", "motion": "slide",
+     "graspable": false, "handle_description": "Flush wooden sliding-door panel (upper left, inner track); no handle, top edge runs hidden inside the frame track, F marker occluded", "height_concern": "", "confidence": "high"},
+    {"joint": "j_link_1", "kind": "drawer", "chosen": "none", "pinch": "none", "motion": "slide",
+     "graspable": false, "handle_description": "Flush wooden sliding-door panel (upper right, outer track); no handle, top edge enclosed, free vertical edge only ~11 mm proud of neighbour panel", "height_concern": "", "confidence": "high"},
+    {"joint": "j_link_2", "kind": "drawer", "chosen": "none", "pinch": "none", "motion": "slide",
+     "graspable": false, "handle_description": "Flush wooden sliding-door panel (lower right, outer track); no handle, top edge hidden under the middle rail", "height_concern": "", "confidence": "high"},
+    {"joint": "j_link_3", "kind": "drawer", "chosen": "none", "pinch": "none", "motion": "slide",
+     "graspable": false, "handle_description": "Flush wooden sliding-door panel (lower left, inner track); no handle, top edge hidden under the middle rail, nothing to pinch", "height_concern": "", "confidence": "high"}
+  ],
+  "object_note": "Not drawers: four handle-less sliding door panels (two overlapping tracks per row) moving along y; all edges enclosed by the frame; heuristic correctly ungraspable. Small middle drawers are fixed base."
+}

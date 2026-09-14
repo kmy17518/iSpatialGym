@@ -1,0 +1,15 @@
+{
+  "category": "soil_bag",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {"model": "soil_bag/gzcqwx", "V": 4, "N": 2, "S": 2, "rest_ok": true, "score": 14, "valid": true,
+     "note": "Brown burlap sack with rolled-down open top and grey SOIL label, 0.27 x 0.37 x 0.24 m; same mesh as flour_sack/petfood_bag, flat base."}
+  ],
+  "picks": ["soil_bag/gzcqwx"],
+  "alternate": null,
+  "natural_scenes": ["house_single_floor", "house_double_floor_lower"],
+  "category_verdict": "weak",
+  "category_note": "Single open sack ~0.37 m wide, 0.24 m tall, stable. Plausible garage/garden-door clutter in the houses but odd in living areas and usually against a wall; generic labelled sack shared with two other categories. One model only."
+}

@@ -1,0 +1,25 @@
+{
+ "scene": "hotel_suite_large",
+ "table": "shelf_aqtmhm_0",
+ "category": "shelf",
+ "model": "aqtmhm",
+ "rooms": [
+  "bedroom_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.907,
+  "bbox_x": 0.46,
+  "bbox_y": 2.292,
+  "bbox_z": 0.098,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:53:48",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

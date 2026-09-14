@@ -1,0 +1,33 @@
+{
+  "category": "signpost",
+  "task": "wa1",
+  "n_models": 7,
+  "n_opened": 7,
+  "models": [
+    {"model": "axhlim", "V": 4, "U": 3, "H": 1, "score": 15, "valid": true,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "grey wall sign 0.16 x 0.22 m, 3 cm thick, blue header and text 'DIPOSITO PULITO' readable from +x; size borderline small"},
+    {"model": "ivvjfv", "V": 3, "U": 3, "H": 2, "score": 14, "valid": true,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "green EXIT sign 0.41 x 0.12 m, wedge profile 5 cm; clear text from +x, but back faces missing (outline only from -x)"},
+    {"model": "mexzmk", "V": 4, "U": 3, "H": 1, "score": 15, "valid": true,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "red fire-extinguisher pictogram sign 0.23 x 0.15 m with black mounting bracket at -y (flag-style); clean, size borderline"},
+    {"model": "mlvfbp", "V": 4, "U": 3, "H": 1, "score": 15, "valid": true,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "mirror twin of mexzmk, bracket at +y; same red extinguisher pictogram, 0.23 x 0.15 m"},
+    {"model": "sdsfzw", "V": 2, "U": 3, "H": 0, "score": 10, "valid": false,
+     "front_axis": "-x", "up_axis": "+z", "thin_axis": "x",
+     "note": "zero-thickness single-sided quad (x 0.000) 0.19 x 0.19 m with the extinguisher pictogram; invisible from +x, degenerate geometry"},
+    {"model": "vvjtkv", "V": 4, "U": 3, "H": 2, "score": 16, "valid": true,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "green exit sign 0.50 x 0.17 m, 4 cm box, door + down arrow + running-man pictograms; flat grey back, clean"},
+    {"model": "vwhtlm", "V": 4, "U": 3, "H": 2, "score": 16, "valid": true,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "dark green trapezoid 'Exit ->' sign 0.63 x 0.27 m, 2 cm thick, text on both faces (+x and -x); clean"}
+  ],
+  "picks": ["vvjtkv", "vwhtlm"],
+  "alternate": "axhlim",
+  "category_verdict": "good",
+  "category_note": "Indoor wall signs (exit signs, extinguisher pictograms, a text plate), 0.16-0.63 m wide, 2-5 cm thick, flat backs, natural in offices/hotels/diners. Text or pictograms give an obvious upright; sdsfzw is a broken zero-thickness sheet."
+}

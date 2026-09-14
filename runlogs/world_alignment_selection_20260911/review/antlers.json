@@ -1,0 +1,18 @@
+{
+  "category": "antlers",
+  "task": "wa1",
+  "n_models": 2,
+  "n_opened": 2,
+  "models": [
+    {"model": "nlsanr", "V": 4, "U": 1, "H": 1, "score": 11, "valid": false,
+     "front_axis": "+z", "up_axis": "-x", "thin_axis": "z",
+     "note": "single palmate shed antler lying flat, 0.56 m; textured OK but no agreed upright (palm-up guessed), single antler odd on a wall"},
+    {"model": "ovwdwa", "V": 4, "U": 1, "H": 1, "score": 11, "valid": false,
+     "front_axis": "+z", "up_axis": "+x", "thin_axis": "z",
+     "note": "single branched antler lying flat, 0.56 m; clean texture, but which end is up is a guess (forked end assumed up)"}
+  ],
+  "picks": [],
+  "alternate": null,
+  "category_verdict": "drop",
+  "category_note": "Two single shed antlers (~0.56 x 0.25-0.29 m, 4 cm thick) modelled lying flat. Textures fine, but a lone antler has no readable upright orientation and is not a natural flat wall item."
+}

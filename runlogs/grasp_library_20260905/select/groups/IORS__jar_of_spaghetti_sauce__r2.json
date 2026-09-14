@@ -1,0 +1,318 @@
+{
+ "group": "IORS__jar_of_spaghetti_sauce__r2",
+ "task": "IORS",
+ "category": "jar_of_spaghetti_sauce",
+ "round": 2,
+ "relation": "nextto",
+ "partner": "canned_food",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "zahyds",
+   "key": "jar_of_spaghetti_sauce__zahyds__t",
+   "strip": "/tmp/glib/strips/jar_of_spaghetti_sauce__zahyds__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-body pinch, both pads touch, off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-body pinch, both pads touch, off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-body pinch, both pads touch, off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-body pinch, both pads touch, off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-body pinch, both pads touch, off-centre"
+    }
+   ],
+   "object_note": "fingers 50/14: 63 mm jar pushed against open finger (17 mm off-centre) but firmly clamped",
+   "bbox_mm": [
+    65,
+    65,
+    106
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "yqnmoy",
+   "key": "jar_of_spaghetti_sauce__yqnmoy__t",
+   "strip": "/tmp/glib/strips/jar_of_spaghetti_sauce__yqnmoy__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug 85 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    }
+   ],
+   "object_note": "85 mm jar nearly fills 97 mm opening; one finger stays at 50",
+   "bbox_mm": [
+    86,
+    85,
+    130
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "fyocnu",
+   "key": "jar_of_spaghetti_sauce__fyocnu__t",
+   "strip": "/tmp/glib/strips/jar_of_spaghetti_sauce__fyocnu__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug 86 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    85,
+    85,
+    129
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "xpasvb",
+   "key": "jar_of_spaghetti_sauce__xpasvb__t",
+   "strip": "/tmp/glib/strips/jar_of_spaghetti_sauce__xpasvb__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug 87 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    85,
+    85,
+    129
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "efrxze",
+   "key": "jar_of_spaghetti_sauce__efrxze__t",
+   "strip": "/tmp/glib/strips/jar_of_spaghetti_sauce__efrxze__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug 86 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    86,
+    89,
+    132
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "exmsmm",
+   "key": "jar_of_spaghetti_sauce__exmsmm__t",
+   "strip": "/tmp/glib/strips/jar_of_spaghetti_sauce__exmsmm__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug 85 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "lid/shoulder pinch, snug"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    89,
+    88,
+    132
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

@@ -1,0 +1,21 @@
+{
+  "category": "rubber_boot",
+  "task": "obst",
+  "n_models": 4,
+  "n_opened": 4,
+  "models": [
+    {"model": "rubber_boot/ejwnhl", "V": 3, "N": 2, "S": 2, "rest_ok": true, "score": 12, "valid": true,
+     "note": "Black heeled ankle boot (leather look, not rubber), 0.31 x 0.11 x 0.29 m; very dark, shaft interior shows through to white in top view."},
+    {"model": "rubber_boot/fajzct", "V": 4, "N": 2, "S": 2, "rest_ok": true, "score": 14, "valid": true,
+     "note": "Black lace-up work boot, 0.34 x 0.13 x 0.26 m; dark but clean geometry, laces visible; not a wellington. Near-duplicate of wsjpfi."},
+    {"model": "rubber_boot/wsjpfi", "V": 4, "N": 2, "S": 2, "rest_ok": true, "score": 14, "valid": true,
+     "note": "Black lace-up work boot, 0.34 x 0.12 x 0.26 m; same look as fajzct (other foot), clean, dark."},
+    {"model": "rubber_boot/zzwsnw", "V": 5, "N": 2, "S": 2, "rest_ok": true, "score": 16, "valid": true,
+     "note": "Yellow tall wellington with dark sole, 0.32 x 0.12 x 0.44 m; crisp textures, clearly a rubber boot, stands on sole."}
+  ],
+  "picks": ["rubber_boot/zzwsnw", "rubber_boot/fajzct"],
+  "alternate": "rubber_boot/wsjpfi",
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int"],
+  "category_verdict": "weak",
+  "category_note": "Four single boots standing on the sole, 0.26-0.44 m tall, good size. Only zzwsnw is a true yellow wellington; the others are dark leather-style boots. A lone boot is credible entryway clutter but not a mid-path object (N = 2)."
+}

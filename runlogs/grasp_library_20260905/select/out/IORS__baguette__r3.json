@@ -1,0 +1,24 @@
+{
+  "group": "IORS__baguette__r3",
+  "task": "IORS",
+  "category": "baguette",
+  "round": 3,
+  "relation": "ontop",
+  "n_candidates": 1,
+  "n_opened": 1,
+  "candidates": [
+    {"model": "xydhpd", "key": "baguette__xydhpd__t", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Five centred side pinches across 46-50 mm body, bottom free; rows 1-4 50/0 one-finger closures yet both pads seated; crisp golden crust; short plump loaf."}
+  ],
+  "selected": [
+    {"model": "xydhpd", "key": "baguette__xydhpd__t", "rank": 1, "reason": "Only candidate; all five rows are clean centred side pinches (CoM 0-5 mm, width 46-50 mm) leaving the bottom free for the cutting board; sharp golden crust, clean geometry."}
+  ],
+  "alternate": null,
+  "short": true,
+  "warnings": [
+    "Only one candidate in the group; no second test instance is available for baguette in this round.",
+    "Rows 1-4 are one_finger (50/0) closures: the loaf is pushed ~24 mm off the gripper centreline against the idle pad; only row 5 (44/0) is a two-sided pinch.",
+    "Model is a short plump loaf (163 mm long, ~3:1 aspect), stubby for a baguette."
+  ],
+  "confidence": "high"
+}

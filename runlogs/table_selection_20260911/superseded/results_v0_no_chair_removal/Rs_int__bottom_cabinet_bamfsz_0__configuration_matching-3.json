@@ -1,0 +1,90 @@
+{
+ "scene": "Rs_int",
+ "table": "bottom_cabinet_bamfsz_0",
+ "category": "bottom_cabinet",
+ "model": "bamfsz",
+ "rooms": [
+  "kitchen_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-3",
+ "inventory": {
+  "top_z": 0.874,
+  "bbox_x": 0.649,
+  "bbox_y": 0.728,
+  "bbox_z": 0.869,
+  "verdict": "keep"
+ },
+ "n_requested": 1,
+ "max_attempts": 8,
+ "started": "2026-09-11 20:16:48",
+ "precheck": {
+  "aabb": [
+   [
+    -2.014,
+    2.787,
+    0.001
+   ],
+   [
+    -1.275,
+    3.443,
+    0.879
+   ]
+  ],
+  "support": {
+   "name": "bottom_cabinet_bamfsz_0",
+   "z": 0.8790966272354126,
+   "yaw": -1.5708003044128418,
+   "local_bounds": [
+    -3.4374496936798096,
+    -2.8374485969543457,
+    -2.003681182861328,
+    -1.2836788892745972
+   ],
+   "n_free_cells": 426,
+   "occupants": [
+    "dishwasher_xlmier_0"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -1.644,
+     2.837
+    ],
+    "length": 0.72
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -1.644,
+     3.437
+    ],
+    "length": 0.72
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -1.284,
+     3.137
+    ],
+    "length": 0.6
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -2.004,
+     3.137
+    ],
+    "length": 0.6
+   }
+  ],
+  "stance": null,
+  "stance_error": "[stance_collision] untucked: [no_stance] no traversable stance around bottom_cabinet_bamfsz_0; ready: [no_stance] no traversable stance around bottom_cabinet_bamfsz_0",
+  "precheck_s": 1.0
+ },
+ "status": "skipped",
+ "reason": "no stance around the support (precheck) and inter_object_relation_satisfaction-0 failed at setup"
+}

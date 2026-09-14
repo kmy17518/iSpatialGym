@@ -1,0 +1,18 @@
+{
+  "category": "folderal",
+  "task": "wa0",
+  "n_models": 2,
+  "n_opened": 2,
+  "models": [
+    {"model": "ttldpx", "V": 4, "O": 0, "F": 2, "score": 10, "valid": false,
+     "long_axis": "y", "front_axis": "-y", "rest_ok": true,
+     "note": "flat wooden five-pointed star 0.22 x 0.23 x 0.02 m; nice texture but 5-fold symmetric, no unique yaw"},
+    {"model": "zwhewa", "V": 4, "O": 0, "F": 2, "score": 10, "valid": false,
+     "long_axis": "x", "front_axis": "-y", "rest_ok": true,
+     "note": "round olive filigree leaf bowl 0.18 m diameter, 6 cm high; detailed geometry but rotationally symmetric"}
+  ],
+  "picks": [],
+  "alternate": null,
+  "category_verdict": "drop",
+  "category_note": "Two decorative trinkets: a flat wooden star (0.22 m) and a round filigree bowl (0.18 m). Both render well but are rotationally symmetric, so no aligned yaw can be read."
+}

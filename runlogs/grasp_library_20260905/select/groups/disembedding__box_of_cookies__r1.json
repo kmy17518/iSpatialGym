@@ -1,0 +1,671 @@
+{
+ "group": "disembedding__box_of_cookies__r1",
+ "task": "disembedding",
+ "category": "box_of_cookies",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "Tabletop task: the object rests among other objects on a table / tray and is picked from its resting pose. It must settle stably on a flat surface (it must not roll or topple). The best single grasp matters most.",
+ "candidates": [
+  {
+   "model": "apjokz",
+   "key": "box_of_cookies__apjokz",
+   "strip": "/tmp/glib/strips/box_of_cookies__apjokz.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "41/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "41/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "41/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "41/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "41/0: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "box lying x_down, pinched across 39mm thickness; all close 41/0",
+   "bbox_mm": [
+    94,
+    149,
+    39
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "lwhbid",
+   "key": "box_of_cookies__lwhbid",
+   "strip": "/tmp/glib/strips/box_of_cookies__lwhbid.png",
+   "n_valid": 5,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "task_violation"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "task_violation"
+     ],
+     "note": "fingertips protrude below box bottom face (placement task)"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "task_violation"
+     ],
+     "note": "fingertips protrude below box bottom face (placement task)"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "task_violation"
+     ],
+     "note": "tilted 30, fingertips reach below box bottom edge"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "task_violation"
+     ],
+     "note": "tilted 30, fingertips reach below box bottom edge"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "task_violation"
+     ],
+     "note": "tilted 30, fingertips reach below box bottom edge"
+    }
+   ],
+   "object_note": "shallow 88mm box; fingers wrap full side and stick out under bottom",
+   "bbox_mm": [
+    113,
+    88,
+    49
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "dlhqft",
+   "key": "box_of_cookies__dlhqft",
+   "strip": "/tmp/glib/strips/box_of_cookies__dlhqft.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wide box nearly fills opening, 50/40 near-symmetric pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wide box nearly fills opening, 50/40 near-symmetric pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wide box nearly fills opening, 50/40 near-symmetric pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wide box nearly fills opening, 50/40 near-symmetric pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wide box nearly fills opening, 50/39 near-symmetric pinch"
+    }
+   ],
+   "object_note": "88mm box pinched across its width, both pads on box",
+   "bbox_mm": [
+    93,
+    266,
+    77
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "jtalxs",
+   "key": "box_of_cookies__jtalxs",
+   "strip": "/tmp/glib/strips/box_of_cookies__jtalxs.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "all candidates close 44/0; top-edge pinches all one-sided",
+   "bbox_mm": [
+    205,
+    205,
+    42
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "hdgsxz",
+   "key": "box_of_cookies__hdgsxz",
+   "strip": "/tmp/glib/strips/box_of_cookies__hdgsxz.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "44/0: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "all candidates close 44/0; top-edge pinches all one-sided",
+   "bbox_mm": [
+    205,
+    205,
+    42
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "nnfisz",
+   "key": "box_of_cookies__nnfisz",
+   "strip": "/tmp/glib/strips/box_of_cookies__nnfisz.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "all candidates close 50/0; top-edge pinches all one-sided",
+   "bbox_mm": [
+    211,
+    189,
+    50
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "nirfva",
+   "key": "box_of_cookies__nirfva",
+   "strip": "/tmp/glib/strips/box_of_cookies__nirfva.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 1,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 42/9 asymmetric but both fingers closed"
+    }
+   ],
+   "object_note": "tall box hangs from top-edge pinch; CoM below pinch",
+   "bbox_mm": [
+    206,
+    189,
+    50
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "sjcnoq",
+   "key": "box_of_cookies__sjcnoq",
+   "strip": "/tmp/glib/strips/box_of_cookies__sjcnoq.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "all candidates close 50/0; top-edge pinches all one-sided",
+   "bbox_mm": [
+    224,
+    189,
+    50
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "levwda",
+   "key": "box_of_cookies__levwda",
+   "strip": "/tmp/glib/strips/box_of_cookies__levwda.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 1,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/2: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/2: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/2: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/2: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, both fingers closed 32/21"
+    }
+   ],
+   "object_note": "tall box hangs from top-edge pinch; CoM below pinch",
+   "bbox_mm": [
+    253,
+    201,
+    52
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "fzlaol",
+   "key": "box_of_cookies__fzlaol",
+   "strip": "/tmp/glib/strips/box_of_cookies__fzlaol.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    }
+   ],
+   "object_note": "tall box hangs from top-edge pinch; CoM below pinch",
+   "bbox_mm": [
+    283,
+    283,
+    65
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ohhshb",
+   "key": "box_of_cookies__ohhshb",
+   "strip": "/tmp/glib/strips/box_of_cookies__ohhshb.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, 50/17 asymmetric but both pads closed on box"
+    }
+   ],
+   "object_note": "tall box hangs from top-edge pinch; CoM below pinch",
+   "bbox_mm": [
+    283,
+    283,
+    65
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": [
+  {
+   "model": "qkzrdd",
+   "key": "box_of_cookies__qkzrdd",
+   "reason": "no candidates"
+  }
+ ]
+}

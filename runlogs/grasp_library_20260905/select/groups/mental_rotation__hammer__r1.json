@@ -1,0 +1,114 @@
+{
+ "group": "mental_rotation__hammer__r1",
+ "task": "mental_rotation",
+ "category": "hammer",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "fcrlbo",
+   "key": "hammer__fcrlbo",
+   "strip": "/tmp/glib/strips/hammer__fcrlbo.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch directly under head"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch under head"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch under head"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diagonal handle pinch under head, antipodal 0.42"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch under head"
+    }
+   ],
+   "object_note": "all grasps on handle next to head, near CoM",
+   "bbox_mm": [
+    231,
+    96,
+    28
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "bbzlel",
+   "key": "hammer__bbzlel",
+   "strip": "/tmp/glib/strips/hammer__bbzlel.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinched next to head; head hangs"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "oblique handle pinch near head, antipodal 0.30, enclosed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinched next to head"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle near head, head hangs tilted"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle near head; gap 31 vs width 15, no daylight seen"
+    }
+   ],
+   "object_note": "mallet always held by handle adjacent to head; natural tool grasp, black head hides pad edges",
+   "bbox_mm": [
+    341,
+    112,
+    72
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

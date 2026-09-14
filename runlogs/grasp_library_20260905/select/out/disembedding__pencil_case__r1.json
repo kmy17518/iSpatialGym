@@ -1,0 +1,25 @@
+{
+  "group": "disembedding__pencil_case__r1",
+  "task": "disembedding",
+  "category": "pencil_case",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 3,
+  "n_opened": 3,
+  "candidates": [
+    {"model": "acikzo", "key": "pencil_case__acikzo", "G": 5, "T": 2, "V": 3, "R": 2, "score": 20,
+     "note": "Orange plaid fabric tube (60 mm) lying flat; five clean diametral pinches, two one-finger (50/12) held centrally. Blurry texture, no zipper, round body may roll."},
+    {"model": "cqxkgl", "key": "pencil_case__cqxkgl", "G": 5, "T": 2, "V": 5, "R": 2, "score": 24,
+     "note": "Blue plaid cylinder case, orange piping and zipper; five clean diametral pinches (mostly 50/11), CoM 1-19 mm. Hull ~4 mm oversize, no daylight; may roll."},
+    {"model": "otcmih", "key": "pencil_case__otcmih", "G": 5, "T": 2, "V": 5, "R": 2, "score": 24,
+     "note": "Blue/white Aztec-pattern soft case with 3D zipper pull; five clean two-sided mid-body pinches (43/24 style), CoM 3-15 mm. Sharp textures. Round body may roll."}
+  ],
+  "selected": [
+    {"model": "otcmih", "key": "pencil_case__otcmih", "rank": 1, "reason": "Tied top score; every row is a symmetric two-sided body pinch with no hull mismatch, sharp fabric texture and modelled zipper pull make it the cleanest asset."},
+    {"model": "cqxkgl", "key": "pencil_case__cqxkgl", "rank": 2, "reason": "Tied score, clearly ahead of acikzo; distinct plaid look with orange piping, all five rows hold the 54 mm body centrally, bottom free for placement."}
+  ],
+  "alternate": {"model": "acikzo", "key": "pencil_case__acikzo"},
+  "short": false,
+  "warnings": ["All three are near-circular cylinders lying on their side; they can roll slightly before settling (T scored 2 rather than 3)."],
+  "confidence": "high"
+}

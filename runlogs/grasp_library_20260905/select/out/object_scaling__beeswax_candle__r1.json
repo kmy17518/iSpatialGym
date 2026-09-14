@@ -1,0 +1,29 @@
+{
+  "group": "object_scaling__beeswax_candle__r1",
+  "task": "object_scaling",
+  "category": "beeswax_candle",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 5,
+  "n_opened": 5,
+  "candidates": [
+    {"model": "pfewit", "key": "beeswax_candle__pfewit", "G": 3, "T": 3, "V": 3, "R": 1, "score": 16,
+     "note": "Very long thin 56x246 mm yellow cylinder; 5 identical horizontal diameter pinches (50/5-7), moving finger 5 mm from limit; featureless flat yellow, faint seam line."},
+    {"model": "oimgmh", "key": "beeswax_candle__oimgmh", "G": 3, "T": 3, "V": 3, "R": 2, "score": 17,
+     "note": "Thin 56x206 mm yellow cylinder; 5 identical horizontal diameter pinches (50/6-7), antipodal 0.99-1.0; smooth featureless flat yellow, wick dot only."},
+    {"model": "nhdnje", "key": "beeswax_candle__nhdnje", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Classic 70x107 mm pillar; 5 clean diameter pinches, two of them centred two-sided (38/33, 39/33), all one pose; wick and rim clearly modelled, clean geometry."},
+    {"model": "ouzkdj", "key": "beeswax_candle__ouzkdj", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "70x157 mm pillar; 5 identical one-finger diameter pinches (50/21-22), antipodal 0.99-1.0, robust 70 mm width; smooth yellow with wick, no defects."},
+    {"model": "nxewyk", "key": "beeswax_candle__nxewyk", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "70x207 mm tall pillar; 5 identical one-finger diameter pinches (50/21-22), CoM offsets 1-14 mm; smooth yellow with wick, no defects."}
+  ],
+  "selected": [
+    {"model": "nhdnje", "key": "beeswax_candle__nhdnje", "rank": 1, "reason": "Tied top score; chosen for two centred two-sided pinches, robust 70 mm width, and the most representative pillar proportions with a visible wick."},
+    {"model": "oimgmh", "key": "beeswax_candle__oimgmh", "rank": 2, "reason": "Within 2 points of the 70 mm look-alikes but visibly different aspect (thin 56 mm, 206 mm long), giving the pair a size/shape spread; clean pinches, G=3."}
+  ],
+  "alternate": {"model": "ouzkdj", "key": "beeswax_candle__ouzkdj"},
+  "short": false,
+  "warnings": ["Every candidate offers only one grasp pose (horizontal mid-body diameter pinch at tilt ~90), so G is capped at 3 group-wide; oimgmh's moving finger stops 6-7 mm from its limit on the 56 mm body."],
+  "confidence": "medium"
+}

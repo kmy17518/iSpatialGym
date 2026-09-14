@@ -1,0 +1,217 @@
+{
+ "scene": "house_double_floor_upper",
+ "table": "desk_aduafr_0",
+ "category": "desk",
+ "model": "aduafr",
+ "rooms": [
+  "bedroom_0"
+ ],
+ "partner": null,
+ "problem": "disembedding-0",
+ "inventory": {
+  "top_z": 0.778,
+  "bbox_x": 0.63,
+  "bbox_y": 1.513,
+  "bbox_z": 0.785,
+  "verdict": "keep"
+ },
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 20:45:56",
+ "precheck": {
+  "aabb": [
+   [
+    -5.991,
+    -0.287,
+    -0.002
+   ],
+   [
+    -4.483,
+    0.338,
+    0.773
+   ]
+  ],
+  "support": {
+   "name": "desk_aduafr_0",
+   "z": 0.7734153270721436,
+   "yaw": 1.5662397146224976,
+   "local_bounds": [
+    -0.30406495928764343,
+    0.24267323315143585,
+    4.499657154083252,
+    5.982101917266846
+   ],
+   "n_free_cells": 2100,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -5.24,
+     0.267
+    ],
+    "length": 1.482
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -5.242,
+     -0.28
+    ],
+    "length": 1.482
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -5.982,
+     -0.003
+    ],
+    "length": 0.547
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -4.5,
+     -0.01
+    ],
+    "length": 0.547
+   }
+  ],
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    -5.239719390869141,
+    0.26655128598213196
+   ],
+   "inward": [
+    -0.004556596279144287,
+    -0.9999896287918091
+   ],
+   "tangent": [
+    0.9999896287918091,
+    -0.004556596279144287
+   ],
+   "base_pose2d": [
+    -5.433813571929932,
+    0.7926017642021179,
+    -1.575352938795802
+   ],
+   "edge_depth": 0.525160551071167,
+   "view": {
+    "translate": 0.5,
+    "tilt": -0.699999988079071,
+    "axis_angle": 0.0003452669847162036
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.5
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "support": {
+   "name": "desk_aduafr_0",
+   "z": 0.7734153270721436,
+   "yaw": 1.5662397146224976,
+   "local_bounds": [
+    -0.30406495928764343,
+    0.24267323315143585,
+    4.499657154083252,
+    5.982101917266846
+   ],
+   "n_free_cells": 2100,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    -5.239719390869141,
+    0.26655128598213196
+   ],
+   "inward": [
+    -0.004556596279144287,
+    -0.9999896287918091
+   ],
+   "tangent": [
+    0.9999896287918091,
+    -0.004556596279144287
+   ],
+   "base_pose2d": [
+    -5.630300521850586,
+    0.7934970855712891,
+    -1.575352938795802
+   ],
+   "edge_depth": 0.5251606106758118,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.007804886686707481
+   }
+  },
+  "place_stance": {
+   "edge": "+u",
+   "edge_mid": [
+    -5.239719390869141,
+    0.26655128598213196
+   ],
+   "inward": [
+    -0.004556596279144287,
+    -0.9999896287918091
+   ],
+   "tangent": [
+    0.9999896287918091,
+    -0.004556596279144287
+   ],
+   "base_pose2d": [
+    -4.8630266189575195,
+    0.7900009155273438,
+    -1.575352938795802
+   ],
+   "edge_depth": 0.5251606702804565
+  },
+  "yaw_adjust_deg": 0.0,
+  "dest_lateral_m": 0.7672820259019362,
+  "dest_side": "left",
+  "n_reachable_cells": 6,
+  "distractors": {
+   "same_category": false,
+   "models": [
+    "box_of_shampoo-bclpiq"
+   ],
+   "requested": 1,
+   "footprint_fraction": 0.18
+  },
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/house_double_floor_upper/house_double_floor_upper__desk_aduafr_0__disembedding-0__s1",
+ "setup_s": 261.3,
+ "reject_reason": "no_support",
+ "error": "[no_support] desk_aduafr_0: [support] untucked: [support] edge +u lateral +0.00: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge +u lateral +0.25: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge +u lateral -0.25: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge +u lateral +0.35: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge +u lateral -0.35: [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge -u: [no_stance] no traversable stance around desk_aduafr_0; edge +v: [no_stance] no traversable stance around desk_aduafr_0; edge -v: [no_stance] no collision-free stance around desk_aduafr_0; edge +u lateral +0.00 (yaw allowed): [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge +u lateral +0.25 (yaw allowed): [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge +u lateral -0.25 (yaw allowed): [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge +u lateral +0.35 (yaw allowed): [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge +u lateral -0.35 (yaw allowed): [unreachable] no (cell, yaw, grasp) is both graspable on the source tray and placeable on the destination tray; edge -u: [no_stance] no traversable stance around desk_aduafr_0; edge +v: [no_stance] no traversable stance around desk_aduafr_0; edge -v: [no_stance] no collision-free stance around desk_aduafr_0; ready: [support] edge +u: [no_stance] no collision-free stance around desk_aduafr_0; edge -u: [no_stance] no traversable stanc",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 247.4,
+   "run_s": null
+  },
+  {
+   "seed": 1000,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 261.3,
+   "run_s": null
+  }
+ ],
+ "job_s": 513.6,
+ "finished": "2026-09-11 20:55:19"
+}

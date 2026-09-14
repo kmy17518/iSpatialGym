@@ -1,0 +1,35 @@
+{
+ "category": "teacup",
+ "model": "tfzfam",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/teacup__tfzfam__y0.png",
+   "drift_m": 0.0008,
+   "tilt_deg": 1.7,
+   "on_tray": true,
+   "settled_z": 0.0274,
+   "seg_pixels": 3101,
+   "aabb_extent": [
+    0.073,
+    0.073,
+    0.053
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/teacup__tfzfam__y1.png",
+   "drift_m": 0.0008,
+   "tilt_deg": 1.7,
+   "on_tray": true,
+   "settled_z": 0.0273
+  }
+ },
+ "stable": true,
+ "visible": true
+}

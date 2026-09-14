@@ -1,0 +1,99 @@
+{
+ "category": "bag_of_chips",
+ "task": "wa0",
+ "n_models": 7,
+ "n_opened": 7,
+ "models": [
+  {
+   "model": "bryahw",
+   "V": 4,
+   "O": 3,
+   "F": 2,
+   "score": 16,
+   "valid": true,
+   "long_axis": "x",
+   "front_axis": "-x",
+   "rest_ok": true,
+   "note": "Yellow Ace 'SALTED' bag lying flat; window at -x, brand and flavor text at +x; print bottom at -x."
+  },
+  {
+   "model": "dwkdko",
+   "V": 4,
+   "O": 3,
+   "F": 2,
+   "score": 16,
+   "valid": true,
+   "long_axis": "x",
+   "front_axis": "-x",
+   "rest_ok": true,
+   "note": "Black 'BARBECUE' bag, high-contrast white text; window -x, logo +x; clean geometry."
+  },
+  {
+   "model": "ennnjj",
+   "V": 4,
+   "O": 3,
+   "F": 2,
+   "score": 16,
+   "valid": true,
+   "long_axis": "x",
+   "front_axis": "-x",
+   "rest_ok": true,
+   "note": "Blue 'SOUR CREME' bag, same Ace layout; text lower contrast on blue."
+  },
+  {
+   "model": "jphwer",
+   "V": 4,
+   "O": 3,
+   "F": 2,
+   "score": 16,
+   "valid": true,
+   "long_axis": "x",
+   "front_axis": "-x",
+   "rest_ok": true,
+   "note": "Dark red 'PAPRIKA' bag; window -x, logo +x; crisp print."
+  },
+  {
+   "model": "qstxpj",
+   "V": 2,
+   "O": 1,
+   "F": 2,
+   "score": 8,
+   "valid": false,
+   "long_axis": "x",
+   "front_axis": "-x",
+   "rest_ok": true,
+   "note": "Uniform olive bag, no print or window visible; pillow silhouette only, 180-degree ambiguity."
+  },
+  {
+   "model": "uevvib",
+   "V": 4,
+   "O": 3,
+   "F": 2,
+   "score": 16,
+   "valid": true,
+   "long_axis": "x",
+   "front_axis": "-x",
+   "rest_ok": true,
+   "note": "Green 'ONION' bag, same Ace layout; window -x, text +x."
+  },
+  {
+   "model": "wnuoym",
+   "V": 3,
+   "O": 2,
+   "F": 1,
+   "score": 11,
+   "valid": true,
+   "long_axis": "x",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "Maroon pouch with off-centre steak photo band at -x, no text; blurry texture, z 0.125; print-up weak."
+  }
+ ],
+ "picks": [
+  "dwkdko",
+  "bryahw"
+ ],
+ "alternate": "jphwer",
+ "category_verdict": "good",
+ "category_note": "Flat-lying chip bags ~0.29x0.22x0.09 m; five share one Ace layout (window one end, brand text other), print reads along the long axis so front is a long-axis end; one untextured, one odd pouch."
+}

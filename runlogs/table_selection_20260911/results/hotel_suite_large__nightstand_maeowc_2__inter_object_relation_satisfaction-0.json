@@ -1,0 +1,115 @@
+{
+ "scene": "hotel_suite_large",
+ "table": "nightstand_maeowc_2",
+ "category": "nightstand",
+ "model": "maeowc",
+ "rooms": [
+  "bedroom_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-0",
+ "inventory": {
+  "top_z": 0.451,
+  "bbox_x": 0.512,
+  "bbox_y": 0.616,
+  "bbox_z": 0.451,
+  "verdict": "low"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:51:11",
+ "precheck": {
+  "aabb": [
+   [
+    -2.253,
+    0.51,
+    -0.01
+   ],
+   [
+    -1.737,
+    1.133,
+    0.448
+   ]
+  ],
+  "support": {
+   "name": "nightstand_maeowc_2",
+   "z": 0.4472286105155945,
+   "yaw": -0.00039005279541015625,
+   "local_bounds": [
+    -2.2438104152679443,
+    -1.7435766458511353,
+    0.5192186832427979,
+    1.1194137334823608
+   ],
+   "n_free_cells": 769,
+   "occupants": [
+    "table_lamp_uzrovn_0"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -1.743,
+     0.82
+    ],
+    "length": 0.6
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -2.243,
+     0.82
+    ],
+    "length": 0.6
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -1.993,
+     1.12
+    ],
+    "length": 0.5
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -1.993,
+     0.52
+    ],
+    "length": 0.5
+   }
+  ],
+  "stance": null,
+  "stance_error": "[stance_collision] untucked: [no_stance] no collision-free stance around nightstand_maeowc_2",
+  "precheck_s": 0.3
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/hotel_suite_large/hotel_suite_large__nightstand_maeowc_2__inter_object_relation_satisfaction-0",
+ "setup_s": 1.5,
+ "reject_reason": "no_support",
+ "error": "[no_support] nightstand_maeowc_2: [no_stance] stand_off 0.45 edge None: [stance_collision] untucked: [no_stance] no collision-free stance around nightstand_maeowc_2; stand_off 0.35 edge None: [stance_collision] untucked: [no_stance] no collision-free stance around nightstand_maeowc_2; stand_off 0.55 edge None: [stance_collision] untucked: [no_stance] no collision-free stance around nightstand_maeowc_2; stand_off 0.65 edge None: [stance_collision] untucked: [no_stance] no collision-free stance around nightstand_maeowc_2",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 1.5,
+   "run_s": null
+  }
+ ],
+ "job_s": 2.4,
+ "finished": "2026-09-12 01:51:14"
+}

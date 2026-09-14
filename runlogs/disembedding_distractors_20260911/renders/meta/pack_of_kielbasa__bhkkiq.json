@@ -1,0 +1,35 @@
+{
+ "category": "pack_of_kielbasa",
+ "model": "bhkkiq",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/pack_of_kielbasa__bhkkiq__y0.png",
+   "drift_m": 0.0059,
+   "tilt_deg": 9.1,
+   "on_tray": true,
+   "settled_z": 0.032,
+   "seg_pixels": 4362,
+   "aabb_extent": [
+    0.127,
+    0.066,
+    0.071
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/pack_of_kielbasa__bhkkiq__y1.png",
+   "drift_m": 0.0057,
+   "tilt_deg": 8.9,
+   "on_tray": true,
+   "settled_z": 0.0321
+  }
+ },
+ "stable": true,
+ "visible": true
+}

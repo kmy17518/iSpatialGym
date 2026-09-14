@@ -1,0 +1,24 @@
+{
+  "group": "disembedding__tablefork__r2", "task": "disembedding", "category": "tablefork", "round": 2, "relation": null,
+  "n_candidates": 5, "n_opened": 5,
+  "candidates": [
+    {"model": "uodzrq", "key": "tablefork__uodzrq__t", "G": 4, "T": 3, "V": 4, "R": 0, "score": 19,
+     "note": "Four clean neck pinches 12-16 mm from CoM but only 6-10 mm wide; row 4 oblique (tilt 24, coverage 0.25). Chrome fork, strong dark reflections."},
+    {"model": "hktwlm", "key": "tablefork__hktwlm__t", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Five clean head/shoulder pinches 17-25 mm wide, top row level (tilt 7); row 4 hangs at 38 deg. Ornate chrome fork, crisp tines."},
+    {"model": "yuihyg", "key": "tablefork__yuihyg__t", "G": 5, "T": 3, "V": 3, "R": 1, "score": 20,
+     "note": "Five neck pinches at the CoM (12 mm, antipodal 0.97-0.99), rows 4-5 tilted 32-34 deg. Long 233 mm fork; pale washed-out metal, low contrast."},
+    {"model": "pqrtkc", "key": "tablefork__pqrtkc__t", "G": 5, "T": 3, "V": 3, "R": 0, "score": 19,
+     "note": "Five clean neck/handle pinches near CoM, only 7-10 mm wide; row 5 tilt 30. Plain matte light-grey fork, little surface detail."},
+    {"model": "flexrc", "key": "tablefork__flexrc__t", "G": 5, "T": 3, "V": 3, "R": 0, "score": 19,
+     "note": "Five clean neck/handle pinches, top row level at CoM (8 mm, antipodal 0.98); row 4 tilt 30. Plain matte grey fork, same style as pqrtkc."}
+  ],
+  "selected": [
+    {"model": "hktwlm", "key": "tablefork__hktwlm__t", "rank": 1, "reason": "Highest score: only fork with robust 17-25 mm head pinches, top row level and centred, all five rows clean; detailed chrome asset that lies flat."},
+    {"model": "yuihyg", "key": "tablefork__yuihyg__t", "rank": 2, "reason": "Best of the rest (20) with neck pinches exactly at the CoM and 12 mm width; pale plain long fork looks clearly different from the ornate chrome #1."}
+  ],
+  "alternate": {"model": "flexrc", "key": "tablefork__flexrc__t"},
+  "short": false,
+  "warnings": ["Neck pinches of uodzrq, pqrtkc and flexrc are only 6-10 mm wide (R 0); yuihyg renders washed-out pale."],
+  "confidence": "medium"
+}

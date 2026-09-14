@@ -1,0 +1,216 @@
+{
+ "group": "mental_rotation__toothbrush__r3",
+ "task": "mental_rotation",
+ "category": "toothbrush",
+ "round": 3,
+ "relation": null,
+ "partner": "H",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "nbgpwg",
+   "key": "toothbrush__nbgpwg__f",
+   "strip": "/tmp/glib/strips/toothbrush__nbgpwg__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch 20 mm from CoM; antipodal only 0.18"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch near middle third"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, thin 5 mm, within middle third"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch, 30 mm from CoM"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, 29 mm from CoM"
+    }
+   ],
+   "object_note": "thin 4-8 mm pinches, coverage 0.50 everywhere; contact quality not verifiable at this resolution",
+   "bbox_mm": [
+    108,
+    8,
+    9
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "vkrjps",
+   "key": "toothbrush__vkrjps__f",
+   "strip": "/tmp/glib/strips/toothbrush__vkrjps__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-handle pinch through CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-handle pinch; antipodal only 0.28"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-handle pinch through CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-handle pinch through CoM"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch 10 mm from CoM"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    147,
+    11,
+    18
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "qbkrzg",
+   "key": "toothbrush__qbkrzg__f",
+   "strip": "/tmp/glib/strips/toothbrush__qbkrzg__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-handle pinch through CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-handle pinch, thin 6 mm, antipodal 0.37"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-handle pinch through CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-handle pinch through CoM"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch near CoM; antipodal only 0.15"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    144,
+    12,
+    16
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ifxlss",
+   "key": "toothbrush__ifxlss__f",
+   "strip": "/tmp/glib/strips/toothbrush__ifxlss__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-handle pinch; antipodal only 0.14"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-handle pinch through CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-handle pinch through CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-handle pinch through CoM"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch 11 mm from CoM"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    170,
+    14,
+    19
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

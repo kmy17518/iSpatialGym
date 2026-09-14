@@ -1,0 +1,35 @@
+{
+ "key": "fridge__hzgqdn",
+ "category": "fridge",
+ "model": "hzgqdn",
+ "scene": "Rs_int",
+ "host": "fridge_xyejdx_0",
+ "host_rank": 0,
+ "host_model": "xyejdx",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "review: No handle: plain flush door slab with interior bins; free edge measures 213 mm thick, far beyond pinch range. Top rail is body hardware.",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.137,
+  1.06,
+  1.67
+ ],
+ "time_s": 1.0
+}

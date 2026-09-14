@@ -1,0 +1,35 @@
+{
+ "category": "bottle_of_antihistamines",
+ "model": "agavwx",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_antihistamines__agavwx__y0.png",
+   "drift_m": 0.0019,
+   "tilt_deg": 1.8,
+   "on_tray": true,
+   "settled_z": 0.0624,
+   "seg_pixels": 6344,
+   "aabb_extent": [
+    0.067,
+    0.067,
+    0.127
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_antihistamines__agavwx__y1.png",
+   "drift_m": 0.0018,
+   "tilt_deg": 1.6,
+   "on_tray": true,
+   "settled_z": 0.0624
+  }
+ },
+ "stable": true,
+ "visible": true
+}

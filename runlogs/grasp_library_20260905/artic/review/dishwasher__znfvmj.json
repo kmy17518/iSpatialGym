@@ -1,0 +1,20 @@
+{
+  "key": "dishwasher__znfvmj",
+  "category": "dishwasher",
+  "model": "znfvmj",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_2",
+      "kind": "flap",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "swing",
+      "graspable": false,
+      "handle_description": "Recessed rectangular pull pocket near the top centre of the door; no protrusion to pinch. Top edge sits under the fixed control panel. Bottom hinge.",
+      "height_concern": "",
+      "confidence": "high"
+    }
+  ],
+  "object_note": "Heuristic 'ungraspable' agreed: only a recessed pull; F fallback is hidden under the control panel overhang in the closed state. Red button on panel is model geometry."
+}

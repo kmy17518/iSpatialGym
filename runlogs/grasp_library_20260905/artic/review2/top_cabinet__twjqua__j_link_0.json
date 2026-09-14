@@ -1,0 +1,5 @@
+{"key": "top_cabinet__twjqua", "joint": "j_link_0", "feasible": true,
+ "proposal": {"face": "right_edge", "a": 0.95, "b": 0.46, "pinch": "thickness", "approach": "right", "depth_mm": 40, "expected_motion": "slide"},
+ "alternative": {"face": "right_edge", "a": 0.9, "b": 0.46, "pinch": "horizontal", "approach": "front", "depth_mm": 40, "expected_motion": "slide"},
+ "note": "Vertical bail pull (~105 mm tall, ~25 mm proud) on door's right face near leading edge; straddle its bar along the slide axis.",
+ "confidence": "medium"}

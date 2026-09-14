@@ -1,0 +1,9 @@
+{
+  "category": "tablefork",
+  "pages_opened": ["grids/pool_other/tablefork__p1.png", "grids/pool_other/tablefork__p2.png"],
+  "n_models": 24,
+  "exclude": [
+    {"model": "toothbrush/ifxlss", "reason": "render check reports segmentation label missing; asset not tracked by the segmentation camera"}
+  ],
+  "notes": "Spoons, knives, tongs, chopstick, pens, pencils, markers, ruler and razor all lie flat along the tray, intact and recognisable; flat cutlery lying down is its natural pose. Larger tilts (pen/gqwdor 18.7, pencil/bfkwhb 13.6, tablespoon/pltxjb 11.6) come from resting on clips/bowls, not toppling. tablespoon/pltxjb is flat white but reads as a plastic spoon, kept."
+}

@@ -1,0 +1,8 @@
+{
+  "category": "box_of_shampoo",
+  "n_models": 4,
+  "pages_opened": ["grids/same/box_of_shampoo__p1.png"],
+  "groups": [],
+  "unusable": [],
+  "notes": "bclpiq/jccyom share geometry and the same 'Just for Men' layout but red vs navy sides, different faces, and red vs blue accents on the grey back - distinct at all yaws. nijidu teal and tzghev yellow are unique. tzghev reports 0 px at yaw 0 although clearly rendered - check its segmentation id."
+}

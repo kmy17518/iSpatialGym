@@ -1,0 +1,6 @@
+{"key": "fridge__hzgqdn", "joint": "j_link_0", "feasible": false,
+ "proposal": {"face": "left_edge", "a": 0.0, "b": 0.5, "pinch": "thickness", "approach": "front", "depth_mm": 40,
+              "expected_motion": "swing"},
+ "alternative": null,
+ "note": "Flush slab, no handle or lip; free edge is 213 mm thick, far beyond the 97 mm opening. Nothing the gripper can pinch.",
+ "confidence": "high"}

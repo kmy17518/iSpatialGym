@@ -1,0 +1,28 @@
+{
+ "key": "carton__libote",
+ "category": "carton",
+ "model": "libote",
+ "aabb_extent": [
+  0.21538397669792175,
+  0.21419267356395721,
+  0.13907383382320404
+ ],
+ "support": "table",
+ "joints": [
+  {
+   "joint": "j_link0",
+   "kind": "flap",
+   "grasp_source": "review: No handle; skirted shoebox lid whose rim overhangs the box wall by only ~2 mm, nothing to hook a fingertip under at the front edge.",
+   "stance": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "time_s": 1.0
+}

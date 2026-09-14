@@ -1,0 +1,267 @@
+{
+ "group": "mental_rotation__carving_knife__r1",
+ "task": "mental_rotation",
+ "category": "carving_knife",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "awvoox",
+   "key": "carving_knife__awvoox",
+   "strip": "/tmp/glib/strips/carving_knife__awvoox.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch, natural knife grasp"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    226,
+    30,
+    17
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "handle_half"
+  },
+  {
+   "model": "fqqbop",
+   "key": "carving_knife__fqqbop",
+   "strip": "/tmp/glib/strips/carving_knife__fqqbop.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch, natural knife grasp"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    323,
+    39,
+    24
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "handle_half"
+  },
+  {
+   "model": "zaihmr",
+   "key": "carving_knife__zaihmr",
+   "strip": "/tmp/glib/strips/carving_knife__zaihmr.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch, natural knife grasp"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    277,
+    37,
+    24
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "handle_half"
+  },
+  {
+   "model": "alekva",
+   "key": "carving_knife__alekva",
+   "strip": "/tmp/glib/strips/carving_knife__alekva.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch, natural knife grasp"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    266,
+    34,
+    25
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "handle_half"
+  },
+  {
+   "model": "gixmnd",
+   "key": "carving_knife__gixmnd",
+   "strip": "/tmp/glib/strips/carving_knife__gixmnd.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch, natural knife grasp"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle/bolster pinch"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    321,
+    53,
+    28
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "handle_half"
+  }
+ ],
+ "excluded": []
+}

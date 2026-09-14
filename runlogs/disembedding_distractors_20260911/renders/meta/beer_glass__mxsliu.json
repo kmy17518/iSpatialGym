@@ -1,0 +1,35 @@
+{
+ "category": "beer_glass",
+ "model": "mxsliu",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/beer_glass__mxsliu__y0.png",
+   "drift_m": 0.0007,
+   "tilt_deg": 0.7,
+   "on_tray": true,
+   "settled_z": 0.0582,
+   "seg_pixels": 5835,
+   "aabb_extent": [
+    0.06,
+    0.061,
+    0.117
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/beer_glass__mxsliu__y1.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.0582
+  }
+ },
+ "stable": true,
+ "visible": true
+}

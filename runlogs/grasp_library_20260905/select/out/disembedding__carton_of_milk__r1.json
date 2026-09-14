@@ -1,0 +1,24 @@
+{
+  "group": "disembedding__carton_of_milk__r1", "task": "disembedding", "category": "carton_of_milk", "round": 1, "relation": null,
+  "n_candidates": 4, "n_opened": 4,
+  "candidates": [
+    {"model": "kklgxk", "key": "carton_of_milk__kklgxk", "G": 5, "T": 3, "V": 3, "R": 1, "score": 20,
+     "note": "Slim 45 mm white brick carton with abstract blue splash; five clean top pinches 47/0, tilt 0, hangs vertical; blurry print, no milk cue."},
+    {"model": "xmugpm", "key": "carton_of_milk__xmugpm", "G": 5, "T": 3, "V": 4, "R": 1, "score": 22,
+     "note": "Tall 1 L gable-top carton, white/purple with cows; five identical 84 mm body pinches 50/36 under gable, tilt 0, CoM 70-79 mm; slightly soft print."},
+    {"model": "kszoro", "key": "carton_of_milk__kszoro", "G": 5, "T": 3, "V": 4, "R": 1, "score": 22,
+     "note": "Blue/white Japanese MILK gable carton with cow; five clean 84 mm upper-body pinches 50/36, tilt 0, CoM 56-66 mm; readable print, blurry up close."},
+    {"model": "atyqub", "key": "carton_of_milk__atyqub", "G": 5, "T": 3, "V": 4, "R": 1, "score": 22,
+     "note": "Squat cow-print gable carton labelled cookie, not milk; five 86 mm body pinches 50/37, tilt 0, CoM 45-50 mm, widest base; sharp spots, borderline width."}
+  ],
+  "selected": [
+    {"model": "kszoro", "key": "carton_of_milk__kszoro", "rank": 1,
+     "reason": "Three-way tie at 22; kszoro is the most unmistakable milk carton (MILK text plus cow), clean two-pad body pinches below the gable, stable 181 mm carton."},
+    {"model": "atyqub", "key": "carton_of_milk__atyqub", "rank": 2,
+     "reason": "Tied at 22 and looks different from #1: black/white cow-print squat carton; pinch closest to CoM (45 mm) on the widest base, bottom free."}
+  ],
+  "alternate": {"model": "xmugpm", "key": "carton_of_milk__xmugpm"},
+  "short": false,
+  "warnings": ["all three gable cartons are 84-86 mm wide at the pinch (borderline R 1) and every row rests one finger at the open limit", "kklgxk closes one finger to 0 and its abstract blurry print gives no milk cue (V 3)"],
+  "confidence": "medium"
+}

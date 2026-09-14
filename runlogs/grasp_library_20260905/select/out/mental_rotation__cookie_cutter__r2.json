@@ -1,0 +1,27 @@
+{
+  "group": "mental_rotation__cookie_cutter__r2",
+  "task": "mental_rotation",
+  "category": "cookie_cutter",
+  "round": 2,
+  "relation": null,
+  "n_candidates": 3,
+  "n_opened": 3,
+  "candidates": [
+    {"model": "jpscvj", "key": "cookie_cutter__jpscvj__f", "G": 5, "T": 3, "V": 4, "R": 1, "score": 22,
+     "note": "Star cutter; all 5 rows pinch across star tips at varied tilts (4-179 deg), both pads touch; one finger at 0-3 in rows 1,3,5; clean."},
+    {"model": "lqrfzo", "key": "cookie_cutter__lqrfzo__f", "G": 3, "T": 3, "V": 4, "R": 1, "score": 18,
+     "note": "Flower cutter; 3 clean rows are near-identical single-lobe pinches (20 mm, one finger bottomed at 0); rows 3-4 edge/tip pinches slip."},
+    {"model": "fvxiun", "key": "cookie_cutter__fvxiun__f", "G": 4, "T": 3, "V": 4, "R": 1, "score": 20,
+     "note": "Heart cutter; rows 1-4 clean lobe pinches at varied tilts, finger A idle at 50; row 5 gap 53 vs 34 mm; clean green-rimmed asset."}
+  ],
+  "selected": [
+    {"model": "jpscvj", "key": "cookie_cutter__jpscvj__f", "rank": 1,
+     "reason": "Best grasp set: 5 clean, diverse star-tip pinches, centred CoM, 32-40 mm width; asset clean and clearly a star cutter."},
+    {"model": "fvxiun", "key": "cookie_cutter__fvxiun__f", "rank": 2,
+     "reason": "Within 2 points of lqrfzo but higher G (4 vs 3) and diverse lobe pinches at 43 mm; heart shape gives a distinct second appearance; one-finger closures still hold centrally."}
+  ],
+  "alternate": {"model": "lqrfzo", "key": "cookie_cutter__lqrfzo__f"},
+  "short": false,
+  "warnings": [],
+  "confidence": "high"
+}

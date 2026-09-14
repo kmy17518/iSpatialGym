@@ -1,0 +1,26 @@
+{
+ "category": "broom",
+ "task": "wa1",
+ "n_models": 1,
+ "n_opened": 1,
+ "models": [
+  {
+   "model": "tpyvbt",
+   "V": 4,
+   "U": 2,
+   "H": 1,
+   "score": 13,
+   "valid": true,
+   "front_axis": "+z",
+   "up_axis": "-x",
+   "thin_axis": "z",
+   "note": "Small hand brush lying flat; handle toward -x, bristle block at +x; clean textures; a tool, unusual as a wall item."
+  }
+ ],
+ "picks": [
+  "tpyvbt"
+ ],
+ "alternate": null,
+ "category_verdict": "weak",
+ "category_note": "Single small hand brush (0.27 m) lying flat, handle at -x. Up (handle) is readable from the silhouette, but it is a tool, not normal wall decor; only one model."
+}

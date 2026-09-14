@@ -1,0 +1,204 @@
+{
+ "scene": "house_double_floor_upper",
+ "table": "nightstand_roxnbe_0",
+ "category": "nightstand",
+ "model": "roxnbe",
+ "rooms": [
+  "bedroom_1"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-0",
+ "inventory": {
+  "top_z": 0.7,
+  "bbox_x": 0.53,
+  "bbox_y": 0.775,
+  "bbox_z": 0.7,
+  "verdict": "keep"
+ },
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 21:04:15",
+ "precheck": {
+  "aabb": [
+   [
+    5.537,
+    3.479,
+    0.0
+   ],
+   [
+    6.312,
+    4.01,
+    0.7
+   ]
+  ],
+  "support": {
+   "name": "nightstand_roxnbe_0",
+   "z": 0.6999990344047546,
+   "yaw": -1.5707921981811523,
+   "local_bounds": [
+    -4.008989334106445,
+    -3.4889862537384033,
+    5.54715633392334,
+    6.307158470153809
+   ],
+   "n_free_cells": 1028,
+   "occupants": [
+    "table_lamp_erfbgw_0"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     5.927,
+     3.489
+    ],
+    "length": 0.76
+   },
+   {
+    "name": "-u",
+    "mid": [
+     5.927,
+     4.009
+    ],
+    "length": 0.76
+   },
+   {
+    "name": "+v",
+    "mid": [
+     6.307,
+     3.749
+    ],
+    "length": 0.52
+   },
+   {
+    "name": "-v",
+    "mid": [
+     5.547,
+     3.749
+    ],
+    "length": 0.52
+   }
+  ],
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    5.927143096923828,
+    3.489010810852051
+   ],
+   "inward": [
+    -4.128613909415435e-06,
+    1.0
+   ],
+   "tangent": [
+    -1.0,
+    -4.128613909415435e-06
+   ],
+   "base_pose2d": [
+    5.970478534698486,
+    3.039011001586914,
+    1.570800455408806
+   ],
+   "edge_depth": 0.44999998807907104,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.11937097122935396
+   }
+  },
+  "view_arms": "ready",
+  "precheck_s": 1.3
+ },
+ "status": "no_instances",
+ "n_written": 0,
+ "rejections": {
+  "scene_reset": 1,
+  "target_placement": 4,
+  "partner_placement": 2
+ },
+ "template_meta": {
+  "support": {
+   "name": "nightstand_roxnbe_0",
+   "z": 0.6999990940093994,
+   "yaw": -1.5707926750183105,
+   "local_bounds": [
+    -4.008993148803711,
+    -3.48898983001709,
+    5.547154426574707,
+    6.307156085968018
+   ],
+   "n_free_cells": 1028,
+   "occupants": [
+    "table_lamp_erfbgw_0"
+   ],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    5.92714262008667,
+    3.489011526107788
+   ],
+   "inward": [
+    -3.6517765238386346e-06,
+    1.0
+   ],
+   "tangent": [
+    -1.0,
+    -3.6517765238386346e-06
+   ],
+   "base_pose2d": [
+    5.97047758102417,
+    3.0390117168426514,
+    1.5707999785714204
+   ],
+   "edge_depth": 0.44999995827674866,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.0735097720106498
+   }
+  },
+  "view_arms": "ready",
+  "n_reachable_cells": 11,
+  "n_grasp_cells": 10,
+  "n_grasp_combos": 167,
+  "n_region_cells": 511,
+  "n_visible_cells": 511,
+  "stand_off": 0.45,
+  "edge": null,
+  "rejections": {
+   "scene_reset": 1,
+   "target_placement": 4,
+   "partner_placement": 2
+  },
+  "n_written": 0,
+  "timings": {
+   "bind_spawn_s": 225.82,
+   "prepare_template_s": 0.28
+  }
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/house_double_floor_upper/house_double_floor_upper__nightstand_roxnbe_0__inter_object_relation_satisfaction-0",
+ "bound_table": "nightstand_roxnbe_0",
+ "setup_s": 226.1,
+ "run_s": 2.2,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "no_instances",
+   "n_written": 0,
+   "rejections": {
+    "scene_reset": 1,
+    "target_placement": 4,
+    "partner_placement": 2
+   },
+   "reject_reason": null,
+   "setup_s": 226.1,
+   "run_s": 2.2
+  }
+ ],
+ "job_s": 230.1,
+ "finished": "2026-09-11 21:09:38"
+}

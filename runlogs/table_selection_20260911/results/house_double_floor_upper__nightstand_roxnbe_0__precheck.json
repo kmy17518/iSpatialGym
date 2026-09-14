@@ -1,0 +1,73 @@
+{
+ "scene": "house_double_floor_upper",
+ "table": "nightstand_roxnbe_0",
+ "rooms": [
+  "bedroom_1"
+ ],
+ "removed_chairs": [],
+ "aabb": [
+  [
+   5.537,
+   3.479,
+   0.0
+  ],
+  [
+   6.312,
+   4.01,
+   0.7
+  ]
+ ],
+ "support": {
+  "name": "nightstand_roxnbe_0",
+  "z": 0.6999990940093994,
+  "yaw": -1.5707921981811523,
+  "local_bounds": [
+   -4.0089898109436035,
+   -3.4889864921569824,
+   5.547155380249023,
+   6.307157516479492
+  ],
+  "n_free_cells": 1028,
+  "occupants": [
+   "table_lamp_erfbgw_0"
+  ],
+  "resolution": 0.02
+ },
+ "edges": [
+  {
+   "name": "+u",
+   "mid": [
+    5.927,
+    3.489
+   ],
+   "length": 0.76
+  },
+  {
+   "name": "-u",
+   "mid": [
+    5.927,
+    4.009
+   ],
+   "length": 0.76
+  },
+  {
+   "name": "+v",
+   "mid": [
+    6.307,
+    3.749
+   ],
+   "length": 0.52
+  },
+  {
+   "name": "-v",
+   "mid": [
+    5.547,
+    3.749
+   ],
+   "length": 0.52
+  }
+ ],
+ "stance": null,
+ "stance_error": "[stance_collision] untucked: [no_stance] no collision-free stance around nightstand_roxnbe_0",
+ "precheck_s": 1.0
+}

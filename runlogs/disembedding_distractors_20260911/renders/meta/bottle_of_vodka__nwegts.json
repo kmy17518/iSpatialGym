@@ -1,0 +1,35 @@
+{
+ "category": "bottle_of_vodka",
+ "model": "nwegts",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_vodka__nwegts__y0.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1189,
+   "seg_pixels": 7708,
+   "aabb_extent": [
+    0.087,
+    0.085,
+    0.286
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_vodka__nwegts__y1.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1189
+  }
+ },
+ "stable": true,
+ "visible": true
+}

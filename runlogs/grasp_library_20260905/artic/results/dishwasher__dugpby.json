@@ -1,0 +1,35 @@
+{
+ "key": "dishwasher__dugpby",
+ "category": "dishwasher",
+ "model": "dugpby",
+ "scene": "house_double_floor_lower",
+ "host": "dishwasher_ynrhuk_0",
+ "host_rank": 0,
+ "host_model": "ynrhuk",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "flap",
+   "grasp_source": "manual skip: round-2 review: infeasible - Flush 90 mm slab set inside the cabinet opening; all four edges enclosed, plain ",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.108,
+  1.14,
+  1.259
+ ],
+ "time_s": 1.1
+}

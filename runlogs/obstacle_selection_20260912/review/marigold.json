@@ -1,0 +1,73 @@
+{
+  "category": "marigold",
+  "task": "obst",
+  "n_models": 6,
+  "n_opened": 6,
+  "models": [
+    {
+      "model": "arvona",
+      "V": 3,
+      "N": 0,
+      "S": 1,
+      "rest_ok": false,
+      "score": 7,
+      "valid": false,
+      "note": "Bare marigold plant, no pot or soil: card leaves and orange flowers resting on leaf tips; 0.24 x 0.23 x 0.15 m."
+    },
+    {
+      "model": "jmomsu",
+      "V": 3,
+      "N": 0,
+      "S": 1,
+      "rest_ok": false,
+      "score": 7,
+      "valid": false,
+      "note": "Bare potless marigold, three flowers, low card leaves; 0.20 x 0.19 x 0.15 m; not a floor-standing form."
+    },
+    {
+      "model": "nghkfn",
+      "V": 3,
+      "N": 0,
+      "S": 1,
+      "rest_ok": false,
+      "score": 7,
+      "valid": false,
+      "note": "Bare potless marigold with four flowers, dark low-poly leaves; 0.18 x 0.18 x 0.14 m; rests on foliage, no base."
+    },
+    {
+      "model": "rlapyi",
+      "V": 3,
+      "N": 0,
+      "S": 1,
+      "rest_ok": false,
+      "score": 7,
+      "valid": false,
+      "note": "Bare potless marigold, five flowers, leaf mound; 0.21 x 0.19 x 0.14 m; rests on leaves, no base."
+    },
+    {
+      "model": "ugezjo",
+      "V": 3,
+      "N": 0,
+      "S": 1,
+      "rest_ok": false,
+      "score": 7,
+      "valid": false,
+      "note": "Bare potless marigold, three flowers; 0.16 x 0.19 x 0.13 m; small, no base."
+    },
+    {
+      "model": "zdlpfb",
+      "V": 3,
+      "N": 0,
+      "S": 1,
+      "rest_ok": false,
+      "score": 7,
+      "valid": false,
+      "note": "Sparse potless marigold with thin exposed stems and few leaves; 0.15 x 0.16 x 0.12 m; smallest, spindly."
+    }
+  ],
+  "picks": [],
+  "alternate": null,
+  "natural_scenes": [],
+  "category_verdict": "drop",
+  "category_note": "All six models are bare marigold plants without a pot: leaves and flowers only, 0.12-0.15 m high. Not a floor-standing object and would rest on foliage, so unusable as an obstacle."
+}

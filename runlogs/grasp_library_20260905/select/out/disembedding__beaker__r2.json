@@ -1,0 +1,43 @@
+{
+  "group": "disembedding__beaker__r2",
+  "task": "disembedding",
+  "category": "beaker",
+  "round": 2,
+  "relation": null,
+  "n_candidates": 9,
+  "n_opened": 9,
+  "candidates": [
+    {"model": "dtjmai", "key": "beaker__dtjmai__t", "G": 2, "T": 2, "V": 2, "R": 0, "score": 10,
+     "note": "Hemispherical bowl 84 mm wide, not a beaker; only rim pinches with one finger inside, tilts up to 32 deg; category mismatch, marginal hold."},
+    {"model": "jdijek", "key": "beaker__jdijek__t", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Plain white tapered tumbler; four symmetric body pinches near rim plus one mild 48/31 offset; clean geometry, plain untextured white."},
+    {"model": "rhohgs", "key": "beaker__rhohgs__t", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Marbled tapered tumbler; all five rows 50/29 one-finger pushes ~10 mm off-centre, both pads touch; texture slightly patchy."},
+    {"model": "uobdoq", "key": "beaker__uobdoq__t", "G": 5, "T": 3, "V": 3, "R": 2, "score": 21,
+     "note": "Plain grey tapered tumbler; three 50/29 one-finger rows, two symmetric pinches; clean but dull flat-grey surface."},
+    {"model": "zycgen", "key": "beaker__zycgen__t", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Dark glossy glass tumbler; top row symmetric 41/38 body pinch, three 50/29 rows, one 44/36; sharp reflective material, clean geometry."},
+    {"model": "fyrkzs", "key": "beaker__fyrkzs__t", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Grey metallic tumbler; top row 50/29 one-finger, rows 3 and 5 symmetric 40/40 and 44/35; clean geometry, plain brushed look."},
+    {"model": "exzsal", "key": "beaker__exzsal__t", "G": 4, "T": 3, "V": 4, "R": 0, "score": 19,
+     "note": "White ceramic tapered cup 95x95x102; body exceeds opening so all rows pinch the 4-5 mm rim wall, tilt 9-13 deg; plain clean asset."},
+    {"model": "effbnc", "key": "beaker__effbnc__t", "G": 4, "T": 3, "V": 3, "R": 1, "score": 18,
+     "note": "Faceted weathered-metal beaker 123x146 mm; rim pinches on 13-15 mm lip, top row tilts 15 deg; low-poly facets, size outlier."},
+    {"model": "sfvswx", "key": "beaker__sfvswx__t", "G": 4, "T": 3, "V": 2, "R": 0, "score": 15,
+     "note": "Large faceted flat-grey beaker 126x146 mm; rim pinches on 4-8 mm wall, low tilt; untextured low-poly asset, size outlier."}
+  ],
+  "selected": [
+    {"model": "jdijek", "key": "beaker__jdijek__t", "rank": 1,
+     "reason": "Top score 23; top-ranked row is a symmetric two-sided body pinch and 4/5 rows are genuinely two-sided; tumbler sits stably with bottom free; clean white asset."},
+    {"model": "zycgen", "key": "beaker__zycgen__t", "rank": 2,
+     "reason": "Ties at 23; top row is a symmetric 41/38 body pinch and all rows clean; dark glossy glass contrasts with the white #1 so the pair spans the category's look."}
+  ],
+  "alternate": {"model": "fyrkzs", "key": "beaker__fyrkzs__t"},
+  "short": false,
+  "warnings": [
+    "Four candidates tie at 23 (jdijek, rhohgs, zycgen, fyrkzs); they share one tumbler mesh (78x78x81) with different materials, so the pair differs mainly by material; tie broken by top-row two-sided closure and appearance",
+    "Many rows are 50/29 one-finger closures ~10 mm off gripper centre; counted clean per contract but they are assisted-grasp artefacts (rhohgs has no two-sided closure at all)",
+    "dtjmai is a hemispherical bowl, not a beaker (category mismatch); exzsal, effbnc and sfvswx are wider than the gripper and only graspable by thin rim pinch (R 0-1)"
+  ],
+  "confidence": "medium"
+}

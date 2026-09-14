@@ -1,0 +1,17 @@
+{
+ "group": "configuration_matching__soda_cup__r2",
+ "task": "configuration_matching",
+ "category": "soda_cup",
+ "round": 2,
+ "relation": null,
+ "partner": "F part: partner cap must be fixed",
+ "requirements": "Attachment task: the object is picked from a table and attached to its partner. The pads must leave the mating side of the object completely free.",
+ "candidates": [],
+ "excluded": [
+  {
+   "model": "vicaqs",
+   "key": "soda_cup__vicaqs__a",
+   "reason": "no AG-valid grasp"
+  }
+ ]
+}

@@ -1,0 +1,169 @@
+{
+ "group": "IORS__pepper_shaker__r3",
+ "task": "IORS",
+ "category": "pepper_shaker",
+ "round": 3,
+ "relation": "nextto",
+ "partner": "salt_shaker",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "stbqbt",
+   "key": "pepper_shaker__stbqbt__t",
+   "strip": "/tmp/glib/strips/pepper_shaker__stbqbt__t.png",
+   "n_valid": 2,
+   "n_clean": 1,
+   "n_clean_strict": 1,
+   "flags": [
+    "end_grasp",
+    "penetration"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-cone pinch below cap, 29/0 closed, coverage 0.75"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp",
+      "penetration"
+     ],
+     "note": "fingers fully closed 0/0 through cap; hangs from finial tip"
+    }
+   ],
+   "object_note": "Small conical shaker, only 2/12 candidates valid; row 2 pads meet inside the cap visual.",
+   "bbox_mm": [
+    46,
+    46,
+    73
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ykujyn",
+   "key": "pepper_shaker__ykujyn__t",
+   "strip": "/tmp/glib/strips/pepper_shaker__ykujyn__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 1,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/12: cap pushed against open finger, ~18 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "50/16 idle finger, ~16 mm off-centre, borderline; 62 mm cap"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/14: cap against open finger, ~17 mm off-centre, borderline"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/14: cap against open finger, ~17 mm off-centre, borderline"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/14: cap against open finger, ~17 mm off-centre, borderline"
+    }
+   ],
+   "object_note": "Pinch on 62 mm grinder cap fills most of opening; off-centre 16-18 mm sits right at the flag threshold.",
+   "bbox_mm": [
+    67,
+    67,
+    160
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "tgcwtr",
+   "key": "pepper_shaker__tgcwtr__t",
+   "strip": "/tmp/glib/strips/pepper_shaker__tgcwtr__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 3,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "50/16 idle finger, ~16 mm off-centre, borderline; 63 mm cap"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/12: cap pushed against open finger, ~18 mm off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/14: cap against open finger, ~17 mm off-centre, borderline"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "50/16 idle finger, ~16 mm off-centre, borderline; 62 mm cap"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "50/17 idle finger, ~16 mm off-centre, tilt 9 deg"
+    }
+   ],
+   "object_note": "Pinch on 62-63 mm grinder cap fills most of opening; off-centre 16-18 mm sits right at the flag threshold.",
+   "bbox_mm": [
+    67,
+    67,
+    160
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

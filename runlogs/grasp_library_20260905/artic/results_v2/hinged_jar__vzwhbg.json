@@ -1,0 +1,65 @@
+{
+ "key": "hinged_jar__vzwhbg",
+ "category": "hinged_jar",
+ "model": "vzwhbg",
+ "aabb_extent": [
+  0.2719062566757202,
+  0.20725350081920624,
+  0.21599221229553223
+ ],
+ "support": "table",
+ "joints": [
+  {
+   "joint": "j_rb1",
+   "kind": "flap",
+   "grasp_source": "review:F",
+   "stance": {
+    "base": [
+     0.502,
+     0.199,
+     -0.003
+    ],
+    "translate": 0.5,
+    "sign": 1.0
+   },
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "steps": [
+    "stance ok",
+    "sign +1: grasp: [grasp] o_hinged_jar__vzwhbg not in hand after closing gripper {'in_hand': None}"
+   ],
+   "error": "grasp: [grasp] o_hinged_jar__vzwhbg not in hand after closing gripper {'in_hand': None}",
+   "contact_world": [
+    1.151,
+    -0.003,
+    0.952
+   ],
+   "handle_height": 0.952,
+   "diag": {
+    "eef_pos_err_mm": 29.9,
+    "eef_ang_err_deg": 2.1,
+    "finger_q_mm": [
+     0,
+     43
+    ],
+    "gripper_contacts": [
+     "o_hinged_jar__vzwhbg/base_link",
+     "o_hinged_jar__vzwhbg/rb1"
+    ],
+    "contact_links": {
+     "rb1": [
+      "right_gripper_finger_link1"
+     ],
+     "base_link": [
+      "right_gripper_finger_link2"
+     ]
+    }
+   }
+  }
+ ],
+ "error": null,
+ "time_s": 27.2
+}

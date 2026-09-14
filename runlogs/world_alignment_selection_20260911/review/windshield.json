@@ -1,0 +1,36 @@
+{
+ "category": "windshield",
+ "task": "wa1",
+ "n_models": 2,
+ "n_opened": 0,
+ "models": [
+  {
+   "model": "akoadf",
+   "V": 0,
+   "U": 0,
+   "H": 0,
+   "score": 0,
+   "valid": false,
+   "front_axis": null,
+   "up_axis": null,
+   "thin_axis": null,
+   "note": "Not rendered: render_meta reports RuntimeError 'no visual mesh' (all-glass object); no grid to review, unusable."
+  },
+  {
+   "model": "mdfijk",
+   "V": 0,
+   "U": 0,
+   "H": 0,
+   "score": 0,
+   "valid": false,
+   "front_axis": null,
+   "up_axis": null,
+   "thin_axis": null,
+   "note": "Not rendered: render_meta reports RuntimeError 'no visual mesh' (all-glass object); no grid to review, unusable."
+  }
+ ],
+ "picks": [],
+ "alternate": null,
+ "category_verdict": "drop",
+ "category_note": "No grids exist for this category; both models failed to render with 'no visual mesh' (glass omitted), and a car windshield is not a natural wall item anyway."
+}

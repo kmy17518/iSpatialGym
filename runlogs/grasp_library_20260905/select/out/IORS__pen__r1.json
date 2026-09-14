@@ -1,0 +1,36 @@
+{
+  "group": "IORS__pen__r1",
+  "task": "IORS",
+  "category": "pen",
+  "round": 1,
+  "relation": "ontop",
+  "n_candidates": 6,
+  "n_opened": 6,
+  "candidates": [
+    {"model": "gqwdor", "key": "pen__gqwdor", "G": 5, "T": 3, "V": 4, "R": 1, "score": 22,
+     "note": "Long (186 mm) silver pen with dark grip; five clean mid-body pinches at 10-11 mm; plain but clean."},
+    {"model": "ubwjqa", "key": "pen__ubwjqa", "G": 5, "T": 3, "V": 5, "R": 1, "score": 24,
+     "note": "Short (126 mm) blue ballpoint with chrome top; five clean body pinches at 10-13 mm; sharp, highly recognisable."},
+    {"model": "enfumt", "key": "pen__enfumt", "G": 5, "T": 3, "V": 3, "R": 1, "score": 20,
+     "note": "Plain white thin pen; five clean mid-body pinches at 11-12 mm; low recognisability, almost untextured white body."},
+    {"model": "nvyicz", "key": "pen__nvyicz", "G": 5, "T": 3, "V": 3, "R": 1, "score": 20,
+     "note": "Transparent Bic-style pen with gold tip; five body pinches at 9-12 mm; barrel nearly invisible in V1/V2, perception risk."},
+    {"model": "gzrbrx", "key": "pen__gzrbrx", "G": 5, "T": 3, "V": 5, "R": 1, "score": 24,
+     "note": "Red rollerball with black bands (158 mm); five clean body/cap-junction pinches at 11-12 mm; sharp and recognisable."},
+    {"model": "hiyeki", "key": "pen__hiyeki", "G": 5, "T": 3, "V": 5, "R": 1, "score": 24,
+     "note": "Chrome pen with black bands (142 mm); five clean body pinches at 10-11 mm matching thickness; polished, recognisable."}
+  ],
+  "selected": [
+    {"model": "gzrbrx", "key": "pen__gzrbrx", "rank": 1,
+     "reason": "Top score; tie broken by high visibility (red) and typical 158 mm length; five clean body pinches, bottom free, pen rests stable."},
+    {"model": "hiyeki", "key": "pen__hiyeki", "rank": 2,
+     "reason": "Same score, visibly different from #1 (chrome metal vs red plastic); closest hull/visual match (11/0 on 11 mm); typical length."}
+  ],
+  "alternate": {"model": "ubwjqa", "key": "pen__ubwjqa"},
+  "short": false,
+  "warnings": [
+    "All pens pinch at 9-13 mm, so R=1 for every candidate (inherent to the category).",
+    "nvyicz transparent barrel and enfumt plain white body are hard to see in the profile views."
+  ],
+  "confidence": "high"
+}

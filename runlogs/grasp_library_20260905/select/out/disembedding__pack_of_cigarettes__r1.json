@@ -1,0 +1,48 @@
+{
+  "group": "disembedding__pack_of_cigarettes__r1",
+  "task": "disembedding",
+  "category": "pack_of_cigarettes",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 12,
+  "n_opened": 12,
+  "candidates": [
+    {"model": "ajphvf", "key": "pack_of_cigarettes__ajphvf", "G": 3, "T": 3, "V": 5, "R": 2, "score": 21,
+     "note": "Orange Meng Du pack, crisp texture; all five rows one-finger (50/4), pack pushed ~22 mm off-centre, no two-sided pinch available."},
+    {"model": "dthkix", "key": "pack_of_cigarettes__dthkix", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Red Nan Fang pack; top row one-finger 50/4, row 2 two-sided 44/12; back-face script blurry in wrist camera."},
+    {"model": "wpmpcf", "key": "pack_of_cigarettes__wpmpcf", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Gold Pride panda pack; top two rows one-finger 50/4, rows 4-5 two-sided; wrist-camera texture slightly soft."},
+    {"model": "ppbmak", "key": "pack_of_cigarettes__ppbmak", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Red Taishan pack, crisp texture; top row centred two-sided pinch 44/11 across 55 mm width, all rows hold pack cleanly."},
+    {"model": "ipmejr", "key": "pack_of_cigarettes__ipmejr", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "White/blue Diamond pack, crisp constellation art; top row one-finger 50/4, row 4 two-sided 39/17; clean geometry."},
+    {"model": "qldhnm", "key": "pack_of_cigarettes__qldhnm", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "White Diamond pack (blue star circle), crisp; top row 48/7 open finger barely moved, row 2 two-sided 44/11."},
+    {"model": "hmhqkq", "key": "pack_of_cigarettes__hmhqkq", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "White Tiger pack with warning text; top row one-finger 50/4, row 5 two-sided 37/20; striped side-face texture looks odd."},
+    {"model": "cfmlhf", "key": "pack_of_cigarettes__cfmlhf", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Dark red Jiaozi panda pack, crisp gold detailing; top row 48/8 one-finger, row 2 two-sided 42/15 centred."},
+    {"model": "gzxueq", "key": "pack_of_cigarettes__gzxueq", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "White Hongmei plum-blossom pack, crisp; top row one-finger 50/4, row 3 two-sided 39/17; pack fills opening."},
+    {"model": "ghbqav", "key": "pack_of_cigarettes__ghbqav", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Beige Maoshan pack; top row two-sided 41/15 near centre, row 5 43/12; texture complete but soft/low-res."},
+    {"model": "qabdgg", "key": "pack_of_cigarettes__qabdgg", "G": 5, "T": 3, "V": 3, "R": 2, "score": 21,
+     "note": "Large standing green/white box (125x55x80) with health-warning image; centred two-sided top pinch 40/17; size outlier, plain faces."},
+    {"model": "rmrubd", "key": "pack_of_cigarettes__rmrubd", "G": 4, "T": 3, "V": 3, "R": 2, "score": 19,
+     "note": "Large standing navy/white swirl box (125x55x80); top row one-finger 50/4, row 2 40/17; row 5 box rolled onto corner contacts; generic look."}
+  ],
+  "selected": [
+    {"model": "ppbmak", "key": "pack_of_cigarettes__ppbmak", "rank": 1,
+     "reason": "Only flat pack combining a crisp texture with a centred two-sided top pinch (44/11) across the 55 mm width; every row clean; lies flat and stable."},
+    {"model": "ghbqav", "key": "pack_of_cigarettes__ghbqav", "rank": 2,
+     "reason": "Tied at 23 with four others; chosen for its natural two-sided top pinch (41/15) and beige look contrasting the red #1; texture slightly soft."}
+  ],
+  "alternate": {"model": "ipmejr", "key": "pack_of_cigarettes__ipmejr"},
+  "short": false,
+  "warnings": [
+    "Most candidates' top-ranked row is a one-finger (50/x) push with the pack ~20 mm off the gripper centre; only ppbmak, ghbqav and qabdgg have a two-sided top pinch.",
+    "qabdgg and rmrubd are 125x55x80 standing boxes, a size/shape outlier for the category."
+  ],
+  "confidence": "medium"
+}

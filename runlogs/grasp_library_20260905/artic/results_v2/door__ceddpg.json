@@ -1,0 +1,15 @@
+{
+ "key": "door__ceddpg",
+ "category": "door",
+ "model": "ceddpg",
+ "scene": "Rs_int",
+ "host": "door_lvgliq_0",
+ "host_rank": 1,
+ "host_model": "lvgliq",
+ "swap": true,
+ "joints": [],
+ "error": "RuntimeError('swap skipped: host/test aspect mismatch, scale factors [4.74, 0.14, 0.86]')",
+ "previous_hosts": [
+  "door_ktydvs_0"
+ ]
+}

@@ -1,0 +1,60 @@
+{
+  "category": "hat",
+  "task": "wa1",
+  "n_models": 4,
+  "n_opened": 4,
+  "models": [
+    {
+      "model": "avvknr",
+      "V": 4,
+      "U": 1,
+      "H": 0,
+      "score": 10,
+      "valid": false,
+      "front_axis": "+z",
+      "up_axis": "+y",
+      "thin_axis": "z",
+      "note": "Wide-brim straw sun hat 0.42 x 0.45 m, crown 19 cm tall; nice texture but almost round from the front, no upright."
+    },
+    {
+      "model": "ldxyyc",
+      "V": 4,
+      "U": 1,
+      "H": 0,
+      "score": 10,
+      "valid": false,
+      "front_axis": "+z",
+      "up_axis": "+y",
+      "thin_axis": "z",
+      "note": "Grey trilby 0.38 x 0.33 m, 17 cm tall; only the pinched crown hints at a direction, 180-deg ambiguity, too thick."
+    },
+    {
+      "model": "wkrzep",
+      "V": 4,
+      "U": 1,
+      "H": 0,
+      "score": 10,
+      "valid": false,
+      "front_axis": "+z",
+      "up_axis": "+y",
+      "thin_axis": "z",
+      "note": "Brown fedora with light band 0.41 x 0.38 m, 17 cm tall; teardrop crown is a weak cue, not flat."
+    },
+    {
+      "model": "zymxgw",
+      "V": 3,
+      "U": 1,
+      "H": 0,
+      "score": 8,
+      "valid": false,
+      "front_axis": "+z",
+      "up_axis": "+y",
+      "thin_axis": "z",
+      "note": "Black hat 0.41 x 0.37 m, 16 cm tall; very dark low-detail textures, round silhouette."
+    }
+  ],
+  "picks": [],
+  "alternate": null,
+  "category_verdict": "drop",
+  "category_note": "Fedora/sun hats 0.33-0.45 m across and 0.16-0.19 m tall standing crown-up. Seen crown-on from a wall hook they are nearly round with no conventional upright, and they are far too thick to count as flat wall items."
+}

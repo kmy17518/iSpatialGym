@@ -1,0 +1,387 @@
+{
+ "reviewer": "rev_03",
+ "task": "obst",
+ "categories": [
+  "alphabet_abacus",
+  "bowling_ball",
+  "box_of_fruit",
+  "doll",
+  "folding_chair",
+  "mop_bucket",
+  "music_stool",
+  "plant_pot",
+  "satchel",
+  "stand",
+  "toolbox",
+  "trash_can"
+ ],
+ "grids": [
+  "renders/grids/alphabet_abacus_00.png",
+  "renders/grids/bowling_ball_00.png",
+  "renders/grids/box_of_fruit_00.png",
+  "renders/grids/doll_00.png",
+  "renders/grids/folding_chair_00.png",
+  "renders/grids/mop_bucket_00.png",
+  "renders/grids/music_stool_00.png",
+  "renders/grids/plant_pot_00.png",
+  "renders/grids/satchel_00.png",
+  "renders/grids/stand_00.png",
+  "renders/grids/toolbox_00.png",
+  "renders/grids/trash_can_00.png",
+  "renders/grids/trash_can_01.png",
+  "renders/grids/trash_can_02.png"
+ ],
+ "hints": {
+  "trash_can": {
+   "why": "household waste bins ~0.35 x 0.36 x 0.41 m (15 ready): kitchens, bathrooms, bedrooms, offices",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "n_models": 15,
+   "bbox_m": {
+    "cdzyew": [
+     0.289,
+     0.243,
+     0.391
+    ],
+    "cjmezk": [
+     0.384,
+     0.383,
+     0.421
+    ],
+    "djgllo": [
+     0.355,
+     0.355,
+     0.397
+    ],
+    "dnvpag": [
+     0.349,
+     0.343,
+     0.358
+    ],
+    "eahqyq": [
+     0.28,
+     0.359,
+     0.486
+    ],
+    "gilsji": [
+     0.355,
+     0.355,
+     0.397
+    ],
+    "gxajos": [
+     0.36,
+     0.365,
+     0.396
+    ],
+    "hqdnjz": [
+     0.356,
+     0.356,
+     0.41
+    ],
+    "ifzxzj": [
+     0.311,
+     0.405,
+     0.795
+    ],
+    "jlawet": [
+     0.28,
+     0.279,
+     0.28
+    ],
+    "rbqckd": [
+     0.446,
+     0.446,
+     0.503
+    ],
+    "uknjdm": [
+     0.375,
+     0.377,
+     0.421
+    ],
+    "vasiit": [
+     0.372,
+     0.376,
+     0.421
+    ],
+    "wklill": [
+     0.41,
+     0.295,
+     0.44
+    ],
+    "wkxtxh": [
+     0.23,
+     0.23,
+     0.279
+    ]
+   }
+  },
+  "stand": {
+   "why": "0.56 x 0.63 x 0.46 m stands (luggage rack?); already stands in the hotel suite",
+   "natural_scenes": [
+    "hotel_suite_large",
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {
+    "hotel_suite_large": [
+     "bedroom"
+    ]
+   },
+   "n_models": 5,
+   "bbox_m": {
+    "dbskvf": [
+     0.559,
+     7.539,
+     0.376
+    ],
+    "kwkcjq": [
+     0.4,
+     0.626,
+     0.456
+    ],
+    "oyenza": [
+     0.4,
+     0.626,
+     0.456
+    ],
+    "vyrick": [
+     0.61,
+     0.762,
+     0.894
+    ],
+    "waxtja": [
+     0.6,
+     0.6,
+     0.368
+    ]
+   }
+  },
+  "plant_pot": {
+   "why": "empty / soil-filled pots ~0.22 m: garden door, garage, corridor",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "n_models": 4,
+   "bbox_m": {
+    "gtnmis": [
+     0.22,
+     0.22,
+     0.237
+    ],
+    "ihnfbi": [
+     0.164,
+     0.164,
+     0.126
+    ],
+    "vhglly": [
+     0.237,
+     0.237,
+     0.244
+    ],
+    "wvgsqk": [
+     0.22,
+     0.22,
+     0.247
+    ]
+   }
+  },
+  "folding_chair": {
+   "why": "folding chairs ~0.88 x 0.48 x 0.59 m (check the canonical pose): garage, office, conference hall",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "n_models": 3,
+   "bbox_m": {
+    "dqhazh": [
+     0.877,
+     0.505,
+     0.658
+    ],
+    "dxergu": [
+     0.86,
+     0.419,
+     0.53
+    ],
+    "vngcqu": [
+     0.981,
+     0.479,
+     0.593
+    ]
+   }
+  },
+  "box_of_fruit": {
+   "why": "0.39 x 0.56 x 0.15 m produce crate: diner kitchen, kitchen, garage",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "n_models": 2,
+   "bbox_m": {
+    "jsgbcz": [
+     0.398,
+     0.534,
+     0.154
+    ],
+    "jzfgwc": [
+     0.39,
+     0.576,
+     0.154
+    ]
+   }
+  },
+  "music_stool": {
+   "why": "0.41 x 0.42 x 0.81 m stools: living room, bar",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "n_models": 2,
+   "bbox_m": {
+    "bjtbrp": [
+     0.348,
+     0.355,
+     0.574
+    ],
+    "dqvlff": [
+     0.482,
+     0.482,
+     1.048
+    ]
+   }
+  },
+  "alphabet_abacus": {
+   "why": "0.15 x 0.32 x 0.39 m toddler abacus: child's room",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "wojwvu": [
+     0.153,
+     0.322,
+     0.393
+    ]
+   }
+  },
+  "bowling_ball": {
+   "why": "0.22 m bowling ball (rolling risk): garage, closet",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "qzzett": [
+     0.22,
+     0.22,
+     0.22
+    ]
+   }
+  },
+  "doll": {
+   "why": "0.45 x 0.37 x 0.35 m doll: child's room",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "fhdgrp": [
+     0.446,
+     0.37,
+     0.352
+    ]
+   }
+  },
+  "mop_bucket": {
+   "why": "0.35 x 0.59 x 0.43 m janitor mop bucket: office corridor, diner kitchen, garage",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "xjzyfc": [
+     0.351,
+     0.593,
+     0.432
+    ]
+   }
+  },
+  "satchel": {
+   "why": "0.46 x 0.54 x 0.24 m satchel: office, entryway, hotel",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "ppzjuj": [
+     0.459,
+     0.544,
+     0.241
+    ]
+   }
+  },
+  "toolbox": {
+   "why": "0.26 x 0.61 x 0.35 m toolbox: garage, utility room",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "redmtl": [
+     0.26,
+     0.608,
+     0.35
+    ]
+   }
+  }
+ },
+ "n_models": 37
+}

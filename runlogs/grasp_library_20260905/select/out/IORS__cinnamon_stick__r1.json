@@ -1,0 +1,41 @@
+{
+  "group": "IORS__cinnamon_stick__r1",
+  "task": "IORS",
+  "category": "cinnamon_stick",
+  "round": 1,
+  "relation": "nextto",
+  "n_candidates": 8,
+  "n_opened": 8,
+  "candidates": [
+    {"model": "hjhcpm", "key": "cinnamon_stick__hjhcpm__s", "G": 0, "T": 3, "V": 4, "R": 0, "score": 11,
+     "note": "Short thick quill (98 mm), nice bark; both rows close to 3-4 mm aperture through the 15 mm stick, fingertips inside quill; scaled z x2.51."},
+    {"model": "cdkjfo", "key": "cinnamon_stick__cdkjfo__s", "G": 0, "T": 3, "V": 4, "R": 1, "score": 12,
+     "note": "Long thin quill, anisotropic scale (x1.65, z2.42) slightly distorts curl; both rows close to 4 mm on a 17 mm stick: penetration."},
+    {"model": "qxpzdm", "key": "cinnamon_stick__qxpzdm__s", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Long 161 mm quill, clean bark texture; rows 1-2 snug 20-21 mm top pinches at middle; rows 3-5 yawed, 14-15 mm apertures across thinner curl."},
+    {"model": "qsqvgk", "key": "cinnamon_stick__qsqvgk__s", "G": 0, "T": 3, "V": 5, "R": 1, "score": 14,
+     "note": "Good-looking 140 mm quill; all three rows close to 2-5 mm aperture on 17 mm stick, wrist view shows pads inside the curl."},
+    {"model": "kdaxdy", "key": "cinnamon_stick__kdaxdy__s", "G": 2, "T": 3, "V": 5, "R": 2, "score": 19,
+     "note": "Handsome double-curl quill, sharp bark; two clean centred top pinches (21 mm on 20-21 mm), row 2 tilted 35 deg; only 2 valid grasps."},
+    {"model": "smfuqz", "key": "cinnamon_stick__smfuqz__s", "G": 0, "T": 3, "V": 4, "R": 1, "score": 12,
+     "note": "Straight tube-like quill, fine texture; apertures 5/7/11 mm on an 18 mm stick, pads sunk into bark in every row."},
+    {"model": "bmbjdf", "key": "cinnamon_stick__bmbjdf__s", "G": 0, "T": 2, "V": 3, "R": 0, "score": 8,
+     "note": "Small banded bundle variant (92 mm), dim close-up; single row closes fully 0/0 at the bundle end, tilt 31: penetration and end pinch."},
+    {"model": "qmlyim", "key": "cinnamon_stick__qmlyim__s", "G": 1, "T": 2, "V": 4, "R": 1, "score": 13,
+     "note": "Curved quill, good bark; row 1 13 mm aperture on 18 mm stick, tilt 34 (borderline); row 2 8 mm aperture sinks into curl."}
+  ],
+  "selected": [
+    {"model": "qxpzdm", "key": "cinnamon_stick__qxpzdm__s", "rank": 1,
+     "reason": "Highest score: top row is a snug centred top pinch (21 mm on 19 mm), four more usable rows, sharp bark, 161 mm quill; scaled z x1.97."},
+    {"model": "kdaxdy", "key": "cinnamon_stick__kdaxdy__s", "rank": 2,
+     "reason": "Clear second (19): both validated rows are clean snug centred pinches with bottom free, excellent double-curl texture; only 2 grasps; scaled z x1.87."}
+  ],
+  "alternate": {"model": "qmlyim", "key": "cinnamon_stick__qmlyim__s"},
+  "short": false,
+  "warnings": [
+    "hjhcpm, cdkjfo, qsqvgk, smfuqz and bmbjdf have collision hulls far smaller than the visual quill (fingers close to 0-5 mm on 15-18 mm sticks); none is selectable despite good textures.",
+    "kdaxdy has only two validated grasps; qxpzdm rows 3-5 close to 14-15 mm on a 19 mm stick (yawed pinch), so rely on its rows 1-2.",
+    "Alternate qmlyim has a single borderline-clean row (13 mm aperture on 18 mm) and is weak."
+  ],
+  "confidence": "high"
+}

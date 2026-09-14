@@ -1,0 +1,6 @@
+{"key": "bottom_cabinet_no_top__qohxjq", "joint": "j_link_0", "feasible": true,
+ "proposal": {"face": "outer", "a": 0.5, "b": 0.5, "pinch": "vertical", "approach": "front", "depth_mm": 5,
+              "expected_motion": "pull"},
+ "alternative": null,
+ "note": "Small horizontal bar pull at drawer centre, ~52x13 mm, protrudes ~11 mm on flat front; close fingers above/below bar and pull out.",
+ "confidence": "medium"}

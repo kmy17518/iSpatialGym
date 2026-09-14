@@ -1,0 +1,24 @@
+{
+ "category": "chopping_block",
+ "task": "wa0",
+ "n_models": 1,
+ "n_opened": 1,
+ "models": [
+  {
+   "model": "ekowsj",
+   "V": 4,
+   "O": 0,
+   "F": 2,
+   "score": 10,
+   "valid": false,
+   "long_axis": "x",
+   "front_axis": "-x",
+   "rest_ok": true,
+   "note": "Round tree-slice slab 0.30x0.27 m, dark wood grain; nearly circular, no readable yaw; front axis arbitrary."
+  }
+ ],
+ "picks": [],
+ "alternate": null,
+ "category_verdict": "drop",
+ "category_note": "Single model is a round rustic wood slice; flat and table-sized but rotationally symmetric, so no aligned yaw can be read."
+}

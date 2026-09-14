@@ -1,0 +1,318 @@
+{
+ "group": "mental_rotation__teacup__r1",
+ "task": "mental_rotation",
+ "category": "teacup",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "vckahe",
+   "key": "teacup__vckahe",
+   "strip": "/tmp/glib/strips/teacup__vckahe.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "bowl pinch: one finger inside cup, one outside"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "bowl pinch: one finger inside cup, one outside"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "bowl pinch: one finger inside cup, one outside"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "bowl pinch: one finger inside cup, one outside"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "bowl pinch: one finger inside cup, one outside"
+    }
+   ],
+   "object_note": "Small bowl-shaped cup; one finger enters the bowl, pads contact the curved shell at different heights",
+   "bbox_mm": [
+    91,
+    73,
+    35
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "tfzfam",
+   "key": "teacup__tfzfam",
+   "strip": "/tmp/glib/strips/teacup__tfzfam.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, cup hangs from fingertips"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, cup hangs from fingertips"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, cup hangs from fingertips"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, cup hangs from fingertips"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, cup hangs from fingertips"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    73,
+    73,
+    52
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "zdvgol",
+   "key": "teacup__zdvgol",
+   "strip": "/tmp/glib/strips/teacup__zdvgol.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch at flared widest section, pads flush"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch at flared widest section, pads flush"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch at flared widest section, pads flush"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch at flared widest section, pads flush"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on flare, cup hangs"
+    }
+   ],
+   "object_note": "Tulip cup; body grasps read fingers 50/14 but both pads sit flush on the wide flared section",
+   "bbox_mm": [
+    75,
+    75,
+    58
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "oxfzfe",
+   "key": "teacup__oxfzfe",
+   "strip": "/tmp/glib/strips/teacup__oxfzfe.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim wall pinch, handle free"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim wall pinch, handle free"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim wall pinch, handle free"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim wall pinch, handle free"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim wall pinch, handle free"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    130,
+    94,
+    71
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "cpozxi",
+   "key": "teacup__cpozxi",
+   "strip": "/tmp/glib/strips/teacup__cpozxi.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim wall pinch from above, 7 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim wall pinch from above"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim wall pinch from above"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim wall pinch from above"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim wall pinch from above"
+    }
+   ],
+   "object_note": "handleless cup; all grasps pinch the 7-11 mm rim wall, tight closure",
+   "bbox_mm": [
+    87,
+    87,
+    106
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "wopjex",
+   "key": "teacup__wopjex",
+   "strip": "/tmp/glib/strips/teacup__wopjex.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on tall mug, cup hangs tilted"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on tall mug, cup hangs tilted"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on tall mug, cup hangs tilted"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on tall mug, cup hangs tilted"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on tall mug, cup hangs tilted"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    115,
+    89,
+    93
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

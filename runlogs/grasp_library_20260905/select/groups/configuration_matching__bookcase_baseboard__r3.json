@@ -1,0 +1,63 @@
+{
+ "group": "configuration_matching__bookcase_baseboard__r3",
+ "task": "configuration_matching",
+ "category": "bookcase_baseboard",
+ "round": 3,
+ "relation": null,
+ "partner": "M -> bookcase_side",
+ "requirements": "Attachment task: the object is picked from a table and attached to its partner. The pads must leave the mating side of the object completely free.",
+ "candidates": [
+  {
+   "model": "hlhneo",
+   "key": "bookcase_baseboard__hlhneo__a",
+   "strip": "/tmp/glib/strips/bookcase_baseboard__hlhneo__a.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across 67 mm width near board centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across width near board centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across width, 21 mm from CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt along board, pads on narrow edges"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt along board, pads on narrow edges"
+    }
+   ],
+   "object_note": "long board pinched on narrow edges within ~2 cm of CoM; V1 partly occluded by robot arm",
+   "bbox_mm": [
+    67,
+    742,
+    20
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "attachment_free"
+  }
+ ],
+ "excluded": []
+}

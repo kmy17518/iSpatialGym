@@ -1,0 +1,26 @@
+{
+  "category": "longboard",
+  "task": "wa2",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "osdbnt",
+      "V": 4,
+      "L": 3,
+      "H": 1,
+      "score": 15,
+      "valid": true,
+      "front_axis": "-z",
+      "level_axis": "y",
+      "up_axis": "+x",
+      "symmetric_180": true,
+      "thin_axis": "z",
+      "note": "Black electric-style longboard 1.04 m along y, wheels and battery box at -z, 0.15 thick; clean geometry, uniform dark texture."
+    }
+  ],
+  "picks": ["osdbnt"],
+  "alternate": null,
+  "category_verdict": "weak",
+  "category_note": "Single complete longboard 1.04 x 0.33 x 0.15 m with wheels; 3:1 outline reads level instantly, wall display is natural, but length and depth sit at the borderline."
+}

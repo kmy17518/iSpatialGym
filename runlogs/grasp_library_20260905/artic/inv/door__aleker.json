@@ -1,0 +1,253 @@
+{
+ "category": "door",
+ "model": "aleker",
+ "key": "door__aleker",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  1.397560477256775
+ ],
+ "aabb_extent": [
+  0.21721315383911133,
+  3.000000238418579,
+  2.750000476837158
+ ],
+ "aabb_min_rel_root": [
+  -0.08716531842947006,
+  -1.5000003576278687,
+  -1.397560477256775
+ ],
+ "aabb_max_rel_root": [
+  0.13004782795906067,
+  1.4999998807907104,
+  1.3524399995803833
+ ],
+ "link_tags": {
+  "base_link": [
+   "locked"
+  ],
+  "door1": [],
+  "glass1": [
+   "glass"
+  ],
+  "handle1": [],
+  "door2": [],
+  "glass2": [
+   "glass"
+  ],
+  "handle2": [],
+  "door3": [],
+  "glass3": [
+   "glass"
+  ],
+  "handle3": [],
+  "door4": [],
+  "glass4": [
+   "glass"
+  ],
+  "handle4": [],
+  "topglass": [
+   "glass"
+  ]
+ },
+ "openable_joint_ids": [],
+ "joints": [
+  {
+   "joint": "j_door1",
+   "type": "RevoluteJoint",
+   "child_link": "door1",
+   "lower": 0.0,
+   "upper": 1.5707963705062866,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    -0.00728,
+    -0.76492,
+    -0.3409
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "hinge_point_obj": [
+    -0.00728,
+    -0.76492,
+    -0.24031
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/door__aleker__door1.obj",
+   "n_pieces": 4,
+   "link_bbox_min": [
+    -0.042,
+    -1.45,
+    -1.3476
+   ],
+   "link_bbox_max": [
+    0.018,
+    -0.7375,
+    0.7524
+   ],
+   "link_tags": [],
+   "sub_links": []
+  },
+  {
+   "joint": "j_door2",
+   "type": "RevoluteJoint",
+   "child_link": "door2",
+   "lower": 0.0,
+   "upper": 1.5707963705062866,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    -0.00884,
+    -0.70731,
+    -0.34237
+   ],
+   "link_quat_obj": [
+    -0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    -0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    -0.00884,
+    -0.70731,
+    -0.34237
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/door__aleker__door2.obj",
+   "n_pieces": 4,
+   "link_bbox_min": [
+    -0.042,
+    -0.7375,
+    -1.3476
+   ],
+   "link_bbox_max": [
+    0.018,
+    -0.0,
+    0.7524
+   ],
+   "link_tags": [],
+   "sub_links": []
+  },
+  {
+   "joint": "j_door3",
+   "type": "RevoluteJoint",
+   "child_link": "door3",
+   "lower": 0.0,
+   "upper": 1.5707964897155762,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    -0.00645,
+    0.70594,
+    -0.34237
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "hinge_point_obj": [
+    -0.00645,
+    0.70594,
+    -0.34237
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/door__aleker__door3.obj",
+   "n_pieces": 4,
+   "link_bbox_min": [
+    -0.042,
+    -0.0,
+    -1.3476
+   ],
+   "link_bbox_max": [
+    0.018,
+    0.7375,
+    0.7524
+   ],
+   "link_tags": [],
+   "sub_links": []
+  },
+  {
+   "joint": "j_door4",
+   "type": "RevoluteJoint",
+   "child_link": "door4",
+   "lower": 0.0,
+   "upper": 1.5707966089248657,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    -0.0091,
+    0.76763,
+    -0.3409
+   ],
+   "link_quat_obj": [
+    -0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    -0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    -0.0091,
+    0.76764,
+    -0.3409
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/door__aleker__door4.obj",
+   "n_pieces": 4,
+   "link_bbox_min": [
+    -0.042,
+    0.7375,
+    -1.3476
+   ],
+   "link_bbox_max": [
+    0.018,
+    1.45,
+    0.7524
+   ],
+   "link_tags": [],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.073,
+   -1.5,
+   -1.3976
+  ],
+  "bbox_max": [
+   0.13,
+   1.5,
+   1.3524
+  ],
+  "n_pieces": 5
+ }
+}

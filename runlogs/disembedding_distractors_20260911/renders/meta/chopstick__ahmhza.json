@@ -1,0 +1,35 @@
+{
+ "category": "chopstick",
+ "model": "ahmhza",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/chopstick__ahmhza__y0.png",
+   "drift_m": 0.0037,
+   "tilt_deg": 75.6,
+   "on_tray": true,
+   "settled_z": 0.0027,
+   "seg_pixels": 606,
+   "aabb_extent": [
+    0.226,
+    0.013,
+    0.008
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/chopstick__ahmhza__y1.png",
+   "drift_m": 0.0037,
+   "tilt_deg": 75.8,
+   "on_tray": true,
+   "settled_z": 0.0032
+  }
+ },
+ "stable": false,
+ "visible": true
+}

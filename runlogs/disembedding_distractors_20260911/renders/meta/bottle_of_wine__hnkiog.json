@@ -1,0 +1,53 @@
+{
+ "category": "bottle_of_wine",
+ "model": "hnkiog",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0,
+  180.0,
+  270.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_wine__hnkiog__y0.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0919,
+   "seg_pixels": 9989,
+   "aabb_extent": [
+    0.065,
+    0.066,
+    0.242
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_wine__hnkiog__y1.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0919
+  },
+  "y2": {
+   "yaw_deg": 180.0,
+   "png": "renders/bottle_of_wine__hnkiog__y2.png",
+   "drift_m": 0.0007,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.0919
+  },
+  "y3": {
+   "yaw_deg": 270.0,
+   "png": "renders/bottle_of_wine__hnkiog__y3.png",
+   "drift_m": 0.0007,
+   "tilt_deg": 0.4,
+   "on_tray": true,
+   "settled_z": 0.0919
+  }
+ },
+ "stable": true,
+ "visible": true
+}

@@ -1,0 +1,136 @@
+{
+ "scene": "hotel_suite_large",
+ "table": "ottoman_hnmndv_0",
+ "category": "ottoman",
+ "model": "hnmndv",
+ "rooms": [
+  "bedroom_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-4",
+ "inventory": {
+  "top_z": 0.472,
+  "bbox_x": 0.452,
+  "bbox_y": 1.474,
+  "bbox_z": 0.47,
+  "verdict": "low"
+ },
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 22:27:25",
+ "precheck": {
+  "aabb": [
+   [
+    -0.086,
+    -3.297,
+    -0.006
+   ],
+   [
+    0.395,
+    -1.799,
+    0.506
+   ]
+  ],
+  "support": {
+   "name": "ottoman_hnmndv_0",
+   "z": 0.49478766322135925,
+   "yaw": -0.009317874908447266,
+   "local_bounds": [
+    -0.03946545720100403,
+    0.4051743447780609,
+    -3.22599196434021,
+    -1.8234435319900513
+   ],
+   "n_free_cells": 1468,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     0.382,
+     -2.528
+    ],
+    "length": 1.403
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -0.063,
+     -2.524
+    ],
+    "length": 1.403
+   },
+   {
+    "name": "+v",
+    "mid": [
+     0.166,
+     -1.825
+    ],
+    "length": 0.445
+   },
+   {
+    "name": "-v",
+    "mid": [
+     0.153,
+     -3.228
+    ],
+    "length": 0.445
+   }
+  ],
+  "stance": {
+   "edge": "-v",
+   "edge_mid": [
+    0.15278756618499756,
+    -3.227555751800537
+   ],
+   "inward": [
+    0.009317739866673946,
+    0.9999566078186035
+   ],
+   "tangent": [
+    -0.9999566078186035,
+    0.009317739866673946
+   ],
+   "base_pose2d": [
+    0.14792588353157043,
+    -3.749300003051758,
+    1.5614784522709257
+   ],
+   "edge_depth": 0.5217669010162354,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8499999642372131,
+    "axis_angle": 0.01619463395460224
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.9
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "view_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/hotel_suite_large/hotel_suite_large__ottoman_hnmndv_0__inter_object_relation_satisfaction-4",
+ "setup_s": 25.0,
+ "reject_reason": "no_support",
+ "error": "[no_support] ottoman_hnmndv_0: [no_stance] stand_off 0.45 edge None: [unreachable] no reachable cell on the support; stand_off 0.35 edge None: [unreachable] no reachable cell on the support; stand_off 0.55 edge None: [unreachable] no reachable cell on the support; stand_off 0.65 edge None: [unreachable] no reachable cell on the support",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 25.0,
+   "run_s": null
+  }
+ ],
+ "job_s": 27.2,
+ "finished": "2026-09-11 22:27:52"
+}

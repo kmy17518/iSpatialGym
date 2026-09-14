@@ -1,0 +1,83 @@
+{
+ "key": "bottom_cabinet__gvtucm",
+ "category": "bottom_cabinet",
+ "model": "gvtucm",
+ "scene": "office_cubicles_right",
+ "host": "bottom_cabinet_rvunhj_2",
+ "host_rank": 2,
+ "host_model": "rvunhj",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "drawer",
+   "grasp_source": "review: Flush wooden sliding-door panel (upper left, inner track); no handle, top edge runs hidden inside the frame track, F marker occluded",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  },
+  {
+   "joint": "j_link_1",
+   "kind": "drawer",
+   "grasp_source": "review: Flush wooden sliding-door panel (upper right, outer track); no handle, top edge enclosed, free vertical edge only ~11 mm proud of neighbour panel",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  },
+  {
+   "joint": "j_link_2",
+   "kind": "drawer",
+   "grasp_source": "review: Flush wooden sliding-door panel (lower right, outer track); no handle, top edge hidden under the middle rail",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  },
+  {
+   "joint": "j_link_3",
+   "kind": "drawer",
+   "grasp_source": "review: Flush wooden sliding-door panel (lower left, inner track); no handle, top edge hidden under the middle rail, nothing to pinch",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "previous_hosts": [
+  "bottom_cabinet_rvunhj_1",
+  "bottom_cabinet_rvunhj_0"
+ ],
+ "scale": [
+  1.993,
+  1.281,
+  1.722
+ ],
+ "time_s": 1.7
+}

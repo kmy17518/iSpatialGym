@@ -1,0 +1,20 @@
+{
+  "key": "top_cabinet__oztrra",
+  "category": "top_cabinet",
+  "model": "oztrra",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_0",
+      "kind": "flap",
+      "chosen": "A",
+      "pinch": "horizontal_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Horizontal bar handle (~123 mm, 6 mm thick) centred near flap's bottom edge; B/C are its end posts; flap hinged at top, swings up",
+      "height_concern": "~0.04 m above object base if floor-placed; wall cabinet, depends on mount height",
+      "confidence": "high"
+    }
+  ],
+  "object_note": "Full-front flap hinged at top; horizontal bar handle visible on flap in opened view; heuristic correct, A is the bar's middle; bar is thin (6 mm) but protrudes 19 mm."
+}

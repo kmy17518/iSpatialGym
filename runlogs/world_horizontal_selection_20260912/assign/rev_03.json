@@ -1,0 +1,19 @@
+{
+ "reviewer": "rev_03",
+ "task": "wa2",
+ "categories": [
+  "radiator",
+  "air_conditioner",
+  "range_hood"
+ ],
+ "grids": [
+  "renders/grids/air_conditioner_00.png",
+  "renders/grids/radiator_00.png",
+  "renders/grids/radiator_01.png",
+  "renders/grids/radiator_02.png",
+  "renders/grids/radiator_03.png",
+  "renders/grids/range_hood_00.png",
+  "renders/grids/range_hood_01.png"
+ ],
+ "n_models": 18
+}

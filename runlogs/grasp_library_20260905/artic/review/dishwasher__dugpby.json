@@ -1,0 +1,20 @@
+{
+  "key": "dishwasher__dugpby",
+  "category": "dishwasher",
+  "model": "dugpby",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_0",
+      "kind": "flap",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "swing",
+      "graspable": false,
+      "handle_description": "No handle; flush slab door, back face inside the cabinet opening, top edge below cabinet top, nothing to pinch. Bottom hinge, folds toward viewer.",
+      "height_concern": "",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Heuristic 'ungraspable' confirmed; F marks a top edge with no clearance behind it. Slab is ~70 mm proud of the cabinet but has no free edge."
+}

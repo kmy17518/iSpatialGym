@@ -1,0 +1,19 @@
+{
+ "task": "configuration_matching",
+ "category": "lid",
+ "model": "haxrqc",
+ "key": "lid__haxrqc",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "attachment_free",
+ "bbox": [
+  0.11482134246826171,
+  0.19999635314941405,
+  0.008109756469726562
+ ],
+ "ready": true,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

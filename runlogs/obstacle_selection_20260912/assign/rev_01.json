@@ -1,0 +1,384 @@
+{
+ "reviewer": "rev_01",
+ "task": "obst",
+ "categories": [
+  "beer_keg",
+  "cooler",
+  "highchair",
+  "ice_bucket",
+  "pot_plant",
+  "power_washer",
+  "recycling_bin",
+  "soccer_ball",
+  "suitcase",
+  "teddy_bear",
+  "toy_car"
+ ],
+ "grids": [
+  "renders/grids/beer_keg_00.png",
+  "renders/grids/cooler_00.png",
+  "renders/grids/highchair_00.png",
+  "renders/grids/ice_bucket_00.png",
+  "renders/grids/pot_plant_00.png",
+  "renders/grids/pot_plant_01.png",
+  "renders/grids/pot_plant_02.png",
+  "renders/grids/power_washer_00.png",
+  "renders/grids/recycling_bin_00.png",
+  "renders/grids/soccer_ball_00.png",
+  "renders/grids/suitcase_00.png",
+  "renders/grids/teddy_bear_00.png",
+  "renders/grids/toy_car_00.png"
+ ],
+ "hints": {
+  "pot_plant": {
+   "why": "potted plants, median 0.25 x 0.28 x 0.37 m (27 ready of 62); already stands in all 7 scenes",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right"
+   ],
+   "in_scene": {
+    "house_single_floor": [
+     "corridor",
+     "garden"
+    ],
+    "house_double_floor_upper": [
+     "bedroom",
+     "living_room"
+    ],
+    "house_double_floor_lower": [
+     "corridor"
+    ],
+    "Rs_int": [
+     "living_room"
+    ],
+    "restaurant_diner": [
+     "corridor",
+     "dining_room"
+    ],
+    "hotel_suite_large": [
+     "bedroom"
+    ],
+    "office_cubicles_right": [
+     "corridor"
+    ]
+   },
+   "n_models": 16,
+   "bbox_m": {
+    "asnsgf": [
+     0.582,
+     0.33,
+     0.63
+    ],
+    "bjwskl": [
+     0.832,
+     0.605,
+     1.163
+    ],
+    "imhfnc": [
+     0.254,
+     0.276,
+     0.594
+    ],
+    "irdjit": [
+     1.281,
+     1.285,
+     1.824
+    ],
+    "jatssq": [
+     0.254,
+     0.26,
+     0.286
+    ],
+    "jaunqh": [
+     0.158,
+     0.158,
+     0.29
+    ],
+    "jgkozi": [
+     0.072,
+     0.083,
+     0.113
+    ],
+    "kxmvco": [
+     0.307,
+     0.299,
+     0.37
+    ],
+    "mypsrd": [
+     0.158,
+     0.196,
+     0.225
+    ],
+    "qenqqv": [
+     0.254,
+     0.258,
+     0.463
+    ],
+    "quaxmw": [
+     0.254,
+     0.252,
+     0.305
+    ],
+    "tbsjnw": [
+     0.349,
+     0.285,
+     0.271
+    ],
+    "ttijye": [
+     1.082,
+     1.176,
+     0.997
+    ],
+    "udqjui": [
+     0.254,
+     0.246,
+     0.671
+    ],
+    "uvbpsf": [
+     0.21,
+     0.399,
+     0.276
+    ],
+    "xyczqb": [
+     0.23,
+     0.238,
+     0.465
+    ]
+   }
+  },
+  "teddy_bear": {
+   "why": "teddy bears ~0.26 x 0.27 x 0.19 m left on the floor: child's room, bedroom",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+   ],
+   "in_scene": {},
+   "n_models": 5,
+   "bbox_m": {
+    "dgagea": [
+     0.244,
+     0.156,
+     0.111
+    ],
+    "ecvxmu": [
+     0.152,
+     0.111,
+     0.088
+    ],
+    "faxvha": [
+     0.431,
+     0.362,
+     0.322
+    ],
+    "hqlobx": [
+     0.468,
+     0.373,
+     0.332
+    ],
+    "mvwvlv": [
+     0.257,
+     0.274,
+     0.19
+    ]
+   }
+  },
+  "toy_car": {
+   "why": "ride-on / push toy cars ~0.57 x 0.26 x 0.28 m: child's room, living room, corridor",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "n_models": 4,
+   "bbox_m": {
+    "dgnnin": [
+     0.886,
+     0.402,
+     0.387
+    ],
+    "ksijjl": [
+     0.448,
+     0.177,
+     0.247
+    ],
+    "kvjpue": [
+     0.579,
+     0.228,
+     0.319
+    ],
+    "nhtywr": [
+     0.56,
+     0.289,
+     0.202
+    ]
+   }
+  },
+  "recycling_bin": {
+   "why": "0.57 x 0.49 x 0.81 m recycling containers: copy room, garage, kitchen",
+   "natural_scenes": [
+    "office_cubicles_right",
+    "house_single_floor",
+    "house_double_floor_lower",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "n_models": 3,
+   "bbox_m": {
+    "mdojox": [
+     0.573,
+     0.517,
+     0.88
+    ],
+    "nuoypc": [
+     0.573,
+     0.49,
+     0.765
+    ],
+    "pdmzhv": [
+     0.573,
+     0.432,
+     0.815
+    ]
+   }
+  },
+  "highchair": {
+   "why": "0.33 x 0.30 x 0.78 m high chairs: diner, kitchen",
+   "natural_scenes": [
+    "restaurant_diner",
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "n_models": 2,
+   "bbox_m": {
+    "eteuuf": [
+     0.347,
+     0.307,
+     0.78
+    ],
+    "pahqnp": [
+     0.312,
+     0.285,
+     0.78
+    ]
+   }
+  },
+  "soccer_ball": {
+   "why": "0.25 m soccer balls (rolling risk when settled): child's room, garage, garden door",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "n_models": 2,
+   "bbox_m": {
+    "ikagkc": [
+     0.243,
+     0.242,
+     0.243
+    ],
+    "nlpvzv": [
+     0.255,
+     0.254,
+     0.255
+    ]
+   }
+  },
+  "beer_keg": {
+   "why": "0.42 x 0.42 x 0.60 m keg: diner bar / kitchen",
+   "natural_scenes": [
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "xtqbuf": [
+     0.416,
+     0.416,
+     0.6
+    ]
+   }
+  },
+  "cooler": {
+   "why": "0.51 x 1.03 x 0.52 m picnic cooler (over the footprint limit; kept for the record)",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "pnkiag": [
+     0.51,
+     1.03,
+     0.515
+    ]
+   }
+  },
+  "ice_bucket": {
+   "why": "0.34 x 0.41 x 0.39 m ice bucket: bar, hotel",
+   "natural_scenes": [
+    "restaurant_diner",
+    "hotel_suite_large"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "vlurir": [
+     0.338,
+     0.411,
+     0.393
+    ]
+   }
+  },
+  "power_washer": {
+   "why": "0.25 x 0.66 x 0.82 m pressure washer: garage",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "pkhrip": [
+     0.252,
+     0.663,
+     0.824
+    ]
+   }
+  },
+  "suitcase": {
+   "why": "0.43 x 0.62 x 0.20 m suitcase (1 ready of 4): hotel, bedroom, entryway, corridor",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "fqsjey": [
+     0.43,
+     0.623,
+     0.205
+    ]
+   }
+  }
+ },
+ "n_models": 37
+}

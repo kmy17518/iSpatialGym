@@ -1,0 +1,220 @@
+{
+ "scene": "restaurant_diner",
+ "table": "pedestal_table_nlfgwe_1",
+ "category": "pedestal_table",
+ "model": "nlfgwe",
+ "rooms": [
+  "dining_room_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-0",
+ "inventory": {
+  "top_z": 0.77,
+  "bbox_x": 1.074,
+  "bbox_y": 1.074,
+  "bbox_z": 0.766,
+  "verdict": "keep"
+ },
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 22:23:29",
+ "precheck": {
+  "aabb": [
+   [
+    0.214,
+    -4.702,
+    -0.001
+   ],
+   [
+    1.299,
+    -3.617,
+    0.777
+   ]
+  ],
+  "support": {
+   "name": "pedestal_table_nlfgwe_1",
+   "z": 0.7756953239440918,
+   "yaw": -0.000286102294921875,
+   "local_bounds": [
+    0.224807471036911,
+    1.2848302125930786,
+    -4.691563129425049,
+    -3.631535053253174
+   ],
+   "n_free_cells": 2222,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     1.284,
+     -4.162
+    ],
+    "length": 1.06
+   },
+   {
+    "name": "-u",
+    "mid": [
+     0.224,
+     -4.162
+    ],
+    "length": 1.06
+   },
+   {
+    "name": "+v",
+    "mid": [
+     0.754,
+     -3.632
+    ],
+    "length": 1.06
+   },
+   {
+    "name": "-v",
+    "mid": [
+     0.753,
+     -4.692
+    ],
+    "length": 1.06
+   }
+  ],
+  "stance": {
+   "edge": "-u",
+   "edge_mid": [
+    0.223616823554039,
+    -4.1616129875183105
+   ],
+   "inward": [
+    0.9999999403953552,
+    -0.000286102294921875
+   ],
+   "tangent": [
+    0.000286102294921875,
+    0.9999999403953552
+   ],
+   "base_pose2d": [
+    -0.22638313472270966,
+    -4.161484241485596,
+    -0.000286102304168645
+   ],
+   "edge_depth": 0.44999995827674866,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.6499999761581421,
+    "axis_angle": 0.015590787826390421
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.7
+ },
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {
+  "layout": 2
+ },
+ "template_meta": {
+  "support": {
+   "name": "pedestal_table_nlfgwe_1",
+   "z": 0.775694727897644,
+   "yaw": -0.0002880096435546875,
+   "local_bounds": [
+    0.22481541335582733,
+    1.2848384380340576,
+    -4.691555023193359,
+    -3.6315267086029053
+   ],
+   "n_free_cells": 2222,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-u",
+   "edge_mid": [
+    0.2236168384552002,
+    -4.161605358123779
+   ],
+   "inward": [
+    0.9999999403953552,
+    -0.0002880096435546875
+   ],
+   "tangent": [
+    0.0002880096435546875,
+    0.9999999403953552
+   ],
+   "base_pose2d": [
+    -0.22638311982154846,
+    -4.161475658416748,
+    -0.0002880096527579761
+   ],
+   "edge_depth": 0.44999995827674866,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.6499999761581421,
+    "axis_angle": 0.044000372447035134
+   }
+  },
+  "view_arms": "untucked",
+  "n_reachable_cells": 15,
+  "edge": 0.025398889556527138,
+  "load_room_instances": [
+   "dining_room_0",
+   "bar_0",
+   "corridor_0",
+   "kitchen_0"
+  ],
+  "task_rooms": [
+   "dining_room_0"
+  ],
+  "rejections": {
+   "layout": 2
+  },
+  "n_written": 1,
+  "timings": {
+   "bind_spawn_s": 34.1,
+   "prepare_template_s": 1.67,
+   "save_template_s": 0.06
+  }
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_table_sel/restaurant_diner/restaurant_diner__pedestal_table_nlfgwe_1__configuration_matching-0/instances/configuration_matching-0__restaurant_diner__pedestal_table_nlfgwe_1__configuration_matching-0__0000.summary.json",
+   "wall_time_s": 26.2,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    -0.22638311982154846,
+    -4.161475658416748,
+    -0.0002880096527579761
+   ],
+   "trunk": [
+    0.749999987042469,
+    -0.6500000357627869
+   ],
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.6499999761581421
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_table_sel/restaurant_diner/restaurant_diner__pedestal_table_nlfgwe_1__configuration_matching-0",
+ "bound_table": "pedestal_table_nlfgwe_1",
+ "setup_s": 35.8,
+ "run_s": 26.4,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "ok",
+   "n_written": 1,
+   "rejections": {
+    "layout": 2
+   },
+   "reject_reason": null,
+   "setup_s": 35.8,
+   "run_s": 26.4
+  }
+ ],
+ "job_s": 65.0,
+ "finished": "2026-09-11 22:24:34"
+}

@@ -1,0 +1,15 @@
+{
+  "category": "hair_dryer",
+  "task": "wa0",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {"model": "ylutzy", "V": 3, "O": 3, "F": 1, "score": 13, "valid": true,
+     "long_axis": "x", "front_axis": "-y", "rest_ok": true,
+     "note": "Uniform grey/dark dryer lying on its side, nozzle to -x, handle flat along -y; obvious L silhouette; 11 cm tall, curved barrel, no texture detail."}
+  ],
+  "picks": ["ylutzy"],
+  "alternate": null,
+  "category_verdict": "weak",
+  "category_note": "Single untextured-looking grey hair dryer, 0.26 m long, lying on its side with the handle flat; silhouette gives a unique yaw but height 0.11 m and the curved barrel are borderline, and only one model."
+}

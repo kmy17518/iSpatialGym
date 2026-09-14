@@ -1,0 +1,20 @@
+{
+  "key": "door__cbgtjl",
+  "category": "door",
+  "model": "cbgtjl",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_leaf",
+      "kind": "door",
+      "chosen": "A",
+      "pinch": "lever",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Black lever at mid-height near free (+y) edge; A = outside lever, B = inside lever (wrong side). Hinge -y side, swings toward viewer.",
+      "height_concern": "",
+      "confidence": "high"
+    }
+  ],
+  "object_note": "B (handle2) is the lever on the back face of the leaf, unreachable from outside; A correct."
+}

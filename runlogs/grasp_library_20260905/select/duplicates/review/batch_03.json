@@ -1,0 +1,518 @@
+[
+ {
+  "id": "bottle_of_pop__c1",
+  "category": "bottle_of_pop",
+  "models": [
+   "hjrwqb",
+   "jnoksl",
+   "msmlud",
+   "oeipjl",
+   "pfjzkn",
+   "pvabxf",
+   "pyrics",
+   "rhclfg",
+   "ubazru"
+  ],
+  "png": "/home/minyeongk/Desktop/projects/ispatialgym/runlogs/grasp_library_20260905/select/duplicates/clusters/bottle_of_pop__c1.png",
+  "best_tier": "same_shape",
+  "pairs": [
+   {
+    "a": "hjrwqb",
+    "b": "jnoksl",
+    "tier": "same_shape",
+    "thumb_dist": 0.2691
+   },
+   {
+    "a": "hjrwqb",
+    "b": "msmlud",
+    "tier": "same_shape",
+    "thumb_dist": 0.2361
+   },
+   {
+    "a": "hjrwqb",
+    "b": "oeipjl",
+    "tier": "same_shape",
+    "thumb_dist": 0.2513
+   },
+   {
+    "a": "hjrwqb",
+    "b": "pfjzkn",
+    "tier": "same_shape",
+    "thumb_dist": 0.2914
+   },
+   {
+    "a": "hjrwqb",
+    "b": "pvabxf",
+    "tier": "same_shape",
+    "thumb_dist": 0.2783
+   },
+   {
+    "a": "hjrwqb",
+    "b": "pyrics",
+    "tier": "same_shape",
+    "thumb_dist": 0.2757
+   },
+   {
+    "a": "hjrwqb",
+    "b": "rhclfg",
+    "tier": "same_shape",
+    "thumb_dist": 0.2572
+   },
+   {
+    "a": "hjrwqb",
+    "b": "ubazru",
+    "tier": "same_shape",
+    "thumb_dist": 0.2107
+   },
+   {
+    "a": "jnoksl",
+    "b": "msmlud",
+    "tier": "same_shape",
+    "thumb_dist": 0.2155
+   },
+   {
+    "a": "jnoksl",
+    "b": "oeipjl",
+    "tier": "same_shape",
+    "thumb_dist": 0.1682
+   },
+   {
+    "a": "jnoksl",
+    "b": "pfjzkn",
+    "tier": "same_shape",
+    "thumb_dist": 0.1599
+   },
+   {
+    "a": "jnoksl",
+    "b": "pvabxf",
+    "tier": "same_shape",
+    "thumb_dist": 0.2259
+   },
+   {
+    "a": "jnoksl",
+    "b": "pyrics",
+    "tier": "same_shape",
+    "thumb_dist": 0.2066
+   },
+   {
+    "a": "jnoksl",
+    "b": "rhclfg",
+    "tier": "same_shape",
+    "thumb_dist": 0.2905
+   },
+   {
+    "a": "jnoksl",
+    "b": "ubazru",
+    "tier": "same_shape",
+    "thumb_dist": 0.1962
+   },
+   {
+    "a": "msmlud",
+    "b": "oeipjl",
+    "tier": "same_shape",
+    "thumb_dist": 0.2097
+   },
+   {
+    "a": "msmlud",
+    "b": "pfjzkn",
+    "tier": "same_shape",
+    "thumb_dist": 0.2472
+   },
+   {
+    "a": "msmlud",
+    "b": "pvabxf",
+    "tier": "same_shape",
+    "thumb_dist": 0.2427
+   },
+   {
+    "a": "msmlud",
+    "b": "pyrics",
+    "tier": "same_shape",
+    "thumb_dist": 0.1065
+   },
+   {
+    "a": "msmlud",
+    "b": "rhclfg",
+    "tier": "same_shape",
+    "thumb_dist": 0.2926
+   },
+   {
+    "a": "msmlud",
+    "b": "ubazru",
+    "tier": "same_shape",
+    "thumb_dist": 0.1651
+   },
+   {
+    "a": "oeipjl",
+    "b": "pfjzkn",
+    "tier": "same_shape",
+    "thumb_dist": 0.2051
+   },
+   {
+    "a": "oeipjl",
+    "b": "pvabxf",
+    "tier": "same_shape",
+    "thumb_dist": 0.2479
+   },
+   {
+    "a": "oeipjl",
+    "b": "pyrics",
+    "tier": "same_shape",
+    "thumb_dist": 0.1876
+   },
+   {
+    "a": "oeipjl",
+    "b": "rhclfg",
+    "tier": "same_shape",
+    "thumb_dist": 0.292
+   },
+   {
+    "a": "oeipjl",
+    "b": "ubazru",
+    "tier": "same_shape",
+    "thumb_dist": 0.1404
+   },
+   {
+    "a": "pfjzkn",
+    "b": "pvabxf",
+    "tier": "same_shape",
+    "thumb_dist": 0.2585
+   },
+   {
+    "a": "pfjzkn",
+    "b": "pyrics",
+    "tier": "same_shape",
+    "thumb_dist": 0.2376
+   },
+   {
+    "a": "pfjzkn",
+    "b": "rhclfg",
+    "tier": "same_shape",
+    "thumb_dist": 0.2538
+   },
+   {
+    "a": "pfjzkn",
+    "b": "ubazru",
+    "tier": "same_shape",
+    "thumb_dist": 0.2403
+   },
+   {
+    "a": "pvabxf",
+    "b": "pyrics",
+    "tier": "same_shape",
+    "thumb_dist": 0.2455
+   },
+   {
+    "a": "pvabxf",
+    "b": "rhclfg",
+    "tier": "same_shape",
+    "thumb_dist": 0.321
+   },
+   {
+    "a": "pvabxf",
+    "b": "ubazru",
+    "tier": "same_shape",
+    "thumb_dist": 0.2371
+   },
+   {
+    "a": "pyrics",
+    "b": "rhclfg",
+    "tier": "same_shape",
+    "thumb_dist": 0.3122
+   },
+   {
+    "a": "pyrics",
+    "b": "ubazru",
+    "tier": "same_shape",
+    "thumb_dist": 0.1817
+   },
+   {
+    "a": "rhclfg",
+    "b": "ubazru",
+    "tier": "same_shape",
+    "thumb_dist": 0.2587
+   }
+  ]
+ },
+ {
+  "id": "bottle_of_essential_oil__c1",
+  "category": "bottle_of_essential_oil",
+  "models": [
+   "eyyhld",
+   "wansva",
+   "xhoipk",
+   "xvqshn",
+   "yjxvpg"
+  ],
+  "png": "/home/minyeongk/Desktop/projects/ispatialgym/runlogs/grasp_library_20260905/select/duplicates/clusters/bottle_of_essential_oil__c1.png",
+  "best_tier": "same_shape",
+  "pairs": [
+   {
+    "a": "eyyhld",
+    "b": "wansva",
+    "tier": "same_shape",
+    "thumb_dist": 0.2109
+   },
+   {
+    "a": "eyyhld",
+    "b": "xhoipk",
+    "tier": "same_shape",
+    "thumb_dist": 0.3623
+   },
+   {
+    "a": "eyyhld",
+    "b": "xvqshn",
+    "tier": "same_shape",
+    "thumb_dist": 0.2023
+   },
+   {
+    "a": "eyyhld",
+    "b": "yjxvpg",
+    "tier": "same_shape",
+    "thumb_dist": 0.1835
+   },
+   {
+    "a": "wansva",
+    "b": "xhoipk",
+    "tier": "same_shape",
+    "thumb_dist": 0.4169
+   },
+   {
+    "a": "wansva",
+    "b": "xvqshn",
+    "tier": "same_shape",
+    "thumb_dist": 0.2096
+   },
+   {
+    "a": "wansva",
+    "b": "yjxvpg",
+    "tier": "same_shape",
+    "thumb_dist": 0.1718
+   },
+   {
+    "a": "xhoipk",
+    "b": "xvqshn",
+    "tier": "same_shape",
+    "thumb_dist": 0.3909
+   },
+   {
+    "a": "xhoipk",
+    "b": "yjxvpg",
+    "tier": "same_shape",
+    "thumb_dist": 0.4047
+   },
+   {
+    "a": "xvqshn",
+    "b": "yjxvpg",
+    "tier": "same_shape",
+    "thumb_dist": 0.194
+   }
+  ]
+ },
+ {
+  "id": "bottle_of_beer__c1",
+  "category": "bottle_of_beer",
+  "models": [
+   "crfcwo",
+   "meqliv",
+   "zbsxro"
+  ],
+  "png": "/home/minyeongk/Desktop/projects/ispatialgym/runlogs/grasp_library_20260905/select/duplicates/clusters/bottle_of_beer__c1.png",
+  "best_tier": "same_shape",
+  "pairs": [
+   {
+    "a": "crfcwo",
+    "b": "meqliv",
+    "tier": "same_shape",
+    "thumb_dist": 0.2014
+   },
+   {
+    "a": "crfcwo",
+    "b": "zbsxro",
+    "tier": "same_shape",
+    "thumb_dist": 0.2561
+   },
+   {
+    "a": "meqliv",
+    "b": "zbsxro",
+    "tier": "near",
+    "thumb_dist": 0.1644
+   }
+  ]
+ },
+ {
+  "id": "cellulose_tape_dispenser__c1",
+  "category": "cellulose_tape_dispenser",
+  "models": [
+   "budhaz",
+   "fetnry",
+   "yyekns"
+  ],
+  "png": "/home/minyeongk/Desktop/projects/ispatialgym/runlogs/grasp_library_20260905/select/duplicates/clusters/cellulose_tape_dispenser__c1.png",
+  "best_tier": "same_shape",
+  "pairs": [
+   {
+    "a": "budhaz",
+    "b": "fetnry",
+    "tier": "same_shape",
+    "thumb_dist": 0.2003
+   },
+   {
+    "a": "budhaz",
+    "b": "yyekns",
+    "tier": "same_shape",
+    "thumb_dist": 0.2722
+   },
+   {
+    "a": "fetnry",
+    "b": "yyekns",
+    "tier": "same_shape",
+    "thumb_dist": 0.286
+   }
+  ]
+ },
+ {
+  "id": "apple__c1",
+  "category": "apple",
+  "models": [
+   "agveuv",
+   "omzprq"
+  ],
+  "png": "/home/minyeongk/Desktop/projects/ispatialgym/runlogs/grasp_library_20260905/select/duplicates/clusters/apple__c1.png",
+  "best_tier": "same_shape",
+  "pairs": [
+   {
+    "a": "agveuv",
+    "b": "omzprq",
+    "tier": "same_shape",
+    "thumb_dist": 0.1117
+   }
+  ]
+ },
+ {
+  "id": "bottle_of_black_pepper__c1",
+  "category": "bottle_of_black_pepper",
+  "models": [
+   "ydzzrv",
+   "zybfok"
+  ],
+  "png": "/home/minyeongk/Desktop/projects/ispatialgym/runlogs/grasp_library_20260905/select/duplicates/clusters/bottle_of_black_pepper__c1.png",
+  "best_tier": "same_shape",
+  "pairs": [
+   {
+    "a": "ydzzrv",
+    "b": "zybfok",
+    "tier": "same_shape",
+    "thumb_dist": 0.0926
+   }
+  ]
+ },
+ {
+  "id": "box_of_cereal__c3",
+  "category": "box_of_cereal",
+  "models": [
+   "hosfhj",
+   "qirvmd"
+  ],
+  "png": "/home/minyeongk/Desktop/projects/ispatialgym/runlogs/grasp_library_20260905/select/duplicates/clusters/box_of_cereal__c3.png",
+  "best_tier": "same_shape",
+  "pairs": [
+   {
+    "a": "hosfhj",
+    "b": "qirvmd",
+    "tier": "same_shape",
+    "thumb_dist": 0.2259
+   }
+  ]
+ },
+ {
+  "id": "box_of_yogurt__c1",
+  "category": "box_of_yogurt",
+  "models": [
+   "jkemqc",
+   "znhjgm"
+  ],
+  "png": "/home/minyeongk/Desktop/projects/ispatialgym/runlogs/grasp_library_20260905/select/duplicates/clusters/box_of_yogurt__c1.png",
+  "best_tier": "same_shape",
+  "pairs": [
+   {
+    "a": "jkemqc",
+    "b": "znhjgm",
+    "tier": "same_shape",
+    "thumb_dist": 0.3281
+   }
+  ]
+ },
+ {
+  "id": "hard_candy__c1",
+  "category": "hard_candy",
+  "models": [
+   "qptjgv",
+   "yuatcg"
+  ],
+  "png": "/home/minyeongk/Desktop/projects/ispatialgym/runlogs/grasp_library_20260905/select/duplicates/clusters/hard_candy__c1.png",
+  "best_tier": "near",
+  "pairs": [
+   {
+    "a": "qptjgv",
+    "b": "yuatcg",
+    "tier": "near",
+    "thumb_dist": 0.2884
+   }
+  ]
+ },
+ {
+  "id": "mug__c1",
+  "category": "mug",
+  "models": [
+   "ehnmxj",
+   "fapsrj"
+  ],
+  "png": "/home/minyeongk/Desktop/projects/ispatialgym/runlogs/grasp_library_20260905/select/duplicates/clusters/mug__c1.png",
+  "best_tier": "same_shape",
+  "pairs": [
+   {
+    "a": "ehnmxj",
+    "b": "fapsrj",
+    "tier": "same_shape",
+    "thumb_dist": 0.3352
+   }
+  ]
+ },
+ {
+  "id": "soda_cup__c1",
+  "category": "soda_cup",
+  "models": [
+   "fsfsas",
+   "lpanoc"
+  ],
+  "png": "/home/minyeongk/Desktop/projects/ispatialgym/runlogs/grasp_library_20260905/select/duplicates/clusters/soda_cup__c1.png",
+  "best_tier": "near",
+  "pairs": [
+   {
+    "a": "fsfsas",
+    "b": "lpanoc",
+    "tier": "near",
+    "thumb_dist": 0.3763
+   }
+  ]
+ },
+ {
+  "id": "walker__c1",
+  "category": "walker",
+  "models": [
+   "fdklhj",
+   "xnpimz"
+  ],
+  "png": "/home/minyeongk/Desktop/projects/ispatialgym/runlogs/grasp_library_20260905/select/duplicates/clusters/walker__c1.png",
+  "best_tier": "same_shape",
+  "pairs": [
+   {
+    "a": "fdklhj",
+    "b": "xnpimz",
+    "tier": "same_shape",
+    "thumb_dist": 0.1862
+   }
+  ]
+ }
+]

@@ -1,0 +1,25 @@
+{
+ "scene": "hotel_suite_large",
+ "table": "nightstand_maeowc_1",
+ "category": "nightstand",
+ "model": "maeowc",
+ "rooms": [
+  "bedroom_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.451,
+  "bbox_x": 0.512,
+  "bbox_y": 0.616,
+  "bbox_z": 0.451,
+  "verdict": "low"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:51:11",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

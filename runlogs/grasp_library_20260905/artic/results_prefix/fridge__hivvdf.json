@@ -1,0 +1,52 @@
+{
+ "key": "fridge__hivvdf",
+ "category": "fridge",
+ "model": "hivvdf",
+ "scene": "Rs_int",
+ "host": "fridge_xyejdx_0",
+ "host_rank": 0,
+ "host_model": "xyejdx",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "review:C",
+   "stance": {
+    "base": [
+     -0.462,
+     2.223,
+     1.565
+    ],
+    "translate": 0.5,
+    "sign": -1.0
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: planning: [planning] no collision-free base path to (-0.4597000777721405, 2.2721097469329834, 1.5695195198059082) {'curobo_status': 'IK failed: goal pose unreachable for the active joints (best pose error 0.0 mm / 0.228 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad) [start configuration is in collision]'}",
+    "sign -1: planning: [planning] ready_arms: no plannable ready configuration"
+   ],
+   "error": "planning: [planning] ready_arms: no plannable ready configuration",
+   "contact_world": [
+    -0.259,
+    2.672,
+    0.987
+   ],
+   "handle_height_above_floor": 0.982
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.159,
+  1.226,
+  1.657
+ ],
+ "time_s": 36.3
+}

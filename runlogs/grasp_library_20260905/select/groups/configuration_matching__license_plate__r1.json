@@ -1,0 +1,37 @@
+{
+ "group": "configuration_matching__license_plate__r1",
+ "task": "configuration_matching",
+ "category": "license_plate",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "Attachment task: the object is picked from a table and attached to its partner. The pads must leave the mating side of the object completely free.",
+ "candidates": [],
+ "excluded": [
+  {
+   "model": "nwfbxn",
+   "key": "license_plate__nwfbxn",
+   "reason": "no candidates"
+  },
+  {
+   "model": "naclac",
+   "key": "license_plate__naclac",
+   "reason": "no candidates"
+  },
+  {
+   "model": "hjdaqn",
+   "key": "license_plate__hjdaqn",
+   "reason": "no candidates"
+  },
+  {
+   "model": "nuqnlr",
+   "key": "license_plate__nuqnlr",
+   "reason": "no candidates"
+  },
+  {
+   "model": "yepdrj",
+   "key": "license_plate__yepdrj",
+   "reason": "no candidates"
+  }
+ ]
+}

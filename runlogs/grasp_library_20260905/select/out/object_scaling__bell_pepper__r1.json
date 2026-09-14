@@ -1,0 +1,31 @@
+{
+  "group": "object_scaling__bell_pepper__r1",
+  "task": "object_scaling",
+  "category": "bell_pepper",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 5,
+  "n_opened": 5,
+  "candidates": [
+    {"model": "ukkycp", "key": "bell_pepper__ukkycp", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Five clean 58-63 mm lobe pinches, CoM 2-3 mm, antipodal 0.92-0.96, tilts 76-172 give diverse poses; glossy red pepper, crisp stem."},
+    {"model": "ggurxn", "key": "bell_pepper__ggurxn", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Five clean 59-62 mm body pinches, CoM 1-6 mm, tilts 12-169 span several approach directions; bright orange pepper, clean texture and stem."},
+    {"model": "ihctxa", "key": "bell_pepper__ihctxa", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Five clean centred lobe pinches, pads visibly span ~60 mm body (width metric 10-13 mm is hollow-shell artefact); yellow pepper, good texture."},
+    {"model": "uqcenz", "key": "bell_pepper__uqcenz", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Row 1 centred body pinch; rows 2-5 shoulder pinches near stem end, CoM 18-23 mm, antipodal 0.78-0.84; dull orange elongated pepper, fine texture."},
+    {"model": "wszvwc", "key": "bell_pepper__wszvwc", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Rows 1-2,4 good 69-71 mm body pinches; row 3 low antipodal 0.22; row 5 hangs from stem-end shoulders (coverage 0), not clean. Large red pepper."}
+  ],
+  "selected": [
+    {"model": "ukkycp", "key": "bell_pepper__ukkycp", "rank": 1,
+     "reason": "Best metrics: all five rows centred body pinches with CoM 2-3 mm, high antipodal, visibly different orientations; clean glossy red asset."},
+    {"model": "ggurxn", "key": "bell_pepper__ggurxn", "rank": 2,
+     "reason": "Ties on score; chosen over ihctxa for its clean width metrics and because orange colour spans the category's appearance against the red #1."}
+  ],
+  "alternate": {"model": "ihctxa", "key": "bell_pepper__ihctxa"},
+  "short": false,
+  "warnings": [],
+  "confidence": "high"
+}

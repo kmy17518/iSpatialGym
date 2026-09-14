@@ -1,0 +1,29 @@
+{
+  "group": "IORS__chili__r2",
+  "task": "IORS",
+  "category": "chili",
+  "round": 2,
+  "relation": "inside",
+  "n_candidates": 4,
+  "n_opened": 4,
+  "candidates": [
+    {"model": "xhbpqh", "key": "chili__xhbpqh__i", "G": 4, "T": 3, "V": 3, "R": 0, "score": 17,
+     "note": "Tiny 39x6 mm chili held by fingertips at CoM, fingers 6-8/0, coverage drops to 0.25-0.50 in rows 3-5; barely visible sliver, undersized outlier"},
+    {"model": "pbbkpz", "key": "chili__pbbkpz__i", "G": 5, "T": 3, "V": 4, "R": 0, "score": 21,
+     "note": "Five clean mid-body pinches at CoM on a 9 mm body (fingers 9-10/0), chili hangs level or tilted 25-37; small red chili with green stem"},
+    {"model": "agecro", "key": "chili__agecro__i", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Five clean full-coverage mid-body pinches at 18-19 mm, CoM offset 0-5 mm, tilts 1-40; realistic glossy green jalapeno-style chili, 92 mm, clean geometry"},
+    {"model": "rafkbt", "key": "chili__rafkbt__i", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Five clean mid-body pinches at 18-19 mm within 1 mm of CoM, tilts 10-37, coverage 1.00 (row 5 0.75); glossy curved red chili with stem"}
+  ],
+  "selected": [
+    {"model": "rafkbt", "key": "chili__rafkbt__i", "rank": 1,
+     "reason": "Top score: firm 18-19 mm mid-body pinches from above within 1 mm of CoM, body hangs free to lower into the bowl; archetypal glossy red chili, sharp stem detail."},
+    {"model": "agecro", "key": "chili__agecro__i", "rank": 2,
+     "reason": "Tied top score with equally clean full-coverage pinches on the 18 mm body; green jalapeno-style chili contrasts the red #1 so the pair spans the category's colours."}
+  ],
+  "alternate": {"model": "pbbkpz", "key": "chili__pbbkpz__i"},
+  "short": false,
+  "warnings": ["xhbpqh (6 mm) and pbbkpz (9 mm) are very thin: fingers close to 6-10 mm, below the 10 mm robustness floor (R 0); xhbpqh is barely visible in the profile views."],
+  "confidence": "high"
+}

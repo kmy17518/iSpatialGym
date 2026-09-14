@@ -1,0 +1,19 @@
+{
+ "task": "IORS",
+ "category": "sunflower",
+ "model": "jsgdlc",
+ "key": "sunflower__jsgdlc",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "flower_stem_top",
+ "bbox": [
+  0.19485783386230468,
+  0.08429039382934571,
+  0.07015053939819337
+ ],
+ "ready": true,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

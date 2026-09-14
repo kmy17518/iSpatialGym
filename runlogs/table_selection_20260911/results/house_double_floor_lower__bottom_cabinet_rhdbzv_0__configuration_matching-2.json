@@ -1,0 +1,25 @@
+{
+ "scene": "house_double_floor_lower",
+ "table": "bottom_cabinet_rhdbzv_0",
+ "category": "bottom_cabinet",
+ "model": "rhdbzv",
+ "rooms": [
+  "living_room_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.413,
+  "bbox_x": 0.406,
+  "bbox_y": 2.338,
+  "bbox_z": 0.413,
+  "verdict": "low"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:10:06",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

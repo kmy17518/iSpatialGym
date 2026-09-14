@@ -1,0 +1,147 @@
+{
+ "target_category": "conditioner_dispenser",
+ "target_model": "njqnuo",
+ "target_key": "conditioner_dispenser__njqnuo__t",
+ "category": "soap_dispenser",
+ "model": "zwudcz",
+ "kind": "diff",
+ "tier": 1,
+ "started": "2026-09-12 13:48:18",
+ "template": {
+  "support": {
+   "name": "breakfast_table_rhjoby_0",
+   "z": 0.8126287460327148,
+   "yaw": 1.5683679580688477,
+   "local_bounds": [
+    2.9350767135620117,
+    4.095267295837402,
+    -8.733920097351074,
+    -5.831209182739258
+   ],
+   "n_free_cells": 8465,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-u",
+   "edge_mid": [
+    7.289670467376709,
+    2.9173834323883057
+   ],
+   "inward": [
+    0.0024283663369715214,
+    0.999997079372406
+   ],
+   "tangent": [
+    -0.999997079372406,
+    0.0024283663369715214
+   ],
+   "base_pose2d": [
+    7.488802909851074,
+    2.4668986797332764,
+    1.5683679581389045
+   ],
+   "edge_depth": 0.4499998688697815,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.1341459915794847
+   }
+  },
+  "place_stance": {
+   "edge": "-u",
+   "edge_mid": [
+    7.289670467376709,
+    2.9173834323883057
+   ],
+   "inward": [
+    0.0024283663369715214,
+    0.999997079372406
+   ],
+   "tangent": [
+    -0.999997079372406,
+    0.0024283663369715214
+   ],
+   "base_pose2d": [
+    8.187939643859863,
+    2.465200901031494,
+    1.5683679581389045
+   ],
+   "edge_depth": 0.4499998986721039
+  },
+  "view_arms": "untucked",
+  "yaw_adjust_deg": 0.0,
+  "dest_lateral_m": -0.6991385782730231,
+  "dest_side": "right",
+  "source_lateral_offset": 0.0,
+  "n_reachable_cells": 3,
+  "n_grasp_cells": 3,
+  "n_place_combos": 3,
+  "distractors": {
+   "same_category": true,
+   "pool": "same_category",
+   "requested_pool": "same_category",
+   "fallback": null,
+   "models": [
+    "conditioner_dispenser-uncljo"
+   ],
+   "requested": 1,
+   "pool_size": 1,
+   "pool_categories": [
+    "conditioner_dispenser"
+   ],
+   "lookalikes_excluded": [],
+   "footprint_fraction": 0.22
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 20.39,
+   "prepare_template_s": 0.14
+  },
+  "setup_s": 20.5
+ },
+ "footprint_fraction_with_target": 0.225,
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {
+  "target_placement": 1,
+  "occlusion": 1
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_dis_distractors/conditioner_dispenser-njqnuo__soap_dispenser-zwudcz/instances/disembedding-0__conditioner_dispenser-njqnuo__soap_dispenser-zwudcz__0000.summary.json",
+   "wall_time_s": 4.9,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    7.488802909851074,
+    2.4668986797332764,
+    1.5683679581389045
+   ],
+   "trunk": [
+    0.0,
+    -0.8999999761581421
+   ],
+   "occluded_variant": false,
+   "grasp": {
+    "key": "conditioner_dispenser__njqnuo__t",
+    "name": "grasp_3",
+    "translate": 0.5,
+    "place_translate": 0.5,
+    "yaw": 2.2456750914808348
+   },
+   "dest_pixels": 11446,
+   "source_pixels": 123299,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_dis_distractors/conditioner_dispenser-njqnuo__soap_dispenser-zwudcz",
+ "job_s": 12.4,
+ "finished": "2026-09-12 13:48:31",
+ "occluded_variant": false,
+ "occlusion_ratio": null
+}

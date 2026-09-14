@@ -1,0 +1,93 @@
+{
+ "scene": "house_single_floor",
+ "table": "desk_bhkhxo_0",
+ "category": "desk",
+ "model": "bhkhxo",
+ "rooms": [
+  "childs_room_1"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-2",
+ "inventory": {
+  "top_z": 0.758,
+  "bbox_x": 0.648,
+  "bbox_y": 1.798,
+  "bbox_z": 0.758,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 22:55:22",
+ "precheck": {
+  "aabb": [
+   [
+    23.582,
+    12.293,
+    -0.006
+   ],
+   [
+    24.254,
+    14.105,
+    0.767
+   ]
+  ],
+  "support": {
+   "name": "desk_bhkhxo_0",
+   "z": 0.7671167850494385,
+   "yaw": -0.0024895668029785156,
+   "local_bounds": [
+    23.55726432800293,
+    24.199203491210938,
+    12.361635208129883,
+    14.163223266601562
+   ],
+   "n_free_cells": 2940,
+   "occupants": [
+    "fixed_window_tspbac_1",
+    "walls_guxxwh_0"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     24.232,
+     13.202
+    ],
+    "length": 1.802
+   },
+   {
+    "name": "-u",
+    "mid": [
+     23.59,
+     13.204
+    ],
+    "length": 1.802
+   },
+   {
+    "name": "+v",
+    "mid": [
+     23.913,
+     14.104
+    ],
+    "length": 0.642
+   },
+   {
+    "name": "-v",
+    "mid": [
+     23.909,
+     12.302
+    ],
+    "length": 0.642
+   }
+  ],
+  "stance": null,
+  "stance_error": "[stance_collision] untucked: [no_stance] no collision-free stance around desk_bhkhxo_0",
+  "precheck_s": 4.2
+ },
+ "status": "skipped",
+ "reason": "inter_object_relation_satisfaction-0 found no stance around the support at any stand-off (precheck: no stance either)"
+}

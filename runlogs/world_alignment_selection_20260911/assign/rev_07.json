@@ -1,0 +1,142 @@
+[
+ {
+  "category": "bag_of_chips",
+  "task": "wa0",
+  "n_models": 7,
+  "grids": [
+   "renders/grids/bag_of_chips_00.png",
+   "renders/grids/bag_of_chips_01.png",
+   "renders/grids/bag_of_chips_02.png"
+  ]
+ },
+ {
+  "category": "board",
+  "task": "wa1",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/board_00.png"
+  ]
+ },
+ {
+  "category": "bulletin_board",
+  "task": "wa1",
+  "n_models": 2,
+  "grids": [
+   "renders/grids/bulletin_board_00.png"
+  ]
+ },
+ {
+  "category": "canvas",
+  "task": "wa1",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/canvas_00.png"
+  ]
+ },
+ {
+  "category": "catalog",
+  "task": "wa0",
+  "n_models": 4,
+  "grids": [
+   "renders/grids/catalog_00.png",
+   "renders/grids/catalog_01.png"
+  ]
+ },
+ {
+  "category": "cutting_board",
+  "task": "wa0",
+  "n_models": 5,
+  "grids": [
+   "renders/grids/cutting_board_00.png",
+   "renders/grids/cutting_board_01.png"
+  ]
+ },
+ {
+  "category": "digital_scale",
+  "task": "wa0",
+  "n_models": 3,
+  "grids": [
+   "renders/grids/digital_scale_00.png"
+  ]
+ },
+ {
+  "category": "first_aid_kit",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/first_aid_kit_00.png"
+  ]
+ },
+ {
+  "category": "frying_pan",
+  "task": "wa0",
+  "n_models": 7,
+  "grids": [
+   "renders/grids/frying_pan_00.png",
+   "renders/grids/frying_pan_01.png",
+   "renders/grids/frying_pan_02.png"
+  ]
+ },
+ {
+  "category": "hanger",
+  "task": "wa1",
+  "n_models": 6,
+  "grids": [
+   "renders/grids/hanger_00.png",
+   "renders/grids/hanger_01.png"
+  ]
+ },
+ {
+  "category": "holly_decoration",
+  "task": "wa1",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/holly_decoration_00.png"
+  ]
+ },
+ {
+  "category": "newspaper",
+  "task": "wa0",
+  "n_models": 2,
+  "grids": [
+   "renders/grids/newspaper_00.png"
+  ]
+ },
+ {
+  "category": "picture",
+  "task": "wa1",
+  "n_models": 16,
+  "grids": [
+   "renders/grids/picture_00.png",
+   "renders/grids/picture_01.png",
+   "renders/grids/picture_02.png",
+   "renders/grids/picture_03.png",
+   "renders/grids/picture_04.png",
+   "renders/grids/picture_05.png"
+  ]
+ },
+ {
+  "category": "plier",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/plier_00.png"
+  ]
+ },
+ {
+  "category": "skateboard_deck",
+  "task": "wa1",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/skateboard_deck_00.png"
+  ]
+ },
+ {
+  "category": "violin",
+  "task": "wa1",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/violin_00.png"
+  ]
+ }
+]

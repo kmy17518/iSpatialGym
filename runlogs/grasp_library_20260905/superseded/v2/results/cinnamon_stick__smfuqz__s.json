@@ -1,0 +1,342 @@
+{
+ "task": "IORS",
+ "category": "cinnamon_stick",
+ "model": "smfuqz",
+ "key": "cinnamon_stick__smfuqz__s",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "tabletop",
+ "bbox": [
+  0.0165716609954834,
+  0.1367739944458008,
+  0.011112800598144531
+ ],
+ "ready": true,
+ "base_key": "cinnamon_stick__smfuqz",
+ "scale": [
+  1.207,
+  1.0,
+  1.8
+ ],
+ "scale_rule": "cross_section",
+ "bbox_scaled": [
+  0.02,
+  0.1368,
+  0.02
+ ],
+ "orig_n_valid": 0,
+ "candidates_meta": {
+  "object": {
+   "category": "cinnamon_stick",
+   "model": "smfuqz"
+  },
+  "task": "IORS",
+  "constraint": "tabletop",
+  "pipeline": "a1",
+  "gripper": "r1pro_right",
+  "source": "a1_tabletop",
+  "log": {
+   "n_sampled": 5676,
+   "n_tilt": 669,
+   "n_width_antipodal": 645,
+   "n_table": 519,
+   "n_collision": 519,
+   "n_lever": 398,
+   "n_selected": 12,
+   "com": [
+    0.0005,
+    0.0009,
+    0.0002
+   ],
+   "rest_pose": "canonical"
+  },
+  "rest_pose": "canonical",
+  "rest_quat_wxyz": [
+   1.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "tested": [
+  {
+   "grasp": "grasp_0",
+   "idx": 0,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 9.0256,
+   "meta": {
+    "com_perp": 0.00833,
+    "width": 0.01297,
+    "antipodal": 0.66728,
+    "coverage": 0.5,
+    "clearance": 0.03243,
+    "tilt_deg": 30.00209
+   },
+   "frames": {},
+   "t_s": 4.98
+  },
+  {
+   "grasp": "grasp_1",
+   "idx": 1,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 8.7854,
+   "meta": {
+    "com_perp": 0.01039,
+    "width": 0.0127,
+    "antipodal": 0.66728,
+    "coverage": 0.5,
+    "clearance": 0.03262,
+    "tilt_deg": 30.03163
+   },
+   "frames": {},
+   "t_s": 4.98
+  },
+  {
+   "grasp": "grasp_2",
+   "idx": 2,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 8.6071,
+   "meta": {
+    "com_perp": 0.01222,
+    "width": 0.01301,
+    "antipodal": 0.66728,
+    "coverage": 0.5,
+    "clearance": 0.03277,
+    "tilt_deg": 30.03163
+   },
+   "frames": {},
+   "t_s": 5.0
+  },
+  {
+   "grasp": "grasp_3",
+   "idx": 3,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 8.0115,
+   "meta": {
+    "com_perp": 0.01842,
+    "width": 0.01265,
+    "antipodal": 0.66728,
+    "coverage": 0.5,
+    "clearance": 0.03243,
+    "tilt_deg": 30.00209
+   },
+   "frames": {},
+   "t_s": 4.99
+  },
+  {
+   "grasp": "grasp_4",
+   "idx": 4,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 7.2583,
+   "meta": {
+    "com_perp": 0.02286,
+    "width": 0.01279,
+    "antipodal": 0.25842,
+    "coverage": 0.5,
+    "clearance": 0.03279,
+    "tilt_deg": 30.00882
+   },
+   "frames": {},
+   "t_s": 4.99
+  },
+  {
+   "grasp": "grasp_5",
+   "idx": 5,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 7.1436,
+   "meta": {
+    "com_perp": 0.01551,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.03937,
+    "tilt_deg": 5.42487
+   },
+   "frames": {},
+   "t_s": 4.97
+  },
+  {
+   "grasp": "grasp_6",
+   "idx": 6,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 7.0683,
+   "meta": {
+    "com_perp": 0.01639,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.03991,
+    "tilt_deg": 6.18452
+   },
+   "frames": {},
+   "t_s": 4.97
+  },
+  {
+   "grasp": "grasp_7",
+   "idx": 7,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 7.0445,
+   "meta": {
+    "com_perp": 0.02461,
+    "width": 0.01169,
+    "antipodal": 0.25842,
+    "coverage": 0.5,
+    "clearance": 0.03295,
+    "tilt_deg": 30.04713
+   },
+   "frames": {},
+   "t_s": 4.97
+  },
+  {
+   "grasp": "grasp_8",
+   "idx": 8,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 7.013,
+   "meta": {
+    "com_perp": 0.01282,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.03634,
+    "tilt_deg": 30.52047
+   },
+   "frames": {},
+   "t_s": 6.15
+  },
+  {
+   "grasp": "grasp_9",
+   "idx": 9,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 7.0108,
+   "meta": {
+    "com_perp": 0.01279,
+    "width": Infinity,
+    "antipodal": 0.0,
+    "coverage": 0.0,
+    "clearance": 0.03634,
+    "tilt_deg": 30.49364
+   },
+   "frames": {},
+   "t_s": 5.08
+  },
+  {
+   "grasp": "grasp_10",
+   "idx": 10,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 6.7325,
+   "meta": {
+    "com_perp": 0.0387,
+    "width": 0.01306,
+    "antipodal": 0.66728,
+    "coverage": 0.5,
+    "clearance": 0.03247,
+    "tilt_deg": 30.00209
+   },
+   "frames": {},
+   "t_s": 4.98
+  },
+  {
+   "grasp": "grasp_11",
+   "idx": 11,
+   "ag_attached": false,
+   "attached_step": null,
+   "held_after_gravity": false,
+   "placement_push_m": 0.0,
+   "finger_q": [
+    0.0,
+    0.0
+   ],
+   "score": 6.7319,
+   "meta": {
+    "com_perp": 0.03667,
+    "width": 0.01173,
+    "antipodal": 0.66331,
+    "coverage": 0.5,
+    "clearance": 0.03331,
+    "tilt_deg": 30.00882
+   },
+   "frames": {},
+   "t_s": 4.99
+  }
+ ],
+ "n_valid": 0,
+ "error": null,
+ "t_model_s": 72.0
+}

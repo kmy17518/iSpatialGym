@@ -1,0 +1,35 @@
+{
+ "category": "bottle_of_tequila",
+ "model": "gbozpr",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_tequila__gbozpr__y0.png",
+   "drift_m": 0.0007,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0685,
+   "seg_pixels": 7866,
+   "aabb_extent": [
+    0.074,
+    0.074,
+    0.172
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_tequila__gbozpr__y1.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0685
+  }
+ },
+ "stable": true,
+ "visible": true
+}

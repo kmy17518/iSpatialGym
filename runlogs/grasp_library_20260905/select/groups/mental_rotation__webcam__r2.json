@@ -1,0 +1,63 @@
+{
+ "group": "mental_rotation__webcam__r2",
+ "task": "mental_rotation",
+ "category": "webcam",
+ "round": 2,
+ "relation": null,
+ "partner": "",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "fabztm",
+   "key": "webcam__fabztm__f",
+   "strip": "/tmp/glib/strips/webcam__fabztm__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sphere pinched across lens dome; finger A at open limit"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sphere pinch, coverage 0.75; finger A at open limit"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sphere pinched across lens dome, both fingers moved"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on sphere, base plate clear"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sphere pinched across lens dome; finger A at open limit"
+    }
+   ],
+   "object_note": "mental_rotation task, no mating constraint; pad separation exceeds sphere by 5-11 mm via lens dome",
+   "bbox_mm": [
+    69,
+    91,
+    65
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

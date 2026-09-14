@@ -1,0 +1,67 @@
+{
+ "group": "mental_rotation__cleaver__r3",
+ "task": "mental_rotation",
+ "category": "cleaver",
+ "round": 3,
+ "relation": null,
+ "partner": "handle half",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "vpmydv",
+   "key": "cleaver__vpmydv__h",
+   "strip": "/tmp/glib/strips/cleaver__vpmydv__h.png",
+   "n_valid": 5,
+   "n_clean": 4,
+   "n_clean_strict": 4,
+   "flags": [
+    "gap"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch near bolster"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "opening 33 mm vs 11 mm width; coverage 0.5, antipodal 0.24"
+    }
+   ],
+   "object_note": "handle_half constraint respected; row 5 oblique half-coverage contact",
+   "bbox_mm": [
+    302,
+    81,
+    29
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "handle_half"
+  }
+ ],
+ "excluded": []
+}

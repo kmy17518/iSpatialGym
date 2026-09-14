@@ -1,0 +1,38 @@
+{
+  "group": "disembedding__mouse__r2",
+  "task": "disembedding",
+  "category": "mouse",
+  "round": 2,
+  "relation": null,
+  "n_candidates": 7,
+  "n_opened": 7,
+  "candidates": [
+    {"model": "oydobn", "key": "mouse__oydobn__t", "G": 5, "T": 3, "V": 1, "R": 1, "score": 16,
+     "note": "Unscaled model is only 31x20x11 mm; five fingertip pinches are clean but the object is a quarter-size black blob, not a usable mouse instance."},
+    {"model": "fjljxp", "key": "mouse__fjljxp__t", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Row 2 proper 38/20 side pinch; rows 1,3-5 one-finger 50/x holds with mouse still between pads. Smooth white shell, clean, plausible size."},
+    {"model": "ihpnjx", "key": "mouse__ihpnjx__t", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "All five rows one-finger 50/5-10 holds, mouse pressed to open pad but both pads on body; no two-sided pinch. Plain white shell, clean."},
+    {"model": "eosngb", "key": "mouse__eosngb__t", "G": 4, "T": 3, "V": 3, "R": 2, "score": 19,
+     "note": "Row 1 proper 44/13 pinch across 54 mm slab; rows 2-5 one-finger holds. Brushed-grey flat slab design, clean but an unusual mouse shape."},
+    {"model": "wwyopp", "key": "mouse__wwyopp__t", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Rows 2 and 5 two-sided pinches, rows 1,3,4 one-finger holds with body between pads. Dark arched Arc-style mouse with logo, clean texture."},
+    {"model": "cduwda", "key": "mouse__cduwda__t", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Top row symmetric 45/25 pinch across 69 mm width; rows 2-5 firm holds with both pads on the wide body. Glossy light-grey oval mouse, clean."},
+    {"model": "pljjtu", "key": "mouse__pljjtu__t", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Rows 2-5 two-sided side pinches (38/28 near-symmetric), top row 50/16 still firm on 64 mm body. Glossy light-grey oval mouse, clean."}
+  ],
+  "selected": [
+    {"model": "cduwda", "key": "mouse__cduwda__t", "rank": 1,
+     "reason": "Best single grasp of the group: symmetric 45/25 side pinch with bottom free, four more firm holds; clean glossy oval mouse of representative size, stable flat base."},
+    {"model": "wwyopp", "key": "mouse__wwyopp__t", "rank": 2,
+     "reason": "Within 2 points of pljjtu and visually different from #1: dark arched Arc-style mouse with two proper two-sided pinches and clean texture; spans the category's appearance."}
+  ],
+  "alternate": {"model": "pljjtu", "key": "mouse__pljjtu__t"},
+  "short": false,
+  "warnings": [
+    "oydobn is an unscaled 31 mm model (about quarter size) and is not selectable as a mouse test instance despite clean fingertip pinches.",
+    "pljjtu ties cduwda at 23 but looks identical to it; wwyopp taken as #2 for appearance contrast. ihpnjx has only one-finger closures."
+  ],
+  "confidence": "high"
+}

@@ -1,0 +1,624 @@
+{
+ "group": "disembedding__bottle_of_beer__r2",
+ "task": "disembedding",
+ "category": "bottle_of_beer",
+ "round": 2,
+ "relation": null,
+ "partner": "stands",
+ "requirements": "Tabletop task: the object rests among other objects on a table / tray and is picked from its resting pose. It must settle stably on a flat surface (it must not roll or topple). The best single grasp matters most.",
+ "candidates": [
+  {
+   "model": "dcwvkg",
+   "key": "bottle_of_beer__dcwvkg__t",
+   "strip": "/tmp/glib/strips/bottle_of_beer__dcwvkg__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wide neck pinch under cap, both pads on glass"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, 14/35 asymmetric but firm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, pads on neck, CoM 6 mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, 16/32 asymmetric but firm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, 40/8 off-centre, both pads touch"
+    }
+   ],
+   "object_note": "Stubby bottle, 46 mm neck; several asymmetric closures but pads always on neck",
+   "bbox_mm": [
+    113,
+    114,
+    288
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "vhscym",
+   "key": "bottle_of_beer__vhscym__t",
+   "strip": "/tmp/glib/strips/bottle_of_beer__vhscym__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch under cap, pads on neck"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, asymmetric 31/18, firm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, CoM 6 mm, fine"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, 38/11 off-centre, both pads touch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, CoM 9 mm, tilt 6, fine"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    113,
+    114,
+    288
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "qepxvl",
+   "key": "bottle_of_beer__qepxvl__t",
+   "strip": "/tmp/glib/strips/bottle_of_beer__qepxvl__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch under cap, dark neck fills gap"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, pads on neck"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, pads on neck"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, coverage 0.5 but both pads touch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "symmetric 13/13 neck pinch, centred"
+    }
+   ],
+   "object_note": "Rows 1-4 close one finger to 0 (neck edge at centreline), still two-pad pinch",
+   "bbox_mm": [
+    56,
+    57,
+    227
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "rdnopv",
+   "key": "bottle_of_beer__rdnopv__t",
+   "strip": "/tmp/glib/strips/bottle_of_beer__rdnopv__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch under cap, pads on neck"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch under cap, pads on neck"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch under cap, pads on neck"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch under cap, pads on neck"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch under cap, pads on neck"
+    }
+   ],
+   "object_note": "One finger at 0 each row; neck between both pads",
+   "bbox_mm": [
+    57,
+    57,
+    205
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "kqskmv",
+   "key": "bottle_of_beer__kqskmv__t",
+   "strip": "/tmp/glib/strips/bottle_of_beer__kqskmv__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch under cap, 11/17 nearly symmetric"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, pads on neck"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, CoM 5 mm, fine"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, tilt 5, pads on neck"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, CoM 6 mm, fine"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    63,
+    64,
+    254
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "saslsh",
+   "key": "bottle_of_beer__saslsh__t",
+   "strip": "/tmp/glib/strips/bottle_of_beer__saslsh__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch under cap, pads on neck"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, 24/4, both pads touch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, pads on neck"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, pads on neck"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "symmetric 13/15 neck pinch"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    64,
+    64,
+    254
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "phdimo",
+   "key": "bottle_of_beer__phdimo__t",
+   "strip": "/tmp/glib/strips/bottle_of_beer__phdimo__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "clear neck pinch, tilt 9, pads bracket neck"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, tilt 11 deg mild"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, 24/15 near symmetric"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, tilt 10, CoM 8 mm, ok"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, tilt 13 deg, CoM 7 mm, acceptable"
+    }
+   ],
+   "object_note": "Transparent bottle; finger sums match neck width, no evidence of gap",
+   "bbox_mm": [
+    68,
+    68,
+    245
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "fgzjnb",
+   "key": "bottle_of_beer__fgzjnb__t",
+   "strip": "/tmp/glib/strips/bottle_of_beer__fgzjnb__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch under gold cap, pads on neck"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, pads on neck"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "symmetric 15/15 neck pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, pads on neck"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, CoM 9 mm, tilt 6, fine"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    68,
+    69,
+    217
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "gxxbhh",
+   "key": "bottle_of_beer__gxxbhh__t",
+   "strip": "/tmp/glib/strips/bottle_of_beer__gxxbhh__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch under cap, pads on neck"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, centred"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, tilt 6, fine"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, tilt 7 deg mild"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, tilt 6, centred"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    68,
+    69,
+    217
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "zbsxro",
+   "key": "bottle_of_beer__zbsxro__t",
+   "strip": "/tmp/glib/strips/bottle_of_beer__zbsxro__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wide neck pinch under cap, pads on neck"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "symmetric 18/20 neck pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, 0/39 off-centre, pads on neck"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, 6/33 off-centre, pads on neck"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, tilt 7, pads on neck"
+    }
+   ],
+   "object_note": "Stubby bottle; off-centre closures in rows 3-4 but neck fills pad gap in V1",
+   "bbox_mm": [
+    89,
+    88,
+    224
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "crfcwo",
+   "key": "bottle_of_beer__crfcwo__t",
+   "strip": "/tmp/glib/strips/bottle_of_beer__crfcwo__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch under cap, pads on neck"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, 25/14 near symmetric"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, 36/3 off-centre, firm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, tilt 6, CoM 8 mm, ok"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, tilt 8 deg mild"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    89,
+    88,
+    225
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "meqliv",
+   "key": "bottle_of_beer__meqliv__t",
+   "strip": "/tmp/glib/strips/bottle_of_beer__meqliv__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "symmetric 19/20 neck pinch, tilt 7"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, pads on neck"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, 21/18 symmetric"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, tilt 9 deg mild"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch, 17/21, CoM 6 mm, fine"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    91,
+    90,
+    225
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

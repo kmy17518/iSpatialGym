@@ -1,0 +1,46 @@
+{
+ "key": "toolbox__redmtl",
+ "category": "toolbox",
+ "model": "redmtl",
+ "aabb_extent": [
+  0.2679709792137146,
+  0.6182060241699219,
+  0.3523434102535248
+ ],
+ "support": "table",
+ "joints": [
+  {
+   "joint": "j_lid",
+   "kind": "flap",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     0.605,
+     0.347,
+     -0.005
+    ],
+    "translate": 0.5,
+    "sign": 1.0
+   },
+   "ag": true,
+   "dq": 0.1348,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": false,
+   "steps": [
+    "stance ok",
+    "grasped",
+    "pull chunk 2: [planning] move_eef_cartesian(right) failed: differential IK did not converge at waypoint 0/3: pos_err=8.0mm rot_err=0.003rad at_lower=[] at_upper=[]"
+   ],
+   "error": null,
+   "contact_world": [
+    1.254,
+    -0.006,
+    1.092
+   ],
+   "handle_height": 1.092
+  }
+ ],
+ "error": null,
+ "time_s": 29.7
+}

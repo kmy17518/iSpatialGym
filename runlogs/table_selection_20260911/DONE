@@ -1,0 +1,15 @@
+{
+  "status": "complete",
+  "finished": "2026-09-12 07:16:34 PDT",
+  "sampler_runs": 1114,
+  "viable_runs": 185,
+  "renders": 19,
+  "outputs": {
+    "csv": "runlogs/grasp_library_20260905/select/task_object_selection.csv",
+    "xlsx": "runlogs/grasp_library_20260905/select/task_object_selection.xlsx",
+    "html": "runlogs/grasp_library_20260905/select/task_object_selection.html",
+    "candidates": "runlogs/table_selection_20260911/candidates_by_task.md",
+    "summary": "runlogs/table_selection_20260911/results_summary.csv",
+    "readme": "runlogs/table_selection_20260911/README.md"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "category": "decorative_sign",
+  "task": "wa1",
+  "n_models": 3,
+  "n_opened": 3,
+  "models": [
+    {"model": "hgonwj", "V": 3, "U": 1, "H": 2, "score": 10, "valid": false,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "flat black letter Z, 0.60 x 0.49 m, 6 cm thick; uniform black, and a Z is 180-degree symmetric (also reads as N sideways)"},
+    {"model": "rypeha", "V": 4, "U": 3, "H": 2, "score": 16, "valid": true,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "3D word LOVE, 0.33 x 0.13 m, 2.4 cm thick, teal, reads from +x; four separate letter blocks in one mesh, no texture detail"},
+    {"model": "xzsmxq", "V": 3, "U": 3, "H": 1, "score": 13, "valid": true,
+     "front_axis": "+x", "up_axis": "+z", "thin_axis": "x",
+     "note": "cut-out 'Welcome HOME' sign 0.93 x 0.60 m, dark teal, text reads from +x; back faces missing (white from -x), width borderline"}
+  ],
+  "picks": ["rypeha", "xzsmxq"],
+  "alternate": null,
+  "category_verdict": "good",
+  "category_note": "Cut-out letter/word wall signs, 0.33-0.93 m wide, 2-7 cm thick, untextured solid colours. LOVE and Welcome HOME give an obvious upright via text; the single letter Z is orientation-ambiguous. Sizes vary a lot."
+}

@@ -1,0 +1,50 @@
+{
+  "group": "object_scaling__box_of_cereal__r2",
+  "task": "object_scaling",
+  "category": "box_of_cereal",
+  "round": 2,
+  "relation": null,
+  "n_candidates": 12,
+  "n_opened": 12,
+  "candidates": [
+    {"model": "wrlalk", "key": "box_of_cereal__wrlalk__f", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Dark Dorset Cereals granola box 60x105x190; five upper-body pinches across 60 mm (50/12), CoM 25-34, only face flips; sharp legible print."},
+    {"model": "dkhgxn", "key": "box_of_cereal__dkhgxn__f", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Red Monkey Balls box 78x155x242; five top-third pinches across 73 mm at 56-71 mm lever, one tilted 118; text texture low-res."},
+    {"model": "yorray", "key": "box_of_cereal__yorray__f", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Beige Dorset box 50x95x200; five upper pinches across 50 mm (50/0), CoM 23-27, front/back flips only; sharp legible text."},
+    {"model": "sgirte", "key": "box_of_cereal__sgirte__f", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Dark grey Dorset muesli box 50x95x200; five upper pinches across 50 mm (50/0), CoM 20-28, face flips only; sharp texture."},
+    {"model": "pfwgkm", "key": "box_of_cereal__pfwgkm__f", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Small cream Dorset box 35x100x115, undersized for the category; five pinches across 35 mm (37/0), CoM 22-29; sharp texture."},
+    {"model": "qirvmd", "key": "box_of_cereal__qirvmd__f", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Brown Cocoa Rice box 45x150x220; five top-edge pinches across 45 mm (47/0), CoM 48-52, face flips only; crisp folk-art print."},
+    {"model": "hosfhj", "key": "box_of_cereal__hosfhj__f", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "White Fibre Flakes box 45x150x220; five top-edge pinches across 45 mm (47/0), CoM 47-52, face flips only; clean illustrated texture."},
+    {"model": "wdkcbu", "key": "box_of_cereal__wdkcbu__f", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Black Dorset fruity box 50x95x200; five near-centre pinches across 50 mm (50/0), CoM 21-27, face flips only; sharp texture."},
+    {"model": "ykuyqb", "key": "box_of_cereal__ykuyqb__f", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Mint Dorset spelt-flakes box 50x95x200; five near-centre pinches across 50 mm (50/0-1), CoM 19-27, one 103 tilt; legible text."},
+    {"model": "iucshm", "key": "box_of_cereal__iucshm__f", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Large brown Cocoa Spheres box 53x196x273; all five hang from top-edge pinches (50/3-4), CoM 73-81 lever; fine print blurry."},
+    {"model": "surzft", "key": "box_of_cereal__surzft__f", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Large yellow Honey Torus box 53x196x273; five top-edge pinches (50/3-4), CoM 72-80, box hangs below pads; fine print blurry."},
+    {"model": "hcwbzw", "key": "box_of_cereal__hcwbzw__f", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Large blue Crunchy Stars box 53x196x273; five top-edge pinches (50/3-4), CoM 73-82, box hangs below pads; fine print blurry."}
+  ],
+  "selected": [
+    {"model": "wrlalk", "key": "box_of_cereal__wrlalk__f", "rank": 1,
+     "reason": "Top score 23; only candidate with a genuine two-sided closure (50/12) on a 60 mm body, moderate 25-34 mm lever, sharpest legible texture, unmistakable cereal box."},
+    {"model": "hosfhj", "key": "box_of_cereal__hosfhj__f", "rank": 2,
+     "reason": "Score 23, tied; chosen for diversity: white illustrated box of a different, wider 45x150x220 shape family versus the dark Dorset box; five clean pinches, both pads seated."}
+  ],
+  "alternate": {"model": "yorray", "key": "box_of_cereal__yorray__f"},
+  "short": false,
+  "warnings": [
+    "Seven candidates tie at 23: every model offers five clean pinches but only front/back face flips of one approach, so G is capped at 4 group-wide",
+    "Dorset-family rows read 50/0 (one finger at the closed limit): assisted-grasp artefact, the 50 mm box still fills the pad gap",
+    "iucshm, surzft, hcwbzw (273 mm) and dkhgxn (242 mm) hang from top-edge pinches with 56-82 mm lever arms",
+    "pfwgkm is an undersized 115 mm box"
+  ],
+  "confidence": "medium"
+}

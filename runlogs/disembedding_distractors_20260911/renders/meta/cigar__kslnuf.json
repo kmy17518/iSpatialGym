@@ -1,0 +1,35 @@
+{
+ "category": "cigar",
+ "model": "kslnuf",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/cigar__kslnuf__y0.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 5.8,
+   "on_tray": true,
+   "settled_z": 0.0054,
+   "seg_pixels": 737,
+   "aabb_extent": [
+    0.121,
+    0.013,
+    0.012
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/cigar__kslnuf__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.1,
+   "on_tray": true,
+   "settled_z": 0.0055
+  }
+ },
+ "stable": true,
+ "visible": true
+}

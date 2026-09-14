@@ -1,0 +1,23 @@
+{
+ "scene": "restaurant_diner",
+ "table": "pedestal_table_nlfgwe_2",
+ "category": "pedestal_table",
+ "model": "nlfgwe",
+ "rooms": [
+  "dining_room_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.77,
+  "bbox_x": 1.074,
+  "bbox_y": 1.074,
+  "bbox_z": 0.766,
+  "verdict": "keep"
+ },
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 22:38:55",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

@@ -1,0 +1,28 @@
+{
+  "category": "compost_bin",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "fvkdos",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Tall slim dark-grey tapered bin with slanted top, 0.42 x 0.28 x 0.82 m; near-uniform grey, no visible lid/pedal detail, flat base."
+    }
+  ],
+  "picks": ["fvkdos"],
+  "alternate": null,
+  "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner"
+  ],
+  "category_verdict": "weak",
+  "category_note": "Single model: a plain tall dark kitchen waste/compost bin (0.42 x 0.28 x 0.82 m), good obstacle size and stable; reads as a generic bin. Natural in kitchens and a diner. Weak only because there is one model."
+}

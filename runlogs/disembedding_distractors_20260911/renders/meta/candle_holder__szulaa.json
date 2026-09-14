@@ -1,0 +1,35 @@
+{
+ "category": "candle_holder",
+ "model": "szulaa",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/candle_holder__szulaa__y0.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0589,
+   "seg_pixels": 18907,
+   "aabb_extent": [
+    0.134,
+    0.133,
+    0.137
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/candle_holder__szulaa__y1.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0589
+  }
+ },
+ "stable": true,
+ "visible": true
+}

@@ -1,0 +1,25 @@
+{
+ "scene": "house_double_floor_lower",
+ "table": "coffee_table_koagbh_0",
+ "category": "coffee_table",
+ "model": "koagbh",
+ "rooms": [
+  "living_room_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.414,
+  "bbox_x": 0.8,
+  "bbox_y": 1.656,
+  "bbox_z": 0.406,
+  "verdict": "low"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:11:19",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

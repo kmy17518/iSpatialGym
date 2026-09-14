@@ -1,0 +1,26 @@
+{
+ "category": "tennis_racket",
+ "task": "wa1",
+ "n_models": 1,
+ "n_opened": 1,
+ "models": [
+  {
+   "model": "rmvafy",
+   "V": 4,
+   "U": 2,
+   "H": 1,
+   "score": 13,
+   "valid": true,
+   "front_axis": "+z",
+   "up_axis": "-x",
+   "thin_axis": "z",
+   "note": "Racket lying flat, head at -x, handle at +x; strings rendered; hangs head-up; sports gear is unusual wall decor."
+  }
+ ],
+ "picks": [
+  "rmvafy"
+ ],
+ "alternate": null,
+ "category_verdict": "weak",
+ "category_note": "Single racket 0.82x0.34x0.03 m lying flat, head at -x, handle at +x. Upright (head up) is readable from the silhouette, but a racket is unusual on a house/office wall; one model only."
+}

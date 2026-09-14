@@ -1,0 +1,177 @@
+{
+ "group": "mental_rotation__cookie_cutter__r2",
+ "task": "mental_rotation",
+ "category": "cookie_cutter",
+ "round": 2,
+ "relation": null,
+ "partner": "shaped",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "jpscvj",
+   "key": "cookie_cutter__jpscvj__f",
+   "strip": "/tmp/glib/strips/cookie_cutter__jpscvj__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on star tips, antipodal 0.78"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on star tips, antipodal 0.80"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on star tips, coverage 0.75"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "oblique star pinch, antipodal 0.65, coverage 0.75"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on star tips, antipodal 0.77"
+    }
+   ],
+   "object_note": "thin-walled star; pads stop at star tips (~50 mm) while pinch-line width is 32-40 mm; finger A near open limit",
+   "bbox_mm": [
+    58,
+    52,
+    20
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "lqrfzo",
+   "key": "cookie_cutter__lqrfzo__f",
+   "strip": "/tmp/glib/strips/cookie_cutter__lqrfzo__f.png",
+   "n_valid": 5,
+   "n_clean": 3,
+   "n_clean_strict": 3,
+   "flags": [
+    "end_grasp",
+    "gap"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across 20 mm lobe, antipodal 0.96"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across 20 mm lobe, antipodal 0.94"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "lobe-edge pinch; antipodal 0.07, coverage 0.25, would slip"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp",
+      "gap"
+     ],
+     "note": "lobe tip 12 mm vs pads 22 mm; antipodal 0.09"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across 20 mm lobe, antipodal 0.90"
+    }
+   ],
+   "object_note": "thin-walled flower cutter; lobe pinches fine, tip pinches have non-opposing contacts",
+   "bbox_mm": [
+    56,
+    56,
+    20
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "fvxiun",
+   "key": "cookie_cutter__fvxiun__f",
+   "strip": "/tmp/glib/strips/cookie_cutter__fvxiun__f.png",
+   "n_valid": 5,
+   "n_clean": 4,
+   "n_clean_strict": 4,
+   "flags": [
+    "gap"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads at heart lobes, antipodal 1.00"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads at heart lobes, antipodal 0.99"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads at heart lobes, antipodal 0.99"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads at heart lobes, coverage 0.50"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "pads 53 mm apart vs 34 mm walls at pinch line"
+    }
+   ],
+   "object_note": "thin-walled heart; finger A at open limit (50) in all grasps, pads stop at ~53 mm hull extent",
+   "bbox_mm": [
+    54,
+    57,
+    20
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

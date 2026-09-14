@@ -1,0 +1,27 @@
+{
+ "scene": "house_double_floor_upper",
+ "table": "desk_iotfzl_0",
+ "category": "desk",
+ "model": "iotfzl",
+ "rooms": [
+  "living_room_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.73,
+  "bbox_x": 0.532,
+  "bbox_y": 1.398,
+  "bbox_z": 0.728,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "armchair_axcwcm_0"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:20:21",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

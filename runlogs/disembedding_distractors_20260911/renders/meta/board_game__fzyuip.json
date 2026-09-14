@@ -1,0 +1,35 @@
+{
+ "category": "board_game",
+ "model": "fzyuip",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/board_game__fzyuip__y0.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0222,
+   "seg_pixels": 15038,
+   "aabb_extent": [
+    0.135,
+    0.162,
+    0.045
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/board_game__fzyuip__y1.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.1,
+   "on_tray": true,
+   "settled_z": 0.0222
+  }
+ },
+ "stable": true,
+ "visible": true
+}

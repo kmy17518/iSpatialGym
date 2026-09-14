@@ -1,0 +1,16 @@
+{
+ "key": "bottom_cabinet_no_top__exgntg",
+ "category": "bottom_cabinet_no_top",
+ "model": "exgntg",
+ "scene": "house_single_floor",
+ "host": "bottom_cabinet_no_top_gjrero_1",
+ "host_rank": 2,
+ "host_model": "gjrero",
+ "swap": true,
+ "joints": [],
+ "error": "AssertionError('Object with name o_bottom_cabinet_no_top__exgntg already exists in scene!')",
+ "previous_hosts": [
+  "bottom_cabinet_no_top_gjrero_0",
+  "bottom_cabinet_no_top_gjrero_4"
+ ]
+}

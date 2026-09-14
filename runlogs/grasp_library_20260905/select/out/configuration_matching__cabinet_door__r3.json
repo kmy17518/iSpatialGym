@@ -1,0 +1,39 @@
+{
+ "group": "configuration_matching__cabinet_door__r3",
+ "task": "configuration_matching",
+ "category": "cabinet_door",
+ "round": 3,
+ "relation": null,
+ "n_candidates": 1,
+ "n_opened": 1,
+ "candidates": [
+  {
+   "model": "ertkre",
+   "key": "cabinet_door__ertkre__a",
+   "G": 5,
+   "T": 3,
+   "V": 4,
+   "R": 0,
+   "score": 21,
+   "note": "Light-wood 263x457x8 mm panel with small dark pull; five top-edge face pinches (10/0), two tilted 30 deg, panel hangs below, hinge side free."
+  }
+ ],
+ "selected": [
+  {
+   "model": "ertkre",
+   "key": "cabinet_door__ertkre__a",
+   "rank": 1,
+   "reason": "Only candidate: clean top-edge face pinches, hinge side far from the pads (attach dist 213-309 mm), clean wood texture; weakness is the 8 mm pinch, one finger fully closed.",
+   "partners": [
+    "cabinet_base/dcmhhh [type doorcabinet]"
+   ]
+  }
+ ],
+ "alternate": null,
+ "short": true,
+ "warnings": [
+  "Only one candidate in the group, so only one test instance can be selected.",
+  "Pinch spans an 8 mm panel with one finger fully closed (10/0), so robustness is marginal (R 0); the panel hangs 200+ mm below the top-edge pinch and two rows hold it tilted 30 deg. Wood texture is plain and slightly blurry."
+ ],
+ "confidence": "medium"
+}

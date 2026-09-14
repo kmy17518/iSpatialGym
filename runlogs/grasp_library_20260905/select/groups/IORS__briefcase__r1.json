@@ -1,0 +1,186 @@
+{
+ "group": "IORS__briefcase__r1",
+ "task": "IORS",
+ "category": "briefcase",
+ "round": 1,
+ "relation": "under",
+ "partner": "under desk",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "uquevd",
+   "key": "briefcase__uquevd",
+   "strip": "/tmp/glib/strips/briefcase__uquevd.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top edge pinched across bag thickness, hangs"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top edge pinched, full coverage"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top edge pinched, tilt 35 acceptable"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top edge pinched, 5 mm off CoM"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top edge pinched, tilt 38 acceptable"
+    }
+   ],
+   "object_note": "soft sleeve standing on edge; V4 saturated, judged from V1-V3",
+   "bbox_mm": [
+    230,
+    266,
+    80
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "psvdau",
+   "key": "briefcase__psvdau",
+   "strip": "/tmp/glib/strips/briefcase__psvdau.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top edge pinched across 88 mm body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "nominal 35 mm but pads close on body, sound"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top edge pinched, 26 mm off CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "nominal 32 mm but pads close on body, sound"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top edge pinched, 25 mm off CoM"
+    }
+   ],
+   "object_note": "rows 2/4 nominal 32-35 mm yet fingers stop on full body thickness; still a proper top-edge grasp",
+   "bbox_mm": [
+    284,
+    332,
+    97
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "lwbctq",
+   "key": "briefcase__lwbctq",
+   "strip": "/tmp/glib/strips/briefcase__lwbctq.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle missed; bag top held across 66 mm, sound"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle strap pinched 22/0"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle missed; bag top pinched 45/0 off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle missed; body top pinched 80 mm, 97 mm from CoM"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle strap pinched 24/0 near its end"
+    }
+   ],
+   "object_note": "handle pinch only realised in ranks 2 and 5; other rows close on the bag top instead",
+   "bbox_mm": [
+    269,
+    330,
+    120
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": [
+  {
+   "model": "fdpjtj",
+   "key": "briefcase__fdpjtj",
+   "reason": "no AG-valid grasp"
+  },
+  {
+   "model": "ohelib",
+   "key": "briefcase__ohelib",
+   "reason": "no AG-valid grasp"
+  },
+  {
+   "model": "rxvbea",
+   "key": "briefcase__rxvbea",
+   "reason": "no candidates"
+  },
+  {
+   "model": "haecvf",
+   "key": "briefcase__haecvf",
+   "reason": "no candidates"
+  }
+ ]
+}

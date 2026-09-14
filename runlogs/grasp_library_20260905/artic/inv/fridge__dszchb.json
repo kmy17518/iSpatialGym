@@ -1,0 +1,100 @@
+{
+ "category": "fridge",
+ "model": "dszchb",
+ "key": "fridge__dszchb",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.8525413274765015
+ ],
+ "aabb_extent": [
+  0.6405017375946045,
+  0.6368075609207153,
+  1.6838645935058594
+ ],
+ "aabb_min_rel_root": [
+  -0.2555691599845886,
+  -0.31683823466300964,
+  -0.8525413870811462
+ ],
+ "aabb_max_rel_root": [
+  0.3849325478076935,
+  0.3199692964553833,
+  0.8313231468200684
+ ],
+ "link_tags": {
+  "base_link": [],
+  "link_0": [
+   "openable"
+  ]
+ },
+ "openable_joint_ids": [
+  [
+   1,
+   "j_link_0"
+  ]
+ ],
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "type": "RevoluteJoint",
+   "child_link": "link_0",
+   "lower": 0.0,
+   "upper": 2.094395160675049,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.30143,
+    0.29633,
+    0.14314
+   ],
+   "link_quat_obj": [
+    -0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    -0.010320000350475311,
+    0.01169000007212162,
+    0.9998800158500671
+   ],
+   "hinge_point_obj": [
+    0.30143,
+    0.29633,
+    0.14313
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/fridge__dszchb__link_0.obj",
+   "n_pieces": 6,
+   "link_bbox_min": [
+    0.2723,
+    -0.2887,
+    -0.5374
+   ],
+   "link_bbox_max": [
+    0.3849,
+    0.32,
+    0.8313
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.2556,
+   -0.3168,
+   -0.8525
+  ],
+  "bbox_max": [
+   0.3436,
+   0.3189,
+   0.8311
+  ],
+  "n_pieces": 11
+ }
+}

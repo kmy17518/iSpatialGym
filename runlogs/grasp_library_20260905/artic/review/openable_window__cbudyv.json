@@ -1,0 +1,42 @@
+{
+  "key": "openable_window__cbudyv",
+  "category": "openable_window",
+  "model": "cbudyv",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_leaf0",
+      "kind": "door",
+      "chosen": "A",
+      "pinch": "vertical_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Lever-style window handle at the leaf's right edge; A is the hanging lever grip, B the hub above it. Left-hinged, swings toward viewer.",
+      "height_concern": "",
+      "confidence": "medium"
+    },
+    {
+      "joint": "j_leaf1",
+      "kind": "door",
+      "chosen": "B",
+      "pinch": "vertical_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Lever-style window handle at the leaf's right edge; B is the hanging lever grip, A the hub above it. Left-hinged, swings toward viewer.",
+      "height_concern": "",
+      "confidence": "medium"
+    },
+    {
+      "joint": "j_leaf2",
+      "kind": "door",
+      "chosen": "A",
+      "pinch": "vertical_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Lever-style window handle at the leaf's right edge; A is the hanging lever grip, B the hub above it. Left-hinged, swings toward viewer.",
+      "height_concern": "",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Three left-hinged casement leaves, lever handles at free edges (upper/lower marker = hub/lever of one handle). Zoom panels appear shifted one leaf; j_leaf0 zoom shows whole window."
+}

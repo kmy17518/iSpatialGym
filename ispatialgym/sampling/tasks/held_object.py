@@ -99,7 +99,7 @@ class HeldObjectSampler(TaskSampler):
         # all 26 orientations of a trunk go into the same batch; candidates are ranked depth-first (largest depth, then
         # the smallest roll) and the first collision-free solution wins
         for translate, tilt in trunks:
-            q0 = self.kit.q_at_base_pose(self.kit.q_config(arms="ready", translate=translate, tilt=tilt), x, y, yaw)
+            q0 = self.kit.q_at_base_pose(self.kit.q_config(arms=self.init_arms(), translate=translate, tilt=tilt), x, y, yaw)
             cam = self.kit.camera_pose(q0)
             axis = self.world.camera_model.optical_axis(cam)
             cands = []

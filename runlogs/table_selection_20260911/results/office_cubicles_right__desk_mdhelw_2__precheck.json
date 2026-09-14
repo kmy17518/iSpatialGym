@@ -1,0 +1,75 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "desk_mdhelw_2",
+ "rooms": [
+  "private_office_0"
+ ],
+ "removed_chairs": [
+  "swivel_chair_gfixyb_6",
+  "swivel_chair_gfixyb_7",
+  "swivel_chair_lhkkri_1"
+ ],
+ "aabb": [
+  [
+   8.393,
+   3.652,
+   -0.016
+  ],
+  [
+   11.205,
+   4.582,
+   0.785
+  ]
+ ],
+ "support": {
+  "name": "desk_mdhelw_2",
+  "z": 0.7852805852890015,
+  "yaw": 1.570802092552185,
+  "local_bounds": [
+   3.661590337753296,
+   4.561605930328369,
+   -11.18322467803955,
+   -8.403219223022461
+  ],
+  "n_free_cells": 6439,
+  "occupants": [],
+  "resolution": 0.02
+ },
+ "edges": [
+  {
+   "name": "+u",
+   "mid": [
+    9.793,
+    4.562
+   ],
+   "length": 2.78
+  },
+  {
+   "name": "-u",
+   "mid": [
+    9.793,
+    3.662
+   ],
+   "length": 2.78
+  },
+  {
+   "name": "+v",
+   "mid": [
+    8.403,
+    4.112
+   ],
+   "length": 0.9
+  },
+  {
+   "name": "-v",
+   "mid": [
+    11.183,
+    4.112
+   ],
+   "length": 0.9
+  }
+ ],
+ "stance": null,
+ "stance_error": "[stance_collision] untucked: [no_stance] no collision-free stance around desk_mdhelw_2",
+ "precheck_s": 2.5
+}

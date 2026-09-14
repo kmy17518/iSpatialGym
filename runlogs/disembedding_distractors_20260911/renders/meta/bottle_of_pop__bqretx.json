@@ -1,0 +1,53 @@
+{
+ "category": "bottle_of_pop",
+ "model": "bqretx",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0,
+  180.0,
+  270.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_pop__bqretx__y0.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.1085,
+   "seg_pixels": 14836,
+   "aabb_extent": [
+    0.087,
+    0.087,
+    0.251
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_pop__bqretx__y1.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1085
+  },
+  "y2": {
+   "yaw_deg": 180.0,
+   "png": "renders/bottle_of_pop__bqretx__y2.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1085
+  },
+  "y3": {
+   "yaw_deg": 270.0,
+   "png": "renders/bottle_of_pop__bqretx__y3.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1085
+  }
+ },
+ "stable": true,
+ "visible": true
+}

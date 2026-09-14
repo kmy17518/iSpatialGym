@@ -1,0 +1,509 @@
+{
+ "group": "mental_rotation__sandal__r2",
+ "task": "mental_rotation",
+ "category": "sandal",
+ "round": 2,
+ "relation": null,
+ "partner": "",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "tkfdsk",
+   "key": "sandal__tkfdsk__f",
+   "strip": "/tmp/glib/strips/sandal__tkfdsk__f.png",
+   "n_valid": 5,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "fragile",
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger",
+      "fragile"
+     ],
+     "note": "pads 38 mm apart, sole 13 mm; far pad on strap"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger",
+      "fragile"
+     ],
+     "note": "pads 34 mm apart, sole 11 mm; far pad on strap"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger",
+      "fragile"
+     ],
+     "note": "pads 37 mm apart, sole 13 mm; far pad on strap"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger",
+      "fragile"
+     ],
+     "note": "pads 37 mm apart, sole 12 mm; far pad on strap"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger",
+      "fragile"
+     ],
+     "note": "pads 36 mm apart, sole 12 mm; far pad on strap"
+    }
+   ],
+   "object_note": "sole is pressed against one pad only; other pad rests on the thin strap arch, not the sole",
+   "bbox_mm": [
+    237,
+    91,
+    34
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "txkidl",
+   "key": "sandal__txkidl__f",
+   "strip": "/tmp/glib/strips/sandal__txkidl__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [
+    "unsure"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "pads 38mm apart vs 12mm sole; strap or hull contact unclear"
+    },
+    {
+     "rank": 2,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "pads 38mm apart vs 12mm sole; strap or hull contact unclear"
+    },
+    {
+     "rank": 3,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "pads 38mm apart vs 12mm sole; strap or hull contact unclear"
+    },
+    {
+     "rank": 4,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "pads 39mm apart vs 12mm sole; strap or hull contact unclear"
+    },
+    {
+     "rank": 5,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "pads 35mm apart vs 11mm sole; strap or hull contact unclear"
+    }
+   ],
+   "object_note": "thin flip-flop; all pinches near toe-post/strap, finger opening far exceeds sole thickness",
+   "bbox_mm": [
+    237,
+    90,
+    34
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "shdahi",
+   "key": "sandal__shdahi__f",
+   "strip": "/tmp/glib/strips/sandal__shdahi__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side-edge sole pinch; opening 29 vs 22mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side-edge sole pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sole pinch near strap"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sole edge pinch, 66mm from CoM"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sole edge pinch, 68mm from CoM"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    236,
+    89,
+    53
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "uhzfis",
+   "key": "sandal__uhzfis__f",
+   "strip": "/tmp/glib/strips/sandal__uhzfis__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sole edge pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sole edge pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sole pinch near straps"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sole edge pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sole edge pinch"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    214,
+    88,
+    59
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "zafskl",
+   "key": "sandal__zafskl__f",
+   "strip": "/tmp/glib/strips/sandal__zafskl__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sole edge pinch, 24mm sole"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sole pinch near strap"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sole pinch toward heel end, 62mm from CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sole edge pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sole pinch toward end, 68mm from CoM"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    224,
+    87,
+    75
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "spcddb",
+   "key": "sandal__spcddb__f",
+   "strip": "/tmp/glib/strips/sandal__spcddb__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [
+    "unsure"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "pads 43mm apart vs 25mm sole; strap or hull contact unclear"
+    },
+    {
+     "rank": 2,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "pads 44mm apart vs 24mm sole; strap or hull contact unclear"
+    },
+    {
+     "rank": 3,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "pads 40mm apart vs 27mm sole; strap or hull contact unclear"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sole pinch; opening 36 vs 28mm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sole edge pinch, 32 vs 30mm"
+    }
+   ],
+   "object_note": "flip-flop; near-centre pinches open much wider than sole, likely strap loop or coarse hull",
+   "bbox_mm": [
+    236,
+    96,
+    51
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "chgcrm",
+   "key": "sandal__chgcrm__f",
+   "strip": "/tmp/glib/strips/sandal__chgcrm__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "thick sole edge pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sole pinch near strap"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "heel-end pinch on 33mm sole, 70mm lever"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "sole pinch near strap"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "end pinch on 33mm sole, 75mm lever"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    243,
+    99,
+    70
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "vwbomj",
+   "key": "sandal__vwbomj__f",
+   "strip": "/tmp/glib/strips/sandal__vwbomj__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "heel block pinch; finger at open limit, both pads touch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "heel block pinch, opening matches 65mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "heel block pinch, opening matches 65mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "heel block pinch from footbed side"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "heel block pinch; finger at open limit, both pads touch"
+    }
+   ],
+   "object_note": "platform sandal; all grasps clamp the 65mm heel block, far from CoM but firm",
+   "bbox_mm": [
+    256,
+    105,
+    117
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "dfkzbd",
+   "key": "sandal__dfkzbd__f",
+   "strip": "/tmp/glib/strips/sandal__dfkzbd__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "heel block pinch; finger at open limit, both pads touch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "heel block pinch, opening matches 65mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "heel block pinch, opening matches 65mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "heel block pinch, opening matches 65mm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "heel block pinch from footbed side"
+    }
+   ],
+   "object_note": "platform sandal; all grasps clamp the 65mm heel block, far from CoM but firm",
+   "bbox_mm": [
+    256,
+    105,
+    117
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

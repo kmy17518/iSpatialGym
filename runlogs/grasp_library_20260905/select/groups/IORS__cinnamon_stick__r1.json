@@ -1,0 +1,370 @@
+{
+ "group": "IORS__cinnamon_stick__r1",
+ "task": "IORS",
+ "category": "cinnamon_stick",
+ "round": 1,
+ "relation": "nextto",
+ "partner": "star_anise",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "hjhcpm",
+   "key": "cinnamon_stick__hjhcpm__s",
+   "strip": "/tmp/glib/strips/cinnamon_stick__hjhcpm__s.png",
+   "n_valid": 2,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "penetration"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "fingers closed to 3/1mm through 15mm quill; tips inside stick"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "fingers closed to 2/1mm through 15mm quill"
+    }
+   ],
+   "object_note": "collision hull far smaller than visual quill; fingers close almost fully yet stay attached",
+   "bbox_mm": [
+    21,
+    98,
+    8
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    2.508
+   ],
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "cdkjfo",
+   "key": "cinnamon_stick__cdkjfo__s",
+   "strip": "/tmp/glib/strips/cinnamon_stick__cdkjfo__s.png",
+   "n_valid": 2,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "penetration"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "fingers closed to 3/1mm through 17mm quill"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "fingers closed to 4/0mm through 17mm quill"
+    }
+   ],
+   "object_note": "collision hull far smaller than visual quill; both rows sink fingertips into stick",
+   "bbox_mm": [
+    12,
+    113,
+    8
+   ],
+   "scale": [
+    1.647,
+    1.0,
+    2.423
+   ],
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "qxpzdm",
+   "key": "cinnamon_stick__qxpzdm__s",
+   "strip": "/tmp/glib/strips/cinnamon_stick__qxpzdm__s.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-stick pinch, pads 21mm on 19mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-stick pinch, pads 20mm on 19mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "CoM 16mm, stick yawed; pads 14mm across thinner curl"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "CoM 16mm, stick yawed; pads 14mm across thinner curl"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "CoM 11mm, skewed pinch; pads 15mm, both touch"
+    }
+   ],
+   "object_note": "ranks 3-5 stick rotated during closing (skewed in V4); still within middle third",
+   "bbox_mm": [
+    21,
+    161,
+    10
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.968
+   ],
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "qsqvgk",
+   "key": "cinnamon_stick__qsqvgk__s",
+   "strip": "/tmp/glib/strips/cinnamon_stick__qsqvgk__s.png",
+   "n_valid": 3,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "penetration"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "fingers closed to 5/0mm through 17mm quill"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "fingers closed to 5/0mm; wrist view shows pads inside quill"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "fingers closed to 2/0mm through 17mm quill"
+    }
+   ],
+   "object_note": "collision hull far smaller than visual quill in every row",
+   "bbox_mm": [
+    19,
+    140,
+    11
+   ],
+   "scale": [
+    1.056,
+    1.0,
+    1.876
+   ],
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "kdaxdy",
+   "key": "cinnamon_stick__kdaxdy__s",
+   "strip": "/tmp/glib/strips/cinnamon_stick__kdaxdy__s.png",
+   "n_valid": 2,
+   "n_clean": 2,
+   "n_clean_strict": 2,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-stick pinch, pads 21mm on 20mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch near middle, tilt 35 moderate, both pads touch"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    21,
+    131,
+    11
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.87
+   ],
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "smfuqz",
+   "key": "cinnamon_stick__smfuqz__s",
+   "strip": "/tmp/glib/strips/cinnamon_stick__smfuqz__s.png",
+   "n_valid": 3,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "penetration"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "fingers closed to 5/0mm through 18mm quill"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "fingers closed to 7/0mm through 18mm quill"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "fingers closed to 11/0mm on 18mm quill; pads sunk into bark"
+    }
+   ],
+   "object_note": "collision hull consistently smaller than visual quill (5-11mm vs 18mm)",
+   "bbox_mm": [
+    17,
+    137,
+    11
+   ],
+   "scale": [
+    1.207,
+    1.0,
+    1.8
+   ],
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "bmbjdf",
+   "key": "cinnamon_stick__bmbjdf__s",
+   "strip": "/tmp/glib/strips/cinnamon_stick__bmbjdf__s.png",
+   "n_valid": 1,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "end_grasp",
+    "penetration"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp",
+      "penetration"
+     ],
+     "note": "fingers fully closed 0/0 through bundle; pinch at bundle end"
+    }
+   ],
+   "object_note": "Short banded bundle; fingers close fully (0/0) on 18 mm section, collision hull likely much smaller than visual",
+   "bbox_mm": [
+    12,
+    92,
+    14
+   ],
+   "scale": [
+    1.628,
+    1.0,
+    1.462
+   ],
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "qmlyim",
+   "key": "cinnamon_stick__qmlyim__s",
+   "strip": "/tmp/glib/strips/cinnamon_stick__qmlyim__s.png",
+   "n_valid": 2,
+   "n_clean": 1,
+   "n_clean_strict": 1,
+   "flags": [
+    "penetration"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred pinch on stick middle, both pads touching curl"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "penetration"
+     ],
+     "note": "closed to 8 mm on 19 mm stick; tips sink into curl"
+    }
+   ],
+   "object_note": "Curled stick; finger closures (13/0, 8/0) below object width, collision hull likely undersized",
+   "bbox_mm": [
+    19,
+    143,
+    15
+   ],
+   "scale": [
+    1.054,
+    1.0,
+    1.326
+   ],
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

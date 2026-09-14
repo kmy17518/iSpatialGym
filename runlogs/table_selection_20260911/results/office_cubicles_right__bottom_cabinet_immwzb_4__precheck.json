@@ -1,0 +1,24 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "bottom_cabinet_immwzb_4",
+ "rooms": [
+  "shared_office_0"
+ ],
+ "removed_chairs": [
+  "swivel_chair_ryznxk_4"
+ ],
+ "aabb": [
+  [
+   10.429,
+   -8.609,
+   0.003
+  ],
+  [
+   10.823,
+   -8.006,
+   0.711
+  ]
+ ],
+ "error": "RuntimeError(\"min(): Expected reduction dim to be specified for input.numel() == 0. Specify the reduction dim with the 'dim' argument.\")",
+ "precheck_s": 2.3
+}

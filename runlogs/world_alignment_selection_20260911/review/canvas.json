@@ -1,0 +1,24 @@
+{
+ "category": "canvas",
+ "task": "wa1",
+ "n_models": 1,
+ "n_opened": 1,
+ "models": [
+  {
+   "model": "adxquq",
+   "V": 2,
+   "U": 1,
+   "H": 1,
+   "score": 7,
+   "valid": false,
+   "up_axis": "+y",
+   "front_axis": "+z",
+   "thin_axis": "z",
+   "note": "Uniform grey blank sheet 1.15x0.96 m, 8 mm; looks untextured; no content, no readable up."
+  }
+ ],
+ "picks": [],
+ "alternate": null,
+ "category_verdict": "drop",
+ "category_note": "Single blank grey canvas, large and featureless; no orientation cue at all."
+}

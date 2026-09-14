@@ -1,0 +1,35 @@
+{
+ "category": "pen",
+ "model": "gzrbrx",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/pen__gzrbrx__y0.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 6.5,
+   "on_tray": true,
+   "settled_z": 0.0049,
+   "seg_pixels": 786,
+   "aabb_extent": [
+    0.159,
+    0.011,
+    0.011
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/pen__gzrbrx__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0051
+  }
+ },
+ "stable": true,
+ "visible": true
+}

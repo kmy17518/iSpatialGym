@@ -1,0 +1,382 @@
+{
+ "reviewer": "rev_02",
+ "task": "obst",
+ "categories": [
+  "birdcage",
+  "bucket_of_paint",
+  "coatrack",
+  "dehumidifier",
+  "floor_lamp",
+  "litter_box",
+  "magazine_rack",
+  "rolled_yoga_mat",
+  "tackle_box",
+  "terrarium",
+  "vacuum"
+ ],
+ "grids": [
+  "renders/grids/birdcage_00.png",
+  "renders/grids/bucket_of_paint_00.png",
+  "renders/grids/coatrack_00.png",
+  "renders/grids/dehumidifier_00.png",
+  "renders/grids/floor_lamp_00.png",
+  "renders/grids/floor_lamp_01.png",
+  "renders/grids/floor_lamp_02.png",
+  "renders/grids/litter_box_00.png",
+  "renders/grids/magazine_rack_00.png",
+  "renders/grids/rolled_yoga_mat_00.png",
+  "renders/grids/tackle_box_00.png",
+  "renders/grids/terrarium_00.png",
+  "renders/grids/vacuum_00.png"
+ ],
+ "hints": {
+  "floor_lamp": {
+   "why": "floor lamps ~0.46 x 0.38 x 1.35 m (15 ready; tall but slim); already stands in 3 of the 7 scenes",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+   ],
+   "in_scene": {
+    "house_single_floor": [
+     "childs_room",
+     "living_room"
+    ],
+    "house_double_floor_upper": [
+     "bedroom"
+    ],
+    "Rs_int": [
+     "living_room"
+    ]
+   },
+   "n_models": 15,
+   "bbox_m": {
+    "chjeoy": [
+     0.373,
+     0.201,
+     1.643
+    ],
+    "cosjfl": [
+     0.454,
+     0.447,
+     1.35
+    ],
+    "fanocp": [
+     0.698,
+     0.195,
+     1.283
+    ],
+    "hdfnqb": [
+     0.433,
+     0.433,
+     1.961
+    ],
+    "imgsrd": [
+     0.423,
+     0.301,
+     1.252
+    ],
+    "jcbvfi": [
+     0.423,
+     0.424,
+     1.302
+    ],
+    "jqsuky": [
+     0.423,
+     0.423,
+     1.243
+    ],
+    "lcmuvd": [
+     0.459,
+     0.848,
+     1.615
+    ],
+    "lqdmym": [
+     0.565,
+     0.346,
+     1.348
+    ],
+    "ogolip": [
+     0.538,
+     0.383,
+     1.662
+    ],
+    "ozknkr": [
+     0.846,
+     0.281,
+     1.564
+    ],
+    "pfuqec": [
+     0.839,
+     0.236,
+     0.476
+    ],
+    "smfygn": [
+     0.488,
+     0.466,
+     1.664
+    ],
+    "uivlzf": [
+     0.455,
+     0.509,
+     1.489
+    ],
+    "vdxlda": [
+     0.353,
+     0.353,
+     1.332
+    ]
+   }
+  },
+  "magazine_rack": {
+   "why": "0.24 x 0.08 x 0.30 m magazine racks (thin; size borderline): living room, lobby",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "n_models": 5,
+   "bbox_m": {
+    "cdhybw": [
+     0.223,
+     0.089,
+     0.283
+    ],
+    "enzfco": [
+     0.28,
+     0.075,
+     0.302
+    ],
+    "fvkjpt": [
+     0.28,
+     0.075,
+     0.302
+    ],
+    "szdjbr": [
+     0.239,
+     0.129,
+     0.383
+    ],
+    "yvhjht": [
+     0.218,
+     0.079,
+     0.284
+    ]
+   }
+  },
+  "coatrack": {
+   "why": "coat racks ~0.52 x 0.48 x 1.66 m (tall, slim; height borderline): entryway, office, diner",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "n_models": 4,
+   "bbox_m": {
+    "hmedjt": [
+     0.375,
+     0.375,
+     1.656
+    ],
+    "qyjssf": [
+     0.623,
+     0.621,
+     1.501
+    ],
+    "tcnxtu": [
+     0.538,
+     0.469,
+     1.932
+    ],
+    "zypzqh": [
+     0.5,
+     0.5,
+     1.667
+    ]
+   }
+  },
+  "bucket_of_paint": {
+   "why": "paint buckets ~0.16 x 0.15 x 0.19 m (small): garage, utility room",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "n_models": 3,
+   "bbox_m": {
+    "gjjugj": [
+     0.159,
+     0.15,
+     0.192
+    ],
+    "mxyrzd": [
+     0.158,
+     0.149,
+     0.191
+    ],
+    "ycnaho": [
+     0.165,
+     0.172,
+     0.156
+    ]
+   }
+  },
+  "vacuum": {
+   "why": "upright vacuum cleaners ~0.37 x 0.30 x 0.85 m: house, hotel, office",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "n_models": 3,
+   "bbox_m": {
+    "amnmmq": [
+     0.422,
+     0.593,
+     0.522
+    ],
+    "bdmsbr": [
+     0.192,
+     0.305,
+     1.015
+    ],
+    "wikhik": [
+     0.366,
+     0.289,
+     0.852
+    ]
+   }
+  },
+  "terrarium": {
+   "why": "0.39 x 0.43 x 0.84 m floor terrarium: living room, lobby",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "n_models": 2,
+   "bbox_m": {
+    "eqxkys": [
+     0.386,
+     0.43,
+     0.836
+    ],
+    "zjyscx": [
+     0.403,
+     0.437,
+     0.842
+    ]
+   }
+  },
+  "birdcage": {
+   "why": "0.36 x 0.31 x 0.50 m birdcage on the floor: living room",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "ogkdoh": [
+     0.364,
+     0.312,
+     0.502
+    ]
+   }
+  },
+  "dehumidifier": {
+   "why": "0.30 x 0.39 x 0.59 m dehumidifier: bathroom, garage, office",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "ppadfd": [
+     0.301,
+     0.385,
+     0.59
+    ]
+   }
+  },
+  "litter_box": {
+   "why": "0.53 x 0.36 x 0.52 m litter box: bathroom, utility room, corridor",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "rwnakn": [
+     0.531,
+     0.364,
+     0.522
+    ]
+   }
+  },
+  "rolled_yoga_mat": {
+   "why": "0.13 x 0.13 x 0.61 m rolled mat (standing? check pose): bedroom, living room, hotel",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "podgkd": [
+     0.131,
+     0.128,
+     0.61
+    ]
+   }
+  },
+  "tackle_box": {
+   "why": "0.23 x 0.60 x 0.24 m tackle box: garage",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "inboqz": [
+     0.235,
+     0.596,
+     0.239
+    ]
+   }
+  }
+ },
+ "n_models": 37
+}

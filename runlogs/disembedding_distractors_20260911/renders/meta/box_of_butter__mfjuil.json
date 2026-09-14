@@ -1,0 +1,53 @@
+{
+ "category": "box_of_butter",
+ "model": "mfjuil",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0,
+  180.0,
+  270.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/box_of_butter__mfjuil__y0.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0472,
+   "seg_pixels": 12021,
+   "aabb_extent": [
+    0.04,
+    0.149,
+    0.095
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/box_of_butter__mfjuil__y1.png",
+   "drift_m": 0.0002,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.047
+  },
+  "y2": {
+   "yaw_deg": 180.0,
+   "png": "renders/box_of_butter__mfjuil__y2.png",
+   "drift_m": 0.0002,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0473
+  },
+  "y3": {
+   "yaw_deg": 270.0,
+   "png": "renders/box_of_butter__mfjuil__y3.png",
+   "drift_m": 0.0002,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.047
+  }
+ },
+ "stable": true,
+ "visible": true
+}

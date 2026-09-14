@@ -1,0 +1,63 @@
+{
+ "group": "IORS__tennis_ball__r3",
+ "task": "IORS",
+ "category": "tennis_ball",
+ "round": 3,
+ "relation": "under",
+ "partner": "under couch / bed",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "rgekxe",
+   "key": "tennis_ball__rgekxe__t",
+   "strip": "/tmp/glib/strips/tennis_ball__rgekxe__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "symmetric 33/34 pinch across ball"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "47/20 asymmetric but closed, ~13 mm off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "44/24 near-symmetric pinch across ball"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "50/17 idle finger, ~16 mm off-centre; 66 mm ball fills opening"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "49/19 asymmetric, ~15 mm off-centre, tilt 13 deg"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    67,
+    66,
+    66
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

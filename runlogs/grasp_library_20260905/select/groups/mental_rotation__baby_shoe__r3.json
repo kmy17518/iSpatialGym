@@ -1,0 +1,128 @@
+{
+ "group": "mental_rotation__baby_shoe__r3",
+ "task": "mental_rotation",
+ "category": "baby_shoe",
+ "round": 3,
+ "relation": null,
+ "partner": "",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "tnbjlw",
+   "key": "baby_shoe__tnbjlw__f",
+   "strip": "/tmp/glib/strips/baby_shoe__tnbjlw__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 3,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across shoe body, both pads contact"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across toe box, both pads contact"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/4 on 11 mm sole/collar edge, off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across toe box, both pads contact"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/2 on 11 mm sole/collar edge, off-centre"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    127,
+    66,
+    64
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "jzwnri",
+   "key": "baby_shoe__jzwnri__f",
+   "strip": "/tmp/glib/strips/baby_shoe__jzwnri__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 2,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across shoe body, near-symmetric 46/20"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across toe box, both pads contact"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/4 on 15 mm heel/collar edge, off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/10, borderline; shoe against open finger"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/0 on 15 mm heel/collar edge, off-centre"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    127,
+    66,
+    64
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

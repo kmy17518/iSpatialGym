@@ -1,0 +1,87 @@
+{
+ "category": "menu",
+ "task": "wa1",
+ "n_models": 6,
+ "n_opened": 6,
+ "models": [
+  {
+   "model": "keaqlh",
+   "V": 4,
+   "U": 3,
+   "H": 2,
+   "score": 16,
+   "valid": true,
+   "front_axis": "+z",
+   "up_axis": "-x",
+   "thin_axis": "z",
+   "note": "KITCHEN menu sheet 0.32 x 0.24 m, bold title reads with up=-x; 1 mm thick paper lying flat."
+  },
+  {
+   "model": "ncfnii",
+   "V": 3,
+   "U": 3,
+   "H": 0,
+   "score": 12,
+   "valid": false,
+   "front_axis": "+z",
+   "up_axis": "-x",
+   "thin_axis": "z",
+   "note": "Folded DINER table tent (two tilted panels), 0.20 x 0.10 x 0.04 m; not flat, not a wall item."
+  },
+  {
+   "model": "qmypsm",
+   "V": 3,
+   "U": 2,
+   "H": 2,
+   "score": 12,
+   "valid": true,
+   "front_axis": "+z",
+   "up_axis": "-x",
+   "thin_axis": "z",
+   "note": "Bordered menu sheet 0.32 x 0.22 m with tiny text; up only inferable from text-line direction and the emblem/title at -x."
+  },
+  {
+   "model": "tissfg",
+   "V": 2,
+   "U": 1,
+   "H": 0,
+   "score": 6,
+   "valid": false,
+   "front_axis": "+z",
+   "up_axis": "+x",
+   "thin_axis": "y",
+   "note": "Grey padded menu cover propped open on a yellow base, 0.18 m tall wedge; no content, not hangable."
+  },
+  {
+   "model": "ugplzr",
+   "V": 2,
+   "U": 3,
+   "H": 0,
+   "score": 10,
+   "valid": false,
+   "front_axis": "+z",
+   "up_axis": "-x",
+   "thin_axis": "z",
+   "note": "DINER price-list card, readable text (up=-x) but z=0.000 zero-thickness sheet and only 0.20 x 0.10 m."
+  },
+  {
+   "model": "wqhybr",
+   "V": 3,
+   "U": 2,
+   "H": 2,
+   "score": 12,
+   "valid": true,
+   "front_axis": "+z",
+   "up_axis": "-x",
+   "thin_axis": "z",
+   "note": "Dense small-text menu sheet 0.27 x 0.18 m, stain at +x,+y; up=-x from text direction; low contrast."
+  }
+ ],
+ "picks": [
+  "keaqlh",
+  "qmypsm"
+ ],
+ "alternate": "wqhybr",
+ "category_verdict": "weak",
+ "category_note": "Paper menu sheets lying flat, 1 mm thick; only keaqlh has a large readable title, the other two valid ones rely on tiny text; two models are 3D stands and one is a zero-thickness sheet."
+}

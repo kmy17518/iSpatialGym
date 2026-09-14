@@ -1,0 +1,35 @@
+{
+  "group": "mental_rotation__mouse__r1",
+  "task": "mental_rotation",
+  "category": "mouse",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 7,
+  "n_opened": 7,
+  "candidates": [
+    {"model": "oydobn", "key": "mouse__oydobn", "G": 3, "T": 2, "V": 2, "R": 1, "score": 13,
+     "note": "Tiny 31 mm black mouse; pads do close on it but rows are near-identical holds of a blob; size outlier, orientation barely readable."},
+    {"model": "fjljxp", "key": "mouse__fjljxp", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Five clean 28 mm pinches across mouse height at front/mid/rear from both sides; glossy white featureless mouse, mild faceting."},
+    {"model": "ihpnjx", "key": "mouse__ihpnjx", "G": 4, "T": 3, "V": 3, "R": 2, "score": 19,
+     "note": "Same white mouse shape as fjljxp, five clean 26-28 mm height pinches; visibly low-poly faceted shell in wrist view, no surface details."},
+    {"model": "eosngb", "key": "mouse__eosngb", "G": 4, "T": 3, "V": 3, "R": 1, "score": 18,
+     "note": "Silver arc-style shell: two head-panel pinches near CoM plus three curved-arc pinches (row 3 antipodal 0.47); thin 15-23 mm, odd shape for category."},
+    {"model": "wwyopp", "key": "mouse__wwyopp", "G": 2, "T": 2, "V": 3, "R": 1, "score": 13,
+     "note": "Dark arc shell held only by the tail end 33-42 mm from CoM; rows 4-5 on the extreme 11 mm tip; one repeated pose."},
+    {"model": "cduwda", "key": "mouse__cduwda", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Five firm 37-38 mm height pinches at front and rear from both sides; light grey conventional mouse with button seam and scroll wheel, slight faceting."},
+    {"model": "pljjtu", "key": "mouse__pljjtu", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Five firm 35-38 mm height pinches, row 1 near front, rows 2-5 rear-biased; light grey mouse with seam detail, slight faceting, slack row 1."}
+  ],
+  "selected": [
+    {"model": "cduwda", "key": "mouse__cduwda", "rank": 1,
+     "reason": "Tied top score; tie broken by firmest 38 mm closures matching width and the most recognisable mouse (button seam, scroll wheel), clean asymmetric shape."},
+    {"model": "fjljxp", "key": "mouse__fjljxp", "rank": 2,
+     "reason": "Also 21 points and visually different from cduwda: smaller glossy white mouse; five clean 28 mm pinches spread along the body from both sides."}
+  ],
+  "alternate": {"model": "pljjtu", "key": "mouse__pljjtu"},
+  "short": false,
+  "warnings": ["Grasp diversity is moderate for all conventional mice: every row pinches across the height, varying only position and side."],
+  "confidence": "medium"
+}

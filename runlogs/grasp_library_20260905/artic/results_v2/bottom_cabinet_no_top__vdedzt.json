@@ -1,0 +1,91 @@
+{
+ "key": "bottom_cabinet_no_top__vdedzt",
+ "category": "bottom_cabinet_no_top",
+ "model": "vdedzt",
+ "scene": "house_single_floor",
+ "host": "bottom_cabinet_no_top_gjrero_2",
+ "host_rank": 2,
+ "host_model": "gjrero",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     23.546,
+     -0.092,
+     0.0
+    ],
+    "translate": 0.5,
+    "sign": -1.0
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "stance ok",
+    "sign +1: planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 9.1 mm / 0.022 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)",
+    "stance ok",
+    "sign -1: planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 43.0 mm / 0.101 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)"
+   ],
+   "error": "planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 43.0 mm / 0.101 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)",
+   "contact_world": [
+    24.196,
+    -0.292,
+    0.743
+   ],
+   "handle_height_above_floor": 0.738
+  },
+  {
+   "joint": "j_link_1",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     23.546,
+     -0.187,
+     0.0
+    ],
+    "translate": 0.5,
+    "sign": -1.0
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "stance ok",
+    "sign +1: planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 11.8 mm / 0.028 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)",
+    "stance ok",
+    "sign -1: planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 45.0 mm / 0.120 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)"
+   ],
+   "error": "planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 45.0 mm / 0.120 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)",
+   "contact_world": [
+    24.196,
+    -0.387,
+    0.74
+   ],
+   "handle_height_above_floor": 0.734
+  }
+ ],
+ "error": null,
+ "previous_hosts": [
+  "bottom_cabinet_no_top_gjrero_1",
+  "bottom_cabinet_no_top_gjrero_0"
+ ],
+ "scale": [
+  1.465,
+  1.585,
+  1.469
+ ],
+ "time_s": 162.2
+}

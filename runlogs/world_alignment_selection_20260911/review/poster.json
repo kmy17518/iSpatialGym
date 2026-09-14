@@ -1,0 +1,26 @@
+{
+  "category": "poster",
+  "task": "wa1",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "dsrcyt",
+      "V": 5,
+      "U": 3,
+      "H": 2,
+      "score": 18,
+      "valid": true,
+      "front_axis": "+x",
+      "up_axis": "+z",
+      "thin_axis": "x",
+      "note": "Framed Star Wars movie poster 0.62 x 0.89 m, 1 cm thick, standing upright; sharp artwork and title text face +x, back is mirrored."
+    }
+  ],
+  "picks": [
+    "dsrcyt"
+  ],
+  "alternate": null,
+  "category_verdict": "weak",
+  "category_note": "Only one model exists, but it is excellent: a 0.62 x 0.89 m framed movie poster with an unmistakable upright (figures and title text), flat and already upright in its canonical frame. Weak only because there is no second model."
+}

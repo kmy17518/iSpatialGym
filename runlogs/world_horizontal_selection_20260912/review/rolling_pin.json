@@ -1,0 +1,40 @@
+{
+  "category": "rolling_pin",
+  "task": "wa2",
+  "n_models": 2,
+  "n_opened": 2,
+  "models": [
+    {
+      "model": "mwrdae",
+      "V": 5,
+      "L": 3,
+      "H": 2,
+      "score": 18,
+      "valid": true,
+      "front_axis": "+x",
+      "level_axis": "y",
+      "up_axis": "+z",
+      "symmetric_180": true,
+      "thin_axis": "x",
+      "note": "Wood-grain 0.42 m pin with ball-knob handles, 6 cm barrel; crisp and immediately recognisable; symmetric rod along y."
+    },
+    {
+      "model": "smnklu",
+      "V": 4,
+      "L": 3,
+      "H": 2,
+      "score": 16,
+      "valid": true,
+      "front_axis": "+x",
+      "level_axis": "y",
+      "up_axis": "+z",
+      "symmetric_180": true,
+      "thin_axis": "x",
+      "note": "Classic 0.40 m pin, grey-brown barrel with cylindrical handles; flatter texture than mwrdae but clean; symmetric rod along y."
+    }
+  ],
+  "picks": ["mwrdae", "smnklu"],
+  "alternate": null,
+  "category_verdict": "good",
+  "category_note": "Two clean wooden rolling pins, 0.40-0.42 m long, 5.5-6 cm barrels, handles both ends. Rod reads level at a glance, natural on kitchen wall hooks; front face arbitrary."
+}

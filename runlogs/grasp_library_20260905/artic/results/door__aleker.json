@@ -1,0 +1,83 @@
+{
+ "key": "door__aleker",
+ "category": "door",
+ "model": "aleker",
+ "scene": "restaurant_diner",
+ "host": "door_mkcndz_0",
+ "host_rank": 2,
+ "host_model": "mkcndz",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_door1",
+   "kind": "door",
+   "grasp_source": "manual skip: vertical pull bars exist only in the visual mesh (leaf collision hull has no handle) - asset issue",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  },
+  {
+   "joint": "j_door2",
+   "kind": "door",
+   "grasp_source": "manual skip: vertical pull bars exist only in the visual mesh (leaf collision hull has no handle) - asset issue",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  },
+  {
+   "joint": "j_door3",
+   "kind": "door",
+   "grasp_source": "manual skip: vertical pull bars exist only in the visual mesh (leaf collision hull has no handle) - asset issue",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  },
+  {
+   "joint": "j_door4",
+   "kind": "door",
+   "grasp_source": "manual skip: vertical pull bars exist only in the visual mesh (leaf collision hull has no handle) - asset issue",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "previous_hosts": [
+  "door_adejun_0",
+  "door_cvvumy_0"
+ ],
+ "scale": [
+  1.201,
+  0.32,
+  0.736
+ ],
+ "time_s": 2.2
+}

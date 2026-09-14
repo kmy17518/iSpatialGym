@@ -1,0 +1,40 @@
+{
+  "group": "IORS__ice_cube__r2",
+  "task": "IORS",
+  "category": "ice_cube",
+  "round": 2,
+  "relation": "inside",
+  "n_candidates": 8,
+  "n_opened": 8,
+  "candidates": [
+    {"model": "kdlafa", "key": "ice_cube__kdlafa__i", "G": 2, "T": 3, "V": 4, "R": 2, "score": 17,
+     "note": "Clear glassy cube (plain transparent material); only two valid rows, both fingertip pinches from above (30/0 rotated, 22/0 face), both pads touch."},
+    {"model": "dueotq", "key": "ice_cube__dueotq__i", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Frosty cracked-ice texture; five clean fingertip pinches from above: edge pinch of rotated cube, then face pinches tilted 0-32 deg."},
+    {"model": "lkirej", "key": "ice_cube__lkirej__i", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Frosty ice cube, sharp; four clean fingertip pinches (face 21 mm, corner-to-corner 34 mm, edge 28 mm, face tilted 30)."},
+    {"model": "xupugj", "key": "ice_cube__xupugj__i", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Frosty ice cube; four clean fingertip pinches plus row 3 diagonal pinch with coverage 0.50 (fragile corner contact)."},
+    {"model": "ujmgkb", "key": "ice_cube__ujmgkb__i", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Frosty ice cube; five clean upright face pinches at the fingertips (22 mm aperture on 20-21 mm), rows 1-4 tilt 1-4, row 5 tilt 30."},
+    {"model": "pjgror", "key": "ice_cube__pjgror__i", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Speckled frosty cube, distinct look; four clean pinches, all tilted 30-32 deg in gripper (three face pinches, one along body diagonal)."},
+    {"model": "czbfpm", "key": "ice_cube__czbfpm__i", "G": 3, "T": 3, "V": 5, "R": 2, "score": 21,
+     "note": "Frosty ice cube; three clean face pinches (tilt 2/29/29) plus row 3 diagonal pinch with coverage 0.50, antipodal 0.94."},
+    {"model": "tqsquu", "key": "ice_cube__tqsquu__i", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Frosty ice cube; five clean rows but top row is a 33 mm corner-ish pinch of a rotated cube; rows 2-4 upright face pinches."}
+  ],
+  "selected": [
+    {"model": "ujmgkb", "key": "ice_cube__ujmgkb__i", "rank": 1,
+     "reason": "Tied top score 25; best single grasp is a clean upright face pinch at the fingertips (22 mm on 21 mm), four more clean rows, sharp frosty texture."},
+    {"model": "dueotq", "key": "ice_cube__dueotq__i", "rank": 2,
+     "reason": "Score 25, next highest; five clean from-above pinches with edge and face variety, frosty texture; visually similar to #1 as all frosty cubes are alike."}
+  ],
+  "alternate": {"model": "tqsquu", "key": "ice_cube__tqsquu__i"},
+  "short": false,
+  "warnings": [
+    "The seven frosty cubes look nearly identical, so the pair cannot span much appearance variety; only kdlafa (clear glass look) differs but has just two valid grasps.",
+    "Every row in every model closes one finger to its 0 limit (cube ~11 mm off gripper centre); both pads still contact, treated as the assisted-grasp artefact."
+  ],
+  "confidence": "high"
+}

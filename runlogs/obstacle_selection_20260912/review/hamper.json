@@ -1,0 +1,179 @@
+{
+  "category": "hamper",
+  "task": "obst",
+  "n_models": 16,
+  "n_opened": 16,
+  "models": [
+    {
+      "model": "clziqw",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Round dark-brown rattan basket with light rim, 0.51 x 0.51 x 0.51 m; complete woven texture, flat base, classic laundry basket."
+    },
+    {
+      "model": "djrdum",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Small black wire basket with side handles, 0.21 x 0.29 x 0.18 m; clean mesh but bathroom-shelf size, low."
+    },
+    {
+      "model": "drgdfh",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Navy rectangular wire-mesh laundry basket, 0.35 x 0.54 x 0.20 m; clean, only 20 cm tall (height borderline)."
+    },
+    {
+      "model": "hlgjme",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Brown wooden beer crate with handle cut-outs and label, 0.28 x 0.42 x 0.21 m; good texture, crate rather than hamper."
+    },
+    {
+      "model": "iofciz",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Black tapered wire-mesh basket, open top, 0.27 x 0.50 x 0.21 m; clean lattice geometry, storage-basket look."
+    },
+    {
+      "model": "pcyjbu",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Grey-blue fabric storage bin with dark trim, 0.39 x 0.48 x 0.31 m; plain but complete, representative collapsible hamper."
+    },
+    {
+      "model": "pdzaca",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Round brown burlap/seagrass laundry bag with two handles, 0.33 x 0.36 x 0.51 m; complete texture, stands on flat bottom."
+    },
+    {
+      "model": "pgwdlg",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Long open wooden box with handle slot, 0.31 x 0.66 x 0.31 m; clean wood texture, 66 cm footprint borderline."
+    },
+    {
+      "model": "pqzyxx",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Oval dark-brown woven basket with two small handles, 0.29 x 0.41 x 0.42 m; complete, slightly dark texture."
+    },
+    {
+      "model": "qhdikw",
+      "V": 3,
+      "N": 1,
+      "S": 0,
+      "rest_ok": true,
+      "score": 8,
+      "valid": false,
+      "note": "Tiny teal pail-like container with handle, 0.10 x 0.10 x 0.16 m; clean but far too small, not a hamper."
+    },
+    {
+      "model": "sijioo",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Round dark wire-mesh waste basket, 0.26 x 0.26 x 0.31 m; clean geometry, reads as office trash can."
+    },
+    {
+      "model": "ssfvij",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Plain light-grey open storage cube with small label window, 0.31 x 0.32 x 0.30 m; flat near-uniform texture."
+    },
+    {
+      "model": "wdsnjy",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Tall open wooden box hamper with side slot, 0.31 x 0.58 x 0.51 m; clean wood texture, 58 cm footprint borderline."
+    },
+    {
+      "model": "wqxrbf",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Wooden crate with handle cut-outs, 0.57 x 0.46 x 0.31 m; clean texture, footprint slightly over 0.55 m."
+    },
+    {
+      "model": "xhdtjn",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Uniform black round tapered tub, 0.44 x 0.44 x 0.35 m; clean geometry but no visible detail, reads as bin/tub."
+    },
+    {
+      "model": "xjftlf",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Dark wooden barrel-style hamper with metal straps and black fabric liner rim, 0.36 x 0.48 x 0.38 m; detailed, complete."
+    }
+  ],
+  "picks": ["clziqw", "xjftlf"],
+  "alternate": "pdzaca",
+  "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+  ],
+  "category_verdict": "good",
+  "category_note": "Mix of woven/fabric laundry baskets, wooden crates and wire baskets, typically 0.3-0.5 m wide and 0.2-0.5 m tall; 15 of 16 valid. Natural in bedrooms, bathrooms, corridors and hotel rooms; only qhdikw is too small."
+}

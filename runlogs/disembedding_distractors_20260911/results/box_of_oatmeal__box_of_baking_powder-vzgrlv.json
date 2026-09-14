@@ -1,0 +1,146 @@
+{
+ "target_category": "box_of_oatmeal",
+ "target_model": "jtqeef",
+ "target_key": "box_of_oatmeal__jtqeef__t",
+ "category": "box_of_baking_powder",
+ "model": "vzgrlv",
+ "kind": "diff",
+ "tier": 1,
+ "started": "2026-09-12 12:30:57",
+ "template": {
+  "support": {
+   "name": "breakfast_table_rhjoby_0",
+   "z": 0.8126288056373596,
+   "yaw": 1.568258285522461,
+   "local_bounds": [
+    2.935851573944092,
+    4.09605073928833,
+    -8.733187675476074,
+    -5.8304057121276855
+   ],
+   "n_free_cells": 8463,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-u",
+   "edge_mid": [
+    7.289224624633789,
+    2.917360544204712
+   ],
+   "inward": [
+    0.0025380386505275965,
+    0.9999967813491821
+   ],
+   "tangent": [
+    -0.9999967813491821,
+    0.0025380386505275965
+   ],
+   "base_pose2d": [
+    7.488313674926758,
+    2.466853618621826,
+    1.5682582854250247
+   ],
+   "edge_depth": 0.45000016689300537,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.13419144146220063
+   }
+  },
+  "place_stance": {
+   "edge": "-u",
+   "edge_mid": [
+    7.289224624633789,
+    2.917360544204712
+   ],
+   "inward": [
+    0.0025380386505275965,
+    0.9999967813491821
+   ],
+   "tangent": [
+    -0.9999967813491821,
+    0.0025380386505275965
+   ],
+   "base_pose2d": [
+    8.187450408935547,
+    2.4650790691375732,
+    1.5682582854250247
+   ],
+   "edge_depth": 0.4500002861022949
+  },
+  "view_arms": "untucked",
+  "yaw_adjust_deg": 0.0,
+  "dest_lateral_m": -0.6991388078728005,
+  "dest_side": "right",
+  "source_lateral_offset": 0.0,
+  "n_reachable_cells": 8,
+  "n_grasp_cells": 8,
+  "n_place_combos": 3,
+  "distractors": {
+   "same_category": true,
+   "pool": "same_category",
+   "requested_pool": "same_category",
+   "fallback": null,
+   "models": [
+    "box_of_oatmeal-rabeel"
+   ],
+   "requested": 1,
+   "pool_size": 1,
+   "pool_categories": [
+    "box_of_oatmeal"
+   ],
+   "lookalikes_excluded": [],
+   "footprint_fraction": 0.36
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 29.12,
+   "prepare_template_s": 0.13
+  },
+  "setup_s": 29.2
+ },
+ "footprint_fraction_with_target": 0.293,
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {
+  "target_placement": 1
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_dis_distractors/box_of_oatmeal-jtqeef__box_of_baking_powder-vzgrlv/instances/disembedding-0__box_of_oatmeal-jtqeef__box_of_baking_powder-vzgrlv__0000.summary.json",
+   "wall_time_s": 4.7,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    7.488313674926758,
+    2.466853618621826,
+    1.5682582854250247
+   ],
+   "trunk": [
+    0.0,
+    -0.8999999761581421
+   ],
+   "occluded_variant": false,
+   "grasp": {
+    "key": "box_of_oatmeal__jtqeef__t",
+    "name": "grasp_3",
+    "translate": 0.5,
+    "place_translate": 0.5,
+    "yaw": 0.02228417938915464
+   },
+   "dest_pixels": 11462,
+   "source_pixels": 87538,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_dis_distractors/box_of_oatmeal-jtqeef__box_of_baking_powder-vzgrlv",
+ "job_s": 7.1,
+ "finished": "2026-09-12 12:31:04",
+ "occluded_variant": false,
+ "occlusion_ratio": null
+}

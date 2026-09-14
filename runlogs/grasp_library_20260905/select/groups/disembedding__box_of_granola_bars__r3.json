@@ -1,0 +1,165 @@
+{
+ "group": "disembedding__box_of_granola_bars__r3",
+ "task": "disembedding",
+ "category": "box_of_granola_bars",
+ "round": 3,
+ "relation": null,
+ "partner": "",
+ "requirements": "Tabletop task: the object rests among other objects on a table / tray and is picked from its resting pose. It must settle stably on a flat surface (it must not roll or topple). The best single grasp matters most.",
+ "candidates": [
+  {
+   "model": "bqeeki",
+   "key": "box_of_granola_bars__bqeeki__t",
+   "strip": "/tmp/glib/strips/box_of_granola_bars__bqeeki__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across box thickness"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across box thickness"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across box thickness"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch, 30 deg tilt"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch, 30 deg tilt"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    35,
+    150,
+    130
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "awombj",
+   "key": "box_of_granola_bars__awombj__t",
+   "strip": "/tmp/glib/strips/box_of_granola_bars__awombj__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across box thickness"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across box thickness"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch, 30 deg tilt"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch, 30 deg tilt"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch, 30 deg tilt"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    35,
+    150,
+    130
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "tqwhvz",
+   "key": "box_of_granola_bars__tqwhvz__t",
+   "strip": "/tmp/glib/strips/box_of_granola_bars__tqwhvz__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across box thickness"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across box thickness"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across box thickness"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch, 30 deg tilt"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across box thickness"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    35,
+    150,
+    130
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

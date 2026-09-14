@@ -1,0 +1,20 @@
+{
+  "key": "openable_window__eyvzfu",
+  "category": "openable_window",
+  "model": "eyvzfu",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_movingpart",
+      "kind": "drawer",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "slide",
+      "graspable": false,
+      "handle_description": "No handle; bare sliding leaf frame, leading stile ~15 cm deep (too thick to pinch), top edge inside the head track.",
+      "height_concern": "Heuristic top-edge spot at ~2.63 m, above reach",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Large sliding leaf (1.45 m wide) slides left over the fixed pane; no pull or grip modelled. Heuristic's ungraspable status confirmed."
+}

@@ -1,0 +1,35 @@
+{
+ "category": "bottle_of_sake",
+ "model": "pwtebq",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_sake__pwtebq__y0.png",
+   "drift_m": 0.0007,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1202,
+   "seg_pixels": 23742,
+   "aabb_extent": [
+    0.102,
+    0.102,
+    0.33
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_sake__pwtebq__y1.png",
+   "drift_m": 0.0007,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.1202
+  }
+ },
+ "stable": true,
+ "visible": true
+}

@@ -1,0 +1,50 @@
+{
+ "key": "top_cabinet__fqitbw",
+ "category": "top_cabinet",
+ "model": "fqitbw",
+ "scene": "office_cubicles_right",
+ "host": "top_cabinet_fqitbw_0",
+ "host_rank": 0,
+ "host_model": "fqitbw",
+ "swap": false,
+ "joints": [
+  {
+   "joint": "j_link_1",
+   "kind": "flap",
+   "grasp_source": "review:A",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [11.541682243347168, -9.054471969604492, 2.0330862998962402]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [11.541682243347168, -9.054471969604492, 2.0330862998962402]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    11.542,
+    -9.054,
+    2.033
+   ],
+   "handle_height_above_floor": 1.98,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 3,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.71,
+  6.193,
+  6.963
+ ],
+ "time_s": 85.3
+}

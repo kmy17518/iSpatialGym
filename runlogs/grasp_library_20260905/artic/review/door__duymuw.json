@@ -1,0 +1,20 @@
+{
+  "key": "door__duymuw",
+  "category": "door",
+  "model": "duymuw",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_leaf",
+      "kind": "door",
+      "chosen": "A",
+      "pinch": "lever",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Lever at mid-height near free (+y) edge; A = lever arm, B = rose/spindle boss, X = lock cylinder. Hinge -y side, swings toward viewer.",
+      "height_concern": "",
+      "confidence": "high"
+    }
+  ],
+  "object_note": "Clean lever door; B is the lever's rose boss (grabbable but small), A on the arm is the right grasp. Grey X is the escutcheon, correctly rejected."
+}

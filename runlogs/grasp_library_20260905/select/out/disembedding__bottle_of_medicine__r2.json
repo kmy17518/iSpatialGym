@@ -1,0 +1,41 @@
+{
+  "group": "disembedding__bottle_of_medicine__r2",
+  "task": "disembedding",
+  "category": "bottle_of_medicine",
+  "round": 2,
+  "relation": null,
+  "n_candidates": 8,
+  "n_opened": 8,
+  "candidates": [
+    {"model": "hvocpc", "key": "bottle_of_medicine__hvocpc__t", "G": 5, "T": 2, "V": 3, "R": 2, "score": 20,
+     "note": "Cardboard supplement box (Jarrow D3), not a bottle; crisp print; five clean 37 mm face pinches at box top; tall 110 mm box may topple."},
+    {"model": "syfpak", "key": "bottle_of_medicine__syfpak__t", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "White pill bottle, red L-Tyrosine label, sharp; five clean 50/0 body pinches at the shoulder, tilt 2-5, antipodal 1.00; cap protrudes free."},
+    {"model": "fmfwng", "key": "bottle_of_medicine__fmfwng__t", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Same white bottle, grey Co-Q10 label; five clean 50/0-1 upper-body pinches, tilt 0-2, both pads on body; bottom free."},
+    {"model": "egondf", "key": "bottle_of_medicine__egondf__t", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "White bottle, maroon Women's Multi label, sharp; five clean 50/0-1 upper-body pinches, tilt 0-2, antipodal 0.99-1.00."},
+    {"model": "kqkwoq", "key": "bottle_of_medicine__kqkwoq__t", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "White bottle, yellow Lutein label, sharp; five clean 50/0-1 upper-body pinches, tilt 0-2, antipodal 1.00 in every row."},
+    {"model": "qqsukh", "key": "bottle_of_medicine__qqsukh__t", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "White bottle, light-blue PhosphOmega label; five clean 50/0-1 upper-body pinches, tilt 1-5, antipodal 0.96-0.99."},
+    {"model": "kasbsy", "key": "bottle_of_medicine__kasbsy__t", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Slightly wider white bottle (55 mm), blue Krill Oil label; five clean 50/0 mid-body pinches (width 49-50 matches aperture), tilt up to 6."},
+    {"model": "zfbnjh", "key": "bottle_of_medicine__zfbnjh__t", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "White bottle, dark-blue Lactoferrin label, sharp; five clean body pinches at 50 mm width (one two-sided 45/6), tilt 2-6, bottom free."}
+  ],
+  "selected": [
+    {"model": "zfbnjh", "key": "bottle_of_medicine__zfbnjh__t", "rank": 1,
+     "reason": "Score 25; pinch planned and closed on the 50 mm body (no hull/visual question), all five rows clean and upright, sharp dark-blue label, stable upright bottle."},
+    {"model": "kqkwoq", "key": "bottle_of_medicine__kqkwoq__t", "rank": 2,
+     "reason": "Score 25 tie; chosen for a clearly different label colour (yellow) from #1, tilt 0-2 and antipodal 1.00 on all rows; bottom free, stable."}
+  ],
+  "alternate": {"model": "syfpak", "key": "bottle_of_medicine__syfpak__t"},
+  "short": false,
+  "warnings": [
+    "Seven candidates are the same white Jarrow bottle mesh with different labels and all score 25; ordering among them is by width/aperture consistency, tilt and label colour only.",
+    "hvocpc is a cardboard box, not a bottle; kept as a scored candidate but not selected.",
+    "All bottle rows are 50/0 one-finger closures (bottle fills one half of the gripper); both pads are on the body, so treated as the assisted-grasp artefact."
+  ],
+  "confidence": "high"
+}

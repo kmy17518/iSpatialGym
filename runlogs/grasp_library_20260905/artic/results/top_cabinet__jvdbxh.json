@@ -1,0 +1,55 @@
+{
+ "key": "top_cabinet__jvdbxh",
+ "category": "top_cabinet",
+ "model": "jvdbxh",
+ "scene": "Rs_int",
+ "host": "top_cabinet_lsyzkh_3",
+ "host_rank": 2,
+ "host_model": "lsyzkh",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [-0.5419084429740906, 2.139118194580078, 2.054683208465576]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [-0.5419084429740906, 2.139118194580078, 2.054683208465576]})",
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [-0.5419084429740906, 2.139118194580078, 2.054683208465576]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [-0.5419084429740906, 2.139118194580078, 2.054683208465576]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    -0.542,
+    2.139,
+    2.055
+   ],
+   "handle_height_above_floor": 2.049,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 0,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [
+  "top_cabinet_lsyzkh_2",
+  "top_cabinet_fqhdne_0"
+ ],
+ "scale": [
+  3.286,
+  0.499,
+  0.947
+ ],
+ "time_s": 46.8
+}

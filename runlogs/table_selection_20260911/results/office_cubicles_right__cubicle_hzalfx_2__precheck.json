@@ -1,0 +1,78 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "cubicle_hzalfx_2",
+ "rooms": [
+  "shared_office_0"
+ ],
+ "removed_chairs": [
+  "swivel_chair_ryznxk_2",
+  "swivel_chair_ryznxk_3",
+  "swivel_chair_ryznxk_8",
+  "swivel_chair_ryznxk_9"
+ ],
+ "aabb": [
+  [
+   8.955,
+   -4.679,
+   -0.006
+  ],
+  [
+   10.416,
+   -3.224,
+   1.222
+  ]
+ ],
+ "support": {
+  "name": "cubicle_hzalfx_2",
+  "z": 0.7756434082984924,
+  "yaw": 0.0,
+  "local_bounds": [
+   8.965107917785645,
+   10.345108032226562,
+   -4.608504772186279,
+   -3.2885048389434814
+  ],
+  "n_free_cells": 3192,
+  "occupants": [
+   "cubicle_deceti_3"
+  ],
+  "resolution": 0.02
+ },
+ "edges": [
+  {
+   "name": "+u",
+   "mid": [
+    10.345,
+    -3.949
+   ],
+   "length": 1.32
+  },
+  {
+   "name": "-u",
+   "mid": [
+    8.965,
+    -3.949
+   ],
+   "length": 1.32
+  },
+  {
+   "name": "+v",
+   "mid": [
+    9.655,
+    -3.289
+   ],
+   "length": 1.38
+  },
+  {
+   "name": "-v",
+   "mid": [
+    9.655,
+    -4.609
+   ],
+   "length": 1.38
+  }
+ ],
+ "stance": null,
+ "stance_error": "[stance_collision] untucked: [no_stance] no collision-free stance around cubicle_hzalfx_2",
+ "precheck_s": 3.9
+}

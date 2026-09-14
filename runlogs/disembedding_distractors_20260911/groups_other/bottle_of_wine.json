@@ -1,0 +1,7 @@
+{
+  "category": "bottle_of_wine",
+  "pages_opened": ["grids/pool_other/bottle_of_wine__p1.png", "grids/pool_other/bottle_of_wine__p2.png"],
+  "n_models": 18,
+  "exclude": [],
+  "notes": "All 18 are upright, textured bottles (beer, sake, rum, whiskey, vodka, gin, tequila, champagne, plus one tier-2 pop bottle) and read as their category. bottle_of_champagne/mjpyvh is plain pale frosted but recognisable. Clear whiskey bottles render transparent but intact. Small tilts (4-5 deg) are settled, not toppled."
+}

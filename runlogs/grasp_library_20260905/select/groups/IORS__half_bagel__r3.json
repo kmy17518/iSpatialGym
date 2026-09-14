@@ -1,0 +1,128 @@
+{
+ "group": "IORS__half_bagel__r3",
+ "task": "IORS",
+ "category": "half_bagel",
+ "round": 3,
+ "relation": "ontop",
+ "partner": "plate",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "gywbkh",
+   "key": "half_bagel__gywbkh__t",
+   "strip": "/tmp/glib/strips/half_bagel__gywbkh__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 4,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "42/0 asymmetric but firmly closed across tube near arc middle"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "42/0 asymmetric but closed; tube pinch, tilt 37 deg"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "47/0 asymmetric but closed; 45 mm tube pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: bagel pushed against open finger, ~24 mm off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "42/0 asymmetric but closed; 40 mm tube pinch"
+    }
+   ],
+   "object_note": "Every row bottoms one finger at 0; only row 4 has the idle open-limit finger. Body pinches across tube.",
+   "bbox_mm": [
+    133,
+    95,
+    48
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "hsvakn",
+   "key": "half_bagel__hsvakn__t",
+   "strip": "/tmp/glib/strips/half_bagel__hsvakn__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 1,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "47/0 asymmetric but closed; 46 mm tube pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: bagel pushed against open finger, ~24 mm off-centre; coverage 0.75"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "49/0: bagel against near-open finger, ~24 mm off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: bagel pushed against open finger, ~24 mm off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/2: bagel pushed against open finger, ~23 mm off-centre"
+    }
+   ],
+   "object_note": "Body pinches across tube; rows 2-5 have idle open-limit finger, bagel entirely in one half of opening.",
+   "bbox_mm": [
+    134,
+    88,
+    49
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

@@ -1,0 +1,35 @@
+{
+ "category": "wine_bottle",
+ "model": "inkqch",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/wine_bottle__inkqch__y0.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0914,
+   "seg_pixels": 9316,
+   "aabb_extent": [
+    0.069,
+    0.069,
+    0.222
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/wine_bottle__inkqch__y1.png",
+   "drift_m": 0.0008,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.0914
+  }
+ },
+ "stable": true,
+ "visible": true
+}

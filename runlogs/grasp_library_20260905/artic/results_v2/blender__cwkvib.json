@@ -1,0 +1,65 @@
+{
+ "key": "blender__cwkvib",
+ "category": "blender",
+ "model": "cwkvib",
+ "aabb_extent": [
+  0.19119754433631897,
+  0.1929970681667328,
+  0.39359480142593384
+ ],
+ "support": "table",
+ "joints": [
+  {
+   "joint": "j_lid",
+   "kind": "flap",
+   "grasp_source": "review:F",
+   "stance": {
+    "base": [
+     0.422,
+     0.203,
+     0.008
+    ],
+    "translate": 0.5,
+    "sign": 1.0
+   },
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.524,
+   "opened": false,
+   "open_state": null,
+   "steps": [
+    "stance ok",
+    "sign +1: grasp: [grasp] o_blender__cwkvib not in hand after closing gripper {'in_hand': None}"
+   ],
+   "error": "grasp: [grasp] o_blender__cwkvib not in hand after closing gripper {'in_hand': None}",
+   "contact_world": [
+    1.223,
+    0.009,
+    1.107
+   ],
+   "handle_height": 1.107,
+   "diag": {
+    "eef_pos_err_mm": 40.1,
+    "eef_ang_err_deg": 2.8,
+    "finger_q_mm": [
+     44,
+     50
+    ],
+    "gripper_contacts": [
+     "o_blender__cwkvib/glass",
+     "o_blender__cwkvib/lid"
+    ],
+    "contact_links": {
+     "glass": [
+      "right_gripper_finger_link2"
+     ],
+     "lid": [
+      "right_gripper_finger_link1"
+     ]
+    }
+   }
+  }
+ ],
+ "error": null,
+ "time_s": 21.2
+}

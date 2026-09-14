@@ -1,0 +1,25 @@
+{
+  "group": "disembedding__box_of_granola_bars__r3",
+  "task": "disembedding",
+  "category": "box_of_granola_bars",
+  "round": 3,
+  "relation": null,
+  "n_candidates": 3,
+  "n_opened": 3,
+  "candidates": [
+    {"model": "bqeeki", "key": "box_of_granola_bars__bqeeki__t", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Brown/cream flapjack box standing upright; five clean top pinches across 35 mm thickness (37/0), three vertical, two at 30 deg. Sharp print, bottom free."},
+    {"model": "awombj", "key": "box_of_granola_bars__awombj__t", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Yellow butter-flapjack variant of the same box; five clean top pinches (37/0, 35 mm), two vertical, three at 30 deg. Sharp textures, bottom free."},
+    {"model": "tqwhvz", "key": "box_of_granola_bars__tqwhvz__t", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Lime-green apple-sultana variant; five clean top pinches (37/0, 35 mm), four vertical, one at 30 deg, CoM offsets 0-3 mm. Sharp print, bottom free."}
+  ],
+  "selected": [
+    {"model": "tqwhvz", "key": "box_of_granola_bars__tqwhvz__t", "rank": 1, "reason": "Tied top score; most vertical top pinches (four at 0 deg) with 35 mm width, sharp complete box textures, bottom face free for placement."},
+    {"model": "bqeeki", "key": "box_of_granola_bars__bqeeki__t", "rank": 2, "reason": "Tied score; chosen over awombj because its dark brown print contrasts most with the green #1, spanning the category's appearance."}
+  ],
+  "alternate": {"model": "awombj", "key": "box_of_granola_bars__awombj__t"},
+  "short": false,
+  "warnings": [],
+  "confidence": "high"
+}

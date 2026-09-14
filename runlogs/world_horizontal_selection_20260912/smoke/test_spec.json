@@ -1,0 +1,92 @@
+{
+ "_comment": "world horizontal smoke test",
+ "world_alignment-2": {
+  "alias": "world_horizontal",
+  "roles": {
+   "target": {
+    "models": {
+     "towel_rack": [
+      "kqrmrh"
+     ],
+     "hook_rack": [
+      "mdnfjr"
+     ]
+    }
+   },
+   "wall": {
+    "fixed": true
+   },
+   "floor": {
+    "fixed": true
+   }
+  },
+  "scenes": {
+   "Rs_int": {
+    "rooms": [
+     "entryway_0"
+    ],
+    "fixed": {
+     "floor": {
+      "room": "entryway_0"
+     },
+     "wall": [
+      "walls_bcjmdz_0"
+     ],
+     "wall_regions": [
+      {
+       "room": "entryway_0",
+       "wall": "walls_bcjmdz_0",
+       "id": "entryway_0/walls_bcjmdz_0/r00",
+       "p0": [
+        1.87,
+        2.77
+       ],
+       "p1": [
+        1.87,
+        2.276
+       ],
+       "normal": [
+        -1.0,
+        0.0
+       ],
+       "hang_z": 1.45,
+       "length_m": 0.74,
+       "max_object_m": 1.1
+      }
+     ]
+    }
+   }
+  },
+  "generation": {
+   "instances_per_template": 1,
+   "height": 1.45,
+   "front_axis": {
+    "default": "+x",
+    "hook_rack/mdnfjr": "-x"
+   },
+   "deviation_range_deg": [
+    15.0,
+    45.0
+   ],
+   "arc_radius_range": [
+    0.6,
+    0.95
+   ],
+   "arc_half_angle_deg": 35.0,
+   "min_visible_objects": 5,
+   "tolerances": {
+    "orientation": 0.08
+   },
+   "up_axis": {
+    "default": "+z"
+   },
+   "level_axis": {
+    "default": "y"
+   },
+   "symmetric_180": {
+    "default": false,
+    "towel_rack/kqrmrh": true
+   }
+  }
+ }
+}

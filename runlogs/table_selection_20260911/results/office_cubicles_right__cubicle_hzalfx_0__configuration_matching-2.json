@@ -1,0 +1,28 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "cubicle_hzalfx_0",
+ "category": "cubicle",
+ "model": "hzalfx",
+ "rooms": [
+  "shared_office_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 1.214,
+  "bbox_x": 1.446,
+  "bbox_y": 1.44,
+  "bbox_z": 1.211,
+  "verdict": "high"
+ },
+ "removed_chairs": [
+  "swivel_chair_ryznxk_4",
+  "swivel_chair_ryznxk_5"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 00:55:45",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

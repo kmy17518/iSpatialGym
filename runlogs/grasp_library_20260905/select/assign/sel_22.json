@@ -1,0 +1,13 @@
+{
+ "assignment": "sel_22",
+ "groups": [
+  "/tmp/glib/select/groups/mental_rotation__crab__r1.json",
+  "/tmp/glib/select/groups/mental_rotation__hook__r1.json",
+  "/tmp/glib/select/groups/mental_rotation__pickle__r2.json",
+  "/tmp/glib/select/groups/mental_rotation__potato__r2.json",
+  "/tmp/glib/select/groups/mental_rotation__soup_ladle__r1.json",
+  "/tmp/glib/select/groups/object_scaling__beeswax_candle__r1.json",
+  "/tmp/glib/select/groups/configuration_matching__dip_candle__r1.json"
+ ],
+ "n_strips": 34
+}

@@ -1,0 +1,167 @@
+{
+ "scene": "restaurant_diner",
+ "table": "booth_xzrpar_2",
+ "category": "booth",
+ "model": "xzrpar",
+ "rooms": [
+  "dining_room_0"
+ ],
+ "partner": null,
+ "problem": "disembedding-0",
+ "inventory": {
+  "top_z": 0.748,
+  "bbox_x": 0.69,
+  "bbox_y": 1.31,
+  "bbox_z": 0.76,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "straight_chair_nntxvr_3"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:18:28",
+ "precheck": {
+  "aabb": [
+   [
+    -0.233,
+    -9.769,
+    -0.019
+   ],
+   [
+    0.471,
+    -8.445,
+    0.754
+   ]
+  ],
+  "support": {
+   "name": "booth_xzrpar_2",
+   "z": 0.7538101673126221,
+   "yaw": 3.1415915489196777,
+   "local_bounds": [
+    -0.45688337087631226,
+    0.22311800718307495,
+    8.459173202514648,
+    9.759174346923828
+   ],
+   "n_free_cells": 2307,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -0.223,
+     -9.109
+    ],
+    "length": 1.3
+   },
+   {
+    "name": "-u",
+    "mid": [
+     0.457,
+     -9.109
+    ],
+    "length": 1.3
+   },
+   {
+    "name": "+v",
+    "mid": [
+     0.117,
+     -9.759
+    ],
+    "length": 0.68
+   },
+   {
+    "name": "-v",
+    "mid": [
+     0.117,
+     -8.459
+    ],
+    "length": 0.68
+   }
+  ],
+  "stance": {
+   "edge": "-v",
+   "edge_mid": [
+    0.11687333881855011,
+    -8.459173202514648
+   ],
+   "inward": [
+    -1.104670104723482e-06,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    -1.104670104723482e-06
+   ],
+   "base_pose2d": [
+    0.1168738380074501,
+    -8.009173393249512,
+    -1.5707974314650013
+   ],
+   "edge_depth": 0.4499998092651367,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.699999988079071,
+    "axis_angle": 0.00802330117122344
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.1
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "distractors": {
+   "same_category": true,
+   "pool": "same_category",
+   "requested_pool": "same_category",
+   "fallback": null,
+   "models": [
+    "box_of_cereal-ykuyqb"
+   ],
+   "requested": 1,
+   "pool_size": 10,
+   "pool_categories": [
+    "box_of_cereal"
+   ],
+   "lookalikes_excluded": [
+    "box_of_cereal/qirvmd"
+   ],
+   "footprint_fraction": 0.18
+  },
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/restaurant_diner/restaurant_diner__booth_xzrpar_2__disembedding-0__s1",
+ "setup_s": 6.0,
+ "reject_reason": "no_support",
+ "error": "[no_support] booth_xzrpar_2: [support] untucked: [support] edge +u: [no_stance] no traversable stance around booth_xzrpar_2; edge -u: [no_stance] no traversable stance around booth_xzrpar_2; edge +v: [no_stance] no traversable stance around booth_xzrpar_2; edge -v lateral +0.00: [support] no lateral room for the destination tray on either side (support bounds (-0.45688337087631226, 0.22311800718307495, 8.459173202514648, 9.759174346923828)); edge -v lateral +0.25: [no_stance] no stance near lateral +0.25 on edge -v; edge -v lateral -0.25: [no_stance] no stance near lateral -0.25 on edge -v; edge -v lateral +0.35: [no_stance] no stance near lateral +0.35 on edge -v; edge -v lateral -0.35: [no_stance] no stance near lateral -0.35 on edge -v; edge +u: [no_stance] no traversable stance around booth_xzrpar_2; edge -u: [no_stance] no traversable stance around booth_xzrpar_2; edge +v: [no_stance] no traversable stance around booth_xzrpar_2; edge -v lateral +0.00 (yaw allowed): [support] no lateral room for the destination tray on either side (support bounds (-0.45688337087631226, 0.22311800718307495, 8.459173202514648, 9.759174346923828)); edge -v lateral +0.25 (yaw allowed): [no_stance] no stance near lateral +0.25 on edge -v; edge -v lateral -0.25 (yaw allowed): [no_stance] no stance near lateral -0.25 on edge -v; edge -v lateral +0.35 (yaw allowed): [no_stance] no stance near lateral +0.35 on edge -v; edge -v lateral -0.35 (yaw allowed): [no_stance] no stance near lateral -0.35 on edge -v",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 6.8,
+   "run_s": null
+  },
+  {
+   "seed": 1000,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 6.0,
+   "run_s": null
+  }
+ ],
+ "job_s": 18.2,
+ "finished": "2026-09-12 01:18:46"
+}

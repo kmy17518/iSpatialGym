@@ -1,0 +1,53 @@
+{
+  "key": "door__aleker",
+  "category": "door",
+  "model": "aleker",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_door1",
+      "kind": "door",
+      "chosen": "none",
+      "pinch": "vertical_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Vertical pull bar on two standoffs near the free (outer, -y) edge at mid-height, not marked. Hinged at the door1/door2 mullion, swings away from viewer.",
+      "height_concern": "",
+      "confidence": "medium"
+    },
+    {
+      "joint": "j_door2",
+      "kind": "door",
+      "chosen": "none",
+      "pinch": "vertical_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Vertical pull bar on two standoffs near the free centre edge (y~0) at mid-height, not marked. Hinged at the door1/door2 mullion, swings away from viewer.",
+      "height_concern": "",
+      "confidence": "medium"
+    },
+    {
+      "joint": "j_door3",
+      "kind": "door",
+      "chosen": "none",
+      "pinch": "vertical_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Vertical pull bar on two standoffs near the free centre edge (y~0) at mid-height, not marked. Hinged at the door3/door4 mullion, swings away from viewer.",
+      "height_concern": "",
+      "confidence": "medium"
+    },
+    {
+      "joint": "j_door4",
+      "kind": "door",
+      "chosen": "none",
+      "pinch": "vertical_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Vertical pull bar on two standoffs near the free (outer, +y) edge at mid-height, not marked. Hinged at the door3/door4 mullion, swings away from viewer.",
+      "height_concern": "",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Heuristic missed all four vertical pull bars (likely took the bar's outer face as the door face); F fallbacks sit on closed edges. All leaves graspable via the bars."
+}

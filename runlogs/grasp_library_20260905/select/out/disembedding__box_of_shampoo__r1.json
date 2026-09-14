@@ -1,0 +1,24 @@
+{
+  "group": "disembedding__box_of_shampoo__r1", "task": "disembedding", "category": "box_of_shampoo", "round": 1, "relation": null,
+  "n_candidates": 4, "n_opened": 4,
+  "candidates": [
+    {"model": "bclpiq", "key": "box_of_shampoo__bclpiq", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Orange/black Just For Men box (184 mm); five 55 mm top pinches 50/5-6 against open pad, both pads flat, hangs vertical, CoM 65-76; crisp print."},
+    {"model": "tzghev", "key": "box_of_shampoo__tzghev", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Tall yellow Marc Anthony Curls box (225 mm, 55x81 base); five 55 mm top-edge pinches 50/5-6, tilt 0, CoM 89-94 mm; sharp print, narrowest base."},
+    {"model": "nijidu", "key": "box_of_shampoo__nijidu", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Tall turquoise Marc Anthony Oil of Morocco box (225 mm); five 55 mm top-edge pinches 50/6, tilt 0, CoM 83-96 mm; sharp print, QR code."},
+    {"model": "jccyom", "key": "box_of_shampoo__jccyom", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Blue/white Just For Men shampoo-in haircolor box (187 mm); five 56 mm top pinches 50/6, tilt 0, CoM 58-78 mm; print slightly soft up close."}
+  ],
+  "selected": [
+    {"model": "bclpiq", "key": "box_of_shampoo__bclpiq", "rank": 1,
+     "reason": "All four tie at 25; bclpiq has the smallest CoM offset (65 mm) for its top pinch on a shorter, more stable 184 mm box, crisp orange/black print."},
+    {"model": "nijidu", "key": "box_of_shampoo__nijidu", "rank": 2,
+     "reason": "Tied score 25; chosen for a different look from #1: turquoise Marc Anthony box, taller slimmer proportions, wider base than tzghev, clean 50/6 top pinches."}
+  ],
+  "alternate": {"model": "jccyom", "key": "box_of_shampoo__jccyom"},
+  "short": false,
+  "warnings": ["every grasp in this group is a one-sided top-edge pinch (50/5-6) with the box pressed against the open-limit pad; both pads still touch and boxes hang vertical", "all four candidates tie at 25; pair chosen by CoM offset, base stability and appearance spread"],
+  "confidence": "medium"
+}

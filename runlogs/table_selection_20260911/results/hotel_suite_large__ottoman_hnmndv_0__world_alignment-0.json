@@ -1,0 +1,117 @@
+{
+ "scene": "hotel_suite_large",
+ "table": "ottoman_hnmndv_0",
+ "category": "ottoman",
+ "model": "hnmndv",
+ "rooms": [
+  "bedroom_0"
+ ],
+ "partner": null,
+ "problem": "world_alignment-0",
+ "inventory": {
+  "top_z": 0.472,
+  "bbox_x": 0.452,
+  "bbox_y": 1.474,
+  "bbox_z": 0.47,
+  "verdict": "low"
+ },
+ "removed_chairs": [
+  "armchair_hfydou_0"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:02:53",
+ "precheck": {
+  "aabb": [
+   [
+    -0.09,
+    -3.282,
+    -0.006
+   ],
+   [
+    0.377,
+    -1.792,
+    0.48
+   ]
+  ],
+  "support": {
+   "name": "ottoman_hnmndv_0",
+   "z": 0.47312623262405396,
+   "yaw": 1.762699321261607e-05,
+   "local_bounds": [
+    -0.06028537079691887,
+    0.3397386074066162,
+    -3.252272605895996,
+    -1.8122669458389282
+   ],
+   "n_free_cells": 1518,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     0.34,
+     -2.532
+    ],
+    "length": 1.44
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -0.06,
+     -2.532
+    ],
+    "length": 1.44
+   },
+   {
+    "name": "+v",
+    "mid": [
+     0.14,
+     -1.812
+    ],
+    "length": 0.4
+   },
+   {
+    "name": "-v",
+    "mid": [
+     0.14,
+     -3.252
+    ],
+    "length": 0.4
+   }
+  ],
+  "stance": {
+   "edge": "-v",
+   "edge_mid": [
+    0.13978394865989685,
+    -3.252270221710205
+   ],
+   "inward": [
+    -1.762699321261607e-05,
+    1.0
+   ],
+   "tangent": [
+    -1.0,
+    -1.762699321261607e-05
+   ],
+   "base_pose2d": [
+    0.13979187607765198,
+    -3.702270269393921,
+    1.5708139537881074
+   ],
+   "edge_depth": 0.4500000476837158,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.8499999642372131,
+    "axis_angle": 0.13092644686195584
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.4
+ },
+ "status": "skipped",
+ "reason": "inter_object_relation_satisfaction-0 found no stance / no reachable cell on the support top at any stand-off"
+}

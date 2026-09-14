@@ -1,0 +1,20 @@
+{
+  "key": "top_cabinet__lsyzkh",
+  "category": "top_cabinet",
+  "model": "lsyzkh",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_1",
+      "kind": "door",
+      "chosen": "A",
+      "pinch": "vertical_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Thin vertical bar handle (~100 mm, 8 mm thick) at the right end of the full-width door, mid-height; hinge at far left (-y) end",
+      "height_concern": "~0.10 m above object base if floor-placed; wall cabinet, depends on mount height",
+      "confidence": "high"
+    }
+  ],
+  "object_note": "Wide low cabinet with one full-width door; thin vertical handle visible near right end; heuristic correct; long swing arm (0.52 m) from left hinge."
+}

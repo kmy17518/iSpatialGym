@@ -1,0 +1,69 @@
+{
+  "category": "standing_loudspeaker",
+  "task": "obst",
+  "n_models": 5,
+  "n_opened": 5,
+  "models": [
+    {
+      "model": "lgkhqt",
+      "V": 2,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 10,
+      "valid": false,
+      "note": "Brown wooden cabinet whose driver cut-outs are see-through holes (drivers missing), holes also visible from top; 0.12 x 0.33 x 0.38 m; broken."
+    },
+    {
+      "model": "ogytka",
+      "V": 3,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 12,
+      "valid": true,
+      "note": "Small black bookshelf speaker with one driver and two ports, 0.27 x 0.16 x 0.27 m; flat black, clean, shelf-size rather than floor-standing."
+    },
+    {
+      "model": "snbvop",
+      "V": 3,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 11,
+      "valid": true,
+      "note": "Slim dark tower speaker with two small drivers at top, 0.13 x 0.09 x 0.44 m; flat texture, footprint borderline, narrow base."
+    },
+    {
+      "model": "suzqfe",
+      "V": 4,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Dark speaker box on a pole stand with round black base, 0.26 x 0.26 x 0.44 m; clean, stable disc base."
+    },
+    {
+      "model": "wsghki",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Grey PA speaker with black baffle, woofer and horn, 0.39 x 0.62 x 0.85 m; clean, footprint borderline."
+    }
+  ],
+  "picks": ["suzqfe", "wsghki"],
+  "alternate": "ogytka",
+  "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner"
+  ],
+  "category_verdict": "weak",
+  "category_note": "Speakers 0.27-0.85 m tall: a stand-mounted speaker and a PA cabinet are the best; one cabinet has missing drivers. Speakers normally sit against a wall or beside furniture, so N=2 at best; plausible in living rooms/bedrooms and a diner."
+}

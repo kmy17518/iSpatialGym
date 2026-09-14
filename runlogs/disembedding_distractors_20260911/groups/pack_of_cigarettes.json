@@ -1,0 +1,13 @@
+{
+  "category": "pack_of_cigarettes",
+  "n_models": 16,
+  "pages_opened": [
+    "grids/same/pack_of_cigarettes__p1.png",
+    "grids/same/pack_of_cigarettes__p2.png",
+    "grids/same/pack_of_cigarettes__p3.png",
+    "grids/same/pack_of_cigarettes__p4.png"
+  ],
+  "groups": [],
+  "unusable": [],
+  "notes": "No exact dups. Ten 11x5x2 cm packs (c1) all have distinct colour schemes/graphics; six 13x6x8 cm ribbed boxes (c2) are plain single-colour on the long sides with a printed end face only. Closest non-grouped pairs: ipmejr/qldhnm (silver+blue emblem, gold panel only on ipmejr), ajphvf/wpmpcf (orange; white stripes vs dark emblem), qabdgg/tngixy (dark vs light green)."
+}

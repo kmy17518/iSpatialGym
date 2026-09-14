@@ -1,0 +1,38 @@
+{
+ "key": "openable_window__qdkcdn",
+ "category": "openable_window",
+ "model": "qdkcdn",
+ "scene": "Rs_int",
+ "host": "openable_window_ithrgo_1",
+ "host_rank": 2,
+ "host_model": "ithrgo",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_dof_rootd_aa002_t",
+   "kind": "drawer",
+   "grasp_source": "manual skip: round-2 review: infeasible - Flush 50 mm wooden sash recessed behind the frame; every edge in a track or agai",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "previous_hosts": [
+  "openable_window_ithrgo_2",
+  "openable_window_ithrgo_0"
+ ],
+ "scale": [
+  1.267,
+  1.579,
+  1.076
+ ],
+ "time_s": 0.9
+}

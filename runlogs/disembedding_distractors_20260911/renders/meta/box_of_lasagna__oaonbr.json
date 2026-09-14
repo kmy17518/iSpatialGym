@@ -1,0 +1,35 @@
+{
+ "category": "box_of_lasagna",
+ "model": "oaonbr",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/box_of_lasagna__oaonbr__y0.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.113,
+   "seg_pixels": 35992,
+   "aabb_extent": [
+    0.084,
+    0.151,
+    0.226
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/box_of_lasagna__oaonbr__y1.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1129
+  }
+ },
+ "stable": true,
+ "visible": true
+}

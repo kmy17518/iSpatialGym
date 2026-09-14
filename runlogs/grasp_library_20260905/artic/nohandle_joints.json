@@ -1,0 +1,1738 @@
+[
+ {
+  "key": "bottom_cabinet__cjcyed",
+  "joint": "j_link_1",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "Sliding door panel (not a drawer), no handle; F sits atop the leading edge with a pinch axis across the panel width, unusable.",
+  "n": [
+   0.0,
+   -1.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.1602,
+   -0.0566,
+   -0.3382
+  ],
+  "bbox_max": [
+   0.2081,
+   0.3455,
+   0.3376
+  ],
+  "hinge": null,
+  "axis": [
+   0.0,
+   -1.0,
+   0.0
+  ]
+ },
+ {
+  "key": "bottom_cabinet__gvtucm",
+  "joint": "j_link_0",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "Flush wooden sliding-door panel (upper left, inner track); no handle, top edge runs hidden inside the frame track, F marker occluded",
+  "n": [
+   0.0,
+   1.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.0946,
+   -0.2807,
+   0.0013
+  ],
+  "bbox_max": [
+   0.1057,
+   0.0242,
+   0.3284
+  ],
+  "hinge": null,
+  "axis": [
+   0.0,
+   1.0,
+   0.0
+  ]
+ },
+ {
+  "key": "bottom_cabinet__gvtucm",
+  "joint": "j_link_1",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "Flush wooden sliding-door panel (upper right, outer track); no handle, top edge enclosed, free vertical edge only ~11 mm proud of neighbour panel",
+  "n": [
+   0.0,
+   -1.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.1055,
+   -0.0243,
+   0.0012
+  ],
+  "bbox_max": [
+   0.1166,
+   0.2805,
+   0.3283
+  ],
+  "hinge": null,
+  "axis": [
+   0.0,
+   -1.0,
+   0.0
+  ]
+ },
+ {
+  "key": "bottom_cabinet__gvtucm",
+  "joint": "j_link_2",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "Flush wooden sliding-door panel (lower right, outer track); no handle, top edge hidden under the middle rail",
+  "n": [
+   0.0,
+   -1.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.1055,
+   -0.0235,
+   -0.4587
+  ],
+  "bbox_max": [
+   0.1256,
+   0.2814,
+   -0.1317
+  ],
+  "hinge": null,
+  "axis": [
+   0.0,
+   -1.0,
+   0.0
+  ]
+ },
+ {
+  "key": "bottom_cabinet__gvtucm",
+  "joint": "j_link_3",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "Flush wooden sliding-door panel (lower left, inner track); no handle, top edge hidden under the middle rail, nothing to pinch",
+  "n": [
+   0.0,
+   1.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.0946,
+   -0.2798,
+   -0.4586
+  ],
+  "bbox_max": [
+   0.1109,
+   0.0251,
+   -0.1316
+  ],
+  "hinge": null,
+  "axis": [
+   0.0,
+   1.0,
+   0.0
+  ]
+ },
+ {
+  "key": "bottom_cabinet__songes",
+  "joint": "j_bottomdrawer",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "Thin ~6 cm bar pull at mid-height inside the recessed panel, unmarked; never protrudes past the frame plane, too shallow to pinch; F edge enclosed",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   -0.1569,
+   -0.3903,
+   -0.358
+  ],
+  "bbox_max": [
+   0.2867,
+   0.3861,
+   -0.1495
+  ],
+  "hinge": null,
+  "axis": [
+   1.0,
+   0.0,
+   0.0
+  ]
+ },
+ {
+  "key": "bottom_cabinet__songes",
+  "joint": "j_middledrawer",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "Thin ~6 cm bar pull at mid-height inside the recessed panel, unmarked; sits within the frame plane, nothing to get fingertips behind; F edge enclosed",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   -0.1569,
+   -0.3903,
+   -0.1482
+  ],
+  "bbox_max": [
+   0.2867,
+   0.3861,
+   0.0603
+  ],
+  "hinge": null,
+  "axis": [
+   1.0,
+   0.0,
+   0.0
+  ]
+ },
+ {
+  "key": "bottom_cabinet__songes",
+  "joint": "j_topdrawer",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "Thin ~6 cm bar pull at mid-height inside the recessed panel, unmarked; sits within the frame plane; top edge hidden under the top rail",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   -0.1569,
+   -0.3903,
+   0.0621
+  ],
+  "bbox_max": [
+   0.2867,
+   0.3861,
+   0.2706
+  ],
+  "hinge": null,
+  "axis": [
+   1.0,
+   0.0,
+   0.0
+  ]
+ },
+ {
+  "key": "bottom_cabinet_no_top__qohxjq",
+  "joint": "j_link_0",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "Small inset horizontal pull at centre of bottom drawer front, protrudes ~11 mm (X); top edge F is covered by the drawer above.",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   -0.1163,
+   -0.1848,
+   -0.243
+  ],
+  "bbox_max": [
+   0.2681,
+   0.1861,
+   -0.0388
+  ],
+  "hinge": null,
+  "axis": [
+   1.0,
+   0.0,
+   0.0
+  ]
+ },
+ {
+  "key": "bottom_cabinet_no_top__qohxjq",
+  "joint": "j_link_1",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "Small inset horizontal pull at centre of middle drawer front, protrudes ~12 mm (X); top edge F hidden under the top drawer.",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   -0.117,
+   -0.1855,
+   -0.0343
+  ],
+  "bbox_max": [
+   0.2686,
+   0.1863,
+   0.1593
+  ],
+  "hinge": null,
+  "axis": [
+   1.0,
+   0.0,
+   0.0
+  ]
+ },
+ {
+  "key": "carton__causya",
+  "joint": "j_link_0",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "review_desc": "F floats in empty air ~0.7 m beside the box; link_0 flap bbox is displaced outside the carton, no visible geometry to pinch.",
+  "n": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "bbox_min": [
+   -0.4748,
+   0.7376,
+   0.1973
+  ],
+  "bbox_max": [
+   0.5252,
+   1.2377,
+   0.2056
+  ],
+  "hinge": [
+   2e-05,
+   0.5,
+   0.42424
+  ],
+  "axis": [
+   -1.0,
+   0.0,
+   0.0
+  ]
+ },
+ {
+  "key": "carton__cdmmwy",
+  "joint": "j_left_lid",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; paper-thin (~1 mm) flap whose free edge meets the other flap flush at the centre seam, no gap to slip a fingertip under.",
+  "n": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "bbox_min": [
+   -0.1141,
+   0.0015,
+   0.1286
+  ],
+  "bbox_max": [
+   0.112,
+   0.1576,
+   0.1294
+  ],
+  "hinge": [
+   -0.00128,
+   0.15752,
+   0.12923
+  ],
+  "axis": [
+   -1.0,
+   0.0,
+   0.0
+  ]
+ },
+ {
+  "key": "carton__cdmmwy",
+  "joint": "j_right_lid",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; paper-thin (~1 mm) flap whose free edge meets the other flap flush at the centre seam, no gap to slip a fingertip under.",
+  "n": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "bbox_min": [
+   -0.1143,
+   -0.1536,
+   0.1301
+  ],
+  "bbox_max": [
+   0.1123,
+   0.0005,
+   0.1309
+  ],
+  "hinge": [
+   -0.00104,
+   -0.15304,
+   0.13007
+  ],
+  "axis": [
+   1.0,
+   0.0,
+   0.0
+  ]
+ },
+ {
+  "key": "carton__hhlmbi",
+  "joint": "j_link0",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; shoebox-style lid skirt sits flush over the box walls, overhanging only ~4 mm, nothing to hook a fingertip under.",
+  "n": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "bbox_min": [
+   -0.108,
+   -0.1132,
+   0.074
+  ],
+  "bbox_max": [
+   0.1143,
+   0.1092,
+   0.1023
+  ],
+  "hinge": [
+   -0.10375,
+   -0.00565,
+   0.09803
+  ],
+  "axis": [
+   0.03658000007271767,
+   -0.9993299841880798,
+   -0.0003800000122282654
+  ]
+ },
+ {
+  "key": "carton__libote",
+  "joint": "j_link0",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; skirted shoebox lid whose rim overhangs the box wall by only ~2 mm, nothing to hook a fingertip under at the front edge.",
+  "n": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "bbox_min": [
+   -0.1059,
+   -0.1092,
+   0.0741
+  ],
+  "bbox_max": [
+   0.1086,
+   0.105,
+   0.1002
+  ],
+  "hinge": [
+   -0.10509,
+   0.03389,
+   0.09445
+  ],
+  "axis": [
+   0.0,
+   -1.0,
+   -0.0
+  ]
+ },
+ {
+  "key": "carton__ylrxhe",
+  "joint": "j_link0",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; flap free edge lies at the centre seam butted against the other flap, underside inside the box, no gap for a fingertip",
+  "n": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "bbox_min": [
+   -0.3071,
+   -0.0021,
+   0.2957
+  ],
+  "bbox_max": [
+   0.3072,
+   0.306,
+   0.316
+  ],
+  "hinge": [
+   -0.00067,
+   0.30009,
+   0.30586
+  ],
+  "axis": [
+   -1.0,
+   0.0,
+   0.0
+  ]
+ },
+ {
+  "key": "carton__ylrxhe",
+  "joint": "j_link1",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; flap free edge lies at the centre seam butted against the other flap, underside inside the box, no gap for a fingertip",
+  "n": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "bbox_min": [
+   -0.3072,
+   -0.3056,
+   0.2983
+  ],
+  "bbox_max": [
+   0.307,
+   0.0044,
+   0.3174
+  ],
+  "hinge": [
+   0.00026,
+   -0.30649,
+   0.30424
+  ],
+  "axis": [
+   1.0,
+   0.0,
+   0.0
+  ]
+ },
+ {
+  "key": "cedar_chest__fwstpx",
+  "joint": "j_up",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; domed trunk lid ~88 mm thick at its free edge, skirt flush with body; only a lock hasp at front centre",
+  "n": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "bbox_min": [
+   -0.1989,
+   -0.27,
+   0.0972
+  ],
+  "bbox_max": [
+   0.2043,
+   0.2701,
+   0.1948
+  ],
+  "hinge": [
+   -0.18778,
+   -0.00333,
+   0.10119
+  ],
+  "axis": [
+   0.0,
+   -1.0,
+   -0.0
+  ]
+ },
+ {
+  "key": "cedar_chest__gbdzls",
+  "joint": "j_up",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; flat trunk lid ~48 mm thick, skirt flush with the body, no lip to get a finger under; lock hasp at front centre",
+  "n": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "bbox_min": [
+   -0.2009,
+   -0.098,
+   0.0516
+  ],
+  "bbox_max": [
+   0.1984,
+   0.0975,
+   0.0991
+  ],
+  "hinge": [
+   -0.19422,
+   -0.04595,
+   0.06695
+  ],
+  "axis": [
+   0.0,
+   -1.0,
+   -0.0
+  ]
+ },
+ {
+  "key": "clothes_dryer__fhtvuq",
+  "joint": "j_link_0",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; flat black round porthole door sits against the front panel, its rim has no clearance behind it to get a fingertip in",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.3046,
+   -0.1694,
+   -0.1505
+  ],
+  "bbox_max": [
+   0.3469,
+   0.1493,
+   0.1497
+  ],
+  "hinge": [
+   0.31853,
+   -0.16531,
+   -0.00039
+  ],
+  "axis": [
+   0.0,
+   -0.0,
+   -1.0
+  ]
+ },
+ {
+  "key": "clothes_dryer__smcyys",
+  "joint": "j_dof_rootd_aa001_r",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; raised ring rim sits against the front panel, no clearance behind it. Vertical block right of the door is cabinet latch hardware",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.2825,
+   -0.2188,
+   -0.2269
+  ],
+  "bbox_max": [
+   0.3086,
+   0.2174,
+   0.2093
+  ],
+  "hinge": [
+   0.29119,
+   -0.19212,
+   -0.00914
+  ],
+  "axis": [
+   0.0,
+   -0.0,
+   -1.0
+  ]
+ },
+ {
+  "key": "clothes_dryer__wivnic",
+  "joint": "j_dof_rootd_aa001_r",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; porthole door with thick raised ring rim sits in a recessed front panel, no clearance behind the leaf edge; rim maybe pinchable radially",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.2296,
+   -0.2418,
+   -0.2553
+  ],
+  "bbox_max": [
+   0.2778,
+   0.2545,
+   0.2092
+  ],
+  "hinge": [
+   0.30842,
+   -0.23736,
+   -0.02319
+  ],
+  "axis": [
+   0.0,
+   -0.0,
+   -1.0
+  ]
+ },
+ {
+  "key": "clothes_dryer__xsuyua",
+  "joint": "j_link_0",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; bowl-shaped porthole door 118 mm thick, black bezel nearly flush with the cabinet front, wide (~8 cm) rim, nothing to get fingertips behind",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.1717,
+   -0.221,
+   -0.2391
+  ],
+  "bbox_max": [
+   0.2899,
+   0.2257,
+   0.2074
+  ],
+  "hinge": [
+   0.2463,
+   -0.22236,
+   -0.01624
+  ],
+  "axis": [
+   0.0,
+   -0.0,
+   -1.0
+  ]
+ },
+ {
+  "key": "clothes_dryer__zlmnfg",
+  "joint": "j_link_0",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; glossy bowl-shaped porthole door 127 mm thick, bezel protrudes ~2 cm but leaf edge has no clearance behind; X bumps are bezel facets",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.1603,
+   -0.2427,
+   -0.1535
+  ],
+  "bbox_max": [
+   0.2869,
+   0.2435,
+   0.3328
+  ],
+  "hinge": [
+   0.27367,
+   -0.23989,
+   -3.58342
+  ],
+  "axis": [
+   0.0,
+   -0.0,
+   -1.0
+  ]
+ },
+ {
+  "key": "cooler__pnkiag",
+  "joint": "j_lid",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "review_desc": "No lid handle; front-centre grey latch is body hardware; 93 mm thick lid skirt sits flush over the body front, no exposed lip to grip",
+  "n": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "bbox_min": [
+   -0.2529,
+   -0.4787,
+   0.2203
+  ],
+  "bbox_max": [
+   0.2573,
+   0.4771,
+   0.3134
+  ],
+  "hinge": [
+   -0.2529,
+   0.0125,
+   0.24554
+  ],
+  "axis": [
+   0.0,
+   -1.0,
+   0.0
+  ]
+ },
+ {
+  "key": "dishwasher__dugpby",
+  "joint": "j_link_0",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; flush slab door, back face inside the cabinet opening, top edge below cabinet top, nothing to pinch. Bottom hinge, folds toward viewer.",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.217,
+   -0.2769,
+   -0.2661
+  ],
+  "bbox_max": [
+   0.3089,
+   0.2561,
+   0.337
+  ],
+  "hinge": [
+   0.26304,
+   0.08448,
+   -0.26105
+  ],
+  "axis": [
+   0.0,
+   1.0,
+   -0.0
+  ]
+ },
+ {
+  "key": "dishwasher__znfvmj",
+  "joint": "j_link_2",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "review_desc": "Recessed rectangular pull pocket near the top centre of the door; no protrusion to pinch. Top edge sits under the fixed control panel. Bottom hinge.",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.2679,
+   -0.2808,
+   -0.4097
+  ],
+  "bbox_max": [
+   0.3237,
+   0.2791,
+   0.2325
+  ],
+  "hinge": [
+   0.30263,
+   -0.00085,
+   -0.38074
+  ],
+  "axis": [
+   0.0,
+   1.0,
+   0.0
+  ]
+ },
+ {
+  "key": "door__adejun",
+  "joint": "j_left_leaf",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; glazed leaf. A/D are full-height meeting/hinge stiles, B/C bottom/top rails, all frame mouldings. Hinge +y side, swings away from viewer.",
+  "n": [
+   -1.0,
+   -0.0,
+   -0.0
+  ],
+  "bbox_min": [
+   -0.0954,
+   -0.0013,
+   -1.7317
+  ],
+  "bbox_max": [
+   -0.0099,
+   0.763,
+   0.3737
+  ],
+  "hinge": [
+   -0.05672,
+   0.76214,
+   -8.12921
+  ],
+  "axis": [
+   0.0,
+   0.0,
+   1.0
+  ]
+ },
+ {
+  "key": "door__adejun",
+  "joint": "j_right_leaf",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; glazed leaf. A/B are full-height hinge/meeting stiles, C/D bottom/top rails, all frame mouldings. Hinge -y side, swings away from viewer.",
+  "n": [
+   -1.0,
+   -0.0,
+   -0.0
+  ],
+  "bbox_min": [
+   -0.0954,
+   -0.7625,
+   -1.7317
+  ],
+  "bbox_max": [
+   -0.0099,
+   -0.0211,
+   0.3737
+  ],
+  "hinge": [
+   -0.05677,
+   -0.76167,
+   -0.73176
+  ],
+  "axis": [
+   0.0,
+   -0.0,
+   -1.0
+  ]
+ },
+ {
+  "key": "door__bandpe",
+  "joint": "j_leaf0",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No knob/pull; A marks the full-width push band (~0.3 m tall plate), not a pinchable bar. Hinge at outer -y edge, opens away from viewer.",
+  "n": [
+   -1.0,
+   -0.0,
+   -0.0
+  ],
+  "bbox_min": [
+   -0.0932,
+   -0.6216,
+   -1.2607
+  ],
+  "bbox_max": [
+   -0.0093,
+   -0.0049,
+   0.7156
+  ],
+  "hinge": [
+   -0.03897,
+   0.61309,
+   3.93988
+  ],
+  "axis": [
+   0.0,
+   0.0,
+   1.0
+  ]
+ },
+ {
+  "key": "door__bandpe",
+  "joint": "j_leaf1",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No knob/pull; A marks the full-width push band (~0.3 m tall plate), not a pinchable bar. Hinge at outer +y edge, opens away from viewer.",
+  "n": [
+   -1.0,
+   -0.0,
+   -0.0
+  ],
+  "bbox_min": [
+   -0.093,
+   0.001,
+   -1.2565
+  ],
+  "bbox_max": [
+   -0.0091,
+   0.6178,
+   0.7198
+  ],
+  "hinge": [
+   -0.03861,
+   -0.61675,
+   -0.38259
+  ],
+  "axis": [
+   0.0,
+   -0.0,
+   -1.0
+  ]
+ },
+ {
+  "key": "door__chonxi",
+  "joint": "j_link_0",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; plain flush slab recessed ~10 mm inside its frame, free (+y) edge abuts post so F edge not exposed. Hinge -y side.",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   -0.0021,
+   -0.4374,
+   -1.2305
+  ],
+  "bbox_max": [
+   0.0643,
+   0.4414,
+   0.837
+  ],
+  "hinge": [
+   -0.07581,
+   -0.44086,
+   -10.04856
+  ],
+  "axis": [
+   0.0,
+   -0.0,
+   1.0
+  ]
+ },
+ {
+  "key": "door__cvvumy",
+  "joint": "j_left_leaf",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No protruding handle; only flush/recessed vertical pull plate near the meeting edge at ~1 m height. Meeting edge not exposed. Hinge on outer (-y) edge.",
+  "n": [
+   -1.0,
+   -0.0,
+   -0.0
+  ],
+  "bbox_min": [
+   -0.053,
+   -0.8573,
+   -1.3483
+  ],
+  "bbox_max": [
+   0.0206,
+   0.0094,
+   0.7282
+  ],
+  "hinge": [
+   -0.04611,
+   -0.86054,
+   -0.40765
+  ],
+  "axis": [
+   0.0,
+   0.0,
+   1.0
+  ]
+ },
+ {
+  "key": "door__cvvumy",
+  "joint": "j_right_leaf",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No protruding handle; only flush/recessed vertical pull plate near the meeting edge at ~1 m height. Meeting edge not exposed. Hinge on outer (+y) edge.",
+  "n": [
+   -1.0,
+   -0.0,
+   -0.0
+  ],
+  "bbox_min": [
+   -0.0432,
+   0.0138,
+   -1.3483
+  ],
+  "bbox_max": [
+   0.0266,
+   0.8801,
+   0.7282
+  ],
+  "hinge": [
+   -0.03785,
+   0.87526,
+   -12.90639
+  ],
+  "axis": [
+   0.0,
+   -0.0,
+   -1.0
+  ]
+ },
+ {
+  "key": "fridge__hzgqdn",
+  "joint": "j_link_0",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle: plain flush door slab with interior bins; free edge measures 213 mm thick, far beyond pinch range. Top rail is body hardware.",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.16,
+   -0.3449,
+   -0.3843
+  ],
+  "bbox_max": [
+   0.3733,
+   0.3775,
+   0.4166
+  ],
+  "hinge": [
+   0.33928,
+   0.34608,
+   3e-05
+  ],
+  "axis": [
+   0.012090000323951244,
+   -0.000699999975040555,
+   0.9999300241470337
+  ]
+ },
+ {
+  "key": "fridge__lleghp",
+  "joint": "j_shelf0",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "Top sliding wire shelf, inside the cabinet behind the closed glass door; 13 mm front wire pinchable from above only once the door is open.",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   -0.1152,
+   -0.3016,
+   0.432
+  ],
+  "bbox_max": [
+   0.2045,
+   0.3014,
+   0.4635
+  ],
+  "hinge": null,
+  "axis": [
+   1.0,
+   0.0,
+   0.0
+  ]
+ },
+ {
+  "key": "fridge__lleghp",
+  "joint": "j_shelf1",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "Bottom sliding wire shelf, inside the cabinet behind the closed glass door; 13 mm front wire pinchable from above only once the door is open.",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   -0.1152,
+   -0.3016,
+   -0.3756
+  ],
+  "bbox_max": [
+   0.2045,
+   0.3014,
+   -0.3442
+  ],
+  "hinge": null,
+  "axis": [
+   1.0,
+   0.0,
+   0.0
+  ]
+ },
+ {
+  "key": "fridge__lleghp",
+  "joint": "j_shelf2",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "Lower-middle sliding wire shelf, inside the cabinet behind the closed glass door; 13 mm front wire pinchable from above only once the door is open.",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   -0.1152,
+   -0.3016,
+   -0.1063
+  ],
+  "bbox_max": [
+   0.2045,
+   0.3014,
+   -0.0749
+  ],
+  "hinge": null,
+  "axis": [
+   1.0,
+   0.0,
+   0.0
+  ]
+ },
+ {
+  "key": "fridge__lleghp",
+  "joint": "j_shelf3",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "Upper-middle sliding wire shelf, inside the cabinet behind the closed glass door; 13 mm front wire pinchable from above only once the door is open.",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   -0.1152,
+   -0.3016,
+   0.1628
+  ],
+  "bbox_max": [
+   0.2045,
+   0.3014,
+   0.1943
+  ],
+  "hinge": null,
+  "axis": [
+   1.0,
+   0.0,
+   0.0
+  ]
+ },
+ {
+  "key": "hinged_jar__jnjtrl",
+  "joint": "j_lid",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; lid rim sits flush with the jar body with no undercut for a fingertip; wire clamp at the free edge holds it shut.",
+  "n": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "bbox_min": [
+   -0.0691,
+   -0.0476,
+   0.0498
+  ],
+  "bbox_max": [
+   0.0646,
+   0.0522,
+   0.0958
+  ],
+  "hinge": [
+   -0.06257,
+   -0.02027,
+   0.05577
+  ],
+  "axis": [
+   0.3420200049877167,
+   -0.9396899938583374,
+   0.0
+  ]
+ },
+ {
+  "key": "openable_window__dpngol",
+  "joint": "j_left_leaf",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "No handle; bare 17 mm sliding leaf frame, back face nearly touching the fixed frame, edges captured in tracks; nothing to pinch.",
+  "n": [
+   0.0,
+   1.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.0082,
+   0.0341,
+   -1.044
+  ],
+  "bbox_max": [
+   0.0251,
+   1.0038,
+   1.0341
+  ],
+  "hinge": null,
+  "axis": [
+   0.0,
+   1.0,
+   0.0
+  ]
+ },
+ {
+  "key": "openable_window__dpngol",
+  "joint": "j_right_leaf",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "No handle; bare 17 mm sliding leaf frame, back face nearly touching the fixed frame, edges captured in tracks; nothing to pinch.",
+  "n": [
+   0.0,
+   -1.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.0071,
+   -0.9394,
+   -1.044
+  ],
+  "bbox_max": [
+   0.024,
+   0.0303,
+   1.0341
+  ],
+  "hinge": null,
+  "axis": [
+   0.0,
+   -1.0,
+   0.0
+  ]
+ },
+ {
+  "key": "openable_window__eyvzfu",
+  "joint": "j_movingpart",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "No handle; bare sliding leaf frame, leading stile ~15 cm deep (too thick to pinch), top edge inside the head track.",
+  "n": [
+   0.0,
+   -1.0,
+   0.0
+  ],
+  "bbox_min": [
+   -0.0235,
+   0.4344,
+   -1.3078
+  ],
+  "bbox_max": [
+   0.1228,
+   1.8825,
+   1.2919
+  ],
+  "hinge": null,
+  "axis": [
+   0.0,
+   -1.0,
+   0.0
+  ]
+ },
+ {
+  "key": "openable_window__qdkcdn",
+  "joint": "j_dof_rootd_aa002_t",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "No handle; flush wooden sash recessed ~1 cm behind the frame, all edges in tracks or against the fixed sash; thin muntins not pinchable.",
+  "n": [
+   0.0,
+   1.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.0102,
+   -0.5854,
+   -0.3429
+  ],
+  "bbox_max": [
+   0.0568,
+   0.0295,
+   0.3406
+  ],
+  "hinge": null,
+  "axis": [
+   0.0,
+   1.0,
+   0.0
+  ]
+ },
+ {
+  "key": "recycling_bin__mdojox",
+  "joint": "j_link_2",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "review_desc": "Handle-less wheelie-bin lid hinged at the rear; F is the front edge, but it rests on the body rim/comb lip with no underside to reach.",
+  "n": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "bbox_min": [
+   -0.3153,
+   -0.211,
+   0.3773
+  ],
+  "bbox_max": [
+   0.2245,
+   0.211,
+   0.4382
+  ],
+  "hinge": [
+   -0.30074,
+   -0.01079,
+   0.39311
+  ],
+  "axis": [
+   0.0,
+   -1.0,
+   0.0
+  ]
+ },
+ {
+  "key": "recycling_bin__nuoypc",
+  "joint": "j_link_2",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "review_desc": "Handle-less lid hinged at the rear; F marks the front skirt edge, but the body rim/comb lip sits directly beneath, no finger fits under.",
+  "n": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "bbox_min": [
+   -0.2833,
+   -0.2355,
+   0.3066
+  ],
+  "bbox_max": [
+   0.2599,
+   0.2314,
+   0.3734
+  ],
+  "hinge": [
+   -0.26356,
+   -0.01107,
+   0.32248
+  ],
+  "axis": [
+   0.036740001291036606,
+   -0.9993199706077576,
+   -0.0024399999529123306
+  ]
+ },
+ {
+  "key": "recycling_bin__pdmzhv",
+  "joint": "j_link_2",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "review_desc": "Handle-less lid hinged at the rear; F is the 12 mm front lip, flush with the body front face, nothing to get a fingertip under.",
+  "n": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "bbox_min": [
+   -0.3297,
+   -0.2051,
+   0.3313
+  ],
+  "bbox_max": [
+   0.247,
+   0.2063,
+   0.42
+  ],
+  "hinge": [
+   -0.29579,
+   0.21134,
+   0.3625
+  ],
+  "axis": [
+   0.0,
+   -1.0,
+   0.0
+  ]
+ },
+ {
+  "key": "sliding_door__hgcxno",
+  "joint": "j_left_leaf",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "No handle; framed glass leaf about 170 mm deep per bbox, too thick to pinch. F marks the top edge hidden inside the header.",
+  "n": [
+   0.0,
+   1.0,
+   0.0
+  ],
+  "bbox_min": [
+   -0.1855,
+   0.0476,
+   -1.8294
+  ],
+  "bbox_max": [
+   -0.0093,
+   1.1727,
+   0.4016
+  ],
+  "hinge": null,
+  "axis": [
+   0.0,
+   1.0,
+   0.0
+  ]
+ },
+ {
+  "key": "sliding_door__hgcxno",
+  "joint": "j_right_leaf",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "No handle; framed glass leaf about 165 mm deep per bbox, too thick to pinch. F marks the top edge hidden inside the header.",
+  "n": [
+   0.0,
+   -1.0,
+   0.0
+  ],
+  "bbox_min": [
+   -0.1822,
+   -1.077,
+   -1.8291
+  ],
+  "bbox_max": [
+   -0.0169,
+   0.043,
+   0.4016
+  ],
+  "hinge": null,
+  "axis": [
+   0.0,
+   -1.0,
+   0.0
+  ]
+ },
+ {
+  "key": "sliding_door__lrvyvc",
+  "joint": "j_movingpart",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "No handle; only grip is the leading vertical stile, but the leaf frame is about 156 mm deep per bbox, too thick to pinch.",
+  "n": [
+   0.0,
+   -1.0,
+   0.0
+  ],
+  "bbox_min": [
+   -0.1704,
+   0.6337,
+   -1.3522
+  ],
+  "bbox_max": [
+   -0.0146,
+   2.7273,
+   1.3607
+  ],
+  "hinge": null,
+  "axis": [
+   0.0,
+   -1.0,
+   0.0
+  ]
+ },
+ {
+  "key": "top_cabinet__dhguym",
+  "joint": "j_link_1",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No real handle; A sits on the raised panel moulding's right stile (18 mm proud), a makeshift grip at best. Inset leaf, edge not pinchable.",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.094,
+   -0.2683,
+   -0.0847
+  ],
+  "bbox_max": [
+   0.1262,
+   0.2699,
+   0.0903
+  ],
+  "hinge": [
+   0.1005,
+   -0.26226,
+   0.00278
+  ],
+  "axis": [
+   0.02630000002682209,
+   -9.999999747378752e-06,
+   -0.9996500015258789
+  ]
+ },
+ {
+  "key": "top_cabinet__nkrgez",
+  "joint": "j_link_0",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; flush plank door hinged at outer right (+y) edge; free inner edge butts against central shelf unit, not pinchable",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.0889,
+   0.263,
+   -0.2947
+  ],
+  "bbox_max": [
+   0.1181,
+   0.5764,
+   0.4328
+  ],
+  "hinge": [
+   0.10221,
+   0.57657,
+   0.06019
+  ],
+  "axis": [
+   -0.02386000007390976,
+   9.999999747378752e-06,
+   0.9997199773788452
+  ]
+ },
+ {
+  "key": "top_cabinet__nkrgez",
+  "joint": "j_link_1",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; flush plank door hinged at outer left (-y) edge; free inner edge butts against central shelf unit, not pinchable",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.0882,
+   -0.5764,
+   -0.2948
+  ],
+  "bbox_max": [
+   0.1181,
+   -0.263,
+   0.4328
+  ],
+  "hinge": [
+   0.10135,
+   -0.57738,
+   0.06018
+  ],
+  "axis": [
+   0.02386000007390976,
+   -9.999999747378752e-06,
+   -0.9997199773788452
+  ]
+ },
+ {
+  "key": "top_cabinet__qiausz",
+  "joint": "j_dof_rootd_ba001_r",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; thin (9 mm) raised-panel door hinged at outer left (-y) edge; free centre edge not exposed, nothing to pinch",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.1651,
+   -0.1909,
+   -0.08
+  ],
+  "bbox_max": [
+   0.1744,
+   -0.0123,
+   0.08
+  ],
+  "hinge": [
+   0.17131,
+   -0.1909,
+   -0.42799
+  ],
+  "axis": [
+   0.0,
+   -0.0,
+   -1.0
+  ]
+ },
+ {
+  "key": "top_cabinet__qiausz",
+  "joint": "j_dof_rootd_bb001_r",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "review_desc": "No handle; thin (9 mm) raised-panel door hinged at outer right (+y) edge; free centre edge not exposed, nothing to pinch",
+  "n": [
+   1.0,
+   0.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.1651,
+   0.0123,
+   -0.08
+  ],
+  "bbox_max": [
+   0.1744,
+   0.1909,
+   0.08
+  ],
+  "hinge": [
+   0.1713,
+   0.19087,
+   0.0
+  ],
+  "axis": [
+   0.0,
+   0.0,
+   1.0
+  ]
+ },
+ {
+  "key": "top_cabinet__twjqua",
+  "joint": "j_link_0",
+  "kind": "drawer",
+  "type": "PrismaticJoint",
+  "review_desc": "Sliding door misread as drawer; F on top-left edge is useless. Possible small vertical pull at right edge, mid-height, protrusion unverified",
+  "n": [
+   0.0,
+   -1.0,
+   0.0
+  ],
+  "bbox_min": [
+   0.1184,
+   -0.0673,
+   -0.2001
+  ],
+  "bbox_max": [
+   0.1652,
+   0.2896,
+   0.1988
+  ],
+  "hinge": null,
+  "axis": [
+   0.0,
+   -1.0,
+   0.0
+  ]
+ },
+ {
+  "key": "violin_case__jlasop",
+  "joint": "j_lid",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "review_desc": "No lid handle; lid rim sits flush on base rim, no lip to pinch; three front latches must open first. F marks lid's front edge",
+  "n": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "bbox_min": [
+   -0.1309,
+   -0.3498,
+   0.0314
+  ],
+  "bbox_max": [
+   0.1253,
+   0.3068,
+   0.1003
+  ],
+  "hinge": [
+   -0.10826,
+   -0.00561,
+   0.03397
+  ],
+  "axis": [
+   0.12049999833106995,
+   -0.9927099943161011,
+   0.00026000000070780516
+  ]
+ }
+]

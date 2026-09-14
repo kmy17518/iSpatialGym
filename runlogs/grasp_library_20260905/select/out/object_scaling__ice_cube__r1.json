@@ -1,0 +1,37 @@
+{
+  "group": "object_scaling__ice_cube__r1",
+  "task": "object_scaling",
+  "category": "ice_cube",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 8,
+  "n_opened": 8,
+  "candidates": [
+    {"model": "kdlafa", "key": "ice_cube__kdlafa", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Only 3 rows: one face pinch plus two edge pinches on the rotated cube; clear glassy cube, dark mirror-like face in V4 row 1."},
+    {"model": "dueotq", "key": "ice_cube__dueotq", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Five clean 22 mm face pinches, tilts 88-153 deg give some variety but all same contact type; sharp mottled ice texture."},
+    {"model": "lkirej", "key": "ice_cube__lkirej", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Four clean face pinches but three share tilt 87-94 deg (near-duplicates), only row 3 differs; good ice texture."},
+    {"model": "xupugj", "key": "ice_cube__xupugj", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Edge pinch, diagonal edge pinch and three face pinches at 90/120/152 deg, all clean; most diverse set; sharp refractive ice texture."},
+    {"model": "ujmgkb", "key": "ice_cube__ujmgkb", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Five clean face pinches in two tilt clusters (87-92, 139-156 deg), limited diversity; clean mottled ice cube."},
+    {"model": "pjgror", "key": "ice_cube__pjgror", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Four clean face pinches at 57/91/98/154 deg plus one edge pinch (row 4), all firm; sharp ice texture, highest GraspGen confidence."},
+    {"model": "czbfpm", "key": "ice_cube__czbfpm", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Five clean face pinches, tilts 56/90/94/150/158 deg, all same contact type; frosty mottled ice texture, no defects."},
+    {"model": "tqsquu", "key": "ice_cube__tqsquu", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Five clean face pinches, tilts 85/114/122/148/153 deg in three loose clusters; clean mottled ice texture, no defects."}
+  ],
+  "selected": [
+    {"model": "xupugj", "key": "ice_cube__xupugj", "rank": 1,
+     "reason": "Most diverse clean set for an in-hand task: two edge orientations plus three face pinches at distinct tilts; well-textured refractive cube, 21 mm pinch comfortably held."},
+    {"model": "pjgror", "key": "ice_cube__pjgror", "rank": 2,
+     "reason": "Five clean rows spanning four tilts plus an edge pinch, highest GraspGen confidence; visually equivalent glassy cube (all candidates look alike, so highest score taken)."}
+  ],
+  "alternate": {"model": "dueotq", "key": "ice_cube__dueotq"},
+  "short": false,
+  "warnings": ["All eight candidates are near-identical ~21 mm glassy cubes; the pair cannot span different appearances, so ranking is by grasp diversity."],
+  "confidence": "high"
+}

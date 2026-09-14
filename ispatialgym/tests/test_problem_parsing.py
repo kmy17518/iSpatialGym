@@ -77,6 +77,14 @@ EXPECTED = {
         [],
         [],
     ),
+    ("world_alignment", 2): (
+        "world_horizontal",
+        ["pose_reached", "not grasped"],
+        ["towel_rack.n.01_1", "agent.n.01_1"],
+        ["towel_rack.n.01_1"],
+        [],
+        [],
+    ),
 }
 for i, rel in enumerate(["ontop", "under", "inside", "nextto", "touching"]):
     EXPECTED[("inter_object_relation_satisfaction", i)] = (

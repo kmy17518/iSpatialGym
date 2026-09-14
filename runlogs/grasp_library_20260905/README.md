@@ -89,6 +89,16 @@ side face) with the AG outcome per candidate in `results/<key>.json`.
   and notes, picks with reasons, alternate, warnings), aggregated by `scripts/aggregate_selection.py` into
   `select/test_instances.csv` / `.json` / `.md`.
 
+## Disembedding distractor pools (2026-09-11)
+* `scripts/build_disembedding_pools.py` -> `select/disembedding_distractor_pools.json` and the `distractors` section of `disembedding-0` in
+  `ispatialgym/assets/task_specs/task_custom_lists.json`: for each of the 39 disembedding categories a same-category pool (every AG-valid
+  disembedding model of the category, 242 models; one V<=1 asset excluded), an other-category pool (the categories of its visual
+  family / families: cartons, packs, bottles, vessels, small_items) and 55 look-alike groups (exact duplicates + same-shape variants
+  that differ only by a small print / label / shade, judged on `select/duplicates/clusters/*.png` and the strips; a target's
+  look-alikes are never drawn as its distractors). The sheet's `same_category_pool` / `distractor_pool` rows list one row per
+  category; the `pair` column of every disembedding target row gives the pool sizes for that model, `duplicates` flags LOOK-ALIKE.
+  Re-run the script after regenerating `task_object_selection.csv` (it post-processes the sheet and is idempotent).
+
 ## Articulated objects (two full passes done 2026-09-07)
 See `artic/ARTIC_RESUME.md` for the pipeline, results (13 joints on 11 models opened by the robot) and how to rerun. Inventory, handle inference,
 renders, reviewer verdicts, scene assignments and the two validation harnesses are in `artic/` and `scripts/artic_*.py`.

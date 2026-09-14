@@ -1,0 +1,6 @@
+{"key": "openable_window__dpngol", "joint": "j_right_leaf", "feasible": false,
+ "proposal": {"face": "outer", "a": 0.5, "b": 0.5, "pinch": "horizontal", "approach": "front", "depth_mm": 30,
+              "expected_motion": "slide"},
+ "alternative": null,
+ "note": "Only the 17 mm leading stile could be clamped, but its back face nearly touches the fixed frame and top/bottom run in tracks.",
+ "confidence": "medium"}

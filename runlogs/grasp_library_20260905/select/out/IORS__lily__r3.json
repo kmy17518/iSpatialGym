@@ -1,0 +1,37 @@
+{
+  "group": "IORS__lily__r3",
+  "task": "IORS",
+  "category": "lily",
+  "round": 3,
+  "relation": "inside",
+  "n_candidates": 6,
+  "n_opened": 6,
+  "candidates": [
+    {"model": "yltekp", "key": "lily__yltekp__fl", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "White lily with bud and leaves; five upper-stem pinches below the head, four sandwich a leaf with the stem (24-28 mm), stem end free."},
+    {"model": "mohrqo", "key": "lily__mohrqo__fl", "G": 1, "T": 3, "V": 4, "R": 1, "score": 14,
+     "note": "White lily; single clean 10 mm stem pinch near the head, stem end free; only one valid grasp."},
+    {"model": "jfeimu", "key": "lily__jfeimu__fl", "G": 0, "T": 3, "V": 4, "R": 1, "score": 12,
+     "note": "Lily with leaves; only grasp closes to 5 mm through an 18 mm stem/leaf section (hull penetration), not clean."},
+    {"model": "relerp", "key": "lily__relerp__fl", "G": 4, "T": 3, "V": 5, "R": 1, "score": 22,
+     "note": "Multi-bloom white lily, excellent textures; four clean 12 mm stem pinches just below the head, head and stem end free."},
+    {"model": "jtouad", "key": "lily__jtouad__fl", "G": 1, "T": 3, "V": 4, "R": 1, "score": 14,
+     "note": "Lily; single 13 mm stem pinch below leaves with 17 mm opening (minor hull gap); head not visible in views."},
+    {"model": "jobzwo", "key": "lily__jobzwo__fl", "G": 0, "T": 1, "V": 4, "R": 0, "score": 9,
+     "note": "Lily spray with several blooms; only grasp lands mid-cluster, pads 47 mm apart on a 17 mm stem squeezing foliage."}
+  ],
+  "selected": [
+    {"model": "yltekp", "key": "lily__yltekp__fl", "rank": 1,
+     "reason": "Highest score: five clean upper-stem pinches (leaf sandwiched in four) with the head free and the long stem end free; good asset."},
+    {"model": "relerp", "key": "lily__relerp__fl", "rank": 2,
+     "reason": "Second score and visibly different (multi-bloom lily); four clean pure stem pinches just below the head; thin 12 mm stem gives R=1."}
+  ],
+  "alternate": {"model": "mohrqo", "key": "lily__mohrqo__fl"},
+  "short": false,
+  "warnings": [
+    "jfeimu and jobzwo have no clean grasp (hull penetration / foliage squeeze) and are not selectable.",
+    "mohrqo and jtouad have a single valid grasp each (G=1).",
+    "yltekp rows 1-4 pinch a leaf together with the stem; only row 5 is a pure 11 mm stem pinch."
+  ],
+  "confidence": "medium"
+}

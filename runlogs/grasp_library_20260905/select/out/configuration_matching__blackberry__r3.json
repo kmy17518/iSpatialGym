@@ -1,0 +1,39 @@
+{
+ "group": "configuration_matching__blackberry__r3",
+ "task": "configuration_matching",
+ "category": "blackberry",
+ "round": 3,
+ "relation": null,
+ "n_candidates": 1,
+ "n_opened": 1,
+ "candidates": [
+  {
+   "model": "tvpfvb",
+   "key": "blackberry__tvpfvb__a",
+   "G": 5,
+   "T": 3,
+   "V": 4,
+   "R": 2,
+   "score": 23,
+   "note": "Recognisable dark 27 mm blackberry, clean geometry, near-black low-contrast render; all five rows clean fingertip side pinches at CoM, one finger at joint limit (30/0)."
+  }
+ ],
+ "selected": [
+  {
+   "model": "tvpfvb",
+   "key": "blackberry__tvpfvb__a",
+   "rank": 1,
+   "reason": "Only candidate; all five grasps are clean centred fingertip pinches on the berry sides with top and bottom free for attachment; recognisable blackberry, 27 mm width comfortably graspable.",
+   "partners": [
+    "bush/waafqw (not ready) [type berrybush]"
+   ]
+  }
+ ],
+ "alternate": null,
+ "short": true,
+ "warnings": [
+  "Only one candidate in the group (no excluded models either), so no second test instance exists for blackberry.",
+  "Asset renders near-black with low contrast; texture sharpness cannot be verified at strip scale. Every row reads 30/0 or 29/0 (one finger at its joint limit) although width is 27 mm."
+ ],
+ "confidence": "medium"
+}

@@ -1,0 +1,41 @@
+{
+ "scene": "house_single_floor",
+ "table": "bottom_cabinet_no_top_gjrero_0",
+ "category": "bottom_cabinet_no_top",
+ "model": "gjrero",
+ "rooms": [
+  "utility_room_0"
+ ],
+ "partner": null,
+ "problem": "world_alignment-0",
+ "inventory": {
+  "top_z": 0.878,
+  "bbox_x": 0.657,
+  "bbox_y": 0.987,
+  "bbox_z": 0.879,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 00:21:29",
+ "precheck": {
+  "aabb": [
+   [
+    24.184,
+    1.178,
+    -0.004
+   ],
+   [
+    24.847,
+    2.176,
+    0.883
+   ]
+  ],
+  "error": "RuntimeError(\"min(): Expected reduction dim to be specified for input.numel() == 0. Specify the reduction dim with the 'dim' argument.\")",
+  "precheck_s": 1.6
+ },
+ "status": "skipped",
+ "reason": "inter_object_relation_satisfaction-0 found no stance / no reachable cell on the support top at any stand-off (precheck: no stance either)"
+}

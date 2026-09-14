@@ -1,0 +1,18 @@
+{
+  "category": "legal_document",
+  "task": "wa0",
+  "n_models": 2,
+  "n_opened": 2,
+  "models": [
+    {"model": "mougvz", "V": 3, "O": 2, "F": 2, "score": 12, "valid": true,
+     "long_axis": "x", "front_axis": "+x", "rest_ok": true,
+     "note": "Grey legal-size paper stack (2 cm) with faint printed text; centred title block at the -x end gives a unique but small orientation cue."},
+    {"model": "qkrlsi", "V": 3, "O": 2, "F": 2, "score": 12, "valid": true,
+     "long_axis": "x", "front_axis": "+x", "rest_ok": true,
+     "note": "Darker grey legal form with ruled fields; header band at the -x end breaks the 180-degree ambiguity but the print is faint and low-res."}
+  ],
+  "picks": ["mougvz", "qkrlsi"],
+  "alternate": null,
+  "category_verdict": "weak",
+  "category_note": "Two grey legal-size (0.35x0.25 m) paper stacks lying flat; readable layout (title/header at one end) but the text is faint grey-on-grey, so the yaw cue is marginal for a policy at 0.6-0.9 m."
+}

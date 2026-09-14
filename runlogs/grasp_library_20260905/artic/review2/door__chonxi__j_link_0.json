@@ -1,0 +1,6 @@
+{"key": "door__chonxi", "joint": "j_link_0", "feasible": true,
+ "proposal": {"face": "outer", "a": 0.8, "b": 0.5, "pinch": "horizontal", "approach": "front", "depth_mm": 0,
+              "expected_motion": "push"},
+ "alternative": null,
+ "note": "Flush handle-less slab that swings away from viewer; nothing to pinch, so push the face near the free edge with closed fingers.",
+ "confidence": "medium"}

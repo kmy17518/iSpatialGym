@@ -1,0 +1,119 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "cubicle_hzalfx_5",
+ "category": "cubicle",
+ "model": "hzalfx",
+ "rooms": [
+  "shared_office_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-0",
+ "inventory": {
+  "top_z": 1.214,
+  "bbox_x": 1.446,
+  "bbox_y": 1.44,
+  "bbox_z": 1.211,
+  "verdict": "high"
+ },
+ "removed_chairs": [
+  "swivel_chair_ryznxk_0",
+  "swivel_chair_ryznxk_6"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 00:44:56",
+ "precheck": {
+  "aabb": [
+   [
+    10.397,
+    -0.755,
+    -0.006
+   ],
+   [
+    11.857,
+    0.699,
+    1.222
+   ]
+  ],
+  "support": {
+   "name": "cubicle_hzalfx_5",
+   "z": 0.7756460905075073,
+   "yaw": 0.0,
+   "local_bounds": [
+    10.426592826843262,
+    11.786592483520508,
+    -0.685491144657135,
+    0.6345088481903076
+   ],
+   "n_free_cells": 3163,
+   "occupants": [
+    "cubicle_deceti_0",
+    "cubicle_hzalfx_4"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     11.787,
+     -0.025
+    ],
+    "length": 1.32
+   },
+   {
+    "name": "-u",
+    "mid": [
+     10.427,
+     -0.025
+    ],
+    "length": 1.32
+   },
+   {
+    "name": "+v",
+    "mid": [
+     11.107,
+     0.635
+    ],
+    "length": 1.36
+   },
+   {
+    "name": "-v",
+    "mid": [
+     11.107,
+     -0.685
+    ],
+    "length": 1.36
+   }
+  ],
+  "stance": null,
+  "stance_error": "[stance_collision] untucked: [no_stance] no collision-free stance around cubicle_hzalfx_5",
+  "precheck_s": 1.5
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/office_cubicles_right/office_cubicles_right__cubicle_hzalfx_5__inter_object_relation_satisfaction-0",
+ "setup_s": 8.5,
+ "reject_reason": "no_support",
+ "error": "[no_support] cubicle_hzalfx_5: [no_stance] stand_off 0.45 edge None: [stance_collision] untucked: [no_stance] no collision-free stance around cubicle_hzalfx_5; stand_off 0.35 edge None: [stance_collision] untucked: [no_stance] no collision-free stance around cubicle_hzalfx_5; stand_off 0.55 edge None: [stance_collision] untucked: [no_stance] no collision-free stance around cubicle_hzalfx_5; stand_off 0.65 edge None: [stance_collision] untucked: [no_stance] no collision-free stance around cubicle_hzalfx_5",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 8.5,
+   "run_s": null
+  }
+ ],
+ "job_s": 13.4,
+ "finished": "2026-09-12 00:45:11"
+}

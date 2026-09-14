@@ -1,0 +1,120 @@
+{
+ "key": "openable_window__cbudyv",
+ "category": "openable_window",
+ "model": "cbudyv",
+ "scene": "Rs_int",
+ "host": "openable_window_ithrgo_1",
+ "host_rank": 1,
+ "host_model": "ithrgo",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_leaf0",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     2.648,
+     -1.199,
+     3.137
+    ],
+    "translate": 0.25,
+    "sign": -1.0
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "stance ok",
+    "sign +1: planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 165151.0 mm / 1.390 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)",
+    "stance ok",
+    "sign -1: planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 180327.7 mm / 1.404 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)"
+   ],
+   "error": "planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 180327.7 mm / 1.404 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)",
+   "contact_world": [
+    1.999,
+    -0.996,
+    1.629
+   ],
+   "handle_height_above_floor": 1.624
+  },
+  {
+   "joint": "j_leaf1",
+   "kind": "door",
+   "grasp_source": "review:B",
+   "stance": {
+    "base": [
+     2.645,
+     -1.893,
+     3.137
+    ],
+    "translate": 0.25,
+    "sign": -1.0
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "stance ok",
+    "sign +1: planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 156133.1 mm / 1.491 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)",
+    "stance ok",
+    "sign -1: planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 180329.3 mm / 1.489 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)"
+   ],
+   "error": "planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 180329.3 mm / 1.489 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)",
+   "contact_world": [
+    1.995,
+    -1.69,
+    1.63
+   ],
+   "handle_height_above_floor": 1.625
+  },
+  {
+   "joint": "j_leaf2",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [1.9924988746643066, -2.3818769454956055, 1.628179669380188]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [1.9924988746643066, -2.3818769454956055, 1.628179669380188]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    1.992,
+    -2.382,
+    1.628
+   ],
+   "handle_height_above_floor": 1.623,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 6,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 3
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [
+  "openable_window_ithrgo_0"
+ ],
+ "scale": [
+  0.942,
+  0.694,
+  0.507
+ ],
+ "time_s": 150.6
+}

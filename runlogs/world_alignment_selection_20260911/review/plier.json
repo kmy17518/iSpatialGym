@@ -1,0 +1,26 @@
+{
+ "category": "plier",
+ "task": "wa0",
+ "n_models": 1,
+ "n_opened": 1,
+ "models": [
+  {
+   "model": "zwzncq",
+   "V": 4,
+   "O": 3,
+   "F": 1,
+   "score": 15,
+   "valid": true,
+   "long_axis": "x",
+   "front_axis": "-x",
+   "rest_ok": true,
+   "note": "Yellow/black pliers 0.154 m lying flat, handles at -x, jaws at +x; two articulated meshes; a tool, F borderline."
+  }
+ ],
+ "picks": [
+  "zwzncq"
+ ],
+ "alternate": null,
+ "category_verdict": "weak",
+ "category_note": "Single small pliers model; the handle-versus-jaw silhouette gives an unambiguous yaw, but it is a tool (borderline table item) and only 0.15 m long."
+}

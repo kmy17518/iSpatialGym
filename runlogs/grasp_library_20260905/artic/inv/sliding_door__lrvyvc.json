@@ -1,0 +1,91 @@
+{
+ "category": "sliding_door",
+ "model": "lrvyvc",
+ "key": "sliding_door__lrvyvc",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  1.360377311706543
+ ],
+ "aabb_extent": [
+  0.2566223740577698,
+  4.177994251251221,
+  2.722151041030884
+ ],
+ "aabb_min_rel_root": [
+  -0.1703886091709137,
+  -1.4506725072860718,
+  -1.360377311706543
+ ],
+ "aabb_max_rel_root": [
+  0.08623375743627548,
+  2.7273216247558594,
+  1.3617737293243408
+ ],
+ "link_tags": {
+  "base_link": [],
+  "glass": [
+   "glass"
+  ],
+  "movingpart": [],
+  "movingpartglass": [
+   "glass"
+  ]
+ },
+ "openable_joint_ids": [],
+ "joints": [
+  {
+   "joint": "j_movingpart",
+   "type": "PrismaticJoint",
+   "child_link": "movingpart",
+   "lower": 0.0,
+   "upper": 2.0704784393310547,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    -0.07638,
+    1.67667,
+    -0.00024
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "travel_per_unit": 0.9999990463256947,
+   "pieces_obj": "/tmp/glib/artic/inv/sliding_door__lrvyvc__movingpart.obj",
+   "n_pieces": 7,
+   "link_bbox_min": [
+    -0.1704,
+    0.6337,
+    -1.3522
+   ],
+   "link_bbox_max": [
+    -0.0146,
+    2.7273,
+    1.3607
+   ],
+   "link_tags": [],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.143,
+   -1.4507,
+   -1.3604
+  ],
+  "bbox_max": [
+   0.0862,
+   2.724,
+   1.3618
+  ],
+  "n_pieces": 7
+ }
+}

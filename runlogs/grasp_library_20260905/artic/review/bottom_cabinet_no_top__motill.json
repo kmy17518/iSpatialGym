@@ -1,0 +1,11 @@
+{
+  "key": "bottom_cabinet_no_top__motill",
+  "category": "bottom_cabinet_no_top",
+  "model": "motill",
+  "strip_opened": true,
+  "joints": [
+    {"joint": "j_link_0", "kind": "door", "chosen": "A", "pinch": "knob", "motion": "swing",
+     "graspable": true, "handle_description": "Small dark knob/tab (27 mm tall, 7 mm wide, 16 mm stand-off) at top centre of the narrow door; hinge on +y edge", "height_concern": "", "confidence": "medium"}
+  ],
+  "object_note": "Slim open-top single-door unit; the marker sits on a small knob at the door top (visible in the opened view); stand-off only ~16 mm so fingertips must reach behind carefully."
+}

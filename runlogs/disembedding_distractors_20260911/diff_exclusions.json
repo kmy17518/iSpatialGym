@@ -1,0 +1,56 @@
+{
+ "bottle_of_beer": {
+  "bottle_of_water/cytqio": "flat matte grey bottle, no label or material detail; looks untextured"
+ },
+ "bottle_of_milk": {
+  "cream_pitcher/ompiss": "flat black untextured blob filling the tile, does not read as a pitcher or any object",
+  "bottle_of_water/cytqio": "flat matte grey untextured bottle with no label, looks like missing material; settled at 5.3 deg tilt"
+ },
+ "bottle_of_shampoo": {
+  "conditioner_dispenser/njqnuo": "Lies on its side on the tray, pump pointing at camera; not an upright resting pose."
+ },
+ "box_of_shampoo": {
+  "conditioner_dispenser/njqnuo": "rests inverted on its red pump head, 12 deg lean; not a natural upright pose"
+ },
+ "can_of_soda": {
+  "can_of_coffee/poteji": "Visibly leaning, settled tilt 13.4 deg; can does not sit flat on the tray."
+ },
+ "cellulose_tape": {
+  "cap/arskxc": "translucent white blob with a black block; does not read as a cap or any everyday object"
+ },
+ "conditioner_dispenser": {
+  "bottle_of_conditioner/teafxb": "lies flat on its back on the tray with the cap pointing at the camera, not standing"
+ },
+ "cookie_cutter": {
+  "cap/arskxc": "White/black blocky shape; does not read as a cap or any everyday object.",
+  "peppermint/pbrxfe": "Tiny green blob over a ghostly translucent wrapper; does not read as an object."
+ },
+ "mouse": {
+  "mousetrap/mwfwsv": "tier-2 word-pun match; a wooden mousetrap is unrelated to a computer mouse"
+ },
+ "notebook": {
+  "folderal/zwhewa": "decorative wire basket with foliage, not stationery; clearly unrelated to a notebook (name-matched to folder)"
+ },
+ "pencil_case": {
+  "pack_of_kielbasa/bhkkiq": "Packaged sausage, unrelated to a pencil case; also leans 9.1 deg standing on end.",
+  "cucumber/wcvwye": "Fresh vegetable, clearly unrelated kind of object for a pencil case.",
+  "burrito/mqjwjq": "Prepared food item, clearly unrelated kind of object for a pencil case.",
+  "taco/werkla": "Prepared food item, clearly unrelated kind of object for a pencil case.",
+  "hotdog_bun/ajlvvj": "Bread bun, unrelated to a pencil case; stands on end in an unnatural pose.",
+  "pack_of_kielbasa/biokqz": "Packaged sausage, unrelated to a pencil case; leans 7.7 deg standing on end.",
+  "zucchini/udvfaz": "Fresh vegetable, clearly unrelated kind of object for a pencil case; stands on end.",
+  "pack_of_kielbasa/bzlsuh": "Packaged sausage, clearly unrelated kind of object for a pencil case."
+ },
+ "pencil_holder": {
+  "can_of_coffee/poteji": "settles leaning 13 deg; can does not stand flat on the tray, unstable base"
+ },
+ "soap_dispenser": {
+  "conditioner_dispenser/njqnuo": "lies on its side on the tray with the pump pointing at the camera, not standing (tilt 12.2 deg)"
+ },
+ "teaspoon": {
+  "comb/lqnwhb": "Nearly invisible white/translucent shape on the tray; does not read as a comb or any object."
+ },
+ "toy_dice": {
+  "battery/dcjyzg": "stray tan strip attached across the battery's middle; extra floating part, not a clean model"
+ }
+}

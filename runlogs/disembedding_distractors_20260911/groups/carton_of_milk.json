@@ -1,0 +1,10 @@
+{
+  "category": "carton_of_milk",
+  "n_models": 4,
+  "pages_opened": [
+    "grids/same/carton_of_milk__p1.png"
+  ],
+  "groups": [],
+  "unusable": [],
+  "notes": "No look-alikes: cow-print gable carton (atyqub), navy/white gable carton (kszoro, 18 cm), tall white/blue flat brick (xmugpm, 22 cm) and slim dark-blue brick (kklgxk) differ in colour, shape or size. kszoro/xmugpm are the closest pair (both blue/white) but differ in top shape, height and graphics. kszoro reports 0 segmentation px at yaw 0 despite rendering normally; check its mask."
+}

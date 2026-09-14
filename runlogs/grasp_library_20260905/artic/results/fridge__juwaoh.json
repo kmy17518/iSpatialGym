@@ -1,0 +1,61 @@
+{
+ "key": "fridge__juwaoh",
+ "category": "fridge",
+ "model": "juwaoh",
+ "scene": "restaurant_diner",
+ "host": "fridge_juwaoh_0",
+ "host_rank": 0,
+ "host_model": "juwaoh",
+ "swap": false,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "review:F",
+   "stance": {
+    "base": [
+     -3.92,
+     -1.542,
+     2.126
+    ],
+    "translate": 0.5,
+    "sign": 1.0,
+    "orientation": "edge_down30"
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: collision: [collision] trunk motion would collide (sample 3) {'translate': 0.5, 'tilt': None}",
+    "stance ok (teleported)",
+    "sign +1: planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 593.1 mm / 0.891 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [-4.0924458503723145, -0.8841613531112671, 0.9930360317230225]})"
+   ],
+   "error": "planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 593.1 mm / 0.891 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)",
+   "contact_world": [
+    -4.092,
+    -0.884,
+    0.993
+   ],
+   "handle_height_above_floor": 0.926,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 0,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 4
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.069,
+  1.377,
+  0.941
+ ],
+ "time_s": 375.7
+}

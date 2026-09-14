@@ -1,0 +1,10 @@
+{
+  "category": "cookie_cutter",
+  "n_models": 3,
+  "pages_opened": [
+    "grids/same/cookie_cutter__p1.png"
+  ],
+  "groups": [],
+  "unusable": [],
+  "notes": "All three are tiny (1195-1463 px) and blurry, rendering as dark outlines with a coloured rim; the rim colour (cyan star, red flower, yellow-green heart) and outline shape separate them at every yaw. No look-alikes, none unusable."
+}

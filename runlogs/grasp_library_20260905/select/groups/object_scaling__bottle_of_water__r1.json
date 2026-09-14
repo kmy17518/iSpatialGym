@@ -1,0 +1,576 @@
+{
+ "group": "object_scaling__bottle_of_water__r1",
+ "task": "object_scaling",
+ "category": "bottle_of_water",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. Rotationally symmetric bodies are preferred for this task.",
+ "candidates": [
+  {
+   "model": "cyzaue",
+   "key": "bottle_of_water__cyzaue",
+   "strip": "/tmp/glib/strips/bottle_of_water__cyzaue.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on facets, CoM 8 mm, both pads touch; V1 blank"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on facets, CoM 24 mm, both pads touch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on facets, CoM 22 mm, both pads touch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across facet edge, antipodal 0.83, both pads touch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder taper pinch 28 mm, wider body beyond pads wedge-locks"
+    }
+   ],
+   "object_note": "faceted bottle; finger readouts 50/x but V2 shows centred symmetric pinches; V1 render blank in row 1",
+   "bbox_mm": [
+    54,
+    51,
+    175
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "suytyi",
+   "key": "bottle_of_water__suytyi",
+   "strip": "/tmp/glib/strips/bottle_of_water__suytyi.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on cylinder; V1 blank"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on cylinder"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on cylinder"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, antipodal 0.80, cylinder spans both pads"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch through CoM, both pads on cylinder"
+    }
+   ],
+   "object_note": "width metric 29-44 mm inconsistent with ~60 mm body filling pad gap; readouts 50/12 but pinch visibly centred",
+   "bbox_mm": [
+    61,
+    61,
+    165
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "sxffiv",
+   "key": "bottle_of_water__sxffiv",
+   "strip": "/tmp/glib/strips/bottle_of_water__sxffiv.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch on flat faces, CoM 13 mm; V1 blank"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch 57 mm, CoM 41 mm, full pad contact"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body pinch 64 mm toward cap, full pad contact"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body pinch 66 mm, CoM 71 mm, pads on flat faces"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch 62 mm, CoM 80 mm, wider body beyond pads"
+    }
+   ],
+   "object_note": "square 1 L bottle; rows 3-5 sit toward the cap end but with full flat-face pad contact",
+   "bbox_mm": [
+    79,
+    65,
+    291
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "rrkhva",
+   "key": "bottle_of_water__rrkhva",
+   "strip": "/tmp/glib/strips/bottle_of_water__rrkhva.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body pinch 60 mm, both pads on body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch 16 mm under mouth, body hangs below, wedge lock"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch 18 mm, body hangs below, wedge lock"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch 16 mm under mouth, wedge lock"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch 16 mm at mouth, tilt 29, wedge lock"
+    }
+   ],
+   "object_note": "small dark bottle; neck grasps are handle-like, shoulder below the pads wedge-locks",
+   "bbox_mm": [
+    65,
+    65,
+    151
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "atvnqy",
+   "key": "bottle_of_water__atvnqy",
+   "strip": "/tmp/glib/strips/bottle_of_water__atvnqy.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch 62 mm, CoM 19 mm, both pads on body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder/upper-body pinch 57 mm, CoM 37 mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch 53 mm near cap, CoM 54 mm, full pads"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "bottle hangs vertically from 64 mm base section, full pads"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "bottle hangs from 64 mm base section, tilt 152, full pads"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    65,
+    65,
+    194
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "rmtdxh",
+   "key": "bottle_of_water__rmtdxh",
+   "strip": "/tmp/glib/strips/bottle_of_water__rmtdxh.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body pinch 57 mm, CoM 52 mm, both pads on body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch 48 mm, wider body beyond pads wedge-locks"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder/neck pinch 41 mm, wedge lock from body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder/neck pinch 39 mm, CoM 85 mm, wedge lock"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch 45 mm, CoM 75 mm, wedge lock"
+    }
+   ],
+   "object_note": "bulbous bottle; shoulder/neck grasps 69-85 mm from CoM, wider body beyond pads wedge-locks",
+   "bbox_mm": [
+    66,
+    71,
+    268
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "migvlt",
+   "key": "bottle_of_water__migvlt",
+   "strip": "/tmp/glib/strips/bottle_of_water__migvlt.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch on octagonal flats through CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch on octagonal flats, CoM 1 mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch on octagonal flats through CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, antipodal 0.88 on facet edge, both pads touch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch on octagonal flats through CoM"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    70,
+    70,
+    228
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "emquat",
+   "key": "bottle_of_water__emquat",
+   "strip": "/tmp/glib/strips/bottle_of_water__emquat.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "base-end body pinch 78 mm, full pads, belly wedge-locks"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "base-end body pinch, CoM 78 mm, full pads, belly locks"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "hangs vertically from base-end waist, wider belly below"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "base-end body pinch, CoM 71 mm, full pads, belly locks"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "hangs vertically from base-end waist, CoM 71 mm"
+    }
+   ],
+   "object_note": "78 mm bottle pinched at narrower base-end waist; belly ~13% wider beyond pads wedge-locks; lever arm 68-78 mm",
+   "bbox_mm": [
+    82,
+    79,
+    222
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "cytqio",
+   "key": "bottle_of_water__cytqio",
+   "strip": "/tmp/glib/strips/bottle_of_water__cytqio.png",
+   "n_valid": 1,
+   "n_clean": 1,
+   "n_clean_strict": 1,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch 33 mm under lip flare, lip shape-locks, lever 87 mm"
+    }
+   ],
+   "object_note": "large jug, single candidate; body too wide, pinch on short neck under flared lip",
+   "bbox_mm": [
+    92,
+    83,
+    218
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "jmwngr",
+   "key": "bottle_of_water__jmwngr",
+   "strip": "/tmp/glib/strips/bottle_of_water__jmwngr.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch 57 mm, tilt 67, body hangs below pads"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch 67 mm, horizontal, lever 128 mm, body wedge-locks"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch 62 mm, lever 137 mm, wedge lock"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch 66 mm, lever 132 mm, wedge lock"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch 66 mm, lever 133 mm, wedge lock"
+    }
+   ],
+   "object_note": "2 L bottle body too wide; all five pinch the shoulder taper 57-67 mm, wider body beyond pads locks",
+   "bbox_mm": [
+    84,
+    85,
+    354
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "eeaimz",
+   "key": "bottle_of_water__eeaimz",
+   "strip": "/tmp/glib/strips/bottle_of_water__eeaimz.png",
+   "n_valid": 1,
+   "n_clean": 1,
+   "n_clean_strict": 1,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch 86 mm under cap, wider body below wedge-locks"
+    }
+   ],
+   "object_note": "large jug, one candidate; pads near max opening (86 mm) on shoulder under cap, lever 133 mm",
+   "bbox_mm": [
+    105,
+    105,
+    340
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "lkpaas",
+   "key": "bottle_of_water__lkpaas",
+   "strip": "/tmp/glib/strips/bottle_of_water__lkpaas.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/shoulder pinch 66 mm, huge body beyond pads wedge-locks"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/shoulder pinch 69 mm, wedge lock, lever 143 mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/shoulder pinch 71 mm, wedge lock, lever 143 mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/shoulder pinch 71 mm, wedge lock, lever 144 mm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/shoulder pinch 71 mm, wedge lock, lever 138 mm"
+    }
+   ],
+   "object_note": "very large transparent bottle; all grasps on neck/shoulder 66-71 mm, handle-like, lever 138-145 mm",
+   "bbox_mm": [
+    110,
+    107,
+    362
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

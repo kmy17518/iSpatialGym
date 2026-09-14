@@ -1,0 +1,33 @@
+{
+  "category": "shoulder_bag",
+  "task": "obst",
+  "n_models": 2,
+  "n_opened": 2,
+  "models": [
+    {
+      "model": "shoulder_bag/mcualj",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Small grey handbag with black handles, standing upright on narrow base; 0.06 x 0.15 x 0.15 m; clean but tiny, thin, easy to miss."
+    },
+    {
+      "model": "shoulder_bag/pxvcyu",
+      "V": 4,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Brown leather shoulder bag standing upright, long strap held straight up in the air; 0.13 x 0.32 x 0.42 m; clean, strap pose unnatural."
+    }
+  ],
+  "picks": ["shoulder_bag/pxvcyu", "shoulder_bag/mcualj"],
+  "alternate": null,
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int", "restaurant_diner", "hotel_suite_large", "office_cubicles_right"],
+  "category_verdict": "weak",
+  "category_note": "Two clean bags standing upright; the brown one (0.32 x 0.42 m) is usable, the grey handbag is only 0.15 m and borderline. A dropped bag is credible clutter anywhere but N = 2; both are thin and may tip."
+}

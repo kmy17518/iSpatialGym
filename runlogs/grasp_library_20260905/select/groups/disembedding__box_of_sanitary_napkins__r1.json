@@ -1,0 +1,483 @@
+{
+ "group": "disembedding__box_of_sanitary_napkins__r1",
+ "task": "disembedding",
+ "category": "box_of_sanitary_napkins",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "Tabletop task: the object rests among other objects on a table / tray and is picked from its resting pose. It must settle stably on a flat surface (it must not roll or topple). The best single grasp matters most.",
+ "candidates": [
+  {
+   "model": "cmnpuv",
+   "key": "box_of_sanitary_napkins__cmnpuv",
+   "strip": "/tmp/glib/strips/box_of_sanitary_napkins__cmnpuv.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 3,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "box yawed between pads, pads on opposite edges; 50/25 closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/11: box pushed against open finger, strongly off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across 78mm side, 50/29 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across 78mm side, 50/30 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/12: box pushed against open finger, strongly off-centre"
+    }
+   ],
+   "object_note": "row1 pad gap 75mm > 60mm width: box rotated, diagonal edge contact",
+   "bbox_mm": [
+    60,
+    78,
+    100
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "mxdefq",
+   "key": "box_of_sanitary_napkins__mxdefq",
+   "strip": "/tmp/glib/strips/box_of_sanitary_napkins__mxdefq.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 3,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "box yawed between pads, pads on opposite edges; 50/26 closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/12: box pushed against open finger, strongly off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across 78mm side, 50/29 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across 78mm side, 50/30 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/12: box pushed against open finger, strongly off-centre"
+    }
+   ],
+   "object_note": "row1 pad gap 76mm > 60mm width: box rotated, diagonal edge contact",
+   "bbox_mm": [
+    60,
+    78,
+    100
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "tkrzkb",
+   "key": "box_of_sanitary_napkins__tkrzkb",
+   "strip": "/tmp/glib/strips/box_of_sanitary_napkins__tkrzkb.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 71mm box, 50/23 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 71mm box, 50/23 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 71mm box, 50/23 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 71mm box, 50/23 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 71mm box, 50/23 asymmetric but closed"
+    }
+   ],
+   "object_note": "wide box, both pads on side faces, fingers end above bottom",
+   "bbox_mm": [
+    71,
+    90,
+    96
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "acaivd",
+   "key": "box_of_sanitary_napkins__acaivd",
+   "strip": "/tmp/glib/strips/box_of_sanitary_napkins__acaivd.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/22 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/22 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/22 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    }
+   ],
+   "object_note": "wide box, both pads on side faces, fingers end above bottom",
+   "bbox_mm": [
+    70,
+    96,
+    109
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "arqcyu",
+   "key": "box_of_sanitary_napkins__arqcyu",
+   "strip": "/tmp/glib/strips/box_of_sanitary_napkins__arqcyu.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    }
+   ],
+   "object_note": "wide box, both pads on side faces, fingers end above bottom",
+   "bbox_mm": [
+    70,
+    103,
+    109
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "humkqw",
+   "key": "box_of_sanitary_napkins__humkqw",
+   "strip": "/tmp/glib/strips/box_of_sanitary_napkins__humkqw.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    }
+   ],
+   "object_note": "wide box, both pads on side faces, fingers end above bottom",
+   "bbox_mm": [
+    70,
+    96,
+    109
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "skltgp",
+   "key": "box_of_sanitary_napkins__skltgp",
+   "strip": "/tmp/glib/strips/box_of_sanitary_napkins__skltgp.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/22 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    }
+   ],
+   "object_note": "wide box, both pads on side faces, fingers end above bottom",
+   "bbox_mm": [
+    70,
+    97,
+    109
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ykpeja",
+   "key": "box_of_sanitary_napkins__ykpeja",
+   "strip": "/tmp/glib/strips/box_of_sanitary_napkins__ykpeja.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/22 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    }
+   ],
+   "object_note": "wide box, both pads on side faces, fingers end above bottom",
+   "bbox_mm": [
+    70,
+    97,
+    109
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "zqinib",
+   "key": "box_of_sanitary_napkins__zqinib",
+   "strip": "/tmp/glib/strips/box_of_sanitary_napkins__zqinib.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/22 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/22 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across 70mm box, 50/21 asymmetric but closed"
+    }
+   ],
+   "object_note": "wide box, both pads on side faces, fingers end above bottom",
+   "bbox_mm": [
+    70,
+    103,
+    109
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

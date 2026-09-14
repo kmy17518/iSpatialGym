@@ -1,0 +1,35 @@
+{
+ "category": "detergent_bottle",
+ "model": "yufawg",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/detergent_bottle__yufawg__y0.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1238,
+   "seg_pixels": 19748,
+   "aabb_extent": [
+    0.087,
+    0.087,
+    0.279
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/detergent_bottle__yufawg__y1.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1238
+  }
+ },
+ "stable": true,
+ "visible": true
+}

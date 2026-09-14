@@ -1,0 +1,19 @@
+{
+ "task": "configuration_matching",
+ "category": "lid",
+ "model": "picclm",
+ "key": "lid__picclm",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "attachment_free",
+ "bbox": [
+  0.1645474853515625,
+  0.16454749298095703,
+  0.0151334228515625
+ ],
+ "ready": true,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

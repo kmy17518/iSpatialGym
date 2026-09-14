@@ -1,0 +1,16 @@
+{
+ "key": "fridge__dxwbae",
+ "category": "fridge",
+ "model": "dxwbae",
+ "scene": "restaurant_diner",
+ "host": "fridge_juwaoh_0",
+ "host_rank": 2,
+ "host_model": "juwaoh",
+ "swap": true,
+ "joints": [],
+ "error": "AssertionError('Object with name o_fridge__dxwbae already exists in scene!')",
+ "previous_hosts": [
+  "fridge_jtqazu_1",
+  "fridge_jtqazu_0"
+ ]
+}

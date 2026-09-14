@@ -1,0 +1,26 @@
+{
+  "category": "bookcase_shelf",
+  "task": "wa2",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "ymtnqa",
+      "V": 4,
+      "L": 3,
+      "H": 1,
+      "score": 15,
+      "valid": true,
+      "front_axis": "+z",
+      "level_axis": "y",
+      "up_axis": "+x",
+      "symmetric_180": true,
+      "thin_axis": "z",
+      "note": "Plain dark-brown plank 0.26x0.74x0.023 m, clean geometry, faint grain; strong 2.8:1 bar reads level at a glance; shelf plank hung flat is unusual."
+    }
+  ],
+  "picks": ["ymtnqa"],
+  "alternate": null,
+  "category_verdict": "weak",
+  "category_note": "One dark wooden plank 0.74 m long, 2.8:1, thin and clean; excellent level cue but a bare shelf board is an unusual wall item. Single model only, so weak."
+}

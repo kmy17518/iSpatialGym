@@ -1,0 +1,188 @@
+{
+ "group": "disembedding__pencil_holder__r3",
+ "task": "disembedding",
+ "category": "pencil_holder",
+ "round": 3,
+ "relation": null,
+ "partner": "",
+ "requirements": "Tabletop task: the object rests among other objects on a table / tray and is picked from its resting pose. It must settle stably on a flat surface (it must not roll or topple). The best single grasp matters most.",
+ "candidates": [
+  {
+   "model": "jyetcl",
+   "key": "pencil_holder__jyetcl__t",
+   "strip": "/tmp/glib/strips/pencil_holder__jyetcl__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across holder walls near top"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across holder walls near top"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across holder walls near top"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across holder walls near top"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch near top, 30 deg tilt, coverage 0.75"
+    }
+   ],
+   "object_note": "openings ~6 mm wider than reported width in all rows; no visible gap",
+   "bbox_mm": [
+    75,
+    58,
+    113
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "taixcy",
+   "key": "pencil_holder__taixcy__t",
+   "strip": "/tmp/glib/strips/pencil_holder__taixcy__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across holder walls near top"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across holder walls near top"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across holder walls near top"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch near top, 30 deg tilt"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across holder walls near top"
+    }
+   ],
+   "object_note": "openings ~6-8 mm wider than reported width in all rows; no visible gap",
+   "bbox_mm": [
+    58,
+    75,
+    113
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "jkuiqg",
+   "key": "pencil_holder__jkuiqg__t",
+   "strip": "/tmp/glib/strips/pencil_holder__jkuiqg__t.png",
+   "n_valid": 1,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "end_grasp"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pads only touch top rim edge; coverage 0.00"
+    }
+   ],
+   "object_note": "finger tips stop at rim level, body entirely below pads; would slip without AG",
+   "bbox_mm": [
+    65,
+    78,
+    73
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "mrrpay",
+   "key": "pencil_holder__mrrpay__t",
+   "strip": "/tmp/glib/strips/pencil_holder__mrrpay__t.png",
+   "n_valid": 3,
+   "n_clean": 2,
+   "n_clean_strict": 2,
+   "flags": [
+    "end_grasp"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on opposite walls near top; box pushed to one finger"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "30 deg tilt, pads at box corner/top rim, coverage 0"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wall pinch near top, slight yaw, coverage 1"
+    }
+   ],
+   "object_note": "open box; grasps pinch outer walls; 50/25 fingers = box pushed against fully-open finger, both pads touch",
+   "bbox_mm": [
+    66,
+    79,
+    73
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

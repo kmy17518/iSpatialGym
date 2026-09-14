@@ -1,0 +1,20 @@
+{
+  "key": "door__dlncrt",
+  "category": "door",
+  "model": "dlncrt",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_leaf",
+      "kind": "door",
+      "chosen": "A",
+      "pinch": "knob",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Round knob (~38 mm) at mid-height near free (+y) edge; protrudes only 18 mm, fingertip grasp only. Hinge on -y edge, swings toward viewer.",
+      "height_concern": "",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Low-quality slab door on a narrow hinge post (base link), opens only 45 deg. Knob is shallow (18 mm) but above the 12 mm threshold; marker correct."
+}

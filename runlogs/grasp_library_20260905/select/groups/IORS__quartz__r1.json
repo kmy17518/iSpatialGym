@@ -1,0 +1,304 @@
+{
+ "group": "IORS__quartz__r1",
+ "task": "IORS",
+ "category": "quartz",
+ "round": 1,
+ "relation": "inside",
+ "partner": "saucepot",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "kilkpz",
+   "key": "quartz__kilkpz",
+   "strip": "/tmp/glib/strips/quartz__kilkpz.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "crystal pinched 24/0 near top, body hangs free"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "crystal pinched 24/0, body hangs free"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch near top, tilt 30, insert end free"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch 12 mm off CoM, tilt 30, firm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch 15 mm off CoM, firm"
+    }
+   ],
+   "object_note": "translucent crystal hard to see in V2; V4 confirms both pads on body",
+   "bbox_mm": [
+    25,
+    80,
+    22
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop_insert"
+  },
+  {
+   "model": "poplsu",
+   "key": "quartz__poplsu",
+   "strip": "/tmp/glib/strips/quartz__poplsu.png",
+   "n_valid": 3,
+   "n_clean": 3,
+   "n_clean_strict": 3,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across crystal near middle, both pads on"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across crystal near middle, both pads on"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~40% along small crystal; fine"
+    }
+   ],
+   "object_note": "small crystal (~7 cm); all pinches across 26 mm body",
+   "bbox_mm": [
+    30,
+    64,
+    26
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop_insert"
+  },
+  {
+   "model": "drqtci",
+   "key": "quartz__drqtci",
+   "strip": "/tmp/glib/strips/quartz__drqtci.png",
+   "n_valid": 3,
+   "n_clean": 3,
+   "n_clean_strict": 3,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across crystal body, both pads on"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch across crystal body, both pads on"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~35% along crystal; not an end grasp"
+    }
+   ],
+   "object_note": "small crystal (~7 cm); pinches across 26 mm body",
+   "bbox_mm": [
+    30,
+    69,
+    26
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop_insert"
+  },
+  {
+   "model": "klgses",
+   "key": "quartz__klgses",
+   "strip": "/tmp/glib/strips/quartz__klgses.png",
+   "n_valid": 4,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "end_grasp"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pads on pointed tip; ~12 cm crystal hangs to one side"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pinch within ~15% of tip end; long body cantilevered"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pinch at very end, crystal dangles diagonally; coverage 0.75"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "pinch near one end; long body extends to other side"
+    }
+   ],
+   "object_note": "long heavy crystal (~12 cm); every valid grasp is at one end, CoM offset 25-36 mm",
+   "bbox_mm": [
+    30,
+    127,
+    26
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop_insert"
+  },
+  {
+   "model": "vfuilh",
+   "key": "quartz__vfuilh",
+   "strip": "/tmp/glib/strips/quartz__vfuilh.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch across crystal body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch across crystal body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "centred side pinch across crystal body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~45% along crystal; fine"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch ~35-38% along crystal; edge of middle third"
+    }
+   ],
+   "object_note": "~10 cm crystal; all pinches on body, none at ends",
+   "bbox_mm": [
+    34,
+    118,
+    32
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop_insert"
+  },
+  {
+   "model": "tgqodl",
+   "key": "quartz__tgqodl",
+   "strip": "/tmp/glib/strips/quartz__tgqodl.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 3,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "finger stuck open at 50; 13 mm spike cannot span 80 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "fingers pinch central spike group (32 mm) from above"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "finger stuck open at 50; pads on spike tips 80 mm apart"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on central spikes, somewhat off-centre (36 mm)"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wide pinch across cluster body (76 mm), finger at open limit"
+    }
+   ],
+   "object_note": "large quartz cluster; fingers descend between spikes, contacts hard to verify; V4 saturated",
+   "bbox_mm": [
+    119,
+    109,
+    134
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop_insert"
+  }
+ ],
+ "excluded": []
+}

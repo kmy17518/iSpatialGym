@@ -1,0 +1,35 @@
+{
+ "category": "potato",
+ "model": "bpwohr",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/potato__bpwohr__y0.png",
+   "drift_m": 0.0024,
+   "tilt_deg": 4.8,
+   "on_tray": true,
+   "settled_z": 0.0286,
+   "seg_pixels": 3280,
+   "aabb_extent": [
+    0.081,
+    0.068,
+    0.065
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/potato__bpwohr__y1.png",
+   "drift_m": 0.0015,
+   "tilt_deg": 3.0,
+   "on_tray": true,
+   "settled_z": 0.0286
+  }
+ },
+ "stable": true,
+ "visible": true
+}

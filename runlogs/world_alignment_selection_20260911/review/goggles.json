@@ -1,0 +1,26 @@
+{
+ "category": "goggles",
+ "task": "wa0",
+ "n_models": 1,
+ "n_opened": 1,
+ "models": [
+  {
+   "model": "wszdxi",
+   "V": 4,
+   "O": 3,
+   "F": 1,
+   "score": 15,
+   "valid": true,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Ski goggles standing on the frame, lens toward +x, strap loop flat behind at -x; 0.11 m tall, somewhat precarious."
+  }
+ ],
+ "picks": [
+  "wszdxi"
+ ],
+ "alternate": null,
+ "category_verdict": "weak",
+ "category_note": "Single ski goggles 0.22x0.23x0.11 m standing upright on the frame with the strap looped behind (-x); lens faces +x. Readable yaw but tall-ish and unusual on a table; one model only."
+}

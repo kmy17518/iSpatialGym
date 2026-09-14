@@ -1,0 +1,670 @@
+{
+ "group": "object_scaling__wineglass__r1",
+ "task": "object_scaling",
+ "category": "wineglass",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. Rotationally symmetric bodies are preferred for this task.",
+ "candidates": [
+  {
+   "model": "bovcqx",
+   "key": "wineglass__bovcqx",
+   "strip": "/tmp/glib/strips/wineglass__bovcqx.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at bowl base, fingers 45/0"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at bowl base, fingers 46/0"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at bowl base, fingers 45/0"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at bowl base, fingers 46/0"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at bowl base, fingers 47/0"
+    }
+   ],
+   "object_note": "asymmetric closing (45-47/0) on every grasp; borderline off-centre but both pads reach the bowl",
+   "bbox_mm": [
+    52,
+    52,
+    165
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "yfzibn",
+   "key": "wineglass__yfzibn",
+   "strip": "/tmp/glib/strips/wineglass__yfzibn.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "predicted width 17 (stem) but fingers closed 41/0, appears to hold the bowl"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch below bowl, fingers 16/0"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch below bowl, fingers 18/0"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch below bowl, fingers 21/0"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch below bowl, fingers 21/0"
+    }
+   ],
+   "object_note": "small snifter-style glass; short stem pinches near CoM",
+   "bbox_mm": [
+    56,
+    56,
+    138
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "oadvet",
+   "key": "wineglass__oadvet",
+   "strip": "/tmp/glib/strips/wineglass__oadvet.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 1,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "bowl grasp, fingers 50/2, one pad at open limit"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "bowl grasp, fingers 50/3, one pad at open limit"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "bowl grasp, fingers 50/6, one pad at open limit"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "bowl base pinch, fingers 44/0"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "bowl grasp, fingers 50/5, one pad at open limit"
+    }
+   ],
+   "object_note": "small glass; bowl grasps push it against the stationary finger",
+   "bbox_mm": [
+    63,
+    63,
+    224
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "vxmzmq",
+   "key": "wineglass__vxmzmq",
+   "strip": "/tmp/glib/strips/wineglass__vxmzmq.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "bowl grasp, fingers 50/12, one pad at open limit"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "bowl grasp, fingers 50/14, one pad at open limit"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "bowl grasp, fingers 50/12, one pad at open limit"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "bowl grasp, fingers 50/12, one pad at open limit"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "bowl grasp, fingers 50/10, one pad at open limit"
+    }
+   ],
+   "object_note": "all bowl grasps push the glass against the stationary finger (same pattern as akusda/oadvet)",
+   "bbox_mm": [
+    64,
+    64,
+    154
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "akusda",
+   "key": "wineglass__akusda",
+   "strip": "/tmp/glib/strips/wineglass__akusda.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "bowl grasp, fingers 50/14, one pad at open limit"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "bowl grasp, fingers 48/14, one pad near open limit"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "bowl grasp, fingers 50/14, one pad at open limit"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "bowl grasp, fingers 50/15, one pad at open limit"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "bowl grasp, fingers 50/16, one pad at open limit"
+    }
+   ],
+   "object_note": "all bowl grasps push the glass against the stationary finger",
+   "bbox_mm": [
+    64,
+    64,
+    154
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ovoceo",
+   "key": "wineglass__ovoceo",
+   "strip": "/tmp/glib/strips/wineglass__ovoceo.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "predicted width 88 (bowl) but fingers closed 10/0 on stem"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "predicted width 88 (bowl) but fingers closed 7/0 on stem"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "predicted width 88 (bowl) but fingers closed 12/0 on stem"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch, fingers 8/0"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch, fingers 13/0, coverage 0.50"
+    }
+   ],
+   "object_note": "glass held horizontal (tilt 92-97) by the stem in every candidate; bowl hangs to one side, CoM offset 22-34 mm",
+   "bbox_mm": [
+    80,
+    80,
+    212
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "hxccge",
+   "key": "wineglass__hxccge",
+   "strip": "/tmp/glib/strips/wineglass__hxccge.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat pinch on foot plate edge, fingers 6/0, width 3"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat pinch on foot plate, fingers 5/0; predicted width 77"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat pinch on foot plate, fingers 6/0; predicted width 73"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat pinch on foot plate, fingers 5/0; predicted width 75"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "flat pinch on foot plate, fingers 5/0; predicted width 75"
+    }
+   ],
+   "object_note": "all grasps hold the foot plate face-to-face; predicted widths (73-77) do not match 5 mm closing",
+   "bbox_mm": [
+    84,
+    84,
+    159
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "aakcyj",
+   "key": "wineglass__aakcyj",
+   "strip": "/tmp/glib/strips/wineglass__aakcyj.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch, fingers 17/0"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch below bowl, fingers 15/0"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch, fingers 15/0"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch, fingers 16/0"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "predicted width 74 (bowl) but fingers closed 16/0 on stem"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    86,
+    86,
+    162
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "euzudc",
+   "key": "wineglass__euzudc",
+   "strip": "/tmp/glib/strips/wineglass__euzudc.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch below bowl, fingers 15/0"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "predicted width 88 (bowl) but fingers closed 14/0 on stem"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch, fingers 12/0"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch, fingers 14/0"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch, fingers 15/0"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    97,
+    97,
+    206
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "exasdr",
+   "key": "wineglass__exasdr",
+   "strip": "/tmp/glib/strips/wineglass__exasdr.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch near foot, fingers 13/0"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch near foot, fingers 14/0"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch near foot, fingers 12/0"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch, fingers 13/0"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch, fingers 13/0"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    103,
+    103,
+    254
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ezsdil",
+   "key": "wineglass__ezsdil",
+   "strip": "/tmp/glib/strips/wineglass__ezsdil.png",
+   "n_valid": 5,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "fragile"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "fragile"
+     ],
+     "note": "pinches goblet rim lip, width 5, CoM offset 70"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "fragile"
+     ],
+     "note": "pinches goblet rim lip, width 4"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "fragile"
+     ],
+     "note": "pinches goblet rim lip, width 4"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "fragile"
+     ],
+     "note": "pinches goblet rim lip, width 5"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "fragile"
+     ],
+     "note": "pinches goblet rim lip, width 4"
+    }
+   ],
+   "object_note": "every candidate pinches the thin rim; stem/base grasps would be available",
+   "bbox_mm": [
+    113,
+    113,
+    148
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "kxovsj",
+   "key": "wineglass__kxovsj",
+   "strip": "/tmp/glib/strips/wineglass__kxovsj.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch near foot, fingers 10/0"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch near foot, fingers 10/0"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch near foot, fingers 10/0"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "predicted width 87 (bowl) but fingers closed 9/0 on stem"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "stem pinch near foot, fingers 10/0"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    117,
+    117,
+    147
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

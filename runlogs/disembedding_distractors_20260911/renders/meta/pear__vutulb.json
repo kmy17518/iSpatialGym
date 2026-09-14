@@ -1,0 +1,35 @@
+{
+ "category": "pear",
+ "model": "vutulb",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/pear__vutulb__y0.png",
+   "drift_m": 0.0006,
+   "tilt_deg": 1.1,
+   "on_tray": true,
+   "settled_z": 0.0338,
+   "seg_pixels": 4191,
+   "aabb_extent": [
+    0.125,
+    0.067,
+    0.075
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/pear__vutulb__y1.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.0338
+  }
+ },
+ "stable": true,
+ "visible": true
+}

@@ -237,7 +237,7 @@ class ArticulationSampler(TaskSampler):
                 yaw = math.atan2(float(-outward[1]), float(-outward[0]))
                 if not self.kit.trav_free(base_xy):
                     continue
-                q_base = self.kit.q_at_base_pose(self.kit.q_config(arms="untucked"), float(base_xy[0]), float(base_xy[1]), yaw)
+                q_base = self.kit.q_at_base_pose(self.kit.q_config(arms=self.init_arms()), float(base_xy[0]), float(base_xy[1]), yaw)
                 if not bool(self.kit.collision_free(q_base, margin=0.01)[0]):
                     continue
                 views = self.kit.solve_view(q_base, centre, translates=th.tensor(self.gen("view_translates", [0.0, 0.25, 0.5, 0.75])), top_k=12)

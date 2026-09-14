@@ -1,0 +1,16 @@
+{
+  "category": "bottle_of_shampoo",
+  "n_models": 4,
+  "pages_opened": [
+    "grids/same/bottle_of_shampoo__p1.png"
+  ],
+  "groups": [
+    {
+      "members": ["stjjjm", "lvvkhx"],
+      "reason": "Same grey 6x6x17 cm cylinder bottle and cap; only faint label accent colour differs, and the label faces away at most yaws",
+      "confidence": "high"
+    }
+  ],
+  "unusable": [],
+  "notes": "stjjjm/lvvkhx share geometry cluster c2 and identical grey bottle look; only faint label accent colour differs and the label faces away at three of four yaws. dvrzmy/hlkpwd share tube geometry (cluster c1) but differ clearly in body colour (teal vs lime) and cap colour at every yaw."
+}

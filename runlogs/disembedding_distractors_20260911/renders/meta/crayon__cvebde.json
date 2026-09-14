@@ -1,0 +1,35 @@
+{
+ "category": "crayon",
+ "model": "cvebde",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/crayon__cvebde__y0.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 1.3,
+   "on_tray": true,
+   "settled_z": 0.005,
+   "seg_pixels": 531,
+   "aabb_extent": [
+    0.109,
+    0.01,
+    0.01
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/crayon__cvebde__y1.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 1.4,
+   "on_tray": true,
+   "settled_z": 0.0051
+  }
+ },
+ "stable": true,
+ "visible": true
+}

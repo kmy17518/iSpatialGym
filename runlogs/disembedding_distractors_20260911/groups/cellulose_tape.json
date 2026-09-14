@@ -1,0 +1,10 @@
+{
+  "category": "cellulose_tape",
+  "n_models": 3,
+  "pages_opened": [
+    "grids/same/cellulose_tape__p1.png"
+  ],
+  "groups": [],
+  "unusable": [],
+  "notes": "No groups: kavsnx (6 cm, white roll with bright green core), gchdhk (thick dark-grey roll, brown core) and sklkyc (thin light-grey ring, brown core) are separable at every yaw. All three are tiny (1.1-2.2k px); gchdhk vs sklkyc is the closest pair, differing by side-wall darkness and thickness only."
+}

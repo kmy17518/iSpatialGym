@@ -1,0 +1,6 @@
+{"key": "bottom_cabinet__songes", "joint": "j_bottomdrawer", "feasible": false,
+ "proposal": {"face": "outer", "a": 0.5, "b": 0.83, "pinch": "vertical", "approach": "front", "depth_mm": 5,
+              "expected_motion": "pull"},
+ "alternative": null,
+ "note": "Thin 6 cm bar pull top-centre of recessed panel, ~6 mm proud, within frame plane; rail directly above blocks upper finger. Likely slips.",
+ "confidence": "medium"}

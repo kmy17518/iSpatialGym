@@ -1,0 +1,112 @@
+{
+ "scene": "house_double_floor_upper",
+ "table": "bottom_cabinet_no_top_ncgmqr_0",
+ "category": "bottom_cabinet_no_top",
+ "model": "ncgmqr",
+ "rooms": [
+  "bedroom_2"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-0",
+ "inventory": {
+  "top_z": 0.697,
+  "bbox_x": 0.624,
+  "bbox_y": 0.417,
+  "bbox_z": 0.696,
+  "verdict": "keep"
+ },
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 21:38:54",
+ "precheck": {
+  "aabb": [
+   [
+    3.655,
+    -4.698,
+    0.002
+   ],
+   [
+    4.081,
+    -4.074,
+    0.697
+   ]
+  ],
+  "support": {
+   "name": "bottom_cabinet_no_top_ncgmqr_0",
+   "z": 0.6718133687973022,
+   "yaw": 1.5707961320877075,
+   "local_bounds": [
+    -4.087887287139893,
+    -4.087887287139893,
+    -3.885315179824829,
+    -3.8653151988983154
+   ],
+   "n_free_cells": 2,
+   "occupants": [
+    "desk_uqcmzf_0"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     3.875,
+     -4.088
+    ],
+    "length": 0.02
+   },
+   {
+    "name": "-u",
+    "mid": [
+     3.875,
+     -4.088
+    ],
+    "length": 0.02
+   },
+   {
+    "name": "+v",
+    "mid": [
+     3.865,
+     -4.088
+    ],
+    "length": 0.0
+   },
+   {
+    "name": "-v",
+    "mid": [
+     3.885,
+     -4.088
+    ],
+    "length": 0.0
+   }
+  ],
+  "stance": null,
+  "stance_error": "too little free top surface",
+  "precheck_s": 0.4
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/house_double_floor_upper/house_double_floor_upper__bottom_cabinet_no_top_ncgmqr_0__inter_object_relation_satisfaction-0",
+ "setup_s": 2.0,
+ "reject_reason": "no_support",
+ "error": "[no_support] bottom_cabinet_no_top_ncgmqr_0: [support] bottom_cabinet_no_top_ncgmqr_0 has too little free top surface",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 2.0,
+   "run_s": null
+  }
+ ],
+ "job_s": 3.1,
+ "finished": "2026-09-11 21:38:58"
+}

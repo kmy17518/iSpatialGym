@@ -1,0 +1,6 @@
+{
+ "category": "chalk",
+ "model": "fdmgww",
+ "status": "spawn_failed",
+ "error": "asset missing on disk: /home/minyeongk/Desktop/projects/ispatialgym/Behavior-1K/datasets/behavior-1k-assets/objects/chalk/fdmgww/usd/fdmgww.encrypted.usd"
+}

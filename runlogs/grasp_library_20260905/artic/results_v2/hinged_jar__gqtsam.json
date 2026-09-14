@@ -1,0 +1,57 @@
+{
+ "key": "hinged_jar__gqtsam",
+ "category": "hinged_jar",
+ "model": "gqtsam",
+ "aabb_extent": [
+  0.15477973222732544,
+  0.13296082615852356,
+  0.20423755049705505
+ ],
+ "support": "table",
+ "joints": [
+  {
+   "joint": "j_cap",
+   "kind": "flap",
+   "grasp_source": "review:F",
+   "stance": {
+    "base": [
+     0.556,
+     0.203,
+     0.005
+    ],
+    "translate": 0.5,
+    "sign": -1.0
+   },
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "steps": [
+    "stance ok",
+    "sign +1: planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 13.6 mm / 0.022 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)",
+    "stance ok",
+    "sign -1: planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 14.0 mm / 0.024 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)"
+   ],
+   "error": "planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 14.0 mm / 0.024 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)",
+   "contact_world": [
+    1.207,
+    0.005,
+    0.938
+   ],
+   "handle_height": 0.938,
+   "diag": {
+    "eef_pos_err_mm": 721.4,
+    "eef_ang_err_deg": 111.6,
+    "finger_q_mm": [
+     50,
+     50
+    ],
+    "gripper_contacts": [],
+    "contact_links": {}
+   }
+  }
+ ],
+ "error": null,
+ "time_s": 15.8
+}

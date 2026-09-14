@@ -1,0 +1,22 @@
+{
+  "group": "IORS__hard_candy__r1", "task": "IORS", "category": "hard_candy", "round": 1, "relation": "inside",
+  "n_candidates": 5, "n_opened": 5,
+  "candidates": [
+    {"model": "ojznyf", "key": "hard_candy__ojznyf", "G": 4, "T": 3, "V": 4, "R": 1, "score": 20,
+     "note": "Five fingertip pinches on the 12 mm body, body hangs below tips; rows 4-5 at pad edge (CoM 23 mm). Blue-purple faceted wrapper, recognisable."},
+    {"model": "vwegtt", "key": "hard_candy__vwegtt", "G": 2, "T": 2, "V": 4, "R": 1, "score": 15,
+     "note": "Rows 1-3 pinch the wrapper twists lengthwise with one finger stuck at 50; only rows 4-5 are clean cross pinches. White speckled candy, blue twists."},
+    {"model": "vyxhmv", "key": "hard_candy__vyxhmv", "G": 3, "T": 3, "V": 4, "R": 0, "score": 17,
+     "note": "Rows 1-4 marginal fingertip pinches (width 9 mm); row 5 diagonal 41/0 pinch on the twist. Magenta low-poly wrapper, recognisable."},
+    {"model": "qptjgv", "key": "hard_candy__qptjgv", "G": 4, "T": 3, "V": 4, "R": 1, "score": 20,
+     "note": "Five pad-edge pinches, all width inf but both tips touch the body; body below fingers. Pink translucent wrapper showing sprinkles, clean."},
+    {"model": "yuatcg", "key": "hard_candy__yuatcg", "G": 5, "T": 3, "V": 4, "R": 1, "score": 22,
+     "note": "Rows 1-2 are real body pinches (width 16/15 mm, antipodal 0.70/0.59); rows 3-5 fingertip. Red twists, multicolour faceted body, clean."}
+  ],
+  "selected": [
+    {"model": "yuatcg", "key": "hard_candy__yuatcg", "rank": 1, "reason": "Only candy with proper centred body pinches (16 mm, high antipodal) on top; body hangs below fingers for jar insertion; clean colourful asset."},
+    {"model": "ojznyf", "key": "hard_candy__ojznyf", "rank": 2, "reason": "Tied with qptjgv at 20; all five rows hold the body at the tips, and its blue-purple wrapper differs most from the red #1."}
+  ],
+  "alternate": {"model": "qptjgv", "key": "hard_candy__qptjgv"},
+  "short": false, "warnings": [], "confidence": "medium"
+}

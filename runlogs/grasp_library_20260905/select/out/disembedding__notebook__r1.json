@@ -1,0 +1,33 @@
+{
+  "group": "disembedding__notebook__r1",
+  "task": "disembedding",
+  "category": "notebook",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 6,
+  "n_opened": 6,
+  "candidates": [
+    {"model": "zkmmnf", "key": "notebook__zkmmnf", "G": 2, "T": 2, "V": 3, "R": 0, "score": 12,
+     "note": "Thin 7 mm dark-grey spiral notebook squeezed at side edges with 90 mm gap (one finger idle), pivots in tilted rows; flat grey, marginal grasp."},
+    {"model": "umxsmd", "key": "notebook__umxsmd", "G": 5, "T": 3, "V": 5, "R": 1, "score": 24,
+     "note": "White sketchpad, crisp purple figure drawing, black spiral; five width squeezes 50/20 on 14 mm edges, rows 1/4 level, rows 3/5 pivot ~45 deg."},
+    {"model": "ksxknp", "key": "notebook__ksxknp", "G": 5, "T": 3, "V": 4, "R": 1, "score": 22,
+     "note": "Ochre-cover spiral notepad, same 68x110 mm shape as umxsmd; five width squeezes 50/21 on 14 mm edges, rows 1-2 level, rows 3-5 pivot; plain colour."},
+    {"model": "dlhxxl", "key": "notebook__dlhxxl", "G": 3, "T": 2, "V": 4, "R": 1, "score": 17,
+     "note": "Thick black elastic-band notebook; width squeezes at 87 mm gap near open limit, rows 1-3 antipodal 0.08, pivoted ~60 deg, row 4 level; dark cover."},
+    {"model": "zkpswz", "key": "notebook__zkpswz", "G": 3, "T": 2, "V": 4, "R": 1, "score": 17,
+     "note": "Same thick black notebook as dlhxxl; width squeezes at 87 mm gap, rows 1/2/5 antipodal 0.08 with row 1 pivoted ~60 deg, row 3 level."},
+    {"model": "yibctu", "key": "notebook__yibctu", "G": 5, "T": 3, "V": 4, "R": 1, "score": 22,
+     "note": "Long 292 mm kraft spiral notebook standing on edge; five clean top pinches across 13 mm thickness, antipodal 1.0, base free; crisp print, elongated proportions."}
+  ],
+  "selected": [
+    {"model": "umxsmd", "key": "notebook__umxsmd", "rank": 1,
+     "reason": "Top score: best-looking asset (crisp drawing, spiral), level top-ranked width pinch with bottom free so the pad lies flat when placed; 14 mm edge contact is the weak point."},
+    {"model": "yibctu", "key": "notebook__yibctu", "rank": 2,
+     "reason": "Ties ksxknp but looks different from #1 (long kraft notebook standing on edge) and has the only true antipodal thickness pinches (1.0), base free; borderline 13 mm width."}
+  ],
+  "alternate": {"model": "ksxknp", "key": "notebook__ksxknp"},
+  "short": false,
+  "warnings": ["All lying notebooks are held by width squeezes with one finger idle at the open limit (2-3 mm nominal slack); dlhxxl/zkpswz top rows pivot ~60 deg with antipodal 0.08; zkmmnf 90 mm span on a 7 mm pad is marginal."],
+  "confidence": "medium"
+}

@@ -1,0 +1,35 @@
+{
+ "category": "bandage",
+ "model": "riftxh",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bandage__riftxh__y0.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0006,
+   "seg_pixels": 766,
+   "aabb_extent": [
+    0.077,
+    0.021,
+    0.001
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bandage__riftxh__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0006
+  }
+ },
+ "stable": true,
+ "visible": true
+}

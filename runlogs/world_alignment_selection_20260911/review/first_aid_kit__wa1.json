@@ -1,0 +1,26 @@
+{
+ "category": "first_aid_kit",
+ "task": "wa1",
+ "n_models": 1,
+ "n_opened": 1,
+ "models": [
+  {
+   "model": "flctdz",
+   "V": 4,
+   "U": 3,
+   "H": 1,
+   "score": 15,
+   "valid": true,
+   "front_axis": "+z",
+   "up_axis": "-x",
+   "thin_axis": "z",
+   "note": "Grey plastic box 0.20x0.16x0.074 m, FIRST AID label on lid (+z), text top toward -x; wall bracket flange on -x side; small for the wall."
+  }
+ ],
+ "picks": [
+  "flctdz"
+ ],
+ "alternate": null,
+ "category_verdict": "weak",
+ "category_note": "One clean wall-mount first aid box with big readable label; upright is obvious, but only 0.20 m across (borderline size) and a single model."
+}

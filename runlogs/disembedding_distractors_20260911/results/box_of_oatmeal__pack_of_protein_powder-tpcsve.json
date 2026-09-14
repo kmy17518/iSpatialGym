@@ -1,0 +1,146 @@
+{
+ "target_category": "box_of_oatmeal",
+ "target_model": "jtqeef",
+ "target_key": "box_of_oatmeal__jtqeef__t",
+ "category": "pack_of_protein_powder",
+ "model": "tpcsve",
+ "kind": "diff",
+ "tier": 1,
+ "started": "2026-09-12 18:52:32",
+ "template": {
+  "support": {
+   "name": "breakfast_table_rhjoby_0",
+   "z": 0.8126290440559387,
+   "yaw": 1.5682475566864014,
+   "local_bounds": [
+    2.9359381198883057,
+    4.096137523651123,
+    -8.733060836791992,
+    -5.830265998840332
+   ],
+   "n_free_cells": 8463,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-u",
+   "edge_mid": [
+    7.289123058319092,
+    2.9173693656921387
+   ],
+   "inward": [
+    0.002548767253756523,
+    0.9999967813491821
+   ],
+   "tangent": [
+    -0.9999967813491821,
+    0.002548767253756523
+   ],
+   "base_pose2d": [
+    7.488208293914795,
+    2.466860294342041,
+    1.5682475568566665
+   ],
+   "edge_depth": 0.45000019669532776,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.13419545101137811
+   }
+  },
+  "place_stance": {
+   "edge": "-u",
+   "edge_mid": [
+    7.289123058319092,
+    2.9173693656921387
+   ],
+   "inward": [
+    0.002548767253756523,
+    0.9999967813491821
+   ],
+   "tangent": [
+    -0.9999967813491821,
+    0.002548767253756523
+   ],
+   "base_pose2d": [
+    8.187344551086426,
+    2.465078353881836,
+    1.5682475568566665
+   ],
+   "edge_depth": 0.45000019669532776
+  },
+  "view_arms": "untucked",
+  "yaw_adjust_deg": 0.0,
+  "dest_lateral_m": -0.6991382382827578,
+  "dest_side": "right",
+  "source_lateral_offset": 0.0,
+  "n_reachable_cells": 8,
+  "n_grasp_cells": 8,
+  "n_place_combos": 7,
+  "distractors": {
+   "same_category": false,
+   "pool": "other_category",
+   "requested_pool": "other_category",
+   "fallback": null,
+   "models": [
+    "box_of_baking_mix-lgusnr"
+   ],
+   "requested": 1,
+   "pool_size": 1,
+   "pool_categories": [
+    "box_of_baking_mix"
+   ],
+   "lookalikes_excluded": [],
+   "footprint_fraction": 0.24
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 33.43,
+   "prepare_template_s": 0.14
+  },
+  "setup_s": 33.6
+ },
+ "footprint_fraction_with_target": 0.341,
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {
+  "distractor_placement": 3
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_dis_distractors/box_of_oatmeal-jtqeef__pack_of_protein_powder-tpcsve/instances/disembedding-0__box_of_oatmeal-jtqeef__pack_of_protein_powder-tpcsve__0000.summary.json",
+   "wall_time_s": 4.8,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    7.488208293914795,
+    2.466860294342041,
+    1.5682475568566665
+   ],
+   "trunk": [
+    0.0,
+    -0.8999999761581421
+   ],
+   "occluded_variant": false,
+   "grasp": {
+    "key": "box_of_oatmeal__jtqeef__t",
+    "name": "grasp_4",
+    "translate": 0.5,
+    "place_translate": 0.5,
+    "yaw": 1.4588845903469103
+   },
+   "dest_pixels": 11448,
+   "source_pixels": 73684,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_dis_distractors/box_of_oatmeal-jtqeef__pack_of_protein_powder-tpcsve",
+ "job_s": 9.0,
+ "finished": "2026-09-12 18:52:41",
+ "occluded_variant": false,
+ "occlusion_ratio": null
+}

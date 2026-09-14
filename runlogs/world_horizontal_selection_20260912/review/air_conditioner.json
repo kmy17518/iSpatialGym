@@ -1,0 +1,26 @@
+{
+  "category": "air_conditioner",
+  "task": "wa2",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "pekain",
+      "V": 4,
+      "L": 3,
+      "H": 0,
+      "score": 14,
+      "valid": false,
+      "front_axis": "+x",
+      "level_axis": "y",
+      "up_axis": "+z",
+      "symmetric_180": false,
+      "thin_axis": "z",
+      "note": "Grey split-AC indoor unit 0.88x0.21 m but 0.30 m deep, D-profile; clear horizontal vent slot yet boxy, not hangable flat."
+    }
+  ],
+  "picks": [],
+  "alternate": null,
+  "category_verdict": "drop",
+  "category_note": "Single model: a deep (0.30 m) wall-mounted split AC indoor unit. Strong horizontal from the long vent slot, but the body is boxy and cannot hang flat against a wall through a pivot; drop."
+}

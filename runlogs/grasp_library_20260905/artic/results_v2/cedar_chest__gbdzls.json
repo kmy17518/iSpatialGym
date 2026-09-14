@@ -1,0 +1,28 @@
+{
+ "key": "cedar_chest__gbdzls",
+ "category": "cedar_chest",
+ "model": "gbdzls",
+ "aabb_extent": [
+  0.40189844369888306,
+  0.19576171040534973,
+  0.14490890502929688
+ ],
+ "support": "table",
+ "joints": [
+  {
+   "joint": "j_up",
+   "kind": "flap",
+   "grasp_source": "review: No handle; flat trunk lid ~48 mm thick, skirt flush with the body, no lip to get a finger under; lock hasp at front centre",
+   "stance": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "time_s": 1.7
+}

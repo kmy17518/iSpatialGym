@@ -1,0 +1,12 @@
+{
+ "assignment": "sel_19",
+ "groups": [
+  "/tmp/glib/select/groups/IORS__quartz__r1.json",
+  "/tmp/glib/select/groups/IORS__teacup__r2.json",
+  "/tmp/glib/select/groups/configuration_matching__cap__r1.json",
+  "/tmp/glib/select/groups/disembedding__bottle_of_milk__r3.json",
+  "/tmp/glib/select/groups/disembedding__notebook__r1.json",
+  "/tmp/glib/select/groups/IORS__brussels_sprouts__r3.json"
+ ],
+ "n_strips": 34
+}

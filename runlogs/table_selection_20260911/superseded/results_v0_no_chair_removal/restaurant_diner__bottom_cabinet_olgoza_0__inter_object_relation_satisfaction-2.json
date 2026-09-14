@@ -1,0 +1,225 @@
+{
+ "scene": "restaurant_diner",
+ "table": "bottom_cabinet_olgoza_0",
+ "category": "bottom_cabinet",
+ "model": "olgoza",
+ "rooms": [
+  "bar_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-2",
+ "inventory": {
+  "top_z": 0.853,
+  "bbox_x": 0.535,
+  "bbox_y": 2.107,
+  "bbox_z": 0.853,
+  "verdict": "keep"
+ },
+ "n_requested": 1,
+ "max_attempts": 8,
+ "started": "2026-09-11 20:22:03",
+ "precheck": {
+  "aabb": [
+   [
+    -4.79,
+    -3.065,
+    -0.001
+   ],
+   [
+    -4.258,
+    -0.958,
+    0.852
+   ]
+  ],
+  "support": {
+   "name": "bottom_cabinet_olgoza_0",
+   "z": 0.8417288661003113,
+   "yaw": 3.478251164779067e-05,
+   "local_bounds": [
+    -4.779668807983398,
+    -4.379596710205078,
+    -3.0547032356262207,
+    -0.9746893644332886
+   ],
+   "n_free_cells": 2205,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -4.38,
+     -2.015
+    ],
+    "length": 2.08
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -4.78,
+     -2.015
+    ],
+    "length": 2.08
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -4.58,
+     -0.975
+    ],
+    "length": 0.4
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -4.58,
+     -3.055
+    ],
+    "length": 0.4
+   }
+  ],
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    -4.379526615142822,
+    -2.0148487091064453
+   ],
+   "inward": [
+    -1.0,
+    -3.478251164779067e-05
+   ],
+   "tangent": [
+    3.478251164779067e-05,
+    -1.0
+   ],
+   "base_pose2d": [
+    -3.8084099292755127,
+    -2.01482892036438,
+    -3.1415578710781595
+   ],
+   "edge_depth": 0.5711166858673096,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.20000001788139343,
+    "axis_angle": 0.006108405982625406
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 3.8
+ },
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {},
+ "template_meta": {
+  "support": {
+   "name": "bottom_cabinet_olgoza_0",
+   "z": 0.841728687286377,
+   "yaw": 3.398719854885712e-05,
+   "local_bounds": [
+    -4.779666423797607,
+    -4.379595756530762,
+    -3.0547072887420654,
+    -0.9746936559677124
+   ],
+   "n_free_cells": 2205,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    -4.3795270919799805,
+    -2.0148491859436035
+   ],
+   "inward": [
+    -1.0,
+    -3.398719854885712e-05
+   ],
+   "tangent": [
+    3.398719854885712e-05,
+    -1.0
+   ],
+   "base_pose2d": [
+    -3.8084099292755127,
+    -2.0148298740386963,
+    -3.1415586663912576
+   ],
+   "edge_depth": 0.5711171627044678,
+   "view": {
+    "translate": 0.5,
+    "tilt": -0.44999998807907104,
+    "axis_angle": 0.012448858494633544
+   }
+  },
+  "view_arms": "untucked",
+  "n_reachable_cells": 7,
+  "n_grasp_cells": 7,
+  "n_grasp_combos": 75,
+  "n_region_cells": 490,
+  "n_visible_cells": 490,
+  "stand_off": 0.45,
+  "edge": null,
+  "load_room_instances": [
+   "bar_0",
+   "corridor_0",
+   "dining_room_0",
+   "kitchen_0"
+  ],
+  "task_rooms": [
+   "bar_0"
+  ],
+  "rejections": {},
+  "n_written": 1,
+  "timings": {
+   "bind_spawn_s": 53.03,
+   "prepare_template_s": 1.14,
+   "save_template_s": 0.06
+  }
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_table_sel/restaurant_diner/restaurant_diner__bottom_cabinet_olgoza_0__inter_object_relation_satisfaction-2/instances/inter_object_relation_satisfaction-2__restaurant_diner__bottom_cabinet_olgoza_0__inter_object_relation_satisfaction-2__0000.summary.json",
+   "wall_time_s": 6.4,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    -3.8084099292755127,
+    -2.0148298740386963,
+    -3.1415586663912576
+   ],
+   "trunk": [
+    0.49999997408493785,
+    -0.44999998807907104
+   ],
+   "grasp": {
+    "key": "lemon__ovbcff__i",
+    "name": "grasp_1",
+    "translate": 0.5,
+    "yaw": -3.0146138262658826
+   },
+   "view": {
+    "translate": 0.5,
+    "tilt": -0.44999998807907104
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_table_sel/restaurant_diner/restaurant_diner__bottom_cabinet_olgoza_0__inter_object_relation_satisfaction-2",
+ "bound_table": "bottom_cabinet_olgoza_0",
+ "setup_s": 54.2,
+ "run_s": 6.4,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "ok",
+   "n_written": 1,
+   "rejections": {},
+   "reject_reason": null,
+   "setup_s": 54.2,
+   "run_s": 6.4
+  }
+ ],
+ "job_s": 62.6,
+ "finished": "2026-09-11 20:23:06"
+}

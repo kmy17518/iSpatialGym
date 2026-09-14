@@ -1,0 +1,237 @@
+{
+ "scene": "house_single_floor",
+ "table": "coffee_table_qtwqqb_0",
+ "category": "coffee_table",
+ "model": "qtwqqb",
+ "rooms": [
+  "living_room_1"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-2",
+ "inventory": {
+  "top_z": 0.478,
+  "bbox_x": 0.874,
+  "bbox_y": 1.739,
+  "bbox_z": 0.469,
+  "verdict": "low"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 00:18:02",
+ "precheck": {
+  "aabb": [
+   [
+    0.868,
+    3.364,
+    0.0
+   ],
+   [
+    1.765,
+    5.123,
+    0.488
+   ]
+  ],
+  "support": {
+   "name": "coffee_table_qtwqqb_0",
+   "z": 0.4876936376094818,
+   "yaw": -3.1390480995178223,
+   "local_bounds": [
+    -1.748988389968872,
+    -0.9086858034133911,
+    -5.089758396148682,
+    -3.3911378383636475
+   ],
+   "n_free_cells": 3547,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     0.898,
+     4.243
+    ],
+    "length": 1.699
+   },
+   {
+    "name": "-u",
+    "mid": [
+     1.738,
+     4.245
+    ],
+    "length": 1.699
+   },
+   {
+    "name": "+v",
+    "mid": [
+     1.32,
+     3.395
+    ],
+    "length": 0.84
+   },
+   {
+    "name": "-v",
+    "mid": [
+     1.316,
+     5.093
+    ],
+    "length": 0.84
+   }
+  ],
+  "stance": {
+   "edge": "-v",
+   "edge_mid": [
+    1.3158817291259766,
+    5.093123435974121
+   ],
+   "inward": [
+    0.0025445513892918825,
+    -0.9999967813491821
+   ],
+   "tangent": [
+    0.9999967813491821,
+    0.0025445513892918825
+   ],
+   "base_pose2d": [
+    1.2580198049545288,
+    5.542977333068848,
+    -1.5682517727073588
+   ],
+   "edge_depth": 0.4499996602535248,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.10008939797426875
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.5
+ },
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {
+  "scene_reset": 2,
+  "target_placement": 1
+ },
+ "template_meta": {
+  "support": {
+   "name": "coffee_table_qtwqqb_0",
+   "z": 0.4876919984817505,
+   "yaw": -3.1390480995178223,
+   "local_bounds": [
+    -1.7489869594573975,
+    -0.9086843729019165,
+    -5.089757919311523,
+    -3.3911373615264893
+   ],
+   "n_free_cells": 3547,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-v",
+   "edge_mid": [
+    1.315880298614502,
+    5.093122959136963
+   ],
+   "inward": [
+    0.0025445513892918825,
+    -0.9999967813491821
+   ],
+   "tangent": [
+    0.9999967813491821,
+    0.0025445513892918825
+   ],
+   "base_pose2d": [
+    1.2582727670669556,
+    5.442977428436279,
+    -1.5682517727073588
+   ],
+   "edge_depth": 0.34999993443489075,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.2480371410532914
+   }
+  },
+  "view_arms": "untucked",
+  "n_reachable_cells": 3,
+  "n_grasp_cells": 3,
+  "n_grasp_combos": 27,
+  "n_region_cells": 582,
+  "n_visible_cells": 582,
+  "stand_off": 0.35,
+  "edge": null,
+  "load_room_instances": [
+   "living_room_1",
+   "dining_room_0",
+   "entryway_0"
+  ],
+  "task_rooms": [
+   "living_room_1"
+  ],
+  "rejections": {
+   "scene_reset": 2,
+   "target_placement": 1
+  },
+  "n_written": 1,
+  "scene_variant": null,
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 28.34,
+   "prepare_template_s": 0.34,
+   "save_template_s": 0.2
+  }
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_table_sel/house_single_floor/house_single_floor__coffee_table_qtwqqb_0__inter_object_relation_satisfaction-2/instances/inter_object_relation_satisfaction-2__house_single_floor__coffee_table_qtwqqb_0__inter_object_relation_satisfaction-2__0000.summary.json",
+   "wall_time_s": 6.5,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    1.2582727670669556,
+    5.442977428436279,
+    -1.5682517727073588
+   ],
+   "trunk": [
+    0.0,
+    -0.8999999761581421
+   ],
+   "grasp": {
+    "key": "lemon__ovbcff__i",
+    "name": "grasp_2",
+    "translate": 0.5,
+    "yaw": 1.4461450249417078
+   },
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_table_sel/house_single_floor/house_single_floor__coffee_table_qtwqqb_0__inter_object_relation_satisfaction-2",
+ "bound_table": "coffee_table_qtwqqb_0",
+ "setup_s": 28.7,
+ "run_s": 6.6,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "ok",
+   "n_written": 1,
+   "rejections": {
+    "scene_reset": 2,
+    "target_placement": 1
+   },
+   "reject_reason": null,
+   "setup_s": 28.7,
+   "run_s": 6.6
+  }
+ ],
+ "job_s": 36.9,
+ "finished": "2026-09-12 00:18:39"
+}

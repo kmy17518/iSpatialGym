@@ -1,0 +1,146 @@
+{
+ "target_category": "box_of_granola_bars",
+ "target_model": "tqwhvz",
+ "target_key": "box_of_granola_bars__tqwhvz__t",
+ "category": "box_of_granola_bars",
+ "model": "bqeeki",
+ "kind": "same",
+ "tier": null,
+ "started": "2026-09-12 12:26:08",
+ "template": {
+  "support": {
+   "name": "breakfast_table_rhjoby_0",
+   "z": 0.8126287460327148,
+   "yaw": 1.5682448148727417,
+   "local_bounds": [
+    2.9359521865844727,
+    4.096152305603027,
+    -8.733062744140625,
+    -5.830265522003174
+   ],
+   "n_free_cells": 8463,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-u",
+   "edge_mid": [
+    7.289131164550781,
+    2.917363405227661
+   ],
+   "inward": [
+    0.002551509067416191,
+    0.9999967217445374
+   ],
+   "tangent": [
+    -0.9999967217445374,
+    0.002551509067416191
+   ],
+   "base_pose2d": [
+    7.488215446472168,
+    2.4668538570404053,
+    1.5682448148999308
+   ],
+   "edge_depth": 0.4500001072883606,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.13419456001074065
+   }
+  },
+  "place_stance": {
+   "edge": "-u",
+   "edge_mid": [
+    7.289131164550781,
+    2.917363405227661
+   ],
+   "inward": [
+    0.002551509067416191,
+    0.9999967217445374
+   ],
+   "tangent": [
+    -0.9999967217445374,
+    0.002551509067416191
+   ],
+   "base_pose2d": [
+    8.18735122680664,
+    2.4650700092315674,
+    1.5682448148999308
+   ],
+   "edge_depth": 0.4500000774860382
+  },
+  "view_arms": "untucked",
+  "yaw_adjust_deg": 0.0,
+  "dest_lateral_m": -0.6991384326073284,
+  "dest_side": "right",
+  "source_lateral_offset": 0.0,
+  "n_reachable_cells": 8,
+  "n_grasp_cells": 8,
+  "n_place_combos": 2,
+  "distractors": {
+   "same_category": true,
+   "pool": "same_category",
+   "requested_pool": "same_category",
+   "fallback": null,
+   "models": [
+    "box_of_granola_bars-bqeeki"
+   ],
+   "requested": 1,
+   "pool_size": 1,
+   "pool_categories": [
+    "box_of_granola_bars"
+   ],
+   "lookalikes_excluded": [],
+   "footprint_fraction": 0.14
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 25.81,
+   "prepare_template_s": 0.13
+  },
+  "setup_s": 25.9
+ },
+ "footprint_fraction_with_target": 0.14,
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {
+  "unstable_init": 1
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_dis_distractors/box_of_granola_bars-tqwhvz__box_of_granola_bars-bqeeki/instances/disembedding-0__box_of_granola_bars-tqwhvz__box_of_granola_bars-bqeeki__0000.summary.json",
+   "wall_time_s": 4.8,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    7.488215446472168,
+    2.4668538570404053,
+    1.5682448148999308
+   ],
+   "trunk": [
+    0.0,
+    -0.8999999761581421
+   ],
+   "occluded_variant": false,
+   "grasp": {
+    "key": "box_of_granola_bars__tqwhvz__t",
+    "name": "grasp_3",
+    "translate": 0.5,
+    "place_translate": 0.5,
+    "yaw": 0.7999771689638218
+   },
+   "dest_pixels": 11470,
+   "source_pixels": 116802,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_dis_distractors/box_of_granola_bars-tqwhvz__box_of_granola_bars-bqeeki",
+ "job_s": 7.0,
+ "finished": "2026-09-12 12:26:15",
+ "occluded_variant": false,
+ "occlusion_ratio": null
+}

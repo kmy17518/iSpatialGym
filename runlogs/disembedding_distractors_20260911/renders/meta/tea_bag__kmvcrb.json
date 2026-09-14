@@ -1,0 +1,35 @@
+{
+ "category": "tea_bag",
+ "model": "kmvcrb",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/tea_bag__kmvcrb__y0.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0048,
+   "seg_pixels": 1151,
+   "aabb_extent": [
+    0.051,
+    0.04,
+    0.026
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/tea_bag__kmvcrb__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0048
+  }
+ },
+ "stable": true,
+ "visible": true
+}

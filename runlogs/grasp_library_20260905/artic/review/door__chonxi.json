@@ -1,0 +1,20 @@
+{
+  "key": "door__chonxi",
+  "category": "door",
+  "model": "chonxi",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_0",
+      "kind": "door",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "swing",
+      "graspable": false,
+      "handle_description": "No handle; plain flush slab recessed ~10 mm inside its frame, free (+y) edge abuts post so F edge not exposed. Hinge -y side.",
+      "height_concern": "",
+      "confidence": "high"
+    }
+  ],
+  "object_note": "Heuristic correct: handle-less door, edge fallback unusable while closed. Swings toward viewer about the -y hinge; would need to be ajar to pinch the edge."
+}

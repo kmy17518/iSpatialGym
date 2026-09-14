@@ -1,0 +1,287 @@
+{
+ "group": "mental_rotation__hook__r1",
+ "task": "mental_rotation",
+ "category": "hook",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "yfikis",
+   "key": "hook__yfikis",
+   "strip": "/tmp/glib/strips/hook__yfikis.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rod pinch near CoM, full coverage"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rod pinch near CoM, full coverage"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rod pinch near CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rod pinch near CoM"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rod pinch near CoM"
+    }
+   ],
+   "object_note": "bent 6 mm rod hook; symmetric 7/0 pinches",
+   "bbox_mm": [
+    44,
+    66,
+    19
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ddbsdk",
+   "key": "hook__ddbsdk",
+   "strip": "/tmp/glib/strips/hook__ddbsdk.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [
+    "unsure"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on hook stem, full coverage"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on stem next to disc"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on disc edge/stem, coverage 0.5"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across J-bend of hook, coverage 0.5"
+    },
+    {
+     "rank": 5,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "antipodal 0.14, pads on disc and stem, contact unclear"
+    }
+   ],
+   "object_note": "small disc-base hook; rank 5 contact geometry cannot be read from images",
+   "bbox_mm": [
+    73,
+    49,
+    26
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "wmvozo",
+   "key": "hook__wmvozo",
+   "strip": "/tmp/glib/strips/hook__wmvozo.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [
+    "unsure"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "tiny chrome disc pinched by rim, antipodal 0.36"
+    },
+    {
+     "rank": 2,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "tiny chrome disc pinched by rim, antipodal 0.33"
+    },
+    {
+     "rank": 3,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "disc rim pinch, antipodal 0.17, coverage 0.5"
+    },
+    {
+     "rank": 4,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "disc rim pinch, antipodal 0.19, coverage 0.25"
+    },
+    {
+     "rank": 5,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "disc rim pinch, antipodal 0.30, coverage 0.25"
+    }
+   ],
+   "object_note": "object ~30 mm, reflective; all grasps pinch suction-disc rim, not hook; contacts too small to verify",
+   "bbox_mm": [
+    31,
+    31,
+    41
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "akwlam",
+   "key": "hook__akwlam",
+   "strip": "/tmp/glib/strips/hook__akwlam.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [
+    "unsure"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "edge pinch across plate width, near CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "edge pinch across plate width at fingertips"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "edge pinch across plate width"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "edge pinch across plate width at fingertips"
+    },
+    {
+     "rank": 5,
+     "verdict": "unsure",
+     "flags": [
+      "unsure"
+     ],
+     "note": "plate skewed between pads, antipodal 0.14, coverage 0"
+    }
+   ],
+   "object_note": "flat plate hook; pads stop on 3 mm plate edges (coverage 0-0.25), never on faces",
+   "bbox_mm": [
+    44,
+    69,
+    63
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "hewhtl",
+   "key": "hook__hewhtl",
+   "strip": "/tmp/glib/strips/hook__hewhtl.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch on plate near top edge"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch at plate corner, full coverage"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch on plate near top edge"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch on plate near top edge"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch on plate, wire hook free"
+    }
+   ],
+   "object_note": "plate hangs 30 mm below pinch; face contact with full coverage, stable",
+   "bbox_mm": [
+    108,
+    86,
+    63
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

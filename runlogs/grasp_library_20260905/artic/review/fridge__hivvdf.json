@@ -1,0 +1,20 @@
+{
+  "key": "fridge__hivvdf",
+  "category": "fridge",
+  "model": "hivvdf",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_0",
+      "kind": "door",
+      "chosen": "C",
+      "pinch": "vertical_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Full-height vertical bar handle along the door's free left edge; C is the bar middle, A/B are its end mounts. Hinge on the right (+y).",
+      "height_concern": "",
+      "confidence": "high"
+    }
+  ],
+  "object_note": "Mini-fridge with one door; heuristic correct. Prefer C (bar middle, 49 mm standoff) over the end-mount knobs A/B. Door swings open to the right."
+}

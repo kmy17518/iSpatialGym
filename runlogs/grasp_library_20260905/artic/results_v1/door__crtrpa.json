@@ -1,0 +1,16 @@
+{
+ "key": "door__crtrpa",
+ "category": "door",
+ "model": "crtrpa",
+ "scene": "house_single_floor",
+ "host": "door_fnvpyu_0",
+ "host_rank": 2,
+ "host_model": "fnvpyu",
+ "swap": true,
+ "joints": [],
+ "error": "AssertionError('Object with name o_door__crtrpa already exists in scene!')",
+ "previous_hosts": [
+  "door_eduavq_0",
+  "door_crtrpa_0"
+ ]
+}

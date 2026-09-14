@@ -1,0 +1,28 @@
+{
+  "category": "pet_bed",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "ynznsw",
+      "V": 4,
+      "N": 2,
+      "S": 0,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Oval wicker pet basket with dark navy cushion, 0.66 x 0.88 x 0.23 m; clean; footprint too large (>0.80 m)."
+    }
+  ],
+  "picks": [],
+  "alternate": null,
+  "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+  ],
+  "category_verdict": "drop",
+  "category_note": "Single wicker pet bed; natural on a house floor (kitchen, living room) but its 0.88 m footprint exceeds the 0.80 m limit and it normally sits against a wall. No valid model."
+}

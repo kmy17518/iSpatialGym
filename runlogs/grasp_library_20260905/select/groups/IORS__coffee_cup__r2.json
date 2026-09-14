@@ -1,0 +1,533 @@
+{
+ "group": "IORS__coffee_cup__r2",
+ "task": "IORS",
+ "category": "coffee_cup",
+ "round": 2,
+ "relation": "ontop",
+ "partner": "saucer",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "dkxddg",
+   "key": "coffee_cup__dkxddg__t",
+   "strip": "/tmp/glib/strips/coffee_cup__dkxddg__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch away from handle, finger inside"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, tilt 14 deg"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch opposite handle"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch"
+    }
+   ],
+   "object_note": "5-6 mm ceramic rim, not fragile; fingers stay well above cup bottom",
+   "bbox_mm": [
+    91,
+    70,
+    50
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ykuftq",
+   "key": "coffee_cup__ykuftq__t",
+   "strip": "/tmp/glib/strips/coffee_cup__ykuftq__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 2,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/5: cup pushed against open finger, ~22 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: cup pushed against open finger, ~22 mm off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch beside handle, symmetric close (10/0)"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, symmetric close (10/0)"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: cup pushed against open finger, ~22 mm off-centre"
+    }
+   ],
+   "object_note": "square mug; rows 1,2,5 body pinches end with one finger fully open, pads 53 mm apart vs 40 mm width",
+   "bbox_mm": [
+    91,
+    57,
+    78
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "fgizgn",
+   "key": "coffee_cup__fgizgn__t",
+   "strip": "/tmp/glib/strips/coffee_cup__fgizgn__t.png",
+   "n_valid": 1,
+   "n_clean": 1,
+   "n_clean_strict": 1,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on plain cup, symmetric close (9/0)"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    95,
+    63,
+    71
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ibhhfj",
+   "key": "coffee_cup__ibhhfj__t",
+   "strip": "/tmp/glib/strips/coffee_cup__ibhhfj__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down body pinch, both pads on cup; finger at 50 idle (50/30)"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down body pinch, both pads on cup; finger at 50 idle (50/30)"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down body pinch, both pads on cup; finger at 50 idle (50/30)"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down body pinch, both pads on cup; finger at 50 idle (50/30)"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-down body pinch, both pads on cup (48/32)"
+    }
+   ],
+   "object_note": "wide 65 mm mug; every row keeps one finger at 50, cup ~10 mm off-centre but firmly held",
+   "bbox_mm": [
+    99,
+    79,
+    64
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "rypdvd",
+   "key": "coffee_cup__rypdvd__t",
+   "strip": "/tmp/glib/strips/coffee_cup__rypdvd__t.png",
+   "n_valid": 1,
+   "n_clean": 1,
+   "n_clean_strict": 1,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on cup, symmetric close (9/0)"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    91,
+    65,
+    90
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "xjdyon",
+   "key": "coffee_cup__xjdyon__t",
+   "strip": "/tmp/glib/strips/coffee_cup__xjdyon__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, symmetric close (14/0)"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, symmetric close (15/0)"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch opposite handle, symmetric close (17/0)"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, symmetric close (14/0)"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, symmetric close (13/0)"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    104,
+    87,
+    68
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "nbhcgu",
+   "key": "coffee_cup__nbhcgu__t",
+   "strip": "/tmp/glib/strips/coffee_cup__nbhcgu__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, symmetric close (14/0)"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, symmetric close (16/0)"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, symmetric close (16/0)"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch near handle, symmetric close (15/0)"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, 28-deg tilt, symmetric close (16/0)"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    104,
+    87,
+    68
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ckkwmj",
+   "key": "coffee_cup__ckkwmj__t",
+   "strip": "/tmp/glib/strips/coffee_cup__ckkwmj__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch (4 mm rim), symmetric close (7/0)"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch (7 mm rim), symmetric close (8/0)"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch near handle, symmetric close (9/0)"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, symmetric close (5/1)"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, symmetric close (7/0)"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    91,
+    72,
+    69
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "nhzrei",
+   "key": "coffee_cup__nhzrei__t",
+   "strip": "/tmp/glib/strips/coffee_cup__nhzrei__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, both pads on mug; finger at 50 idle (50/25)"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, both pads on mug; finger at 50 idle (50/25)"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, both pads on mug; finger at 50 idle (50/25)"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, both pads on mug; finger at 50 idle (50/25)"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, both pads on mug; finger at 50 idle (50/25)"
+    }
+   ],
+   "object_note": "65 mm mug; every row keeps one finger at 50, mug ~12 mm off-centre, both pads on body; not flagged",
+   "bbox_mm": [
+    102,
+    74,
+    86
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "skamgp",
+   "key": "coffee_cup__skamgp__t",
+   "strip": "/tmp/glib/strips/coffee_cup__skamgp__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wide body pinch near rim, both pads on cup (50/42)"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wide body pinch near rim, both pads on cup (50/40)"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wide body pinch near rim, both pads on cup (50/40)"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "wide body pinch near rim, both pads on cup (50/40)"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch beside handle, symmetric close (11/0)"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    126,
+    87,
+    74
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "siksnl",
+   "key": "coffee_cup__siksnl__t",
+   "strip": "/tmp/glib/strips/coffee_cup__siksnl__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, both pads on mug, near-symmetric close (48/32)"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, both pads on mug, near-symmetric close (48/32)"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, both pads on mug (50/31), ~9 mm off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, both pads on mug, symmetric close (44/37)"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, both pads on mug, near-symmetric close (47/33)"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    95,
+    79,
+    80
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

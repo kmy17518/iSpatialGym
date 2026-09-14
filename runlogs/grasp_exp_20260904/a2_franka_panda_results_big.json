@@ -1,0 +1,73 @@
+{
+ "brussels_sprouts_hkwyzk": {
+  "n_returned": 500,
+  "conf_min": 0.9699873924255371,
+  "conf_max": 0.9906210899353027,
+  "t_prep_s": 0.001,
+  "t_inference_s": 0.49
+ },
+ "mushroom_zlukhz": {
+  "n_returned": 500,
+  "conf_min": 0.9334127902984619,
+  "conf_max": 0.9634535312652588,
+  "t_prep_s": 0.001,
+  "t_inference_s": 0.236
+ },
+ "tube_of_toothpaste_vsclsj": {
+  "n_returned": 500,
+  "conf_min": 0.9717236161231995,
+  "conf_max": 0.9925193786621094,
+  "t_prep_s": 0.001,
+  "t_inference_s": 0.243
+ },
+ "vidalia_onion_buyxll": {
+  "n_returned": 500,
+  "conf_min": 0.7243621945381165,
+  "conf_max": 0.9065111875534058,
+  "t_prep_s": 0.001,
+  "t_inference_s": 0.244
+ },
+ "broccolini_rlsytp": {
+  "n_returned": 500,
+  "conf_min": 0.9505208730697632,
+  "conf_max": 0.9834480285644531,
+  "t_prep_s": 0.001,
+  "t_inference_s": 0.248
+ },
+ "half_apple_pie_grcock": {
+  "n_returned": 500,
+  "conf_min": 0.9669394493103027,
+  "conf_max": 0.9917831420898438,
+  "t_prep_s": 0.001,
+  "t_inference_s": 0.37
+ },
+ "steel_wool_egeolq": {
+  "n_returned": 500,
+  "conf_min": 0.9204732775688171,
+  "conf_max": 0.9768163561820984,
+  "t_prep_s": 0.001,
+  "t_inference_s": 0.243
+ },
+ "toy_figure_orunry": {
+  "n_returned": 500,
+  "conf_min": 0.8761062026023865,
+  "conf_max": 0.9659472703933716,
+  "t_prep_s": 0.001,
+  "t_inference_s": 0.245
+ },
+ "tablefork_flexrc": {
+  "n_returned": 500,
+  "conf_min": 0.9458062052726746,
+  "conf_max": 0.9863411784172058,
+  "t_prep_s": 0.001,
+  "t_inference_s": 0.245
+ },
+ "zucchini_udvfaz": {
+  "n_returned": 500,
+  "conf_min": 0.8713111281394958,
+  "conf_max": 0.9844878315925598,
+  "t_prep_s": 0.001,
+  "t_inference_s": 0.242
+ },
+ "_model_load_s": 1.16
+}

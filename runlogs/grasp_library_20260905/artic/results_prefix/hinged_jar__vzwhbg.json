@@ -1,0 +1,45 @@
+{
+ "key": "hinged_jar__vzwhbg",
+ "category": "hinged_jar",
+ "model": "vzwhbg",
+ "aabb_extent": [
+  0.2719062566757202,
+  0.20725350081920624,
+  0.21599221229553223
+ ],
+ "support": "table",
+ "joints": [
+  {
+   "joint": "j_rb1",
+   "kind": "flap",
+   "grasp_source": "review:F",
+   "stance": {
+    "base": [
+     0.502,
+     0.199,
+     -0.003
+    ],
+    "translate": 0.5,
+    "sign": 1.0
+   },
+   "ag": true,
+   "dq": 0.7912,
+   "dq_target": 0.785,
+   "opened": true,
+   "open_state": true,
+   "steps": [
+    "stance ok",
+    "grasped"
+   ],
+   "error": null,
+   "contact_world": [
+    1.151,
+    -0.003,
+    0.952
+   ],
+   "handle_height": 0.952
+  }
+ ],
+ "error": null,
+ "time_s": 15.4
+}

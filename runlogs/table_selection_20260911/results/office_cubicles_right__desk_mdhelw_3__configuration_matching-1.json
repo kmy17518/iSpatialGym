@@ -1,0 +1,143 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "desk_mdhelw_3",
+ "category": "desk",
+ "model": "mdhelw",
+ "rooms": [
+  "private_office_1"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-1",
+ "inventory": {
+  "top_z": 0.77,
+  "bbox_x": 0.9,
+  "bbox_y": 2.781,
+  "bbox_z": 0.77,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "swivel_chair_gfixyb_4",
+  "swivel_chair_gfixyb_5",
+  "swivel_chair_lhkkri_2"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 00:00:45",
+ "precheck": {
+  "aabb": [
+   [
+    14.699,
+    -5.523,
+    -0.016
+   ],
+   [
+    17.51,
+    -4.593,
+    0.785
+   ]
+  ],
+  "support": {
+   "name": "desk_mdhelw_3",
+   "z": 0.7852806448936462,
+   "yaw": -1.5707907676696777,
+   "local_bounds": [
+    4.613264560699463,
+    5.513279914855957,
+    14.708813667297363,
+    17.488819122314453
+   ],
+   "n_free_cells": 6439,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     16.099,
+     -5.513
+    ],
+    "length": 2.78
+   },
+   {
+    "name": "-u",
+    "mid": [
+     16.099,
+     -4.613
+    ],
+    "length": 2.78
+   },
+   {
+    "name": "+v",
+    "mid": [
+     17.489,
+     -5.063
+    ],
+    "length": 0.9
+   },
+   {
+    "name": "-v",
+    "mid": [
+     14.709,
+     -5.063
+    ],
+    "length": 0.9
+   }
+  ],
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    17.488847732543945,
+    -5.063175201416016
+   ],
+   "inward": [
+    -1.0,
+    -5.55912538402481e-06
+   ],
+   "tangent": [
+    5.55912538402481e-06,
+    -1.0
+   ],
+   "base_pose2d": [
+    17.9388484954834,
+    -5.063172817230225,
+    -3.141587094464409
+   ],
+   "edge_depth": 0.4500007629394531,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.6000000238418579,
+    "axis_angle": 0.00505082589260511
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 6.9
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "view_arms": "untucked",
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/office_cubicles_right/office_cubicles_right__desk_mdhelw_3__configuration_matching-1",
+ "setup_s": 17.6,
+ "reject_reason": "no_support",
+ "error": "[no_support] desk_mdhelw_3: [unreachable] handle not reachable from any of 3 cells (e.g. handle at [17.175443649291992, -5.051483154296875, 1.1406526565551758], base (18.038846969604492, -5.063172340393066, -3.141587094464409), translates [0.0, 0.25, 0.5])",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 17.6,
+   "run_s": null
+  }
+ ],
+ "job_s": 18.5,
+ "finished": "2026-09-12 00:01:04"
+}

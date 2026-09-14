@@ -1,0 +1,20 @@
+{
+  "key": "bottom_cabinet__cjcyed",
+  "category": "bottom_cabinet",
+  "model": "cjcyed",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_1",
+      "kind": "drawer",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "slide",
+      "graspable": false,
+      "handle_description": "Sliding door panel (not a drawer), no handle; F sits atop the leading edge with a pinch axis across the panel width, unusable.",
+      "height_concern": "",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Prismatic joint is a flush sliding door on the +x front face, mislabelled as drawer with outward normal along the slide direction; no protrusion to pinch."
+}

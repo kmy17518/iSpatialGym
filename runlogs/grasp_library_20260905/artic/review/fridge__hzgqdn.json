@@ -1,0 +1,20 @@
+{
+  "key": "fridge__hzgqdn",
+  "category": "fridge",
+  "model": "hzgqdn",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_0",
+      "kind": "door",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "swing",
+      "graspable": false,
+      "handle_description": "No handle: plain flush door slab with interior bins; free edge measures 213 mm thick, far beyond pinch range. Top rail is body hardware.",
+      "height_concern": "",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Boxy handle-less door hinged at +y. F is at the correct free edge but the leaf is >85 mm thick with no lip; the top-front rail is base hardware."
+}

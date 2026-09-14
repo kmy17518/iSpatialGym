@@ -1,0 +1,35 @@
+{
+ "category": "bag_of_ice_cream",
+ "model": "jwalbo",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bag_of_ice_cream__jwalbo__y0.png",
+   "drift_m": 0.0006,
+   "tilt_deg": 2.0,
+   "on_tray": true,
+   "settled_z": 0.0167,
+   "seg_pixels": 8013,
+   "aabb_extent": [
+    0.093,
+    0.169,
+    0.037
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bag_of_ice_cream__jwalbo__y1.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 2.2,
+   "on_tray": true,
+   "settled_z": 0.0168
+  }
+ },
+ "stable": true,
+ "visible": true
+}

@@ -1,0 +1,35 @@
+{
+ "category": "bracelet",
+ "model": "thqqmo",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bracelet__thqqmo__y0.png",
+   "drift_m": 0.0002,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0036,
+   "seg_pixels": 149,
+   "aabb_extent": [
+    0.053,
+    0.015,
+    0.01
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bracelet__thqqmo__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.4,
+   "on_tray": true,
+   "settled_z": 0.0036
+  }
+ },
+ "stable": true,
+ "visible": false
+}

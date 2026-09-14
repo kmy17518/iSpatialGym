@@ -1,0 +1,90 @@
+{
+ "scene": "restaurant_diner",
+ "table": "commercial_kitchen_table_nisnrl_0",
+ "category": "commercial_kitchen_table",
+ "model": "nisnrl",
+ "rooms": [
+  "kitchen_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-1",
+ "inventory": {
+  "top_z": 0.951,
+  "bbox_x": 0.705,
+  "bbox_y": 1.119,
+  "bbox_z": 0.943,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:42:19",
+ "precheck": {
+  "aabb": [
+   [
+    -10.059,
+    0.537,
+    0.004
+   ],
+   [
+    -8.931,
+    1.246,
+    0.957
+   ]
+  ],
+  "support": {
+   "name": "commercial_kitchen_table_nisnrl_0",
+   "z": 0.8742234706878662,
+   "yaw": -1.568570613861084,
+   "local_bounds": [
+    -1.2294042110443115,
+    -0.5669575333595276,
+    -10.047840118408203,
+    -8.946374893188477
+   ],
+   "n_free_cells": 1904,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -9.498,
+     0.546
+    ],
+    "length": 1.101
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -9.5,
+     1.208
+    ],
+    "length": 1.101
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -8.948,
+     0.878
+    ],
+    "length": 0.662
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -10.05,
+     0.876
+    ],
+    "length": 0.662
+   }
+  ],
+  "stance": null,
+  "stance_error": "[stance_collision] untucked: [no_stance] no collision-free stance around commercial_kitchen_table_nisnrl_0",
+  "precheck_s": 12.6
+ },
+ "status": "skipped",
+ "reason": "inter_object_relation_satisfaction-0 found no stance around the support at any stand-off (precheck: no stance either)"
+}

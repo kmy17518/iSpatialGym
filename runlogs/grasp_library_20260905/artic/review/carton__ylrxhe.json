@@ -1,0 +1,31 @@
+{
+  "key": "carton__ylrxhe",
+  "category": "carton",
+  "model": "ylrxhe",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link0",
+      "kind": "flap",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "lift",
+      "graspable": false,
+      "handle_description": "No handle; flap free edge lies at the centre seam butted against the other flap, underside inside the box, no gap for a fingertip",
+      "height_concern": "",
+      "confidence": "medium"
+    },
+    {
+      "joint": "j_link1",
+      "kind": "flap",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "lift",
+      "graspable": false,
+      "handle_description": "No handle; flap free edge lies at the centre seam butted against the other flap, underside inside the box, no gap for a fingertip",
+      "height_concern": "",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Two top flaps hinged at the outer +y/-y edges meeting flush at the centre seam; F markers sit on the free edges but closed flaps cannot be pinched without prying."
+}

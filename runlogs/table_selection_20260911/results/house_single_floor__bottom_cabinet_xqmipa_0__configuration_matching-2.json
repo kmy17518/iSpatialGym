@@ -1,0 +1,25 @@
+{
+ "scene": "house_single_floor",
+ "table": "bottom_cabinet_xqmipa_0",
+ "category": "bottom_cabinet",
+ "model": "xqmipa",
+ "rooms": [
+  "bathroom_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.736,
+  "bbox_x": 0.38,
+  "bbox_y": 1.316,
+  "bbox_z": 0.737,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 22:52:19",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

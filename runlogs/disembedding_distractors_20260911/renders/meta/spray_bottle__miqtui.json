@@ -1,0 +1,35 @@
+{
+ "category": "spray_bottle",
+ "model": "miqtui",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/spray_bottle__miqtui__y0.png",
+   "drift_m": 0.0079,
+   "tilt_deg": 3.4,
+   "on_tray": true,
+   "settled_z": 0.1324,
+   "seg_pixels": 14971,
+   "aabb_extent": [
+    0.105,
+    0.09,
+    0.273
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/spray_bottle__miqtui__y1.png",
+   "drift_m": 0.0085,
+   "tilt_deg": 3.7,
+   "on_tray": true,
+   "settled_z": 0.1324
+  }
+ },
+ "stable": true,
+ "visible": true
+}

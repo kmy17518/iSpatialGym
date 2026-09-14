@@ -1,0 +1,21 @@
+{
+  "category": "pencil_holder",
+  "n_models": 4,
+  "pages_opened": [
+    "grids/same/pencil_holder__p1.png"
+  ],
+  "groups": [
+    {
+      "members": ["jyetcl", "taixcy"],
+      "reason": "Same asset (exact dup) in two yaws: tall tan wooden rectangular open box, identical wood grain and proportions",
+      "confidence": "high"
+    },
+    {
+      "members": ["mrrpay", "jkuiqg"],
+      "reason": "Same asset (exact dup): squat plain grey metal-look open box, identical shade and proportions at every yaw",
+      "confidence": "high"
+    }
+  ],
+  "unusable": [],
+  "notes": "Wooden 11 cm box and 7 cm grey box differ in colour and proportions, so the two pairs stay separate. mrrpay/jkuiqg are nearly uniform grey but shade like brushed metal and read as a holder; not flagged, exclude them if plain-grey assets are unwanted."
+}

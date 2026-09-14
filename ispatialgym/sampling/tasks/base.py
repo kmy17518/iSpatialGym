@@ -144,6 +144,24 @@ class TaskSampler:
     def gen(self, key: str, default=None):
         return self.spec.generation.get(key, default)
 
+    #: arm configuration of the robot at init for every task unless the spec says otherwise (``generation.init_arms``):
+    #: BEHAVIOR's reset pose. "ready" (hands in front, elbows bent) and "tucked" (hanging) are the alternatives.
+    DEFAULT_INIT_ARMS = "untucked"
+
+    def _scene_variant_meta(self) -> Optional[dict]:
+        """Scene variant used (chairs removed, ...): scene file relative to the template dir, removed objects and the
+        traversability-map footprints to free at evaluation time (``scene_variants.patch_trav_map_from_meta``)."""
+        sv = getattr(self.world, "scene_variant", None) or {}
+        if not sv:
+            return None
+        return {"scene_file": os.path.relpath(sv["path"], self.ctx.out_dir), "removed_objects": list(sv.get("removed_objects", [])),
+                "freed_footprints": sv.get("freed_footprints")}
+
+    def init_arms(self) -> str:
+        """Init arm mode from the spec; fixed per task so that every instance of a task starts in the same arm pose
+        (no silent fallback: ``generation.view_arm_fallbacks`` must list alternatives explicitly)."""
+        return str(self.gen("init_arms", self.DEFAULT_INIT_ARMS))
+
     def tol(self, key: str, default: float) -> float:
         return float((self.gen("tolerances") or {}).get(key, default))
 
@@ -161,6 +179,7 @@ class TaskSampler:
         # the table and the support raster's downward rays hit them (seen: 32 cells of the dining table "occupied",
         # the source tray then had no supported position at the only usable end)
         self.world.park_robot(self.world.robot_park_xy, floor_z=self.world.floor_z)
+        self.template_meta["init_arms"] = self.init_arms()
         self.bind_fixed_roles()
         self.spawn_roles()
         self.kit.sync_world()
@@ -368,11 +387,14 @@ class TaskSampler:
             obj.keep_still()
 
     def check_goal_feasible(self, draft: Draft):
-        """Teleport the objects to the goal (robot untouched), settle, require the binary goal to hold, restore."""
+        """Teleport the objects to the goal, settle, require the binary goal to hold, restore. The robot is parked
+        out of the way meanwhile: the goal must be feasible *excluding* the robot, and a hand hovering where the goal
+        object lands would eject it (seen in disembedding). The snapshot restore puts the robot back."""
         if not draft.goal_poses and not draft.goal_joints:
             return
         state = self.world.snapshot()
         try:
+            self.world.park_robot(self.world.robot_park_xy, floor_z=self.world.floor_z)
             self.apply_goal(draft)
             ents = self.goal_entities(draft)
             err = self.world.settle(ents, steps=int(self.gen("goal_settle_steps", 2 * self.DEFAULT_SETTLE_STEPS)))
@@ -430,6 +452,7 @@ class TaskSampler:
             "load_room_instances": list(self.world.eval_rooms or []),  # task rooms + neighbours (what evaluation loads)
             "task_rooms": list(self.world.rooms or []),
             "sampled_with_rooms": list(self.world.loaded_rooms or []),
+            "scene_variant": self._scene_variant_meta(),
             "required_scene_objects": sorted({b.scene_object_name for b in self.bindings.all() if b.scene_object_name in self.world.scene_object_names}),
         }
 
@@ -495,6 +518,7 @@ class TaskSampler:
             "load_room_instances": list(self.world.eval_rooms or []),
             "task_rooms": list(self.world.rooms or []),
             "sampled_with_rooms": list(self.world.loaded_rooms or []),
+            "scene_variant": self._scene_variant_meta(),
             "problem": self.spec.name,
             "alias": self.problem.alias,
             "choices": {r: c.__dict__ for r, c in self.choices.items()},
@@ -669,17 +693,19 @@ class TaskSampler:
         q0 = self.kit.q_config(arms=self.REACH_ARMS, translate=translate)
         return self.kit.q_at_base_pose(q0, *stance.base_pose2d)
 
-    def stance_with_view(self, top: SupportTop, depth_mid: float, arms: str = "untucked", stand_off: Optional[float] = None,
+    def stance_with_view(self, top: SupportTop, depth_mid: float, arms: Optional[str] = None, stand_off: Optional[float] = None,
                          preferred_edge: Optional[str] = None, focus_xy: Optional[th.Tensor] = None, focus_z: Optional[float] = None,
                          prefer_translate: Optional[float] = None) -> Stance:
         """Stance plus the trunk (translate, tilt) that centres the point at ``depth_mid`` in front of the robot.
         ``prefer_translate`` (default spec ``view_prefer_translate`` or the JoyLo default 0.5) biases the trunk: low
         translates keep the camera high and behind the table edge (wide objects), high ones bring it close.
 
-        If no viewing configuration with ``arms`` is collision free (objects already on the table under the untucked
-        hands), the compact ``ready`` arm pose is tried; the arm mode used is recorded in ``template_meta``."""
+        ``arms`` defaults to the spec's ``init_arms``. Alternatives listed in ``generation.view_arm_fallbacks`` (none by
+        default, so that all instances of a task share the arm pose) are tried when no viewing configuration with
+        ``arms`` is collision free; the arm mode used is recorded in ``template_meta``."""
+        arms = self.init_arms() if arms is None else arms
         errors = []
-        for arm_mode in ([arms] + [a for a in self.gen("view_arm_fallbacks", ["ready"]) if a != arms]):
+        for arm_mode in ([arms] + [a for a in self.gen("view_arm_fallbacks", []) if a != arms]):
             try:
                 st = self._stance_with_view(top, depth_mid, arm_mode, stand_off, preferred_edge, focus_xy, focus_z, prefer_translate)
                 self.template_meta["view_arms"] = arm_mode

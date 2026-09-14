@@ -1,8 +1,9 @@
 """Disembedding (``disembedding-0``): find the target among distractors on the source tray and move it to the
 destination tray.
 
-Roles: ``target``, ``distractors`` (drawn per template from ``same_category_pool`` / ``distractor_pool``),
-``tray_source``, ``tray_dest``, fixed ``table``, ``floor``.
+Roles: ``target``, ``distractors`` (drawn per template from the spec's ``distractors`` section: the target
+category's same-category pool or its other-category pool, never a look-alike of the target; see
+:class:`ispatialgym.sampling.spec.DistractorSpec`), ``tray_source``, ``tray_dest``, fixed ``table``, ``floor``.
 
 Template geometry (once): canonical stance, source tray centred in front of the robot with its long axis parallel
 to the front edge, destination tray at the same depth on one side so that only ``dest_visible_width`` of it enters
@@ -19,6 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import torch as th
 
+from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling import grasp_library as GL
 from ispatialgym.sampling import knowledge as K
@@ -57,14 +59,30 @@ class DisembeddingSampler(TaskSampler):
         super().spawn_roles()  # target, tray_source, tray_dest
         rng = np.random.default_rng(self.ctx.base_seed * 31 + 17)
         target = self.choices["target"]
-        same = rng.random() < float(self.gen("same_category_prob", 0.5))
-        pool_role = self.spec.roles.get("same_category_pool" if same else "distractor_pool")
-        pool = [c for c in (pool_role.choices() if pool_role else []) if not (c.category == target.category and c.model == target.model)]
-        if not pool and not same:
-            pool_role = self.spec.roles.get("same_category_pool")
-            pool = [c for c in (pool_role.choices() if pool_role else []) if c.model != target.model]
+        dspec = self.spec.distractor_spec()
+        if dspec is None or target.category not in dspec.pools:
+            raise Reject("spec", f"no 'distractors' pool for target category {target.category!r} (spec section distractors.pools)")
+        # which pool: the spec probability, unless --variant same_category / other_category forces it
+        if "same_category" in self.variant_overrides:
+            same = True
+        elif "other_category" in self.variant_overrides:
+            same = False
+        else:
+            same = rng.random() < float(self.gen("same_category_prob", 0.5))
+        requested = "same_category" if same else "other_category"
+        # look-alikes of the target (exact duplicates, label-only variants, ... judged from the init view) are
+        # excluded from both pools: a distractor that cannot be told apart from the target makes the task ambiguous
+        lookalikes = sorted(dspec.lookalikes_of(target.category, target.model))
+        pools = {"same_category": dspec.same_category_choices(target), "other_category": dspec.other_category_choices(target)}
+        used_pool, fallback = requested, None
+        if not pools[used_pool]:
+            used_pool = "other_category" if same else "same_category"
+            fallback = f"{requested} pool empty for {target.tag}" + (f" (look-alikes excluded: {[f'{c}/{m}' for c, m in lookalikes]})" if lookalikes else "")
+            log.warning("%s: %s; drawing from the %s pool instead", self.spec.name, fallback, used_pool)
+        pool = pools[used_pool]
         if not pool:
-            raise Reject("spec", "empty distractor pool")
+            raise Reject("spec", f"both distractor pools are empty for {target.tag}")
+        same = used_pool == "same_category"
         n_max = min(int(self.gen("max_distractors", 3)), len(pool))
         n = int(rng.integers(1, n_max + 1))
         order = [pool[i] for i in rng.permutation(len(pool))]
@@ -91,8 +109,16 @@ class DisembeddingSampler(TaskSampler):
             picks = [min(order, key=area)]
         for c in picks:
             self.spawn_role("distractors", c)
-        self.template_meta["distractors"] = {"same_category": bool(same), "models": [c.tag for c in picks], "requested": n,
-                                             "footprint_fraction": round(used / (tray_bb[0] * tray_bb[1]), 2)}
+        self.template_meta["distractors"] = {
+            "same_category": bool(same), "pool": used_pool, "requested_pool": requested, "fallback": fallback,
+            "models": [c.tag for c in picks], "requested": n, "pool_size": len(pool),
+            "pool_categories": sorted({c.category for c in pool}),
+            "lookalikes_excluded": [f"{c}/{m}" for c, m in lookalikes],
+            "footprint_fraction": round(used / (tray_bb[0] * tray_bb[1]), 2),
+        }
+        log.info("%s: target %s, %d distractor(s) from the %s pool (%d candidates%s): %s", self.spec.name, target.tag, len(picks), used_pool,
+                 len(pool), f", look-alikes excluded {self.template_meta['distractors']['lookalikes_excluded']}" if lookalikes else "",
+                 self.template_meta["distractors"]["models"])
 
     def prepare_bindings(self):
         self._load_grasps()
@@ -159,7 +185,7 @@ class DisembeddingSampler(TaskSampler):
 
     def _try_support(self, table):
         errors = []
-        for arms in ["untucked"] + [a for a in self.gen("view_arm_fallbacks", ["ready"]) if a != "untucked"]:
+        for arms in [self.init_arms()] + [a for a in self.gen("view_arm_fallbacks", []) if a != self.init_arms()]:
             try:
                 self._try_support_arms(table, arms)
                 self.template_meta["view_arms"] = arms
@@ -202,7 +228,9 @@ class DisembeddingSampler(TaskSampler):
                         self.template_meta["source_lateral_offset"] = float(s_lat)
                         return
                     except Reject as e:
-                        errors.append(f"edge {edge} lateral {s_lat:+.2f}{' (yaw allowed)' if allow_yaw else ''}: {e}")
+                        msg = f"edge {edge} lateral {s_lat:+.2f}{' (yaw allowed)' if allow_yaw else ''}: {e}"
+                        errors.append(msg)
+                        log.info("%s: stance option rejected: %s", self.spec.name, msg[:300])
                         for o in self.world.spawned.values():
                             self.world.park(o, list(self.world.spawned).index(o.name))
         raise Reject("support", "; ".join(errors))
@@ -268,7 +296,25 @@ class DisembeddingSampler(TaskSampler):
             raise Reject("support", f"no lateral room for the destination tray on either side (support bounds {top.local_bounds()})")
         chosen = None
         diag = {"views": len(views), "collision_free": int(free.sum()), "src_in_view": 0, "lateral_out_of_range": 0, "yaw_search_failed": 0,
-                "yaw_collision": 0, "yaw_src_out": 0}
+                "yaw_collision": 0, "yaw_src_out": 0, "hand_over_tray": 0}
+        # hands hovering in the column above a tray (up to the tallest object) are recorded (``template_meta.hands_over_tray``)
+        # and, with ``generation.require_hands_clear``, rejected. The untucked arms span 1.2 m, so on a 1.16 m table end
+        # one hand is always above a tray when the torso tilts forward; the goal check parks the robot, so this is a
+        # realism preference, not a feasibility issue.
+        z_top = top.z + max(self.height.values()) + 0.05
+        hand_r = 0.06
+        require_clear = bool(self.gen("require_hands_clear", False))
+
+        def hands_clear(q_cfg, fps) -> bool:
+            for arm in M.ARMS:
+                p = self.kit.eef_pose(q_cfg, arm)[0]
+                if float(p[2]) > z_top:
+                    continue
+                pt = th.tensor([[float(p[0]) + dx, float(p[1]) + dy] for dx, dy in ((hand_r, hand_r), (hand_r, -hand_r), (-hand_r, -hand_r), (-hand_r, hand_r))])
+                for fp in fps:
+                    if G.polygons_overlap(pt, fp, margin=0.02):
+                        return False
+            return True
         x0, y0, yaw0 = stance.base_pose2d
         l_min = half_lat_s + half_lat_d + 0.04
         bound_of = {"right": self.world.camera_model.width, "left": 0.0}
@@ -313,9 +359,14 @@ class DisembeddingSampler(TaskSampler):
                                 hi = mid
                         lat = sign * 0.5 * (lo + hi)
                         d_pose = self._pose_on("tray_dest", stance.world(depth_d, lat), yaw_d, top.z)
-                        if not top.polygon_supported(self.world.footprint(self.hull["tray_dest"], d_pose)):
+                        d_fp = self.world.footprint(self.hull["tray_dest"], d_pose)
+                        if not top.polygon_supported(d_fp):
                             diag["lateral_out_of_range"] += 1
                             continue
+                        if not hands_clear(q, [s_fp, d_fp]):
+                            diag["hand_over_tray"] += 1
+                            if require_clear:
+                                continue
                         chosen = (v, q, cam, side, d_pose, lat, 0.0)
                         break
                     d_pose = self._pose_on("tray_dest", stance.world(depth_d, lat_c), yaw_d, top.z)
@@ -357,6 +408,10 @@ class DisembeddingSampler(TaskSampler):
                     if not bool(self.kit.collision_free(q_psi, margin=0.01)[0]):
                         diag["yaw_collision"] += 1
                         continue
+                    if not hands_clear(q_psi, [s_fp, self.world.footprint(self.hull["tray_dest"], d_pose)]):
+                        diag["hand_over_tray"] += 1
+                        if require_clear:
+                            continue
                     chosen = (v, q_psi, cam_psi, side, d_pose, lat_c, psi)
                     break
                 if chosen:
@@ -373,6 +428,7 @@ class DisembeddingSampler(TaskSampler):
         stance.view.cam_pose = cam
         self.template_meta["yaw_adjust_deg"] = math.degrees(psi)
         self.template_meta["dest_lateral_m"] = float(lat_c)
+        self.template_meta["hands_over_tray"] = not hands_clear(q, [s_fp, self.world.footprint(self.hull["tray_dest"], d_pose)])
         if abs(psi) > 1e-6:
             log.warning("%s: no lateral position keeps the destination tray barely visible with the robot square to the edge %s; base yaw turned %.1f deg",
                         self.spec.name, stance.edge_name, math.degrees(psi))
@@ -447,6 +503,21 @@ class DisembeddingSampler(TaskSampler):
         translates = list(self.gen("reach_translates", self.DEFAULT_TRANSLATES))
         yaws = list(th.linspace(-math.pi, math.pi, 9)[:-1].tolist())
         combos = self.grasp_combo_table(self.stance, self.cells, lambda xy, yaw: self._pose_on("target", xy, yaw, self.src_floor.z), self.grasps, translates, yaws=yaws)
+        # placement point on the destination tray: the reachable floor cell (from the shifted stance) closest to the
+        # tray centre. The arm's reach over a table is a narrow band at a fixed depth from the edge; whether it crosses
+        # the tray centre depends on the tray's depth, so insisting on the centre made every long-edge stance fail.
+        r_t = self.radius["target"]
+        d_cells = th.stack([c for c in self.dst_floor.cells() if self.dst_floor.contains(c, r_t * 0.8)]) if int(self.dst_floor.free.sum()) else th.zeros(0, 2)
+        if len(d_cells) == 0:
+            raise Reject("unreachable", "destination tray too small for the target")
+        d_coarse = self.coarse_cells(d_cells, float(self.gen("reach_resolution", 0.04)), self.dst_floor.resolution)
+        d_mask, _ = self.reachable_cells(d_coarse, self.place_stance, self.dst_floor.z + self.grasp_z_offset)
+        if int(d_mask.sum()) == 0:
+            raise Reject("unreachable", "no reachable placement cell on the destination tray from the shifted stance")
+        reach_d = d_coarse[d_mask]
+        centre = d_cells.mean(dim=0)
+        self.dst_centre = reach_d[int(th.argmin(th.linalg.norm(reach_d - centre, dim=1)))]
+        self.template_meta["dest_place_offset_m"] = float(th.linalg.norm(self.dst_centre - centre))
         place_ok: Dict[Tuple[float, str], float] = {}
         pairs, index = [], []
         for yaw in yaws:
@@ -667,9 +738,11 @@ class DisembeddingSampler(TaskSampler):
         side = th.tensor([-float(to_cam[1]), float(to_cam[0])])
         sign = 1.0 if rng.random() < 0.5 else -1.0
         base_pose = draft.object_poses[occluder]
-        t_fp = self.world.footprint(self.hull[tname], draft.object_poses[tname])
-        others = {n: self.world.footprint(self.hull[n], draft.object_poses[n]) for n in draft.object_poses if n not in (occluder, tname)}
-        lo, hi = 0.0, self.radius[occluder] + self.radius[tname] + 0.05
+        # hull / radius of the target are stored under the role key ("target"), the distractors' under their instance
+        # names; the trays are the support, not obstacles for the occluder
+        t_fp = self.world.footprint(self.hull["target"], draft.object_poses[tname])
+        others = {n: self.world.footprint(self.hull[n], draft.object_poses[n]) for n in dnames if n != occluder and n in draft.object_poses}
+        lo, hi = 0.0, self.radius[occluder] + self.radius["target"] + 0.05
         off = 0.0
         best = None
         for it in range(int(occ.get("max_renders", 6))):

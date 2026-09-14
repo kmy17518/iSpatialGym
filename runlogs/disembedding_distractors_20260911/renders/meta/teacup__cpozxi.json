@@ -1,0 +1,35 @@
+{
+ "category": "teacup",
+ "model": "cpozxi",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/teacup__cpozxi__y0.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.055,
+   "seg_pixels": 7016,
+   "aabb_extent": [
+    0.087,
+    0.087,
+    0.106
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/teacup__cpozxi__y1.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.4,
+   "on_tray": true,
+   "settled_z": 0.055
+  }
+ },
+ "stable": true,
+ "visible": true
+}

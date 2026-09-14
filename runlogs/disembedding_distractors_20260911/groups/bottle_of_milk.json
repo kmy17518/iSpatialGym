@@ -1,0 +1,11 @@
+{
+  "category": "bottle_of_milk",
+  "n_models": 6,
+  "pages_opened": [
+    "grids/same/bottle_of_milk__p1.png",
+    "grids/same/bottle_of_milk__p2.png"
+  ],
+  "groups": [],
+  "unusable": [],
+  "notes": "All six assets rest lying on their side (canonical pose, bbox long axis horizontal) and are small (3.7-9.5k px, blurry). ddvsgl/utfsmp share geometry (c1) and a pale grey-green body; kept apart only by ddvsgl's red cap and red print visible at every yaw. czblzn settles with 8.8 deg tilt but reads fine."
+}

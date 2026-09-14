@@ -1,0 +1,116 @@
+{
+ "scene": "restaurant_diner",
+ "table": "bench_xwphjd_7",
+ "category": "bench",
+ "model": "xwphjd",
+ "rooms": [
+  "dining_room_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-0",
+ "inventory": {
+  "top_z": 0.952,
+  "bbox_x": 0.664,
+  "bbox_y": 1.241,
+  "bbox_z": 0.952,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:29:34",
+ "precheck": {
+  "aabb": [
+   [
+    -1.666,
+    -9.771,
+    -0.005
+   ],
+   [
+    -0.993,
+    -8.526,
+    0.956
+   ]
+  ],
+  "support": {
+   "name": "bench_xwphjd_7",
+   "z": 0.39706161618232727,
+   "yaw": 3.141591787338257,
+   "local_bounds": [
+    1.1158044338226318,
+    1.655805230140686,
+    8.54105281829834,
+    9.761052131652832
+   ],
+   "n_free_cells": 1476,
+   "occupants": [
+    "bench_xwphjd_3"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -1.656,
+     -9.151
+    ],
+    "length": 1.22
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -1.116,
+     -9.151
+    ],
+    "length": 1.22
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -1.386,
+     -9.761
+    ],
+    "length": 0.54
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -1.386,
+     -8.541
+    ],
+    "length": 0.54
+   }
+  ],
+  "stance": null,
+  "stance_error": "[stance_collision] untucked: [stance_collision] no collision-free viewing trunk configuration (29 candidates)",
+  "precheck_s": 1.1
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "view_arms": "untucked",
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/restaurant_diner/restaurant_diner__bench_xwphjd_7__inter_object_relation_satisfaction-0",
+ "setup_s": 4.3,
+ "reject_reason": "no_support",
+ "error": "[no_support] bench_xwphjd_7: [no_stance] stand_off 0.45 edge None: [stance_collision] untucked: [stance_collision] no collision-free viewing trunk configuration (33 candidates); stand_off 0.35 edge None: [stance_collision] untucked: [stance_collision] no collision-free viewing trunk configuration (19 candidates); stand_off 0.55 edge None: [stance_collision] untucked: [stance_collision] no collision-free viewing trunk configuration (47 candidates); stand_off 0.65 edge None: [unreachable] no reachable cell on the support",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 4.3,
+   "run_s": null
+  }
+ ],
+ "job_s": 5.7,
+ "finished": "2026-09-12 02:29:40"
+}

@@ -1,0 +1,379 @@
+{
+ "scene": "house_single_floor",
+ "table": "breakfast_table_rhjoby_0",
+ "category": "breakfast_table",
+ "model": "rhjoby",
+ "rooms": [
+  "dining_room_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-0",
+ "inventory": {
+  "top_z": 0.797,
+  "bbox_x": 1.16,
+  "bbox_y": 2.896,
+  "bbox_z": 0.781,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "straight_chair_jgoolz_0",
+  "straight_chair_jgoolz_1",
+  "straight_chair_jgoolz_2",
+  "straight_chair_jgoolz_3",
+  "straight_chair_jgoolz_4",
+  "straight_chair_jgoolz_5"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 22:58:41",
+ "precheck": {
+  "aabb": [
+   [
+    5.831,
+    2.905,
+    -0.0
+   ],
+   [
+    8.76,
+    4.096,
+    0.813
+   ]
+  ],
+  "support": {
+   "name": "breakfast_table_rhjoby_0",
+   "z": 0.8126287460327148,
+   "yaw": 1.5682439804077148,
+   "local_bounds": [
+    2.9359545707702637,
+    4.096155166625977,
+    -8.733036041259766,
+    -5.83023738861084
+   ],
+   "n_free_cells": 8463,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     7.292,
+     4.078
+    ],
+    "length": 2.903
+   },
+   {
+    "name": "-u",
+    "mid": [
+     7.289,
+     2.917
+    ],
+    "length": 2.903
+   },
+   {
+    "name": "+v",
+    "mid": [
+     5.839,
+     3.501
+    ],
+    "length": 1.16
+   },
+   {
+    "name": "-v",
+    "mid": [
+     8.742,
+     3.494
+    ],
+    "length": 1.16
+   }
+  ],
+  "stance": {
+   "edge": "-v",
+   "edge_mid": [
+    8.741981506347656,
+    3.493753671646118
+   ],
+   "inward": [
+    -0.9999967217445374,
+    0.0025523435324430466
+   ],
+   "tangent": [
+    -0.0025523435324430466,
+    -0.9999967217445374
+   ],
+   "base_pose2d": [
+    9.192100524902344,
+    3.539762258529663,
+    3.1390403072324995
+   ],
+   "edge_depth": 0.4500001072883606,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.4000000059604645,
+    "axis_angle": 0.06970161156186469
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.8
+ },
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {},
+ "template_meta": {
+  "support": {
+   "name": "breakfast_table_rhjoby_0",
+   "z": 0.8126288056373596,
+   "yaw": 1.568244457244873,
+   "local_bounds": [
+    2.935950517654419,
+    4.0961503982543945,
+    -8.733041763305664,
+    -5.830244064331055
+   ],
+   "n_free_cells": 8463,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-v",
+   "edge_mid": [
+    8.741985321044922,
+    3.493753433227539
+   ],
+   "inward": [
+    -0.9999967217445374,
+    0.0025518666952848434
+   ],
+   "tangent": [
+    -0.0025518666952848434,
+    -0.9999967217445374
+   ],
+   "base_pose2d": [
+    9.19210433959961,
+    3.539762258529663,
+    3.139040784068115
+   ],
+   "edge_depth": 0.4500001072883606,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.4000000059604645,
+    "axis_angle": 0.02477338914510238
+   }
+  },
+  "view_arms": "untucked",
+  "n_reachable_cells": 12,
+  "n_grasp_cells": 10,
+  "n_grasp_combos": 138,
+  "n_region_cells": 630,
+  "n_visible_cells": 542,
+  "stand_off": 0.45,
+  "edge": null,
+  "load_room_instances": [
+   "dining_room_0",
+   "entryway_0",
+   "kitchen_0",
+   "living_room_0",
+   "living_room_1"
+  ],
+  "task_rooms": [
+   "dining_room_0"
+  ],
+  "rejections": {},
+  "n_written": 1,
+  "scene_variant": {
+   "scene_file": "../../scene_variants/house_single_floor__c2c12af826.json",
+   "removed_objects": [
+    "straight_chair_jgoolz_0",
+    "straight_chair_jgoolz_1",
+    "straight_chair_jgoolz_2",
+    "straight_chair_jgoolz_3",
+    "straight_chair_jgoolz_4",
+    "straight_chair_jgoolz_5"
+   ],
+   "freed_footprints": {
+    "free": [
+     [
+      [
+       7.993353843688965,
+       3.1143271923065186
+      ],
+      [
+       8.363746643066406,
+       3.248072862625122
+      ],
+      [
+       8.546874046325684,
+       2.7409231662750244
+      ],
+      [
+       8.176481246948242,
+       2.607177495956421
+      ]
+     ],
+     [
+      [
+       8.428321838378906,
+       3.81669282913208
+      ],
+      [
+       8.04768180847168,
+       3.715738296508789
+      ],
+      [
+       7.909452438354492,
+       4.236918926239014
+      ],
+      [
+       8.290092468261719,
+       4.337873458862305
+      ]
+     ],
+     [
+      [
+       7.475783348083496,
+       3.7558629512786865
+      ],
+      [
+       7.083395957946777,
+       3.722538948059082
+      ],
+      [
+       7.037768363952637,
+       4.259805202484131
+      ],
+      [
+       7.4301557540893555,
+       4.293128967285156
+      ]
+     ],
+     [
+      [
+       6.607521057128906,
+       3.804436206817627
+      ],
+      [
+       6.21530818939209,
+       3.8397560119628906
+      ],
+      [
+       6.263669013977051,
+       4.3767828941345215
+      ],
+      [
+       6.655881881713867,
+       4.341463088989258
+      ]
+     ],
+     [
+      [
+       6.289393901824951,
+       3.2292425632476807
+      ],
+      [
+       6.669515132904053,
+       3.1263527870178223
+      ],
+      [
+       6.528636455535889,
+       2.605881929397583
+      ],
+      [
+       6.148515224456787,
+       2.7087717056274414
+      ]
+     ],
+     [
+      [
+       7.140786647796631,
+       3.0244858264923096
+      ],
+      [
+       7.520907878875732,
+       2.921595573425293
+      ],
+      [
+       7.380028247833252,
+       2.401125192642212
+      ],
+      [
+       6.99990701675415,
+       2.5040154457092285
+      ]
+     ]
+    ],
+    "block": [
+     [
+      [
+       5.848289966583252,
+       4.084524154663086
+      ],
+      [
+       8.743980407714844,
+       4.077131748199463
+      ],
+      [
+       8.741019248962402,
+       2.9172356128692627
+      ],
+      [
+       5.845329284667969,
+       2.9246277809143066
+      ]
+     ]
+    ]
+   }
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 3.65,
+   "prepare_template_s": 1.38,
+   "save_template_s": 0.18
+  }
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_table_sel/house_single_floor/house_single_floor__breakfast_table_rhjoby_0__inter_object_relation_satisfaction-0/instances/inter_object_relation_satisfaction-0__house_single_floor__breakfast_table_rhjoby_0__inter_object_relation_satisfaction-0__0000.summary.json",
+   "wall_time_s": 7.5,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    9.19210433959961,
+    3.539762258529663,
+    3.139040784068115
+   ],
+   "trunk": [
+    0.749999987042469,
+    -0.40000003576278687
+   ],
+   "grasp": {
+    "key": "pack_of_kielbasa__dgodnn__t",
+    "name": "grasp_1",
+    "translate": 0.5,
+    "yaw": -0.7086660723161335
+   },
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.4000000059604645
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_table_sel/house_single_floor/house_single_floor__breakfast_table_rhjoby_0__inter_object_relation_satisfaction-0",
+ "bound_table": "breakfast_table_rhjoby_0",
+ "setup_s": 5.0,
+ "run_s": 7.5,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "ok",
+   "n_written": 1,
+   "rejections": {},
+   "reject_reason": null,
+   "setup_s": 5.0,
+   "run_s": 7.5
+  }
+ ],
+ "job_s": 14.2,
+ "finished": "2026-09-11 23:00:08"
+}

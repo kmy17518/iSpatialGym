@@ -1,0 +1,7 @@
+{
+  "category": "carton_of_milk",
+  "pages_opened": ["grids/pool_other/carton_of_milk__p1.png", "grids/pool_other/carton_of_milk__p2.png"],
+  "n_models": 24,
+  "exclude": [],
+  "notes": "All 24 are upright, textured cartons, bottles, a milk jug and tier-2 grocery boxes. Borderline kept: carton_of_pineapple_juice/vzueyg renders blurry/lumpy at 5040 px but still reads as a juice carton; box_of_shampoo/bclpiq is a non-food box yet a plausible boxed product."
+}

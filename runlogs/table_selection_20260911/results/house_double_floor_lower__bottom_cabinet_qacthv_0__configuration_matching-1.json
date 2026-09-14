@@ -1,0 +1,117 @@
+{
+ "scene": "house_double_floor_lower",
+ "table": "bottom_cabinet_qacthv_0",
+ "category": "bottom_cabinet",
+ "model": "qacthv",
+ "rooms": [
+  "bathroom_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-1",
+ "inventory": {
+  "top_z": 0.798,
+  "bbox_x": 0.482,
+  "bbox_y": 1.137,
+  "bbox_z": 0.798,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:04:37",
+ "precheck": {
+  "aabb": [
+   [
+    -3.061,
+    -0.982,
+    -0.009
+   ],
+   [
+    -1.912,
+    -0.487,
+    0.807
+   ]
+  ],
+  "support": {
+   "name": "bottom_cabinet_qacthv_0",
+   "z": 0.8061590194702148,
+   "yaw": 1.5707948207855225,
+   "local_bounds": [
+    -0.9517868161201477,
+    -0.511785089969635,
+    1.9313918352127075,
+    3.0313925743103027
+   ],
+   "n_free_cells": 725,
+   "occupants": [
+    "drop_in_sink_hecjnt_0"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -2.481,
+     -0.512
+    ],
+    "length": 1.1
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -2.481,
+     -0.952
+    ],
+    "length": 1.1
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -3.031,
+     -0.732
+    ],
+    "length": 0.44
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -1.931,
+     -0.732
+    ],
+    "length": 0.44
+   }
+  ],
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    -2.4813928604125977,
+    -0.5117813348770142
+   ],
+   "inward": [
+    -1.5060094256114098e-06,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    -1.5060094256114098e-06
+   ],
+   "base_pose2d": [
+    -2.4813921451568604,
+    -0.061781346797943115,
+    -1.5707978328043222
+   ],
+   "edge_depth": 0.44999998807907104,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.08188829350918886
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.2
+ },
+ "status": "skipped",
+ "reason": "inter_object_relation_satisfaction-0 found no stance / no reachable cell on the support top at any stand-off"
+}

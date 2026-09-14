@@ -1,0 +1,9 @@
+{
+ "target_category": "pencil_case",
+ "category": "pencil_case",
+ "model": "otcmih",
+ "kind": "same",
+ "status": "is_target",
+ "error": "the category's test target itself: it is the target of every other validated pair of the category (stands on the tray, graspable, placeable), not re-validated as a distractor",
+ "n_written": 0
+}

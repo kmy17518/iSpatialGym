@@ -1,0 +1,35 @@
+{
+ "category": "box_of_baking_powder",
+ "model": "vzgrlv",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/box_of_baking_powder__vzgrlv__y0.png",
+   "drift_m": 0.0013,
+   "tilt_deg": 0.6,
+   "on_tray": true,
+   "settled_z": 0.1077,
+   "seg_pixels": 25568,
+   "aabb_extent": [
+    0.083,
+    0.139,
+    0.188
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/box_of_baking_powder__vzgrlv__y1.png",
+   "drift_m": 0.001,
+   "tilt_deg": 0.6,
+   "on_tray": true,
+   "settled_z": 0.1077
+  }
+ },
+ "stable": true,
+ "visible": true
+}

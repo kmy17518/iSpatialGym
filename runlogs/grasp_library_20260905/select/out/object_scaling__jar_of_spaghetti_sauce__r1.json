@@ -1,0 +1,33 @@
+{
+  "group": "object_scaling__jar_of_spaghetti_sauce__r1",
+  "task": "object_scaling",
+  "category": "jar_of_spaghetti_sauce",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 6,
+  "n_opened": 6,
+  "candidates": [
+    {"model": "zahyds", "key": "jar_of_spaghetti_sauce__zahyds", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Five clean 63-65 mm diameter pinches all at CoM, diversity only from flips/axial rotation; small jar with sharp colourful label and red lid"},
+    {"model": "yqnmoy", "key": "jar_of_spaghetti_sauce__yqnmoy", "G": 5, "T": 3, "V": 2, "R": 1, "score": 18,
+     "note": "Five clean mid-body pinches 11-21 mm from CoM at 78-83 mm (nearly fills gripper, conf 0.72-0.76); body rendered black glossy, tiny label"},
+    {"model": "fyocnu", "key": "jar_of_spaghetti_sauce__fyocnu", "G": 3, "T": 3, "V": 3, "R": 1, "score": 16,
+     "note": "Rows 1-3 clean body pinches; rows 4-5 end grasps 43-49 mm off CoM with pads overhanging the end; black glossy body, tomato label visible"},
+    {"model": "xpasvb", "key": "jar_of_spaghetti_sauce__xpasvb", "G": 5, "T": 3, "V": 3, "R": 1, "score": 20,
+     "note": "Five clean full-pad pinches spread 20-39 mm along the axis, good diversity; 78-83 mm width borderline; black glossy body, legible pasta-sauce label"},
+    {"model": "efrxze", "key": "jar_of_spaghetti_sauce__efrxze", "G": 4, "T": 3, "V": 3, "R": 1, "score": 18,
+     "note": "Rows 1,2,3,5 clean pinches 20-34 mm from CoM; row 4 end grasp 46 mm lever; 76-81 mm width; black glossy body with tomato/red-pepper label"},
+    {"model": "exmsmm", "key": "jar_of_spaghetti_sauce__exmsmm", "G": 5, "T": 3, "V": 2, "R": 1, "score": 18,
+     "note": "Five clean pinches 9-23 mm from CoM, antipodal 0.90-0.99; 79-84 mm width borderline; black glossy body, generic herb label, wrist cam sees only black"}
+  ],
+  "selected": [
+    {"model": "zahyds", "key": "jar_of_spaghetti_sauce__zahyds", "rank": 1,
+     "reason": "Highest score: robust 64 mm pinches at CoM with full coverage, and the only sharply textured, immediately recognisable sauce jar; smaller size variant."},
+    {"model": "xpasvb", "key": "jar_of_spaghetti_sauce__xpasvb", "rank": 2,
+     "reason": "Best of the 85 mm jars: five clean pinches spread along the body for diverse in-hand transforms; label legible in wrist cam. Dark glossy body, 78-83 mm width are weak."}
+  ],
+  "alternate": {"model": "exmsmm", "key": "jar_of_spaghetti_sauce__exmsmm"},
+  "short": false,
+  "warnings": ["All 85 mm jars (yqnmoy, fyocnu, xpasvb, efrxze, exmsmm) render the glass body as a black mirror-like surface and nearly fill the gripper (76-84 mm)."],
+  "confidence": "medium"
+}

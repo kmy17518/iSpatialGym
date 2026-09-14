@@ -1,0 +1,22 @@
+{
+ "assignment": "sel_28",
+ "groups": [
+  "/tmp/glib/select/groups/disembedding__box_of_oatmeal__r3.json",
+  "/tmp/glib/select/groups/disembedding__box_of_yogurt__r1.json",
+  "/tmp/glib/select/groups/mental_rotation__baby_shoe__r3.json",
+  "/tmp/glib/select/groups/mental_rotation__banana__r1.json",
+  "/tmp/glib/select/groups/mental_rotation__ginger_root__r3.json",
+  "/tmp/glib/select/groups/mental_rotation__hammer__r1.json",
+  "/tmp/glib/select/groups/mental_rotation__high_heel__r3.json",
+  "/tmp/glib/select/groups/mental_rotation__vegetable_peeler__r1.json",
+  "/tmp/glib/select/groups/object_scaling__orange__r3.json",
+  "/tmp/glib/select/groups/disembedding__jar_of_bath_salt__r3.json",
+  "/tmp/glib/select/groups/mental_rotation__cleaver__r3.json",
+  "/tmp/glib/select/groups/mental_rotation__drill__r3.json",
+  "/tmp/glib/select/groups/mental_rotation__gaming_controller__r3.json",
+  "/tmp/glib/select/groups/mental_rotation__mallet__r3.json",
+  "/tmp/glib/select/groups/mental_rotation__stapler__r3.json",
+  "/tmp/glib/select/groups/mental_rotation__webcam__r2.json"
+ ],
+ "n_strips": 25
+}

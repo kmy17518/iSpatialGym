@@ -1,0 +1,7 @@
+{
+  "category": "box_of_cookies",
+  "pages_opened": ["grids/pool_other/box_of_cookies__p1.png", "grids/pool_other/box_of_cookies__p2.png"],
+  "n_models": 18,
+  "exclude": [],
+  "notes": "All 18 are textured, recognisable food packaging (crackers, cereal, granola bars, baking mix, coffee, candy, cookie bags, tier-2 sugar) and sit upright or in their natural rest pose. The three bag_of_cookies pouches lie flat, which is normal for a bag, not toppled. box_of_candy/gvreky is a cylindrical candy tub rather than a box but still a good related distractor."
+}

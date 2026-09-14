@@ -1,0 +1,92 @@
+{
+ "scene": "hotel_suite_large",
+ "table": "shelf_xogqqm_2",
+ "category": "shelf",
+ "model": "xogqqm",
+ "rooms": [
+  "bathroom_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-0",
+ "inventory": {
+  "top_z": 0.641,
+  "bbox_x": 0.31,
+  "bbox_y": 0.856,
+  "bbox_z": 0.098,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:50:32",
+ "precheck": {
+  "aabb": [
+   [
+    -2.195,
+    2.242,
+    0.543
+   ],
+   [
+    -1.34,
+    2.551,
+    0.641
+   ]
+  ],
+  "support": {
+   "name": "shelf_xogqqm_2",
+   "z": 0.6409976482391357,
+   "yaw": -1.5707964897155762,
+   "local_bounds": [
+    -2.5317018032073975,
+    -2.251701831817627,
+    -2.1847352981567383,
+    -1.3647351264953613
+   ],
+   "n_free_cells": 624,
+   "occupants": [
+    "walls_znbklu_0"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -1.775,
+     2.252
+    ],
+    "length": 0.82
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -1.775,
+     2.532
+    ],
+    "length": 0.82
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -1.365,
+     2.392
+    ],
+    "length": 0.28
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -2.185,
+     2.392
+    ],
+    "length": 0.28
+   }
+  ],
+  "stance": null,
+  "stance_error": "[stance_collision] untucked: [no_stance] no collision-free stance around shelf_xogqqm_2",
+  "precheck_s": 0.6
+ },
+ "status": "skipped",
+ "reason": "inter_object_relation_satisfaction-0 found no stance / no reachable cell on the support top at any stand-off (precheck: no stance either)"
+}

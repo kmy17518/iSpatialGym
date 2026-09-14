@@ -1,0 +1,199 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "desk_pfsjbc_0",
+ "category": "desk",
+ "model": "pfsjbc",
+ "rooms": [
+  "lobby_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-0",
+ "inventory": {
+  "top_z": 0.968,
+  "bbox_x": 1.112,
+  "bbox_y": 4.2,
+  "bbox_z": 1.085,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "swivel_chair_ryznxk_10",
+  "swivel_chair_ryznxk_11"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 15,
+ "started": "2026-09-12 04:08:00",
+ "precheck": {
+  "aabb": [
+   [
+    -2.893,
+    -16.058,
+    -0.023
+   ],
+   [
+    1.354,
+    -14.932,
+    1.134
+   ]
+  ],
+  "support": {
+   "name": "desk_pfsjbc_0",
+   "z": 0.7741228938102722,
+   "yaw": -1.5707964897155762,
+   "local_bounds": [
+    14.948094367980957,
+    16.048093795776367,
+    -2.8626842498779297,
+    1.3373160362243652
+   ],
+   "n_free_cells": 8846,
+   "occupants": [
+    "walls_wcngqp_0"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -0.763,
+     -16.048
+    ],
+    "length": 4.2
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -0.763,
+     -14.948
+    ],
+    "length": 4.2
+   },
+   {
+    "name": "+v",
+    "mid": [
+     1.337,
+     -15.498
+    ],
+    "length": 1.1
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -2.863,
+     -15.498
+    ],
+    "length": 1.1
+   }
+  ],
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    1.3373135328292847,
+    -15.49809455871582
+   ],
+   "inward": [
+    -1.0,
+    1.6292068494294654e-07
+   ],
+   "tangent": [
+    -1.6292068494294654e-07,
+    -1.0
+   ],
+   "base_pose2d": [
+    1.787313461303711,
+    -15.49809455871582,
+    3.141592490669108
+   ],
+   "edge_depth": 0.44999992847442627,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.04628278783954801
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 2.8
+ },
+ "status": "no_instances",
+ "n_written": 0,
+ "rejections": {
+  "layout": 15
+ },
+ "template_meta": {
+  "support": {
+   "name": "desk_pfsjbc_0",
+   "z": 0.7741228938102722,
+   "yaw": -1.5707964897155762,
+   "local_bounds": [
+    14.948094367980957,
+    16.048093795776367,
+    -2.8626842498779297,
+    1.3373160362243652
+   ],
+   "n_free_cells": 8846,
+   "occupants": [
+    "walls_wcngqp_0"
+   ],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    1.3373135328292847,
+    -15.49809455871582
+   ],
+   "inward": [
+    -1.0,
+    1.6292068494294654e-07
+   ],
+   "tangent": [
+    -1.6292068494294654e-07,
+    -1.0
+   ],
+   "base_pose2d": [
+    1.787313461303711,
+    -15.49809455871582,
+    3.141592490669108
+   ],
+   "edge_depth": 0.44999992847442627,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.024609220920268744
+   }
+  },
+  "view_arms": "untucked",
+  "n_reachable_cells": 13,
+  "edge": 0.025398889556527138,
+  "rejections": {
+   "layout": 15
+  },
+  "n_written": 0,
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 3.99,
+   "prepare_template_s": 0.45
+  }
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/office_cubicles_right/office_cubicles_right__desk_pfsjbc_0__configuration_matching-0",
+ "bound_table": "desk_pfsjbc_0",
+ "setup_s": 4.4,
+ "run_s": 0.9,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "no_instances",
+   "n_written": 0,
+   "rejections": {
+    "layout": 15
+   },
+   "reject_reason": null,
+   "setup_s": 4.4,
+   "run_s": 0.9
+  }
+ ],
+ "job_s": 7.4,
+ "finished": "2026-09-12 04:08:55"
+}

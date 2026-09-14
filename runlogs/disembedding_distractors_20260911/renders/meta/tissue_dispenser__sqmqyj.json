@@ -1,0 +1,35 @@
+{
+ "category": "tissue_dispenser",
+ "model": "sqmqyj",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/tissue_dispenser__sqmqyj__y0.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.4,
+   "on_tray": true,
+   "settled_z": 0.0517,
+   "seg_pixels": 32328,
+   "aabb_extent": [
+    0.123,
+    0.253,
+    0.131
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/tissue_dispenser__sqmqyj__y1.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.1,
+   "on_tray": true,
+   "settled_z": 0.0514
+  }
+ },
+ "stable": true,
+ "visible": true
+}

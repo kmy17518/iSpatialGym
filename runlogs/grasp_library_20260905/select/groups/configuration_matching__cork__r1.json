@@ -1,0 +1,165 @@
+{
+ "group": "configuration_matching__cork__r1",
+ "task": "configuration_matching",
+ "category": "cork",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "Attachment task: the object is picked from a table and attached to its partner. The pads must leave the mating side of the object completely free.",
+ "candidates": [
+  {
+   "model": "ncxgpe",
+   "key": "cork__ncxgpe",
+   "strip": "/tmp/glib/strips/cork__ncxgpe.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch of standing cork; top mating end free"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch of standing cork; top mating end free"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch of standing cork; top mating end free"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch of standing cork; top mating end free"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch (18/0) of standing cork; top end free"
+    }
+   ],
+   "object_note": "Fingers 19/0 match 17 mm cork; attach point 50 mm away at top, unobstructed.",
+   "bbox_mm": [
+    18,
+    18,
+    34
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "attachment_free"
+  },
+  {
+   "model": "lseuwf",
+   "key": "cork__lseuwf",
+   "strip": "/tmp/glib/strips/cork__lseuwf.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch of standing cork; top mating end free"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch of standing cork; top mating end free"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch of standing cork; top mating end free"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch of standing cork; top mating end free"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "Diameter pinch of standing cork; top mating end free"
+    }
+   ],
+   "object_note": "Fingers 20/0 match 18 mm cork; attach point 48 mm away at top, unobstructed in V4.",
+   "bbox_mm": [
+    19,
+    18,
+    30
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "attachment_free"
+  },
+  {
+   "model": "uyceta",
+   "key": "cork__uyceta",
+   "strip": "/tmp/glib/strips/cork__uyceta.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upright cork pinched near top; bottom mating end free"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "same top pinch, both pads on cork"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "same top pinch, both pads on cork"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "same top pinch, both pads on cork"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "same top pinch, both pads on cork"
+    }
+   ],
+   "object_note": "fingers read 37/0 on all rows (one finger at centreline) but both pads clearly contact the cork",
+   "bbox_mm": [
+    36,
+    36,
+    45
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "attachment_free"
+  }
+ ],
+ "excluded": []
+}

@@ -1,0 +1,118 @@
+{
+ "scene": "house_single_floor",
+ "table": "desk_nbpuns_0",
+ "category": "desk",
+ "model": "nbpuns",
+ "rooms": [
+  "childs_room_2"
+ ],
+ "partner": "bed_ivdnny_0",
+ "problem": "inter_object_relation_satisfaction-1",
+ "inventory": {
+  "top_z": 0.543,
+  "bbox_x": 0.545,
+  "bbox_y": 1.09,
+  "bbox_z": 0.543,
+  "verdict": "low"
+ },
+ "removed_chairs": [
+  "straight_chair_gktknj_0"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:44:56",
+ "precheck": {
+  "aabb": [
+   [
+    23.671,
+    7.119,
+    -0.003
+   ],
+   [
+    24.231,
+    8.222,
+    0.549
+   ]
+  ],
+  "support": {
+   "name": "desk_nbpuns_0",
+   "z": 0.5494412183761597,
+   "yaw": 3.1390490531921387,
+   "local_bounds": [
+    -24.202749252319336,
+    -23.660003662109375,
+    -8.270058631896973,
+    -7.188739776611328
+   ],
+   "n_free_cells": 1447,
+   "occupants": [
+    "fixed_window_tspbac_2"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     23.68,
+     7.669
+    ],
+    "length": 1.081
+   },
+   {
+    "name": "-u",
+    "mid": [
+     24.222,
+     7.668
+    ],
+    "length": 1.081
+   },
+   {
+    "name": "+v",
+    "mid": [
+     23.95,
+     7.128
+    ],
+    "length": 0.543
+   },
+   {
+    "name": "-v",
+    "mid": [
+     23.952,
+     8.209
+    ],
+    "length": 0.543
+   }
+  ],
+  "stance": null,
+  "stance_error": "[stance_collision] untucked: [no_stance] no collision-free stance around desk_nbpuns_0",
+  "precheck_s": 1.1
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "view_arms": "untucked",
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/house_single_floor/house_single_floor__desk_nbpuns_0__under_bed_ivdnny_0__inter_object_relation_satisfaction-1",
+ "setup_s": 56.0,
+ "reject_reason": "no_support",
+ "error": "[no_support] desk_nbpuns_0: [no_stance] stand_off 0.45 edge None: [stance_collision] untucked: [no_stance] no collision-free stance around desk_nbpuns_0; stand_off 0.45 edge +u: [stance_collision] untucked: [no_stance] no collision-free stance around desk_nbpuns_0; stand_off 0.45 edge -u: [stance_collision] untucked: [no_stance] no collision-free stance around desk_nbpuns_0; stand_off 0.45 edge +v: [stance_collision] untucked: [no_stance] no collision-free stance around desk_nbpuns_0; stand_off 0.45 edge -v: [stance_collision] untucked: [no_stance] no collision-free stance around desk_nbpuns_0; stand_off 0.35 edge None: [stance_collision] untucked: [no_stance] no collision-free stance around desk_nbpuns_0; stand_off 0.35 edge +u: [stance_collision] untucked: [no_stance] no collision-free stance around desk_nbpuns_0; stand_off 0.35 edge -u: [stance_collision] untucked: [no_stance] no collision-free stance around desk_nbpuns_0; stand_off 0.35 edge +v: [stance_collision] untucked: [no_stance] no collision-free stance around desk_nbpuns_0; stand_off 0.35 edge -v: [stance_collision] untucked: [no_stance] no collision-free stance around desk_nbpuns_0; stand_off 0.55 edge None: [stance_collision] untucked: [no_stance] no collision-free stance around desk_nbpuns_0; stand_off 0.55 edge +u: [stance_collision] untucked: [no_stance] no collision-free stance around desk_nbpuns_0; stand_off 0.55 edge -u: [stance_collision] untucked: [no_stance] no collision-free stance around desk_nbpuns_0; stand_off 0.55 edge +v: [stance_collision] untucked: [no_stance] no collision-free stance around desk_nbpuns_0; stand_off 0.55 edge -v: [stance_collision] untucked: [no_stance] no collision-free stance around desk_nbpuns_0; bed_ivdnny_0: [no_stance] stand_off 0.45 edge None: [unreachable] no reachable cell on the support; stand_off 0.45 edge +u: [stance_collision] untucked: [no_stance] no collision-free stance around bed_ivdnny_0; stand_off 0.45 edge -u: [stance_collision] untucked: [no_stance",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 56.0,
+   "run_s": null
+  }
+ ],
+ "job_s": 58.0,
+ "finished": "2026-09-12 02:47:01"
+}

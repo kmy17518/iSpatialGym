@@ -1,0 +1,35 @@
+{
+ "category": "box_of_sake",
+ "model": "qfrurx",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/box_of_sake__qfrurx__y0.png",
+   "drift_m": 0.0029,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1745,
+   "seg_pixels": 45643,
+   "aabb_extent": [
+    0.095,
+    0.094,
+    0.349
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/box_of_sake__qfrurx__y1.png",
+   "drift_m": 0.0011,
+   "tilt_deg": 0.1,
+   "on_tray": true,
+   "settled_z": 0.1745
+  }
+ },
+ "stable": true,
+ "visible": true
+}

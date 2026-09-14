@@ -1,0 +1,35 @@
+{
+ "category": "pillar_candle",
+ "model": "cxswbc",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/pillar_candle__cxswbc__y0.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.0,
+   "on_tray": true,
+   "settled_z": 0.055,
+   "seg_pixels": 10642,
+   "aabb_extent": [
+    0.102,
+    0.102,
+    0.14
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/pillar_candle__cxswbc__y1.png",
+   "drift_m": 0.0007,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.0551
+  }
+ },
+ "stable": true,
+ "visible": true
+}

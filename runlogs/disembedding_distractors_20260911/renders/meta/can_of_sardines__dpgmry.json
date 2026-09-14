@@ -1,0 +1,35 @@
+{
+ "category": "can_of_sardines",
+ "model": "dpgmry",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/can_of_sardines__dpgmry__y0.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0562,
+   "seg_pixels": 9257,
+   "aabb_extent": [
+    0.085,
+    0.085,
+    0.119
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/can_of_sardines__dpgmry__y1.png",
+   "drift_m": 0.0002,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0562
+  }
+ },
+ "stable": true,
+ "visible": true
+}

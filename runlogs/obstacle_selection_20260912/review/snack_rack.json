@@ -1,0 +1,43 @@
+{
+  "category": "snack_rack",
+  "task": "obst",
+  "n_models": 3,
+  "n_opened": 3,
+  "models": [
+    {
+      "model": "bfdnho",
+      "V": 3,
+      "N": 0,
+      "S": 0,
+      "rest_ok": true,
+      "score": 6,
+      "valid": false,
+      "note": "Huge L-shaped green store shelving unit 3.1 x 2.1 x 0.96 m; shop fixture, far too large for any path."
+    },
+    {
+      "model": "mmaeua",
+      "V": 2,
+      "N": 1,
+      "S": 0,
+      "rest_ok": true,
+      "score": 6,
+      "valid": false,
+      "note": "Stepped counter display of stacked snack boxes, most boxes untextured grey, cluttered; 0.44 x 0.80 x 0.45 m, footprint just over limit."
+    },
+    {
+      "model": "ytrmpz",
+      "V": 3,
+      "N": 1,
+      "S": 1,
+      "rest_ok": true,
+      "score": 9,
+      "valid": false,
+      "note": "Wire-grid counter display panel on a tray base, grey, clean; 0.23 x 0.64 x 0.48 m; counter item, odd on the floor."
+    }
+  ],
+  "picks": [],
+  "alternate": null,
+  "natural_scenes": [],
+  "category_verdict": "drop",
+  "category_note": "Store display fixtures: one 3 m shelving gondola and two countertop snack displays. None is a floor object met mid-path in the seven scenes; sizes are either huge or borderline. No valid model."
+}

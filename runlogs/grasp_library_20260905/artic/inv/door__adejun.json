@@ -1,0 +1,147 @@
+{
+ "category": "door",
+ "model": "adejun",
+ "key": "door__adejun",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  1.7370774745941162
+ ],
+ "aabb_extent": [
+  0.2276829183101654,
+  1.6722393035888672,
+  2.6199140548706055
+ ],
+ "aabb_min_rel_root": [
+  -0.11107076704502106,
+  -0.8353362679481506,
+  -1.7370774745941162
+ ],
+ "aabb_max_rel_root": [
+  0.11661215126514435,
+  0.8369030356407166,
+  0.8828365802764893
+ ],
+ "link_tags": {
+  "base_link": [],
+  "left_leaf": [],
+  "left_glass": [
+   "glass"
+  ],
+  "right_leaf": [],
+  "right_glass": [
+   "glass"
+  ],
+  "top_glass": [
+   "glass"
+  ]
+ },
+ "openable_joint_ids": [],
+ "joints": [
+  {
+   "joint": "j_left_leaf",
+   "type": "RevoluteJoint",
+   "child_link": "left_leaf",
+   "lower": 0.0,
+   "upper": 1.5709525346755981,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    -0.05672,
+    0.76214,
+    -0.73187
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "hinge_point_obj": [
+    -0.05672,
+    0.76214,
+    -8.12921
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/door__adejun__left_leaf.obj",
+   "n_pieces": 7,
+   "link_bbox_min": [
+    -0.0954,
+    -0.0013,
+    -1.7317
+   ],
+   "link_bbox_max": [
+    -0.0099,
+    0.763,
+    0.3737
+   ],
+   "link_tags": [],
+   "sub_links": []
+  },
+  {
+   "joint": "j_right_leaf",
+   "type": "RevoluteJoint",
+   "child_link": "right_leaf",
+   "lower": 0.0,
+   "upper": 1.570868968963623,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    -0.05677,
+    -0.76167,
+    -0.73176
+   ],
+   "link_quat_obj": [
+    -0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    -0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    -0.05677,
+    -0.76167,
+    -0.73176
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/door__adejun__right_leaf.obj",
+   "n_pieces": 7,
+   "link_bbox_min": [
+    -0.0954,
+    -0.7625,
+    -1.7317
+   ],
+   "link_bbox_max": [
+    -0.0099,
+    -0.0211,
+    0.3737
+   ],
+   "link_tags": [],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.1111,
+   -0.8353,
+   -1.7371
+  ],
+  "bbox_max": [
+   0.1166,
+   0.8369,
+   0.8828
+  ],
+  "n_pieces": 7
+ }
+}

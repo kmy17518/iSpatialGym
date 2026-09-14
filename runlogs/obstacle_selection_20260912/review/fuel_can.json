@@ -1,0 +1,23 @@
+{
+  "category": "fuel_can",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "fuel_can/bfaqfe",
+      "V": 4,
+      "N": 1,
+      "S": 2,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Dark red jerrycan with handle, spout and X ribbing, upright on flat base; 0.23 x 0.11 x 0.31 m; clean, flat colour."
+    }
+  ],
+  "picks": [],
+  "alternate": null,
+  "natural_scenes": [],
+  "category_verdict": "drop",
+  "category_note": "Single clean upright jerrycan, 0.23 x 0.11 x 0.31 m, stands well. A fuel can belongs in a garage; mid-room in a living room, flat, hotel suite, diner or office it is odd, so it fails the naturalness bar."
+}

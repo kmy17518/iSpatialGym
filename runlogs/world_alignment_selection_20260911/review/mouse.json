@@ -1,0 +1,33 @@
+{
+  "category": "mouse",
+  "task": "wa0",
+  "n_models": 7,
+  "n_opened": 7,
+  "models": [
+    {"model": "cduwda", "V": 3, "O": 2, "F": 2, "score": 12, "valid": true,
+     "long_axis": "x", "front_axis": "-x", "rest_ok": true,
+     "note": "Uniform grey oval mouse 0.124 m, single black dot at the -x (button) end is the only yaw cue; near-symmetric silhouette."},
+    {"model": "eosngb", "V": 3, "O": 1, "F": 1, "score": 9, "valid": false,
+     "long_axis": "x", "front_axis": "-x", "rest_ok": true,
+     "note": "Black arch-shaped (Arc) mouse, plain rectangle from above with a tiny mark; odd outlier shape; 0.109 m borderline size."},
+    {"model": "fjljxp", "V": 3, "O": 2, "F": 1, "score": 11, "valid": true,
+     "long_axis": "x", "front_axis": "-x", "rest_ok": true,
+     "note": "Grey teardrop mouse with scroll-wheel slot at the narrow -x end; subtle but unique cue; 0.106 m borderline size."},
+    {"model": "ihpnjx", "V": 3, "O": 2, "F": 1, "score": 11, "valid": true,
+     "long_axis": "x", "front_axis": "-x", "rest_ok": true,
+     "note": "Same grey teardrop design as fjljxp, scroll wheel at -x; faint button seams; 0.106 m borderline size."},
+    {"model": "oydobn", "V": 3, "O": 2, "F": 0, "score": 10, "valid": false,
+     "long_axis": "x", "front_axis": "-x", "rest_ok": true,
+     "note": "Detailed black gaming mouse with thumb-button grid but bbox only 3 cm long: scale error, far below table-fit minimum."},
+    {"model": "pljjtu", "V": 3, "O": 2, "F": 1, "score": 11, "valid": true,
+     "long_axis": "x", "front_axis": "-x", "rest_ok": true,
+     "note": "Same grey oval-with-dot design as cduwda, 0.119 m (just under 0.12 m); dot at -x end is the only cue."},
+    {"model": "wwyopp", "V": 3, "O": 1, "F": 1, "score": 9, "valid": false,
+     "long_axis": "x", "front_axis": "-x", "rest_ok": true,
+     "note": "Black Arc Touch style curved mouse; black rounded rectangle from above with only a faint two-tone seam, 180-degree ambiguity."}
+  ],
+  "picks": ["cduwda", "fjljxp"],
+  "alternate": "pljjtu",
+  "category_verdict": "weak",
+  "category_note": "Desk mice 0.10-0.12 m long, mostly uniform grey/black with no buttons or cable modelled; only a dot or scroll slot marks the front, so the yaw cue is marginal, and sizes sit at the 0.12 m table-fit border."
+}

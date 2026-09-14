@@ -1,0 +1,24 @@
+{
+ "category": "package",
+ "task": "wa0",
+ "n_models": 1,
+ "n_opened": 1,
+ "models": [
+  {
+   "model": "mvvnqm",
+   "V": 3,
+   "O": 1,
+   "F": 2,
+   "score": 10,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "Brown paper-wrapped parcel 0.30 x 0.20 x 0.036 m, wrinkled but plain; no label or tape, 180-deg ambiguity."
+  }
+ ],
+ "picks": [],
+ "alternate": null,
+ "category_verdict": "drop",
+ "category_note": "Single plain kraft parcel with no print, label or tape pattern; no readable yaw from above or obliquely."
+}

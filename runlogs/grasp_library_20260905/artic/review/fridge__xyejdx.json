@@ -1,0 +1,31 @@
+{
+  "key": "fridge__xyejdx",
+  "category": "fridge",
+  "model": "xyejdx",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_0",
+      "kind": "door",
+      "chosen": "A",
+      "pinch": "vertical_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Vertical bar handle on the upper door's free left edge at mid-door height; grey X ends are its flush mounts. Hinge on the right (+y).",
+      "height_concern": "handle at ~1.48 m, close to 1.5 m limit",
+      "confidence": "high"
+    },
+    {
+      "joint": "j_link_1",
+      "kind": "door",
+      "chosen": "A",
+      "pinch": "vertical_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Vertical bar handle on the lower door's free left edge at mid-door height; grey X ends are its flush mounts. Hinge on the right (+y).",
+      "height_concern": "",
+      "confidence": "high"
+    }
+  ],
+  "object_note": "Two stacked doors hinged on the right, each with a vertical bar handle on the left edge. A correct on both; X end mounts rightly rejected."
+}

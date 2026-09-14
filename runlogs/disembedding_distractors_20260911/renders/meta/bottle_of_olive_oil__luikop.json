@@ -1,0 +1,35 @@
+{
+ "category": "bottle_of_olive_oil",
+ "model": "luikop",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_olive_oil__luikop__y0.png",
+   "drift_m": 0.0002,
+   "tilt_deg": 0.1,
+   "on_tray": true,
+   "settled_z": 0.077,
+   "seg_pixels": 4846,
+   "aabb_extent": [
+    0.04,
+    0.041,
+    0.159
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_olive_oil__luikop__y1.png",
+   "drift_m": 0.0006,
+   "tilt_deg": 0.4,
+   "on_tray": true,
+   "settled_z": 0.077
+  }
+ },
+ "stable": true,
+ "visible": true
+}

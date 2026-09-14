@@ -1,0 +1,27 @@
+{
+ "scene": "house_single_floor",
+ "table": "desk_nbpuns_0",
+ "category": "desk",
+ "model": "nbpuns",
+ "rooms": [
+  "childs_room_2"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.543,
+  "bbox_x": 0.545,
+  "bbox_y": 1.09,
+  "bbox_z": 0.543,
+  "verdict": "low"
+ },
+ "removed_chairs": [
+  "straight_chair_gktknj_0"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 22:56:54",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

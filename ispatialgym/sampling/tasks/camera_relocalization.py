@@ -36,15 +36,16 @@ class CameraRelocalizationSampler(TaskSampler):
         self.room = req.get("room") if isinstance(req, dict) else (self.scene_spec.rooms[0] if self.scene_spec.rooms else None)
 
     def prepare_template(self):
-        self.q_init_rel = self.kit.q_config(arms="tucked", torso_zero=True)
-        self.template_meta["init_config"] = "tucked (all joints zero)"
+        self.q_init_rel = self.kit.q_config(arms=self.init_arms(), torso_zero=True)
+        self.template_meta["init_config"] = f"{self.init_arms()} arms, torso joints zero"
 
     def _in_room(self, xy) -> bool:
         if self.room is None:
             return True
         return self.world.scene.seg_map.get_room_instance_by_point(G.t(xy)[:2]) == self.room
 
-    def _config(self, base2d, translate: float, tilt: float, arms: str = "tucked") -> th.Tensor:
+    def _config(self, base2d, translate: float, tilt: float, arms: Optional[str] = None) -> th.Tensor:
+        arms = self.init_arms() if arms is None else arms
         q = self.kit.q_config(arms=arms, translate=translate, tilt=tilt) if translate is not None else self.q_init_rel
         return self.kit.q_at_base_pose(q, *base2d)
 

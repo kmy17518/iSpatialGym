@@ -1,0 +1,91 @@
+{
+ "category": "carton",
+ "model": "libote",
+ "key": "carton__libote",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.0388970747590065
+ ],
+ "aabb_extent": [
+  0.21538397669792175,
+  0.21419267356395721,
+  0.13907383382320404
+ ],
+ "aabb_min_rel_root": [
+  -0.10679580271244049,
+  -0.10917120426893234,
+  -0.0388970747590065
+ ],
+ "aabb_max_rel_root": [
+  0.10858816653490067,
+  0.10502146929502487,
+  0.10017675906419754
+ ],
+ "link_tags": {
+  "base_link": [],
+  "link0": []
+ },
+ "openable_joint_ids": [],
+ "joints": [
+  {
+   "joint": "j_link0",
+   "type": "RevoluteJoint",
+   "child_link": "link0",
+   "lower": 0.0,
+   "upper": 2.356194257736206,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    -0.10509,
+    -0.00167,
+    0.09445
+   ],
+   "link_quat_obj": [
+    -0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "hinge_point_obj": [
+    -0.10509,
+    0.03389,
+    0.09445
+   ],
+   "measured_angle": 0.2315,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/carton__libote__link0.obj",
+   "n_pieces": 4,
+   "link_bbox_min": [
+    -0.1059,
+    -0.1092,
+    0.0741
+   ],
+   "link_bbox_max": [
+    0.1086,
+    0.105,
+    0.1002
+   ],
+   "link_tags": [],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.1068,
+   -0.1077,
+   -0.0389
+  ],
+  "bbox_max": [
+   0.1061,
+   0.1043,
+   0.0953
+  ],
+  "n_pieces": 31
+ }
+}

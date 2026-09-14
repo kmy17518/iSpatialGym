@@ -1,0 +1,6 @@
+{
+ "category": "chalk",
+ "model": "hpnnry",
+ "status": "spawn_failed",
+ "error": "asset missing on disk: /home/minyeongk/Desktop/projects/ispatialgym/Behavior-1K/datasets/behavior-1k-assets/objects/chalk/hpnnry/usd/hpnnry.encrypted.usd"
+}

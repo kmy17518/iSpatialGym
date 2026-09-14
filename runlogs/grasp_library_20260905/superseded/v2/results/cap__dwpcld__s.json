@@ -1,0 +1,32 @@
+{
+ "task": "configuration_matching",
+ "category": "cap",
+ "model": "dwpcld",
+ "key": "cap__dwpcld__s",
+ "pipeline": "a1",
+ "mode": null,
+ "constraint": "attachment_free",
+ "bbox": [
+  0.0757802734375,
+  0.0757802734375,
+  0.01307708740234375
+ ],
+ "ready": true,
+ "base_key": "cap__dwpcld",
+ "scale": [
+  1.0,
+  1.0,
+  1.529
+ ],
+ "scale_rule": "thickness_only",
+ "bbox_scaled": [
+  0.0758,
+  0.0758,
+  0.02
+ ],
+ "orig_n_valid": 0,
+ "candidates_meta": null,
+ "tested": [],
+ "n_valid": 0,
+ "error": "no candidates"
+}

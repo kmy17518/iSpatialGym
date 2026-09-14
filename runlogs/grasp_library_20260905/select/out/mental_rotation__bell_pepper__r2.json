@@ -1,0 +1,24 @@
+{
+  "group": "mental_rotation__bell_pepper__r2", "task": "mental_rotation", "category": "bell_pepper", "round": 2, "relation": null,
+  "n_candidates": 5, "n_opened": 5,
+  "candidates": [
+    {"model": "ukkycp", "key": "bell_pepper__ukkycp", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Five centred lobe pinches 58-63 mm (CoM 2-3 mm, antipodal 0.92-0.96) with stem sideways, toward camera and down: diverse. Red glossy pepper, faint faceting."},
+    {"model": "ggurxn", "key": "bell_pepper__ggurxn", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Five centred lobe pinches 59-62 mm, antipodal 0.93-0.98, stem in three distinct directions. Orange pepper, clean material, faint faceting."},
+    {"model": "ihctxa", "key": "bell_pepper__ihctxa", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Five lobe pinches spanning ~60 mm (width metric 10-13 mm is the hollow shell), CoM 1-7 mm, diverse stem directions. Yellow pepper, nice cut stem."},
+    {"model": "uqcenz", "key": "bell_pepper__uqcenz", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Row 1 full-width body pinch; rows 2-5 off-centre shoulder pinches (CoM 18-23 mm, antipodal 0.78-0.84). Larger lumpy dark-orange pepper, realistic shading."},
+    {"model": "wszvwc", "key": "bell_pepper__wszvwc", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Rows 1-4 clean body pinches 57-71 mm in two orientations; row 5 hangs the pepper from stem-end shoulders by fingertips. Elongated glossy red pepper."}
+  ],
+  "selected": [
+    {"model": "ukkycp", "key": "bell_pepper__ukkycp", "rank": 1, "reason": "Top of a three-way 23 tie with the best coverage (1.0 in three rows) and CoM 2-3 mm; five diverse in-hand orientations; clean red asset."},
+    {"model": "ihctxa", "key": "bell_pepper__ihctxa", "rank": 2, "reason": "Also 23 with five diverse centred pinches; yellow pepper gives the strongest colour contrast to the red #1, spanning the category."}
+  ],
+  "alternate": {"model": "ggurxn", "key": "bell_pepper__ggurxn"},
+  "short": false,
+  "warnings": ["All rows are 50/x one-finger closures (assisted grasp); ihctxa width metric reflects a hollow shell, pads still span the body."],
+  "confidence": "medium"
+}

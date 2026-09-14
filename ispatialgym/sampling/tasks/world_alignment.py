@@ -1,7 +1,9 @@
-"""World alignment: table surface (``world_alignment-0``) and world vertical (``world_alignment-1``).
+"""World alignment: table surface (``world_alignment-0``), world vertical (``world_alignment-1``) and world horizontal
+(``world_alignment-2``).
 
-Both hinge the target at its centre of mass (TRO ``constraints``) so that only its orientation can change; the
-goal is the aligned orientation (table axes / world vertical) and the init is a sampled deviation from it.
+All three hinge the target at its centre of mass (TRO ``constraints``) so that only its orientation can change; the
+goal is the aligned orientation (table axes / world vertical / level along the wall) and the init is a sampled
+deviation from it.
 """
 
 from __future__ import annotations
@@ -51,6 +53,22 @@ class _HingedSampler(TaskSampler):
 
     def teardown(self):
         self._clear_hinge()
+
+    def target_param(self, key: str, default=None):
+        """``generation.<key>`` for the bound target: a single value for every target, or a dict keyed by
+        ``"<category>/<model>"``, ``"<category>"`` or ``"default"``."""
+        v = self.gen(key, default)
+        if isinstance(v, dict):
+            b = self.bindings.one("target")
+            v = v.get(f"{b.category}/{b.model}", v.get(b.category, v.get("default", default)))
+        return v
+
+    def axis_param(self, key: str, default: str) -> str:
+        """``generation.<key>`` (``front_axis`` / ``long_axis`` / ``up_axis`` / ``level_axis``) as an axis name
+        (``"+x"``), per target through :meth:`target_param` (the canonical frames differ per category: books lie with
+        the cover text bottom at +x, pictures lie flat with their up at -x, ...; see
+        runlogs/world_alignment_selection_20260911/selection.md and runlogs/world_horizontal_selection_20260912/selection.md)."""
+        return str(self.target_param(key, default))
 
     def com_world(self, obj) -> th.Tensor:
         p, q = obj.get_position_orientation()
@@ -181,7 +199,7 @@ class TableSurfaceSampler(_HingedSampler):
 
     def _aligned_yaw(self) -> float:
         st = self.stance
-        front = _axis(self.gen("front_axis", "+x"))[:2]
+        front = _axis(self.axis_param("front_axis", "+x"))[:2]
         target_dir = -st.inward  # front of the object toward the robot
         return math.atan2(float(target_dir[1]), float(target_dir[0])) - math.atan2(float(front[1]), float(front[0]))
 
@@ -191,7 +209,7 @@ class TableSurfaceSampler(_HingedSampler):
         tname = self.bindings.one("target").name
         yaw_goal = self._aligned_yaw()
         lo, hi = self.gen("deviation_range_deg", [20.0, 70.0])
-        long_axis = _axis(self.gen("long_axis", "y"))
+        long_axis = _axis(self.axis_param("long_axis", "y"))
         ex, ey, ez = self._extents()
         half_len = 0.5 * (ex if long_axis[0] != 0 else ey) - 0.03
         z_push = top.z + max(0.6 * ez, 0.03)
@@ -276,6 +294,8 @@ class TableSurfaceSampler(_HingedSampler):
 
 
 class WorldVerticalSampler(_HingedSampler):
+    tag = "world_vertical"
+
     def __init__(self, ctx):
         super().__init__(ctx)
         self.wall_spots: List[Dict[str, Any]] = []
@@ -296,9 +316,21 @@ class WorldVerticalSampler(_HingedSampler):
         self.hull = self.world.local_hull(target)
         self.com_local = self._com_local(target)
         self.kit.sync_world()
-        spots = [s for s in self._find_wall_spots() if self._in_room(s["point"][:2] + s["normal"][:2] * 0.8)]
+        # optional spec restrictions (``scenes.<scene>.fixed``): ``wall`` = allowed wall object names,
+        # ``wall_regions`` = surveyed wall segments (runlogs/world_alignment_selection_20260911/wall_candidates.json);
+        # with regions the spots are seeded along the segments instead of by rays from the room centre
+        req = self.scene_spec.fixed.get("wall")
+        allowed_walls = set(req) if isinstance(req, list) else None
+        regions = self.scene_spec.fixed.get("wall_regions") or []
+        if self.room is not None:
+            regions = [r for r in regions if r.get("room") in (None, self.room)]
+        spots = self._region_spots(regions) if regions else self._find_wall_spots()
+        spots = [s for s in spots if self._in_room(s["point"][:2] + s["normal"][:2] * 0.8)]
+        if allowed_walls is not None:
+            spots = [s for s in spots if s["wall_name"] in allowed_walls]
         if not spots:
-            raise Reject("no_wall", "no flat, free wall patch found in the room")
+            raise Reject("no_wall", "no flat, free wall patch found in the room" + (f" (restricted to walls {sorted(allowed_walls)})" if allowed_walls else "")
+                         + (f" ({len(regions)} spec wall regions)" if regions else ""))
         # per spot: collision-free, traversable base poses on the arc (computed once) and pushing reach of the aligned
         # object's bottom corners from at least one of them
         good = []
@@ -327,11 +359,15 @@ class WorldVerticalSampler(_HingedSampler):
             good.append(s)
         if not good:
             raise Reject("no_stance", f"{len(spots)} wall patches, {n_bases} traversable collision-free arc positions, none with a pushable goal corner")
-        wall_obj = self.world.obj(good[0]["wall_name"])
-        for s in good[1:]:
-            if s["wall_name"] != good[0]["wall_name"]:
-                log.info("world_vertical: spots on several walls; keeping those on %s", wall_obj.name)
-        self.wall_spots = [s for s in good if s["wall_name"] == good[0]["wall_name"]]
+        # one wall object per template (one BDDL wall instance): the one with the most usable spots
+        counts: Dict[str, int] = {}
+        for s in good:
+            counts[s["wall_name"]] = counts.get(s["wall_name"], 0) + 1
+        wall_name = sorted(counts, key=lambda n: (-counts[n], n))[0]
+        wall_obj = self.world.obj(wall_name)
+        if len(counts) > 1:
+            log.info("%s: spots on several walls %s; keeping those on %s", self.tag, counts, wall_obj.name)
+        self.wall_spots = [s for s in good if s["wall_name"] == wall_name]
         self.bind_scene_object("wall", wall_obj)
         self.template_meta["wall_spots"] = [{"point": s["point"].tolist(), "normal": s["normal"].tolist(), "n_bases": len(s["bases"])} for s in self.wall_spots]
 
@@ -356,7 +392,7 @@ class WorldVerticalSampler(_HingedSampler):
         quat = self._push_quat(normal)
         standoff = (contact + normal * 0.10, quat)
         pre = (contact + normal * 0.20, quat)
-        q_stance = self.kit.q_at_base_pose(self.kit.q_config(arms="untucked"), *base)
+        q_stance = self.kit.q_at_base_pose(self.kit.q_config(arms=self.init_arms()), *base)
         for tr in self.gen("reach_translates", [0.0, 0.25, 0.5, 0.75]):
             if self.kit.reachable([pre, standoff], self.kit.with_trunk(q_stance, tr, 0.0), ignore_for_last=[self.obj("target")]) is not None:
                 return float(tr)
@@ -378,17 +414,51 @@ class WorldVerticalSampler(_HingedSampler):
                 cands.append((float(base_xy[0]), float(base_xy[1]), yaw))
         if not cands:
             return []
-        qs = th.stack([self.kit.q_at_base_pose(self.kit.q_config(arms="untucked"), *c) for c in cands])
+        qs = th.stack([self.kit.q_at_base_pose(self.kit.q_config(arms=self.init_arms()), *c) for c in cands])
         free = self.kit.collision_free(qs, margin=0.02)
         return [c for c, f in zip(cands, free.tolist()) if f]
 
     # -- geometry helpers -------------------------------------------------------------------------------------------
 
+    def _frame_axes(self) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
+        """Object-frame unit vectors (front = toward the room / out of the wall, side = along the wall, up = world up
+        when hung) from ``generation.front_axis`` (default +x) and ``generation.up_axis`` (default +z), per category /
+        model when given as dicts. The defaults are the frame of the paintings (thin x, standing upright); pictures,
+        license plates or guitars that lie flat in their canonical frame use e.g. front +z / up -x."""
+        front = _axis(self.axis_param("front_axis", "+x"))
+        up = _axis(self.axis_param("up_axis", "+z"))
+        if abs(float(th.dot(front, up))) > 1e-6:
+            raise Reject("spec", f"front_axis {self.axis_param('front_axis', '+x')} and up_axis {self.axis_param('up_axis', '+z')} are not orthogonal")
+        side = th.cross(up, front, dim=0)  # right-handed: front x side = up ... (front, side, up) ~ (x, y, z)
+        return front, side, up
+
+    def _hang_quat(self, normal) -> th.Tensor:
+        """Rotation that maps the object's front axis onto the wall normal (horizontal) and its up axis onto world +z."""
+        n = G.t(normal).clone()
+        n[2] = 0.0
+        n = n / th.linalg.norm(n)
+        z = th.tensor([0.0, 0.0, 1.0])
+        t = th.cross(z, n, dim=0)
+        W = th.stack([n, t, z], dim=1)  # world basis columns
+        front, side, up = self._frame_axes()
+        O = th.stack([front, side, up], dim=1)  # object basis columns
+        return T.mat2quat(W @ O.T)
+
     def _object_dims(self) -> Tuple[float, float, float]:
-        """(thickness along the face normal, width, height) in the canonical frame; face normal = thinnest axis."""
+        """(thickness along the front axis, width along the wall, height along the up axis) of the canonical hull."""
         pts = self.hull
-        ext = (pts.max(dim=0).values - pts.min(dim=0).values).tolist()
-        return ext[0], ext[1], ext[2]
+        front, side, up = self._frame_axes()
+        return tuple(float((pts @ a).max() - (pts @ a).min()) for a in (front, side, up))
+
+    def _patch_extents(self) -> Tuple[float, float]:
+        """(width along the wall, height) the wall patch must accommodate: the aligned object's extents here; the
+        horizontal problem overrides this with the extents swept over the deviation range."""
+        _, width, height = self._object_dims()
+        return width, height
+
+    def _goal_equivalences(self) -> List[List[float]]:
+        """Object-frame symmetry quaternions written into the target's ``orientation_equivalences``."""
+        return [list(q) for q in self.gen("orientation_equivalences", [])]
 
     def _find_wall_spots(self) -> List[Dict[str, Any]]:
         floor = self.obj("floor")
@@ -400,7 +470,7 @@ class WorldVerticalSampler(_HingedSampler):
         ends = starts + dirs * 12.0
         hits = self.world.raycast(starts, ends)
         walls = {l.prim_path: o for o in self.world.scene.objects if o.category == "walls" for l in o.links.values()}
-        thickness, width, height = self._object_dims()
+        width, height = self._patch_extents()
         spots = []
         for h in hits:
             if not h["hit"] or h["rigidBody"] not in walls:
@@ -417,6 +487,47 @@ class WorldVerticalSampler(_HingedSampler):
             if not self._front_clear(point, normal, width, height):
                 continue
             spots.append({"wall_name": wall.name, "wall_link": h["rigidBody"], "point": point, "normal": normal})
+        return spots
+
+    def _region_spots(self, regions, step: float = 0.25) -> List[Dict[str, Any]]:
+        """Candidate spots along spec wall regions (``{"p0": [x, y], "p1": [x, y], "normal": [nx, ny], "hang_z": z}``
+        in world coordinates; ``hang_z`` defaults to floor top + ``generation.height``). Each point is confirmed by a
+        ray onto the wall and by the same flat-patch / front-clearance tests as the ray-found spots."""
+        floor = self.obj("floor")
+        z_default = float(floor.aabb[1][2]) + float(self.gen("height", 1.45))
+        walls = {l.prim_path: o for o in self.world.scene.objects if o.category == "walls" for l in o.links.values()}
+        width, height = self._patch_extents()
+        spots = []
+        for r in regions:
+            p0, p1 = th.tensor([float(v) for v in r["p0"]]), th.tensor([float(v) for v in r["p1"]])
+            n = th.tensor([float(r["normal"][0]), float(r["normal"][1]), 0.0])
+            n = n / th.linalg.norm(n)
+            z = float(r.get("hang_z", z_default))
+            length = float(th.linalg.norm(p1 - p0))
+            k = max(1, int(round(length / step)))
+            for t in th.linspace(0.0, 1.0, k + 1).tolist():
+                xy = p0 * (1 - t) + p1 * t
+                start = th.tensor([float(xy[0]), float(xy[1]), z]) + n * 0.5
+                end = th.tensor([float(xy[0]), float(xy[1]), z]) - n * 0.15
+                h = self.world.raycast(start.unsqueeze(0), end.unsqueeze(0))[0]
+                if not h["hit"] or h["rigidBody"] not in walls:
+                    continue
+                if r.get("wall") and walls[h["rigidBody"]].name != r["wall"]:
+                    continue
+                point = G.t(h["position"]).clone()
+                point[2] = z
+                normal = G.t(h["normal"]).clone()
+                normal[2] = 0.0
+                if float(th.linalg.norm(normal)) < 0.5:
+                    continue
+                normal = normal / th.linalg.norm(normal)
+                wall = walls[h["rigidBody"]]
+                if not self._flat_patch(point, normal, width + 0.10, height + 0.10, wall):
+                    continue
+                if not self._front_clear(point, normal, width, height):
+                    continue
+                spots.append({"wall_name": wall.name, "wall_link": h["rigidBody"], "point": point, "normal": normal, "region": r.get("id")})
+        log.info("%s: %d spots from %d spec wall regions", self.tag, len(spots), len(regions))
         return spots
 
     def _flat_patch(self, point, normal, w, h, wall) -> bool:
@@ -464,9 +575,7 @@ class WorldVerticalSampler(_HingedSampler):
         """Object pose hanging on the wall: canonical +z up, thin axis (x) along the wall normal (front face toward the
         room, ``front_axis`` from the spec), rotated in-plane by ``angle`` about the normal through the COM."""
         normal = spot["normal"]
-        front = _axis(self.gen("front_axis", "+x"))
-        yaw_face = math.atan2(float(normal[1]), float(normal[0])) - math.atan2(float(front[1]), float(front[0]))
-        q_up = G.quat_from_yaw(yaw_face)
+        q_up = self._hang_quat(normal)
         q = G.qmul(G.quat_about_axis(normal, angle), q_up)
         thickness, width, height = self._object_dims()
         centre_target = spot["point"] + normal * (thickness / 2 + 0.01)
@@ -492,7 +601,7 @@ class WorldVerticalSampler(_HingedSampler):
         for i in order[:12]:
             bx, by, yaw = spot["bases"][i]
             base_xy = th.tensor([bx, by])
-            q_base = self.kit.q_at_base_pose(self.kit.q_config(arms="untucked"), bx, by, yaw)
+            q_base = self.kit.q_at_base_pose(self.kit.q_config(arms=self.init_arms()), bx, by, yaw)
             views = self.kit.solve_view(q_base, obj_centre, translates=th.tensor(self.gen("view_translates", [0.0, 0.25, 0.5, 0.75])), top_k=12)
             qs = th.stack([self.kit.with_trunk(q_base, v.translate, v.tilt) for v in views])
             free = self.kit.collision_free(qs, margin=0.02)
@@ -527,7 +636,7 @@ class WorldVerticalSampler(_HingedSampler):
         d.summary.update({"wall": spot["wall_name"], "deviation_deg": math.degrees(delta), "arc": {"radius": float(th.linalg.norm(base_xy - obj_centre[:2])), "yaw": yaw},
                           "view": {"translate": view.translate, "tilt": view.tilt}, "push_reach_translates": reach})
         d.pose_targets[tname] = pose_target(orientation=q_goal, orientation_metric="full", orientation_tolerance=self.tol("orientation", 0.08),
-                                            equivalences=self.gen("orientation_equivalences", []))
+                                            equivalences=self._goal_equivalences())
         self._spot = spot
         return d
 
@@ -568,3 +677,83 @@ class WorldVerticalSampler(_HingedSampler):
         path = super().write_instance(draft, index, seed)
         self._clear_hinge()
         return path
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# World horizontal
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def _swept_extent(p: float, q: float, delta: float) -> float:
+    """max over ``a in [0, delta]`` of ``p cos a + q sin a``: the extent along one wall axis of a ``p x q`` rectangle
+    swept between the aligned pose and a tilt of ``delta`` (the diagonal when the tilt reaches ``atan(q / p)``)."""
+    if delta <= 0:
+        return p
+    if math.atan2(q, p) <= delta:
+        return math.hypot(p, q)
+    return p * math.cos(delta) + q * math.sin(delta)
+
+
+class WorldHorizontalSampler(WorldVerticalSampler):
+    """``world_alignment-2``: the target hangs on the wall hinge like in world vertical, but it is an elongated wall
+    item (towel bar, hook rail, shelf, wide sign / screen, a rod on display hooks) that starts tilted in the wall plane
+    and must be pushed back to **level**. Spec (``generation``): ``front_axis`` / ``up_axis`` as for world vertical, the
+    optional ``level_axis`` (the reviewers' reading of the axis that lies along the wall; checked against the frame),
+    ``symmetric_180`` (bool or per-model dict: the object looks the same upside down, so the half turn about its front
+    axis becomes an orientation equivalence of the goal) and ``swept_patch`` (default true: the wall patch must be flat
+    and clear for the extents the tilted object sweeps between its largest init tilt and level)."""
+
+    tag = "world_horizontal"
+
+    def _frame_axes(self) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
+        front, side, up = super()._frame_axes()
+        lv = self.target_param("level_axis", None)
+        if lv is not None:
+            want = str(lv).strip().lstrip("+-").lower()
+            got = "xyz"[int(th.argmax(side.abs()))]
+            if want != got:
+                raise Reject("spec", f"level_axis {lv} is not the axis along the wall implied by front_axis "
+                                     f"{self.axis_param('front_axis', '+x')} / up_axis {self.axis_param('up_axis', '+z')} ({got})")
+        return front, side, up
+
+    def _max_deviation(self) -> float:
+        lo, hi = self.gen("deviation_range_deg", [15.0, 45.0])
+        return math.radians(float(max(abs(float(lo)), abs(float(hi)))))
+
+    def _patch_extents(self) -> Tuple[float, float]:
+        _, width, height = self._object_dims()
+        if not bool(self.gen("swept_patch", True)):
+            return width, height
+        d = self._max_deviation()
+        return _swept_extent(width, height, d), _swept_extent(height, width, d)
+
+    def _symmetric_180(self) -> bool:
+        return bool(self.target_param("symmetric_180", False))
+
+    def _goal_equivalences(self) -> List[List[float]]:
+        eqs = super()._goal_equivalences()
+        if self._symmetric_180():
+            front, _, _ = self._frame_axes()
+            eqs.append([float(round(float(v), 6)) or 0.0 for v in G.quat_about_axis(front, math.pi)])  # exact (1, 0, 0, 0) for +x
+        return eqs
+
+    def prepare_bindings(self):
+        # frame / swept extents first (recorded even when no wall spot admits the object)
+        target = self.obj("target")
+        self.hull = self.world.local_hull(target)
+        self.com_local = self._com_local(target)
+        front, side, up = self._frame_axes()
+        _, width, height = self._object_dims()
+        sw, sh = self._patch_extents()
+        self.template_meta["frame"] = {"front_axis": self.axis_param("front_axis", "+x"), "up_axis": self.axis_param("up_axis", "+z"),
+                                       "level_axis": "xyz"[int(th.argmax(side.abs()))], "symmetric_180": self._symmetric_180()}
+        self.template_meta["swept_dims"] = {"level_width": round(width, 4), "level_height": round(height, 4), "patch_width": round(sw, 4),
+                                            "patch_height": round(sh, 4), "max_deviation_deg": round(math.degrees(self._max_deviation()), 2)}
+        log.info("%s: %s level %.2f x %.2f m, wall patch %.2f x %.2f m (+0.10 margin), symmetric_180=%s", self.tag,
+                 self.bindings.one("target").name, width, height, sw, sh, self._symmetric_180())
+        super().prepare_bindings()
+
+    def sample(self, rng: np.random.Generator) -> Draft:
+        d = super().sample(rng)
+        d.summary["symmetric_180"] = self._symmetric_180()
+        return d

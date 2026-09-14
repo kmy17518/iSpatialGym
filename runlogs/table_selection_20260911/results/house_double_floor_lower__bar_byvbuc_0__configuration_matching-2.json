@@ -1,0 +1,25 @@
+{
+ "scene": "house_double_floor_lower",
+ "table": "bar_byvbuc_0",
+ "category": "bar",
+ "model": "byvbuc",
+ "rooms": [
+  "kitchen_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.887,
+  "bbox_x": 0.605,
+  "bbox_y": 2.155,
+  "bbox_z": 0.895,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:07:17",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

@@ -1,0 +1,248 @@
+{
+ "group": "object_scaling__beefsteak_tomato__r3",
+ "task": "object_scaling",
+ "category": "beefsteak_tomato",
+ "round": 3,
+ "relation": null,
+ "partner": "",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. Rotationally symmetric bodies are preferred for this task.",
+ "candidates": [
+  {
+   "model": "eevvzv",
+   "key": "beefsteak_tomato__eevvzv__f",
+   "strip": "/tmp/glib/strips/beefsteak_tomato__eevvzv__f.png",
+   "n_valid": 5,
+   "n_clean": 2,
+   "n_clean_strict": 2,
+   "flags": [
+    "gap",
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch, both pads touch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "diameter pinch, both pads touch"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "gap",
+      "one_finger"
+     ],
+     "note": "~10 mm daylight to open finger, tomato on other pad only"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "gap",
+      "one_finger"
+     ],
+     "note": "~5 mm daylight to open finger, tomato on other pad only"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "gap",
+      "one_finger"
+     ],
+     "note": "~8 mm daylight to open finger, tomato on other pad only"
+    }
+   ],
+   "object_note": "fingers 50/9-12 on 50 mm tomato: open finger stops 5-10 mm short of body (calyx in collision hull?)",
+   "bbox_mm": [
+    55,
+    54,
+    72
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ogpans",
+   "key": "beefsteak_tomato__ogpans__f",
+   "strip": "/tmp/glib/strips/beefsteak_tomato__ogpans__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/2: tomato pushed against unmoved finger"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/3: tomato pushed against unmoved finger"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/2: tomato pushed against unmoved finger"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/2: tomato pushed against unmoved finger"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/2: tomato pushed against unmoved finger"
+    }
+   ],
+   "object_note": "every candidate closes with one finger fully open, other nearly fully closed; body pinch location itself fine",
+   "bbox_mm": [
+    68,
+    78,
+    56
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "altlfz",
+   "key": "beefsteak_tomato__altlfz__f",
+   "strip": "/tmp/glib/strips/beefsteak_tomato__altlfz__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 2,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/8: object hard against open finger"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, both pads on tomato (50/20)"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/9: object hard against open finger"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, both pads on tomato (50/19)"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "fingers 50/8: object hard against open finger"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    69,
+    69,
+    66
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "pnrdxh",
+   "key": "beefsteak_tomato__pnrdxh__f",
+   "strip": "/tmp/glib/strips/beefsteak_tomato__pnrdxh__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, asymmetric 50/21 but both pads contact"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, asymmetric 50/22 but both pads contact"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, asymmetric 50/26 but both pads contact"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, asymmetric 50/21 but both pads contact"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, asymmetric 50/21 but both pads contact"
+    }
+   ],
+   "object_note": "large tomato (70 mm); CoM offset 11-15 mm acceptable for round object",
+   "bbox_mm": [
+    93,
+    91,
+    74
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

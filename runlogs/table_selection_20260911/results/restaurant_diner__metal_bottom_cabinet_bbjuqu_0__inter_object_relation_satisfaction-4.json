@@ -1,0 +1,90 @@
+{
+ "scene": "restaurant_diner",
+ "table": "metal_bottom_cabinet_bbjuqu_0",
+ "category": "metal_bottom_cabinet",
+ "model": "bbjuqu",
+ "rooms": [
+  "kitchen_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-4",
+ "inventory": {
+  "top_z": 0.922,
+  "bbox_x": 0.615,
+  "bbox_y": 1.404,
+  "bbox_z": 0.923,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:42:36",
+ "precheck": {
+  "aabb": [
+   [
+    -11.168,
+    -7.054,
+    -0.001
+   ],
+   [
+    -9.764,
+    -6.439,
+    0.922
+   ]
+  ],
+  "support": {
+   "name": "metal_bottom_cabinet_bbjuqu_0",
+   "z": 0.8612474203109741,
+   "yaw": 1.5707964897155762,
+   "local_bounds": [
+    -7.024012565612793,
+    -6.44401216506958,
+    9.778053283691406,
+    11.158053398132324
+   ],
+   "n_free_cells": 2100,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -10.468,
+     -6.444
+    ],
+    "length": 1.38
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -10.468,
+     -7.024
+    ],
+    "length": 1.38
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -11.158,
+     -6.734
+    ],
+    "length": 0.58
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -9.778,
+     -6.734
+    ],
+    "length": 0.58
+   }
+  ],
+  "stance": null,
+  "stance_error": "[stance_collision] untucked: [no_stance] no collision-free stance around metal_bottom_cabinet_bbjuqu_0",
+  "precheck_s": 1.0
+ },
+ "status": "skipped",
+ "reason": "inter_object_relation_satisfaction-0 found no stance around the support at any stand-off (precheck: no stance either)"
+}

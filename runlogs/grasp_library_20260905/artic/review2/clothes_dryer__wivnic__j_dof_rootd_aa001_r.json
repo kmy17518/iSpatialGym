@@ -1,0 +1,5 @@
+{"key": "clothes_dryer__wivnic", "joint": "j_dof_rootd_aa001_r", "feasible": true,
+ "proposal": {"face": "outer", "a": 0.9, "b": 0.5, "pinch": "horizontal", "approach": "front", "depth_mm": 15,
+              "expected_motion": "pull"},
+ "alternative": {"face": "outer", "a": 0.5, "b": 0.92, "pinch": "vertical", "approach": "front", "depth_mm": 15, "expected_motion": "pull"},
+ "note": "Radial pinch across the thick ~70 mm ring rim at the free (right) edge: outer pad on rim, inner pad on deep glass recess wall.", "confidence": "medium"}

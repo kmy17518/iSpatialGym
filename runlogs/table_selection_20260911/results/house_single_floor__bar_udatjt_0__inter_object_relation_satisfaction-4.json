@@ -1,0 +1,226 @@
+{
+ "scene": "house_single_floor",
+ "table": "bar_udatjt_0",
+ "category": "bar",
+ "model": "udatjt",
+ "rooms": [
+  "kitchen_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-4",
+ "inventory": {
+  "top_z": 1.052,
+  "bbox_x": 1.145,
+  "bbox_y": 2.994,
+  "bbox_z": 1.051,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 23:58:59",
+ "precheck": {
+  "aabb": [
+   [
+    5.789,
+    -0.305,
+    0.001
+   ],
+   [
+    8.786,
+    0.848,
+    1.052
+   ]
+  ],
+  "support": {
+   "name": "bar_udatjt_0",
+   "z": 1.0505356788635254,
+   "yaw": -1.5733394622802734,
+   "local_bounds": [
+    -0.8629434704780579,
+    0.2797994017601013,
+    5.796337127685547,
+    8.77922534942627
+   ],
+   "n_free_cells": 8605,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     7.287,
+     -0.298
+    ],
+    "length": 2.983
+   },
+   {
+    "name": "-u",
+    "mid": [
+     7.29,
+     0.844
+    ],
+    "length": 2.983
+   },
+   {
+    "name": "+v",
+    "mid": [
+     8.78,
+     0.269
+    ],
+    "length": 1.143
+   },
+   {
+    "name": "-v",
+    "mid": [
+     5.797,
+     0.277
+    ],
+    "length": 1.143
+   }
+  ],
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    8.779938697814941,
+    0.26924437284469604
+   ],
+   "inward": [
+    -0.9999967813491821,
+    0.0025431327521800995
+   ],
+   "tangent": [
+    -0.0025431327521800995,
+    -0.9999967813491821
+   ],
+   "base_pose2d": [
+    9.229937553405762,
+    0.26809996366500854,
+    3.139049518134753
+   ],
+   "edge_depth": 0.4500003159046173,
+   "view": {
+    "translate": 0.75,
+    "tilt": 0.10000002384185791,
+    "axis_angle": 0.0004882812548506386
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 8.0
+ },
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {},
+ "template_meta": {
+  "support": {
+   "name": "bar_udatjt_0",
+   "z": 1.0505356788635254,
+   "yaw": -1.5733394622802734,
+   "local_bounds": [
+    -0.8629426956176758,
+    0.2798001766204834,
+    5.796337127685547,
+    8.77922534942627
+   ],
+   "n_free_cells": 8605,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    8.779938697814941,
+    0.26924359798431396
+   ],
+   "inward": [
+    -0.9999967813491821,
+    0.0025431327521800995
+   ],
+   "tangent": [
+    -0.0025431327521800995,
+    -0.9999967813491821
+   ],
+   "base_pose2d": [
+    9.229937553405762,
+    0.26809918880462646,
+    3.139049518134753
+   ],
+   "edge_depth": 0.4500003159046173,
+   "view": {
+    "translate": 0.75,
+    "tilt": 0.10000002384185791,
+    "axis_angle": 0.012872575522876979
+   }
+  },
+  "view_arms": "untucked",
+  "n_reachable_cells": 14,
+  "n_region_cells": 630,
+  "n_visible_cells": 630,
+  "stand_off": 0.45,
+  "edge": null,
+  "load_room_instances": [
+   "kitchen_0",
+   "dining_room_0",
+   "entryway_0",
+   "living_room_0"
+  ],
+  "task_rooms": [
+   "kitchen_0"
+  ],
+  "rejections": {},
+  "n_written": 1,
+  "scene_variant": null,
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 32.43,
+   "prepare_template_s": 2.02,
+   "save_template_s": 0.29
+  }
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_table_sel/house_single_floor/house_single_floor__bar_udatjt_0__inter_object_relation_satisfaction-4/instances/inter_object_relation_satisfaction-4__house_single_floor__bar_udatjt_0__inter_object_relation_satisfaction-4__0000.summary.json",
+   "wall_time_s": 26.8,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    9.229937553405762,
+    0.26809918880462646,
+    3.139049518134753
+   ],
+   "trunk": [
+    0.749999987042469,
+    0.10000002384185791
+   ],
+   "grasp": {
+    "key": null,
+    "translate": 0.5,
+    "yaw": 2.2816030616199505
+   },
+   "view": {
+    "translate": 0.75,
+    "tilt": 0.10000002384185791
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_table_sel/house_single_floor/house_single_floor__bar_udatjt_0__inter_object_relation_satisfaction-4",
+ "bound_table": "bar_udatjt_0",
+ "setup_s": 34.4,
+ "run_s": 26.8,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "ok",
+   "n_written": 1,
+   "rejections": {},
+   "reject_reason": null,
+   "setup_s": 34.4,
+   "run_s": 26.8
+  }
+ ],
+ "job_s": 64.2,
+ "finished": "2026-09-12 00:00:04"
+}

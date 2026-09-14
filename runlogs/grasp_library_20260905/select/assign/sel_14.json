@@ -1,0 +1,11 @@
+{
+ "assignment": "sel_14",
+ "groups": [
+  "/tmp/glib/select/groups/object_scaling__can_of_soda__r1.json",
+  "/tmp/glib/select/groups/IORS__cinnamon_stick__r1.json",
+  "/tmp/glib/select/groups/IORS__ice_cube__r2.json",
+  "/tmp/glib/select/groups/disembedding__bottle_of_medicine__r2.json",
+  "/tmp/glib/select/groups/configuration_matching__trout__r3.json"
+ ],
+ "n_strips": 34
+}

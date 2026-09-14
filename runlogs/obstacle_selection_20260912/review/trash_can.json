@@ -1,0 +1,163 @@
+{
+  "category": "trash_can",
+  "task": "obst",
+  "n_models": 15,
+  "n_opened": 15,
+  "models": [
+    {
+      "model": "trash_can/cdzyew",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Black cylindrical pedal bin with grey lid and foot pedal, 0.29 x 0.24 x 0.39 m; clean, complete, very recognisable."
+    },
+    {
+      "model": "trash_can/cjmezk",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Black mesh wastebasket with black liner bag draped over rim, 0.38 x 0.38 x 0.42 m; bag lumpy, otherwise clean."
+    },
+    {
+      "model": "trash_can/djgllo",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Solid black tapered bin with closed top and no surface detail, 0.36 x 0.36 x 0.40 m; identical twin of gilsji."
+    },
+    {
+      "model": "trash_can/dnvpag",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Square wire-mesh wastebasket with grey liner over rim, 0.35 x 0.34 x 0.36 m; clean mesh, liner slightly lumpy."
+    },
+    {
+      "model": "trash_can/eahqyq",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Dark grey rectangular tapered bin with blue flap lid, 0.28 x 0.36 x 0.49 m; clean, complete."
+    },
+    {
+      "model": "trash_can/gilsji",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Solid black tapered bin with closed top and no surface detail, 0.36 x 0.36 x 0.40 m; identical twin of djgllo."
+    },
+    {
+      "model": "trash_can/gxajos",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Dark grey bin with blue liner bag bunched over the rim, 0.36 x 0.37 x 0.40 m; clean, distinct colour."
+    },
+    {
+      "model": "trash_can/hqdnjz",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Dark grey-brown tapered open bin with thin rim and base ring, interior visible, 0.36 x 0.36 x 0.41 m; clean, low detail."
+    },
+    {
+      "model": "trash_can/ifzxzj",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Tall black kitchen bin with lid flipped open standing up and a thin curved flap, 0.31 x 0.41 x 0.80 m; odd lid geometry."
+    },
+    {
+      "model": "trash_can/jlawet",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Small light grey plastic tapered wastebasket, uniform untextured-looking grey, 0.28 x 0.28 x 0.28 m; clean shape."
+    },
+    {
+      "model": "trash_can/rbqckd",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Dark grey tapered cylinder bin, 0.45 x 0.45 x 0.50 m; interior and bottom faces missing so it is see-through from above."
+    },
+    {
+      "model": "trash_can/uknjdm",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Black mesh wastebasket with black liner bag over rim, 0.38 x 0.38 x 0.42 m; clean, near-duplicate look of cjmezk."
+    },
+    {
+      "model": "trash_can/vasiit",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Grey slotted metal bin with black liner bag over rim, 0.37 x 0.38 x 0.42 m; sharp, complete, very recognisable."
+    },
+    {
+      "model": "trash_can/wklill",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Black rounded-rectangle tapered bin, uniform black without detail, 0.41 x 0.30 x 0.44 m; clean shape."
+    },
+    {
+      "model": "trash_can/wkxtxh",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Small dark grey tapered bin with wood-look interior and two handle slots in rim, 0.23 x 0.23 x 0.28 m; clean."
+    }
+  ],
+  "picks": ["trash_can/cdzyew", "trash_can/vasiit"],
+  "alternate": "trash_can/eahqyq",
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int", "restaurant_diner", "hotel_suite_large", "office_cubicles_right"],
+  "category_verdict": "good",
+  "category_note": "Fifteen household bins 0.23-0.45 m wide, 0.28-0.80 m tall, all standing on flat bases; natural in every scene. Best: pedal bin cdzyew and slotted bin vasiit; featureless black twins and see-through rbqckd rank lowest."
+}

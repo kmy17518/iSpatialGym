@@ -1,0 +1,28 @@
+{
+  "group": "disembedding__box_of_butter__r3",
+  "task": "disembedding",
+  "category": "box_of_butter",
+  "round": 3,
+  "relation": null,
+  "n_candidates": 2,
+  "n_opened": 2,
+  "candidates": [
+    {"model": "mfjuil", "key": "box_of_butter__mfjuil__t", "G": 5, "T": 3, "V": 3, "R": 1, "score": 20,
+     "note": "Blue box with blurry low-res print of cream blobs, not clearly butter; five face pinches across 39 mm near top edge, one finger at 0."},
+    {"model": "oixapu", "key": "box_of_butter__oixapu__t", "G": 5, "T": 3, "V": 4, "R": 1, "score": 22,
+     "note": "Green meadow box with laurel emblem and cow, dairy-like but blurry texture; five face pinches across 45 mm near top edge, one finger at 0."}
+  ],
+  "selected": [
+    {"model": "oixapu", "key": "box_of_butter__oixapu__t", "rank": 1,
+     "reason": "Top score: five clean top-edge face pinches at 45 mm leaving the bottom free, box stable on any face; label with emblem and cow reads as dairy packaging."},
+    {"model": "mfjuil", "key": "box_of_butter__mfjuil__t", "rank": 2,
+     "reason": "Only other candidate (short group) and a different colour (blue); equally clean 39 mm top-edge pinches, but the blurry print is not recognisable as butter."}
+  ],
+  "alternate": null,
+  "short": true,
+  "warnings": [
+    "Both textures are low-resolution/blurry; mfjuil's blue print does not read as a butter box.",
+    "Every row closes one finger to 0 mm (41/0, 47/0), so the box is pressed against a bottomed-out finger."
+  ],
+  "confidence": "medium"
+}

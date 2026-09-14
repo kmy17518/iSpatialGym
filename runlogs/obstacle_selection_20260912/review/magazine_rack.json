@@ -1,0 +1,63 @@
+{
+  "category": "magazine_rack",
+  "task": "obst",
+  "n_models": 5,
+  "n_opened": 5,
+  "models": [
+    {
+      "model": "magazine_rack/cdhybw",
+      "V": 4,
+      "N": 0,
+      "S": 2,
+      "rest_ok": true,
+      "score": 10,
+      "valid": false,
+      "note": "Black perforated-mesh desktop magazine file, slanted front; 0.22 x 0.09 x 0.28 m; desk item, not a floor rack."
+    },
+    {
+      "model": "magazine_rack/enzfco",
+      "V": 4,
+      "N": 0,
+      "S": 2,
+      "rest_ok": true,
+      "score": 10,
+      "valid": false,
+      "note": "Grey speckled cardboard-style desktop magazine file with label; 0.28 x 0.08 x 0.30 m; desk item, thin."
+    },
+    {
+      "model": "magazine_rack/fvkjpt",
+      "V": 4,
+      "N": 0,
+      "S": 2,
+      "rest_ok": true,
+      "score": 10,
+      "valid": false,
+      "note": "Near duplicate of enzfco: grey speckled desktop magazine file; 0.28 x 0.08 x 0.30 m; desk item, thin."
+    },
+    {
+      "model": "magazine_rack/szdjbr",
+      "V": 3,
+      "N": 0,
+      "S": 2,
+      "rest_ok": true,
+      "score": 8,
+      "valid": false,
+      "note": "Plain uniform-grey desktop magazine file, no texture detail; 0.24 x 0.13 x 0.38 m; desk item."
+    },
+    {
+      "model": "magazine_rack/yvhjht",
+      "V": 3,
+      "N": 0,
+      "S": 2,
+      "rest_ok": true,
+      "score": 8,
+      "valid": false,
+      "note": "Plain uniform-grey rounded desktop magazine file; 0.22 x 0.08 x 0.28 m; desk item, thin."
+    }
+  ],
+  "picks": [],
+  "alternate": null,
+  "natural_scenes": [],
+  "category_verdict": "drop",
+  "category_note": "All five models are desktop magazine file holders (~0.25 x 0.08 x 0.30 m), not floor-standing racks. They belong on a desk or shelf, are thin and tip-prone; not a natural floor obstacle in any scene."
+}

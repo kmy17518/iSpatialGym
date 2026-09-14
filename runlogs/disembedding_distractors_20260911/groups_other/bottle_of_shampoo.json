@@ -1,0 +1,9 @@
+{
+  "category": "bottle_of_shampoo",
+  "pages_opened": ["grids/pool_other/bottle_of_shampoo__p1.png", "grids/pool_other/bottle_of_shampoo__p2.png"],
+  "n_models": 25,
+  "exclude": [
+    {"model": "conditioner_dispenser/njqnuo", "reason": "Lies on its side on the tray, pump pointing at camera; not an upright resting pose."}
+  ],
+  "notes": "Remaining 24 are upright bottles, pump dispensers, atomizers, deodorants and boxes; all textured and recognisable. Several dispensers share a red pump-top marker, harmless. Leaners kept: detergent_atomizer/rhfpsb (10.5 deg) and spray_bottle/asztxi (6.8 deg) still stand upright."
+}

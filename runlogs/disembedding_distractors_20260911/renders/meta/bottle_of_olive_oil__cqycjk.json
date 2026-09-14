@@ -1,0 +1,35 @@
+{
+ "category": "bottle_of_olive_oil",
+ "model": "cqycjk",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_olive_oil__cqycjk__y0.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1006,
+   "seg_pixels": 6296,
+   "aabb_extent": [
+    0.046,
+    0.046,
+    0.225
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_olive_oil__cqycjk__y1.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1006
+  }
+ },
+ "stable": true,
+ "visible": true
+}

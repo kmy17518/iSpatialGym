@@ -1,0 +1,22 @@
+[
+ [
+  "world-alignment target rows",
+  "Rounds 1-3 of runlogs/world_alignment_selection_20260911 (no grasp test: the objects are pushed). Every valid model is listed: valid = reviewer scores V >= 3 (visual), O/U >= 2 (orientation / up readability), F/H >= 1 (table fit / hangability); score = 2V + 2O + F (table surface) or 2V + 2U + H (world vertical), max 18; picks = the two best valid models per category, alternate = the next one. pair = canonical frame read from the renders: table surface 'long axis x|y, front +x|-x|+y|-y' (side that faces the robot when aligned); world vertical 'front <axis out of the wall>, up <axis>, thin <axis>'. Category blocks are ordered by round, then category score. Renders: renders/grids (pyrender, canonical frame + axis gizmo)."
+ ],
+ [
+  "selection = viable (wall rows)",
+  "world_alignment-1 wall row: a wall region where the sampler generated a validated instance (survey of every indoor room of the 7 scenes, runlogs/world_alignment_selection_20260911/wall_candidates.{json,md} and maps/<scene>_walls.png). model = wall object, pair = scene: room, note = region segment p0 -> p1 (world xy at hang height), outward normal, length, largest object that fits, arc bases / pushing-capable bases, the instance's robot base, and the evidence path."
+ ],
+ [
+  "world-horizontal target rows",
+  "Rounds 1-3 of runlogs/world_horizontal_selection_20260912 (no grasp test: the object is pushed). Every valid model is listed: valid = reviewer scores V >= 3 (visual), L >= 2 (level readability: one dominant axis / edge that must be horizontal), H >= 1 (hangability); score = 2V + 2L + H, max 18; picks = the two best valid models per category, alternate = the next one. pair = canonical frame read from the renders: 'front <axis out of the wall>, level <axis along the wall when aligned>, up <axis pointing up when hung>, thin <axis>' plus 'symmetric 180' when the model looks the same upside down (the sampler then accepts the half turn about the front axis as an orientation equivalence of the level goal). Category blocks ordered by round, then category score. Renders: renders/grids."
+ ],
+ [
+  "world-horizontal wall rows",
+  "world_alignment-2 wall rows are the 78 validated regions of the world-vertical survey (same wall, same instance evidence); the note ends with the horizontal pick-1 models whose swept extent (footprints between the largest init tilt of 45 deg and level, + 0.10 m margin) fits the region's flat / clear patch."
+ ],
+ [
+  "obstacle rows (camera_relocalization-0)",
+  "Rounds 1-3 of runlogs/obstacle_selection_20260912 (no grasp test: the obstacle is never touched; it is an optional extra object dropped on the floor midway along the robot's path in some instances). Every valid model is listed: valid = reviewer scores V >= 3 (visual), N >= 2 (naturalness as a mid-path floor obstacle in at least one of the 7 candidate scenes), S >= 1 (size fit: 2 = footprint 0.20-0.55 m and height 0.20-1.10 m, 1 = borderline, 0 = blocks a corridor / too small) and rest_ok (stands stably in its canonical pose, +z up); score = 2V + 2N + S, max 18; picks = the two best valid models per category, alternate = the next one. Rounds are ranking tiers (round 1 = the 10 best categories with >= 2 valid models, round 2 = the next 5, round 3 = the next 5 with >= 1 valid model); no overlap rule with other tasks' categories (overlaps are noted). pair = the scenes the category is natural in ('*' = the category already stands in that scene's BEHAVIOR files; rooms in the first note of the category). Category blocks ordered by round, then category score. Renders: renders/grids; ranking of the categories not selected: selection.md."
+ ]
+]

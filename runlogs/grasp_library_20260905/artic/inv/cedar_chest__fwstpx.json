@@ -1,0 +1,100 @@
+{
+ "category": "cedar_chest",
+ "model": "fwstpx",
+ "key": "cedar_chest__fwstpx",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.06873174756765366
+ ],
+ "aabb_extent": [
+  0.4032890200614929,
+  0.5401484966278076,
+  0.2635308504104614
+ ],
+ "aabb_min_rel_root": [
+  -0.1989475041627884,
+  -0.2700081467628479,
+  -0.06873174756765366
+ ],
+ "aabb_max_rel_root": [
+  0.20434153079986572,
+  0.27014032006263733,
+  0.19479909539222717
+ ],
+ "link_tags": {
+  "base_link": [],
+  "up": [
+   "openable"
+  ]
+ },
+ "openable_joint_ids": [
+  [
+   1,
+   "j_up"
+  ]
+ ],
+ "joints": [
+  {
+   "joint": "j_up",
+   "type": "RevoluteJoint",
+   "child_link": "up",
+   "lower": 0.0,
+   "upper": 0.7978606224060059,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    -0.18778,
+    0.00028,
+    0.10119
+   ],
+   "link_quat_obj": [
+    -0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    -0.0
+   ],
+   "hinge_point_obj": [
+    -0.18778,
+    -0.00333,
+    0.10119
+   ],
+   "measured_angle": 0.2421,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/cedar_chest__fwstpx__up.obj",
+   "n_pieces": 16,
+   "link_bbox_min": [
+    -0.1989,
+    -0.27,
+    0.0972
+   ],
+   "link_bbox_max": [
+    0.2043,
+    0.2701,
+    0.1948
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.1988,
+   -0.2698,
+   -0.0687
+  ],
+  "bbox_max": [
+   0.2042,
+   0.2697,
+   0.1066
+  ],
+  "n_pieces": 13
+ }
+}

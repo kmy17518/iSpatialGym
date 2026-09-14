@@ -1,0 +1,36 @@
+{
+  "category": "car_wheel",
+  "task": "obst",
+  "n_models": 2,
+  "n_opened": 2,
+  "models": [
+    {
+      "model": "lnbowh",
+      "V": 4,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Tyre lying flat, no rim, hollow centre; dark muddy tread texture; 0.55 x 0.55 x 0.23 m; stable on its sidewall."
+    },
+    {
+      "model": "xeedbe",
+      "V": 3,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 11,
+      "valid": true,
+      "note": "Flat black tyre lying flat, no rim; inner wall shows a white tread pattern (texture oddity); 0.61 x 0.61 x 0.24 m."
+    }
+  ],
+  "picks": ["lnbowh", "xeedbe"],
+  "alternate": null,
+  "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower"
+  ],
+  "category_verdict": "weak",
+  "category_note": "Two rimless tyres lying flat, 0.55-0.61 m across, 0.23 m high, stable. Only plausible in the garages of the two house scenes (both contain a car); odd in any other room."
+}

@@ -1,0 +1,33 @@
+{
+  "group": "mental_rotation__teacup__r1",
+  "task": "mental_rotation",
+  "category": "teacup",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 6,
+  "n_opened": 6,
+  "candidates": [
+    {"model": "vckahe", "key": "teacup__vckahe", "G": 4, "T": 3, "V": 3, "R": 0, "score": 17,
+     "note": "Five side pinches with one pad inside the bowl clamping the 4-6 mm shell, ring handle at varying azimuth; odd shallow grey/red bowl, flat material"},
+    {"model": "tfzfam", "key": "teacup__tfzfam", "G": 1, "T": 1, "V": 2, "R": 0, "score": 7,
+     "note": "All rows fingertip rim pinches on 3-5 mm wall, cup dangles 25-31 mm off CoM at 42-54 deg; plain untextured white bowl, fully rotationally symmetric"},
+    {"model": "zdvgol", "key": "teacup__zdvgol", "G": 4, "T": 2, "V": 4, "R": 2, "score": 20,
+     "note": "Rows 1-4 firm one-finger body pinches on 45-51 mm flare, inverted and sideways poses; row 5 weak rim pinch; white fluted tulip cup, handle-less, near-symmetric"},
+    {"model": "oxfzfe", "key": "teacup__oxfzfe", "G": 4, "T": 3, "V": 4, "R": 0, "score": 19,
+     "note": "Five top rim-wall pinches (7 mm wall, fingers 9-11 mm), cup hangs upright tilt 1-17, handle azimuth varies; clean plain white handled mug"},
+    {"model": "cpozxi", "key": "teacup__cpozxi", "G": 3, "T": 2, "V": 4, "R": 1, "score": 17,
+     "note": "Five near-duplicate top rim pinches on 7-11 mm wall, tilt 10-19; tall handle-less cup with repeating blue/tan pattern, well textured but near-symmetric"},
+    {"model": "wopjex", "key": "teacup__wopjex", "G": 2, "T": 2, "V": 4, "R": 0, "score": 14,
+     "note": "All rows rim pinches on 6-8 mm flared rim, mug dangles 43-55 mm off CoM at 30-61 deg tilt; glossy light-grey handled mug, clean"}
+  ],
+  "selected": [
+    {"model": "zdvgol", "key": "teacup__zdvgol", "rank": 1,
+     "reason": "Only candidate with firm wide body grasps (45-51 mm on the flare) in inverted and sideways poses; clean white fluted tulip cup. Handle-less, so axial orientation is weakly readable."},
+    {"model": "oxfzfe", "key": "teacup__oxfzfe", "rank": 2,
+     "reason": "Best of the rest: stable upright rim pinches with the handle free and visible for orientation; handled mug differs from the handle-less #1. Thin 7 mm rim pinch is weak."}
+  ],
+  "alternate": {"model": "vckahe", "key": "teacup__vckahe"},
+  "short": false,
+  "warnings": ["All candidates except zdvgol are held only by 3-11 mm rim/shell pinches (R 0-1); zdvgol and cpozxi are handle-less and nearly rotationally symmetric, weak for orientation readability."],
+  "confidence": "medium"
+}

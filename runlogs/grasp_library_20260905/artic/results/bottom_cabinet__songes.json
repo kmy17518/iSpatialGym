@@ -1,0 +1,67 @@
+{
+ "key": "bottom_cabinet__songes",
+ "category": "bottom_cabinet",
+ "model": "songes",
+ "scene": "house_double_floor_upper",
+ "host": "bottom_cabinet_jhymlr_0",
+ "host_rank": 1,
+ "host_model": "jhymlr",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_bottomdrawer",
+   "kind": "drawer",
+   "grasp_source": "manual skip: round-2 review: infeasible - Thin 6 cm bar pull top-centre of recessed panel, ~6 mm proud, within frame plane",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  },
+  {
+   "joint": "j_middledrawer",
+   "kind": "drawer",
+   "grasp_source": "manual skip: round-2 review: infeasible - Thin 6 cm bar pull top-centre of recessed panel, ~6 mm proud, within frame plane",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  },
+  {
+   "joint": "j_topdrawer",
+   "kind": "drawer",
+   "grasp_source": "manual skip: round-2 review: infeasible - Thin 6 cm bar pull top-centre of recessed panel, ~6 mm proud, within frame plane",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "previous_hosts": [
+  "bottom_cabinet_nddvba_0"
+ ],
+ "scale": [
+  0.751,
+  1.407,
+  0.936
+ ],
+ "time_s": 1.7
+}

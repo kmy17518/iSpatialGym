@@ -1,0 +1,49 @@
+{
+ "key": "blender__eyedvd",
+ "category": "blender",
+ "model": "eyedvd",
+ "aabb_extent": [
+  0.17623218894004822,
+  0.15930040180683136,
+  0.364931583404541
+ ],
+ "support": "table",
+ "joints": [
+  {
+   "joint": "j_lid",
+   "kind": "flap",
+   "grasp_source": "manual:F",
+   "stance": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [1.2676000595092773, -0.016999999061226845, 1.0792361497879028]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [1.2676000595092773, -0.016999999061226845, 1.0792361497879028]})"
+   ],
+   "error": "unreachable: no stance",
+   "contact_world": [
+    1.268,
+    -0.017,
+    1.079
+   ],
+   "handle_height": 1.079,
+   "diag_stance": {
+    "probed": 12,
+    "collision_free": 5,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0,
+    "handle_height": 1.079,
+    "approach": [
+     -1.0,
+     0.0,
+     0.0
+    ]
+   }
+  }
+ ],
+ "error": null,
+ "time_s": 9.4
+}

@@ -1,0 +1,140 @@
+{
+ "scene": "house_double_floor_upper",
+ "table": "desk_aduafr_0",
+ "category": "desk",
+ "model": "aduafr",
+ "rooms": [
+  "living_room_0",
+  "bedroom_0"
+ ],
+ "partner": "sofa_ukfaaz_0",
+ "problem": "inter_object_relation_satisfaction-1",
+ "inventory": {
+  "top_z": 0.778,
+  "bbox_x": 0.63,
+  "bbox_y": 1.513,
+  "bbox_z": 0.785,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:53:14",
+ "precheck": {
+  "aabb": [
+   [
+    -5.991,
+    -0.287,
+    -0.002
+   ],
+   [
+    -4.483,
+    0.338,
+    0.773
+   ]
+  ],
+  "support": {
+   "name": "desk_aduafr_0",
+   "z": 0.7734153270721436,
+   "yaw": 1.5662397146224976,
+   "local_bounds": [
+    -0.30406495928764343,
+    0.24267323315143585,
+    4.499657154083252,
+    5.982101917266846
+   ],
+   "n_free_cells": 2100,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -5.24,
+     0.267
+    ],
+    "length": 1.482
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -5.242,
+     -0.28
+    ],
+    "length": 1.482
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -5.982,
+     -0.003
+    ],
+    "length": 0.547
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -4.5,
+     -0.01
+    ],
+    "length": 0.547
+   }
+  ],
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    -5.239719390869141,
+    0.26655128598213196
+   ],
+   "inward": [
+    -0.004556596279144287,
+    -0.9999896287918091
+   ],
+   "tangent": [
+    0.9999896287918091,
+    -0.004556596279144287
+   ],
+   "base_pose2d": [
+    -5.433813571929932,
+    0.7926017642021179,
+    -1.575352938795802
+   ],
+   "edge_depth": 0.525160551071167,
+   "view": {
+    "translate": 0.5,
+    "tilt": -0.550000011920929,
+    "axis_angle": 0.08835907541338407
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 5.5
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "view_arms": "untucked",
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/house_double_floor_upper/house_double_floor_upper__desk_aduafr_0__under_sofa_ukfaaz_0__inter_object_relation_satisfaction-1",
+ "setup_s": 83.1,
+ "reject_reason": "no_support",
+ "error": "[no_support] desk_aduafr_0: [no_stance] stand_off 0.45 edge None: [partner_not_visible] sofa_ukfaaz_0 corners in view: 2/8; stand_off 0.45 edge +u: [partner_not_visible] sofa_ukfaaz_0 corners in view: 2/8; stand_off 0.45 edge -u: [stance_collision] untucked: [no_stance] no traversable stance around desk_aduafr_0; stand_off 0.45 edge +v: [stance_collision] untucked: [no_stance] no traversable stance around desk_aduafr_0; stand_off 0.45 edge -v: [stance_collision] untucked: [no_stance] no collision-free stance around desk_aduafr_0; stand_off 0.35 edge None: [partner_far] geodesic to sofa_ukfaaz_0: None; stand_off 0.35 edge +u: [partner_far] geodesic to sofa_ukfaaz_0: None; stand_off 0.35 edge -u: [stance_collision] untucked: [no_stance] no traversable stance around desk_aduafr_0; stand_off 0.35 edge +v: [stance_collision] untucked: [no_stance] no traversable stance around desk_aduafr_0; stand_off 0.35 edge -v: [stance_collision] untucked: [no_stance] no collision-free stance around desk_aduafr_0; stand_off 0.55 edge None: [partner_far] geodesic to sofa_ukfaaz_0: None; stand_off 0.55 edge +u: [partner_far] geodesic to sofa_ukfaaz_0: None; stand_off 0.55 edge -u: [stance_collision] untucked: [no_stance] no collision-free stance around desk_aduafr_0; stand_off 0.55 edge +v: [stance_collision] untucked: [no_stance] no traversable stance around desk_aduafr_0; stand_off 0.55 edge -v: [stance_collision] untucked: [no_stance] no collision-free stance around desk_aduafr_0; sofa_ukfaaz_0: [no_stance] stand_off 0.45 edge None: [support] placement region empty; stand_off 0.45 edge +u: [support] placement region empty; stand_off 0.45 edge -u: [stance_collision] untucked: [no_stance] no traversable stance around sofa_ukfaaz_0; stand_off 0.45 edge +v: [support] placement region empty; stand_off 0.45 edge -v: [stance_collision] untucked: [no_stance] no traversable stance around sofa_ukfaaz_0; stand_off 0.35 edge None: [support] placement region empty; stand_off 0.35 edge +u: [support",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 83.1,
+   "run_s": null
+  }
+ ],
+ "job_s": 84.1,
+ "finished": "2026-09-12 02:55:30"
+}

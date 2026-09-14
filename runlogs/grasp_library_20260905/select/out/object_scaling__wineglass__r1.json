@@ -1,0 +1,48 @@
+{
+  "group": "object_scaling__wineglass__r1",
+  "task": "object_scaling",
+  "category": "wineglass",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 12,
+  "n_opened": 12,
+  "candidates": [
+    {"model": "bovcqx", "key": "wineglass__bovcqx", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Five bowl-base pinches (45-47/0), glass horizontal, near-identical poses, one tilted 114; slender 52x165 mm flute-like glass, clean transparent render."},
+    {"model": "yfzibn", "key": "wineglass__yfzibn", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "One bowl grasp (41 mm gap) plus four stem-bowl junction pinches (16-21 mm), all clean; small 138 mm snifter-style glass, clean render."},
+    {"model": "oadvet", "key": "wineglass__oadvet", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Five clean bowl grasps in mid-bowl and bowl-base regions (gap 44-56 mm), four one_finger but centred; tall 224 mm long-stem glass, clean render."},
+    {"model": "vxmzmq", "key": "wineglass__vxmzmq", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Five near-identical bowl grasps at the widest 60-64 mm section, glass horizontal, one_finger rows centred; standard 154 mm wineglass, clean render."},
+    {"model": "akusda", "key": "wineglass__akusda", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Five near-identical bowl grasps (gap 62-66 mm), one tilted 111; standard 154 mm wineglass, same shape as vxmzmq, clean render."},
+    {"model": "ovoceo", "key": "wineglass__ovoceo", "G": 3, "T": 3, "V": 4, "R": 1, "score": 18,
+     "note": "Five near-duplicate stem pinches (gap 7-13 mm, stem 5-7 mm), bowl hangs 22-34 mm off centre; classic 212 mm glass, clean render."},
+    {"model": "hxccge", "key": "wineglass__hxccge", "G": 2, "T": 3, "V": 4, "R": 0, "score": 15,
+     "note": "All five rows pinch the 3 mm foot-plate edge (gap 5-6 mm) with the bowl 27-31 mm out; precarious and non-diverse; nice 159 mm glass."},
+    {"model": "aakcyj", "key": "wineglass__aakcyj", "G": 3, "T": 3, "V": 4, "R": 1, "score": 18,
+     "note": "Five near-duplicate stem pinches (gap 15-17 mm, stem 8-12 mm), glass horizontal, CoM offset 24-31; large-bowl 162 mm glass, clean render."},
+    {"model": "euzudc", "key": "wineglass__euzudc", "G": 3, "T": 3, "V": 4, "R": 1, "score": 18,
+     "note": "Five near-duplicate stem pinches (gap 12-15 mm, stem 7-9 mm), CoM offset 26-35; classic 97x206 mm red-wine glass, clean render."},
+    {"model": "exasdr", "key": "wineglass__exasdr", "G": 3, "T": 3, "V": 4, "R": 1, "score": 18,
+     "note": "Five near-duplicate stem pinches near the foot (gap 12-14 mm, stem 5-10 mm), CoM offset 35-52; very large 254 mm goblet, clean render."},
+    {"model": "ezsdil", "key": "wineglass__ezsdil", "G": 0, "T": 2, "V": 3, "R": 0, "score": 8,
+     "note": "Every row pinches the fragile 4-5 mm rim lip with the glass hanging 64-77 mm below; wide faceted coupe, atypical wineglass; no clean row."},
+    {"model": "kxovsj", "key": "wineglass__kxovsj", "G": 3, "T": 3, "V": 3, "R": 0, "score": 15,
+     "note": "Five stem-near-foot pinches on a 4-5 mm stem, CoM offset 42-57, row 4 weak (antipodal 0.27); very wide 117 mm balloon glass, odd proportions."}
+  ],
+  "selected": [
+    {"model": "oadvet", "key": "wineglass__oadvet", "rank": 1,
+     "reason": "Top score: five clean bowl grasps in two regions with a robust 44-56 mm gap, tall classic long-stem glass, clean transparent asset."},
+    {"model": "yfzibn", "key": "wineglass__yfzibn", "rank": 2,
+     "reason": "Ties the top score and differs in shape (small snifter-style glass): one clean bowl grasp plus junction pinches at 16-21 mm, two grasp regions, clean asset."}
+  ],
+  "alternate": {"model": "vxmzmq", "key": "wineglass__vxmzmq"},
+  "short": false,
+  "warnings": [
+    "ezsdil is not selectable: all five rows pinch the fragile rim lip (n_clean 0, confirmed visually).",
+    "No candidate offers three visibly different grasp regions; every model repeats one pose family (bowl or stem), so G is capped at 3-4 throughout. Stem-pinch models (ovoceo, aakcyj, euzudc, exasdr, kxovsj) hold a 4-12 mm stem with large CoM offsets, hence R 0-1."
+  ],
+  "confidence": "medium"
+}

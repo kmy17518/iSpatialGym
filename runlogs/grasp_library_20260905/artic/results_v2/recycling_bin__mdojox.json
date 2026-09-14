@@ -1,0 +1,28 @@
+{
+ "key": "recycling_bin__mdojox",
+ "category": "recycling_bin",
+ "model": "mdojox",
+ "aabb_extent": [
+  0.5804529786109924,
+  0.5266072750091553,
+  0.8852239847183228
+ ],
+ "support": "floor",
+ "joints": [
+  {
+   "joint": "j_link_2",
+   "kind": "flap",
+   "grasp_source": "review: Handle-less wheelie-bin lid hinged at the rear; F is the front edge, but it rests on the body rim/comb lip with no underside to reach.",
+   "stance": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "time_s": 1.6
+}

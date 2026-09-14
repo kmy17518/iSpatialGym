@@ -1,0 +1,33 @@
+{
+  "group": "disembedding__bottle_of_milk__r3",
+  "task": "disembedding",
+  "category": "bottle_of_milk",
+  "round": 3,
+  "relation": null,
+  "n_candidates": 6,
+  "n_opened": 6,
+  "candidates": [
+    {"model": "debqen", "key": "bottle_of_milk__debqen__t", "G": 3, "T": 1, "V": 4, "R": 2, "score": 17,
+     "note": "Flat 196 mm carton with blue label; only three rows, all cap/neck pinches with 76 mm lever, carton swings to hang from neck; clean asset."},
+    {"model": "czblzn", "key": "bottle_of_milk__czblzn__t", "G": 5, "T": 2, "V": 3, "R": 2, "score": 20,
+     "note": "Slender white 189x46 mm cylinder with black cap and tiny monogram label; five centred body pinches (46/0), rows 3-5 tilted; looks unlike milk, may roll."},
+    {"model": "mrejrs", "key": "bottle_of_milk__mrejrs__t", "G": 5, "T": 2, "V": 5, "R": 1, "score": 23,
+     "note": "White milk bottle with blue cap and crisp 'milk' label; five centred body pinches, but fingers at both joint limits (50/0) on 50 mm body."},
+    {"model": "ddvsgl", "key": "bottle_of_milk__ddvsgl__t", "G": 5, "T": 3, "V": 3, "R": 2, "score": 21,
+     "note": "White carton with red octagonal cap and red 'MILK' print (blurry, low-res texture); five centred body pinches 50/9, one finger at open limit; stable box."},
+    {"model": "utfsmp", "key": "bottle_of_milk__utfsmp__t", "G": 5, "T": 3, "V": 2, "R": 2, "score": 19,
+     "note": "Same carton mesh as ddvsgl but flat cream body with olive panels and no print (texture looks missing); five centred body pinches 50/9; stable box."},
+    {"model": "qsnnbp", "key": "bottle_of_milk__qsnnbp__t", "G": 5, "T": 3, "V": 3, "R": 2, "score": 21,
+     "note": "Large 219 mm carton with blurry blue/purple print and small light-blue cap; five centred body pinches 50/8, all tilt 30; stable box, low-res texture."}
+  ],
+  "selected": [
+    {"model": "mrejrs", "key": "bottle_of_milk__mrejrs__t", "rank": 1,
+     "reason": "Top score: centred body pinches at the CoM with near-vertical approach, bottom free; best-looking asset (crisp blue milk label). Caveat: fingers at both joint limits (50/0)."},
+    {"model": "ddvsgl", "key": "bottle_of_milk__ddvsgl__t", "rank": 2,
+     "reason": "Ties qsnnbp on score but differs most from #1 (rectangular carton, red cap/print vs white cylinder); centred body pinch, vertical approach, carton rests flat."}
+  ],
+  "alternate": {"model": "qsnnbp", "key": "bottle_of_milk__qsnnbp__t"},
+  "short": false,
+  "warnings": ["mrejrs closes at both joint limits (50/0) with zero margin; ddvsgl and qsnnbp textures are low-resolution; utfsmp appears to be missing its print texture; debqen offers only neck pinches with a 76 mm lever arm."],
+  "confidence": "medium"
+}

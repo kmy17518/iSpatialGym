@@ -1,0 +1,53 @@
+{
+ "category": "bottle_of_medicine",
+ "model": "kasbsy",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0,
+  180.0,
+  270.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_medicine__kasbsy__y0.png",
+   "drift_m": 0.0025,
+   "tilt_deg": 3.2,
+   "on_tray": true,
+   "settled_z": 0.0416,
+   "seg_pixels": 3164,
+   "aabb_extent": [
+    0.053,
+    0.054,
+    0.093
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_medicine__kasbsy__y1.png",
+   "drift_m": 0.0023,
+   "tilt_deg": 3.1,
+   "on_tray": true,
+   "settled_z": 0.0416
+  },
+  "y2": {
+   "yaw_deg": 180.0,
+   "png": "renders/bottle_of_medicine__kasbsy__y2.png",
+   "drift_m": 0.0025,
+   "tilt_deg": 3.0,
+   "on_tray": true,
+   "settled_z": 0.0416
+  },
+  "y3": {
+   "yaw_deg": 270.0,
+   "png": "renders/bottle_of_medicine__kasbsy__y3.png",
+   "drift_m": 0.0048,
+   "tilt_deg": 6.6,
+   "on_tray": true,
+   "settled_z": 0.0416
+  }
+ },
+ "stable": true,
+ "visible": true
+}

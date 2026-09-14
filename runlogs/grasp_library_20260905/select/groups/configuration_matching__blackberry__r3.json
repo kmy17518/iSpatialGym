@@ -1,0 +1,63 @@
+{
+ "group": "configuration_matching__blackberry__r3",
+ "task": "configuration_matching",
+ "category": "blackberry",
+ "round": 3,
+ "relation": null,
+ "partner": "M",
+ "requirements": "Attachment task: the object is picked from a table and attached to its partner. The pads must leave the mating side of the object completely free.",
+ "candidates": [
+  {
+   "model": "tvpfvb",
+   "key": "blackberry__tvpfvb__a",
+   "strip": "/tmp/glib/strips/blackberry__tvpfvb__a.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "27 mm berry between fingertips, both pads touch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "berry between fingertips, both pads touch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "berry between fingertips, both pads touch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "berry between fingertips, both pads touch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "berry between fingertips, near-vertical approach"
+    }
+   ],
+   "object_note": "small object sits at fingertips; finger readings (29-30/0) consistent with 27 mm width",
+   "bbox_mm": [
+    28,
+    29,
+    26
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "attachment_free"
+  }
+ ],
+ "excluded": []
+}

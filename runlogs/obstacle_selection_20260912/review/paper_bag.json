@@ -1,0 +1,19 @@
+{
+  "category": "paper_bag",
+  "task": "obst",
+  "n_models": 3,
+  "n_opened": 3,
+  "models": [
+    {"model": "paper_bag/bzsxgw", "V": 3, "N": 2, "S": 1, "rest_ok": true, "score": 11, "valid": true,
+     "note": "Plain brown crumpled grocery bag, open top, 0.10 x 0.15 x 0.24 m; thin-walled, flat texture, footprint borderline."},
+    {"model": "paper_bag/ruryqd", "V": 4, "N": 2, "S": 1, "rest_ok": true, "score": 13, "valid": true,
+     "note": "Tan gusseted gift bag with green rope handles, open, 0.12 x 0.20 x 0.20 m; clean, height just under 0.20 m."},
+    {"model": "paper_bag/wvhmww", "V": 4, "N": 2, "S": 2, "rest_ok": true, "score": 14, "valid": true,
+     "note": "Tall dark brown shopping bag with twisted rope handles, 0.14 x 0.29 x 0.51 m; good size, thin but flat base."}
+  ],
+  "picks": ["paper_bag/wvhmww", "paper_bag/ruryqd"],
+  "alternate": "paper_bag/bzsxgw",
+  "natural_scenes": ["house_single_floor", "house_double_floor_lower", "Rs_int", "restaurant_diner"],
+  "category_verdict": "weak",
+  "category_note": "Three upright paper bags (grocery, gift, tall shopping). All stand on a flat base; a set-down bag is credible kitchen/entryway clutter (N = 2). Two are small/thin (borderline size); wvhmww is the only comfortably sized one."
+}

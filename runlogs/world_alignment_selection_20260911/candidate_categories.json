@@ -1,0 +1,1518 @@
+{
+ "keyboard": {
+  "n_ready": 6,
+  "n_total": 10,
+  "rendered": [
+   "hgtbot",
+   "injrgc",
+   "jtdyix",
+   "kzcreb",
+   "nddmmy",
+   "uwacaq"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "tablet": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "kywsta"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "calculator": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "kwmmty"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "clipboard": {
+  "n_ready": 2,
+  "n_total": 2,
+  "rendered": [
+   "envjqe",
+   "gmxyfo"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "chopping_board": {
+  "n_ready": 14,
+  "n_total": 15,
+  "rendered": [
+   "afwefw",
+   "akgegh",
+   "ayegwd",
+   "cptayn",
+   "drjnag",
+   "gaxhrw",
+   "iocgzv",
+   "ktxcvz",
+   "mqsqhl",
+   "mwmzzv",
+   "ozrzrr",
+   "psabiv",
+   "sygezm",
+   "uzeftd"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "cutting_board": {
+  "n_ready": 5,
+  "n_total": 7,
+  "rendered": [
+   "aibvew",
+   "idmcgf",
+   "jfrbuz",
+   "nsvnai",
+   "tcdrzs"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "hardback": {
+  "n_ready": 246,
+  "n_total": 255,
+  "rendered": [
+   "acaxtl",
+   "acbrnv",
+   "aceozs",
+   "acskbo",
+   "aesiym",
+   "aewljo",
+   "agbqsy",
+   "ajpulw",
+   "atxzzy",
+   "axvnml",
+   "bcmzwo",
+   "bgtbdp",
+   "bklqfz",
+   "bobmzf",
+   "bpgluc",
+   "bqvvvx"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "paperback_book": {
+  "n_ready": 19,
+  "n_total": 23,
+  "rendered": [
+   "aubynm",
+   "bisnup",
+   "eqzjjk",
+   "fvzdec",
+   "hdhhqo",
+   "hrtflt",
+   "ixwtnb",
+   "jhaltj",
+   "ncjkcg",
+   "phsgun",
+   "vciijb",
+   "wfcxjv",
+   "xhibsy",
+   "xxknda",
+   "xzxgfw",
+   "ydarnr"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "magazine": {
+  "n_ready": 7,
+  "n_total": 9,
+  "rendered": [
+   "ajitiv",
+   "ehdwsd",
+   "kjfxxx",
+   "tfovwy",
+   "vvcrhu",
+   "ymfwaz",
+   "zfeoeu"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "catalog": {
+  "n_ready": 4,
+  "n_total": 4,
+  "rendered": [
+   "aygcnt",
+   "deirql",
+   "uilzqm",
+   "zmidof"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "comic_book": {
+  "n_ready": 5,
+  "n_total": 5,
+  "rendered": [
+   "nekxsh",
+   "qkczyc",
+   "scycof",
+   "vzejnl",
+   "xmbxfm"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "letter": {
+  "n_ready": 17,
+  "n_total": 17,
+  "rendered": [
+   "bdlpry",
+   "bswqmq",
+   "csncjv",
+   "cvtjcy",
+   "dyvllf",
+   "esmoua",
+   "fnaqcr",
+   "igvnic",
+   "jafvfh",
+   "jgnowc",
+   "oheufk",
+   "pieqjf",
+   "pvuaxx",
+   "qhqhwk",
+   "qljxat",
+   "qrykxc"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "legal_document": {
+  "n_ready": 2,
+  "n_total": 3,
+  "rendered": [
+   "mougvz",
+   "qkrlsi"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "notepad": {
+  "n_ready": 5,
+  "n_total": 5,
+  "rendered": [
+   "awcyha",
+   "hirdfd",
+   "njeocp",
+   "oaikde",
+   "rvevdj"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "notebook": {
+  "n_ready": 34,
+  "n_total": 36,
+  "rendered": [
+   "aanuhi",
+   "bnsvvw",
+   "dlhxxl",
+   "eijrqw",
+   "fckzgw",
+   "ffdjzp",
+   "flpxdx",
+   "gqkaqu",
+   "hwhisw",
+   "ioaxit",
+   "jxabmj",
+   "jzwprb",
+   "kchdrf",
+   "ksxknp",
+   "mtveio",
+   "nxegkh"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "mail": {
+  "n_ready": 5,
+  "n_total": 5,
+  "rendered": [
+   "azunex",
+   "gvivdi",
+   "mbbwhn",
+   "ojkepk",
+   "qpwlor"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "newspaper": {
+  "n_ready": 2,
+  "n_total": 3,
+  "rendered": [
+   "edarlp",
+   "ukamcl"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "paper_sheet": {
+  "n_ready": 2,
+  "n_total": 2,
+  "rendered": [
+   "afdjfk",
+   "uqbipw"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "folder": {
+  "n_ready": 6,
+  "n_total": 7,
+  "rendered": [
+   "guhatz",
+   "inkwmw",
+   "lktggf",
+   "piezyg",
+   "poqpux",
+   "wauyns"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "folderal": {
+  "n_ready": 2,
+  "n_total": 3,
+  "rendered": [
+   "ttldpx",
+   "zwhewa"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "package": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "mvvnqm"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "board_game": {
+  "n_ready": 16,
+  "n_total": 16,
+  "rendered": [
+   "eoywpy",
+   "frgdqh",
+   "fzyuip",
+   "gcfkqa",
+   "gumkqh",
+   "ibzhzu",
+   "iqfvfl",
+   "lzslbu",
+   "nfewft",
+   "ovttum",
+   "phwwnx",
+   "qdkyzl",
+   "qgvsnb",
+   "rgvkmy",
+   "twkglv",
+   "vbamua"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "video_game": {
+  "n_ready": 12,
+  "n_total": 12,
+  "rendered": [
+   "apjpos",
+   "ceaxsd",
+   "ckugyi",
+   "coiafo",
+   "lfdpse",
+   "ppnzqm",
+   "pujfzk",
+   "qsyyql",
+   "quzjuo",
+   "rzaxlj",
+   "veodkq",
+   "yyvkel"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "pizza_box": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "hvaucj"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "box_of_chocolates": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "bdvkbh"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "boxed_ink_cartridge": {
+  "n_ready": 3,
+  "n_total": 3,
+  "rendered": [
+   "ltblou",
+   "oepuip",
+   "oinelo"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "game_console": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "anslwz"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "scanner": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "juzkjp"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "digital_scale": {
+  "n_ready": 3,
+  "n_total": 4,
+  "rendered": [
+   "ccphiu",
+   "hfetby",
+   "xwzzen"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "credit_card_terminal": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "bqpanz"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "portable_game_console": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "muwcnf"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "hard_drive": {
+  "n_ready": 2,
+  "n_total": 2,
+  "rendered": [
+   "ijibkm",
+   "ubjbsm"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "tray": {
+  "n_ready": 20,
+  "n_total": 24,
+  "rendered": [
+   "coqeme",
+   "glwebh",
+   "gsxbym",
+   "hbjdlb",
+   "hjxczh",
+   "huwhjg",
+   "hvlfig",
+   "incirm",
+   "jpcflq",
+   "mhhoga",
+   "mkdcha",
+   "spopfj",
+   "thkphg",
+   "txcjux",
+   "uekqey",
+   "vxbtax"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "baking_sheet": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "yhurut"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "chopping_block": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "ekowsj"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "frying_pan": {
+  "n_ready": 7,
+  "n_total": 8,
+  "rendered": [
+   "aewpzn",
+   "cprjvq",
+   "jpzusm",
+   "mhndon",
+   "sfbdjn",
+   "snvhlz",
+   "vycozd"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "griddle_pan": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "ryvqep"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "saucepan": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "fsinsu"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "wok": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "pobfpe"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "skimmer": {
+  "n_ready": 2,
+  "n_total": 2,
+  "rendered": [
+   "wvmcce",
+   "xocqxg"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "dustpan": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "espzwv"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "hairbrush": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "bdylnb"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "ripsaw": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "laysom"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "putty_knife": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "qmdkub"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "utility_knife": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "kridpz"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "open_end_wrench": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "klnawb"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "plier": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "zwzncq"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "wire_cutter": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "ugbval"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "clamp": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "feswhy"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "caliper": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "sngjmj"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "magnifying_glass": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "clyiol"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "hair_dryer": {
+  "n_ready": 1,
+  "n_total": 2,
+  "rendered": [
+   "ylutzy"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "electric_hand_mixer": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "prewfi"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "stapler": {
+  "n_ready": 1,
+  "n_total": 2,
+  "rendered": [
+   "kgnsas"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "gym_shoe": {
+  "n_ready": 22,
+  "n_total": 24,
+  "rendered": [
+   "arigtn",
+   "hwrvmy",
+   "kmcbym",
+   "lmpdfa",
+   "lqzooz",
+   "lwcwme",
+   "mcfcwq",
+   "mjyyda",
+   "nahllg",
+   "pblxfp",
+   "picdro",
+   "qxecbh",
+   "rcozpq",
+   "rkikcm",
+   "ugbxip",
+   "ukkqib"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "skates": {
+  "n_ready": 2,
+  "n_total": 2,
+  "rendered": [
+   "igyveo",
+   "sjehwr"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "sunglasses": {
+  "n_ready": 3,
+  "n_total": 4,
+  "rendered": [
+   "gqawld",
+   "nxfifs",
+   "qiwncl"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "eyeglasses": {
+  "n_ready": 2,
+  "n_total": 2,
+  "rendered": [
+   "gphhuu",
+   "ujauoy"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "goggles": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "wszdxi"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "wallet": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "lagjae"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "toy_train": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "zdfhbw"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "chess_set": {
+  "n_ready": 2,
+  "n_total": 2,
+  "rendered": [
+   "nzgefv",
+   "zncboj"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "desk_organizer": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "yidrel"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "power_strip": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "czvrku"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "bag_of_chips": {
+  "n_ready": 7,
+  "n_total": 7,
+  "rendered": [
+   "bryahw",
+   "dwkdko",
+   "ennnjj",
+   "jphwer",
+   "qstxpj",
+   "uevvib",
+   "wnuoym"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "carton_of_eggs": {
+  "n_ready": 3,
+  "n_total": 4,
+  "rendered": [
+   "mimzbz",
+   "rixhgu",
+   "stxfxb"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "pack_of_bread": {
+  "n_ready": 4,
+  "n_total": 4,
+  "rendered": [
+   "fckfij",
+   "sfupqo",
+   "wjbnfu",
+   "yehtiv"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "mouse": {
+  "n_ready": 7,
+  "n_total": 9,
+  "rendered": [
+   "cduwda",
+   "eosngb",
+   "fjljxp",
+   "ihpnjx",
+   "oydobn",
+   "pljjtu",
+   "wwyopp"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "laptop": {
+  "n_ready": 1,
+  "n_total": 6,
+  "rendered": [
+   "nvulcs"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "violin_case": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "jlasop"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "pencil_case": {
+  "n_ready": 3,
+  "n_total": 3,
+  "rendered": [
+   "acikzo",
+   "cqxkgl",
+   "otcmih"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "monitor": {
+  "n_ready": 10,
+  "n_total": 13,
+  "rendered": [
+   "huvcgu",
+   "kmltvq",
+   "mlyppp",
+   "nghyiv",
+   "qaacxt",
+   "qvpbge",
+   "rbqanz",
+   "wxhvqc",
+   "xffisd",
+   "xhxcyg"
+  ],
+  "groups": [
+   "wa0",
+   "wa1"
+  ]
+ },
+ "alarm_clock": {
+  "n_ready": 1,
+  "n_total": 3,
+  "rendered": [
+   "vqwovi"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "radio": {
+  "n_ready": 2,
+  "n_total": 2,
+  "rendered": [
+   "vgioak",
+   "wxnicr"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "menu": {
+  "n_ready": 6,
+  "n_total": 6,
+  "rendered": [
+   "keaqlh",
+   "ncfnii",
+   "qmypsm",
+   "tissfg",
+   "ugplzr",
+   "wqhybr"
+  ],
+  "groups": [
+   "wa0",
+   "wa1"
+  ]
+ },
+ "receipt": {
+  "n_ready": 5,
+  "n_total": 5,
+  "rendered": [
+   "hgnbjj",
+   "qfaleu",
+   "rzrhlo",
+   "xvfean",
+   "zsxylm"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "platter": {
+  "n_ready": 6,
+  "n_total": 6,
+  "rendered": [
+   "csanbr",
+   "ekjpdj",
+   "hnlivs",
+   "iadlti",
+   "ieoasd",
+   "kiiamx"
+  ],
+  "groups": [
+   "wa0"
+  ]
+ },
+ "calendar": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "ydunsu"
+  ],
+  "groups": [
+   "wa0",
+   "wa1"
+  ]
+ },
+ "first_aid_kit": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "flctdz"
+  ],
+  "groups": [
+   "wa0",
+   "wa1"
+  ]
+ },
+ "painting": {
+  "n_ready": 36,
+  "n_total": 39,
+  "rendered": [
+   "dacihj",
+   "ljabhq",
+   "cjrilr",
+   "eexydp",
+   "ejhanr",
+   "fmcgul",
+   "fmlmox",
+   "fqlxxd",
+   "fwuole",
+   "fyoxcq",
+   "gardkz",
+   "ggloob",
+   "ifdzgs",
+   "jayvqq",
+   "jfkvxh",
+   "jreujf"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "picture": {
+  "n_ready": 46,
+  "n_total": 85,
+  "rendered": [
+   "abtgvz",
+   "alwmys",
+   "bxpohm",
+   "bzmdxc",
+   "chfljy",
+   "cltbty",
+   "dogydw",
+   "etixod",
+   "fanvpf",
+   "fhkzlm",
+   "ggajdz",
+   "gwricv",
+   "hffaxw",
+   "hhxttu",
+   "jmvdxm",
+   "jovfqj"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "wall_clock": {
+  "n_ready": 7,
+  "n_total": 8,
+  "rendered": [
+   "fnwzqj",
+   "fqvgny",
+   "jerval",
+   "oqmbtp",
+   "przkmo",
+   "xevvel",
+   "zpctvp"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "poster": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "dsrcyt"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "bulletin_board": {
+  "n_ready": 2,
+  "n_total": 2,
+  "rendered": [
+   "ayaoal",
+   "rjlpsy"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "whiteboard": {
+  "n_ready": 3,
+  "n_total": 3,
+  "rendered": [
+   "bqqmtc",
+   "gvkgsi",
+   "onhspt"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "decorative_sign": {
+  "n_ready": 3,
+  "n_total": 3,
+  "rendered": [
+   "hgonwj",
+   "rypeha",
+   "xzsmxq"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "signpost": {
+  "n_ready": 7,
+  "n_total": 10,
+  "rendered": [
+   "axhlim",
+   "ivvjfv",
+   "mexzmk",
+   "mlvfbp",
+   "sdsfzw",
+   "vvjtkv",
+   "vwhtlm"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "grocery_sign": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "kyyjer"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "canvas": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "adxquq"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "pegboard": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "jafivf"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "guitar": {
+  "n_ready": 3,
+  "n_total": 4,
+  "rendered": [
+   "cybisc",
+   "gysapt",
+   "hpqjrq"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "tennis_racket": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "rmvafy"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "violin": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "rgwsac"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "hanger": {
+  "n_ready": 6,
+  "n_total": 7,
+  "rendered": [
+   "agrpio",
+   "anobre",
+   "ffecvd",
+   "lymqks",
+   "nadesv",
+   "nagryh"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "hook_rack": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "mdnfjr"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "towel_rack": {
+  "n_ready": 6,
+  "n_total": 7,
+  "rendered": [
+   "crivoa",
+   "kqrmrh",
+   "nhlijv",
+   "pqhsry",
+   "qedffr",
+   "quznqx"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "valentine_wreath": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "xpbsof"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "picture_frame": {
+  "n_ready": 10,
+  "n_total": 13,
+  "rendered": [
+   "brhofj",
+   "byaund",
+   "fgsgpu",
+   "guatvs",
+   "kncybf",
+   "lsqclh",
+   "lxpxcf",
+   "nrviiu",
+   "vmyqsm",
+   "yxmjdx"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "paper_towel_dispenser": {
+  "n_ready": 5,
+  "n_total": 5,
+  "rendered": [
+   "jacqxv",
+   "lahuhb",
+   "ovwdpz",
+   "tuvnnt",
+   "zpfghl"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "wall_mounted_soap_dispenser": {
+  "n_ready": 3,
+  "n_total": 3,
+  "rendered": [
+   "aofnyo",
+   "byjkkn",
+   "zvslvk"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "wall_mounted_tv": {
+  "n_ready": 15,
+  "n_total": 20,
+  "rendered": [
+   "aoqsbu",
+   "bfehsl",
+   "cwdngq",
+   "dkpfys",
+   "dxyfxf",
+   "gffrzl",
+   "ggfznh",
+   "leeqgt",
+   "ovzajm",
+   "pghmyr",
+   "rifpjo",
+   "sodbbr",
+   "uvlqsl",
+   "ylvjhb",
+   "zesqym"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "fire_extinguisher": {
+  "n_ready": 5,
+  "n_total": 6,
+  "rendered": [
+   "bejaeu",
+   "inqyom",
+   "jgdvdl",
+   "noepez",
+   "xqtkxb"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "thermostat": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "jophec"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "broom": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "tpyvbt"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "umbrella": {
+  "n_ready": 5,
+  "n_total": 5,
+  "rendered": [
+   "cqfbku",
+   "frpfnc",
+   "hdfkbc",
+   "ziqzqo",
+   "zxnjwz"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "hat": {
+  "n_ready": 4,
+  "n_total": 6,
+  "rendered": [
+   "avvknr",
+   "ldxyyc",
+   "wkrzep",
+   "zymxgw"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "map": {
+  "n_ready": 3,
+  "n_total": 3,
+  "rendered": [
+   "fdtxut",
+   "hsbtqi",
+   "umftoc"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "board": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "fxugbm"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "frame": {
+  "n_ready": 2,
+  "n_total": 2,
+  "rendered": [
+   "argijo",
+   "trhhqo"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "dartboard": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "zjenlc"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "license_plate": {
+  "n_ready": 5,
+  "n_total": 5,
+  "rendered": [
+   "hjdaqn",
+   "naclac",
+   "nuqnlr",
+   "nwfbxn",
+   "yepdrj"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "skateboard_deck": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "tgfidu"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "wreath": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "rkrxno"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "holly_decoration": {
+  "n_ready": 1,
+  "n_total": 1,
+  "rendered": [
+   "shmkir"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "antlers": {
+  "n_ready": 2,
+  "n_total": 2,
+  "rendered": [
+   "nlsanr",
+   "ovwdwa"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "mirror": {
+  "n_ready": 0,
+  "n_total": 19,
+  "rendered": [
+   "catitv",
+   "ddmyjg",
+   "edxfnt",
+   "ffoudz",
+   "jpktmn",
+   "jtgjha"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ },
+ "windshield": {
+  "n_ready": 2,
+  "n_total": 2,
+  "rendered": [
+   "akoadf",
+   "mdfijk"
+  ],
+  "groups": [
+   "wa1"
+  ]
+ }
+}

@@ -1,0 +1,656 @@
+{
+ "bar_soap": {
+  "same_pages": [
+   "grids/same/bar_soap__p1.png"
+  ],
+  "n_same": 4,
+  "same_contact": [
+   "grids/same_contact/bar_soap__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/bar_soap__p1.png",
+   "grids/diff/bar_soap__p2.png",
+   "grids/diff/bar_soap__p3.png",
+   "grids/diff/bar_soap__p4.png",
+   "grids/diff/bar_soap__p5.png"
+  ]
+ },
+ "beaker": {
+  "same_pages": [
+   "grids/same/beaker__p1.png",
+   "grids/same/beaker__p2.png",
+   "grids/same/beaker__p3.png"
+  ],
+  "n_same": 10,
+  "same_contact": [
+   "grids/same_contact/beaker__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/beaker__p1.png",
+   "grids/diff/beaker__p2.png",
+   "grids/diff/beaker__p3.png"
+  ]
+ },
+ "bottle_of_beer": {
+  "same_pages": [
+   "grids/same/bottle_of_beer__p1.png",
+   "grids/same/bottle_of_beer__p2.png",
+   "grids/same/bottle_of_beer__p3.png",
+   "grids/same/bottle_of_beer__p4.png"
+  ],
+  "n_same": 13,
+  "same_contact": [
+   "grids/same_contact/bottle_of_beer__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/bottle_of_beer__p1.png",
+   "grids/diff/bottle_of_beer__p2.png",
+   "grids/diff/bottle_of_beer__p3.png",
+   "grids/diff/bottle_of_beer__p4.png"
+  ]
+ },
+ "bottle_of_medicine": {
+  "same_pages": [
+   "grids/same/bottle_of_medicine__p1.png",
+   "grids/same/bottle_of_medicine__p2.png"
+  ],
+  "n_same": 8,
+  "same_contact": [
+   "grids/same_contact/bottle_of_medicine__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/bottle_of_medicine__p1.png",
+   "grids/diff/bottle_of_medicine__p2.png",
+   "grids/diff/bottle_of_medicine__p3.png",
+   "grids/diff/bottle_of_medicine__p4.png"
+  ]
+ },
+ "bottle_of_milk": {
+  "same_pages": [
+   "grids/same/bottle_of_milk__p1.png",
+   "grids/same/bottle_of_milk__p2.png"
+  ],
+  "n_same": 6,
+  "same_contact": [
+   "grids/same_contact/bottle_of_milk__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/bottle_of_milk__p1.png",
+   "grids/diff/bottle_of_milk__p2.png",
+   "grids/diff/bottle_of_milk__p3.png"
+  ]
+ },
+ "bottle_of_pop": {
+  "same_pages": [
+   "grids/same/bottle_of_pop__p1.png",
+   "grids/same/bottle_of_pop__p2.png",
+   "grids/same/bottle_of_pop__p3.png",
+   "grids/same/bottle_of_pop__p4.png",
+   "grids/same/bottle_of_pop__p5.png",
+   "grids/same/bottle_of_pop__p6.png",
+   "grids/same/bottle_of_pop__p7.png",
+   "grids/same/bottle_of_pop__p8.png",
+   "grids/same/bottle_of_pop__p9.png",
+   "grids/same/bottle_of_pop__p10.png"
+  ],
+  "n_same": 37,
+  "same_contact": [
+   "grids/same_contact/bottle_of_pop__p1.png",
+   "grids/same_contact/bottle_of_pop__p2.png",
+   "grids/same_contact/bottle_of_pop__p3.png"
+  ],
+  "diff_contact": [
+   "grids/diff/bottle_of_pop__p1.png",
+   "grids/diff/bottle_of_pop__p2.png",
+   "grids/diff/bottle_of_pop__p3.png",
+   "grids/diff/bottle_of_pop__p4.png",
+   "grids/diff/bottle_of_pop__p5.png"
+  ]
+ },
+ "bottle_of_shampoo": {
+  "same_pages": [
+   "grids/same/bottle_of_shampoo__p1.png"
+  ],
+  "n_same": 4,
+  "same_contact": [
+   "grids/same_contact/bottle_of_shampoo__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/bottle_of_shampoo__p1.png",
+   "grids/diff/bottle_of_shampoo__p2.png",
+   "grids/diff/bottle_of_shampoo__p3.png",
+   "grids/diff/bottle_of_shampoo__p4.png",
+   "grids/diff/bottle_of_shampoo__p5.png"
+  ]
+ },
+ "bottle_of_wine": {
+  "same_pages": [
+   "grids/same/bottle_of_wine__p1.png",
+   "grids/same/bottle_of_wine__p2.png",
+   "grids/same/bottle_of_wine__p3.png",
+   "grids/same/bottle_of_wine__p4.png",
+   "grids/same/bottle_of_wine__p5.png",
+   "grids/same/bottle_of_wine__p6.png",
+   "grids/same/bottle_of_wine__p7.png"
+  ],
+  "n_same": 27,
+  "same_contact": [
+   "grids/same_contact/bottle_of_wine__p1.png",
+   "grids/same_contact/bottle_of_wine__p2.png"
+  ],
+  "diff_contact": [
+   "grids/diff/bottle_of_wine__p1.png",
+   "grids/diff/bottle_of_wine__p2.png",
+   "grids/diff/bottle_of_wine__p3.png"
+  ]
+ },
+ "box_of_baking_mix": {
+  "same_pages": [
+   "grids/same/box_of_baking_mix__p1.png",
+   "grids/same/box_of_baking_mix__p2.png"
+  ],
+  "n_same": 8,
+  "same_contact": [
+   "grids/same_contact/box_of_baking_mix__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/box_of_baking_mix__p1.png",
+   "grids/diff/box_of_baking_mix__p2.png",
+   "grids/diff/box_of_baking_mix__p3.png",
+   "grids/diff/box_of_baking_mix__p4.png"
+  ]
+ },
+ "box_of_butter": {
+  "same_pages": [
+   "grids/same/box_of_butter__p1.png"
+  ],
+  "n_same": 2,
+  "same_contact": [
+   "grids/same_contact/box_of_butter__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/box_of_butter__p1.png",
+   "grids/diff/box_of_butter__p2.png",
+   "grids/diff/box_of_butter__p3.png",
+   "grids/diff/box_of_butter__p4.png",
+   "grids/diff/box_of_butter__p5.png"
+  ]
+ },
+ "box_of_cane_sugar": {
+  "same_pages": [
+   "grids/same/box_of_cane_sugar__p1.png"
+  ],
+  "n_same": 4,
+  "same_contact": [
+   "grids/same_contact/box_of_cane_sugar__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/box_of_cane_sugar__p1.png",
+   "grids/diff/box_of_cane_sugar__p2.png",
+   "grids/diff/box_of_cane_sugar__p3.png",
+   "grids/diff/box_of_cane_sugar__p4.png"
+  ]
+ },
+ "box_of_cereal": {
+  "same_pages": [
+   "grids/same/box_of_cereal__p1.png",
+   "grids/same/box_of_cereal__p2.png",
+   "grids/same/box_of_cereal__p3.png",
+   "grids/same/box_of_cereal__p4.png"
+  ],
+  "n_same": 14,
+  "same_contact": [
+   "grids/same_contact/box_of_cereal__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/box_of_cereal__p1.png",
+   "grids/diff/box_of_cereal__p2.png",
+   "grids/diff/box_of_cereal__p3.png",
+   "grids/diff/box_of_cereal__p4.png"
+  ]
+ },
+ "box_of_cookies": {
+  "same_pages": [
+   "grids/same/box_of_cookies__p1.png",
+   "grids/same/box_of_cookies__p2.png",
+   "grids/same/box_of_cookies__p3.png"
+  ],
+  "n_same": 11,
+  "same_contact": [
+   "grids/same_contact/box_of_cookies__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/box_of_cookies__p1.png",
+   "grids/diff/box_of_cookies__p2.png",
+   "grids/diff/box_of_cookies__p3.png"
+  ]
+ },
+ "box_of_granola_bars": {
+  "same_pages": [
+   "grids/same/box_of_granola_bars__p1.png"
+  ],
+  "n_same": 3,
+  "same_contact": [
+   "grids/same_contact/box_of_granola_bars__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/box_of_granola_bars__p1.png",
+   "grids/diff/box_of_granola_bars__p2.png",
+   "grids/diff/box_of_granola_bars__p3.png",
+   "grids/diff/box_of_granola_bars__p4.png",
+   "grids/diff/box_of_granola_bars__p5.png"
+  ]
+ },
+ "box_of_oatmeal": {
+  "same_pages": [
+   "grids/same/box_of_oatmeal__p1.png"
+  ],
+  "n_same": 3,
+  "same_contact": [
+   "grids/same_contact/box_of_oatmeal__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/box_of_oatmeal__p1.png",
+   "grids/diff/box_of_oatmeal__p2.png",
+   "grids/diff/box_of_oatmeal__p3.png",
+   "grids/diff/box_of_oatmeal__p4.png"
+  ]
+ },
+ "box_of_rice": {
+  "same_pages": [
+   "grids/same/box_of_rice__p1.png"
+  ],
+  "n_same": 3,
+  "same_contact": [
+   "grids/same_contact/box_of_rice__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/box_of_rice__p1.png",
+   "grids/diff/box_of_rice__p2.png",
+   "grids/diff/box_of_rice__p3.png",
+   "grids/diff/box_of_rice__p4.png"
+  ]
+ },
+ "box_of_sanitary_napkins": {
+  "same_pages": [
+   "grids/same/box_of_sanitary_napkins__p1.png",
+   "grids/same/box_of_sanitary_napkins__p2.png",
+   "grids/same/box_of_sanitary_napkins__p3.png"
+  ],
+  "n_same": 9,
+  "same_contact": [
+   "grids/same_contact/box_of_sanitary_napkins__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/box_of_sanitary_napkins__p1.png",
+   "grids/diff/box_of_sanitary_napkins__p2.png",
+   "grids/diff/box_of_sanitary_napkins__p3.png",
+   "grids/diff/box_of_sanitary_napkins__p4.png"
+  ]
+ },
+ "box_of_shampoo": {
+  "same_pages": [
+   "grids/same/box_of_shampoo__p1.png"
+  ],
+  "n_same": 4,
+  "same_contact": [
+   "grids/same_contact/box_of_shampoo__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/box_of_shampoo__p1.png",
+   "grids/diff/box_of_shampoo__p2.png",
+   "grids/diff/box_of_shampoo__p3.png",
+   "grids/diff/box_of_shampoo__p4.png",
+   "grids/diff/box_of_shampoo__p5.png"
+  ]
+ },
+ "box_of_tissues": {
+  "same_pages": [
+   "grids/same/box_of_tissues__p1.png"
+  ],
+  "n_same": 4,
+  "same_contact": [
+   "grids/same_contact/box_of_tissues__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/box_of_tissues__p1.png",
+   "grids/diff/box_of_tissues__p2.png",
+   "grids/diff/box_of_tissues__p3.png",
+   "grids/diff/box_of_tissues__p4.png",
+   "grids/diff/box_of_tissues__p5.png"
+  ]
+ },
+ "box_of_yogurt": {
+  "same_pages": [
+   "grids/same/box_of_yogurt__p1.png"
+  ],
+  "n_same": 3,
+  "same_contact": [
+   "grids/same_contact/box_of_yogurt__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/box_of_yogurt__p1.png",
+   "grids/diff/box_of_yogurt__p2.png",
+   "grids/diff/box_of_yogurt__p3.png",
+   "grids/diff/box_of_yogurt__p4.png",
+   "grids/diff/box_of_yogurt__p5.png",
+   "grids/diff/box_of_yogurt__p6.png"
+  ]
+ },
+ "can_of_soda": {
+  "same_pages": [
+   "grids/same/can_of_soda__p1.png",
+   "grids/same/can_of_soda__p2.png",
+   "grids/same/can_of_soda__p3.png"
+  ],
+  "n_same": 9,
+  "same_contact": [
+   "grids/same_contact/can_of_soda__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/can_of_soda__p1.png",
+   "grids/diff/can_of_soda__p2.png",
+   "grids/diff/can_of_soda__p3.png",
+   "grids/diff/can_of_soda__p4.png"
+  ]
+ },
+ "carton_of_milk": {
+  "same_pages": [
+   "grids/same/carton_of_milk__p1.png"
+  ],
+  "n_same": 4,
+  "same_contact": [
+   "grids/same_contact/carton_of_milk__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/carton_of_milk__p1.png",
+   "grids/diff/carton_of_milk__p2.png",
+   "grids/diff/carton_of_milk__p3.png"
+  ]
+ },
+ "cellulose_tape": {
+  "same_pages": [
+   "grids/same/cellulose_tape__p1.png"
+  ],
+  "n_same": 3,
+  "same_contact": [
+   "grids/same_contact/cellulose_tape__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/cellulose_tape__p1.png",
+   "grids/diff/cellulose_tape__p2.png",
+   "grids/diff/cellulose_tape__p3.png",
+   "grids/diff/cellulose_tape__p4.png",
+   "grids/diff/cellulose_tape__p5.png"
+  ]
+ },
+ "chili": {
+  "same_pages": [
+   "grids/same/chili__p1.png"
+  ],
+  "n_same": 4,
+  "same_contact": [
+   "grids/same_contact/chili__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/chili__p1.png",
+   "grids/diff/chili__p2.png",
+   "grids/diff/chili__p3.png",
+   "grids/diff/chili__p4.png",
+   "grids/diff/chili__p5.png"
+  ]
+ },
+ "conditioner_dispenser": {
+  "same_pages": [
+   "grids/same/conditioner_dispenser__p1.png"
+  ],
+  "n_same": 3,
+  "same_contact": [
+   "grids/same_contact/conditioner_dispenser__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/conditioner_dispenser__p1.png",
+   "grids/diff/conditioner_dispenser__p2.png",
+   "grids/diff/conditioner_dispenser__p3.png",
+   "grids/diff/conditioner_dispenser__p4.png"
+  ]
+ },
+ "cookie_cutter": {
+  "same_pages": [
+   "grids/same/cookie_cutter__p1.png"
+  ],
+  "n_same": 3,
+  "same_contact": [
+   "grids/same_contact/cookie_cutter__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/cookie_cutter__p1.png",
+   "grids/diff/cookie_cutter__p2.png",
+   "grids/diff/cookie_cutter__p3.png",
+   "grids/diff/cookie_cutter__p4.png"
+  ]
+ },
+ "jar_of_bath_salt": {
+  "same_pages": [
+   "grids/same/jar_of_bath_salt__p1.png"
+  ],
+  "n_same": 2,
+  "same_contact": [
+   "grids/same_contact/jar_of_bath_salt__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/jar_of_bath_salt__p1.png",
+   "grids/diff/jar_of_bath_salt__p2.png",
+   "grids/diff/jar_of_bath_salt__p3.png",
+   "grids/diff/jar_of_bath_salt__p4.png",
+   "grids/diff/jar_of_bath_salt__p5.png",
+   "grids/diff/jar_of_bath_salt__p6.png",
+   "grids/diff/jar_of_bath_salt__p7.png"
+  ]
+ },
+ "mouse": {
+  "same_pages": [
+   "grids/same/mouse__p1.png",
+   "grids/same/mouse__p2.png"
+  ],
+  "n_same": 7,
+  "same_contact": [
+   "grids/same_contact/mouse__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/mouse__p1.png",
+   "grids/diff/mouse__p2.png",
+   "grids/diff/mouse__p3.png",
+   "grids/diff/mouse__p4.png"
+  ]
+ },
+ "mug": {
+  "same_pages": [
+   "grids/same/mug__p1.png",
+   "grids/same/mug__p2.png",
+   "grids/same/mug__p3.png"
+  ],
+  "n_same": 10,
+  "same_contact": [
+   "grids/same_contact/mug__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/mug__p1.png",
+   "grids/diff/mug__p2.png",
+   "grids/diff/mug__p3.png"
+  ]
+ },
+ "notebook": {
+  "same_pages": [
+   "grids/same/notebook__p1.png",
+   "grids/same/notebook__p2.png",
+   "grids/same/notebook__p3.png",
+   "grids/same/notebook__p4.png"
+  ],
+  "n_same": 15,
+  "same_contact": [
+   "grids/same_contact/notebook__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/notebook__p1.png",
+   "grids/diff/notebook__p2.png"
+  ]
+ },
+ "pack_of_cigarettes": {
+  "same_pages": [
+   "grids/same/pack_of_cigarettes__p1.png",
+   "grids/same/pack_of_cigarettes__p2.png",
+   "grids/same/pack_of_cigarettes__p3.png",
+   "grids/same/pack_of_cigarettes__p4.png"
+  ],
+  "n_same": 16,
+  "same_contact": [
+   "grids/same_contact/pack_of_cigarettes__p1.png",
+   "grids/same_contact/pack_of_cigarettes__p2.png"
+  ],
+  "diff_contact": [
+   "grids/diff/pack_of_cigarettes__p1.png",
+   "grids/diff/pack_of_cigarettes__p2.png",
+   "grids/diff/pack_of_cigarettes__p3.png",
+   "grids/diff/pack_of_cigarettes__p4.png",
+   "grids/diff/pack_of_cigarettes__p5.png"
+  ]
+ },
+ "pencil_case": {
+  "same_pages": [
+   "grids/same/pencil_case__p1.png"
+  ],
+  "n_same": 3,
+  "same_contact": [
+   "grids/same_contact/pencil_case__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/pencil_case__p1.png",
+   "grids/diff/pencil_case__p2.png",
+   "grids/diff/pencil_case__p3.png",
+   "grids/diff/pencil_case__p4.png",
+   "grids/diff/pencil_case__p5.png"
+  ]
+ },
+ "pencil_holder": {
+  "same_pages": [
+   "grids/same/pencil_holder__p1.png"
+  ],
+  "n_same": 4,
+  "same_contact": [
+   "grids/same_contact/pencil_holder__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/pencil_holder__p1.png",
+   "grids/diff/pencil_holder__p2.png",
+   "grids/diff/pencil_holder__p3.png",
+   "grids/diff/pencil_holder__p4.png",
+   "grids/diff/pencil_holder__p5.png",
+   "grids/diff/pencil_holder__p6.png"
+  ]
+ },
+ "soap_dispenser": {
+  "same_pages": [
+   "grids/same/soap_dispenser__p1.png",
+   "grids/same/soap_dispenser__p2.png"
+  ],
+  "n_same": 6,
+  "same_contact": [
+   "grids/same_contact/soap_dispenser__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/soap_dispenser__p1.png",
+   "grids/diff/soap_dispenser__p2.png",
+   "grids/diff/soap_dispenser__p3.png",
+   "grids/diff/soap_dispenser__p4.png"
+  ]
+ },
+ "tablefork": {
+  "same_pages": [
+   "grids/same/tablefork__p1.png",
+   "grids/same/tablefork__p2.png"
+  ],
+  "n_same": 5,
+  "same_contact": [
+   "grids/same_contact/tablefork__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/tablefork__p1.png",
+   "grids/diff/tablefork__p2.png",
+   "grids/diff/tablefork__p3.png",
+   "grids/diff/tablefork__p4.png"
+  ]
+ },
+ "teaspoon": {
+  "same_pages": [
+   "grids/same/teaspoon__p1.png",
+   "grids/same/teaspoon__p2.png",
+   "grids/same/teaspoon__p3.png"
+  ],
+  "n_same": 9,
+  "same_contact": [
+   "grids/same_contact/teaspoon__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/teaspoon__p1.png",
+   "grids/diff/teaspoon__p2.png",
+   "grids/diff/teaspoon__p3.png",
+   "grids/diff/teaspoon__p4.png"
+  ]
+ },
+ "tortilla_chips": {
+  "same_pages": [
+   "grids/same/tortilla_chips__p1.png",
+   "grids/same/tortilla_chips__p2.png"
+  ],
+  "n_same": 6,
+  "same_contact": [
+   "grids/same_contact/tortilla_chips__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/tortilla_chips__p1.png",
+   "grids/diff/tortilla_chips__p2.png",
+   "grids/diff/tortilla_chips__p3.png",
+   "grids/diff/tortilla_chips__p4.png",
+   "grids/diff/tortilla_chips__p5.png"
+  ]
+ },
+ "toy_dice": {
+  "same_pages": [
+   "grids/same/toy_dice__p1.png",
+   "grids/same/toy_dice__p2.png",
+   "grids/same/toy_dice__p3.png",
+   "grids/same/toy_dice__p4.png",
+   "grids/same/toy_dice__p5.png"
+  ],
+  "n_same": 20,
+  "same_contact": [
+   "grids/same_contact/toy_dice__p1.png",
+   "grids/same_contact/toy_dice__p2.png"
+  ],
+  "diff_contact": [
+   "grids/diff/toy_dice__p1.png",
+   "grids/diff/toy_dice__p2.png",
+   "grids/diff/toy_dice__p3.png",
+   "grids/diff/toy_dice__p4.png",
+   "grids/diff/toy_dice__p5.png",
+   "grids/diff/toy_dice__p6.png"
+  ]
+ },
+ "video_game": {
+  "same_pages": [
+   "grids/same/video_game__p1.png",
+   "grids/same/video_game__p2.png",
+   "grids/same/video_game__p3.png"
+  ],
+  "n_same": 11,
+  "same_contact": [
+   "grids/same_contact/video_game__p1.png"
+  ],
+  "diff_contact": [
+   "grids/diff/video_game__p1.png",
+   "grids/diff/video_game__p2.png",
+   "grids/diff/video_game__p3.png"
+  ]
+ }
+}

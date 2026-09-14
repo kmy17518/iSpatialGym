@@ -1,0 +1,35 @@
+{
+ "category": "box_of_candy",
+ "model": "gvreky",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/box_of_candy__gvreky__y0.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1112,
+   "seg_pixels": 24616,
+   "aabb_extent": [
+    0.077,
+    0.135,
+    0.202
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/box_of_candy__gvreky__y1.png",
+   "drift_m": 0.0006,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1112
+  }
+ },
+ "stable": true,
+ "visible": true
+}

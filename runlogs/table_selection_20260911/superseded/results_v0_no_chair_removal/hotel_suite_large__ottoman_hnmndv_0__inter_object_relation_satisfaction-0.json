@@ -1,0 +1,200 @@
+{
+ "scene": "hotel_suite_large",
+ "table": "ottoman_hnmndv_0",
+ "category": "ottoman",
+ "model": "hnmndv",
+ "rooms": [
+  "bedroom_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-0",
+ "inventory": {
+  "top_z": 0.472,
+  "bbox_x": 0.452,
+  "bbox_y": 1.474,
+  "bbox_z": 0.47,
+  "verdict": "low"
+ },
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 22:24:42",
+ "precheck": {
+  "aabb": [
+   [
+    -0.086,
+    -3.297,
+    -0.006
+   ],
+   [
+    0.395,
+    -1.799,
+    0.506
+   ]
+  ],
+  "support": {
+   "name": "ottoman_hnmndv_0",
+   "z": 0.49478766322135925,
+   "yaw": -0.009317874908447266,
+   "local_bounds": [
+    -0.03946545720100403,
+    0.4051743447780609,
+    -3.22599196434021,
+    -1.8234435319900513
+   ],
+   "n_free_cells": 1468,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     0.382,
+     -2.528
+    ],
+    "length": 1.403
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -0.063,
+     -2.524
+    ],
+    "length": 1.403
+   },
+   {
+    "name": "+v",
+    "mid": [
+     0.166,
+     -1.825
+    ],
+    "length": 0.445
+   },
+   {
+    "name": "-v",
+    "mid": [
+     0.153,
+     -3.228
+    ],
+    "length": 0.445
+   }
+  ],
+  "stance": {
+   "edge": "-v",
+   "edge_mid": [
+    0.15278756618499756,
+    -3.227555751800537
+   ],
+   "inward": [
+    0.009317739866673946,
+    0.9999566078186035
+   ],
+   "tangent": [
+    -0.9999566078186035,
+    0.009317739866673946
+   ],
+   "base_pose2d": [
+    0.14792588353157043,
+    -3.749300003051758,
+    1.5614784522709257
+   ],
+   "edge_depth": 0.5217669010162354,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8499999642372131,
+    "axis_angle": 0.01619463395460224
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.9
+ },
+ "status": "no_instances",
+ "n_written": 0,
+ "rejections": {
+  "scene_reset": 6,
+  "partner_placement": 3,
+  "target_placement": 3
+ },
+ "template_meta": {
+  "support": {
+   "name": "ottoman_hnmndv_0",
+   "z": 0.7994806170463562,
+   "yaw": -0.009514808654785156,
+   "local_bounds": [
+    -0.1019354909658432,
+    0.34051841497421265,
+    -2.293221950531006,
+    -1.9119069576263428
+   ],
+   "n_free_cells": 315,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    0.3204978108406067,
+    -2.1057090759277344
+   ],
+   "inward": [
+    -0.9999547600746155,
+    0.009514665231108665
+   ],
+   "tangent": [
+    -0.009514665231108665,
+    -0.9999547600746155
+   ],
+   "base_pose2d": [
+    0.8830116987228394,
+    -2.1110613346099854,
+    3.1320778450370863
+   ],
+   "edge_depth": 0.5625393390655518,
+   "view": {
+    "translate": 0.5,
+    "tilt": -0.3500000238418579,
+    "axis_angle": 0.023976128374901397
+   }
+  },
+  "view_arms": "untucked",
+  "n_reachable_cells": 1,
+  "n_grasp_cells": 1,
+  "n_grasp_combos": 3,
+  "n_region_cells": 119,
+  "n_visible_cells": 119,
+  "stand_off": 0.45,
+  "edge": null,
+  "rejections": {
+   "scene_reset": 6,
+   "partner_placement": 3,
+   "target_placement": 3
+  },
+  "n_written": 0,
+  "timings": {
+   "bind_spawn_s": 23.73,
+   "prepare_template_s": 1.05
+  }
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/hotel_suite_large/hotel_suite_large__ottoman_hnmndv_0__inter_object_relation_satisfaction-0",
+ "bound_table": "ottoman_hnmndv_0",
+ "setup_s": 24.8,
+ "run_s": 9.8,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "no_instances",
+   "n_written": 0,
+   "rejections": {
+    "scene_reset": 6,
+    "partner_placement": 3,
+    "target_placement": 3
+   },
+   "reject_reason": null,
+   "setup_s": 24.8,
+   "run_s": 9.8
+  }
+ ],
+ "job_s": 36.5,
+ "finished": "2026-09-11 22:25:20"
+}

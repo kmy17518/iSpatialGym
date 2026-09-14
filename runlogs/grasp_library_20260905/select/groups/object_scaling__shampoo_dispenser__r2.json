@@ -1,0 +1,387 @@
+{
+ "group": "object_scaling__shampoo_dispenser__r2",
+ "task": "object_scaling",
+ "category": "shampoo_dispenser",
+ "round": 2,
+ "relation": null,
+ "partner": "round body",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. Rotationally symmetric bodies are preferred for this task.",
+ "candidates": [
+  {
+   "model": "thurmw",
+   "key": "shampoo_dispenser__thurmw__f",
+   "strip": "/tmp/glib/strips/shampoo_dispenser__thurmw__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on cube, centred"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on cube, centred"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on cube, centred"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on cube, centred"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on cube, centred"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    46,
+    46,
+    94
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "zoyyia",
+   "key": "shampoo_dispenser__zoyyia__f",
+   "strip": "/tmp/glib/strips/shampoo_dispenser__zoyyia__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on cube, centred"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on cube, centred"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on cube, centred"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on cube, centred"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on cube, centred"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    48,
+    52,
+    92
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "nrthyl",
+   "key": "shampoo_dispenser__nrthyl__f",
+   "strip": "/tmp/glib/strips/shampoo_dispenser__nrthyl__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on cube, centred"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on cube, centred"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on cube, centred"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on cube, centred"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch on cube, centred"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    48,
+    51,
+    134
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "ndrvvm",
+   "key": "shampoo_dispenser__ndrvvm__f",
+   "strip": "/tmp/glib/strips/shampoo_dispenser__ndrvvm__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across cylinder body at mid-length"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across cylinder body at mid-length"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across cylinder body at mid-length"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across cylinder body at mid-length"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across cylinder body at mid-length"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    67,
+    51,
+    151
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "eblcnw",
+   "key": "shampoo_dispenser__eblcnw__f",
+   "strip": "/tmp/glib/strips/shampoo_dispenser__eblcnw__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across cylinder body at mid-length"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across cylinder body at mid-length"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across cylinder body at mid-length"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across cylinder body at mid-length"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across cylinder body at mid-length"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    71,
+    56,
+    145
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "kkbhzw",
+   "key": "shampoo_dispenser__kkbhzw__f",
+   "strip": "/tmp/glib/strips/shampoo_dispenser__kkbhzw__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near bottle base, pads well engaged"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near bottle base, pads well engaged"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near bottle base, pads well engaged"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near bottle base, symmetric closure"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near bottle base, pads well engaged"
+    }
+   ],
+   "object_note": "grasps sit toward base end (CoM offset ~60 mm) but pads cover a long stretch of body",
+   "bbox_mm": [
+    74,
+    73,
+    204
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "eywylh",
+   "key": "shampoo_dispenser__eywylh__f",
+   "strip": "/tmp/glib/strips/shampoo_dispenser__eywylh__f.png",
+   "n_valid": 5,
+   "n_clean": 0,
+   "n_clean_strict": 0,
+   "flags": [
+    "end_grasp",
+    "fragile"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp",
+      "fragile"
+     ],
+     "note": "pinches 16 mm pump knob; big body hangs 81 mm away"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp",
+      "fragile"
+     ],
+     "note": "pinches 15 mm pump knob; big body hangs 79 mm away"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp",
+      "fragile"
+     ],
+     "note": "pinches 14 mm pump knob; big body hangs 81 mm away"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp",
+      "fragile"
+     ],
+     "note": "pinches 16 mm pump knob; big body hangs 87 mm away"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp",
+      "fragile"
+     ],
+     "note": "pinches 16 mm pump knob; big body hangs 88 mm away"
+    }
+   ],
+   "object_note": "all grasps on the small pump knob; body ~90-100 mm wide, near gripper max opening",
+   "bbox_mm": [
+    89,
+    89,
+    154
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

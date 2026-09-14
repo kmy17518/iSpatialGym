@@ -1,0 +1,28 @@
+{
+ "key": "cooler__pnkiag",
+ "category": "cooler",
+ "model": "pnkiag",
+ "aabb_extent": [
+  0.520813524723053,
+  1.0416269302368164,
+  0.5209921598434448
+ ],
+ "support": "table",
+ "joints": [
+  {
+   "joint": "j_lid",
+   "kind": "flap",
+   "grasp_source": "review: No lid handle; front-centre grey latch is body hardware; 93 mm thick lid skirt sits flush over the body front, no exposed lip to grip",
+   "stance": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "time_s": 1.8
+}

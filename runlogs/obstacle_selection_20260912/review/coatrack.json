@@ -1,0 +1,53 @@
+{
+  "category": "coatrack",
+  "task": "obst",
+  "n_models": 4,
+  "n_opened": 4,
+  "models": [
+    {
+      "model": "coatrack/hmedjt",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Slim black coat stand, round disc base, small hooks at top and a mid ring; 0.38 m footprint, 1.66 m tall."
+    },
+    {
+      "model": "coatrack/qyjssf",
+      "V": 3,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 11,
+      "valid": true,
+      "note": "Thick uniform-grey post with cross pegs on a heavy round base; looks like a bollard; 0.62 m footprint, 1.50 m tall."
+    },
+    {
+      "model": "coatrack/tcnxtu",
+      "V": 4,
+      "N": 2,
+      "S": 0,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Classic black bentwood coat stand with curved hooks and legs; clean, but 1.93 m tall exceeds the height limit."
+    },
+    {
+      "model": "coatrack/zypzqh",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Thin black pole on four cross feet with two hooks at top; 0.50 m footprint, 1.67 m tall; clean geometry."
+    }
+  ],
+  "picks": ["coatrack/hmedjt", "coatrack/zypzqh"],
+  "alternate": "coatrack/qyjssf",
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int", "restaurant_diner", "hotel_suite_large", "office_cubicles_right"],
+  "category_verdict": "weak",
+  "category_note": "Tall slim coat stands (0.4-0.6 m footprint, 1.5-1.9 m). Natural near entrances, offices and diners but normally against a wall (N=2), and height is borderline for every model; one exceeds 1.7 m."
+}

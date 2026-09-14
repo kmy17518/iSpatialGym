@@ -1,0 +1,35 @@
+{
+ "category": "tweezers",
+ "model": "ngwoat",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/tweezers__ngwoat__y0.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.1,
+   "on_tray": true,
+   "settled_z": 0.0014,
+   "seg_pixels": 61,
+   "aabb_extent": [
+    0.005,
+    0.032,
+    0.003
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/tweezers__ngwoat__y1.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 5.7,
+   "on_tray": true,
+   "settled_z": 0.0013
+  }
+ },
+ "stable": true,
+ "visible": false
+}

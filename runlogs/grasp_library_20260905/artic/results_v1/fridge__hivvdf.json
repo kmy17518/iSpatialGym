@@ -1,0 +1,52 @@
+{
+ "key": "fridge__hivvdf",
+ "category": "fridge",
+ "model": "hivvdf",
+ "scene": "Rs_int",
+ "host": "fridge_xyejdx_0",
+ "host_rank": 0,
+ "host_model": "xyejdx",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "review:C",
+   "stance": {
+    "base": [
+     -0.464,
+     2.125,
+     1.559
+    ],
+    "translate": 0.25,
+    "sign": 1.0
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: planning: [planning] no collision-free base path to (-0.4642546772956848, 2.1254165172576904, 1.5594780445098877) {'curobo_status': 'IK failed: goal pose unreachable for the active joints (best pose error 0.0 mm / 0.297 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad) [start configuration is in collision]'}",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [-0.2580425441265106, 2.6731176376342773, 0.986987292766571]})"
+   ],
+   "error": "planning: [planning] no collision-free base path to (-0.4642546772956848, 2.1254165172576904, 1.5594780445098877) {'curobo_status': 'IK failed: goal pose unreachable for the active joints (best pose error 0.0 mm / 0.297 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad) [start configuration is in collision]'}",
+   "contact_world": [
+    -0.258,
+    2.673,
+    0.987
+   ],
+   "handle_height_above_floor": 0.982
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.159,
+  1.222,
+  1.657
+ ],
+ "time_s": 14.8
+}

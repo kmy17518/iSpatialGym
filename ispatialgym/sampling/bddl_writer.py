@@ -15,6 +15,7 @@ Roles per activity (``*`` = list role):
 * configuration_matching-3 (attachment): male, female, table, floor
 * world_alignment-0 (table_surface): target, table, floor
 * world_alignment-1 (world_vertical): target, wall, floor
+* world_alignment-2 (world_horizontal): target, wall, floor
 * inter_object_relation_satisfaction-N: target, partner, floor [, table (init support of the target)]
   [, partner_support (init support of the partner)]
 """
@@ -256,6 +257,16 @@ def build_problem_text(activity: str, definition_id: int, b: Bindings) -> str:
                  f"(pose_settled {_q(agent)})"], [],
                 comment="The object hangs on the wall through a TRO revolute constraint at its centre of mass. Binary success: "
                 "the object is released and its orientation is within tolerance of the straight (world vertical) goal.",
+            )
+        if definition_id == 2:
+            b.one("wall")  # declared for the constraint parent
+            return render_problem(
+                activity, definition_id, "world_horizontal", b.all(), {}, [on_floor],
+                [f"(pose_reached {_q(t)})", f"(not (grasped {_q(agent)} {_q(t)}))", f"(pose_settled {_q(t)})",
+                 f"(pose_settled {_q(agent)})"], [],
+                comment="The object hangs on the wall through a TRO revolute constraint at its centre of mass. Binary success: "
+                "the object is released and its orientation is within tolerance of the level (world horizontal) goal; "
+                "models that look the same upside down carry the 180-degree flip in orientation_equivalences.",
             )
         raise ValueError(f"world_alignment has no definition {definition_id}")
     if activity == "inter_object_relation_satisfaction":

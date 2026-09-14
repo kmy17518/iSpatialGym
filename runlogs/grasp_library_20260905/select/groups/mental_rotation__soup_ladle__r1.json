@@ -1,0 +1,277 @@
+{
+ "group": "mental_rotation__soup_ladle__r1",
+ "task": "mental_rotation",
+ "category": "soup_ladle",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "gxsrhh",
+   "key": "soup_ladle__gxsrhh",
+   "strip": "/tmp/glib/strips/soup_ladle__gxsrhh.png",
+   "n_valid": 5,
+   "n_clean": 3,
+   "n_clean_strict": 3,
+   "flags": [
+    "gap"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "pads 24 mm apart on 7 mm blade; coverage 0.00"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch, 16 mm, coverage 0.50"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "pads 23 mm apart on 6 mm blade; antipodal 0.29"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch across 20 mm width"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch across 22 mm width"
+    }
+   ],
+   "object_note": "flat blade handle; fingers stop at ~24 mm in every grasp, so thin-edge pinches are not touched",
+   "bbox_mm": [
+    276,
+    65,
+    55
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "tmdqpb",
+   "key": "soup_ladle__tmdqpb",
+   "strip": "/tmp/glib/strips/soup_ladle__tmdqpb.png",
+   "n_valid": 5,
+   "n_clean": 4,
+   "n_clean_strict": 4,
+   "flags": [
+    "gap"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "gap"
+     ],
+     "note": "pads 33 mm apart on 5 mm section; antipodal 0.06"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "paddle handle pinched across 28 mm; antipodal 0.33"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch across 14 mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch across 14 mm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch across 14 mm"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    358,
+    87,
+    87
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "rqnufc",
+   "key": "soup_ladle__rqnufc",
+   "strip": "/tmp/glib/strips/soup_ladle__rqnufc.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch near bowl"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch near bowl"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-handle pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch, CoM 150 mm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch near tip, CoM 176 mm"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    326,
+    96,
+    83
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "hgvzdm",
+   "key": "soup_ladle__hgvzdm",
+   "strip": "/tmp/glib/strips/soup_ladle__hgvzdm.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at handle-bowl neck, near CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch near bowl"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch near bowl"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-handle pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-handle pinch"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    317,
+    86,
+    107
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "cfzneb",
+   "key": "soup_ladle__cfzneb",
+   "strip": "/tmp/glib/strips/soup_ladle__cfzneb.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch near bowl"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch at bowl junction"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch near bowl"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-handle pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch toward tip, CoM 128 mm"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    339,
+    101,
+    93
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

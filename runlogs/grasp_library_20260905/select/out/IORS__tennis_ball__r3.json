@@ -1,0 +1,24 @@
+{
+  "group": "IORS__tennis_ball__r3",
+  "task": "IORS",
+  "category": "tennis_ball",
+  "round": 3,
+  "relation": "under",
+  "n_candidates": 1,
+  "n_opened": 1,
+  "candidates": [
+    {"model": "rgekxe", "key": "tennis_ball__rgekxe__t", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Standard 66 mm fuzzy yellow tennis ball, white seam, sharp texture. Five centred pinches, CoM 0-1 mm, antipodal 0.94-0.99; rows 2, 4, 5 asymmetric closures."}
+  ],
+  "selected": [
+    {"model": "rgekxe", "key": "tennis_ball__rgekxe__t", "rank": 1,
+     "reason": "Only candidate; perfect score: five clean centred pinches across the 66 mm ball (row 1 symmetric 33/34), bottom free for placing under couch, photoreal fuzz texture."}
+  ],
+  "alternate": null,
+  "short": true,
+  "warnings": [
+    "Only one candidate in this group (round 3), so no second test instance can be selected; the single model itself has no weakness (G=5, V=5, R=2).",
+    "Rows 2, 4, 5 close asymmetrically (47/20, 50/17, 49/19) because the 66 mm ball nearly fills the opening; the ball is still held between both pads."
+  ],
+  "confidence": "high"
+}

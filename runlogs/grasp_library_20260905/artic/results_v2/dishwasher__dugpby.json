@@ -1,0 +1,35 @@
+{
+ "key": "dishwasher__dugpby",
+ "category": "dishwasher",
+ "model": "dugpby",
+ "scene": "house_double_floor_lower",
+ "host": "dishwasher_ynrhuk_0",
+ "host_rank": 0,
+ "host_model": "ynrhuk",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "flap",
+   "grasp_source": "review: No handle; flush slab door, back face inside the cabinet opening, top edge below cabinet top, nothing to pinch. Bottom hinge, folds toward viewer.",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.108,
+  1.14,
+  1.259
+ ],
+ "time_s": 1.2
+}

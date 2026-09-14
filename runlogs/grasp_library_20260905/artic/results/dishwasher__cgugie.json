@@ -1,0 +1,64 @@
+{
+ "key": "dishwasher__cgugie",
+ "category": "dishwasher",
+ "model": "cgugie",
+ "scene": "house_single_floor",
+ "host": "dishwasher_ynrhuk_0",
+ "host_rank": 0,
+ "host_model": "ynrhuk",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "flap",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     7.401,
+     -1.123,
+     -1.565
+    ],
+    "translate": 0.5,
+    "sign": 1.0,
+    "orientation": "front_down45"
+   },
+   "reachable": true,
+   "ag": true,
+   "dq": 0.0001,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": false,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [7.2041473388671875, -1.574414610862732, 0.5827380418777466]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [7.2041473388671875, -1.574414610862732, 0.5827380418777466]})",
+    "stance ok (teleported)",
+    "grasped",
+    "pull chunk 1: base follow failed: [planning] no collision-free base path to (7.4009199142456055, -1.0522116422653198, -1.5658321380615234) {'curobo_status': 'IK failed: goal pose reachable (19/32 seeds converge) but every converged solution violates collision or joint-limit constraints (0/32 seeds feasible overall) [start configuration is in collision]'}",
+    "pull chunk 1: base shift failed: [planning] no collision-free base path to (7.400410175323486, -0.9744853973388672, -1.5632219314575195) {'curobo_status': 'IK failed: goal pose is kinematically reachable but blocked by world obstacles (best pose error with obstacles 157.1 mm / 1.109 rad; converges once obstacles are ignored) [start configuration is in collision]'}",
+    "pull chunk 1: arm+base could not follow"
+   ],
+   "error": null,
+   "contact_world": [
+    7.204,
+    -1.574,
+    0.583
+   ],
+   "handle_height_above_floor": 0.577,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 4,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.254,
+  1.08,
+  1.191
+ ],
+ "time_s": 238.4
+}

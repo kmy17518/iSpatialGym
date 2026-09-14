@@ -1,0 +1,25 @@
+{
+ "scene": "house_double_floor_upper",
+ "table": "serving_cart_vvtcby_0",
+ "category": "serving_cart",
+ "model": "vvtcby",
+ "rooms": [
+  "bathroom_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.643,
+  "bbox_x": 0.375,
+  "bbox_y": 0.519,
+  "bbox_z": 0.643,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:03:17",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

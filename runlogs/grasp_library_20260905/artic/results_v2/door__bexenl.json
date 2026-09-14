@@ -1,0 +1,52 @@
+{
+ "key": "door__bexenl",
+ "category": "door",
+ "model": "bexenl",
+ "scene": "house_double_floor_lower",
+ "host": "door_bexenl_0",
+ "host_rank": 0,
+ "host_model": "bexenl",
+ "swap": false,
+ "joints": [
+  {
+   "joint": "j_leaf",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     -3.804,
+     1.494,
+     1.573
+    ],
+    "translate": 0.5,
+    "sign": -1.0
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: planning: [planning] no collision-free base path to (-3.804273843765259, 1.4940764904022217, 1.573014736175537) {'curobo_status': 'IK found a goal configuration but trajectory optimization failed: best final pose error 0.0 mm / 0.032 rad [start configuration is in collision]'}",
+    "sign -1: planning: [planning] no collision-free base path to (-3.804232358932495, 1.4940662384033203, 1.5730664730072021) {'curobo_status': 'IK found a goal configuration but trajectory optimization failed: best final pose error 0.0 mm / 0.032 rad [start configuration is in collision]'}"
+   ],
+   "error": "planning: [planning] no collision-free base path to (-3.804232358932495, 1.4940662384033203, 1.5730664730072021) {'curobo_status': 'IK found a goal configuration but trajectory optimization failed: best final pose error 0.0 mm / 0.032 rad [start configuration is in collision]'}",
+   "contact_world": [
+    -3.606,
+    2.295,
+    1.096
+   ],
+   "handle_height_above_floor": 1.091
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.0,
+  1.0,
+  1.0
+ ],
+ "time_s": 64.0
+}

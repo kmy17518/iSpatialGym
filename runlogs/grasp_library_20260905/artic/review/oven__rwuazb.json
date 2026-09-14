@@ -1,0 +1,20 @@
+{
+  "key": "oven__rwuazb",
+  "category": "oven",
+  "model": "rwuazb",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_dof_rootd_aa001_r",
+      "kind": "flap",
+      "chosen": "A",
+      "pinch": "horizontal_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Horizontal bar handle along the top of the drop-down door (bottom hinge); A is the bar's middle, B/C its small end posts. 25 mm standoff.",
+      "height_concern": "",
+      "confidence": "high"
+    }
+  ],
+  "object_note": "Good detection. Large red sphere and grey sphere on the control panel are mesh knobs, not markers; B/C are hidden inside the bar in the zoom."
+}

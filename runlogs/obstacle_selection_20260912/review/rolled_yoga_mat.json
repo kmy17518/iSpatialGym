@@ -1,0 +1,23 @@
+{
+  "category": "rolled_yoga_mat",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "rolled_yoga_mat/podgkd",
+      "V": 3,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 11,
+      "valid": true,
+      "note": "Plain maroon cylinder standing on end, faint spiral on top; 0.13 m diameter, 0.61 m tall; low detail, tips easily."
+    }
+  ],
+  "picks": ["rolled_yoga_mat/podgkd"],
+  "alternate": null,
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int", "hotel_suite_large"],
+  "category_verdict": "weak",
+  "category_note": "Single rolled mat whose canonical pose is upright on its end: thin (0.13 m) and unstable-looking; if it tips it becomes a 0.13 m low roll. Credible bedroom/living-room clutter but odd standing mid-path."
+}

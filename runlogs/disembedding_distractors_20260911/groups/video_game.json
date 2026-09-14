@@ -1,0 +1,12 @@
+{
+  "category": "video_game",
+  "n_models": 11,
+  "pages_opened": [
+    "grids/same/video_game__p1.png",
+    "grids/same/video_game__p2.png",
+    "grids/same/video_game__p3.png"
+  ],
+  "groups": [],
+  "unusable": [],
+  "notes": "No exact dups. Cases differ by cover art and case colour. Closest pair yyvkel/apjpos (same 9x6x1 geometry, busy Mario-Party-style collage covers) separated by apjpos's bright blue case edges visible at every yaw. qsyyql (4x4x1) and rzaxlj (3x3x1) are tiny (<1000 px) blurry cartridge-like squares; ceaxsd shows thin light-blue stray lines beside the case at yaw 0."
+}

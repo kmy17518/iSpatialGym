@@ -1,0 +1,241 @@
+{
+ "category": "bottom_cabinet",
+ "model": "gvtucm",
+ "key": "bottom_cabinet__gvtucm",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.5141481757164001
+ ],
+ "aabb_extent": [
+  0.22204133868217468,
+  0.6320276260375977,
+  0.9145776033401489
+ ],
+ "aabb_min_rel_root": [
+  -0.08307001739740372,
+  -0.3160306215286255,
+  -0.5141481757164001
+ ],
+ "aabb_max_rel_root": [
+  0.13897132873535156,
+  0.31599700450897217,
+  0.4004294276237488
+ ],
+ "link_tags": {
+  "base_link": [],
+  "link_0": [
+   "openable"
+  ],
+  "link_1": [
+   "openable"
+  ],
+  "link_2": [
+   "openable"
+  ],
+  "link_3": [
+   "openable"
+  ]
+ },
+ "openable_joint_ids": [
+  [
+   1,
+   "j_link_0"
+  ],
+  [
+   2,
+   "j_link_1"
+  ],
+  [
+   3,
+   "j_link_2"
+  ],
+  [
+   4,
+   "j_link_3"
+  ]
+ ],
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "type": "PrismaticJoint",
+   "child_link": "link_0",
+   "lower": 0.0,
+   "upper": 0.2577461004257202,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.0998,
+    -0.12828,
+    0.16218
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "travel_per_unit": 1.0000000894069783,
+   "pieces_obj": "/tmp/glib/artic/inv/bottom_cabinet__gvtucm__link_0.obj",
+   "n_pieces": 1,
+   "link_bbox_min": [
+    0.0946,
+    -0.2807,
+    0.0013
+   ],
+   "link_bbox_max": [
+    0.1057,
+    0.0242,
+    0.3284
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  },
+  {
+   "joint": "j_link_1",
+   "type": "PrismaticJoint",
+   "child_link": "link_1",
+   "lower": 0.0,
+   "upper": 0.2577461004257202,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.11066,
+    0.12805,
+    0.16211
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "travel_per_unit": 0.9999997913837544,
+   "pieces_obj": "/tmp/glib/artic/inv/bottom_cabinet__gvtucm__link_1.obj",
+   "n_pieces": 1,
+   "link_bbox_min": [
+    0.1055,
+    -0.0243,
+    0.0012
+   ],
+   "link_bbox_max": [
+    0.1166,
+    0.2805,
+    0.3283
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  },
+  {
+   "joint": "j_link_2",
+   "type": "PrismaticJoint",
+   "child_link": "link_2",
+   "lower": 0.0,
+   "upper": 0.2554658353328705,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.11084,
+    0.13102,
+    -0.29778
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "travel_per_unit": 1.0000000894069783,
+   "pieces_obj": "/tmp/glib/artic/inv/bottom_cabinet__gvtucm__link_2.obj",
+   "n_pieces": 6,
+   "link_bbox_min": [
+    0.1055,
+    -0.0235,
+    -0.4587
+   ],
+   "link_bbox_max": [
+    0.1256,
+    0.2814,
+    -0.1317
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  },
+  {
+   "joint": "j_link_3",
+   "type": "PrismaticJoint",
+   "child_link": "link_3",
+   "lower": 0.0,
+   "upper": 0.2577461004257202,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.09992,
+    -0.12954,
+    -0.29771
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "travel_per_unit": 0.9999997913837544,
+   "pieces_obj": "/tmp/glib/artic/inv/bottom_cabinet__gvtucm__link_3.obj",
+   "n_pieces": 6,
+   "link_bbox_min": [
+    0.0946,
+    -0.2798,
+    -0.4586
+   ],
+   "link_bbox_max": [
+    0.1109,
+    0.0251,
+    -0.1316
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0831,
+   -0.316,
+   -0.5141
+  ],
+  "bbox_max": [
+   0.139,
+   0.316,
+   0.4004
+  ],
+  "n_pieces": 12
+ }
+}

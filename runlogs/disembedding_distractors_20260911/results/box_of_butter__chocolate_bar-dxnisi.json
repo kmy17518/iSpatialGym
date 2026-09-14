@@ -1,0 +1,146 @@
+{
+ "target_category": "box_of_butter",
+ "target_model": "oixapu",
+ "target_key": "box_of_butter__oixapu__t",
+ "category": "chocolate_bar",
+ "model": "dxnisi",
+ "kind": "diff",
+ "tier": 1,
+ "started": "2026-09-12 18:51:00",
+ "template": {
+  "support": {
+   "name": "breakfast_table_rhjoby_0",
+   "z": 0.8126286268234253,
+   "yaw": 1.5682439804077148,
+   "local_bounds": [
+    2.935955286026001,
+    4.096155643463135,
+    -8.733036994934082,
+    -5.8302388191223145
+   ],
+   "n_free_cells": 8463,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-u",
+   "edge_mid": [
+    7.289107799530029,
+    2.917360544204712
+   ],
+   "inward": [
+    0.0025523435324430466,
+    0.9999967217445374
+   ],
+   "tangent": [
+    -0.9999967217445374,
+    0.0025523435324430466
+   ],
+   "base_pose2d": [
+    7.488191604614258,
+    2.466850757598877,
+    1.5682439804376027
+   ],
+   "edge_depth": 0.45000016689300537,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.13419277799182439
+   }
+  },
+  "place_stance": {
+   "edge": "-u",
+   "edge_mid": [
+    7.289107799530029,
+    2.917360544204712
+   ],
+   "inward": [
+    0.0025523435324430466,
+    0.9999967217445374
+   ],
+   "tangent": [
+    -0.9999967217445374,
+    0.0025523435324430466
+   ],
+   "base_pose2d": [
+    8.1873197555542,
+    2.465066432952881,
+    1.5682439804376027
+   ],
+   "edge_depth": 0.4500000774860382
+  },
+  "view_arms": "untucked",
+  "yaw_adjust_deg": 0.0,
+  "dest_lateral_m": -0.6991301928612621,
+  "dest_side": "right",
+  "source_lateral_offset": 0.0,
+  "n_reachable_cells": 8,
+  "n_grasp_cells": 8,
+  "n_place_combos": 2,
+  "distractors": {
+   "same_category": false,
+   "pool": "other_category",
+   "requested_pool": "other_category",
+   "fallback": null,
+   "models": [
+    "box_of_cookies-lwhbid"
+   ],
+   "requested": 1,
+   "pool_size": 1,
+   "pool_categories": [
+    "box_of_cookies"
+   ],
+   "lookalikes_excluded": [],
+   "footprint_fraction": 0.2
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 40.07,
+   "prepare_template_s": 0.13
+  },
+  "setup_s": 40.2
+ },
+ "footprint_fraction_with_target": 0.296,
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {
+  "target_placement": 1
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_dis_distractors/box_of_butter-oixapu__chocolate_bar-dxnisi/instances/disembedding-0__box_of_butter-oixapu__chocolate_bar-dxnisi__0000.summary.json",
+   "wall_time_s": 4.8,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    7.488191604614258,
+    2.466850757598877,
+    1.5682439804376027
+   ],
+   "trunk": [
+    0.0,
+    -0.8999999761581421
+   ],
+   "occluded_variant": false,
+   "grasp": {
+    "key": "box_of_butter__oixapu__t",
+    "name": "grasp_4",
+    "translate": 0.5,
+    "place_translate": 0.5,
+    "yaw": 0.6786460690690335
+   },
+   "dest_pixels": 11466,
+   "source_pixels": 108750,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.8999999761581421
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_dis_distractors/box_of_butter-oixapu__chocolate_bar-dxnisi",
+ "job_s": 6.3,
+ "finished": "2026-09-12 18:51:06",
+ "occluded_variant": false,
+ "occlusion_ratio": null
+}

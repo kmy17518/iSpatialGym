@@ -1,0 +1,7 @@
+{
+  "category": "bottle_of_pop",
+  "pages_opened": ["grids/pool_other/bottle_of_pop__p1.png", "grids/pool_other/bottle_of_pop__p2.png"],
+  "n_models": 18,
+  "exclude": [],
+  "notes": "All 18 tiles are upright, intact, textured beverage containers (water, beer, soda, juices, tea, coconut water). bottle_of_milkshake/naxqya is a domed cup with straw rather than a bottle but reads as a related drink. can_of_soda/opivig shows strong specular streaking from its metallic material but is recognisable and passed a pick."
+}

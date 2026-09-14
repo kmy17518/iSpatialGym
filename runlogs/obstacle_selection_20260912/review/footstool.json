@@ -1,0 +1,33 @@
+{
+  "category": "footstool",
+  "task": "obst",
+  "n_models": 2,
+  "n_opened": 2,
+  "models": [
+    {
+      "model": "footstool/mysfnz",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Round footstool with dark grey check fabric top and four splayed dark wooden legs; 0.41 x 0.41 x 0.36 m; clean, sharp."
+    },
+    {
+      "model": "footstool/sghekm",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Rectangular footstool, brown patterned cushion on wooden X-frame legs; 0.41 x 0.32 x 0.34 m; clean textures, stands flat."
+    }
+  ],
+  "picks": ["footstool/mysfnz", "footstool/sghekm"],
+  "alternate": null,
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int", "hotel_suite_large"],
+  "category_verdict": "good",
+  "category_note": "Two clean upholstered footstools, ~0.41 m footprint and ~0.35 m tall, one round on legs and one rectangular on an X-frame. A footstool pulled into the walkway is unremarkable in living rooms, bedrooms and hotel suites."
+}

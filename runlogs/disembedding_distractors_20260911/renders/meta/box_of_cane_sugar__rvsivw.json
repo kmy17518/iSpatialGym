@@ -1,0 +1,53 @@
+{
+ "category": "box_of_cane_sugar",
+ "model": "rvsivw",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0,
+  180.0,
+  270.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/box_of_cane_sugar__rvsivw__y0.png",
+   "drift_m": 0.0002,
+   "tilt_deg": 0.1,
+   "on_tray": true,
+   "settled_z": 0.0869,
+   "seg_pixels": 15160,
+   "aabb_extent": [
+    0.095,
+    0.094,
+    0.176
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/box_of_cane_sugar__rvsivw__y1.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0869
+  },
+  "y2": {
+   "yaw_deg": 180.0,
+   "png": "renders/box_of_cane_sugar__rvsivw__y2.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0869
+  },
+  "y3": {
+   "yaw_deg": 270.0,
+   "png": "renders/box_of_cane_sugar__rvsivw__y3.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0869
+  }
+ },
+ "stable": true,
+ "visible": true
+}

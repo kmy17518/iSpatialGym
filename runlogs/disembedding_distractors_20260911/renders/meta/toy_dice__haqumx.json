@@ -1,0 +1,53 @@
+{
+ "category": "toy_dice",
+ "model": "haqumx",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0,
+  180.0,
+  270.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/toy_dice__haqumx__y0.png",
+   "drift_m": 0.0052,
+   "tilt_deg": 5.5,
+   "on_tray": true,
+   "settled_z": 0.0485,
+   "seg_pixels": 9193,
+   "aabb_extent": [
+    0.11,
+    0.101,
+    0.104
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/toy_dice__haqumx__y1.png",
+   "drift_m": 0.005,
+   "tilt_deg": 5.4,
+   "on_tray": true,
+   "settled_z": 0.0485
+  },
+  "y2": {
+   "yaw_deg": 180.0,
+   "png": "renders/toy_dice__haqumx__y2.png",
+   "drift_m": 0.0052,
+   "tilt_deg": 5.1,
+   "on_tray": true,
+   "settled_z": 0.0486
+  },
+  "y3": {
+   "yaw_deg": 270.0,
+   "png": "renders/toy_dice__haqumx__y3.png",
+   "drift_m": 0.0051,
+   "tilt_deg": 5.3,
+   "on_tray": true,
+   "settled_z": 0.0485
+  }
+ },
+ "stable": true,
+ "visible": true
+}

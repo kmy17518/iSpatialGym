@@ -1,0 +1,63 @@
+{
+ "group": "mental_rotation__drill__r3",
+ "task": "mental_rotation",
+ "category": "drill",
+ "round": 3,
+ "relation": null,
+ "partner": "H",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "nzgmza",
+   "key": "drill__nzgmza__f",
+   "strip": "/tmp/glib/strips/drill__nzgmza__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper handle/body pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "chuck pinch, 76 mm lever arm, full contact"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rear housing pinch, 88 mm lever arm, wide contact"
+    }
+   ],
+   "object_note": "rows 4-5 far from CoM but wide solid contact; body would swing, not slip",
+   "bbox_mm": [
+    59,
+    157,
+    197
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

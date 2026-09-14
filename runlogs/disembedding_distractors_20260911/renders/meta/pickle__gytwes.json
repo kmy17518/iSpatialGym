@@ -1,0 +1,35 @@
+{
+ "category": "pickle",
+ "model": "gytwes",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/pickle__gytwes__y0.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0152,
+   "seg_pixels": null,
+   "aabb_extent": [
+    0.047,
+    0.091,
+    0.034
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/pickle__gytwes__y1.png",
+   "drift_m": 0.0006,
+   "tilt_deg": 2.4,
+   "on_tray": true,
+   "settled_z": 0.0152
+  }
+ },
+ "stable": true,
+ "visible": null
+}

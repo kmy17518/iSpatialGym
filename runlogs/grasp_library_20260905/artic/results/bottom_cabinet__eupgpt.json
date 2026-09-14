@@ -1,0 +1,83 @@
+{
+ "key": "bottom_cabinet__eupgpt",
+ "category": "bottom_cabinet",
+ "model": "eupgpt",
+ "scene": "Rs_int",
+ "host": "bottom_cabinet_bamfsz_0",
+ "host_rank": 2,
+ "host_model": "bamfsz",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [-1.9165436029434204, 2.7795462608337402, 0.36326563358306885]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [-1.9165436029434204, 2.7795462608337402, 0.36326563358306885]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    -1.917,
+    2.78,
+    0.363
+   ],
+   "handle_height_above_floor": 0.358,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 0,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0
+   }
+  },
+  {
+   "joint": "j_link_1",
+   "kind": "door",
+   "grasp_source": "review:C",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [-1.915862798690796, 2.7796010971069336, 0.6268864870071411]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [-1.915862798690796, 2.7796010971069336, 0.6268864870071411]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    -1.916,
+    2.78,
+    0.627
+   ],
+   "handle_height_above_floor": 0.622,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 0,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [
+  "bottom_cabinet_bamfsz_1",
+  "bottom_cabinet_dajebq_0"
+ ],
+ "scale": [
+  2.416,
+  2.258,
+  0.96
+ ],
+ "time_s": 46.7
+}

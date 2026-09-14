@@ -1,0 +1,15 @@
+{
+  "category": "caliper",
+  "task": "wa0",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {"model": "sngjmj", "V": 3, "O": 3, "F": 1, "score": 13, "valid": true,
+     "long_axis": "x", "front_axis": "-y", "rest_ok": true,
+     "note": "vernier caliper 0.25 x 0.06 x 0.007 m, flat dark grey, low detail but recognisable; jaws at -x protrude to -y, depth rod at +x"}
+  ],
+  "picks": ["sngjmj"],
+  "alternate": null,
+  "category_verdict": "weak",
+  "category_note": "One flat vernier caliper, 0.25 m long, 6 cm wide, 7 mm thick, uniform dark grey. Yaw is unique (jaws at one end, one side) but the object is very narrow and a tool on a table; only one model."
+}

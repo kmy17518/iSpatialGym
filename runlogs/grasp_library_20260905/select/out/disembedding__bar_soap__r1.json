@@ -1,0 +1,33 @@
+{
+  "group": "disembedding__bar_soap__r1",
+  "task": "disembedding",
+  "category": "bar_soap",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 4,
+  "n_opened": 4,
+  "candidates": [
+    {"model": "utgixp", "key": "bar_soap__utgixp", "G": 4, "T": 3, "V": 3, "R": 1, "score": 18,
+     "note": "Rows 1,2,4,5 tiny 29 mm fingertip pinches (30/0), CoM 12 mm; row 3 (49/0) wedges bar diagonally. Featureless cream mini box, 47x29x11 mm outlier."},
+    {"model": "ofargb", "key": "bar_soap__ofargb", "G": 5, "T": 3, "V": 4, "R": 1, "score": 22,
+     "note": "Five clean face pinches across 85 mm width, CoM 2-12 mm, antipodal 1.0, one finger at open limit. Plain ivory rounded bar, classic soap shape."},
+    {"model": "ozifwa", "key": "bar_soap__ozifwa", "G": 5, "T": 2, "V": 3, "R": 2, "score": 20,
+     "note": "Five clean 36 mm pinches on both flat faces (38/0), CoM 3-6 mm, coverage 1.0. Plain white round puck tested standing on its rim (x_down)."},
+    {"model": "feqemg", "key": "bar_soap__feqemg", "G": 5, "T": 3, "V": 4, "R": 1, "score": 22,
+     "note": "Five clean 83-87 mm side pinches at CoM 2-7 mm, antipodal 0.96-0.99, tilt 7-37; one finger at open limit. Smooth cream oval dome soap, large."}
+  ],
+  "selected": [
+    {"model": "ofargb", "key": "bar_soap__ofargb", "rank": 1,
+     "reason": "Tied top score; perfect antipodal/coverage face pinches at the CoM with a free bottom, and the most representative bar-soap shape. 85 mm pinch is near the gripper limit."},
+    {"model": "feqemg", "key": "bar_soap__feqemg", "rank": 2,
+     "reason": "Equal score; clean upright side pinches at the CoM on a stable flat-bottomed dome, and its oval shape differs from the rectangular #1. 86 mm pinch near gripper limit."}
+  ],
+  "alternate": {"model": "ozifwa", "key": "bar_soap__ozifwa"},
+  "short": false,
+  "warnings": [
+    "Both picks pinch at 85-87 mm, close to the 97 mm gripper opening (one finger stays at the open limit), so width margin is small (R=1).",
+    "ozifwa was tested in rest pose x_down (round puck standing on its rounded rim), which conflicts with the no-roll/no-topple requirement; lying flat it would need a 93 mm pinch.",
+    "utgixp is a 47x29x11 mm mini bar with invalid width/antipodal metrics; pads contact only an 11 mm band and row 3 is a diagonal 49/0 wedge."
+  ],
+  "confidence": "medium"
+}

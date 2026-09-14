@@ -1,0 +1,93 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "cubicle_hzalfx_0",
+ "category": "cubicle",
+ "model": "hzalfx",
+ "rooms": [
+  "shared_office_0"
+ ],
+ "partner": null,
+ "problem": "world_alignment-0",
+ "inventory": {
+  "top_z": 1.214,
+  "bbox_x": 1.446,
+  "bbox_y": 1.44,
+  "bbox_z": 1.211,
+  "verdict": "high"
+ },
+ "removed_chairs": [
+  "swivel_chair_ryznxk_4",
+  "swivel_chair_ryznxk_5"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 00:55:45",
+ "precheck": {
+  "aabb": [
+   [
+    8.955,
+    -8.665,
+    -0.006
+   ],
+   [
+    10.416,
+    -7.21,
+    1.222
+   ]
+  ],
+  "support": {
+   "name": "cubicle_hzalfx_0",
+   "z": 0.7756426334381104,
+   "yaw": 0.0,
+   "local_bounds": [
+    8.965108871459961,
+    10.345108985900879,
+    -8.595193862915039,
+    -7.2751946449279785
+   ],
+   "n_free_cells": 3192,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     10.345,
+     -7.935
+    ],
+    "length": 1.32
+   },
+   {
+    "name": "-u",
+    "mid": [
+     8.965,
+     -7.935
+    ],
+    "length": 1.32
+   },
+   {
+    "name": "+v",
+    "mid": [
+     9.655,
+     -7.275
+    ],
+    "length": 1.38
+   },
+   {
+    "name": "-v",
+    "mid": [
+     9.655,
+     -8.595
+    ],
+    "length": 1.38
+   }
+  ],
+  "stance": null,
+  "stance_error": "[stance_collision] untucked: [no_stance] no collision-free stance around cubicle_hzalfx_0",
+  "precheck_s": 12.8
+ },
+ "status": "skipped",
+ "reason": "inter_object_relation_satisfaction-0 found no stance around the support at any stand-off (precheck: no stance either)"
+}

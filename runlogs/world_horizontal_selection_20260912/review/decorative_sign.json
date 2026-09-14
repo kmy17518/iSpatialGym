@@ -1,0 +1,54 @@
+{
+  "category": "decorative_sign",
+  "task": "wa2",
+  "n_models": 3,
+  "n_opened": 3,
+  "models": [
+    {
+      "model": "hgonwj",
+      "V": 4,
+      "L": 2,
+      "H": 2,
+      "score": 14,
+      "valid": true,
+      "front_axis": "+x",
+      "level_axis": "y",
+      "up_axis": "+z",
+      "symmetric_180": true,
+      "thin_axis": "x",
+      "note": "Plain black block letter Z, clean geometry, flat texture; top/bottom bars set the level; a 90-deg turn would read as N."
+    },
+    {
+      "model": "rypeha",
+      "V": 4,
+      "L": 3,
+      "H": 2,
+      "score": 16,
+      "valid": true,
+      "front_axis": "+x",
+      "level_axis": "y",
+      "up_axis": "+z",
+      "symmetric_180": false,
+      "thin_axis": "x",
+      "note": "Sage-green block-letter LOVE word sign, 0.33 m wide; clear text baseline, reads correctly from +x; minor flat-shading seams on letters."
+    },
+    {
+      "model": "xzsmxq",
+      "V": 3,
+      "L": 3,
+      "H": 1,
+      "score": 13,
+      "valid": true,
+      "front_axis": "+x",
+      "level_axis": "y",
+      "up_axis": "+z",
+      "symmetric_180": false,
+      "thin_axis": "x",
+      "note": "Dark teal cut-out 'Welcome HOME' script sign; strong text baseline; back faces render white/missing, odd depth spikes in side view; 0.93 m slightly long."
+    }
+  ],
+  "picks": ["rypeha", "hgonwj"],
+  "alternate": "xzsmxq",
+  "category_verdict": "good",
+  "category_note": "Cut-out letter and word wall signs (black Z, teal LOVE, teal Welcome HOME), 0.33-0.93 m wide, 0.02-0.07 m thick; text baselines or letter bars give the level; single letter Z has a 90-deg Z/N ambiguity."
+}

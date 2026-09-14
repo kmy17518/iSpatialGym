@@ -1,0 +1,307 @@
+{
+ "group": "IORS__canned_food__r2",
+ "task": "IORS",
+ "category": "canned_food",
+ "round": 2,
+ "relation": "ontop",
+ "partner": "countertop (scene)",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "byakrm",
+   "key": "canned_food__byakrm__t",
+   "strip": "/tmp/glib/strips/canned_food__byakrm__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: can pushed fully against open finger, ~22 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: can pushed fully against open finger, ~22 mm off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: can pushed fully against open finger, ~22 mm off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: can pushed fully against open finger, ~22 mm off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: can pushed fully against open finger, ~22 mm off-centre"
+    }
+   ],
+   "object_note": "53 mm can; all rows end 50/4, can sits against the open finger; both pads touch but strongly off-centre",
+   "bbox_mm": [
+    58,
+    58,
+    82
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ycbspm",
+   "key": "canned_food__ycbspm__t",
+   "strip": "/tmp/glib/strips/canned_food__ycbspm__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/9: can pushed against open finger, ~20 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/9: can against open finger, ~20 mm off-centre; 30-deg tilt"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/9: can against open finger, ~20 mm off-centre; 30-deg tilt"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/10: can pushed against open finger, ~19 mm off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/9: can against open finger, ~20 mm off-centre; 30-deg tilt"
+    }
+   ],
+   "object_note": "SPAM can 56 mm; every row ends 50/9-10 with can against open finger; otherwise clean body pinches",
+   "bbox_mm": [
+    60,
+    102,
+    84
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "foetdd",
+   "key": "canned_food__foetdd__t",
+   "strip": "/tmp/glib/strips/canned_food__foetdd__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/14: box pushed against open finger, ~17 mm off-centre; lid-band pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/14: box pushed against open finger, ~17 mm off-centre; lid-band pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/15: box pushed against open finger, ~17 mm off-centre; lid-band pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/15: box pushed against open finger, ~17 mm off-centre; lid-band pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/14: box pushed against open finger, ~17 mm off-centre; 10-deg tilt"
+    }
+   ],
+   "object_note": "tall box held at top lid band, hangs vertically (fine); every row keeps one finger at 50",
+   "bbox_mm": [
+    62,
+    62,
+    170
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "qhgdys",
+   "key": "canned_food__qhgdys__t",
+   "strip": "/tmp/glib/strips/canned_food__qhgdys__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near top, both pads on can; 50/22 idle finger"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near top, both pads on can; 50/22 idle finger"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near top, both pads on can; 50/22 idle finger"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near top, both pads on can; 50/21 idle finger"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near top, both pads on can; 50/22 idle finger"
+    }
+   ],
+   "object_note": "70 mm can; one finger stays at 50 in all rows (~14 mm off-centre), borderline, not flagged",
+   "bbox_mm": [
+    74,
+    74,
+    148
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "acgdtc",
+   "key": "canned_food__acgdtc__t",
+   "strip": "/tmp/glib/strips/canned_food__acgdtc__t.png",
+   "n_valid": 3,
+   "n_clean": 3,
+   "n_clean_strict": 3,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at lid/shoulder of wide jar, both pads on body (50/41)"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at lid/shoulder of wide jar, both pads on body (50/41)"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at lid/shoulder of wide jar, both pads on body (50/31)"
+    }
+   ],
+   "object_note": "89 mm bulbous jar nearly fills the opening; top grasps hold the shoulder, jar hangs below",
+   "bbox_mm": [
+    100,
+    99,
+    115
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": [
+  {
+   "model": "cbmndg",
+   "key": "canned_food__cbmndg__t",
+   "reason": "no candidates"
+  },
+  {
+   "model": "pkopdw",
+   "key": "canned_food__pkopdw__t",
+   "reason": "no candidates"
+  },
+  {
+   "model": "zfmfje",
+   "key": "canned_food__zfmfje__t",
+   "reason": "no candidates"
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+{
+  "group": "object_scaling__beefsteak_tomato__r3",
+  "task": "object_scaling",
+  "category": "beefsteak_tomato",
+  "round": 3,
+  "relation": null,
+  "n_candidates": 4,
+  "n_opened": 4,
+  "candidates": [
+    {"model": "eevvzv", "key": "beefsteak_tomato__eevvzv__f", "G": 2, "T": 3, "V": 4, "R": 2, "score": 17,
+     "note": "Smooth red tomato with green calyx, but small and taller than wide; rows 1-2 clean, rows 3-5 stop 9-12 mm short of the open pad."},
+    {"model": "ogpans", "key": "beefsteak_tomato__ogpans__f", "G": 4, "T": 3, "V": 3, "R": 2, "score": 19,
+     "note": "Faceted low-poly orange-red tomato with small calyx, flat colour; five body holds at 86-116 deg tilt, closing finger nearly at limit (50/2)."},
+    {"model": "altlfz", "key": "beefsteak_tomato__altlfz__f", "G": 5, "T": 3, "V": 3, "R": 2, "score": 21,
+     "note": "Bright orange-red faceted sphere, no visible calyx, weak tomato identity; five clean two-pad body holds spanning tilts 21-123 deg, 60-68 mm."},
+    {"model": "pnrdxh", "key": "beefsteak_tomato__pnrdxh__f", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Large 93 mm deep-red tomato, mottled skin, stem visible, visible faceting; five clean 69-72 mm body holds, tilt only 81-106, upper-body pinch."}
+  ],
+  "selected": [
+    {"model": "pnrdxh", "key": "beefsteak_tomato__pnrdxh__f", "rank": 1, "reason": "Tie at 21 broken by the more representative beefsteak asset (large, wide, textured skin, stem) with five clean, robust 70 mm body holds."},
+    {"model": "altlfz", "key": "beefsteak_tomato__altlfz__f", "rank": 2, "reason": "Best grasp diversity of the group (five clean holds, tilts 21-123 deg) and a lighter orange-red variant that contrasts with the deep-red pick."}
+  ],
+  "alternate": {"model": "ogpans", "key": "beefsteak_tomato__ogpans__f"},
+  "short": false,
+  "warnings": ["Three of four assets are visibly low-poly (faceted); altlfz shows no calyx and reads as a plain orange sphere at wrist-camera distance."],
+  "confidence": "medium"
+}

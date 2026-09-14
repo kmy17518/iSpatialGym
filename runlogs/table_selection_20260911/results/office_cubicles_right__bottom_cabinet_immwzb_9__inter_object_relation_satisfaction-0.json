@@ -1,0 +1,118 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "bottom_cabinet_immwzb_9",
+ "category": "bottom_cabinet",
+ "model": "immwzb",
+ "rooms": [
+  "shared_office_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-0",
+ "inventory": {
+  "top_z": 0.712,
+  "bbox_x": 0.603,
+  "bbox_y": 0.395,
+  "bbox_z": 0.71,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "swivel_chair_ryznxk_3",
+  "swivel_chair_ryznxk_9"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 00:52:11",
+ "precheck": {
+  "aabb": [
+   [
+    8.988,
+    -5.32,
+    0.003
+   ],
+   [
+    9.381,
+    -4.717,
+    0.711
+   ]
+  ],
+  "support": {
+   "name": "bottom_cabinet_immwzb_9",
+   "z": 0.6689941883087158,
+   "yaw": -1.5708045959472656,
+   "local_bounds": [
+    5.3101911544799805,
+    5.310192108154297,
+    9.1978178024292,
+    9.337818145751953
+   ],
+   "n_free_cells": 8,
+   "occupants": [
+    "cubicle_deceti_3"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     9.268,
+     -5.31
+    ],
+    "length": 0.14
+   },
+   {
+    "name": "-u",
+    "mid": [
+     9.268,
+     -5.31
+    ],
+    "length": 0.14
+   },
+   {
+    "name": "+v",
+    "mid": [
+     9.338,
+     -5.31
+    ],
+    "length": 0.0
+   },
+   {
+    "name": "-v",
+    "mid": [
+     9.198,
+     -5.31
+    ],
+    "length": 0.0
+   }
+  ],
+  "stance": null,
+  "stance_error": "too little free top surface",
+  "precheck_s": 0.9
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/office_cubicles_right/office_cubicles_right__bottom_cabinet_immwzb_9__inter_object_relation_satisfaction-0",
+ "setup_s": 3.4,
+ "reject_reason": "no_support",
+ "error": "[no_support] bottom_cabinet_immwzb_9: [support] bottom_cabinet_immwzb_9 has too little free top surface",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 3.4,
+   "run_s": null
+  }
+ ],
+ "job_s": 5.4,
+ "finished": "2026-09-12 00:52:17"
+}

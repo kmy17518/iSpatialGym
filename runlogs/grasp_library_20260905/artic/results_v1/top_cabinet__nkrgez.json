@@ -1,0 +1,15 @@
+{
+ "key": "top_cabinet__nkrgez",
+ "category": "top_cabinet",
+ "model": "nkrgez",
+ "scene": "house_double_floor_lower",
+ "host": "top_cabinet_tynnnw_1",
+ "host_rank": 1,
+ "host_model": "tynnnw",
+ "swap": true,
+ "joints": [],
+ "error": "AttributeError(\"'NoneType' object has no attribute 'scene'\")",
+ "previous_hosts": [
+  "top_cabinet_tynnnw_0"
+ ]
+}

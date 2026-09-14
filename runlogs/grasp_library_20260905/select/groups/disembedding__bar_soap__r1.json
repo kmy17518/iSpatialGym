@@ -1,0 +1,220 @@
+{
+ "group": "disembedding__bar_soap__r1",
+ "task": "disembedding",
+ "category": "bar_soap",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "Tabletop task: the object rests among other objects on a table / tray and is picked from its resting pose. It must settle stably on a flat surface (it must not roll or topple). The best single grasp matters most.",
+ "candidates": [
+  {
+   "model": "utgixp",
+   "key": "bar_soap__utgixp",
+   "strip": "/tmp/glib/strips/bar_soap__utgixp.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 4,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "small bar between pads, 30/0 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "small bar between pads, 30/0 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "49/0: bar pushed against open-limit finger, other fully closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "small bar between pads, 30/0 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "small bar between pads, 30/0 asymmetric but closed"
+    }
+   ],
+   "object_note": "width/antipodal metrics invalid (inf / 0.00); judged visually",
+   "bbox_mm": [
+    47,
+    29,
+    11
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ofargb",
+   "key": "bar_soap__ofargb",
+   "strip": "/tmp/glib/strips/bar_soap__ofargb.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across 85 mm bar, tilt 30, both pads contact"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across 85 mm bar, tilt 30"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "face pinch across 85 mm bar, tilt 30"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "vertical face pinch, tips above bottom face"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "vertical face pinch, CoM 12 mm, tips above bottom"
+    }
+   ],
+   "object_note": "85 mm bar nearly fills gripper; 50/37 readings are width-limited, both pads touch",
+   "bbox_mm": [
+    109,
+    86,
+    31
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ozifwa",
+   "key": "bar_soap__ozifwa",
+   "strip": "/tmp/glib/strips/bar_soap__ozifwa.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "puck on edge, pads on both flat faces; 38/0 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pads on both flat faces at centre, asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tilt 30, pads on both flat faces, closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tilt 30, pads on both flat faces, closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tilt 30, pads on both flat faces, closed"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    93,
+    93,
+    36
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "feqemg",
+   "key": "bar_soap__feqemg",
+   "strip": "/tmp/glib/strips/bar_soap__feqemg.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "dome soap 86 mm fills gripper; 50/36 but both pads contact"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "same side pinch, tilt 26, both pads contact"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch at CoM, both pads contact"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch, CoM 6 mm, both pads contact"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tilt 37 side pinch, both pads on dome, tips above bottom"
+    }
+   ],
+   "object_note": "86 mm soap nearly fills 97 mm gripper; one finger stays at open limit by geometry",
+   "bbox_mm": [
+    113,
+    89,
+    61
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

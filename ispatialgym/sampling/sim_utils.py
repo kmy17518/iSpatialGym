@@ -70,10 +70,10 @@ def adjacent_rooms(scene_model: str, rooms: Sequence[str], reach_m: float = 0.6)
     k = 2 * int(round(reach_m / seg.map_resolution)) + 1
     dilated = th.nn.functional.max_pool2d(mask.float()[None, None], k, stride=1, padding=k // 2)[0, 0] > 0.5
     touched = th.unique(seg.room_ins_map[dilated]).tolist()
-    # outdoor "rooms" (garden: foliage with opacity maps, pool water, ~150 instanced meshes) crash Isaac Sim 5.1's
-    # synthetic-data graph when seen through the windows and when their prims are hidden (bisected on
-    # house_single_floor); they are excluded by name (``ISG_ADJACENT_EXCLUDE``, comma separated substrings)
-    exclude = tuple(s for s in os.environ.get("ISG_ADJACENT_EXCLUDE", "garden,patio,backyard,yard,pool").split(",") if s)
+    # ``ISG_ADJACENT_EXCLUDE`` (comma separated name substrings) drops rooms from the neighbour list. Default none: rgb
+    # rendering with the garden loaded is fine; only the sampler's seg_instance renders crash with it (and with the
+    # kitchen) in view, which is why the sampler loads the task rooms only.
+    exclude = tuple(s for s in os.environ.get("ISG_ADJACENT_EXCLUDE", "").split(",") if s)
     names = sorted(seg.room_ins_id_to_ins_name[int(i)] for i in touched if int(i) in seg.room_ins_id_to_ins_name and int(i) not in ids and int(i) != 0)
     return [n for n in names if not any(s in n for s in exclude)]
 
@@ -87,7 +87,7 @@ class SimWorld:
     """One OmniGibson environment (scene + R1Pro) plus the helpers every task sampler needs."""
 
     def __init__(self, scene_model: str, rooms: Optional[Sequence[str]], robot_name: str = "robot_r1", image_size: int = IMAGE_SIZE,
-                 load_adjacent: Optional[bool] = None):
+                 load_adjacent: Optional[bool] = None, scene_variant: Optional[dict] = None):
         # macros lock once they have been read (second SimWorld in one process after og.clear())
         for name, value in (("ENABLE_OBJECT_STATES", True), ("USE_GPU_DYNAMICS", False), ("ENABLE_TRANSITION_RULES", False)):
             if getattr(gm, name) != value:
@@ -109,7 +109,10 @@ class SimWorld:
         self.eval_rooms = (self.rooms + [r for r in self.adjacent if r not in self.rooms]) if self.rooms else None
         self.loaded_rooms = self.eval_rooms if load_adjacent else self.rooms
         self.robot_name = robot_name
-        self.stable_path = stable_scene_path(scene_model)
+        #: scene variant (``scene_variants.py``): stable scene minus e.g. the chairs around the work table. Everything
+        #: downstream (template merge, scene-unchanged checks, resets) compares against the variant.
+        self.scene_variant = scene_variant or {}
+        self.stable_path = self.scene_variant.get("path") or stable_scene_path(scene_model)
         with open(self.stable_path) as f:
             self.stable_scene = json.load(f)
         cfg = {
@@ -145,6 +148,12 @@ class SimWorld:
         self.scene_object_names = {o.name for o in self.scene.objects}
         self.spawned: Dict[str, DatasetObject] = {}
         self.floor_z = float(self.scene.trav_map.floor_heights[0]) if getattr(self.scene, "trav_map", None) is not None else 0.0
+        if self.scene_variant.get("freed_footprints"):
+            # the traversability PNG is baked with the furniture: free the removed objects' footprints
+            from ispatialgym.sampling.scene_variants import patch_trav_map
+
+            n_freed = patch_trav_map(self.scene, self.scene_variant["freed_footprints"])
+            log.info("traversability map patched for the scene variant: %d cells freed", n_freed)
         self.robot_park_xy = self.park_robot(floor_z=self.floor_z)
         self.scene.update_initial_file()
         # Isaac Sim 5.1's synthetic-data graph (seg_instance) segfaults deterministically on the third frame when a
@@ -442,6 +451,20 @@ class SimWorld:
         obj.keep_still()
         self.full_step(render=True)
         self.robot.keep_still()
+        if present():
+            return True
+        # nothing at all labelled (only background / unlabelled): the instance-segmentation annotator went stale
+        # (seen in the second world of a process after og.clear()); re-create it on the head camera
+        _, mapping = self.seg_instance()
+        if len(mapping) <= 2:
+            log.warning("instance segmentation returned no labels; re-creating the annotator on %s", self.cam_key)
+            try:
+                self.cam.remove_modality("seg_instance")
+                self.render(2)
+                self.cam.add_modality("seg_instance")
+                self.render(3)
+            except Exception as e:  # noqa: BLE001
+                log.warning("re-creating the seg_instance annotator failed: %r", e)
         return present()
 
     def rgb(self, n_renders: int = 3):

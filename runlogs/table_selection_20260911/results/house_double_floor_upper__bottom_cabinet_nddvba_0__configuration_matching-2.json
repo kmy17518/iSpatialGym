@@ -1,0 +1,25 @@
+{
+ "scene": "house_double_floor_upper",
+ "table": "bottom_cabinet_nddvba_0",
+ "category": "bottom_cabinet",
+ "model": "nddvba",
+ "rooms": [
+  "bedroom_2"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.722,
+  "bbox_x": 0.416,
+  "bbox_y": 0.772,
+  "bbox_z": 0.714,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:15:59",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

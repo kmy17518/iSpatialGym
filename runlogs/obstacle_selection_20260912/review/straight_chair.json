@@ -1,0 +1,101 @@
+{
+  "category": "straight_chair",
+  "task": "obst",
+  "n_models": 8,
+  "n_opened": 8,
+  "models": [
+    {
+      "model": "amgwaw",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Black bentwood cafe chair with curved back, 0.44 x 0.46 x 0.78 m; clean; classic dining/cafe chair."
+    },
+    {
+      "model": "dgqubu",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Dark wood ladder-back dining chair with black seat, 0.55 x 0.47 x 0.91 m; clean; footprint at the upper limit."
+    },
+    {
+      "model": "dmcixv",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Louis-style oval-back chair, grey check upholstery, dark wood, 0.41 x 0.36 x 0.78 m; clean; hotel/dining look."
+    },
+    {
+      "model": "dxusxd",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Black folding chair standing open on X legs, 0.60 x 0.64 x 0.94 m; wide footprint for a folding chair."
+    },
+    {
+      "model": "dzrlfn",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Solid green plastic-look chair, uniform colour, 0.52 x 0.52 x 0.78 m; clean, plain."
+    },
+    {
+      "model": "eospnr",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Brown wooden slat-back kitchen chair, 0.35 x 0.35 x 0.78 m; clean, compact."
+    },
+    {
+      "model": "fmdswa",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Black padded seat and back on tubular frame (school/visitor chair), 0.47 x 0.43 x 0.75 m; clean."
+    },
+    {
+      "model": "gktknj",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Low red upholstered chair with flat wooden back panel, 0.42 x 0.35 x 0.62 m; back looks plain but intact."
+    }
+  ],
+  "picks": ["amgwaw", "eospnr"],
+  "alternate": "dmcixv",
+  "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right"
+  ],
+  "category_verdict": "good",
+  "category_note": "Dining/desk chairs ~0.35-0.55 m footprint, 0.6-0.9 m tall; all eight valid and stable on four legs. A pulled-out chair is unremarkable mid-room in every scene; picks span black cafe and brown wooden styles."
+}

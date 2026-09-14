@@ -1,0 +1,17 @@
+{
+ "group": "configuration_matching__dartboard__r1",
+ "task": "configuration_matching",
+ "category": "dartboard",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "Attachment task: the object is picked from a table and attached to its partner. The pads must leave the mating side of the object completely free.",
+ "candidates": [],
+ "excluded": [
+  {
+   "model": "zjenlc",
+   "key": "dartboard__zjenlc",
+   "reason": "no candidates"
+  }
+ ]
+}

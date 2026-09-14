@@ -1,0 +1,125 @@
+[
+ {
+  "category": "board_game",
+  "task": "wa0",
+  "n_models": 16,
+  "grids": [
+   "renders/grids/board_game_00.png",
+   "renders/grids/board_game_01.png",
+   "renders/grids/board_game_02.png",
+   "renders/grids/board_game_03.png",
+   "renders/grids/board_game_04.png",
+   "renders/grids/board_game_05.png"
+  ]
+ },
+ {
+  "category": "chopping_block",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/chopping_block_00.png"
+  ]
+ },
+ {
+  "category": "first_aid_kit",
+  "task": "wa1",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/first_aid_kit_00.png"
+  ]
+ },
+ {
+  "category": "frame",
+  "task": "wa1",
+  "n_models": 2,
+  "grids": [
+   "renders/grids/frame_00.png"
+  ]
+ },
+ {
+  "category": "hook_rack",
+  "task": "wa1",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/hook_rack_00.png"
+  ]
+ },
+ {
+  "category": "license_plate",
+  "task": "wa1",
+  "n_models": 5,
+  "grids": [
+   "renders/grids/license_plate_00.png",
+   "renders/grids/license_plate_01.png"
+  ]
+ },
+ {
+  "category": "menu",
+  "task": "wa0",
+  "n_models": 6,
+  "grids": [
+   "renders/grids/menu_00.png",
+   "renders/grids/menu_01.png"
+  ]
+ },
+ {
+  "category": "pack_of_bread",
+  "task": "wa0",
+  "n_models": 4,
+  "grids": [
+   "renders/grids/pack_of_bread_00.png",
+   "renders/grids/pack_of_bread_01.png"
+  ]
+ },
+ {
+  "category": "portable_game_console",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/portable_game_console_00.png"
+  ]
+ },
+ {
+  "category": "stapler",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/stapler_00.png"
+  ]
+ },
+ {
+  "category": "sunglasses",
+  "task": "wa0",
+  "n_models": 3,
+  "grids": [
+   "renders/grids/sunglasses_00.png"
+  ]
+ },
+ {
+  "category": "tray",
+  "task": "wa0",
+  "n_models": 16,
+  "grids": [
+   "renders/grids/tray_00.png",
+   "renders/grids/tray_01.png",
+   "renders/grids/tray_02.png",
+   "renders/grids/tray_03.png",
+   "renders/grids/tray_04.png",
+   "renders/grids/tray_05.png"
+  ]
+ },
+ {
+  "category": "violin_case",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/violin_case_00.png"
+  ]
+ },
+ {
+  "category": "windshield",
+  "task": "wa1",
+  "n_models": 2,
+  "grids": []
+ }
+]

@@ -1,0 +1,35 @@
+{
+ "category": "wineglass",
+ "model": "akusda",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/wineglass__akusda__y0.png",
+   "drift_m": 0.0006,
+   "tilt_deg": 0.4,
+   "on_tray": true,
+   "settled_z": 0.0955,
+   "seg_pixels": 5778,
+   "aabb_extent": [
+    0.064,
+    0.064,
+    0.154
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/wineglass__akusda__y1.png",
+   "drift_m": 0.0008,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.0955
+  }
+ },
+ "stable": true,
+ "visible": true
+}

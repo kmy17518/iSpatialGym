@@ -1,0 +1,695 @@
+{
+"keyboard": [
+"hgtbot",
+"injrgc",
+"jtdyix",
+"kzcreb",
+"nddmmy",
+"uwacaq"
+],
+"tablet": [
+"kywsta"
+],
+"calculator": [
+"kwmmty"
+],
+"clipboard": [
+"envjqe",
+"gmxyfo"
+],
+"chopping_board": [
+"afwefw",
+"akgegh",
+"ayegwd",
+"cptayn",
+"drjnag",
+"gaxhrw",
+"iocgzv",
+"ktxcvz",
+"mqsqhl",
+"mwmzzv",
+"ozrzrr",
+"psabiv",
+"sygezm",
+"uzeftd"
+],
+"cutting_board": [
+"aibvew",
+"idmcgf",
+"jfrbuz",
+"nsvnai",
+"tcdrzs"
+],
+"hardback": [
+"acaxtl",
+"acbrnv",
+"aceozs",
+"acskbo",
+"aesiym",
+"aewljo",
+"agbqsy",
+"ajpulw",
+"atxzzy",
+"axvnml",
+"bcmzwo",
+"bgtbdp",
+"bklqfz",
+"bobmzf",
+"bpgluc",
+"bqvvvx"
+],
+"paperback_book": [
+"aubynm",
+"bisnup",
+"eqzjjk",
+"fvzdec",
+"hdhhqo",
+"hrtflt",
+"ixwtnb",
+"jhaltj",
+"ncjkcg",
+"phsgun",
+"vciijb",
+"wfcxjv",
+"xhibsy",
+"xxknda",
+"xzxgfw",
+"ydarnr"
+],
+"magazine": [
+"ajitiv",
+"ehdwsd",
+"kjfxxx",
+"tfovwy",
+"vvcrhu",
+"ymfwaz",
+"zfeoeu"
+],
+"catalog": [
+"aygcnt",
+"deirql",
+"uilzqm",
+"zmidof"
+],
+"comic_book": [
+"nekxsh",
+"qkczyc",
+"scycof",
+"vzejnl",
+"xmbxfm"
+],
+"letter": [
+"bdlpry",
+"bswqmq",
+"csncjv",
+"cvtjcy",
+"dyvllf",
+"esmoua",
+"fnaqcr",
+"igvnic",
+"jafvfh",
+"jgnowc",
+"oheufk",
+"pieqjf",
+"pvuaxx",
+"qhqhwk",
+"qljxat",
+"qrykxc"
+],
+"legal_document": [
+"mougvz",
+"qkrlsi"
+],
+"notepad": [
+"awcyha",
+"hirdfd",
+"njeocp",
+"oaikde",
+"rvevdj"
+],
+"notebook": [
+"aanuhi",
+"bnsvvw",
+"dlhxxl",
+"eijrqw",
+"fckzgw",
+"ffdjzp",
+"flpxdx",
+"gqkaqu",
+"hwhisw",
+"ioaxit",
+"jxabmj",
+"jzwprb",
+"kchdrf",
+"ksxknp",
+"mtveio",
+"nxegkh"
+],
+"mail": [
+"azunex",
+"gvivdi",
+"mbbwhn",
+"ojkepk",
+"qpwlor"
+],
+"newspaper": [
+"edarlp",
+"ukamcl"
+],
+"paper_sheet": [
+"afdjfk",
+"uqbipw"
+],
+"folder": [
+"guhatz",
+"inkwmw",
+"lktggf",
+"piezyg",
+"poqpux",
+"wauyns"
+],
+"folderal": [
+"ttldpx",
+"zwhewa"
+],
+"package": [
+"mvvnqm"
+],
+"board_game": [
+"eoywpy",
+"frgdqh",
+"fzyuip",
+"gcfkqa",
+"gumkqh",
+"ibzhzu",
+"iqfvfl",
+"lzslbu",
+"nfewft",
+"ovttum",
+"phwwnx",
+"qdkyzl",
+"qgvsnb",
+"rgvkmy",
+"twkglv",
+"vbamua"
+],
+"video_game": [
+"apjpos",
+"ceaxsd",
+"ckugyi",
+"coiafo",
+"lfdpse",
+"ppnzqm",
+"pujfzk",
+"qsyyql",
+"quzjuo",
+"rzaxlj",
+"veodkq",
+"yyvkel"
+],
+"pizza_box": [
+"hvaucj"
+],
+"box_of_chocolates": [
+"bdvkbh"
+],
+"boxed_ink_cartridge": [
+"ltblou",
+"oepuip",
+"oinelo"
+],
+"game_console": [
+"anslwz"
+],
+"scanner": [
+"juzkjp"
+],
+"digital_scale": [
+"ccphiu",
+"hfetby",
+"xwzzen"
+],
+"credit_card_terminal": [
+"bqpanz"
+],
+"portable_game_console": [
+"muwcnf"
+],
+"hard_drive": [
+"ijibkm",
+"ubjbsm"
+],
+"tray": [
+"coqeme",
+"glwebh",
+"gsxbym",
+"hbjdlb",
+"hjxczh",
+"huwhjg",
+"hvlfig",
+"incirm",
+"jpcflq",
+"mhhoga",
+"mkdcha",
+"spopfj",
+"thkphg",
+"txcjux",
+"uekqey",
+"vxbtax"
+],
+"baking_sheet": [
+"yhurut"
+],
+"chopping_block": [
+"ekowsj"
+],
+"frying_pan": [
+"aewpzn",
+"cprjvq",
+"jpzusm",
+"mhndon",
+"sfbdjn",
+"snvhlz",
+"vycozd"
+],
+"griddle_pan": [
+"ryvqep"
+],
+"saucepan": [
+"fsinsu"
+],
+"wok": [
+"pobfpe"
+],
+"skimmer": [
+"wvmcce",
+"xocqxg"
+],
+"dustpan": [
+"espzwv"
+],
+"hairbrush": [
+"bdylnb"
+],
+"ripsaw": [
+"laysom"
+],
+"putty_knife": [
+"qmdkub"
+],
+"utility_knife": [
+"kridpz"
+],
+"open_end_wrench": [
+"klnawb"
+],
+"plier": [
+"zwzncq"
+],
+"wire_cutter": [
+"ugbval"
+],
+"clamp": [
+"feswhy"
+],
+"caliper": [
+"sngjmj"
+],
+"magnifying_glass": [
+"clyiol"
+],
+"hair_dryer": [
+"ylutzy"
+],
+"electric_hand_mixer": [
+"prewfi"
+],
+"stapler": [
+"kgnsas"
+],
+"gym_shoe": [
+"arigtn",
+"hwrvmy",
+"kmcbym",
+"lmpdfa",
+"lqzooz",
+"lwcwme",
+"mcfcwq",
+"mjyyda",
+"nahllg",
+"pblxfp",
+"picdro",
+"qxecbh",
+"rcozpq",
+"rkikcm",
+"ugbxip",
+"ukkqib"
+],
+"skates": [
+"igyveo",
+"sjehwr"
+],
+"sunglasses": [
+"gqawld",
+"nxfifs",
+"qiwncl"
+],
+"eyeglasses": [
+"gphhuu",
+"ujauoy"
+],
+"goggles": [
+"wszdxi"
+],
+"wallet": [
+"lagjae"
+],
+"toy_train": [
+"zdfhbw"
+],
+"chess_set": [
+"nzgefv",
+"zncboj"
+],
+"desk_organizer": [
+"yidrel"
+],
+"power_strip": [
+"czvrku"
+],
+"bag_of_chips": [
+"bryahw",
+"dwkdko",
+"ennnjj",
+"jphwer",
+"qstxpj",
+"uevvib",
+"wnuoym"
+],
+"carton_of_eggs": [
+"mimzbz",
+"rixhgu",
+"stxfxb"
+],
+"pack_of_bread": [
+"fckfij",
+"sfupqo",
+"wjbnfu",
+"yehtiv"
+],
+"mouse": [
+"cduwda",
+"eosngb",
+"fjljxp",
+"ihpnjx",
+"oydobn",
+"pljjtu",
+"wwyopp"
+],
+"laptop": [
+"nvulcs"
+],
+"violin_case": [
+"jlasop"
+],
+"pencil_case": [
+"acikzo",
+"cqxkgl",
+"otcmih"
+],
+"monitor": [
+"huvcgu",
+"kmltvq",
+"mlyppp",
+"nghyiv",
+"qaacxt",
+"qvpbge",
+"rbqanz",
+"wxhvqc",
+"xffisd",
+"xhxcyg"
+],
+"alarm_clock": [
+"vqwovi"
+],
+"radio": [
+"vgioak",
+"wxnicr"
+],
+"menu": [
+"keaqlh",
+"ncfnii",
+"qmypsm",
+"tissfg",
+"ugplzr",
+"wqhybr"
+],
+"receipt": [
+"hgnbjj",
+"qfaleu",
+"rzrhlo",
+"xvfean",
+"zsxylm"
+],
+"platter": [
+"csanbr",
+"ekjpdj",
+"hnlivs",
+"iadlti",
+"ieoasd",
+"kiiamx"
+],
+"calendar": [
+"ydunsu"
+],
+"first_aid_kit": [
+"flctdz"
+],
+"painting": [
+"dacihj",
+"ljabhq",
+"cjrilr",
+"eexydp",
+"ejhanr",
+"fmcgul",
+"fmlmox",
+"fqlxxd",
+"fwuole",
+"fyoxcq",
+"gardkz",
+"ggloob",
+"ifdzgs",
+"jayvqq",
+"jfkvxh",
+"jreujf"
+],
+"picture": [
+"abtgvz",
+"alwmys",
+"bxpohm",
+"bzmdxc",
+"chfljy",
+"cltbty",
+"dogydw",
+"etixod",
+"fanvpf",
+"fhkzlm",
+"ggajdz",
+"gwricv",
+"hffaxw",
+"hhxttu",
+"jmvdxm",
+"jovfqj"
+],
+"wall_clock": [
+"fnwzqj",
+"fqvgny",
+"jerval",
+"oqmbtp",
+"przkmo",
+"xevvel",
+"zpctvp"
+],
+"poster": [
+"dsrcyt"
+],
+"bulletin_board": [
+"ayaoal",
+"rjlpsy"
+],
+"whiteboard": [
+"bqqmtc",
+"gvkgsi",
+"onhspt"
+],
+"decorative_sign": [
+"hgonwj",
+"rypeha",
+"xzsmxq"
+],
+"signpost": [
+"axhlim",
+"ivvjfv",
+"mexzmk",
+"mlvfbp",
+"sdsfzw",
+"vvjtkv",
+"vwhtlm"
+],
+"grocery_sign": [
+"kyyjer"
+],
+"canvas": [
+"adxquq"
+],
+"pegboard": [
+"jafivf"
+],
+"guitar": [
+"cybisc",
+"gysapt",
+"hpqjrq"
+],
+"tennis_racket": [
+"rmvafy"
+],
+"violin": [
+"rgwsac"
+],
+"hanger": [
+"agrpio",
+"anobre",
+"ffecvd",
+"lymqks",
+"nadesv",
+"nagryh"
+],
+"hook_rack": [
+"mdnfjr"
+],
+"towel_rack": [
+"crivoa",
+"kqrmrh",
+"nhlijv",
+"pqhsry",
+"qedffr",
+"quznqx"
+],
+"valentine_wreath": [
+"xpbsof"
+],
+"picture_frame": [
+"brhofj",
+"byaund",
+"fgsgpu",
+"guatvs",
+"kncybf",
+"lsqclh",
+"lxpxcf",
+"nrviiu",
+"vmyqsm",
+"yxmjdx"
+],
+"paper_towel_dispenser": [
+"jacqxv",
+"lahuhb",
+"ovwdpz",
+"tuvnnt",
+"zpfghl"
+],
+"wall_mounted_soap_dispenser": [
+"aofnyo",
+"byjkkn",
+"zvslvk"
+],
+"wall_mounted_tv": [
+"aoqsbu",
+"bfehsl",
+"cwdngq",
+"dkpfys",
+"dxyfxf",
+"gffrzl",
+"ggfznh",
+"leeqgt",
+"ovzajm",
+"pghmyr",
+"rifpjo",
+"sodbbr",
+"uvlqsl",
+"ylvjhb",
+"zesqym"
+],
+"fire_extinguisher": [
+"bejaeu",
+"inqyom",
+"jgdvdl",
+"noepez",
+"xqtkxb"
+],
+"thermostat": [
+"jophec"
+],
+"broom": [
+"tpyvbt"
+],
+"umbrella": [
+"cqfbku",
+"frpfnc",
+"hdfkbc",
+"ziqzqo",
+"zxnjwz"
+],
+"hat": [
+"avvknr",
+"ldxyyc",
+"wkrzep",
+"zymxgw"
+],
+"map": [
+"fdtxut",
+"hsbtqi",
+"umftoc"
+],
+"board": [
+"fxugbm"
+],
+"frame": [
+"argijo",
+"trhhqo"
+],
+"dartboard": [
+"zjenlc"
+],
+"license_plate": [
+"hjdaqn",
+"naclac",
+"nuqnlr",
+"nwfbxn",
+"yepdrj"
+],
+"skateboard_deck": [
+"tgfidu"
+],
+"wreath": [
+"rkrxno"
+],
+"holly_decoration": [
+"shmkir"
+],
+"antlers": [
+"nlsanr",
+"ovwdwa"
+],
+"mirror": [
+"catitv",
+"ddmyjg",
+"edxfnt",
+"ffoudz",
+"jpktmn",
+"jtgjha"
+],
+"windshield": [
+"akoadf",
+"mdfijk"
+]
+}

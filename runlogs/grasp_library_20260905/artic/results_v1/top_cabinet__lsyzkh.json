@@ -1,0 +1,16 @@
+{
+ "key": "top_cabinet__lsyzkh",
+ "category": "top_cabinet",
+ "model": "lsyzkh",
+ "scene": "Rs_int",
+ "host": "top_cabinet_lsyzkh_1",
+ "host_rank": 2,
+ "host_model": "lsyzkh",
+ "swap": false,
+ "joints": [],
+ "error": "AttributeError(\"'NoneType' object has no attribute 'scene'\")",
+ "previous_hosts": [
+  "top_cabinet_fqhdne_0",
+  "top_cabinet_lsyzkh_0"
+ ]
+}

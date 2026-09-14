@@ -1,0 +1,139 @@
+{
+ "scene": "house_single_floor",
+ "table": "bar_udatjt_0",
+ "category": "bar",
+ "model": "udatjt",
+ "rooms": [
+  "kitchen_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-1",
+ "inventory": {
+  "top_z": 1.052,
+  "bbox_x": 1.145,
+  "bbox_y": 2.994,
+  "bbox_z": 1.051,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 00:00:04",
+ "precheck": {
+  "aabb": [
+   [
+    5.789,
+    -0.305,
+    0.001
+   ],
+   [
+    8.786,
+    0.848,
+    1.052
+   ]
+  ],
+  "support": {
+   "name": "bar_udatjt_0",
+   "z": 1.0505356788635254,
+   "yaw": -1.5733394622802734,
+   "local_bounds": [
+    -0.8629434704780579,
+    0.2797994017601013,
+    5.796337127685547,
+    8.77922534942627
+   ],
+   "n_free_cells": 8605,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     7.287,
+     -0.298
+    ],
+    "length": 2.983
+   },
+   {
+    "name": "-u",
+    "mid": [
+     7.29,
+     0.844
+    ],
+    "length": 2.983
+   },
+   {
+    "name": "+v",
+    "mid": [
+     8.78,
+     0.269
+    ],
+    "length": 1.143
+   },
+   {
+    "name": "-v",
+    "mid": [
+     5.797,
+     0.277
+    ],
+    "length": 1.143
+   }
+  ],
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    8.779938697814941,
+    0.26924437284469604
+   ],
+   "inward": [
+    -0.9999967813491821,
+    0.0025431327521800995
+   ],
+   "tangent": [
+    -0.0025431327521800995,
+    -0.9999967813491821
+   ],
+   "base_pose2d": [
+    9.229937553405762,
+    0.26809996366500854,
+    3.139049518134753
+   ],
+   "edge_depth": 0.4500003159046173,
+   "view": {
+    "translate": 0.75,
+    "tilt": 0.10000002384185791,
+    "axis_angle": 0.0004882812548506386
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 8.0
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "view_arms": "untucked",
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/house_single_floor/house_single_floor__bar_udatjt_0__configuration_matching-1",
+ "setup_s": 41.9,
+ "reject_reason": "no_support",
+ "error": "[no_support] bar_udatjt_0: [unreachable] handle not reachable from any of 6 cells (e.g. handle at [8.465109825134277, 0.28713566064834595, 1.4059076309204102], base (9.329936981201172, 0.2678448259830475, 3.139049518134753), translates [0.0, 0.25, 0.5])",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 41.9,
+   "run_s": null
+  }
+ ],
+ "job_s": 44.3,
+ "finished": "2026-09-12 00:00:48"
+}

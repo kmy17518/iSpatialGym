@@ -1,0 +1,35 @@
+{
+ "category": "hamburger_bun",
+ "model": "fqxumh",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/hamburger_bun__fqxumh__y0.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.8,
+   "on_tray": true,
+   "settled_z": 0.0101,
+   "seg_pixels": null,
+   "aabb_extent": [
+    0.087,
+    0.085,
+    0.026
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/hamburger_bun__fqxumh__y1.png",
+   "drift_m": 0.0002,
+   "tilt_deg": 1.1,
+   "on_tray": true,
+   "settled_z": 0.0102
+  }
+ },
+ "stable": true,
+ "visible": null
+}

@@ -1,0 +1,103 @@
+{
+ "category": "oven",
+ "model": "kfftgk",
+ "key": "oven__kfftgk",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.2455926537513733
+ ],
+ "aabb_extent": [
+  0.5284569263458252,
+  0.5290391445159912,
+  0.5393249988555908
+ ],
+ "aabb_min_rel_root": [
+  -0.22991149127483368,
+  -0.26254773139953613,
+  -0.2455926537513733
+ ],
+ "aabb_max_rel_root": [
+  0.2985454499721527,
+  0.2664913833141327,
+  0.29373234510421753
+ ],
+ "link_tags": {
+  "base_link": [],
+  "dof_rootd_aa001_r": [
+   "openable"
+  ],
+  "glass": [
+   "glass"
+  ]
+ },
+ "openable_joint_ids": [
+  [
+   1,
+   "j_dof_rootd_aa001_r"
+  ]
+ ],
+ "joints": [
+  {
+   "joint": "j_dof_rootd_aa001_r",
+   "type": "RevoluteJoint",
+   "child_link": "dof_rootd_aa001_r",
+   "lower": 0.0,
+   "upper": 1.3962633609771729,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.2505,
+    0.00063,
+    -0.24371
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.2505,
+    0.01795,
+    -0.24371
+   ],
+   "measured_angle": 0.2503,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/oven__kfftgk__dof_rootd_aa001_r.obj",
+   "n_pieces": 8,
+   "link_bbox_min": [
+    0.2401,
+    -0.2625,
+    -0.2424
+   ],
+   "link_bbox_max": [
+    0.2985,
+    0.2657,
+    0.2001
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.2299,
+   -0.2615,
+   -0.2456
+  ],
+  "bbox_max": [
+   0.2717,
+   0.2665,
+   0.2937
+  ],
+  "n_pieces": 8
+ }
+}

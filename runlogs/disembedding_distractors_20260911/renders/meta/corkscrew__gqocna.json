@@ -1,0 +1,35 @@
+{
+ "category": "corkscrew",
+ "model": "gqocna",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/corkscrew__gqocna__y0.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.1,
+   "on_tray": true,
+   "settled_z": 0.0098,
+   "seg_pixels": 1524,
+   "aabb_extent": [
+    0.112,
+    0.088,
+    0.021
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/corkscrew__gqocna__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0095
+  }
+ },
+ "stable": true,
+ "visible": true
+}

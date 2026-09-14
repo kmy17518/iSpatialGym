@@ -1,0 +1,45 @@
+{
+  "category": "printer",
+  "task": "obst",
+  "n_models": 3,
+  "n_opened": 3,
+  "models": [
+    {
+      "model": "icxhbx",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Dark grey/black HP-style laser MFP with light lower body, control panel and tray, 0.46 x 0.62 x 0.35 m; clean, footprint borderline."
+    },
+    {
+      "model": "oyqbtq",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Light grey office copier/MFP with control panel and paper tray, 0.58 x 0.53 x 0.40 m; clean, footprint borderline."
+    },
+    {
+      "model": "tiioui",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Compact grey inkjet printer with small display, 0.30 x 0.44 x 0.14 m; clean, but only 14 cm tall (height borderline)."
+    }
+  ],
+  "picks": ["icxhbx", "oyqbtq"],
+  "alternate": "tiioui",
+  "natural_scenes": [
+    "office_cubicles_right"
+  ],
+  "category_verdict": "weak",
+  "category_note": "Three clean printers: two desktop MFPs ~0.5-0.6 m wide and 0.35-0.40 m tall, one low inkjet. Credible on an office floor beside a desk or in a copy corner, but odd mid-corridor and sizes are borderline; office scene only."
+}

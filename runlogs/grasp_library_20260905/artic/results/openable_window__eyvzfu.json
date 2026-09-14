@@ -1,0 +1,62 @@
+{
+ "key": "openable_window__eyvzfu",
+ "category": "openable_window",
+ "model": "eyvzfu",
+ "scene": "house_single_floor",
+ "host": "openable_window_eyvzfu_0",
+ "host_rank": 0,
+ "host_model": "eyvzfu",
+ "swap": false,
+ "joints": [
+  {
+   "joint": "j_movingpart",
+   "kind": "drawer",
+   "grasp_source": "manual",
+   "stance": {
+    "base": [
+     23.217,
+     9.593,
+     3.059
+    ],
+    "translate": 0.5,
+    "sign": -1.0,
+    "orientation": "front"
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.15,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [22.78470230102539, 9.82965087890625, 0.9584078788757324]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [22.78470230102539, 9.82965087890625, 0.9584078788757324]})",
+    "stance ok (teleported)",
+    "sign +1: planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 149.3 mm / 0.464 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)",
+    "sign -1: collision: [collision] trunk motion would collide (sample 1) {'translate': 0.5, 'tilt': None}"
+   ],
+   "error": "collision: [collision] trunk motion would collide (sample 1) {'translate': 0.5, 'tilt': None}",
+   "contact_world": [
+    22.785,
+    9.83,
+    0.958
+   ],
+   "handle_height_above_floor": 0.953,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 0,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 3
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.0,
+  1.0,
+  1.0
+ ],
+ "time_s": 226.8
+}

@@ -1,0 +1,94 @@
+{
+ "category": "door",
+ "model": "crtrpa",
+ "key": "door__crtrpa",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  1.164919137954712
+ ],
+ "aabb_extent": [
+  0.14599215984344482,
+  0.9289615154266357,
+  2.3298373222351074
+ ],
+ "aabb_min_rel_root": [
+  -0.08790354430675507,
+  -0.4644908010959625,
+  -1.164919137954712
+ ],
+ "aabb_max_rel_root": [
+  0.05808861926198006,
+  0.46447068452835083,
+  1.1649181842803955
+ ],
+ "link_tags": {
+  "base_link": [],
+  "leaf": [],
+  "glass": [
+   "glass"
+  ]
+ },
+ "openable_joint_ids": [],
+ "joints": [
+  {
+   "joint": "j_leaf",
+   "type": "RevoluteJoint",
+   "child_link": "leaf",
+   "lower": 0.0,
+   "upper": 1.9084651470184326,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    -0.05512,
+    -0.41209,
+    -0.00092
+   ],
+   "link_quat_obj": [
+    -0.0,
+    0.0,
+    -0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "hinge_point_obj": [
+    -0.05512,
+    -0.41209,
+    -0.00092
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/door__crtrpa__leaf.obj",
+   "n_pieces": 7,
+   "link_bbox_min": [
+    -0.0879,
+    -0.4177,
+    -1.1189
+   ],
+   "link_bbox_max": [
+    0.0578,
+    0.4183,
+    1.1181
+   ],
+   "link_tags": [],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0581,
+   -0.4645,
+   -1.1649
+  ],
+  "bbox_max": [
+   0.0581,
+   0.4645,
+   1.1649
+  ],
+  "n_pieces": 4
+ }
+}

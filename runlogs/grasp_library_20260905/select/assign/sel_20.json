@@ -1,0 +1,12 @@
+{
+ "assignment": "sel_20",
+ "groups": [
+  "/tmp/glib/select/groups/disembedding__soap_dispenser__r3.json",
+  "/tmp/glib/select/groups/mental_rotation__quartz__r2.json",
+  "/tmp/glib/select/groups/mental_rotation__teacup__r1.json",
+  "/tmp/glib/select/groups/object_scaling__jar_of_spaghetti_sauce__r1.json",
+  "/tmp/glib/select/groups/object_scaling__toy_dice__r2.json",
+  "/tmp/glib/select/groups/IORS__chili__r2.json"
+ ],
+ "n_strips": 34
+}

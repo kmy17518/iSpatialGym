@@ -1,0 +1,85 @@
+{
+ "category": "sliding_door",
+ "model": "tprpvb",
+ "key": "sliding_door__tprpvb",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  2.2990779876708984
+ ],
+ "aabb_extent": [
+  0.04686523601412773,
+  1.6798710823059082,
+  2.3442740440368652
+ ],
+ "aabb_min_rel_root": [
+  -0.02339269034564495,
+  -0.8399471640586853,
+  -2.2990782260894775
+ ],
+ "aabb_max_rel_root": [
+  0.02347254566848278,
+  0.8399239778518677,
+  0.045195817947387695
+ ],
+ "link_tags": {
+  "base_link": [],
+  "movingpart": []
+ },
+ "openable_joint_ids": [],
+ "joints": [
+  {
+   "joint": "j_movingpart",
+   "type": "PrismaticJoint",
+   "child_link": "movingpart",
+   "lower": 0.0,
+   "upper": 0.8177558779716492,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.0,
+    0.39713,
+    -1.14754
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "travel_per_unit": 1.0000002384185862,
+   "pieces_obj": "/tmp/glib/artic/inv/sliding_door__tprpvb__movingpart.obj",
+   "n_pieces": 7,
+   "link_bbox_min": [
+    -0.0234,
+    -0.0485,
+    -2.2991
+   ],
+   "link_bbox_max": [
+    0.0235,
+    0.8399,
+    0.0039
+   ],
+   "link_tags": [],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0109,
+   -0.8399,
+   -0.0452
+  ],
+  "bbox_max": [
+   0.0109,
+   0.8399,
+   0.0452
+  ],
+  "n_pieces": 1
+ }
+}

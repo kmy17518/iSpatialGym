@@ -1,0 +1,143 @@
+{
+ "key": "bottom_cabinet__glefdh",
+ "category": "bottom_cabinet",
+ "model": "glefdh",
+ "scene": "house_single_floor",
+ "host": "bottom_cabinet_rhdbzv_0",
+ "host_rank": 2,
+ "host_model": "rhdbzv",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "review:C",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [0.8952978849411011, -1.4851183891296387, 0.20165349543094635]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [0.8952978849411011, -1.4851183891296387, 0.20165349543094635]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    0.895,
+    -1.485,
+    0.202
+   ],
+   "handle_height_above_floor": 0.196,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 0,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0
+   }
+  },
+  {
+   "joint": "j_link_1",
+   "kind": "door",
+   "grasp_source": "review:C",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [0.8952980041503906, -1.3983551263809204, 0.2016535848379135]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [0.8952980041503906, -1.3983551263809204, 0.2016535848379135]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    0.895,
+    -1.398,
+    0.202
+   ],
+   "handle_height_above_floor": 0.196,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 6,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0
+   }
+  },
+  {
+   "joint": "j_link_2",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [0.8949933648109436, -1.4827042818069458, 0.3174647390842438]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [0.8949933648109436, -1.4827042818069458, 0.3174647390842438]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    0.895,
+    -1.483,
+    0.317
+   ],
+   "handle_height_above_floor": 0.312,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 6,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0
+   }
+  },
+  {
+   "joint": "j_link_3",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [0.8946889638900757, -1.4004676342010498, 0.29146552085876465]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [0.8946889638900757, -1.4004676342010498, 0.29146552085876465]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    0.895,
+    -1.4,
+    0.291
+   ],
+   "handle_height_above_floor": 0.286,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 6,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [
+  "bottom_cabinet_xqmipa_0",
+  "bottom_cabinet_fancyy_0"
+ ],
+ "scale": [
+  1.015,
+  1.509,
+  0.409
+ ],
+ "time_s": 593.6
+}

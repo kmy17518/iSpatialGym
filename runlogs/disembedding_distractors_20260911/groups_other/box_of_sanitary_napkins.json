@@ -1,0 +1,7 @@
+{
+  "category": "box_of_sanitary_napkins",
+  "pages_opened": ["grids/pool_other/box_of_sanitary_napkins__p1.png", "grids/pool_other/box_of_sanitary_napkins__p2.png"],
+  "n_models": 19,
+  "exclude": [],
+  "notes": "All 19 are intact packaged goods: tissue boxes, shampoo/cereal/sugar boxes, snack bags and paper liners. Flat bags (cookies, ice cream, cream cheese) lie in their natural pose. bag_of_cream_cheese/dxrsol has abstract print and 7.5 deg tilt but still reads as a packet."
+}

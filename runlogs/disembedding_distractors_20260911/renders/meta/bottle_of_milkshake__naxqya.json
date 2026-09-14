@@ -1,0 +1,35 @@
+{
+ "category": "bottle_of_milkshake",
+ "model": "naxqya",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_milkshake__naxqya__y0.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0812,
+   "seg_pixels": 9034,
+   "aabb_extent": [
+    0.093,
+    0.093,
+    0.189
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_milkshake__naxqya__y1.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0812
+  }
+ },
+ "stable": true,
+ "visible": true
+}

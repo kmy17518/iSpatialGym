@@ -1,0 +1,23 @@
+{
+  "category": "mop_bucket",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "mop_bucket/xjzyfc",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Green plastic janitor bucket with wringer on top and wire handle, 0.35 x 0.59 x 0.43 m; flat colour, clean geometry; stands on base."
+    }
+  ],
+  "picks": ["mop_bucket/xjzyfc"],
+  "alternate": null,
+  "natural_scenes": ["house_single_floor", "house_double_floor_lower", "restaurant_diner", "hotel_suite_large", "office_cubicles_right"],
+  "category_verdict": "weak",
+  "category_note": "Commercial mop bucket with wringer, 0.59 m long footprint (borderline), 0.43 m tall; natural in office corridors, diner kitchen, hotel housekeeping and a garage, odd in a flat; single model only."
+}

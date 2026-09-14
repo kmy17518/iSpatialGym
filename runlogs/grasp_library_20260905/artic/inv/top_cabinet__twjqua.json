@@ -1,0 +1,94 @@
+{
+ "category": "top_cabinet",
+ "model": "twjqua",
+ "key": "top_cabinet__twjqua",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.2019258439540863
+ ],
+ "aabb_extent": [
+  0.25325194001197815,
+  0.5651425719261169,
+  0.4059324860572815
+ ],
+ "aabb_min_rel_root": [
+  -0.08801151812076569,
+  -0.2746681272983551,
+  -0.2019258439540863
+ ],
+ "aabb_max_rel_root": [
+  0.16524042189121246,
+  0.29047444462776184,
+  0.2040066421031952
+ ],
+ "link_tags": {
+  "base_link": [],
+  "link_0": [
+   "openable"
+  ]
+ },
+ "openable_joint_ids": [
+  [
+   1,
+   "j_link_0"
+  ]
+ ],
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "type": "PrismaticJoint",
+   "child_link": "link_0",
+   "lower": 0.0,
+   "upper": 0.19943749904632568,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.12982,
+    0.11458,
+    -0.00193
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "travel_per_unit": 1.0000000894069672,
+   "pieces_obj": "/tmp/glib/artic/inv/top_cabinet__twjqua__link_0.obj",
+   "n_pieces": 4,
+   "link_bbox_min": [
+    0.1184,
+    -0.0673,
+    -0.2001
+   ],
+   "link_bbox_max": [
+    0.1652,
+    0.2896,
+    0.1988
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.088,
+   -0.2747,
+   -0.2019
+  ],
+  "bbox_max": [
+   0.1246,
+   0.2905,
+   0.204
+  ],
+  "n_pieces": 8
+ }
+}

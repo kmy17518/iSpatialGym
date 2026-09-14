@@ -1,0 +1,54 @@
+{
+ "key": "bottom_cabinet_no_top__ufhpbn",
+ "category": "bottom_cabinet_no_top",
+ "model": "ufhpbn",
+ "scene": "house_double_floor_upper",
+ "host": "bottom_cabinet_no_top_ncgmqr_0",
+ "host_rank": 0,
+ "host_model": "ncgmqr",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "drawer",
+   "grasp_source": "review:A",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.15,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [3.838745355606079, -4.1817402839660645, 0.6717280745506287]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [3.838745355606079, -4.1817402839660645, 0.6717280745506287]})",
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [3.838745355606079, -4.1817402839660645, 0.6717280745506287]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [3.838745355606079, -4.1817402839660645, 0.6717280745506287]})",
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [3.838745355606079, -4.1817402839660645, 0.6717280745506287]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [3.838745355606079, -4.1817402839660645, 0.6717280745506287]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    3.839,
+    -4.182,
+    0.672
+   ],
+   "handle_height_above_floor": 0.666,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 0,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 2
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  0.701,
+  1.961,
+  0.761
+ ],
+ "time_s": 85.7
+}

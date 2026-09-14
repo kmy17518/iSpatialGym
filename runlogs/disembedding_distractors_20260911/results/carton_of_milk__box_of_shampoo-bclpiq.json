@@ -1,0 +1,144 @@
+{
+ "target_category": "carton_of_milk",
+ "target_model": "kszoro",
+ "target_key": "carton_of_milk__kszoro",
+ "category": "box_of_shampoo",
+ "model": "bclpiq",
+ "kind": "diff",
+ "tier": 2,
+ "started": "2026-09-12 18:58:55",
+ "template": {
+  "support": {
+   "name": "breakfast_table_rhjoby_0",
+   "z": 0.8126286268234253,
+   "yaw": 1.5682487487792969,
+   "local_bounds": [
+    2.935926675796509,
+    4.096126556396484,
+    -8.733063697814941,
+    -5.830271244049072
+   ],
+   "n_free_cells": 8463,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-v",
+   "edge_mid": [
+    8.741992950439453,
+    3.493767261505127
+   ],
+   "inward": [
+    -0.9999967813491821,
+    0.0025475751608610153
+   ],
+   "tangent": [
+    -0.0025475751608610153,
+    -0.9999967813491821
+   ],
+   "base_pose2d": [
+    9.191150665283203,
+    3.162522077560425,
+    3.139045075740555
+   ],
+   "edge_depth": 0.450000137090683,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.4000000059604645,
+    "axis_angle": 0.17422455164657594
+   }
+  },
+  "place_stance": {
+   "edge": "-v",
+   "edge_mid": [
+    8.741992950439453,
+    3.493767261505127
+   ],
+   "inward": [
+    -0.9999967813491821,
+    0.0025475751608610153
+   ],
+   "tangent": [
+    -0.0025475751608610153,
+    -0.9999967813491821
+   ],
+   "base_pose2d": [
+    9.191984176635742,
+    3.489550828933716,
+    3.139045075740555
+   ],
+   "edge_depth": 0.45000049471855164
+  },
+  "view_arms": "untucked",
+  "yaw_adjust_deg": 0.0,
+  "dest_lateral_m": -0.6540594224329879,
+  "dest_side": "right",
+  "source_lateral_offset": 0.35,
+  "n_reachable_cells": 10,
+  "n_grasp_cells": 6,
+  "n_place_combos": 31,
+  "distractors": {
+   "same_category": true,
+   "pool": "same_category",
+   "requested_pool": "same_category",
+   "fallback": null,
+   "models": [
+    "carton_of_milk-atyqub"
+   ],
+   "requested": 1,
+   "pool_size": 1,
+   "pool_categories": [
+    "carton_of_milk"
+   ],
+   "lookalikes_excluded": [],
+   "footprint_fraction": 0.21
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 181.72,
+   "prepare_template_s": 0.14
+  },
+  "setup_s": 181.9
+ },
+ "footprint_fraction_with_target": 0.174,
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {},
+ "instances": [
+  {
+   "summary": "/tmp/isg_dis_distractors/carton_of_milk-kszoro__box_of_shampoo-bclpiq/instances/disembedding-0__carton_of_milk-kszoro__box_of_shampoo-bclpiq__0000.summary.json",
+   "wall_time_s": 4.9,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    9.191150665283203,
+    3.162522077560425,
+    3.139045075740555
+   ],
+   "trunk": [
+    0.749999987042469,
+    -0.40000003576278687
+   ],
+   "occluded_variant": false,
+   "grasp": {
+    "key": "carton_of_milk__kszoro",
+    "name": "grasp_3",
+    "translate": 0.5,
+    "place_translate": 0.5,
+    "yaw": 1.6979675858316015
+   },
+   "dest_pixels": 15379,
+   "source_pixels": 88411,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.4000000059604645
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_dis_distractors/carton_of_milk-kszoro__box_of_shampoo-bclpiq",
+ "job_s": 6.3,
+ "finished": "2026-09-12 18:59:01",
+ "occluded_variant": false,
+ "occlusion_ratio": null
+}

@@ -1,0 +1,331 @@
+{
+ "scene": "restaurant_diner",
+ "table": "pedestal_table_nlfgwe_0",
+ "category": "pedestal_table",
+ "model": "nlfgwe",
+ "rooms": [
+  "dining_room_0"
+ ],
+ "partner": null,
+ "problem": "world_alignment-0",
+ "inventory": {
+  "top_z": 0.77,
+  "bbox_x": 1.074,
+  "bbox_y": 1.074,
+  "bbox_z": 0.766,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "straight_chair_nntxvr_0",
+  "straight_chair_nntxvr_1",
+  "straight_chair_nntxvr_2"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:14:04",
+ "precheck": {
+  "aabb": [
+   [
+    -3.901,
+    1.581,
+    -0.001
+   ],
+   [
+    -2.816,
+    2.666,
+    0.775
+   ]
+  ],
+  "support": {
+   "name": "pedestal_table_nlfgwe_0",
+   "z": 0.7752547264099121,
+   "yaw": 6.853292688902002e-08,
+   "local_bounds": [
+    -3.890580654144287,
+    -2.830580711364746,
+    1.5905704498291016,
+    2.6505703926086426
+   ],
+   "n_free_cells": 2222,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -2.831,
+     2.121
+    ],
+    "length": 1.06
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -3.891,
+     2.121
+    ],
+    "length": 1.06
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -3.361,
+     2.651
+    ],
+    "length": 1.06
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -3.361,
+     1.591
+    ],
+    "length": 1.06
+   }
+  ],
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    -2.830580949783325,
+    2.120570182800293
+   ],
+   "inward": [
+    -1.0,
+    -6.853292688902002e-08
+   ],
+   "tangent": [
+    6.853292688902002e-08,
+    -1.0
+   ],
+   "base_pose2d": [
+    -2.3805809020996094,
+    2.120570182800293,
+    -3.1415925850568662
+   ],
+   "edge_depth": 0.4500000476837158,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.6499999761581421,
+    "axis_angle": 0.01481848607472173
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 3.0
+ },
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {
+  "grasp_unreachable": 1
+ },
+ "template_meta": {
+  "support": {
+   "name": "pedestal_table_nlfgwe_0",
+   "z": 0.7752311825752258,
+   "yaw": -9.5367431640625e-07,
+   "local_bounds": [
+    -3.8911890983581543,
+    -2.831188917160034,
+    1.5911799669265747,
+    2.6511800289154053
+   ],
+   "n_free_cells": 2222,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    -3.3611862659454346,
+    2.6511831283569336
+   ],
+   "inward": [
+    -9.5367431640625e-07,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    -9.5367431640625e-07
+   ],
+   "base_pose2d": [
+    -3.3611857891082764,
+    3.1011831760406494,
+    -1.570797280469213
+   ],
+   "edge_depth": 0.4500000476837158,
+   "view": {
+    "translate": 0.25,
+    "tilt": -0.699999988079071,
+    "axis_angle": 0.0006905339797221658
+   }
+  },
+  "view_arms": "untucked",
+  "n_cells": 13,
+  "n_reachable_strip_cells": 16,
+  "load_room_instances": [
+   "dining_room_0",
+   "bar_0",
+   "corridor_0",
+   "kitchen_0"
+  ],
+  "task_rooms": [
+   "dining_room_0"
+  ],
+  "rejections": {
+   "grasp_unreachable": 1
+  },
+  "n_written": 1,
+  "scene_variant": {
+   "scene_file": "../../scene_variants/restaurant_diner__67e0452371.json",
+   "removed_objects": [
+    "straight_chair_nntxvr_0",
+    "straight_chair_nntxvr_1",
+    "straight_chair_nntxvr_2"
+   ],
+   "freed_footprints": {
+    "free": [
+     [
+      [
+       -3.350187301635742,
+       1.8445541858673096
+      ],
+      [
+       -3.1451821327209473,
+       1.4046804904937744
+      ],
+      [
+       -3.6934609413146973,
+       1.1491527557373047
+      ],
+      [
+       -3.898466110229492,
+       1.5890264511108398
+      ]
+     ],
+     [
+      [
+       -3.184587240219116,
+       2.925015449523926
+      ],
+      [
+       -3.5277795791625977,
+       2.5818898677825928
+      ],
+      [
+       -3.9554669857025146,
+       3.009660243988037
+      ],
+      [
+       -3.612274646759033,
+       3.35278582572937
+      ]
+     ],
+     [
+      [
+       -2.678246259689331,
+       2.352806329727173
+      ],
+      [
+       -3.0758423805236816,
+       2.6310746669769287
+      ],
+      [
+       -2.7289960384368896,
+       3.1266567707061768
+      ],
+      [
+       -2.331399917602539,
+       2.848388433456421
+      ]
+     ]
+    ],
+    "block": [
+     [
+      [
+       -2.8211820125579834,
+       2.6601898670196533
+      ],
+      [
+       -2.8211820125579834,
+       1.5863897800445557
+      ],
+      [
+       -3.894982099533081,
+       1.5863897800445557
+      ],
+      [
+       -3.894982099533081,
+       2.6601898670196533
+      ]
+     ],
+     [
+      [
+       -0.9516016244888306,
+       1.351168155670166
+      ],
+      [
+       -0.9516016244888306,
+       -4.412731647491455
+      ],
+      [
+       -3.2284016609191895,
+       -4.412731647491455
+      ],
+      [
+       -3.2284016609191895,
+       1.351168155670166
+      ]
+     ]
+    ]
+   }
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 31.92,
+   "prepare_template_s": 0.76,
+   "save_template_s": 0.06
+  }
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_table_sel/restaurant_diner/restaurant_diner__pedestal_table_nlfgwe_0__world_alignment-0/instances/world_alignment-0__restaurant_diner__pedestal_table_nlfgwe_0__world_alignment-0__0000.summary.json",
+   "wall_time_s": 5.6,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    -3.3611857891082764,
+    3.1011831760406494,
+    -1.570797280469213
+   ],
+   "trunk": [
+    0.2499999611274068,
+    -0.7000000476837158
+   ],
+   "view": {
+    "translate": 0.25,
+    "tilt": -0.699999988079071
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_table_sel/restaurant_diner/restaurant_diner__pedestal_table_nlfgwe_0__world_alignment-0",
+ "bound_table": "pedestal_table_nlfgwe_0",
+ "setup_s": 32.7,
+ "run_s": 9.3,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "ok",
+   "n_written": 1,
+   "rejections": {
+    "grasp_unreachable": 1
+   },
+   "reject_reason": null,
+   "setup_s": 32.7,
+   "run_s": 9.3
+  }
+ ],
+ "job_s": 43.3,
+ "finished": "2026-09-12 01:14:47"
+}

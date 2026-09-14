@@ -1,0 +1,27 @@
+{
+  "group": "object_scaling__bottle_of_sake__r3",
+  "task": "object_scaling",
+  "category": "bottle_of_sake",
+  "round": 3,
+  "relation": null,
+  "n_candidates": 4,
+  "n_opened": 4,
+  "candidates": [
+    {"model": "swlykk", "key": "bottle_of_sake__swlykk__f", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Dark green sake bottle, crisp calligraphy label and tan neck wrap; five clean 50-59 mm holds at body centre, shoulder and base, body fills pads."},
+    {"model": "utwglw", "key": "bottle_of_sake__utwglw__f", "G": 3, "T": 3, "V": 5, "R": 2, "score": 21,
+     "note": "Large green sake bottle with white label, realistic glass; all five rows pinch the neck/shoulder 89-98 mm from CoM, only row 4 tilts differently."},
+    {"model": "vfxfuj", "key": "bottle_of_sake__vfxfuj__f", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Dark wine-style bottle with gold label and cork, reads more like wine than sake; five identical snug 38 mm neck pinches, body far from pads."},
+    {"model": "pwtebq", "key": "bottle_of_sake__pwtebq__f", "G": 3, "T": 3, "V": 3, "R": 2, "score": 17,
+     "note": "Chrome-like reflective conical bottle 99 mm wide, odd shape for sake; five identical tapered-neck pinches with the wide body wedged, antipodal 0.86-0.95."}
+  ],
+  "selected": [
+    {"model": "swlykk", "key": "bottle_of_sake__swlykk__f", "rank": 1, "reason": "Maximum score: five clean two-pad holds at three distinct contact regions on a sharply textured, immediately recognisable sake bottle."},
+    {"model": "vfxfuj", "key": "bottle_of_sake__vfxfuj__f", "rank": 2, "reason": "Within 2 points of utwglw, which duplicates the pick's look; the dark wine-style cork bottle spans the category's appearance. Clean snug neck pinches."}
+  ],
+  "alternate": {"model": "utwglw", "key": "bottle_of_sake__utwglw__f"},
+  "short": false,
+  "warnings": ["utwglw, vfxfuj and pwtebq are held only by the neck in one repeated pose; vfxfuj's identity as sake is weaker (wine-style bottle)."],
+  "confidence": "medium"
+}

@@ -1,0 +1,35 @@
+{
+ "category": "case_of_eyeshadow",
+ "model": "zgervc",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/case_of_eyeshadow__zgervc__y0.png",
+   "drift_m": 0.0002,
+   "tilt_deg": 1.8,
+   "on_tray": true,
+   "settled_z": 0.004,
+   "seg_pixels": 3037,
+   "aabb_extent": [
+    0.065,
+    0.081,
+    0.012
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/case_of_eyeshadow__zgervc__y1.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 1.8,
+   "on_tray": true,
+   "settled_z": 0.0039
+  }
+ },
+ "stable": true,
+ "visible": true
+}

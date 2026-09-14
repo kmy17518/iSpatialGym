@@ -1,0 +1,17 @@
+{
+ "group": "configuration_matching__bow__r3",
+ "task": "configuration_matching",
+ "category": "bow",
+ "round": 3,
+ "relation": null,
+ "n_candidates": 0,
+ "n_opened": 0,
+ "candidates": [],
+ "selected": [],
+ "alternate": null,
+ "short": true,
+ "warnings": [
+  "no model with an AG-valid grasp: fhchql: no AG-valid grasp"
+ ],
+ "confidence": "high"
+}

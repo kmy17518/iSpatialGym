@@ -1,0 +1,16 @@
+{
+ "key": "top_cabinet__tactqn",
+ "category": "top_cabinet",
+ "model": "tactqn",
+ "scene": "Rs_int",
+ "host": "top_cabinet_lsyzkh_3",
+ "host_rank": 2,
+ "host_model": "lsyzkh",
+ "swap": true,
+ "joints": [],
+ "error": "AttributeError(\"'NoneType' object has no attribute 'scene'\")",
+ "previous_hosts": [
+  "top_cabinet_lsyzkh_2",
+  "top_cabinet_fqhdne_0"
+ ]
+}

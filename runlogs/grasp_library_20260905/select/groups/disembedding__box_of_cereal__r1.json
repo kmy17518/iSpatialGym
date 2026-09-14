@@ -1,0 +1,746 @@
+{
+ "group": "disembedding__box_of_cereal__r1",
+ "task": "disembedding",
+ "category": "box_of_cereal",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "Tabletop task: the object rests among other objects on a table / tray and is picked from its resting pose. It must settle stably on a flat surface (it must not roll or topple). The best single grasp matters most.",
+ "candidates": [
+  {
+   "model": "yorray",
+   "key": "box_of_cereal__yorray",
+   "strip": "/tmp/glib/strips/box_of_cereal__yorray.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "all candidates close 50/0; every top-edge pinch is one-sided",
+   "bbox_mm": [
+    50,
+    95,
+    200
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "sgirte",
+   "key": "box_of_cereal__sgirte",
+   "strip": "/tmp/glib/strips/box_of_cereal__sgirte.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/1: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open-limit finger, other pad at centre"
+    }
+   ],
+   "object_note": "50 mm muesli box, top pinch hangs fine; one finger stuck at open limit every row",
+   "bbox_mm": [
+    50,
+    95,
+    200
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "pfwgkm",
+   "key": "box_of_cereal__pfwgkm",
+   "strip": "/tmp/glib/strips/box_of_cereal__pfwgkm.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "deep pinch near CoM on 35 mm box, 37/0 asymmetric but closed"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "deep pinch near CoM on 35 mm box, 37/0 asymmetric but closed"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch on 35 mm box, 37/0 asymmetric but closed"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch on 35 mm box, 37/0 asymmetric but closed"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on 35 mm box, 37/0 asymmetric but closed"
+    }
+   ],
+   "object_note": "small 35 mm bar box; both fingers moved, pads flat on both faces",
+   "bbox_mm": [
+    35,
+    100,
+    115
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "qirvmd",
+   "key": "box_of_cereal__qirvmd",
+   "strip": "/tmp/glib/strips/box_of_cereal__qirvmd.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    }
+   ],
+   "object_note": "thin 45 mm box hangs from top pinch; V2 shows box against one finger, other finger at centreline",
+   "bbox_mm": [
+    45,
+    150,
+    220
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "hosfhj",
+   "key": "box_of_cereal__hosfhj",
+   "strip": "/tmp/glib/strips/box_of_cereal__hosfhj.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "47/0: box hugs near-open-limit finger, other pad at centre; 23 mm off-centre"
+    }
+   ],
+   "object_note": "thin 45 mm box hangs from top pinch; box sits entirely in one half of gripper every row",
+   "bbox_mm": [
+    45,
+    150,
+    220
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "wdkcbu",
+   "key": "box_of_cereal__wdkcbu",
+   "strip": "/tmp/glib/strips/box_of_cereal__wdkcbu.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "all candidates close 50/0; every pinch is one-sided on the top edge",
+   "bbox_mm": [
+    50,
+    95,
+    200
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ykuyqb",
+   "key": "box_of_cereal__ykuyqb",
+   "strip": "/tmp/glib/strips/box_of_cereal__ykuyqb.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/0: box pushed against open finger, fully off-centre"
+    }
+   ],
+   "object_note": "all candidates close 50/0; every top-edge pinch is one-sided",
+   "bbox_mm": [
+    50,
+    95,
+    200
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "iucshm",
+   "key": "box_of_cereal__iucshm",
+   "strip": "/tmp/glib/strips/box_of_cereal__iucshm.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 1,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across 53 mm box, 38/17 both fingers closed on box"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/3: box pushed against open-limit finger, other pad at centre"
+    }
+   ],
+   "object_note": "tall 53 mm cereal box hangs from top pinch, CoM 113-126 mm below",
+   "bbox_mm": [
+    53,
+    196,
+    273
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "surzft",
+   "key": "box_of_cereal__surzft",
+   "strip": "/tmp/glib/strips/box_of_cereal__surzft.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 2,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across 53 mm box, 35/20 both fingers closed on box"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top pinch across 53 mm box, 41/15 asymmetric but closed"
+    }
+   ],
+   "object_note": "tall 53 mm cereal box hangs from top pinch, CoM 109-121 mm below",
+   "bbox_mm": [
+    53,
+    196,
+    273
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "hcwbzw",
+   "key": "box_of_cereal__hcwbzw",
+   "strip": "/tmp/glib/strips/box_of_cereal__hcwbzw.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/3: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open-limit finger, other pad at centre"
+    }
+   ],
+   "object_note": "tall 53 mm cereal box hangs from top pinch, CoM 110-121 mm below; one finger at open limit every row",
+   "bbox_mm": [
+    53,
+    196,
+    273
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "tiykku",
+   "key": "box_of_cereal__tiykku",
+   "strip": "/tmp/glib/strips/box_of_cereal__tiykku.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 2,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/4: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/3: box pushed against open finger, fully off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, both fingers closed 35/21"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "top-edge pinch, asymmetric but closed 41/14"
+    }
+   ],
+   "object_note": "tall box pinched at top edge; CoM hangs below pinch, no lever torque",
+   "bbox_mm": [
+    53,
+    196,
+    273
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ihedod",
+   "key": "box_of_cereal__ihedod",
+   "strip": "/tmp/glib/strips/box_of_cereal__ihedod.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 0,
+   "flags": [
+    "one_finger"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/12: 60 mm box pushed against open-limit finger, 18 mm off-centre"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/12: box pushed against open-limit finger, 18 mm off-centre"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/12: box pushed against open-limit finger, 18 mm off-centre"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/11: box pushed against open-limit finger, 19 mm off-centre"
+    },
+    {
+     "rank": 5,
+     "verdict": "flag",
+     "flags": [
+      "one_finger"
+     ],
+     "note": "50/12: box pushed against open-limit finger, 18 mm off-centre"
+    }
+   ],
+   "object_note": "60 mm granola box, top pinch hangs fine; one finger stuck at open limit every row",
+   "bbox_mm": [
+    60,
+    105,
+    190
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

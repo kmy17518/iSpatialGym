@@ -1,0 +1,25 @@
+{
+  "group": "mental_rotation__cellulose_tape_dispenser__r1",
+  "task": "mental_rotation",
+  "category": "cellulose_tape_dispenser",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 3,
+  "n_opened": 3,
+  "candidates": [
+    {"model": "budhaz", "key": "cellulose_tape_dispenser__budhaz", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Yellow-green desk dispenser with grey roll; five body pinches across the 50 mm flat sides (all 50/0 off-centre closures), tilts 31-176 deg, rows 1-2 near-duplicates."},
+    {"model": "fetnry", "key": "cellulose_tape_dispenser__fetnry", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Mustard-yellow dispenser, same mesh as budhaz; five clean flat-side body pinches (50/1 closures) at tilts 30-176 deg with distinct contact spots, CoM 1-12 mm."},
+    {"model": "yyekns", "key": "cellulose_tape_dispenser__yyekns", "G": 5, "T": 3, "V": 3, "R": 2, "score": 21,
+     "note": "Light-grey variant of the same mesh; five clean 50/1 body pinches, three distinct poses (rows 1-2 near-duplicates). Flat grey body reads close to untextured."}
+  ],
+  "selected": [
+    {"model": "fetnry", "key": "cellulose_tape_dispenser__fetnry", "rank": 1, "reason": "Tied top score; five clean body pinches with the widest spread of in-hand poses (tilts 30-176 deg, none duplicated) and the most typical yellow dispenser look."},
+    {"model": "budhaz", "key": "cellulose_tape_dispenser__budhaz", "rank": 2, "reason": "Tied score and a different colour (yellow-green) so the pair spans appearance; four distinct clean poses including a roll-side pinch, CoM 2-13 mm."}
+  ],
+  "alternate": {"model": "yyekns", "key": "cellulose_tape_dispenser__yyekns"},
+  "short": false,
+  "warnings": ["All three candidates share one mesh (bbox 112x50x68 mm); the pair differs only by colour.", "Every row is an off-centre 50/0-1 closure: the 50 mm body fills the gap and both pads sit on the flat sides (assisted-grasp artefact, not a one-finger hold)."],
+  "confidence": "high"
+}

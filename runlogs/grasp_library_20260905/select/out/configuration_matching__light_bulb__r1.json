@@ -1,0 +1,58 @@
+{
+ "group": "configuration_matching__light_bulb__r1",
+ "task": "configuration_matching",
+ "category": "light_bulb",
+ "round": 1,
+ "relation": null,
+ "n_candidates": 3,
+ "n_opened": 3,
+ "candidates": [
+  {
+   "model": "sxkjea",
+   "key": "light_bulb__sxkjea",
+   "G": 5,
+   "T": 3,
+   "V": 4,
+   "R": 2,
+   "score": 23,
+   "note": "Clear glass bulb with filament and black screw base; all five rows pinch the 60 mm globe (50/12), base free. Glass refraction renders slightly cluttered."
+  },
+  {
+   "model": "kfmkwd",
+   "key": "light_bulb__kfmkwd",
+   "G": 5,
+   "T": 3,
+   "V": 5,
+   "R": 2,
+   "score": 25,
+   "note": "White frosted A-bulb, clean smooth geometry, threaded base modelled; five clean globe pinches (67-70 mm), three fully two-sided, base always free."
+  },
+  {
+   "model": "ymomhw",
+   "key": "light_bulb__ymomhw",
+   "G": 4,
+   "T": 2,
+   "V": 2,
+   "R": 1,
+   "score": 15,
+   "note": "Oversized 210 mm glossy bulb pinched at 83-86 mm near gripper limit, CoM 37-50 mm off; visible low-poly facets, one V4 frame nearly black."
+  }
+ ],
+ "selected": [
+  {
+   "model": "kfmkwd",
+   "key": "light_bulb__kfmkwd",
+   "rank": 1,
+   "reason": "Highest score: five clean globe pinches at 67-70 mm, symmetric closures, screw base uncovered in every row, clean representative frosted-bulb asset.",
+   "partners": [
+    "table_lamp/ehjsdz [type bulblamp]"
+   ]
+  }
+ ],
+ "alternate": null,
+ "short": true,
+ "warnings": [
+  "re-selected after attachment-link check: ['sxkjea'] have no attachment meta-link and can never attach"
+ ],
+ "confidence": "high"
+}

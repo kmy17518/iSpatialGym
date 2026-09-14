@@ -1,0 +1,443 @@
+{
+ "reviewer": "rev_07",
+ "task": "obst",
+ "categories": [
+  "balloon",
+  "briefcase",
+  "carpet_sweeper",
+  "footstool",
+  "fuel_can",
+  "ottoman",
+  "plant_pot_stand",
+  "poinsettia",
+  "serving_cart",
+  "shoulder_bag",
+  "space_heater",
+  "taboret",
+  "water_dispenser"
+ ],
+ "grids": [
+  "renders/grids/balloon_00.png",
+  "renders/grids/briefcase_00.png",
+  "renders/grids/briefcase_01.png",
+  "renders/grids/carpet_sweeper_00.png",
+  "renders/grids/footstool_00.png",
+  "renders/grids/fuel_can_00.png",
+  "renders/grids/ottoman_00.png",
+  "renders/grids/ottoman_01.png",
+  "renders/grids/plant_pot_stand_00.png",
+  "renders/grids/poinsettia_00.png",
+  "renders/grids/serving_cart_00.png",
+  "renders/grids/shoulder_bag_00.png",
+  "renders/grids/space_heater_00.png",
+  "renders/grids/taboret_00.png",
+  "renders/grids/water_dispenser_00.png"
+ ],
+ "hints": {
+  "briefcase": {
+   "why": "0.28 x 0.33 x 0.10 m briefcases lying flat (7 ready; low)",
+   "natural_scenes": [
+    "office_cubicles_right",
+    "hotel_suite_large",
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "n_models": 7,
+   "bbox_m": {
+    "fdpjtj": [
+     0.309,
+     0.4,
+     0.061
+    ],
+    "haecvf": [
+     0.282,
+     0.422,
+     0.116
+    ],
+    "lwbctq": [
+     0.269,
+     0.33,
+     0.12
+    ],
+    "ohelib": [
+     0.33,
+     0.398,
+     0.077
+    ],
+    "psvdau": [
+     0.284,
+     0.332,
+     0.097
+    ],
+    "rxvbea": [
+     0.33,
+     0.329,
+     0.106
+    ],
+    "uquevd": [
+     0.23,
+     0.266,
+     0.08
+    ]
+   }
+  },
+  "ottoman": {
+   "why": "ottomans ~0.57 x 0.66 x 0.33 m (7 ready); already stands in 4 of the 7 scenes",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+   ],
+   "in_scene": {
+    "house_single_floor": [
+     "entryway",
+     "garden"
+    ],
+    "house_double_floor_upper": [
+     "bedroom"
+    ],
+    "Rs_int": [
+     "living_room"
+    ],
+    "hotel_suite_large": [
+     "bedroom"
+    ]
+   },
+   "n_models": 7,
+   "bbox_m": {
+    "lsaxch": [
+     0.821,
+     0.75,
+     0.297
+    ],
+    "miftfy": [
+     0.402,
+     0.406,
+     0.32
+    ],
+    "mjmkdw": [
+     0.941,
+     0.976,
+     0.446
+    ],
+    "qsnawv": [
+     0.452,
+     0.453,
+     0.438
+    ],
+    "xcmniq": [
+     0.463,
+     0.664,
+     0.421
+    ],
+    "xcuyiw": [
+     0.567,
+     1.323,
+     0.334
+    ],
+    "ycfbsd": [
+     0.597,
+     0.595,
+     0.327
+    ]
+   }
+  },
+  "taboret": {
+   "why": "stools ~0.37 x 0.36 x 0.58 m (6 ready); already stands in 3 of the 7 scenes",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right"
+   ],
+   "in_scene": {
+    "house_single_floor": [
+     "kitchen"
+    ],
+    "house_double_floor_upper": [
+     "bedroom"
+    ],
+    "restaurant_diner": [
+     "dining_room"
+    ]
+   },
+   "n_models": 6,
+   "bbox_m": {
+    "bciekv": [
+     0.341,
+     0.341,
+     0.427
+    ],
+    "ehaclu": [
+     0.541,
+     0.505,
+     0.794
+    ],
+    "hugvml": [
+     0.401,
+     0.382,
+     0.579
+    ],
+    "vzzmir": [
+     0.344,
+     0.346,
+     0.549
+    ],
+    "wjrpwg": [
+     0.398,
+     0.381,
+     0.577
+    ],
+    "ysrhuw": [
+     0.348,
+     0.348,
+     0.737
+    ]
+   }
+  },
+  "serving_cart": {
+   "why": "serving carts ~0.48 x 0.75 x 0.85 m; already stands in 3 of the 7 scenes",
+   "natural_scenes": [
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right",
+    "house_double_floor_upper"
+   ],
+   "in_scene": {
+    "house_double_floor_upper": [
+     "bathroom"
+    ],
+    "restaurant_diner": [
+     "kitchen"
+    ],
+    "office_cubicles_right": [
+     "meeting_room"
+    ]
+   },
+   "n_models": 4,
+   "bbox_m": {
+    "heqtlk": [
+     0.39,
+     0.438,
+     0.849
+    ],
+    "lwgmcc": [
+     0.567,
+     0.985,
+     0.855
+    ],
+    "vvtcby": [
+     0.375,
+     0.519,
+     0.643
+    ],
+    "yaabya": [
+     0.657,
+     1.151,
+     1.175
+    ]
+   }
+  },
+  "poinsettia": {
+   "why": "potted poinsettias ~0.27 m: living room, lobby, dining room",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "n_models": 3,
+   "bbox_m": {
+    "eefcsd": [
+     0.274,
+     0.281,
+     0.247
+    ],
+    "peeehg": [
+     0.343,
+     0.327,
+     0.26
+    ],
+    "qdcipo": [
+     0.211,
+     0.208,
+     0.284
+    ]
+   }
+  },
+  "footstool": {
+   "why": "footstools ~0.41 x 0.36 x 0.35 m: living room, bedroom, hotel",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+   ],
+   "in_scene": {},
+   "n_models": 2,
+   "bbox_m": {
+    "mysfnz": [
+     0.408,
+     0.406,
+     0.358
+    ],
+    "sghekm": [
+     0.412,
+     0.315,
+     0.337
+    ]
+   }
+  },
+  "shoulder_bag": {
+   "why": "shoulder bags ~0.10 x 0.23 x 0.28 m (2 ready of 11)",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "n_models": 2,
+   "bbox_m": {
+    "mcualj": [
+     0.059,
+     0.15,
+     0.146
+    ],
+    "pxvcyu": [
+     0.132,
+     0.32,
+     0.421
+    ]
+   }
+  },
+  "balloon": {
+   "why": "0.41 x 0.33 x 0.33 m balloon (weighted? check pose): child's room, dining room",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "ixhbmk": [
+     0.409,
+     0.328,
+     0.328
+    ]
+   }
+  },
+  "carpet_sweeper": {
+   "why": "0.25 x 0.28 x 0.83 m carpet sweeper: house, hotel, diner",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "xboreo": [
+     0.251,
+     0.284,
+     0.826
+    ]
+   }
+  },
+  "fuel_can": {
+   "why": "0.23 x 0.11 x 0.31 m jerrycan: garage",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "bfaqfe": [
+     0.23,
+     0.107,
+     0.309
+    ]
+   }
+  },
+  "plant_pot_stand": {
+   "why": "0.26 x 0.56 x 0.83 m tiered stand with pots: living room, corridor",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "dylpyb": [
+     0.262,
+     0.563,
+     0.828
+    ]
+   }
+  },
+  "space_heater": {
+   "why": "0.26 x 0.28 x 0.39 m space heater: bedroom, office, living room",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "office_cubicles_right",
+    "hotel_suite_large"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "kxzqpr": [
+     0.257,
+     0.279,
+     0.39
+    ]
+   }
+  },
+  "water_dispenser": {
+   "why": "0.26 x 0.25 x 0.60 m water dispenser: office, diner",
+   "natural_scenes": [
+    "office_cubicles_right",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "n_models": 1,
+   "bbox_m": {
+    "rwmotb": [
+     0.264,
+     0.252,
+     0.603
+    ]
+   }
+  }
+ },
+ "n_models": 37
+}

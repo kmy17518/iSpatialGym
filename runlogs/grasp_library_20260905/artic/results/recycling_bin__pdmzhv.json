@@ -1,0 +1,28 @@
+{
+ "key": "recycling_bin__pdmzhv",
+ "category": "recycling_bin",
+ "model": "pdmzhv",
+ "aabb_extent": [
+  0.5812500715255737,
+  0.44169145822525024,
+  0.8232007622718811
+ ],
+ "support": "floor",
+ "joints": [
+  {
+   "joint": "j_link_2",
+   "kind": "flap",
+   "grasp_source": "manual skip: round-2 review: infeasible - Front lip flush with body face; only relief is the raised lid border with a shal",
+   "stance": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "time_s": 1.8
+}

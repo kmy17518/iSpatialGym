@@ -1,0 +1,53 @@
+{
+ "category": "bar_soap",
+ "model": "ofargb",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0,
+  180.0,
+  270.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bar_soap__ofargb__y0.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.016,
+   "seg_pixels": 6616,
+   "aabb_extent": [
+    0.109,
+    0.086,
+    0.032
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bar_soap__ofargb__y1.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0161
+  },
+  "y2": {
+   "yaw_deg": 180.0,
+   "png": "renders/bar_soap__ofargb__y2.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.016
+  },
+  "y3": {
+   "yaw_deg": 270.0,
+   "png": "renders/bar_soap__ofargb__y3.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0161
+  }
+ },
+ "stable": true,
+ "visible": true
+}

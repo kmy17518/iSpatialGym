@@ -1,0 +1,134 @@
+[
+ {
+  "category": "antlers",
+  "task": "wa1",
+  "n_models": 2,
+  "grids": [
+   "renders/grids/antlers_00.png"
+  ]
+ },
+ {
+  "category": "caliper",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/caliper_00.png"
+  ]
+ },
+ {
+  "category": "decorative_sign",
+  "task": "wa1",
+  "n_models": 3,
+  "grids": [
+   "renders/grids/decorative_sign_00.png"
+  ]
+ },
+ {
+  "category": "electric_hand_mixer",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/electric_hand_mixer_00.png"
+  ]
+ },
+ {
+  "category": "folderal",
+  "task": "wa0",
+  "n_models": 2,
+  "grids": [
+   "renders/grids/folderal_00.png"
+  ]
+ },
+ {
+  "category": "hairbrush",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/hairbrush_00.png"
+  ]
+ },
+ {
+  "category": "paper_towel_dispenser",
+  "task": "wa1",
+  "n_models": 5,
+  "grids": [
+   "renders/grids/paper_towel_dispenser_00.png",
+   "renders/grids/paper_towel_dispenser_01.png"
+  ]
+ },
+ {
+  "category": "paperback_book",
+  "task": "wa0",
+  "n_models": 16,
+  "grids": [
+   "renders/grids/paperback_book_00.png",
+   "renders/grids/paperback_book_01.png",
+   "renders/grids/paperback_book_02.png",
+   "renders/grids/paperback_book_03.png",
+   "renders/grids/paperback_book_04.png",
+   "renders/grids/paperback_book_05.png"
+  ]
+ },
+ {
+  "category": "picture_frame",
+  "task": "wa1",
+  "n_models": 10,
+  "grids": [
+   "renders/grids/picture_frame_00.png",
+   "renders/grids/picture_frame_01.png",
+   "renders/grids/picture_frame_02.png",
+   "renders/grids/picture_frame_03.png"
+  ]
+ },
+ {
+  "category": "pizza_box",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/pizza_box_00.png"
+  ]
+ },
+ {
+  "category": "platter",
+  "task": "wa0",
+  "n_models": 6,
+  "grids": [
+   "renders/grids/platter_00.png",
+   "renders/grids/platter_01.png"
+  ]
+ },
+ {
+  "category": "scanner",
+  "task": "wa0",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/scanner_00.png"
+  ]
+ },
+ {
+  "category": "signpost",
+  "task": "wa1",
+  "n_models": 7,
+  "grids": [
+   "renders/grids/signpost_00.png",
+   "renders/grids/signpost_01.png",
+   "renders/grids/signpost_02.png"
+  ]
+ },
+ {
+  "category": "skimmer",
+  "task": "wa0",
+  "n_models": 2,
+  "grids": [
+   "renders/grids/skimmer_00.png"
+  ]
+ },
+ {
+  "category": "valentine_wreath",
+  "task": "wa1",
+  "n_models": 1,
+  "grids": [
+   "renders/grids/valentine_wreath_00.png"
+  ]
+ }
+]

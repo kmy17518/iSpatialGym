@@ -1,0 +1,258 @@
+{
+ "category": "fridge",
+ "model": "lleghp",
+ "key": "fridge__lleghp",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  1.1673099994659424
+ ],
+ "aabb_extent": [
+  0.5825729370117188,
+  0.7069568634033203,
+  2.246551990509033
+ ],
+ "aabb_min_rel_root": [
+  -0.26733139157295227,
+  -0.35058411955833435,
+  -1.1673099994659424
+ ],
+ "aabb_max_rel_root": [
+  0.3152415156364441,
+  0.35637274384498596,
+  1.0792419910430908
+ ],
+ "link_tags": {
+  "base_link": [],
+  "door": [],
+  "glass": [
+   "glass"
+  ],
+  "shelf0": [],
+  "shelf1": [],
+  "shelf2": [],
+  "shelf3": []
+ },
+ "openable_joint_ids": [],
+ "joints": [
+  {
+   "joint": "j_door",
+   "type": "RevoluteJoint",
+   "child_link": "door",
+   "lower": 0.0,
+   "upper": 2.6179940700531006,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.26502,
+    0.34079,
+    0.05553
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "hinge_point_obj": [
+    0.26502,
+    0.34079,
+    0.05553
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/fridge__lleghp__door.obj",
+   "n_pieces": 4,
+   "link_bbox_min": [
+    0.2648,
+    -0.3432,
+    -0.7582
+   ],
+   "link_bbox_max": [
+    0.3152,
+    0.3436,
+    0.8718
+   ],
+   "link_tags": [],
+   "sub_links": []
+  },
+  {
+   "joint": "j_shelf0",
+   "type": "PrismaticJoint",
+   "child_link": "shelf0",
+   "lower": 0.0,
+   "upper": 0.27887988090515137,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.04465,
+    -0.00011,
+    0.43957
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "travel_per_unit": 0.9999999403953552,
+   "pieces_obj": "/tmp/glib/artic/inv/fridge__lleghp__shelf0.obj",
+   "n_pieces": 3,
+   "link_bbox_min": [
+    -0.1152,
+    -0.3016,
+    0.432
+   ],
+   "link_bbox_max": [
+    0.2045,
+    0.3014,
+    0.4635
+   ],
+   "link_tags": [],
+   "sub_links": []
+  },
+  {
+   "joint": "j_shelf1",
+   "type": "PrismaticJoint",
+   "child_link": "shelf1",
+   "lower": 0.0,
+   "upper": 0.27887994050979614,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.04466,
+    -0.00012,
+    -0.36809
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "travel_per_unit": 1.0000000894069672,
+   "pieces_obj": "/tmp/glib/artic/inv/fridge__lleghp__shelf1.obj",
+   "n_pieces": 3,
+   "link_bbox_min": [
+    -0.1152,
+    -0.3016,
+    -0.3756
+   ],
+   "link_bbox_max": [
+    0.2045,
+    0.3014,
+    -0.3442
+   ],
+   "link_tags": [],
+   "sub_links": []
+  },
+  {
+   "joint": "j_shelf2",
+   "type": "PrismaticJoint",
+   "child_link": "shelf2",
+   "lower": 0.0,
+   "upper": 0.27887994050979614,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.04466,
+    -0.00012,
+    -0.09878
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "travel_per_unit": 0.9999997913837433,
+   "pieces_obj": "/tmp/glib/artic/inv/fridge__lleghp__shelf2.obj",
+   "n_pieces": 3,
+   "link_bbox_min": [
+    -0.1152,
+    -0.3016,
+    -0.1063
+   ],
+   "link_bbox_max": [
+    0.2045,
+    0.3014,
+    -0.0749
+   ],
+   "link_tags": [],
+   "sub_links": []
+  },
+  {
+   "joint": "j_shelf3",
+   "type": "PrismaticJoint",
+   "child_link": "shelf3",
+   "lower": 0.0,
+   "upper": 0.27887994050979614,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.04465,
+    -0.00011,
+    0.17033
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "travel_per_unit": 1.0000000149011612,
+   "pieces_obj": "/tmp/glib/artic/inv/fridge__lleghp__shelf3.obj",
+   "n_pieces": 3,
+   "link_bbox_min": [
+    -0.1152,
+    -0.3016,
+    0.1628
+   ],
+   "link_bbox_max": [
+    0.2045,
+    0.3014,
+    0.1943
+   ],
+   "link_tags": [],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.2673,
+   -0.3506,
+   -1.1673
+  ],
+  "bbox_max": [
+   0.3139,
+   0.3564,
+   1.0792
+  ],
+  "n_pieces": 8
+ }
+}

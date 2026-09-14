@@ -1,0 +1,35 @@
+{
+ "category": "conditioner_atomizer",
+ "model": "quqgcu",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/conditioner_atomizer__quqgcu__y0.png",
+   "drift_m": 0.012,
+   "tilt_deg": 4.7,
+   "on_tray": true,
+   "settled_z": 0.145,
+   "seg_pixels": 13344,
+   "aabb_extent": [
+    0.096,
+    0.082,
+    0.26
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/conditioner_atomizer__quqgcu__y1.png",
+   "drift_m": 0.0106,
+   "tilt_deg": 4.2,
+   "on_tray": true,
+   "settled_z": 0.1449
+  }
+ },
+ "stable": true,
+ "visible": true
+}

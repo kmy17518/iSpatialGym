@@ -1,0 +1,43 @@
+{
+  "category": "folding_chair",
+  "task": "obst",
+  "n_models": 3,
+  "n_opened": 3,
+  "models": [
+    {
+      "model": "folding_chair/dqhazh",
+      "V": 3,
+      "N": 1,
+      "S": 0,
+      "rest_ok": true,
+      "score": 8,
+      "valid": false,
+      "note": "Wooden slatted X-frame folding chair in a low reclined / half-open pose, 0.88 x 0.51 x 0.66 m; rests on leg ends; footprint too long."
+    },
+    {
+      "model": "folding_chair/dxergu",
+      "V": 3,
+      "N": 0,
+      "S": 0,
+      "rest_ok": false,
+      "score": 6,
+      "valid": false,
+      "note": "Bentwood folding chair collapsed on its back, loops lying flat with seat panel upright, 0.86 x 0.42 x 0.53 m; not the standing form."
+    },
+    {
+      "model": "folding_chair/vngcqu",
+      "V": 3,
+      "N": 0,
+      "S": 0,
+      "rest_ok": false,
+      "score": 6,
+      "valid": false,
+      "note": "Black padded tubular folding chair lying on its back, backrest flat on floor, seat upright, 0.98 x 0.48 x 0.59 m; not standing."
+    }
+  ],
+  "picks": [],
+  "alternate": null,
+  "natural_scenes": ["house_single_floor", "house_double_floor_lower", "office_cubicles_right"],
+  "category_verdict": "drop",
+  "category_note": "All three models are in collapsed or reclined canonical poses (0.86-0.98 m long, only 0.53-0.66 m tall) rather than upright chairs; footprints exceed 0.8 m; textures fine but no valid model."
+}

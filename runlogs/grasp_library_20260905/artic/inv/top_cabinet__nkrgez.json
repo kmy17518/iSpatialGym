@@ -1,0 +1,155 @@
+{
+ "category": "top_cabinet",
+ "model": "nkrgez",
+ "key": "top_cabinet__nkrgez",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.34915417432785034
+ ],
+ "aabb_extent": [
+  0.20038318634033203,
+  1.2114534378051758,
+  0.832504391670227
+ ],
+ "aabb_min_rel_root": [
+  -0.08223619312047958,
+  -0.6057206988334656,
+  -0.34915417432785034
+ ],
+ "aabb_max_rel_root": [
+  0.11814698576927185,
+  0.605732798576355,
+  0.4833502173423767
+ ],
+ "link_tags": {
+  "base_link": [],
+  "link_0": [
+   "openable"
+  ],
+  "link_1": [
+   "openable"
+  ]
+ },
+ "openable_joint_ids": [
+  [
+   2,
+   "j_link_0"
+  ],
+  [
+   3,
+   "j_link_1"
+  ]
+ ],
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "type": "RevoluteJoint",
+   "child_link": "link_0",
+   "lower": 0.0,
+   "upper": 1.5707950592041016,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.10221,
+    0.57657,
+    0.06019
+   ],
+   "link_quat_obj": [
+    -0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    -0.02386000007390976,
+    9.999999747378752e-06,
+    0.9997199773788452
+   ],
+   "hinge_point_obj": [
+    0.10221,
+    0.57657,
+    0.06019
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/top_cabinet__nkrgez__link_0.obj",
+   "n_pieces": 1,
+   "link_bbox_min": [
+    0.0889,
+    0.263,
+    -0.2947
+   ],
+   "link_bbox_max": [
+    0.1181,
+    0.5764,
+    0.4328
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  },
+  {
+   "joint": "j_link_1",
+   "type": "RevoluteJoint",
+   "child_link": "link_1",
+   "lower": 0.0,
+   "upper": 1.570794939994812,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.10135,
+    -0.57738,
+    0.06018
+   ],
+   "link_quat_obj": [
+    0.0,
+    -0.0,
+    -0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.02386000007390976,
+    -9.999999747378752e-06,
+    -0.9997199773788452
+   ],
+   "hinge_point_obj": [
+    0.10135,
+    -0.57738,
+    0.06018
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/top_cabinet__nkrgez__link_1.obj",
+   "n_pieces": 1,
+   "link_bbox_min": [
+    0.0882,
+    -0.5764,
+    -0.2948
+   ],
+   "link_bbox_max": [
+    0.1181,
+    -0.263,
+    0.4328
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0822,
+   -0.6057,
+   -0.3492
+  ],
+  "bbox_max": [
+   0.111,
+   0.6057,
+   0.4834
+  ],
+  "n_pieces": 36
+ }
+}

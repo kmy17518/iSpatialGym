@@ -1,0 +1,20 @@
+{
+  "key": "top_cabinet__twjqua",
+  "category": "top_cabinet",
+  "model": "twjqua",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_0",
+      "kind": "drawer",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "slide",
+      "graspable": false,
+      "handle_description": "Sliding door misread as drawer; F on top-left edge is useless. Possible small vertical pull at right edge, mid-height, protrusion unverified",
+      "height_concern": "",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "j_link_0 is a sliding door (prismatic along -y, slides over open shelf), not a drawer; F and zoom camera on wrong face. Possible small pull on door's right edge unmarked."
+}

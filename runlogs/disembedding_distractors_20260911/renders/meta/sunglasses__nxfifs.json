@@ -1,0 +1,35 @@
+{
+ "category": "sunglasses",
+ "model": "nxfifs",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/sunglasses__nxfifs__y0.png",
+   "drift_m": 0.0002,
+   "tilt_deg": 0.7,
+   "on_tray": true,
+   "settled_z": 0.016,
+   "seg_pixels": 1423,
+   "aabb_extent": [
+    0.032,
+    0.097,
+    0.026
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/sunglasses__nxfifs__y1.png",
+   "drift_m": 0.0002,
+   "tilt_deg": 0.6,
+   "on_tray": true,
+   "settled_z": 0.0158
+  }
+ },
+ "stable": true,
+ "visible": true
+}

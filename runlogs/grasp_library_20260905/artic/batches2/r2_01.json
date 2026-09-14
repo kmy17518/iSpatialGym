@@ -1,0 +1,122 @@
+[
+ {
+  "key": "carton__ylrxhe",
+  "joint": "j_link0",
+  "strip": "/tmp/glib/artic/strips2/carton__ylrxhe__j_link0.png",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "reviewer_round1": "No handle; flap free edge lies at the centre seam butted against the other flap, underside inside the box, no gap for a fingertip"
+ },
+ {
+  "key": "carton__ylrxhe",
+  "joint": "j_link1",
+  "strip": "/tmp/glib/artic/strips2/carton__ylrxhe__j_link1.png",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "reviewer_round1": "No handle; flap free edge lies at the centre seam butted against the other flap, underside inside the box, no gap for a fingertip"
+ },
+ {
+  "key": "cedar_chest__fwstpx",
+  "joint": "j_up",
+  "strip": "/tmp/glib/artic/strips2/cedar_chest__fwstpx__j_up.png",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "reviewer_round1": "No handle; domed trunk lid ~88 mm thick at its free edge, skirt flush with body; only a lock hasp at front centre"
+ },
+ {
+  "key": "cedar_chest__gbdzls",
+  "joint": "j_up",
+  "strip": "/tmp/glib/artic/strips2/cedar_chest__gbdzls__j_up.png",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "reviewer_round1": "No handle; flat trunk lid ~48 mm thick, skirt flush with the body, no lip to get a finger under; lock hasp at front centre"
+ },
+ {
+  "key": "clothes_dryer__fhtvuq",
+  "joint": "j_link_0",
+  "strip": "/tmp/glib/artic/strips2/clothes_dryer__fhtvuq__j_link_0.png",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "reviewer_round1": "No handle; flat black round porthole door sits against the front panel, its rim has no clearance behind it to get a fingertip in"
+ },
+ {
+  "key": "clothes_dryer__smcyys",
+  "joint": "j_dof_rootd_aa001_r",
+  "strip": "/tmp/glib/artic/strips2/clothes_dryer__smcyys__j_dof_rootd_aa001_r.png",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "reviewer_round1": "No handle; raised ring rim sits against the front panel, no clearance behind it. Vertical block right of the door is cabinet latch hardware"
+ },
+ {
+  "key": "clothes_dryer__wivnic",
+  "joint": "j_dof_rootd_aa001_r",
+  "strip": "/tmp/glib/artic/strips2/clothes_dryer__wivnic__j_dof_rootd_aa001_r.png",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "reviewer_round1": "No handle; porthole door with thick raised ring rim sits in a recessed front panel, no clearance behind the leaf edge; rim maybe pinchable radially"
+ },
+ {
+  "key": "clothes_dryer__xsuyua",
+  "joint": "j_link_0",
+  "strip": "/tmp/glib/artic/strips2/clothes_dryer__xsuyua__j_link_0.png",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "reviewer_round1": "No handle; bowl-shaped porthole door 118 mm thick, black bezel nearly flush with the cabinet front, wide (~8 cm) rim, nothing to get fingertips behind"
+ },
+ {
+  "key": "clothes_dryer__zlmnfg",
+  "joint": "j_link_0",
+  "strip": "/tmp/glib/artic/strips2/clothes_dryer__zlmnfg__j_link_0.png",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "reviewer_round1": "No handle; glossy bowl-shaped porthole door 127 mm thick, bezel protrudes ~2 cm but leaf edge has no clearance behind; X bumps are bezel facets"
+ },
+ {
+  "key": "cooler__pnkiag",
+  "joint": "j_lid",
+  "strip": "/tmp/glib/artic/strips2/cooler__pnkiag__j_lid.png",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "reviewer_round1": "No lid handle; front-centre grey latch is body hardware; 93 mm thick lid skirt sits flush over the body front, no exposed lip to grip"
+ },
+ {
+  "key": "dishwasher__dugpby",
+  "joint": "j_link_0",
+  "strip": "/tmp/glib/artic/strips2/dishwasher__dugpby__j_link_0.png",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "reviewer_round1": "No handle; flush slab door, back face inside the cabinet opening, top edge below cabinet top, nothing to pinch. Bottom hinge, folds toward viewer."
+ },
+ {
+  "key": "dishwasher__znfvmj",
+  "joint": "j_link_2",
+  "strip": "/tmp/glib/artic/strips2/dishwasher__znfvmj__j_link_2.png",
+  "kind": "flap",
+  "type": "RevoluteJoint",
+  "reviewer_round1": "Recessed rectangular pull pocket near the top centre of the door; no protrusion to pinch. Top edge sits under the fixed control panel. Bottom hinge."
+ },
+ {
+  "key": "door__adejun",
+  "joint": "j_left_leaf",
+  "strip": "/tmp/glib/artic/strips2/door__adejun__j_left_leaf.png",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "reviewer_round1": "No handle; glazed leaf. A/D are full-height meeting/hinge stiles, B/C bottom/top rails, all frame mouldings. Hinge +y side, swings away from viewer."
+ },
+ {
+  "key": "door__adejun",
+  "joint": "j_right_leaf",
+  "strip": "/tmp/glib/artic/strips2/door__adejun__j_right_leaf.png",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "reviewer_round1": "No handle; glazed leaf. A/B are full-height hinge/meeting stiles, C/D bottom/top rails, all frame mouldings. Hinge -y side, swings away from viewer."
+ },
+ {
+  "key": "door__bandpe",
+  "joint": "j_leaf0",
+  "strip": "/tmp/glib/artic/strips2/door__bandpe__j_leaf0.png",
+  "kind": "door",
+  "type": "RevoluteJoint",
+  "reviewer_round1": "No knob/pull; A marks the full-width push band (~0.3 m tall plate), not a pinchable bar. Hinge at outer -y edge, opens away from viewer."
+ }
+]

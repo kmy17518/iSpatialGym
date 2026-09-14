@@ -1,0 +1,522 @@
+{
+ "group": "disembedding__mug__r2",
+ "task": "disembedding",
+ "category": "mug",
+ "round": 2,
+ "relation": null,
+ "partner": "stands",
+ "requirements": "Tabletop task: the object rests among other objects on a table / tray and is picked from its resting pose. It must settle stably on a flat surface (it must not roll or topple). The best single grasp matters most.",
+ "candidates": [
+  {
+   "model": "fapsrj",
+   "key": "mug__fapsrj__t",
+   "strip": "/tmp/glib/strips/mug__fapsrj__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 6 mm wall, both pads on wall"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch opposite handle"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 9 mm wall"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, handle clear"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, handle clear"
+    }
+   ],
+   "object_note": "all rows are top-down rim pinches (fingers 10-12/0), sturdy ceramic wall",
+   "bbox_mm": [
+    87,
+    113,
+    70
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ehnmxj",
+   "key": "mug__ehnmxj__t",
+   "strip": "/tmp/glib/strips/mug__ehnmxj__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch above handle root, 8 mm wall"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, handle clear"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, handle clear"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, handle clear"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 10 mm wall"
+    }
+   ],
+   "object_note": "all rows are top-down rim pinches (fingers 9-12/0)",
+   "bbox_mm": [
+    87,
+    113,
+    70
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "lgxhsc",
+   "key": "mug__lgxhsc__t",
+   "strip": "/tmp/glib/strips/mug__lgxhsc__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on upper body, small handle at one pad"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on upper body, handle at one pad"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on upper body, handle at one pad"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on upper body"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "side pinch on upper body"
+    }
+   ],
+   "object_note": "fingers 50/28 (~76 mm) vs 61-67 mm body on all rows: pinch likely spans body plus small handle",
+   "bbox_mm": [
+    77,
+    105,
+    85
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ppzttc",
+   "key": "mug__ppzttc__t",
+   "strip": "/tmp/glib/strips/mug__ppzttc__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 6 mm wall"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 6 mm wall"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch opposite handle"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 6 mm wall"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 5 mm wall"
+    }
+   ],
+   "object_note": "all rows are top-down rim pinches (fingers 7-9/0)",
+   "bbox_mm": [
+    81,
+    109,
+    80
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ycbmug",
+   "key": "mug__ycbmug__t",
+   "strip": "/tmp/glib/strips/mug__ycbmug__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across body and handle outer face, 93 mm span"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across body and handle outer face"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across body and handle outer face"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across body and handle outer face"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch across body and handle outer face"
+    }
+   ],
+   "object_note": "fingers 50/46 on all rows: every pinch spans body plus sturdy enamel handle, near max opening",
+   "bbox_mm": [
+    93,
+    117,
+    81
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "jgethp",
+   "key": "mug__jgethp__t",
+   "strip": "/tmp/glib/strips/mug__jgethp__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 6 mm wall, tilt 17 deg"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 10 mm wall, tilt 27 deg"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 10 mm wall, tilt 24 deg"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 8 mm wall, tilt 17 deg"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 6 mm wall, tilt 24 deg"
+    }
+   ],
+   "object_note": "wide teacup; all rim pinches use 17-27 deg approach tilt, cup hangs tilted but both pads on wall",
+   "bbox_mm": [
+    113,
+    137,
+    64
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "waqrdy",
+   "key": "mug__waqrdy__t",
+   "strip": "/tmp/glib/strips/mug__waqrdy__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 7 mm wall"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 8 mm wall"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, tilt 13 deg, CoM offset 5 mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 8 mm wall"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 8 mm wall; camera views permuted in row"
+    }
+   ],
+   "object_note": "tall mug, all rows top-down rim pinches (fingers 9-10/0); row 5 panels rendered in different view order",
+   "bbox_mm": [
+    82,
+    118,
+    135
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ppdqbj",
+   "key": "mug__ppdqbj__t",
+   "strip": "/tmp/glib/strips/mug__ppdqbj__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 8 mm wall"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 8 mm wall"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch at handle root, 9 mm wall"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 8 mm wall"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 8 mm wall"
+    }
+   ],
+   "object_note": "all rows top-down rim pinches (fingers 10-13/0)",
+   "bbox_mm": [
+    88,
+    129,
+    100
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "yxaapv",
+   "key": "mug__yxaapv__t",
+   "strip": "/tmp/glib/strips/mug__yxaapv__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 8 mm wall, tilt 16 deg"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 9 mm wall"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 9 mm wall"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, CoM offset 4 mm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch, CoM offset 4 mm"
+    }
+   ],
+   "object_note": "tall latte mug, all rows top-down rim pinches (fingers 10-13/0)",
+   "bbox_mm": [
+    91,
+    128,
+    124
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ntgftr",
+   "key": "mug__ntgftr__t",
+   "strip": "/tmp/glib/strips/mug__ntgftr__t.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 6 mm wall, tilt 8 deg"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on far side of rim"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "symmetric rim pinch (5/4)"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 6 mm wall"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "rim pinch on 6 mm wall"
+    }
+   ],
+   "object_note": "all rows top-down rim pinches; camera framing varies between rows",
+   "bbox_mm": [
+    106,
+    144,
+    96
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

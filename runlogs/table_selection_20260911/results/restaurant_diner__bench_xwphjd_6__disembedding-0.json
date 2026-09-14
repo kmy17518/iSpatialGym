@@ -1,0 +1,92 @@
+{
+ "scene": "restaurant_diner",
+ "table": "bench_xwphjd_6",
+ "category": "bench",
+ "model": "xwphjd",
+ "rooms": [
+  "dining_room_0"
+ ],
+ "partner": null,
+ "problem": "disembedding-0",
+ "inventory": {
+  "top_z": 0.952,
+  "bbox_x": 0.664,
+  "bbox_y": 1.241,
+  "bbox_z": 0.952,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "straight_chair_nntxvr_3"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:18:15",
+ "precheck": {
+  "aabb": [
+   [
+    0.622,
+    -9.771,
+    -0.005
+   ],
+   [
+    1.295,
+    -8.526,
+    0.956
+   ]
+  ],
+  "support": {
+   "name": "bench_xwphjd_6",
+   "z": 0.39706161618232727,
+   "yaw": 3.141591787338257,
+   "local_bounds": [
+    -1.1717562675476074,
+    -0.6317554712295532,
+    8.541050910949707,
+    9.7610502243042
+   ],
+   "n_free_cells": 1476,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     0.632,
+     -9.151
+    ],
+    "length": 1.22
+   },
+   {
+    "name": "-u",
+    "mid": [
+     1.172,
+     -9.151
+    ],
+    "length": 1.22
+   },
+   {
+    "name": "+v",
+    "mid": [
+     0.902,
+     -9.761
+    ],
+    "length": 0.54
+   },
+   {
+    "name": "-v",
+    "mid": [
+     0.902,
+     -8.541
+    ],
+    "length": 0.54
+   }
+  ],
+  "stance": null,
+  "stance_error": "[stance_collision] untucked: [no_stance] no collision-free stance around bench_xwphjd_6",
+  "precheck_s": 2.7
+ },
+ "status": "skipped",
+ "reason": "inter_object_relation_satisfaction-0 found no stance around the support at any stand-off (precheck: no stance either)"
+}

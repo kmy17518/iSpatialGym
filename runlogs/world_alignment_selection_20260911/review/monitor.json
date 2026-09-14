@@ -1,0 +1,132 @@
+{
+ "category": "monitor",
+ "task": "wa0",
+ "n_models": 10,
+ "n_opened": 10,
+ "models": [
+  {
+   "model": "huvcgu",
+   "V": 3,
+   "O": 3,
+   "F": 0,
+   "score": 12,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Grey blank screen, black frame, two meshes; 0.44 m wide, 0.39 m tall, far above the table-fit height."
+  },
+  {
+   "model": "kmltvq",
+   "V": 4,
+   "O": 3,
+   "F": 0,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "iMac-style all-in-one, black screen, grey back and foot; 0.62 m wide, 0.52 m tall."
+  },
+  {
+   "model": "mlyppp",
+   "V": 3,
+   "O": 3,
+   "F": 0,
+   "score": 12,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Dark flat monitor on a rectangular stand; 0.57 m wide, 0.44 m tall."
+  },
+  {
+   "model": "nghyiv",
+   "V": 3,
+   "O": 2,
+   "F": 0,
+   "score": 10,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Older black monitor on a round base, tilted panel; 0.50 m wide, 0.46 m tall."
+  },
+  {
+   "model": "qaacxt",
+   "V": 4,
+   "O": 3,
+   "F": 0,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "iMac-style all-in-one, black screen, grey back; 0.65 m wide, 0.52 m tall."
+  },
+  {
+   "model": "qvpbge",
+   "V": 3,
+   "O": 3,
+   "F": 0,
+   "score": 12,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Wide monitor on a thin arc stand, port label on the back; 0.82 m wide, 0.48 m tall."
+  },
+  {
+   "model": "rbqanz",
+   "V": 3,
+   "O": 3,
+   "F": 0,
+   "score": 12,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Grey screen, noisy dark texture on the stand, V-shaped foot; 0.37 m wide, 0.34 m tall."
+  },
+  {
+   "model": "wxhvqc",
+   "V": 3,
+   "O": 2,
+   "F": 0,
+   "score": 10,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Black monitor on a round base (like nghyiv); 0.50 m wide, 0.46 m tall."
+  },
+  {
+   "model": "xffisd",
+   "V": 3,
+   "O": 2,
+   "F": 0,
+   "score": 10,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Flat black monitor on a star-shaped foot, no texture detail; 0.45 m wide, 0.45 m tall."
+  },
+  {
+   "model": "xhxcyg",
+   "V": 4,
+   "O": 3,
+   "F": 0,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Apple-style display, grey screen, logo on the back; 0.48 m wide, 0.46 m tall."
+  }
+ ],
+ "picks": [],
+ "alternate": null,
+ "category_verdict": "drop",
+ "category_note": "Desk monitors with an obvious +x screen face, but every model is 0.34-0.52 m tall (limit 0.20 m) and three are wider than 0.60 m; none fits the table-surface task. Screens are blank."
+}

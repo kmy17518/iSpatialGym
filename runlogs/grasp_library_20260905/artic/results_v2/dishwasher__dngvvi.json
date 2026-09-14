@@ -1,0 +1,50 @@
+{
+ "key": "dishwasher__dngvvi",
+ "category": "dishwasher",
+ "model": "dngvvi",
+ "scene": "house_double_floor_lower",
+ "host": "dishwasher_ynrhuk_0",
+ "host_rank": 0,
+ "host_model": "ynrhuk",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "flap",
+   "grasp_source": "review:F",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [7.879608631134033, 1.1169263124465942, 0.7880085706710815]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [7.879608631134033, 1.1169263124465942, 0.7880085706710815]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    7.88,
+    1.117,
+    0.788
+   ],
+   "handle_height_above_floor": 0.783,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 6,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 3
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.108,
+  1.201,
+  1.159
+ ],
+ "time_s": 92.5
+}

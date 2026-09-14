@@ -1,0 +1,38 @@
+{
+ "key": "top_cabinet__dhguym",
+ "category": "top_cabinet",
+ "model": "dhguym",
+ "scene": "Rs_int",
+ "host": "top_cabinet_lsyzkh_3",
+ "host_rank": 2,
+ "host_model": "lsyzkh",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_1",
+   "kind": "door",
+   "grasp_source": "manual skip: round-2 review: infeasible - Flush inset door; only relief is the 18 mm moulding step. A fingertip could hook",
+   "stance": null,
+   "reachable": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "previous_hosts": [
+  "top_cabinet_lsyzkh_2",
+  "top_cabinet_lsyzkh_1"
+ ],
+ "scale": [
+  4.175,
+  0.499,
+  1.881
+ ],
+ "time_s": 1.0
+}

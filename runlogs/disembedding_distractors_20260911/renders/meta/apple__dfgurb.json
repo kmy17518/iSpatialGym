@@ -1,0 +1,35 @@
+{
+ "category": "apple",
+ "model": "dfgurb",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/apple__dfgurb__y0.png",
+   "drift_m": 0.0047,
+   "tilt_deg": 5.3,
+   "on_tray": true,
+   "settled_z": 0.0507,
+   "seg_pixels": 8263,
+   "aabb_extent": [
+    0.114,
+    0.113,
+    0.112
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/apple__dfgurb__y1.png",
+   "drift_m": 0.0045,
+   "tilt_deg": 5.0,
+   "on_tray": true,
+   "settled_z": 0.0508
+  }
+ },
+ "stable": true,
+ "visible": true
+}

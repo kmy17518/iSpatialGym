@@ -1,0 +1,49 @@
+{
+ "key": "blender__cwkvib",
+ "category": "blender",
+ "model": "cwkvib",
+ "aabb_extent": [
+  0.19119754433631897,
+  0.1929970681667328,
+  0.39359480142593384
+ ],
+ "support": "table",
+ "joints": [
+  {
+   "joint": "j_lid",
+   "kind": "flap",
+   "grasp_source": "review:F",
+   "stance": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.524,
+   "opened": false,
+   "open_state": null,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [1.2768000364303589, -0.009299999102950096, 1.1073493957519531]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [1.2768000364303589, -0.009299999102950096, 1.1073493957519531]})"
+   ],
+   "error": "unreachable: no stance",
+   "contact_world": [
+    1.277,
+    -0.009,
+    1.107
+   ],
+   "handle_height": 1.107,
+   "diag_stance": {
+    "probed": 12,
+    "collision_free": 5,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0,
+    "handle_height": 1.107,
+    "approach": [
+     -0.93,
+     0.0,
+     -0.38
+    ]
+   }
+  }
+ ],
+ "error": null,
+ "time_s": 9.2
+}

@@ -1,0 +1,35 @@
+{
+ "category": "hotdog_frank",
+ "model": "qijvmi",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/hotdog_frank__qijvmi__y0.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.0115,
+   "seg_pixels": 1628,
+   "aabb_extent": [
+    0.145,
+    0.036,
+    0.024
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/hotdog_frank__qijvmi__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0119
+  }
+ },
+ "stable": true,
+ "visible": true
+}

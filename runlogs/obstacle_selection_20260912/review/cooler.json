@@ -1,0 +1,27 @@
+{
+  "category": "cooler",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "pnkiag",
+      "V": 4,
+      "N": 2,
+      "S": 0,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Red chest cooler with grey moulded lid and front latch, 0.51 x 1.03 x 0.52 m, clean textures; footprint over the 0.80 m limit."
+    }
+  ],
+  "picks": [],
+  "alternate": null,
+  "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "restaurant_diner"
+  ],
+  "category_verdict": "drop",
+  "category_note": "One large picnic chest cooler, 1.03 m long, flat-based and stable; it would block a 1 m corridor. Plausible on a garage or diner floor but normally against a wall. No valid model."
+}

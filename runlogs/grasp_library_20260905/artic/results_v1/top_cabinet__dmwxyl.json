@@ -1,0 +1,15 @@
+{
+ "key": "top_cabinet__dmwxyl",
+ "category": "top_cabinet",
+ "model": "dmwxyl",
+ "scene": "house_double_floor_lower",
+ "host": "top_cabinet_tynnnw_1",
+ "host_rank": 1,
+ "host_model": "tynnnw",
+ "swap": true,
+ "joints": [],
+ "error": "AssertionError('Object with name o_top_cabinet__dmwxyl already exists in scene!')",
+ "previous_hosts": [
+  "top_cabinet_tynnnw_0"
+ ]
+}

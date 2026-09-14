@@ -1,0 +1,31 @@
+{
+  "group": "object_scaling__hard_candy__r2",
+  "task": "object_scaling",
+  "category": "hard_candy",
+  "round": 2,
+  "relation": null,
+  "n_candidates": 5,
+  "n_opened": 5,
+  "candidates": [
+    {"model": "ojznyf", "key": "hard_candy__ojznyf__f", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Five clean 20-22 mm body pinches between wrapper twists, CoM 2-4 mm, tilts 19-146 diverse; light-blue low-poly wrapper, mottled purple body texture."},
+    {"model": "vwegtt", "key": "hard_candy__vwegtt__f", "G": 5, "T": 3, "V": 3, "R": 2, "score": 21,
+     "note": "Five clean 21-22 mm body pinches, coverage 1.0, antipodal 0.95-0.99, tilts 83-175; blue wrapper but drab grey-olive body reads as flat, low-contrast texture."},
+    {"model": "vyxhmv", "key": "hard_candy__vyxhmv__f", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Five clean 20-22 mm body pinches, CoM 2-3 mm, tilts 67-178 diverse, row 4 coverage 0.75; magenta wrapper, pink-white mottled body, low-poly."},
+    {"model": "qptjgv", "key": "hard_candy__qptjgv__f", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Five clean 21-22 mm body pinches, CoM 2-3 mm, tilts 3-154 widest spread; pink translucent wrapper over sharply textured multicoloured candy."},
+    {"model": "yuatcg", "key": "hard_candy__yuatcg__f", "G": 5, "T": 3, "V": 5, "R": 2, "score": 25,
+     "note": "Five clean 19-21 mm body pinches, CoM 2-4 mm, antipodal 0.94-0.97, tilts 4-101; red wrapper with crisp rainbow body texture, two rows coverage 0.75."}
+  ],
+  "selected": [
+    {"model": "qptjgv", "key": "hard_candy__qptjgv__f", "rank": 1,
+     "reason": "Top score with the widest range of approach tilts (3-154), centred body pinches, and the sharpest texture (translucent pink wrapper, colourful candy)."},
+    {"model": "yuatcg", "key": "hard_candy__yuatcg__f", "rank": 2,
+     "reason": "Equal score; clean diverse body pinches and its red wrapper with rainbow body is a different colourway from the pink #1."}
+  ],
+  "alternate": {"model": "ojznyf", "key": "hard_candy__ojznyf__f"},
+  "short": false,
+  "warnings": ["All candidates share one low-poly wrapped-candy mesh style (~21 mm body, 55 mm with twists) and differ mainly in wrapper/body colour; grasps are 22-25/0 one-finger fingertip presses."],
+  "confidence": "medium"
+}

@@ -1,0 +1,41 @@
+{
+ "key": "carton__ylrxhe",
+ "category": "carton",
+ "model": "ylrxhe",
+ "aabb_extent": [
+  0.6372079849243164,
+  0.6416953206062317,
+  0.5064695477485657
+ ],
+ "support": "table",
+ "joints": [
+  {
+   "joint": "j_link0",
+   "kind": "flap",
+   "grasp_source": "review: No handle; flap free edge lies at the centre seam butted against the other flap, underside inside the box, no gap for a fingertip",
+   "stance": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "steps": [],
+   "error": "no graspable handle"
+  },
+  {
+   "joint": "j_link1",
+   "kind": "flap",
+   "grasp_source": "review: No handle; flap free edge lies at the centre seam butted against the other flap, underside inside the box, no gap for a fingertip",
+   "stance": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "time_s": 0.6
+}

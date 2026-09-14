@@ -1,0 +1,59 @@
+{
+  "category": "storage_box",
+  "task": "obst",
+  "n_models": 4,
+  "n_opened": 4,
+  "models": [
+    {
+      "model": "aqdbdu",
+      "V": 3,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 11,
+      "valid": true,
+      "note": "Small round teal open tub, 0.20 x 0.20 x 0.14 m; flat colour, clean geometry; more a small bin than a storage box, low."
+    },
+    {
+      "model": "bwbpvg",
+      "V": 3,
+      "N": 1,
+      "S": 0,
+      "rest_ok": true,
+      "score": 8,
+      "valid": false,
+      "note": "Very flat grey grid-textured tray, 0.24 x 0.25 x 0.06 m; clean but 6 cm tall, a lid/tray, too flat to matter."
+    },
+    {
+      "model": "eicujj",
+      "V": 3,
+      "N": 1,
+      "S": 0,
+      "rest_ok": true,
+      "score": 8,
+      "valid": false,
+      "note": "Flat black shallow tray, 0.29 x 0.31 x 0.07 m; clean but 7 cm tall, too flat."
+    },
+    {
+      "model": "izcglf",
+      "V": 2,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Brown tapered box, 0.40 x 0.41 x 0.21 m, good size, but top view renders nothing and sides are flat panels: missing faces/flipped normals."
+    }
+  ],
+  "picks": ["aqdbdu"],
+  "alternate": null,
+  "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "office_cubicles_right"
+  ],
+  "category_verdict": "weak",
+  "category_note": "Weak set: two models are flat trays under 8 cm, the one well-sized box (izcglf) has broken geometry, leaving only a 20 x 14 cm teal tub as a marginal, low obstacle. Boxes would be natural floor clutter in houses/office."
+}

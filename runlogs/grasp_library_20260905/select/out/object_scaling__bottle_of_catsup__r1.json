@@ -1,0 +1,31 @@
+{
+  "group": "object_scaling__bottle_of_catsup__r1",
+  "task": "object_scaling",
+  "category": "bottle_of_catsup",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 5,
+  "n_opened": 5,
+  "candidates": [
+    {"model": "ialodu", "key": "bottle_of_catsup__ialodu", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Five 49-52 mm base pinches, CoM 8-16 mm, 50/0 one-finger closures; two flip poses plus roll only. Dark glossy cone bottle, printed label, odd shape."},
+    {"model": "dmyfdf", "key": "bottle_of_catsup__dmyfdf", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Same cone mesh; five 48-52 mm base pinches, CoM 2-15 mm, 49-50/0-3 closures, flip plus roll variation. Crisp white tomato-label texture; odd cone shape."},
+    {"model": "ahoiqe", "key": "bottle_of_catsup__ahoiqe", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Five mid-body 53-54 mm pinches, CoM 2-4 mm, but rows 1-4 near-duplicate poses (row 5 flipped); 50/4-5 closures. Plain red cylinder, visible faceting, no label."},
+    {"model": "hvxkso", "key": "bottle_of_catsup__hvxkso", "G": 4, "T": 3, "V": 5, "R": 2, "score": 23,
+     "note": "Five clean 35-38 mm flat-face pinches near CoM (8-19 mm), flips and tilt 78-90 vary; 38/0 asymmetric closures. Glossy red squeeze bottle, white cap."},
+    {"model": "bcqfxb", "key": "bottle_of_catsup__bcqfxb", "G": 2, "T": 2, "V": 3, "R": 2, "score": 14,
+     "note": "All rows over-cap shoulder pinches 62-65 mm with 112 mm CoM lever arm, one repeated pose; 267 mm outlier bottle, blank white label."}
+  ],
+  "selected": [
+    {"model": "hvxkso", "key": "bottle_of_catsup__hvxkso", "rank": 1,
+     "reason": "Highest score: clean flat-face pinches at the body centre with flip/tilt variety, cleanest and most recognisable ketchup-bottle asset."},
+    {"model": "dmyfdf", "key": "bottle_of_catsup__dmyfdf", "rank": 2,
+     "reason": "Ties ialodu; better-centred pinches (CoM 2-15 mm) and its white printed label contrasts with the red #1, spanning the category's look. One-finger 50/0 closures."}
+  ],
+  "alternate": {"model": "ialodu", "key": "bottle_of_catsup__ialodu"},
+  "short": false,
+  "warnings": ["All candidates except bcqfxb rely on one-finger closures (object pressed against the open pad); pose diversity is limited to flips/rolls for these symmetric bodies. bcqfxb hangs the 267 mm bottle from its shoulder."],
+  "confidence": "medium"
+}

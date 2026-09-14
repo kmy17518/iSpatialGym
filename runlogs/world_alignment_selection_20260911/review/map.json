@@ -1,0 +1,48 @@
+{
+ "category": "map",
+ "task": "wa1",
+ "n_models": 3,
+ "n_opened": 3,
+ "models": [
+  {
+   "model": "fdtxut",
+   "V": 2,
+   "U": 2,
+   "H": 0,
+   "score": 8,
+   "valid": false,
+   "front_axis": "+z",
+   "up_axis": "+y",
+   "thin_axis": "z",
+   "note": "Zero-thickness 0.20x0.24 m sheet, regional map with tiny labels, upright in top view; degenerate geometry."
+  },
+  {
+   "model": "hsbtqi",
+   "V": 2,
+   "U": 2,
+   "H": 0,
+   "score": 8,
+   "valid": false,
+   "front_axis": "+z",
+   "up_axis": "+y",
+   "thin_axis": "z",
+   "note": "Tiny 7x8 cm antique-map sheet with zero thickness; far too small and degenerate."
+  },
+  {
+   "model": "umftoc",
+   "V": 4,
+   "U": 3,
+   "H": 0,
+   "score": 14,
+   "valid": false,
+   "front_axis": "+z",
+   "up_axis": "+x",
+   "thin_axis": "z",
+   "note": "World map 1.16x2.15 m lying flat, content rotated 90 deg (north toward +x); far too large."
+  }
+ ],
+ "picks": [],
+ "alternate": null,
+ "category_verdict": "drop",
+ "category_note": "Two zero-thickness sheets (0.07 m and 0.24 m across) plus a 2.1 m world map, all lying flat; none satisfies the hangability size/thickness rules, so no valid model."
+}

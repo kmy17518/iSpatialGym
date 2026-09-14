@@ -1,0 +1,53 @@
+{
+ "category": "box_of_cereal",
+ "model": "tiykku",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0,
+  180.0,
+  270.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/box_of_cereal__tiykku__y0.png",
+   "drift_m": 0.001,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.1368,
+   "seg_pixels": 57749,
+   "aabb_extent": [
+    0.054,
+    0.197,
+    0.274
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/box_of_cereal__tiykku__y1.png",
+   "drift_m": 0.0008,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.1365
+  },
+  "y2": {
+   "yaw_deg": 180.0,
+   "png": "renders/box_of_cereal__tiykku__y2.png",
+   "drift_m": 0.0009,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.1368
+  },
+  "y3": {
+   "yaw_deg": 270.0,
+   "png": "renders/box_of_cereal__tiykku__y3.png",
+   "drift_m": 0.001,
+   "tilt_deg": 0.4,
+   "on_tray": true,
+   "settled_z": 0.1365
+  }
+ },
+ "stable": true,
+ "visible": true
+}

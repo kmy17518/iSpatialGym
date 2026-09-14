@@ -1,0 +1,55 @@
+=== RUN environments.navigation_env_demo (19:16:46) ===
+RESULT environments.navigation_env_demo : exit=0 : []
+=== RUN environments.vector_env_demo (19:17:38) ===
+RESULT environments.vector_env_demo : exit=0 : []
+=== RUN object_states.attachment_demo (19:18:27) ===
+RESULT object_states.attachment_demo : exit=0 : []
+=== RUN object_states.dicing_demo (19:18:54) ===
+RESULT object_states.dicing_demo : exit=0 : []
+=== RUN object_states.folded_unfolded_state_demo (19:19:52) ===
+RESULT object_states.folded_unfolded_state_demo : exit=0 : []
+=== RUN object_states.heat_source_or_sink_demo (19:20:10) ===
+RESULT object_states.heat_source_or_sink_demo : exit=0 : []
+=== RUN object_states.heated_state_demo (19:20:41) ===
+RESULT object_states.heated_state_demo : exit=0 : []
+=== RUN object_states.onfire_demo (19:21:02) ===
+RESULT object_states.onfire_demo : exit=0 : []
+=== RUN object_states.overlaid_demo (19:21:34) ===
+RESULT object_states.overlaid_demo : exit=0 : []
+=== RUN object_states.particle_applier_remover_demo (19:21:52) ===
+RESULT object_states.particle_applier_remover_demo : exit=0 : []
+=== RUN object_states.particle_source_sink_demo (19:22:30) ===
+RESULT object_states.particle_source_sink_demo : exit=0 : []
+=== RUN object_states.sample_kinematics_demo (19:23:17) ===
+RESULT object_states.sample_kinematics_demo : exit=0 : []
+=== RUN object_states.slicing_demo (19:23:51) ===
+RESULT object_states.slicing_demo : exit=0 : []
+=== RUN object_states.temperature_demo (19:24:18) ===
+RESULT object_states.temperature_demo : exit=0 : []
+=== RUN objects.draw_bounding_box (19:25:23) ===
+RESULT objects.draw_bounding_box : exit=0 : []
+=== RUN objects.highlight_objects (19:25:44) ===
+RESULT objects.highlight_objects : exit=0 : []
+=== RUN objects.load_object_selector (19:26:46) ===
+RESULT objects.load_object_selector : exit=0 : []
+=== RUN objects.view_cloth_configurations (19:27:34) ===
+RESULT objects.view_cloth_configurations : exit=0 : []
+=== RUN objects.visualize_object (19:27:50) ===
+RESULT objects.visualize_object : exit=0 : []
+=== RUN robots.all_robots_visualizer (19:28:11) ===
+RESULT robots.all_robots_visualizer : exit=0 : []
+=== RUN robots.grasping_mode_example (19:30:25) ===
+RESULT robots.grasping_mode_example : exit=0 : []
+=== RUN robots.import_custom_robot (19:30:52) ===
+RESULT robots.import_custom_robot : exit=0 : []
+=== RUN robots.robot_control_example (19:31:00) ===
+RESULT robots.robot_control_example : exit=0 : []
+=== RUN scenes.scene_selector (19:31:24) ===
+RESULT scenes.scene_selector : exit=0 : []
+=== RUN scenes.scene_tour_demo (19:32:23) ===
+RESULT scenes.scene_tour_demo : exit=0 : []
+=== RUN scenes.traversability_map_example (19:33:07) ===
+RESULT scenes.traversability_map_example : exit=0 : []
+=== RUN simulator.sim_save_load_example (19:33:15) ===
+RESULT simulator.sim_save_load_example : exit=0 : []
+ALL_DONE (19:33:55)

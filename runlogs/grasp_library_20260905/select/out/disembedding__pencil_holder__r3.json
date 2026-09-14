@@ -1,0 +1,24 @@
+{
+  "group": "disembedding__pencil_holder__r3", "task": "disembedding", "category": "pencil_holder", "round": 3, "relation": null,
+  "n_candidates": 4, "n_opened": 4,
+  "candidates": [
+    {"model": "jyetcl", "key": "pencil_holder__jyetcl__t", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Light-wood open box; five 71 mm wall pinches near top, rows 1-2 two-sided 46/31, tilt 0, row 5 tilts 30; clean geometry, plain wood grain."},
+    {"model": "taixcy", "key": "pencil_holder__taixcy__t", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Same wooden box as jyetcl (mesh rotated); five 70-71 mm wall pinches, top row 50/27 against open pad, row 4 tilts 30; plain wood look."},
+    {"model": "jkuiqg", "key": "pencil_holder__jkuiqg__t", "G": 1, "T": 2, "V": 3, "R": 2, "score": 12,
+     "note": "White plastic bin with slot handles; single grasp pinches only the top rim edge (coverage 0), box hangs 30 deg below fingertips; flat white, generic."},
+    {"model": "mrrpay", "key": "pencil_holder__mrrpay__t", "G": 2, "T": 3, "V": 3, "R": 2, "score": 15,
+     "note": "White slot-handle box on its side; rows 1/3 clean 70 mm wall pinches 50/25, row 2 rim grasp tilted 30, coverage 0; flat white, generic."}
+  ],
+  "selected": [
+    {"model": "jyetcl", "key": "pencil_holder__jyetcl__t", "rank": 1,
+     "reason": "Top score 23; best top grasp of the group: centred two-sided 46/31 pinch across the 71 mm walls, tilt 0, bottom free, box stands flat; clean wood asset."},
+    {"model": "taixcy", "key": "pencil_holder__taixcy__t", "rank": 2,
+     "reason": "Score 23, 8 points clear of the next candidate so the diversity clause does not apply; same clean wall pinches, all rows valid, stable upright box."}
+  ],
+  "alternate": {"model": "mrrpay", "key": "pencil_holder__mrrpay__t"},
+  "short": false,
+  "warnings": ["jyetcl and taixcy are the same wooden mesh in two orientations, so the pair does not span the category's appearance", "jkuiqg has no clean row (rim-edge grasp only) and is not selectable; mrrpay has only 2 clean rows (G 2) and a plain untextured look"],
+  "confidence": "medium"
+}

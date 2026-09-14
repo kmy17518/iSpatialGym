@@ -1,0 +1,117 @@
+{
+ "scene": "house_double_floor_upper",
+ "table": "desk_iotfzl_0",
+ "category": "desk",
+ "model": "iotfzl",
+ "rooms": [
+  "living_room_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-0",
+ "inventory": {
+  "top_z": 0.73,
+  "bbox_x": 0.532,
+  "bbox_y": 1.398,
+  "bbox_z": 0.728,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "armchair_axcwcm_0"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:18:34",
+ "precheck": {
+  "aabb": [
+   [
+    -1.572,
+    -3.656,
+    -0.003
+   ],
+   [
+    -1.031,
+    -2.245,
+    0.735
+   ]
+  ],
+  "support": {
+   "name": "desk_iotfzl_0",
+   "z": 0.7351076006889343,
+   "yaw": -0.00013017654418945312,
+   "local_bounds": [
+    -1.5618765354156494,
+    -1.0416995286941528,
+    -3.6259050369262695,
+    -2.2658371925354004
+   ],
+   "n_free_cells": 1791,
+   "occupants": [
+    "table_lamp_lshxmu_0"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -1.042,
+     -2.946
+    ],
+    "length": 1.36
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -1.562,
+     -2.946
+    ],
+    "length": 1.36
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -1.302,
+     -2.266
+    ],
+    "length": 0.52
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -1.302,
+     -3.626
+    ],
+    "length": 0.52
+   }
+  ],
+  "stance": null,
+  "stance_error": "[stance_collision] untucked: [stance_collision] no collision-free viewing trunk configuration (44 candidates)",
+  "precheck_s": 1.4
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/house_double_floor_upper/house_double_floor_upper__desk_iotfzl_0__configuration_matching-0",
+ "setup_s": 2.8,
+ "reject_reason": "no_support",
+ "error": "[no_support] desk_iotfzl_0: [stance_collision] untucked: [stance_collision] no collision-free viewing trunk configuration (47 candidates)",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 2.8,
+   "run_s": null
+  }
+ ],
+ "job_s": 4.4,
+ "finished": "2026-09-12 01:18:38"
+}

@@ -1,0 +1,83 @@
+{
+  "category": "briefcase",
+  "task": "obst",
+  "n_models": 7,
+  "n_opened": 7,
+  "models": [
+    {
+      "model": "briefcase/fdpjtj",
+      "V": 4,
+      "N": 2,
+      "S": 0,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Slim dark-grey hard attache case lying flat; 0.31 x 0.40 x 0.06 m; clean but only 6 cm tall, base would barely notice it."
+    },
+    {
+      "model": "briefcase/haecvf",
+      "V": 3,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 11,
+      "valid": true,
+      "note": "Plain black hard briefcase lying flat with small handle bump; 0.28 x 0.42 x 0.12 m; featureless uniform black but complete."
+    },
+    {
+      "model": "briefcase/lwbctq",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Brown soft leather briefcase lying flat, handle on +x side, slightly lumpy; 0.27 x 0.33 x 0.12 m; good texture."
+    },
+    {
+      "model": "briefcase/ohelib",
+      "V": 4,
+      "N": 2,
+      "S": 0,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Black hard briefcase with brass latches lying flat; 0.33 x 0.40 x 0.08 m; clean and recognisable but too low."
+    },
+    {
+      "model": "briefcase/psvdau",
+      "V": 4,
+      "N": 2,
+      "S": 0,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Dark brown soft briefcase lying flat with handle; 0.28 x 0.33 x 0.10 m; clean, just under the 0.10 m height floor."
+    },
+    {
+      "model": "briefcase/rxvbea",
+      "V": 2,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 9,
+      "valid": false,
+      "note": "Dark-grey hard case whose lid shows odd light triangular wedges (missing or open top faces); 0.33 x 0.33 x 0.11 m; broken-looking."
+    },
+    {
+      "model": "briefcase/uquevd",
+      "V": 4,
+      "N": 2,
+      "S": 0,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Grey fabric document bag with ornate corner print and handle cut-out, lying flat; 0.23 x 0.27 x 0.08 m; too low."
+    }
+  ],
+  "picks": ["briefcase/lwbctq", "briefcase/haecvf"],
+  "alternate": null,
+  "natural_scenes": ["office_cubicles_right", "hotel_suite_large", "house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int"],
+  "category_verdict": "weak",
+  "category_note": "All seven briefcases lie flat, 0.23-0.42 m footprint but only 0.06-0.12 m tall; five fall below the 0.10 m height floor. Credible floor clutter in office, hotel and homes, but low and hard to see; one lid looks broken."
+}

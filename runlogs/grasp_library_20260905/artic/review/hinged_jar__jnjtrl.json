@@ -1,0 +1,20 @@
+{
+  "key": "hinged_jar__jnjtrl",
+  "category": "hinged_jar",
+  "model": "jnjtrl",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_lid",
+      "kind": "flap",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "lift",
+      "graspable": false,
+      "handle_description": "No handle; lid rim sits flush with the jar body with no undercut for a fingertip; wire clamp at the free edge holds it shut.",
+      "height_concern": "lid edge ~0.17 m above object base",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Clip-top jar. F is at the correct free edge but the lid does not overhang the body, so nothing to pinch; heuristic 'ungraspable' agrees. Lid flips up about rear hinge."
+}

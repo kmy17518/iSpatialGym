@@ -1,0 +1,35 @@
+{
+ "category": "pack_of_chocolate_bar",
+ "model": "bxgewr",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/pack_of_chocolate_bar__bxgewr__y0.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0027,
+   "seg_pixels": 2362,
+   "aabb_extent": [
+    0.1,
+    0.048,
+    0.006
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/pack_of_chocolate_bar__bxgewr__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.0,
+   "on_tray": true,
+   "settled_z": 0.0028
+  }
+ },
+ "stable": true,
+ "visible": true
+}

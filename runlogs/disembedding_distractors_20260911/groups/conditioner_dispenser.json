@@ -1,0 +1,10 @@
+{
+  "category": "conditioner_dispenser",
+  "n_models": 3,
+  "pages_opened": ["grids/same/conditioner_dispenser__p1.png"],
+  "groups": [
+    {"members": ["uncljo", "udeflt"], "reason": "both plain white upright pump bottles, red ball pump, same 19 cm height, no print; udeflt only somewhat slimmer with softer shoulder", "confidence": "medium"}
+  ],
+  "unusable": [],
+  "notes": "njqnuo lies on its side (canonical 21x8x8, settled tilt 12.2 deg): a horizontal white pump bottle with red pump, visually distinct from the upright pair but a fallen-looking pose; keep only if lying dispensers are acceptable. If ~25% slimmer silhouette counts as a proportion difference, split uncljo/udeflt."
+}

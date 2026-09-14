@@ -1,0 +1,163 @@
+{
+  "category": "floor_lamp",
+  "task": "obst",
+  "n_models": 15,
+  "n_opened": 15,
+  "models": [
+    {
+      "model": "floor_lamp/chjeoy",
+      "V": 3,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 11,
+      "valid": true,
+      "note": "Very thin grey arc lamp with small cone shade and small oval base; low detail; 0.37 x 0.20 x 1.64 m."
+    },
+    {
+      "model": "floor_lamp/cosjfl",
+      "V": 5,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Beige drum shade on dark wooden tripod; complete sharp textures, very typical lamp; 0.45 m footprint, 1.35 m tall."
+    },
+    {
+      "model": "floor_lamp/fanocp",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Jointed arc lamp with dark cone shade offset far from a small round base; 0.70 x 0.20 x 1.28 m, wide footprint."
+    },
+    {
+      "model": "floor_lamp/hdfnqb",
+      "V": 4,
+      "N": 2,
+      "S": 0,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Black torchiere with bowl shade on round base; clean, but 1.96 m tall exceeds the height limit."
+    },
+    {
+      "model": "floor_lamp/imgsrd",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Black bent-arm task floor lamp with dome shade and round base; clean; 0.42 x 0.30 x 1.25 m."
+    },
+    {
+      "model": "floor_lamp/jcbvfi",
+      "V": 3,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 11,
+      "valid": true,
+      "note": "Dark pole and round base with a busy petal-ball shade; atypical design, shade looks noisy; 0.42 m footprint, 1.30 m tall."
+    },
+    {
+      "model": "floor_lamp/jqsuky",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Simple dark pole lamp with black dome shade and round base; clean, compact; 0.42 m footprint, 1.24 m tall."
+    },
+    {
+      "model": "floor_lamp/lcmuvd",
+      "V": 2,
+      "N": 1,
+      "S": 0,
+      "rest_ok": true,
+      "score": 6,
+      "valid": false,
+      "note": "Industrial contraption: box base, pipes, wire cage and sphere; not recognisable as a floor lamp; 0.85 m wide."
+    },
+    {
+      "model": "floor_lamp/lqdmym",
+      "V": 3,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 11,
+      "valid": true,
+      "note": "Uniform grey pole with flexible arm and bell shade, round base; flat low-detail look; 0.57 x 0.35 x 1.35 m."
+    },
+    {
+      "model": "floor_lamp/ogolip",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Dark drum shade on thin pole with X-shaped legs; clean; 0.54 x 0.38 x 1.66 m, height borderline."
+    },
+    {
+      "model": "floor_lamp/ozknkr",
+      "V": 4,
+      "N": 2,
+      "S": 0,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Long horizontal-arm arc lamp with cone shade; clean, but 0.85 m footprint exceeds the limit."
+    },
+    {
+      "model": "floor_lamp/pfuqec",
+      "V": 2,
+      "N": 0,
+      "S": 0,
+      "rest_ok": false,
+      "score": 4,
+      "valid": false,
+      "note": "Grey dish-shade lamp lying nearly horizontal in canonical pose (0.84 x 0.24 x 0.48 m); not standing, unusable."
+    },
+    {
+      "model": "floor_lamp/smfygn",
+      "V": 2,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 9,
+      "valid": false,
+      "note": "Uniform grey cone body with tapered shade; no texture detail, reads as a bollard not a lamp; 0.49 m footprint, 1.66 m."
+    },
+    {
+      "model": "floor_lamp/uivlzf",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Black studio-style tripod spotlight lamp with round grilled head; decent detail; 0.46 x 0.51 x 1.49 m."
+    },
+    {
+      "model": "floor_lamp/vdxlda",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Wooden three-column torchiere with dark patterned bowl shade; textured, stable; 0.35 m footprint, 1.33 m tall."
+    }
+  ],
+  "picks": ["floor_lamp/cosjfl", "floor_lamp/jqsuky"],
+  "alternate": "floor_lamp/imgsrd",
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int", "hotel_suite_large"],
+  "category_verdict": "weak",
+  "category_note": "Fifteen lamps, ten valid: mostly slim 0.35-0.55 m footprints but all 1.24-1.96 m tall, so size is borderline at best. Natural in living rooms, bedrooms and hotel suites but normally beside furniture (N=2); several arc lamps too wide."
+}

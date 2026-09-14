@@ -1,0 +1,53 @@
+{
+ "key": "dishwasher__tnlzww",
+ "category": "dishwasher",
+ "model": "tnlzww",
+ "scene": "house_single_floor",
+ "host": "dishwasher_ynrhuk_0",
+ "host_rank": 0,
+ "host_model": "ynrhuk",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_4",
+   "kind": "flap",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     7.283,
+     -1.138,
+     -1.566
+    ],
+    "translate": 0.5,
+    "sign": 1.0,
+    "orientation": "front_down45"
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: collision: [collision] trunk motion would collide (sample 1) {'translate': 0.5, 'tilt': None}",
+    "sign +1: collision: [collision] trunk motion would collide (sample 1) {'translate': 0.5, 'tilt': None}"
+   ],
+   "error": "collision: [collision] trunk motion would collide (sample 1) {'translate': 0.5, 'tilt': None}",
+   "contact_world": [
+    7.085,
+    -1.589,
+    0.713
+   ],
+   "handle_height_above_floor": 0.708
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.02,
+  1.161,
+  1.077
+ ],
+ "time_s": 499.3
+}

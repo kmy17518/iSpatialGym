@@ -1,0 +1,52 @@
+{
+ "key": "dishwasher__tnlzww",
+ "category": "dishwasher",
+ "model": "tnlzww",
+ "scene": "house_single_floor",
+ "host": "dishwasher_ynrhuk_0",
+ "host_rank": 0,
+ "host_model": "ynrhuk",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_4",
+   "kind": "flap",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     7.283,
+     -1.188,
+     -1.565
+    ],
+    "translate": 0.5,
+    "sign": -1.0
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: planning: [planning] no collision-free base path to (7.282930374145508, -1.1882095336914062, -1.5652942657470703) {'curobo_status': 'IK failed: goal pose reachable (29/32 seeds converge) but every converged solution violates collision or joint-limit constraints (0/32 seeds feasible overall) [start configuration is in collision]'}",
+    "sign -1: planning: [planning] no collision-free base path to (7.282804489135742, -1.1881475448608398, -1.56498122215271) {'curobo_status': 'IK failed: goal pose is kinematically reachable but blocked by world obstacles (best pose error with obstacles 0.0 mm / 0.002 rad; converges once obstacles are ignored) [start configuration is in collision]'}"
+   ],
+   "error": "planning: [planning] no collision-free base path to (7.282804489135742, -1.1881475448608398, -1.56498122215271) {'curobo_status': 'IK failed: goal pose is kinematically reachable but blocked by world obstacles (best pose error with obstacles 0.0 mm / 0.002 rad; converges once obstacles are ignored) [start configuration is in collision]'}",
+   "contact_world": [
+    7.085,
+    -1.589,
+    0.713
+   ],
+   "handle_height_above_floor": 0.708
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.02,
+  1.161,
+  1.077
+ ],
+ "time_s": 151.4
+}

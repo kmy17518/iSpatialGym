@@ -1,0 +1,267 @@
+{
+ "group": "IORS__pickle__r1",
+ "task": "IORS",
+ "category": "pickle",
+ "round": 1,
+ "relation": "ontop",
+ "partner": "cutting_board",
+ "requirements": "Inter-object relation task: the object is picked from a table and placed so that a spatial relation with a partner object holds (see relation / partner). The grasp must leave the placing side free; for 'inside' the pinch must come from above so the body can be lowered into the container; flowers are held by the stem.",
+ "candidates": [
+  {
+   "model": "gytwes",
+   "key": "pickle__gytwes",
+   "strip": "/tmp/glib/strips/pickle__gytwes.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, CoM 10 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, tilt 31"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, coverage 1.0"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch nearer one end, coverage 0.75"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, CoM 12 mm"
+    }
+   ],
+   "object_note": "all rows X/0 finger pattern; opening matches width, pickle off-centre but pinched",
+   "bbox_mm": [
+    46,
+    90,
+    33
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "ifterk",
+   "key": "pickle__ifterk",
+   "strip": "/tmp/glib/strips/pickle__ifterk.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, CoM 4 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, CoM 4 mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, CoM 6 mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, tilt 3"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, narrow 21 mm section, pads touch"
+    }
+   ],
+   "object_note": "short stubby pickle; X/0 closures, both pads on body",
+   "bbox_mm": [
+    33,
+    100,
+    33
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "vuspsy",
+   "key": "pickle__vuspsy",
+   "strip": "/tmp/glib/strips/pickle__vuspsy.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, CoM 5 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, tilt 4"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, CoM 9 mm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch toward one end, CoM 13 mm, pads covered"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    33,
+    110,
+    34
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "rxuimv",
+   "key": "pickle__rxuimv",
+   "strip": "/tmp/glib/strips/pickle__rxuimv.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, CoM 5 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, CoM 6 mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, CoM 12 mm, not at tip"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, tilt 32"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, CoM 12 mm"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    35,
+    80,
+    38
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  },
+  {
+   "model": "iobrqp",
+   "key": "pickle__iobrqp",
+   "strip": "/tmp/glib/strips/pickle__iobrqp.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, 38 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, tilt 7"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, antipodal 0.97"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-body pinch, CoM 8 mm"
+    }
+   ],
+   "object_note": "41/0 closures, opening within 5 mm of width",
+   "bbox_mm": [
+    40,
+    100,
+    40
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "tabletop"
+  }
+ ],
+ "excluded": []
+}

@@ -1,0 +1,53 @@
+{
+ "category": "bottle_of_beer",
+ "model": "zlmwyn",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0,
+  180.0,
+  270.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_beer__zlmwyn__y0.png",
+   "drift_m": 0.0013,
+   "tilt_deg": 0.6,
+   "on_tray": true,
+   "settled_z": 0.1251,
+   "seg_pixels": 23218,
+   "aabb_extent": [
+    0.095,
+    0.096,
+    0.34
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_beer__zlmwyn__y1.png",
+   "drift_m": 0.0008,
+   "tilt_deg": 0.4,
+   "on_tray": true,
+   "settled_z": 0.1252
+  },
+  "y2": {
+   "yaw_deg": 180.0,
+   "png": "renders/bottle_of_beer__zlmwyn__y2.png",
+   "drift_m": 0.0002,
+   "tilt_deg": 0.1,
+   "on_tray": true,
+   "settled_z": 0.1252
+  },
+  "y3": {
+   "yaw_deg": 270.0,
+   "png": "renders/bottle_of_beer__zlmwyn__y3.png",
+   "drift_m": 0.0011,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.1251
+  }
+ },
+ "stable": true,
+ "visible": true
+}

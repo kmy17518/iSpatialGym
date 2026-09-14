@@ -1,0 +1,24 @@
+{
+ "category": "wreath",
+ "task": "wa1",
+ "n_models": 1,
+ "n_opened": 1,
+ "models": [
+  {
+   "model": "rkrxno",
+   "V": 4,
+   "U": 0,
+   "H": 1,
+   "score": 9,
+   "valid": false,
+   "front_axis": "+z",
+   "up_axis": "+y",
+   "thin_axis": "z",
+   "note": "Round berry-and-leaf wreath 0.20 m across lying flat; rotationally symmetric, no readable up."
+  }
+ ],
+ "picks": [],
+ "alternate": null,
+ "category_verdict": "drop",
+ "category_note": "Single round wreath 0.20 m in diameter; symmetric ring gives no upright cue, and it is borderline small for the wall task."
+}

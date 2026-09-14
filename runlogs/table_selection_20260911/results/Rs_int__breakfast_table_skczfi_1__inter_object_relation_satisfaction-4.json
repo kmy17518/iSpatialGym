@@ -1,0 +1,257 @@
+{
+ "scene": "Rs_int",
+ "table": "breakfast_table_skczfi_1",
+ "category": "breakfast_table",
+ "model": "skczfi",
+ "rooms": [
+  "living_room_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-4",
+ "inventory": {
+  "top_z": 0.749,
+  "bbox_x": 0.489,
+  "bbox_y": 1.417,
+  "bbox_z": 0.739,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "swivel_chair_qtqitn_0"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:01:02",
+ "precheck": {
+  "aabb": [
+   [
+    -0.546,
+    -4.017,
+    -0.0
+   ],
+   [
+    0.886,
+    -3.515,
+    0.759
+   ]
+  ],
+  "support": {
+   "name": "breakfast_table_skczfi_1",
+   "z": 0.7587616443634033,
+   "yaw": 1.5707932710647583,
+   "local_bounds": [
+    -4.006640911102295,
+    -3.526637077331543,
+    -0.8841164112091064,
+    0.5358850359916687
+   ],
+   "n_free_cells": 1787,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     0.174,
+     -3.527
+    ],
+    "length": 1.42
+   },
+   {
+    "name": "-u",
+    "mid": [
+     0.174,
+     -4.007
+    ],
+    "length": 1.42
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -0.536,
+     -3.767
+    ],
+    "length": 0.48
+   },
+   {
+    "name": "-v",
+    "mid": [
+     0.884,
+     -3.767
+    ],
+    "length": 0.48
+   }
+  ],
+  "stance": null,
+  "stance_error": "[stance_collision] untucked: [stance_collision] no collision-free viewing trunk configuration (46 candidates)",
+  "precheck_s": 6.2
+ },
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {
+  "goal_infeasible": 2
+ },
+ "template_meta": {
+  "support": {
+   "name": "breakfast_table_skczfi_1",
+   "z": 0.7587617039680481,
+   "yaw": 1.570712924003601,
+   "local_bounds": [
+    -4.0067138671875,
+    -3.526597261428833,
+    -0.8844240307807922,
+    0.5356159806251526
+   ],
+   "n_free_cells": 1787,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    0.17410989105701447,
+    -3.526611804962158
+   ],
+   "inward": [
+    -8.340278873220086e-05,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    -8.340278873220086e-05
+   ],
+   "base_pose2d": [
+    0.4297224283218384,
+    -2.976633071899414,
+    -1.5708797295834354
+   ],
+   "edge_depth": 0.5500000715255737,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.3500000238418579,
+    "axis_angle": 0.0033116860754117466
+   }
+  },
+  "view_arms": "untucked",
+  "n_reachable_cells": 9,
+  "n_region_cells": 630,
+  "n_visible_cells": 630,
+  "stand_off": 0.55,
+  "edge": null,
+  "load_room_instances": [
+   "living_room_0",
+   "bathroom_0",
+   "bedroom_0",
+   "entryway_0",
+   "kitchen_0"
+  ],
+  "task_rooms": [
+   "living_room_0"
+  ],
+  "rejections": {
+   "goal_infeasible": 2
+  },
+  "n_written": 1,
+  "scene_variant": {
+   "scene_file": "../../scene_variants/Rs_int__e8598ec1ea.json",
+   "removed_objects": [
+    "swivel_chair_qtqitn_0"
+   ],
+   "freed_footprints": {
+    "free": [
+     [
+      [
+       0.35108447074890137,
+       -3.5587360858917236
+      ],
+      [
+       -0.0738583654165268,
+       -3.6238327026367188
+      ],
+      [
+       -0.12986968457698822,
+       -3.2581980228424072
+      ],
+      [
+       0.29507315158843994,
+       -3.193101406097412
+      ]
+     ]
+    ],
+    "block": [
+     [
+      [
+       -0.538267970085144,
+       -3.5215678215026855
+      ],
+      [
+       0.8783320188522339,
+       -3.521568536758423
+      ],
+      [
+       0.8783317804336548,
+       -4.010168552398682
+      ],
+      [
+       -0.5382682085037231,
+       -4.010168075561523
+      ]
+     ]
+    ]
+   }
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 23.64,
+   "prepare_template_s": 0.5,
+   "save_template_s": 0.05
+  }
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_table_sel/Rs_int/Rs_int__breakfast_table_skczfi_1__inter_object_relation_satisfaction-4/instances/inter_object_relation_satisfaction-4__Rs_int__breakfast_table_skczfi_1__inter_object_relation_satisfaction-4__0000.summary.json",
+   "wall_time_s": 4.9,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    0.4297224283218384,
+    -2.976633071899414,
+    -1.5708797295834354
+   ],
+   "trunk": [
+    0.749999987042469,
+    -0.3500000834465027
+   ],
+   "grasp": {
+    "key": null,
+    "translate": 0.5,
+    "yaw": -0.8416589883664276
+   },
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.3500000238418579
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_table_sel/Rs_int/Rs_int__breakfast_table_skczfi_1__inter_object_relation_satisfaction-4",
+ "bound_table": "breakfast_table_skczfi_1",
+ "setup_s": 24.1,
+ "run_s": 22.9,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "ok",
+   "n_written": 1,
+   "rejections": {
+    "goal_infeasible": 2
+   },
+   "reject_reason": null,
+   "setup_s": 24.1,
+   "run_s": 22.9
+  }
+ ],
+ "job_s": 49.8,
+ "finished": "2026-09-12 02:01:51"
+}

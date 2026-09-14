@@ -1,0 +1,37 @@
+{
+  "group": "mental_rotation__drill__r3",
+  "task": "mental_rotation",
+  "category": "drill",
+  "round": 3,
+  "relation": null,
+  "n_candidates": 1,
+  "n_opened": 1,
+  "candidates": [
+    {
+      "model": "nzgmza",
+      "key": "drill__nzgmza__f",
+      "G": 5,
+      "T": 3,
+      "V": 5,
+      "R": 1,
+      "score": 24,
+      "note": "Five clean grasps on four regions (handle, upper body, chuck, rear housing) at tilts 31-155, wide contact; sharp scuffed orange/black drill; one finger at 0."
+    }
+  ],
+  "selected": [
+    {
+      "model": "nzgmza",
+      "key": "drill__nzgmza__f",
+      "rank": 1,
+      "reason": "Only candidate but strong: clean handle, body, chuck and housing grasps give excellent in-hand pose diversity; realistic well-textured drill, instantly recognisable."
+    }
+  ],
+  "alternate": null,
+  "short": true,
+  "warnings": [
+    "Only 1 candidate in the group; fewer than 2 models selectable.",
+    "Rows 4-5 grasp the chuck and rear housing 76-88 mm from CoM; contact is wide but the body will swing under rotation.",
+    "One finger closes to 0 mm on rows 1-4 (drill pressed against the other pad)."
+  ],
+  "confidence": "high"
+}

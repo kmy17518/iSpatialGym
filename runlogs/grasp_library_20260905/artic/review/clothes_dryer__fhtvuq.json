@@ -1,0 +1,20 @@
+{
+  "key": "clothes_dryer__fhtvuq",
+  "category": "clothes_dryer",
+  "model": "fhtvuq",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_0",
+      "kind": "door",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "swing",
+      "graspable": false,
+      "handle_description": "No handle; flat black round porthole door sits against the front panel, its rim has no clearance behind it to get a fingertip in",
+      "height_concern": "grasp spot ~0.26 m above floor, marginal",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Compact 0.52 m tall dryer; door hinged on -y (viewer-left) side, free edge swings out at +y. F is on the free edge but it is not exposed; heuristic agrees."
+}

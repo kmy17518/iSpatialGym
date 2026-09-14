@@ -1,0 +1,17 @@
+{
+ "group": "configuration_matching__license_plate__r1",
+ "task": "configuration_matching",
+ "category": "license_plate",
+ "round": 1,
+ "relation": null,
+ "n_candidates": 0,
+ "n_opened": 0,
+ "candidates": [],
+ "selected": [],
+ "alternate": null,
+ "short": true,
+ "warnings": [
+  "no model with an AG-valid grasp: nwfbxn: no candidates; naclac: no candidates; hjdaqn: no candidates; nuqnlr: no candidates; yepdrj: no candidates"
+ ],
+ "confidence": "high"
+}

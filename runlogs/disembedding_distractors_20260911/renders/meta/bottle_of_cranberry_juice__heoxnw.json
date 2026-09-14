@@ -1,0 +1,35 @@
+{
+ "category": "bottle_of_cranberry_juice",
+ "model": "heoxnw",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_cranberry_juice__heoxnw__y0.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.103,
+   "seg_pixels": 13865,
+   "aabb_extent": [
+    0.079,
+    0.078,
+    0.231
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_cranberry_juice__heoxnw__y1.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.103
+  }
+ },
+ "stable": true,
+ "visible": true
+}

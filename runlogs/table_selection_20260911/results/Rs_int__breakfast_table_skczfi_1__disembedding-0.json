@@ -1,0 +1,143 @@
+{
+ "scene": "Rs_int",
+ "table": "breakfast_table_skczfi_1",
+ "category": "breakfast_table",
+ "model": "skczfi",
+ "rooms": [
+  "living_room_0"
+ ],
+ "partner": null,
+ "problem": "disembedding-0",
+ "inventory": {
+  "top_z": 0.749,
+  "bbox_x": 0.489,
+  "bbox_y": 1.417,
+  "bbox_z": 0.739,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "swivel_chair_qtqitn_0"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:57:42",
+ "precheck": {
+  "aabb": [
+   [
+    -0.546,
+    -4.017,
+    -0.0
+   ],
+   [
+    0.886,
+    -3.515,
+    0.759
+   ]
+  ],
+  "support": {
+   "name": "breakfast_table_skczfi_1",
+   "z": 0.7587616443634033,
+   "yaw": 1.5707932710647583,
+   "local_bounds": [
+    -4.006640911102295,
+    -3.526637077331543,
+    -0.8841164112091064,
+    0.5358850359916687
+   ],
+   "n_free_cells": 1787,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     0.174,
+     -3.527
+    ],
+    "length": 1.42
+   },
+   {
+    "name": "-u",
+    "mid": [
+     0.174,
+     -4.007
+    ],
+    "length": 1.42
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -0.536,
+     -3.767
+    ],
+    "length": 0.48
+   },
+   {
+    "name": "-v",
+    "mid": [
+     0.884,
+     -3.767
+    ],
+    "length": 0.48
+   }
+  ],
+  "stance": null,
+  "stance_error": "[stance_collision] untucked: [stance_collision] no collision-free viewing trunk configuration (46 candidates)",
+  "precheck_s": 6.2
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "distractors": {
+   "same_category": true,
+   "pool": "same_category",
+   "requested_pool": "same_category",
+   "fallback": null,
+   "models": [
+    "box_of_cereal-wdkcbu",
+    "box_of_cereal-pfwgkm"
+   ],
+   "requested": 2,
+   "pool_size": 10,
+   "pool_categories": [
+    "box_of_cereal"
+   ],
+   "lookalikes_excluded": [
+    "box_of_cereal/qirvmd"
+   ],
+   "footprint_fraction": 0.23
+  },
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/Rs_int/Rs_int__breakfast_table_skczfi_1__disembedding-0__s1",
+ "setup_s": 13.3,
+ "reject_reason": "no_support",
+ "error": "[no_support] breakfast_table_skczfi_1: [support] untucked: [support] edge +u lateral +0.00: [support] no view / side keeps the source tray in view with the destination tray barely visible ({'views': 40, 'collision_free': 0, 'src_in_view': 0, 'lateral_out_of_range': 0, 'yaw_search_failed': 0, 'yaw_collision': 0, 'yaw_src_out': 0}; source tray at depth 0.23, dest options [('right', -0.72)], support bounds (-4.0066423416137695, -3.5265963077545166, -0.8842319250106812, 0.5357840657234192)); edge +u lateral +0.25: [support] no view / side keeps the source tray in view with the destination tray barely visible ({'views': 40, 'collision_free': 0, 'src_in_view': 0, 'lateral_out_of_range': 0, 'yaw_search_failed': 0, 'yaw_collision': 0, 'yaw_src_out': 0}; source tray at depth 0.23, dest options [('right', -0.72)], support bounds (-4.0066423416137695, -3.5265963077545166, -0.8842319250106812, 0.5357840657234192)); edge +u lateral -0.25: [no_stance] no stance near lateral -0.25 on edge +u; edge +u lateral +0.35: [support] no view / side keeps the source tray in view with the destination tray barely visible ({'views': 40, 'collision_free': 0, 'src_in_view': 0, 'lateral_out_of_range': 0, 'yaw_search_failed': 0, 'yaw_collision': 0, 'yaw_src_out': 0}; source tray at depth 0.23, dest options [('right', -0.82)], support bounds (-4.0066423416137695, -3.5265963077545166, -0.8842319250106812, 0.5357840657234192)); edge +u lateral -0.35: [no_stance] no stance near lateral -0.35 on edge +u; edge -u: [no_stance] no traversable stance around breakfast_table_skczfi_1; edge +v: [no_stance] no traversable stance around breakfast_table_skczfi_1; edge -v: [no_stance] no traversable stance around breakfast_table_skczfi_1; edge +u lateral +0.00 (yaw allowed): [support] no view / side keeps the source tray in view with the destination tray barely visible ({'views': 40, 'collision_free': 0, 'src_in_view': 0, 'lateral_out_of_range': 0, 'yaw_search_failed': 0, 'yaw_collision': 0, 'yaw_src_out': 0}; so",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 13.3,
+   "run_s": null
+  },
+  {
+   "seed": 1000,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 13.3,
+   "run_s": null
+  }
+ ],
+ "job_s": 34.5,
+ "finished": "2026-09-12 01:58:17"
+}

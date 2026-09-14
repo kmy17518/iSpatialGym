@@ -1,0 +1,35 @@
+{
+ "category": "lipstick",
+ "model": "albshz",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/lipstick__albshz__y0.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0105,
+   "seg_pixels": 2974,
+   "aabb_extent": [
+    0.02,
+    0.146,
+    0.021
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/lipstick__albshz__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0102
+  }
+ },
+ "stable": true,
+ "visible": true
+}

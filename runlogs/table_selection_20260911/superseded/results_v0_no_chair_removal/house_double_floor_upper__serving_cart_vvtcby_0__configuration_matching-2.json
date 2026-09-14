@@ -1,0 +1,23 @@
+{
+ "scene": "house_double_floor_upper",
+ "table": "serving_cart_vvtcby_0",
+ "category": "serving_cart",
+ "model": "vvtcby",
+ "rooms": [
+  "bathroom_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.643,
+  "bbox_x": 0.375,
+  "bbox_y": 0.519,
+  "bbox_z": 0.643,
+  "verdict": "keep"
+ },
+ "n_requested": 1,
+ "max_attempts": 8,
+ "started": "2026-09-11 20:31:30",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

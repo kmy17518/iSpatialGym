@@ -1,0 +1,147 @@
+{
+ "target_category": "jar_of_bath_salt",
+ "target_model": "dtrjxi",
+ "target_key": "jar_of_bath_salt__dtrjxi__t",
+ "category": "jar_of_curry_powder",
+ "model": "ozhftu",
+ "kind": "diff",
+ "tier": 1,
+ "started": "2026-09-12 14:06:21",
+ "template": {
+  "support": {
+   "name": "breakfast_table_rhjoby_0",
+   "z": 0.8126288652420044,
+   "yaw": 1.5683811902999878,
+   "local_bounds": [
+    2.934999704360962,
+    4.095189571380615,
+    -8.734033584594727,
+    -5.831336975097656
+   ],
+   "n_free_cells": 8465,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-v",
+   "edge_mid": [
+    8.742497444152832,
+    3.493990659713745
+   ],
+   "inward": [
+    -0.999997079372406,
+    0.0024151341058313847
+   ],
+   "tangent": [
+    -0.0024151341058313847,
+    -0.999997079372406
+   ],
+   "base_pose2d": [
+    9.191699028015137,
+    3.1628098487854004,
+    3.139177517125982
+   ],
+   "edge_depth": 0.4500001072883606,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.4000000059604645,
+    "axis_angle": 0.17428162163321145
+   }
+  },
+  "place_stance": {
+   "edge": "-v",
+   "edge_mid": [
+    8.742497444152832,
+    3.493990659713745
+   ],
+   "inward": [
+    -0.999997079372406,
+    0.0024151341058313847
+   ],
+   "tangent": [
+    -0.0024151341058313847,
+    -0.999997079372406
+   ],
+   "base_pose2d": [
+    9.192488670349121,
+    3.4898409843444824,
+    3.139177517125982
+   ],
+   "edge_depth": 0.44999992847442627
+  },
+  "view_arms": "untucked",
+  "yaw_adjust_deg": 0.0,
+  "dest_lateral_m": -0.6540644391449131,
+  "dest_side": "right",
+  "source_lateral_offset": 0.35,
+  "n_reachable_cells": 13,
+  "n_grasp_cells": 5,
+  "n_place_combos": 20,
+  "distractors": {
+   "same_category": true,
+   "pool": "same_category",
+   "requested_pool": "same_category",
+   "fallback": null,
+   "models": [
+    "jar_of_bath_salt-erglwp"
+   ],
+   "requested": 1,
+   "pool_size": 1,
+   "pool_categories": [
+    "jar_of_bath_salt"
+   ],
+   "lookalikes_excluded": [],
+   "footprint_fraction": 0.12
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 135.44,
+   "prepare_template_s": 0.15
+  },
+  "setup_s": 135.6
+ },
+ "footprint_fraction_with_target": 0.106,
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {
+  "occlusion": 2,
+  "unstable_init": 1
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_dis_distractors/jar_of_bath_salt-dtrjxi__jar_of_curry_powder-ozhftu/instances/disembedding-0__jar_of_bath_salt-dtrjxi__jar_of_curry_powder-ozhftu__0000.summary.json",
+   "wall_time_s": 5.0,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    9.191699028015137,
+    3.1628098487854004,
+    3.139177517125982
+   ],
+   "trunk": [
+    0.749999987042469,
+    -0.40000003576278687
+   ],
+   "occluded_variant": false,
+   "grasp": {
+    "key": "jar_of_bath_salt__dtrjxi__t",
+    "name": "grasp_4",
+    "translate": 0.5,
+    "place_translate": 0.5,
+    "yaw": -0.7572087657534863
+   },
+   "dest_pixels": 15398,
+   "source_pixels": 112391,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.4000000059604645
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_dis_distractors/jar_of_bath_salt-dtrjxi__jar_of_curry_powder-ozhftu",
+ "job_s": 19.5,
+ "finished": "2026-09-12 14:06:41",
+ "occluded_variant": false,
+ "occlusion_ratio": null
+}

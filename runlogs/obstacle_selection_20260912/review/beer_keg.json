@@ -1,0 +1,25 @@
+{
+  "category": "beer_keg",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "xtqbuf",
+      "V": 4,
+      "N": 1,
+      "S": 2,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Black ribbed steel drum with two handle slots, 0.42 x 0.42 x 0.60 m, clean geometry; looks like a barrel; odd mid-path outside a bar."
+    }
+  ],
+  "picks": [],
+  "alternate": null,
+  "natural_scenes": [
+    "restaurant_diner"
+  ],
+  "category_verdict": "drop",
+  "category_note": "Single black keg/drum, 0.42 m wide, 0.60 m tall, stable and well sized, but a keg only belongs behind a diner bar; in the middle of a dining room or corridor it is odd. No valid model."
+}

@@ -1,0 +1,155 @@
+{
+ "category": "bottom_cabinet_no_top",
+ "model": "fmelap",
+ "key": "bottom_cabinet_no_top__fmelap",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.2570965588092804
+ ],
+ "aabb_extent": [
+  0.42373278737068176,
+  0.6843711137771606,
+  0.5621618032455444
+ ],
+ "aabb_min_rel_root": [
+  -0.1741294264793396,
+  -0.341522753238678,
+  -0.2570965588092804
+ ],
+ "aabb_max_rel_root": [
+  0.24960336089134216,
+  0.3428483307361603,
+  0.30506524443626404
+ ],
+ "link_tags": {
+  "base_link": [],
+  "link_0": [
+   "openable"
+  ],
+  "link_1": [
+   "openable"
+  ]
+ },
+ "openable_joint_ids": [
+  [
+   1,
+   "j_link_0"
+  ],
+  [
+   2,
+   "j_link_1"
+  ]
+ ],
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "type": "RevoluteJoint",
+   "child_link": "link_0",
+   "lower": 0.0,
+   "upper": 1.5707968473434448,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.22247,
+    0.33164,
+    0.00397
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "hinge_point_obj": [
+    0.22247,
+    0.33164,
+    0.00397
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/bottom_cabinet_no_top__fmelap__link_0.obj",
+   "n_pieces": 4,
+   "link_bbox_min": [
+    0.215,
+    0.0048,
+    -0.1796
+   ],
+   "link_bbox_max": [
+    0.2496,
+    0.3387,
+    0.1858
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  },
+  {
+   "joint": "j_link_1",
+   "type": "RevoluteJoint",
+   "child_link": "link_1",
+   "lower": 0.0,
+   "upper": 1.5707963705062866,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.22288,
+    -0.33029,
+    0.00397
+   ],
+   "link_quat_obj": [
+    -0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    -0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    0.22288,
+    -0.33029,
+    1.9663
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/bottom_cabinet_no_top__fmelap__link_1.obj",
+   "n_pieces": 4,
+   "link_bbox_min": [
+    0.215,
+    -0.3374,
+    -0.1796
+   ],
+   "link_bbox_max": [
+    0.2496,
+    -0.0034,
+    0.1858
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.1741,
+   -0.3415,
+   -0.2571
+  ],
+  "bbox_max": [
+   0.2292,
+   0.3428,
+   0.3051
+  ],
+  "n_pieces": 16
+ }
+}

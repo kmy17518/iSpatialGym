@@ -1,0 +1,11 @@
+{
+  "key": "bottom_cabinet_no_top__apjbrw",
+  "category": "bottom_cabinet_no_top",
+  "model": "apjbrw",
+  "strip_opened": true,
+  "joints": [
+    {"joint": "j_link_0", "kind": "door", "chosen": "A", "pinch": "horizontal_bar", "motion": "swing",
+     "graspable": true, "handle_description": "Small 4 cm tab pull (15 mm thick, 17 mm stand-off) at the door's top corner beside the free +y edge; hinge on -y edge", "height_concern": "", "confidence": "medium"}
+  ],
+  "object_note": "Slim single-door unit; only candidate is a tiny tab at the door's top free corner, plausible but hard to see in the render; recessed panel outline is not a handle."
+}

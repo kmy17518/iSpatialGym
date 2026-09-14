@@ -1,0 +1,48 @@
+{
+  "group": "object_scaling__pack_of_cigarettes__r2",
+  "task": "object_scaling",
+  "category": "pack_of_cigarettes",
+  "round": 2,
+  "relation": null,
+  "n_candidates": 12,
+  "n_opened": 12,
+  "candidates": [
+    {"model": "tngixy", "key": "pack_of_cigarettes__tngixy__f", "G": 4, "T": 3, "V": 3, "R": 2, "score": 19,
+     "note": "Five clean 55 mm face pinches in two flipped poses (tilt 178/3); green generic emblem box, blurry banded side texture, chunky 125x55x80 proportions."},
+    {"model": "kienyo", "key": "pack_of_cigarettes__kienyo__f", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Five clean 55 mm face pinches, upright and flipped poses; red pack with sharp health-warning graphic, faint diagonal seam in V4; chunky 80 mm depth."},
+    {"model": "ohpqua", "key": "pack_of_cigarettes__ohpqua__f", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Five clean 55 mm face pinches, two flipped poses; white Marlboro-style chevron pack, vertical banding visible on white sides; chunky 80 mm depth."},
+    {"model": "wjfbhw", "key": "pack_of_cigarettes__wjfbhw__f", "G": 4, "T": 3, "V": 3, "R": 2, "score": 19,
+     "note": "Five clean 55 mm face pinches, two flipped poses; gold box with blue emblem, faint seam line, generic look, chunky 80 mm depth."},
+    {"model": "ajphvf", "key": "pack_of_cigarettes__ajphvf__f", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Five clean 16 mm flat-face pinches, front/back sides plus a diagonal row; sharp orange Chunghwa-style front, plain back, smeared narrow faces."},
+    {"model": "dthkix", "key": "pack_of_cigarettes__dthkix__f", "G": 4, "T": 3, "V": 3, "R": 2, "score": 19,
+     "note": "Five clean 16 mm face pinches (valid 5/6), front/back and diagonal; red-gold front but plain yellow back, smeared side texture."},
+    {"model": "wpmpcf", "key": "pack_of_cigarettes__wpmpcf__f", "G": 4, "T": 3, "V": 3, "R": 2, "score": 19,
+     "note": "Five clean 16 mm face pinches including a diagonal row; gold-text front but blank white back face, smeared narrow sides."},
+    {"model": "ppbmak", "key": "pack_of_cigarettes__ppbmak__f", "G": 4, "T": 3, "V": 4, "R": 2, "score": 21,
+     "note": "Five clean 16 mm face pinches on front/back sides, small offsets; sharp red pack with white text and warning box, glossy streaks, minor seam."},
+    {"model": "ipmejr", "key": "pack_of_cigarettes__ipmejr__f", "G": 4, "T": 3, "V": 3, "R": 2, "score": 19,
+     "note": "Five clean 16 mm face pinches at three rotations (valid 5/6); white pack with blue-gold emblem, plain grey-white back, smeared narrow side."},
+    {"model": "qldhnm", "key": "pack_of_cigarettes__qldhnm__f", "G": 4, "T": 3, "V": 3, "R": 2, "score": 19,
+     "note": "Five clean 16 mm face pinches at several rotations; white DIAMOND pack, plain white back, heavily smeared blue texture on narrow sides."},
+    {"model": "hmhqkq", "key": "pack_of_cigarettes__hmhqkq__f", "G": 4, "T": 3, "V": 3, "R": 2, "score": 19,
+     "note": "Five clean 16 mm face pinches at several rotations (valid 5/6); white pack with tiger motif, plain back, black smeared streaks on sides."},
+    {"model": "cfmlhf", "key": "pack_of_cigarettes__cfmlhf__f", "G": 4, "T": 3, "V": 3, "R": 2, "score": 19,
+     "note": "Five clean 16 mm face pinches (only 5/8 valid), front/back and diagonal; dark-red gold-text pack, plain back, smeared top face."}
+  ],
+  "selected": [
+    {"model": "kienyo", "key": "pack_of_cigarettes__kienyo__f", "rank": 1,
+     "reason": "Top score: five clean two-pad 55 mm face pinches in two poses, robust wide pinch, sharp red pack with health-warning graphic; chunky 80 mm depth is the only oddity."},
+    {"model": "ajphvf", "key": "pack_of_cigarettes__ajphvf__f", "rank": 2,
+     "reason": "Ties the top score and looks different from #1: slim 110x55x16 orange pack, five clean 16 mm face pinches with front/back and diagonal transforms; plain back, smeared sides."}
+  ],
+  "alternate": {"model": "ohpqua", "key": "pack_of_cigarettes__ohpqua__f"},
+  "short": false,
+  "warnings": [
+    "Group splits into two mesh families: 125x55x80 chunky boxes (odd depth, banded side texture) and 110x55x16 slim packs (plain backs, smeared narrow faces); no candidate is defect-free.",
+    "Every model repeats one approach direction (face pinch) varied only by flips/rotations, so G is capped at 4 throughout; kienyo, ohpqua, ajphvf and ppbmak tie at 21."
+  ],
+  "confidence": "medium"
+}

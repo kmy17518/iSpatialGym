@@ -1,0 +1,23 @@
+{
+ "scene": "Rs_int",
+ "table": "bottom_cabinet_bamfsz_0",
+ "category": "bottom_cabinet",
+ "model": "bamfsz",
+ "rooms": [
+  "kitchen_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.874,
+  "bbox_x": 0.649,
+  "bbox_y": 0.728,
+  "bbox_z": 0.869,
+  "verdict": "keep"
+ },
+ "n_requested": 1,
+ "max_attempts": 8,
+ "started": "2026-09-11 20:16:48",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

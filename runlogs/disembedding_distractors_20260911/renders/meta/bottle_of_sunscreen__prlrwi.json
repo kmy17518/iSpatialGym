@@ -1,0 +1,35 @@
+{
+ "category": "bottle_of_sunscreen",
+ "model": "prlrwi",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_sunscreen__prlrwi__y0.png",
+   "drift_m": 0.0283,
+   "tilt_deg": 27.0,
+   "on_tray": true,
+   "settled_z": 0.0574,
+   "seg_pixels": 1625,
+   "aabb_extent": [
+    0.078,
+    0.048,
+    0.106
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_sunscreen__prlrwi__y1.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.1,
+   "on_tray": true,
+   "settled_z": 0.0617
+  }
+ },
+ "stable": false,
+ "visible": true
+}

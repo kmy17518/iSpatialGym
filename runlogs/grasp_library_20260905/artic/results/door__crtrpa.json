@@ -1,0 +1,58 @@
+{
+ "key": "door__crtrpa",
+ "category": "door",
+ "model": "crtrpa",
+ "scene": "house_single_floor",
+ "host": "door_crtrpa_0",
+ "host_rank": 0,
+ "host_model": "crtrpa",
+ "swap": false,
+ "joints": [
+  {
+   "joint": "j_leaf",
+   "kind": "door",
+   "grasp_source": "review:B",
+   "stance": {
+    "base": [
+     -6.375,
+     4.223,
+     -3.126
+    ],
+    "translate": 0.0,
+    "sign": 1.0,
+    "orientation": "front"
+   },
+   "reachable": true,
+   "ag": true,
+   "dq": 0.2997,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": true,
+   "base_shifts": 0,
+   "steps": [
+    "stance ok (teleported)",
+    "grasped",
+    "pull chunk 1: base follow failed: [planning] no collision-free base path to (-6.2498602867126465, 4.29533576965332, -2.9946675300598145) {'curobo_status': 'IK failed: goal pose reachable (32/32 seeds converge) but every converged solution violates collision or joint-limit constraints (0/32 seeds feasible overall) [start configuration is in collision]'}",
+    "pull chunk 2: base follow failed: [planning] no collision-free base path to (-6.1354522705078125, 4.3829851150512695, -2.8637678623199463) {'curobo_status': 'IK failed: goal pose is kinematically reachable but blocked by world obstacles (best pose error with obstacles 0.3 mm / 1.116 rad; converges once obstacles are ignored) [start configuration is in collision]'}",
+    "pull chunk 3: base follow failed: [planning] no collision-free base path to (-6.033463001251221, 4.484817981719971, -2.732868194580078) {'curobo_status': 'IK failed: goal pose is kinematically reachable but blocked by world obstacles (best pose error with obstacles 0.0 mm / 1.152 rad; converges once obstacles are ignored) [start configuration is in collision]'}",
+    "pull chunk 3: base shift failed: [planning] no collision-free base path to (-6.226884841918945, 4.2307257652282715, -3.118257761001587) {'curobo_status': 'IK failed: goal pose is kinematically reachable but blocked by world obstacles (best pose error with obstacles 153.1 mm / 1.022 rad; converges once obstacles are ignored) [start configuration is in collision]'}",
+    "pull chunk 3: arm+base could not follow"
+   ],
+   "error": null,
+   "contact_world": [
+    -6.828,
+    4.416,
+    1.037
+   ],
+   "handle_height_above_floor": 1.031
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.0,
+  1.0,
+  1.0
+ ],
+ "time_s": 150.4
+}

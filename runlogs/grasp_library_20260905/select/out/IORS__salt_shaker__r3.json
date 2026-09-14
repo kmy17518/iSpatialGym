@@ -1,0 +1,28 @@
+{
+  "group": "IORS__salt_shaker__r3",
+  "task": "IORS",
+  "category": "salt_shaker",
+  "round": 3,
+  "relation": "nextto",
+  "n_candidates": 2,
+  "n_opened": 2,
+  "candidates": [
+    {"model": "fonexa", "key": "salt_shaker__fonexa__t", "G": 5, "T": 2, "V": 3, "R": 1, "score": 19,
+     "note": "Low-poly tan wooden mill, glossy knob alternating green/red per row, grinder spike protruding below base; five near-identical 50/0 one-finger pinches on top bulge, 48-51 mm."},
+    {"model": "iomwtn", "key": "salt_shaker__iomwtn__t", "G": 5, "T": 3, "V": 5, "R": 1, "score": 24,
+     "note": "Smooth dark-walnut mill with red top nut, sharp wood grain, flat base; five natural top-bulge pinches 48-52 mm, rows 1 and 3 two-sided (43/3, 42/8)."}
+  ],
+  "selected": [
+    {"model": "iomwtn", "key": "salt_shaker__iomwtn__t", "rank": 1,
+     "reason": "Top score: clean, natural pinch on the top bulge (rank-1 row two-sided), bottom free for nextto placement, best-textured asset with flat stable base."},
+    {"model": "fonexa", "key": "salt_shaker__fonexa__t", "rank": 2,
+     "reason": "Only other candidate (short group); natural top-bulge pinches leave bottom free, but all rows one-finger 50/0, low-poly texture and a bottom spike that may tilt the resting pose."}
+  ],
+  "alternate": null,
+  "short": true,
+  "warnings": [
+    "fonexa: grinder spike protrudes below the base, so the shaker may rest tilted on the table; every grasp is a 50/0 one-finger closure and the knob colour changes between rows.",
+    "Both candidates are pepper-mill style shakers (no perforated cap); the pair spans light vs dark wood."
+  ],
+  "confidence": "medium"
+}

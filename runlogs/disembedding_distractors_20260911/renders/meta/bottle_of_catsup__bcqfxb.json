@@ -1,0 +1,35 @@
+{
+ "category": "bottle_of_catsup",
+ "model": "bcqfxb",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_catsup__bcqfxb__y0.png",
+   "drift_m": 0.0007,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1306,
+   "seg_pixels": 24509,
+   "aabb_extent": [
+    0.072,
+    0.117,
+    0.27
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_catsup__bcqfxb__y1.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1306
+  }
+ },
+ "stable": true,
+ "visible": true
+}

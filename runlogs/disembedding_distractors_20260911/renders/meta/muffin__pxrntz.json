@@ -1,0 +1,35 @@
+{
+ "category": "muffin",
+ "model": "pxrntz",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/muffin__pxrntz__y0.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.0332,
+   "seg_pixels": 3351,
+   "aabb_extent": [
+    0.077,
+    0.08,
+    0.061
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/muffin__pxrntz__y1.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.0332
+  }
+ },
+ "stable": true,
+ "visible": true
+}

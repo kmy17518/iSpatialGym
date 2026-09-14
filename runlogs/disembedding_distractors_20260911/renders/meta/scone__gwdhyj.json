@@ -1,0 +1,35 @@
+{
+ "category": "scone",
+ "model": "gwdhyj",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/scone__gwdhyj__y0.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0136,
+   "seg_pixels": 3446,
+   "aabb_extent": [
+    0.112,
+    0.071,
+    0.038
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/scone__gwdhyj__y1.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.4,
+   "on_tray": true,
+   "settled_z": 0.0136
+  }
+ },
+ "stable": true,
+ "visible": true
+}

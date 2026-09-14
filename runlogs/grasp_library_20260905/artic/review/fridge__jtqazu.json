@@ -1,0 +1,20 @@
+{
+  "key": "fridge__jtqazu",
+  "category": "fridge",
+  "model": "jtqazu",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_0",
+      "kind": "door",
+      "chosen": "A",
+      "pinch": "vertical_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Short slim vertical bar (~12 cm) on the door frame's free left edge at mid-height; only 16 mm standoff. Hinge on the right (+y).",
+      "height_concern": "",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "Tall single glass-door cooler. A sits on the free-edge frame at mid-height; the slim bar is hard to see in the render and protrudes only 16 mm."
+}

@@ -1,0 +1,5 @@
+{"key": "sliding_door__hgcxno", "joint": "j_left_leaf", "feasible": true,
+ "proposal": {"face": "right_edge", "a": 0.75, "b": 0.45, "pinch": "thickness", "approach": "right", "depth_mm": 45, "expected_motion": "slide"},
+ "alternative": {"face": "outer", "a": 0.5, "b": 0.45, "pinch": "horizontal", "approach": "front", "depth_mm": 25, "expected_motion": "slide"},
+ "note": "Straddle leading stile (~90 mm) from exposed right face: pad on end face, pad in glass recess behind stile; width near 97 mm limit.",
+ "confidence": "low"}

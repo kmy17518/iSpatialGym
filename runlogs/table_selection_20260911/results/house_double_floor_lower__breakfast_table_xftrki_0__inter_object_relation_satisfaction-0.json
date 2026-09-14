@@ -1,0 +1,118 @@
+{
+ "scene": "house_double_floor_lower",
+ "table": "breakfast_table_xftrki_0",
+ "category": "breakfast_table",
+ "model": "xftrki",
+ "rooms": [
+  "kitchen_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-0",
+ "inventory": {
+  "top_z": 0.679,
+  "bbox_x": 0.931,
+  "bbox_y": 1.49,
+  "bbox_z": 0.679,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "straight_chair_hgunnf_0",
+  "straight_chair_uofiqj_0",
+  "straight_chair_uofiqj_1",
+  "straight_chair_zdhnyg_0"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:08:04",
+ "precheck": {
+  "aabb": [
+   [
+    3.826,
+    0.693,
+    -0.0
+   ],
+   [
+    4.756,
+    2.183,
+    0.679
+   ]
+  ],
+  "support": {
+   "name": "breakfast_table_xftrki_0",
+   "z": 0.6788813471794128,
+   "yaw": -4.76837158203125e-07,
+   "local_bounds": [
+    3.8358073234558105,
+    4.7358078956604,
+    0.703156590461731,
+    2.183156967163086
+   ],
+   "n_free_cells": 3450,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     4.736,
+     1.443
+    ],
+    "length": 1.48
+   },
+   {
+    "name": "-u",
+    "mid": [
+     3.836,
+     1.443
+    ],
+    "length": 1.48
+   },
+   {
+    "name": "+v",
+    "mid": [
+     4.286,
+     2.183
+    ],
+    "length": 0.9
+   },
+   {
+    "name": "-v",
+    "mid": [
+     4.286,
+     0.703
+    ],
+    "length": 0.9
+   }
+  ],
+  "stance": null,
+  "stance_error": "[stance_collision] untucked: [no_stance] no traversable stance around breakfast_table_xftrki_0",
+  "precheck_s": 1.1
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/house_double_floor_lower/house_double_floor_lower__breakfast_table_xftrki_0__inter_object_relation_satisfaction-0",
+ "setup_s": 2.0,
+ "reject_reason": "no_support",
+ "error": "[no_support] breakfast_table_xftrki_0: [no_stance] stand_off 0.45 edge None: [stance_collision] untucked: [no_stance] no traversable stance around breakfast_table_xftrki_0; stand_off 0.35 edge None: [stance_collision] untucked: [no_stance] no traversable stance around breakfast_table_xftrki_0; stand_off 0.55 edge None: [stance_collision] untucked: [no_stance] no traversable stance around breakfast_table_xftrki_0; stand_off 0.65 edge None: [stance_collision] untucked: [no_stance] no traversable stance around breakfast_table_xftrki_0",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 2.0,
+   "run_s": null
+  }
+ ],
+ "job_s": 3.1,
+ "finished": "2026-09-12 02:08:49"
+}

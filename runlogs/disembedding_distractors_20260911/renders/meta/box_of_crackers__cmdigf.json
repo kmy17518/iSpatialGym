@@ -1,0 +1,35 @@
+{
+ "category": "box_of_crackers",
+ "model": "cmdigf",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/box_of_crackers__cmdigf__y0.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.096,
+   "seg_pixels": 25223,
+   "aabb_extent": [
+    0.065,
+    0.146,
+    0.191
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/box_of_crackers__cmdigf__y1.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0959
+  }
+ },
+ "stable": true,
+ "visible": true
+}

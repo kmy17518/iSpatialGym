@@ -1,0 +1,7932 @@
+{
+ "problem": "camera_relocalization-0",
+ "task": "obst",
+ "rules": [
+  "Rules:",
+  "* valid model = re-derived from the rubric (V >= 3, N >= 2, S >= 1, rest_ok); score = 2V + 2N + S (max 18);",
+  "* categories are ranked by the mean score of their two best valid models (single-model categories by that model's",
+  "  score minus 2, ``weak`` verdicts with >= 2 valid models minus 1), ties by the number of valid models, then by the",
+  "  number of the seven scenes the category is natural in;",
+  "* round 1 = the 10 best categories with >= 2 valid models, round 2 = the next 5 with >= 2 valid models, round 3 = the",
+  "  next 5 with >= 1 valid model. The obstacle is never manipulated, so - unlike the target selections of the other",
+  "  tasks - no overlap rule with other tasks' categories is applied; overlaps are only recorded (``used_categories.json``).",
+  "  Every other reviewed category is listed under ``not_selected`` with its ranking, so the pool can be extended later;",
+  "* picks per category = the two best valid models (reviewer picks when given), alternate = the next valid model; every",
+  "  other valid model is a candidate.",
+  "",
+  "Output: ``selection.json``, ``selection.md`` and ``spec_fragments.json`` (``roles.obstacle.models`` = the picks of every"
+ ],
+ "rounds": {
+  "1": [
+   {
+    "task": "obst",
+    "category": "trash_can",
+    "group": "bins",
+    "n_ready": 15,
+    "n_reviewed": 15,
+    "n_valid": 15,
+    "n_unreviewed": 0,
+    "category_score": 18.0,
+    "verdict": "good",
+    "category_note": "Fifteen household bins 0.23-0.45 m wide, 0.28-0.80 m tall, all standing on flat bases; natural in every scene. Best: pedal bin cdzyew and slotted bin vasiit; featureless black twins and see-through rbqckd rank lowest.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int",
+     "restaurant_diner",
+     "hotel_suite_large",
+     "office_cubicles_right"
+    ],
+    "in_scene": {},
+    "picks": [
+     "cdzyew",
+     "vasiit"
+    ],
+    "alternate": "eahqyq",
+    "models": [
+     {
+      "model": "cdzyew",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Black cylindrical pedal bin with grey lid and foot pedal, 0.29 x 0.24 x 0.39 m; clean, complete, very recognisable.",
+      "bbox": [
+       0.289,
+       0.243,
+       0.391
+      ]
+     },
+     {
+      "model": "cjmezk",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Black mesh wastebasket with black liner bag draped over rim, 0.38 x 0.38 x 0.42 m; bag lumpy, otherwise clean.",
+      "bbox": [
+       0.384,
+       0.383,
+       0.421
+      ]
+     },
+     {
+      "model": "djgllo",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Solid black tapered bin with closed top and no surface detail, 0.36 x 0.36 x 0.40 m; identical twin of gilsji.",
+      "bbox": [
+       0.355,
+       0.355,
+       0.397
+      ]
+     },
+     {
+      "model": "dnvpag",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Square wire-mesh wastebasket with grey liner over rim, 0.35 x 0.34 x 0.36 m; clean mesh, liner slightly lumpy.",
+      "bbox": [
+       0.349,
+       0.343,
+       0.358
+      ]
+     },
+     {
+      "model": "eahqyq",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Dark grey rectangular tapered bin with blue flap lid, 0.28 x 0.36 x 0.49 m; clean, complete.",
+      "bbox": [
+       0.28,
+       0.359,
+       0.486
+      ]
+     },
+     {
+      "model": "gilsji",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Solid black tapered bin with closed top and no surface detail, 0.36 x 0.36 x 0.40 m; identical twin of djgllo.",
+      "bbox": [
+       0.355,
+       0.355,
+       0.397
+      ]
+     },
+     {
+      "model": "gxajos",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Dark grey bin with blue liner bag bunched over the rim, 0.36 x 0.37 x 0.40 m; clean, distinct colour.",
+      "bbox": [
+       0.36,
+       0.365,
+       0.396
+      ]
+     },
+     {
+      "model": "hqdnjz",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Dark grey-brown tapered open bin with thin rim and base ring, interior visible, 0.36 x 0.36 x 0.41 m; clean, low detail.",
+      "bbox": [
+       0.356,
+       0.356,
+       0.41
+      ]
+     },
+     {
+      "model": "ifzxzj",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Tall black kitchen bin with lid flipped open standing up and a thin curved flap, 0.31 x 0.41 x 0.80 m; odd lid geometry.",
+      "bbox": [
+       0.311,
+       0.405,
+       0.795
+      ]
+     },
+     {
+      "model": "jlawet",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Small light grey plastic tapered wastebasket, uniform untextured-looking grey, 0.28 x 0.28 x 0.28 m; clean shape.",
+      "bbox": [
+       0.28,
+       0.279,
+       0.28
+      ]
+     },
+     {
+      "model": "rbqckd",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Dark grey tapered cylinder bin, 0.45 x 0.45 x 0.50 m; interior and bottom faces missing so it is see-through from above.",
+      "bbox": [
+       0.446,
+       0.446,
+       0.503
+      ]
+     },
+     {
+      "model": "uknjdm",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Black mesh wastebasket with black liner bag over rim, 0.38 x 0.38 x 0.42 m; clean, near-duplicate look of cjmezk.",
+      "bbox": [
+       0.375,
+       0.377,
+       0.421
+      ]
+     },
+     {
+      "model": "vasiit",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Grey slotted metal bin with black liner bag over rim, 0.37 x 0.38 x 0.42 m; sharp, complete, very recognisable.",
+      "bbox": [
+       0.372,
+       0.376,
+       0.421
+      ]
+     },
+     {
+      "model": "wklill",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Black rounded-rectangle tapered bin, uniform black without detail, 0.41 x 0.30 x 0.44 m; clean shape.",
+      "bbox": [
+       0.41,
+       0.295,
+       0.44
+      ]
+     },
+     {
+      "model": "wkxtxh",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Small dark grey tapered bin with wood-look interior and two handle slots in rim, 0.23 x 0.23 x 0.28 m; clean.",
+      "bbox": [
+       0.23,
+       0.23,
+       0.279
+      ]
+     }
+    ],
+    "valid_models": [
+     "cdzyew",
+     "vasiit",
+     "cjmezk",
+     "dnvpag",
+     "eahqyq",
+     "gxajos",
+     "hqdnjz",
+     "uknjdm",
+     "wkxtxh",
+     "djgllo",
+     "gilsji",
+     "ifzxzj",
+     "jlawet",
+     "rbqckd",
+     "wklill"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/trash_can.json",
+    "round": 1
+   },
+   {
+    "task": "obst",
+    "category": "hamper",
+    "group": "containers",
+    "n_ready": 16,
+    "n_reviewed": 16,
+    "n_valid": 15,
+    "n_unreviewed": 0,
+    "category_score": 18.0,
+    "verdict": "good",
+    "category_note": "Mix of woven/fabric laundry baskets, wooden crates and wire baskets, typically 0.3-0.5 m wide and 0.2-0.5 m tall; 15 of 16 valid. Natural in bedrooms, bathrooms, corridors and hotel rooms; only qhdikw is too small.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int",
+     "hotel_suite_large"
+    ],
+    "in_scene": {},
+    "picks": [
+     "clziqw",
+     "xjftlf"
+    ],
+    "alternate": "pdzaca",
+    "models": [
+     {
+      "model": "clziqw",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Round dark-brown rattan basket with light rim, 0.51 x 0.51 x 0.51 m; complete woven texture, flat base, classic laundry basket.",
+      "bbox": [
+       0.51,
+       0.51,
+       0.506
+      ]
+     },
+     {
+      "model": "djrdum",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Small black wire basket with side handles, 0.21 x 0.29 x 0.18 m; clean mesh but bathroom-shelf size, low.",
+      "bbox": [
+       0.209,
+       0.288,
+       0.179
+      ]
+     },
+     {
+      "model": "drgdfh",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Navy rectangular wire-mesh laundry basket, 0.35 x 0.54 x 0.20 m; clean, only 20 cm tall (height borderline).",
+      "bbox": [
+       0.35,
+       0.54,
+       0.198
+      ]
+     },
+     {
+      "model": "hlgjme",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Brown wooden beer crate with handle cut-outs and label, 0.28 x 0.42 x 0.21 m; good texture, crate rather than hamper.",
+      "bbox": [
+       0.278,
+       0.417,
+       0.206
+      ]
+     },
+     {
+      "model": "iofciz",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Black tapered wire-mesh basket, open top, 0.27 x 0.50 x 0.21 m; clean lattice geometry, storage-basket look.",
+      "bbox": [
+       0.273,
+       0.503,
+       0.213
+      ]
+     },
+     {
+      "model": "pcyjbu",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Grey-blue fabric storage bin with dark trim, 0.39 x 0.48 x 0.31 m; plain but complete, representative collapsible hamper.",
+      "bbox": [
+       0.391,
+       0.481,
+       0.314
+      ]
+     },
+     {
+      "model": "pdzaca",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Round brown burlap/seagrass laundry bag with two handles, 0.33 x 0.36 x 0.51 m; complete texture, stands on flat bottom.",
+      "bbox": [
+       0.331,
+       0.355,
+       0.513
+      ]
+     },
+     {
+      "model": "pgwdlg",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Long open wooden box with handle slot, 0.31 x 0.66 x 0.31 m; clean wood texture, 66 cm footprint borderline.",
+      "bbox": [
+       0.314,
+       0.658,
+       0.314
+      ]
+     },
+     {
+      "model": "pqzyxx",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Oval dark-brown woven basket with two small handles, 0.29 x 0.41 x 0.42 m; complete, slightly dark texture.",
+      "bbox": [
+       0.291,
+       0.414,
+       0.419
+      ]
+     },
+     {
+      "model": "qhdikw",
+      "V": 3,
+      "N": 1,
+      "S": 0,
+      "rest_ok": true,
+      "score": 8,
+      "valid": false,
+      "note": "Tiny teal pail-like container with handle, 0.10 x 0.10 x 0.16 m; clean but far too small, not a hamper.",
+      "bbox": [
+       0.103,
+       0.103,
+       0.155
+      ]
+     },
+     {
+      "model": "sijioo",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Round dark wire-mesh waste basket, 0.26 x 0.26 x 0.31 m; clean geometry, reads as office trash can.",
+      "bbox": [
+       0.26,
+       0.26,
+       0.305
+      ]
+     },
+     {
+      "model": "ssfvij",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Plain light-grey open storage cube with small label window, 0.31 x 0.32 x 0.30 m; flat near-uniform texture.",
+      "bbox": [
+       0.309,
+       0.323,
+       0.298
+      ]
+     },
+     {
+      "model": "wdsnjy",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Tall open wooden box hamper with side slot, 0.31 x 0.58 x 0.51 m; clean wood texture, 58 cm footprint borderline.",
+      "bbox": [
+       0.312,
+       0.584,
+       0.506
+      ]
+     },
+     {
+      "model": "wqxrbf",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Wooden crate with handle cut-outs, 0.57 x 0.46 x 0.31 m; clean texture, footprint slightly over 0.55 m.",
+      "bbox": [
+       0.572,
+       0.457,
+       0.314
+      ]
+     },
+     {
+      "model": "xhdtjn",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Uniform black round tapered tub, 0.44 x 0.44 x 0.35 m; clean geometry but no visible detail, reads as bin/tub.",
+      "bbox": [
+       0.436,
+       0.436,
+       0.346
+      ]
+     },
+     {
+      "model": "xjftlf",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Dark wooden barrel-style hamper with metal straps and black fabric liner rim, 0.36 x 0.48 x 0.38 m; detailed, complete.",
+      "bbox": [
+       0.358,
+       0.475,
+       0.38
+      ]
+     }
+    ],
+    "valid_models": [
+     "clziqw",
+     "pdzaca",
+     "xjftlf",
+     "hlgjme",
+     "iofciz",
+     "pcyjbu",
+     "pqzyxx",
+     "sijioo",
+     "drgdfh",
+     "pgwdlg",
+     "wdsnjy",
+     "wqxrbf",
+     "ssfvij",
+     "xhdtjn",
+     "djrdum"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/hamper.json",
+    "round": 1
+   },
+   {
+    "task": "obst",
+    "category": "straight_chair",
+    "group": "seats",
+    "n_ready": 51,
+    "n_reviewed": 8,
+    "n_valid": 8,
+    "n_unreviewed": 43,
+    "category_score": 18.0,
+    "verdict": "good",
+    "category_note": "Dining/desk chairs ~0.35-0.55 m footprint, 0.6-0.9 m tall; all eight valid and stable on four legs. A pulled-out chair is unremarkable mid-room in every scene; picks span black cafe and brown wooden styles.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int",
+     "restaurant_diner",
+     "hotel_suite_large",
+     "office_cubicles_right"
+    ],
+    "in_scene": {
+     "house_single_floor": [
+      "childs_room",
+      "dining_room"
+     ],
+     "house_double_floor_lower": [
+      "kitchen"
+     ],
+     "Rs_int": [
+      "living_room"
+     ],
+     "restaurant_diner": [
+      "dining_room"
+     ]
+    },
+    "picks": [
+     "amgwaw",
+     "eospnr"
+    ],
+    "alternate": "dmcixv",
+    "models": [
+     {
+      "model": "amgwaw",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Black bentwood cafe chair with curved back, 0.44 x 0.46 x 0.78 m; clean; classic dining/cafe chair.",
+      "bbox": [
+       0.437,
+       0.461,
+       0.78
+      ]
+     },
+     {
+      "model": "dgqubu",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Dark wood ladder-back dining chair with black seat, 0.55 x 0.47 x 0.91 m; clean; footprint at the upper limit.",
+      "bbox": [
+       0.547,
+       0.465,
+       0.91
+      ]
+     },
+     {
+      "model": "dmcixv",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Louis-style oval-back chair, grey check upholstery, dark wood, 0.41 x 0.36 x 0.78 m; clean; hotel/dining look.",
+      "bbox": [
+       0.411,
+       0.361,
+       0.78
+      ]
+     },
+     {
+      "model": "dxusxd",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Black folding chair standing open on X legs, 0.60 x 0.64 x 0.94 m; wide footprint for a folding chair.",
+      "bbox": [
+       0.597,
+       0.64,
+       0.942
+      ]
+     },
+     {
+      "model": "dzrlfn",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Solid green plastic-look chair, uniform colour, 0.52 x 0.52 x 0.78 m; clean, plain.",
+      "bbox": [
+       0.517,
+       0.516,
+       0.776
+      ]
+     },
+     {
+      "model": "eospnr",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Brown wooden slat-back kitchen chair, 0.35 x 0.35 x 0.78 m; clean, compact.",
+      "bbox": [
+       0.345,
+       0.354,
+       0.78
+      ]
+     },
+     {
+      "model": "fmdswa",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Black padded seat and back on tubular frame (school/visitor chair), 0.47 x 0.43 x 0.75 m; clean.",
+      "bbox": [
+       0.473,
+       0.429,
+       0.749
+      ]
+     },
+     {
+      "model": "gktknj",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Low red upholstered chair with flat wooden back panel, 0.42 x 0.35 x 0.62 m; back looks plain but intact.",
+      "bbox": [
+       0.417,
+       0.351,
+       0.615
+      ]
+     }
+    ],
+    "valid_models": [
+     "amgwaw",
+     "dgqubu",
+     "dmcixv",
+     "eospnr",
+     "fmdswa",
+     "dzrlfn",
+     "gktknj",
+     "dxusxd"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/straight_chair.json",
+    "round": 1
+   },
+   {
+    "task": "obst",
+    "category": "taboret",
+    "group": "seats",
+    "n_ready": 6,
+    "n_reviewed": 6,
+    "n_valid": 6,
+    "n_unreviewed": 0,
+    "category_score": 18.0,
+    "verdict": "good",
+    "category_note": "Six stools, all valid: 0.34-0.54 m footprint, 0.43-0.79 m tall, standing on legs or a flat base. Wooden-top and padded bar stools are classic; a stone block and a drum throne are odd variants. A pulled-out stool is natural everywhere.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int",
+     "restaurant_diner",
+     "hotel_suite_large",
+     "office_cubicles_right"
+    ],
+    "in_scene": {
+     "house_single_floor": [
+      "kitchen"
+     ],
+     "house_double_floor_upper": [
+      "bedroom"
+     ],
+     "restaurant_diner": [
+      "dining_room"
+     ]
+    },
+    "picks": [
+     "hugvml",
+     "ysrhuw"
+    ],
+    "alternate": "ehaclu",
+    "models": [
+     {
+      "model": "bciekv",
+      "V": 3,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 12,
+      "valid": true,
+      "note": "Grey carved stone-look block stool with concave sides and ornament, mottled uniform texture; 0.34 x 0.34 x 0.43 m; odd decorative variant.",
+      "bbox": [
+       0.341,
+       0.341,
+       0.427
+      ]
+     },
+     {
+      "model": "ehaclu",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Green upholstered counter stool on four black metal legs with footrest bars; 0.54 x 0.51 x 0.79 m; clean, footprint near 0.55 limit.",
+      "bbox": [
+       0.541,
+       0.505,
+       0.794
+      ]
+     },
+     {
+      "model": "hugvml",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Round wooden-top stool with black metal legs and ring footrest; 0.40 x 0.38 x 0.58 m; clean, classic kitchen stool.",
+      "bbox": [
+       0.401,
+       0.382,
+       0.579
+      ]
+     },
+     {
+      "model": "vzzmir",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Black padded drum-throne stool on chrome tripod base with rubber feet; 0.34 x 0.35 x 0.55 m; clean, dark, music-room variant.",
+      "bbox": [
+       0.344,
+       0.346,
+       0.549
+      ]
+     },
+     {
+      "model": "wjrpwg",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Round wooden-top stool with black metal legs and ring footrest, near-duplicate of hugvml; 0.40 x 0.38 x 0.58 m; clean.",
+      "bbox": [
+       0.398,
+       0.381,
+       0.577
+      ]
+     },
+     {
+      "model": "ysrhuw",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Maroon padded round bar stool on black metal legs with double ring footrest; 0.35 x 0.35 x 0.74 m; clean, sharp.",
+      "bbox": [
+       0.348,
+       0.348,
+       0.737
+      ]
+     }
+    ],
+    "valid_models": [
+     "ehaclu",
+     "hugvml",
+     "wjrpwg",
+     "ysrhuw",
+     "vzzmir",
+     "bciekv"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/taboret.json",
+    "round": 1
+   },
+   {
+    "task": "obst",
+    "category": "footstool",
+    "group": "seats",
+    "n_ready": 2,
+    "n_reviewed": 2,
+    "n_valid": 2,
+    "n_unreviewed": 0,
+    "category_score": 18.0,
+    "verdict": "good",
+    "category_note": "Two clean upholstered footstools, ~0.41 m footprint and ~0.35 m tall, one round on legs and one rectangular on an X-frame. A footstool pulled into the walkway is unremarkable in living rooms, bedrooms and hotel suites.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int",
+     "hotel_suite_large"
+    ],
+    "in_scene": {},
+    "picks": [
+     "mysfnz",
+     "sghekm"
+    ],
+    "alternate": null,
+    "models": [
+     {
+      "model": "mysfnz",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Round footstool with dark grey check fabric top and four splayed dark wooden legs; 0.41 x 0.41 x 0.36 m; clean, sharp.",
+      "bbox": [
+       0.408,
+       0.406,
+       0.358
+      ]
+     },
+     {
+      "model": "sghekm",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Rectangular footstool, brown patterned cushion on wooden X-frame legs; 0.41 x 0.32 x 0.34 m; clean textures, stands flat.",
+      "bbox": [
+       0.412,
+       0.315,
+       0.337
+      ]
+     }
+    ],
+    "valid_models": [
+     "mysfnz",
+     "sghekm"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/footstool.json",
+    "round": 1
+   },
+   {
+    "task": "obst",
+    "category": "ottoman",
+    "group": "seats",
+    "n_ready": 7,
+    "n_reviewed": 7,
+    "n_valid": 4,
+    "n_unreviewed": 0,
+    "category_score": 17.5,
+    "verdict": "good",
+    "category_note": "Seven clean ottomans; the compact cubes (0.40-0.45 m, ~0.35-0.45 m tall) fit well, two are borderline 0.6-0.66 m and three are 0.8-1.3 m furniture. Ottomans already stand in living rooms, bedrooms and the hotel suite; natural mid-room.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int",
+     "hotel_suite_large"
+    ],
+    "in_scene": {
+     "house_single_floor": [
+      "entryway",
+      "garden"
+     ],
+     "house_double_floor_upper": [
+      "bedroom"
+     ],
+     "Rs_int": [
+      "living_room"
+     ],
+     "hotel_suite_large": [
+      "bedroom"
+     ]
+    },
+    "picks": [
+     "miftfy",
+     "xcmniq"
+    ],
+    "alternate": "qsnawv",
+    "models": [
+     {
+      "model": "lsaxch",
+      "V": 3,
+      "N": 3,
+      "S": 0,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Dark olive-brown low bench-ottoman with concave saddle top and arched apron on four legs, rotated in bbox; 0.82 x 0.75 x 0.30 m; too wide.",
+      "bbox": [
+       0.821,
+       0.75,
+       0.297
+      ]
+     },
+     {
+      "model": "miftfy",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Navy quilted cube ottoman on four short dark wooden feet; 0.40 x 0.41 x 0.32 m; clean, sharp texture.",
+      "bbox": [
+       0.402,
+       0.406,
+       0.32
+      ]
+     },
+     {
+      "model": "mjmkdw",
+      "V": 5,
+      "N": 3,
+      "S": 0,
+      "rest_ok": true,
+      "score": 16,
+      "valid": false,
+      "note": "Large dusty-pink square upholstered ottoman on thin black metal legs; 0.94 x 0.98 x 0.45 m; clean but corridor-blocking size.",
+      "bbox": [
+       0.941,
+       0.976,
+       0.446
+      ]
+     },
+     {
+      "model": "qsnawv",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Plain black cube ottoman without feet, sits flat; 0.45 x 0.45 x 0.44 m; clean, little surface detail.",
+      "bbox": [
+       0.452,
+       0.453,
+       0.438
+      ]
+     },
+     {
+      "model": "xcmniq",
+      "V": 5,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 17,
+      "valid": true,
+      "note": "Charcoal rectangular storage ottoman with lid seam on four small wooden feet; 0.46 x 0.66 x 0.42 m; clean weave texture, footprint borderline.",
+      "bbox": [
+       0.463,
+       0.664,
+       0.421
+      ]
+     },
+     {
+      "model": "xcuyiw",
+      "V": 4,
+      "N": 2,
+      "S": 0,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Long light-grey padded bench ottoman on thin black frame; 0.57 x 1.32 x 0.33 m; clean but 1.3 m long, bed-foot furniture.",
+      "bbox": [
+       0.567,
+       1.323,
+       0.334
+      ]
+     },
+     {
+      "model": "ycfbsd",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Very dark brown square upholstered ottoman on thin black metal legs; 0.60 x 0.60 x 0.33 m; nearly silhouette-dark but complete.",
+      "bbox": [
+       0.597,
+       0.595,
+       0.327
+      ]
+     }
+    ],
+    "valid_models": [
+     "miftfy",
+     "xcmniq",
+     "qsnawv",
+     "ycfbsd"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/ottoman.json",
+    "round": 1
+   },
+   {
+    "task": "obst",
+    "category": "poinsettia",
+    "group": "plants",
+    "n_ready": 3,
+    "n_reviewed": 3,
+    "n_valid": 3,
+    "n_unreviewed": 0,
+    "category_score": 17.0,
+    "verdict": "good",
+    "category_note": "Three clean potted poinsettias, 0.21-0.34 m footprint and ~0.25-0.28 m tall, upright in flat-bottomed pots (one low bowl). A potted plant on the floor is unremarkable in every scene; small but above the base height, camera sees it.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int",
+     "restaurant_diner",
+     "hotel_suite_large",
+     "office_cubicles_right"
+    ],
+    "in_scene": {},
+    "picks": [
+     "qdcipo",
+     "eefcsd"
+    ],
+    "alternate": "peeehg",
+    "models": [
+     {
+      "model": "eefcsd",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Red poinsettia in round mottled blue-grey pot with flat base; 0.27 x 0.28 x 0.25 m; clean plant, pot texture slightly murky.",
+      "bbox": [
+       0.274,
+       0.281,
+       0.247
+      ]
+     },
+     {
+      "model": "peeehg",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Wide red poinsettia in low striped bowl pot; 0.34 x 0.33 x 0.26 m; clean; bowl bottom looks rounded, may rock but stays put.",
+      "bbox": [
+       0.343,
+       0.327,
+       0.26
+      ]
+     },
+     {
+      "model": "qdcipo",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Red poinsettia in tall tapered black-white diagonal-striped pot with flat base; 0.21 x 0.21 x 0.28 m; sharp, complete.",
+      "bbox": [
+       0.211,
+       0.208,
+       0.284
+      ]
+     }
+    ],
+    "valid_models": [
+     "qdcipo",
+     "eefcsd",
+     "peeehg"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/poinsettia.json",
+    "round": 1
+   },
+   {
+    "task": "obst",
+    "category": "pot_plant",
+    "group": "plants",
+    "n_ready": 27,
+    "n_reviewed": 16,
+    "n_valid": 12,
+    "n_unreviewed": 11,
+    "category_score": 16.0,
+    "verdict": "good",
+    "category_note": "Potted plants of all sizes; 12 of 16 valid, typical 0.25-0.35 m pot, 0.3-0.7 m tall, all flat-based. Four too large (>0.8 m spread) or tiny. Present on the floor of all seven scenes; some have thin, sparse foliage.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int",
+     "restaurant_diner",
+     "hotel_suite_large",
+     "office_cubicles_right"
+    ],
+    "in_scene": {
+     "house_single_floor": [
+      "corridor",
+      "garden"
+     ],
+     "house_double_floor_upper": [
+      "bedroom",
+      "living_room"
+     ],
+     "house_double_floor_lower": [
+      "corridor"
+     ],
+     "Rs_int": [
+      "living_room"
+     ],
+     "restaurant_diner": [
+      "corridor",
+      "dining_room"
+     ],
+     "hotel_suite_large": [
+      "bedroom"
+     ],
+     "office_cubicles_right": [
+      "corridor"
+     ]
+    },
+    "picks": [
+     "imhfnc",
+     "kxmvco"
+    ],
+    "alternate": "xyczqb",
+    "models": [
+     {
+      "model": "asnsgf",
+      "V": 3,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Low grey stone bowl with sparse bare twigs leaning to +x, 0.58 x 0.33 x 0.63 m; thin, odd looking; twigs set the footprint.",
+      "bbox": [
+       0.582,
+       0.33,
+       0.63
+      ]
+     },
+     {
+      "model": "bjwskl",
+      "V": 4,
+      "N": 3,
+      "S": 0,
+      "rest_ok": true,
+      "score": 14,
+      "valid": false,
+      "note": "Large agave in dark blue square pot, 0.83 x 0.61 x 1.16 m, good textures; too wide for a corridor.",
+      "bbox": [
+       0.832,
+       0.605,
+       1.163
+      ]
+     },
+     {
+      "model": "imhfnc",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Dark leafy plant in white urn on ornate scrolled metal stand, 0.25 x 0.28 x 0.59 m; clean, stands on legs.",
+      "bbox": [
+       0.254,
+       0.276,
+       0.594
+      ]
+     },
+     {
+      "model": "irdjit",
+      "V": 4,
+      "N": 3,
+      "S": 0,
+      "rest_ok": true,
+      "score": 14,
+      "valid": false,
+      "note": "Large areca palm in terracotta pot, 1.28 x 1.29 x 1.82 m; nice but furniture-sized, blocks a corridor.",
+      "bbox": [
+       1.281,
+       1.285,
+       1.824
+      ]
+     },
+     {
+      "model": "jatssq",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Rounded grey stone pot with a few thin grass blades and small flowers, 0.25 x 0.26 x 0.29 m; sparse, flat base.",
+      "bbox": [
+       0.254,
+       0.26,
+       0.286
+      ]
+     },
+     {
+      "model": "jaunqh",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Tall mottled concrete cylinder pot with small dark succulent, 0.16 x 0.16 x 0.29 m; clean; narrow footprint borderline.",
+      "bbox": [
+       0.158,
+       0.158,
+       0.29
+      ]
+     },
+     {
+      "model": "jgkozi",
+      "V": 4,
+      "N": 3,
+      "S": 0,
+      "rest_ok": true,
+      "score": 14,
+      "valid": false,
+      "note": "Tiny faceted grey pot with bushy green plant, 0.07 x 0.08 x 0.11 m; far too small to matter.",
+      "bbox": [
+       0.072,
+       0.083,
+       0.113
+      ]
+     },
+     {
+      "model": "kxmvco",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Dark green spiky dracaena-like plant in light grey pot, 0.31 x 0.30 x 0.37 m; clean textures, flat pot.",
+      "bbox": [
+       0.307,
+       0.299,
+       0.37
+      ]
+     },
+     {
+      "model": "mypsrd",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Variegated green-white leafy plant in light grey pot, 0.16 x 0.20 x 0.23 m; good textures; footprint borderline small.",
+      "bbox": [
+       0.158,
+       0.196,
+       0.225
+      ]
+     },
+     {
+      "model": "qenqqv",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Tall ribbed grey vase with sparse dried grass stems, 0.25 x 0.26 x 0.46 m; scraggly look, flat base.",
+      "bbox": [
+       0.254,
+       0.258,
+       0.463
+      ]
+     },
+     {
+      "model": "quaxmw",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Dark green agave-like rosette in small black pot, 0.25 x 0.25 x 0.31 m; clean; pot small and dark.",
+      "bbox": [
+       0.254,
+       0.252,
+       0.305
+      ]
+     },
+     {
+      "model": "tbsjnw",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Dark bucket-shaped pot with sparse thin grass leaves, 0.35 x 0.29 x 0.27 m; thin foliage, clean pot.",
+      "bbox": [
+       0.349,
+       0.285,
+       0.271
+      ]
+     },
+     {
+      "model": "ttijye",
+      "V": 4,
+      "N": 3,
+      "S": 0,
+      "rest_ok": true,
+      "score": 14,
+      "valid": false,
+      "note": "Banana-leaf plant with huge leaves in small terracotta pot, 1.08 x 1.18 x 1.00 m; too wide, top heavy.",
+      "bbox": [
+       1.082,
+       1.176,
+       0.997
+      ]
+     },
+     {
+      "model": "udqjui",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Thin bamboo stalks with small leaves in grey cylinder pot, 0.25 x 0.25 x 0.67 m; clean but slender, small pot.",
+      "bbox": [
+       0.254,
+       0.246,
+       0.671
+      ]
+     },
+     {
+      "model": "uvbpsf",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Wooden slatted planter box with two dark spiky plants, 0.21 x 0.40 x 0.28 m; clean, solid box base.",
+      "bbox": [
+       0.21,
+       0.399,
+       0.276
+      ]
+     },
+     {
+      "model": "xyczqb",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Grey stone pot with mossy top, a bulb and two big leaves, 0.23 x 0.24 x 0.47 m; clean, solid; plant sparse.",
+      "bbox": [
+       0.23,
+       0.238,
+       0.465
+      ]
+     }
+    ],
+    "valid_models": [
+     "imhfnc",
+     "kxmvco",
+     "quaxmw",
+     "udqjui",
+     "uvbpsf",
+     "xyczqb",
+     "jaunqh",
+     "mypsrd",
+     "jatssq",
+     "qenqqv",
+     "tbsjnw",
+     "asnsgf"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/pot_plant.json",
+    "round": 1
+   },
+   {
+    "task": "obst",
+    "category": "public_trash_can",
+    "group": "bins",
+    "n_ready": 11,
+    "n_reviewed": 11,
+    "n_valid": 10,
+    "n_unreviewed": 0,
+    "category_score": 16.0,
+    "verdict": "good",
+    "category_note": "Eleven bins 0.19-0.76 m wide, 0.35-0.98 m tall. Indoor-style lidded bins (duugbb, glzckq, fkosow, hxsyxo) are natural anywhere; slatted park bins are street furniture, only plausible in diner or office; drum zotrbg odd.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int",
+     "restaurant_diner",
+     "hotel_suite_large",
+     "office_cubicles_right"
+    ],
+    "in_scene": {
+     "house_single_floor": [
+      "bathroom"
+     ],
+     "house_double_floor_upper": [
+      "bedroom"
+     ],
+     "Rs_int": [
+      "kitchen"
+     ],
+     "office_cubicles_right": [
+      "bathroom"
+     ]
+    },
+    "picks": [
+     "duugbb",
+     "glzckq"
+    ],
+    "alternate": "fkosow",
+    "models": [
+     {
+      "model": "aefcem",
+      "V": 3,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 11,
+      "valid": true,
+      "note": "Dark wooden-slat outdoor bin with liner ring; top view shows through the bottom; 0.57 m footprint borderline; street style, odd indoors.",
+      "bbox": [
+       0.573,
+       0.573,
+       0.659
+      ]
+     },
+     {
+      "model": "duugbb",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Dark rectangular bin with peaked swing lid, grey liner bag over rim, green logo; textured; 0.36 x 0.43 x 0.74 m; indoor style.",
+      "bbox": [
+       0.355,
+       0.429,
+       0.743
+      ]
+     },
+     {
+      "model": "fkosow",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Black rectangular flap-top bin with trash pictogram; renders as flat black silhouette; 0.29 x 0.48 x 0.66 m; indoor style.",
+      "bbox": [
+       0.287,
+       0.477,
+       0.664
+      ]
+     },
+     {
+      "model": "glzckq",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Navy blue round bin, domed top with side openings and recycling labels; clean; 0.35 x 0.35 x 0.66 m; indoor/office style.",
+      "bbox": [
+       0.347,
+       0.347,
+       0.657
+      ]
+     },
+     {
+      "model": "gsgutn",
+      "V": 4,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Grey-blue slatted metal park bin, flared rim, black liner; clean detailed geometry; 0.52 x 0.52 x 0.69 m; outdoor style.",
+      "bbox": [
+       0.521,
+       0.521,
+       0.693
+      ]
+     },
+     {
+      "model": "gvnfgj",
+      "V": 3,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Small dark grey cylinder bin with slotted lid; flat shading; 0.19 x 0.19 x 0.35 m, footprint borderline small.",
+      "bbox": [
+       0.193,
+       0.193,
+       0.349
+      ]
+     },
+     {
+      "model": "hxsyxo",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Slim tall black cylinder bin with lid, side opening and pictogram; flat black; 0.29 x 0.29 x 0.78 m; indoor style.",
+      "bbox": [
+       0.289,
+       0.289,
+       0.779
+      ]
+     },
+     {
+      "model": "leazin",
+      "V": 4,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Black slatted metal park bin with flared slatted rim and liner; clean; 0.43 x 0.43 x 0.71 m; outdoor style.",
+      "bbox": [
+       0.43,
+       0.43,
+       0.711
+      ]
+     },
+     {
+      "model": "rteihy",
+      "V": 4,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 13,
+      "valid": true,
+      "note": "Black slatted metal park bin, wide flared rim; clean; 0.63 x 0.63 x 0.77 m, footprint borderline wide; outdoor style.",
+      "bbox": [
+       0.63,
+       0.63,
+       0.771
+      ]
+     },
+     {
+      "model": "xkqkbf",
+      "V": 3,
+      "N": 2,
+      "S": 1,
+      "rest_ok": true,
+      "score": 11,
+      "valid": true,
+      "note": "Large black ornate bin with scrollwork rim; very dark; 0.76 x 0.76 x 0.98 m, near corridor-blocking; outdoor style.",
+      "bbox": [
+       0.762,
+       0.762,
+       0.98
+      ]
+     },
+     {
+      "model": "zotrbg",
+      "V": 3,
+      "N": 1,
+      "S": 1,
+      "rest_ok": true,
+      "score": 9,
+      "valid": false,
+      "note": "Plain black drum/barrel with lid, no bin features; 0.63 x 0.63 x 0.89 m; reads as an oil drum, odd indoors.",
+      "bbox": [
+       0.63,
+       0.63,
+       0.891
+      ]
+     }
+    ],
+    "valid_models": [
+     "duugbb",
+     "glzckq",
+     "fkosow",
+     "gsgutn",
+     "hxsyxo",
+     "leazin",
+     "gvnfgj",
+     "rteihy",
+     "aefcem",
+     "xkqkbf"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/public_trash_can.json",
+    "round": 1
+   },
+   {
+    "task": "obst",
+    "category": "vacuum",
+    "group": "cleaning",
+    "n_ready": 3,
+    "n_reviewed": 3,
+    "n_valid": 3,
+    "n_unreviewed": 0,
+    "category_score": 16.0,
+    "verdict": "good",
+    "category_note": "Three clean vacuum cleaners (upright, stick, canister), 0.3-0.6 m footprint and 0.5-1.0 m tall, all standing stably. A vacuum left mid-room or in a corridor is unremarkable in every one of the seven scenes.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int",
+     "restaurant_diner",
+     "hotel_suite_large",
+     "office_cubicles_right"
+    ],
+    "in_scene": {},
+    "picks": [
+     "wikhik",
+     "bdmsbr"
+    ],
+    "alternate": "amnmmq",
+    "models": [
+     {
+      "model": "amnmmq",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Black canister/shop vacuum with looping hose and floor nozzle; 0.42 x 0.59 x 0.52 m, hose widens footprint; clean.",
+      "bbox": [
+       0.422,
+       0.593,
+       0.522
+      ]
+     },
+     {
+      "model": "bdmsbr",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Slim dark-red and black stick vacuum standing on its floor head; 0.19 x 0.31 x 1.02 m; clean, thin, may tip.",
+      "bbox": [
+       0.192,
+       0.305,
+       1.015
+      ]
+     },
+     {
+      "model": "wikhik",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Dark-red upright vacuum with handle and side hose on a flat floor head; 0.37 x 0.29 x 0.85 m; clean textures.",
+      "bbox": [
+       0.366,
+       0.289,
+       0.852
+      ]
+     }
+    ],
+    "valid_models": [
+     "bdmsbr",
+     "wikhik",
+     "amnmmq"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/vacuum.json",
+    "override": "swapped with music_stool for obstacle-type diversity (taboret already covers stools)",
+    "round": 1
+   }
+  ],
+  "2": [
+   {
+    "task": "obst",
+    "category": "music_stool",
+    "group": "seats",
+    "n_ready": 2,
+    "n_reviewed": 2,
+    "n_valid": 2,
+    "n_unreviewed": 0,
+    "category_score": 17.0,
+    "verdict": "good",
+    "category_note": "Two clean stools: 0.35 m red pedestal stool 0.57 m tall and 0.48 m bar stool 1.05 m tall; a pulled-out stool is natural in kitchens, living rooms and the diner; both valid and visually distinct.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int",
+     "restaurant_diner"
+    ],
+    "in_scene": {},
+    "picks": [
+     "dqvlff",
+     "bjtbrp"
+    ],
+    "alternate": null,
+    "models": [
+     {
+      "model": "bjtbrp",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Red bucket-seat swivel stool on chrome column with round grey base and footring, 0.35 x 0.36 x 0.57 m; seat rim slightly lumpy.",
+      "bbox": [
+       0.348,
+       0.355,
+       0.574
+      ]
+     },
+     {
+      "model": "dqvlff",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Tall bar stool with curved black backrest, dark wooden legs and footring, 0.48 x 0.48 x 1.05 m; clean, stands on four legs.",
+      "bbox": [
+       0.482,
+       0.482,
+       1.048
+      ]
+     }
+    ],
+    "valid_models": [
+     "dqvlff",
+     "bjtbrp"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/music_stool.json",
+    "override": "swapped with vacuum: second stool category next to taboret",
+    "round": 2
+   },
+   {
+    "task": "obst",
+    "category": "wicker_basket",
+    "group": "containers",
+    "n_ready": 5,
+    "n_reviewed": 5,
+    "n_valid": 5,
+    "n_unreviewed": 0,
+    "category_score": 16.0,
+    "verdict": "good",
+    "category_note": "Five well-scanned wicker baskets 0.26-0.41 m wide; round handled ones 0.43 m tall, cube 0.28 m, two identical low ovals 0.19 m. Natural laundry/storage clutter in homes and hotel; dgkhyn/unasxd are duplicates.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int",
+     "hotel_suite_large"
+    ],
+    "in_scene": {},
+    "picks": [
+     "drxfmr",
+     "jqfftz"
+    ],
+    "alternate": "tsjvyu",
+    "models": [
+     {
+      "model": "dgkhyn",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Low oval dark wicker basket, open, no handles, detailed weave scan; 0.26 x 0.41 x 0.19 m, height borderline low.",
+      "bbox": [
+       0.258,
+       0.412,
+       0.194
+      ]
+     },
+     {
+      "model": "drxfmr",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Round tapered dark wicker basket with two side handles, open top, detailed weave; 0.39 x 0.41 x 0.43 m.",
+      "bbox": [
+       0.389,
+       0.412,
+       0.431
+      ]
+     },
+     {
+      "model": "jqfftz",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Cube-shaped dark brown woven storage basket with handle slots, small white patch on one rim; 0.31 x 0.31 x 0.28 m.",
+      "bbox": [
+       0.309,
+       0.309,
+       0.284
+      ]
+     },
+     {
+      "model": "tsjvyu",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Round lighter-brown wicker basket with two loop handles, open top, clean weave; 0.39 x 0.41 x 0.43 m.",
+      "bbox": [
+       0.394,
+       0.414,
+       0.432
+      ]
+     },
+     {
+      "model": "unasxd",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Duplicate of dgkhyn: identical low oval wicker basket, 0.26 x 0.41 x 0.19 m, height borderline low.",
+      "bbox": [
+       0.258,
+       0.412,
+       0.194
+      ]
+     }
+    ],
+    "valid_models": [
+     "drxfmr",
+     "jqfftz",
+     "tsjvyu",
+     "dgkhyn",
+     "unasxd"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/wicker_basket.json",
+    "round": 2
+   },
+   {
+    "task": "obst",
+    "category": "carton",
+    "group": "containers",
+    "n_ready": 6,
+    "n_reviewed": 6,
+    "n_valid": 4,
+    "n_unreviewed": 0,
+    "category_score": 16.0,
+    "verdict": "weak",
+    "category_note": "Cardboard boxes, the archetypal floor obstacle, natural in every scene. Sizes all miss the ideal band: three are 0.14-0.19 m low, two are ~1 m huge; cdmmwy (small) and ylrxhe (0.64 m) are usable.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int",
+     "restaurant_diner",
+     "hotel_suite_large",
+     "office_cubicles_right"
+    ],
+    "in_scene": {},
+    "picks": [
+     "cdmmwy",
+     "ylrxhe"
+    ],
+    "alternate": "hhlmbi",
+    "models": [
+     {
+      "model": "causya",
+      "V": 2,
+      "N": 3,
+      "S": 0,
+      "rest_ok": true,
+      "score": 10,
+      "valid": false,
+      "note": "1.0 x 1.0 x 0.67 m plain grey-brown box; open lid flap floats detached above the body; far too big.",
+      "bbox": [
+       1.0,
+       1.0,
+       0.667
+      ]
+     },
+     {
+      "model": "cdmmwy",
+      "V": 5,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 17,
+      "valid": true,
+      "note": "Closed brown shipping box with handling symbols, 0.23 x 0.31 x 0.19 m; sharp texture; low but not roll-over-able.",
+      "bbox": [
+       0.23,
+       0.314,
+       0.187
+      ]
+     },
+     {
+      "model": "hhlmbi",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Small white lidded carton with dark lid band and symbols, 0.22 x 0.22 x 0.14 m; clean, plain; low.",
+      "bbox": [
+       0.222,
+       0.22,
+       0.138
+      ]
+     },
+     {
+      "model": "libote",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Near-duplicate of hhlmbi: white lidded carton with dark band, 0.21 x 0.21 x 0.14 m; clean; low.",
+      "bbox": [
+       0.213,
+       0.212,
+       0.138
+      ]
+     },
+     {
+      "model": "msfzpz",
+      "V": 3,
+      "N": 3,
+      "S": 0,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "1.2 x 1.0 x 0.78 m open moving box with splayed flaps, plain grey-brown; far too big for a corridor.",
+      "bbox": [
+       1.195,
+       1.018,
+       0.776
+      ]
+     },
+     {
+      "model": "ylrxhe",
+      "V": 5,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 17,
+      "valid": true,
+      "note": "Closed brown cardboard box with magenta straps and hand holes, 0.63 x 0.64 x 0.50 m; sharp texture; slightly large footprint.",
+      "bbox": [
+       0.631,
+       0.637,
+       0.501
+      ]
+     }
+    ],
+    "valid_models": [
+     "cdmmwy",
+     "ylrxhe",
+     "hhlmbi",
+     "libote"
+    ],
+    "used_by_other_tasks": [
+     {
+      "task": "configuration_matching-1/-2",
+      "round": 1,
+      "role": "target"
+     },
+     {
+      "task": "configuration_matching-1/-2",
+      "round": 1,
+      "role": "artic"
+     }
+    ],
+    "used_in_round1_elsewhere": true,
+    "used_elsewhere": true,
+    "review_file": "review/carton.json",
+    "round": 2
+   },
+   {
+    "task": "obst",
+    "category": "teddy_bear",
+    "group": "toys",
+    "n_ready": 5,
+    "n_reviewed": 5,
+    "n_valid": 4,
+    "n_unreviewed": 0,
+    "category_score": 16.0,
+    "verdict": "good",
+    "category_note": "Plush bears, all lying on their backs face-up (stable, canonical +z up), 0.15-0.47 m long and 0.09-0.33 m high. Two big brown bears are clear obstacles; the small ones are low. Natural toy clutter in bedrooms and living rooms.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int",
+     "hotel_suite_large"
+    ],
+    "in_scene": {},
+    "picks": [
+     "faxvha",
+     "mvwvlv"
+    ],
+    "alternate": "hqlobx",
+    "models": [
+     {
+      "model": "dgagea",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Mauve-grey plush bear lying on its back, face up, 0.24 x 0.16 x 0.11 m; clean; low profile, height borderline.",
+      "bbox": [
+       0.244,
+       0.156,
+       0.111
+      ]
+     },
+     {
+      "model": "ecvxmu",
+      "V": 4,
+      "N": 3,
+      "S": 0,
+      "rest_ok": true,
+      "score": 14,
+      "valid": false,
+      "note": "Small brown plush bear lying on its back, 0.15 x 0.11 x 0.09 m; clean but under 0.10 m high, too small to matter.",
+      "bbox": [
+       0.152,
+       0.111,
+       0.088
+      ]
+     },
+     {
+      "model": "faxvha",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Large brown plush bear lying on its back with legs raised, 0.43 x 0.36 x 0.32 m; clean textures, stable.",
+      "bbox": [
+       0.431,
+       0.362,
+       0.322
+      ]
+     },
+     {
+      "model": "hqlobx",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Large brown plush bear lying on its back, near twin of faxvha, 0.47 x 0.37 x 0.33 m; clean, stable.",
+      "bbox": [
+       0.468,
+       0.373,
+       0.332
+      ]
+     },
+     {
+      "model": "mvwvlv",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Medium brown plush bear lying on its back, arms out, 0.26 x 0.27 x 0.19 m; clean; height borderline.",
+      "bbox": [
+       0.257,
+       0.274,
+       0.19
+      ]
+     }
+    ],
+    "valid_models": [
+     "faxvha",
+     "hqlobx",
+     "dgagea",
+     "mvwvlv"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/teddy_bear.json",
+    "round": 2
+   },
+   {
+    "task": "obst",
+    "category": "serving_cart",
+    "group": "appliances",
+    "n_ready": 4,
+    "n_reviewed": 4,
+    "n_valid": 2,
+    "n_unreviewed": 0,
+    "category_score": 16.0,
+    "verdict": "good",
+    "category_note": "Four carts on casters; the mesh utility cart (0.44 x 0.85 m) and grey cabinet cart (0.52 x 0.64 m) fit, the AV cart and wooden trolley exceed 0.8 m. Parked carts are natural in diner, hotel, office, homes.",
+    "natural_scenes": [
+     "restaurant_diner",
+     "hotel_suite_large",
+     "office_cubicles_right",
+     "house_double_floor_upper",
+     "house_single_floor"
+    ],
+    "in_scene": {
+     "house_double_floor_upper": [
+      "bathroom"
+     ],
+     "restaurant_diner": [
+      "kitchen"
+     ],
+     "office_cubicles_right": [
+      "meeting_room"
+     ]
+    },
+    "picks": [
+     "heqtlk",
+     "vvtcby"
+    ],
+    "alternate": null,
+    "models": [
+     {
+      "model": "heqtlk",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Black three-tier rolling utility cart with grey mesh baskets and handle, on casters; 0.39 x 0.44 x 0.85 m; clean, sharp.",
+      "bbox": [
+       0.39,
+       0.438,
+       0.849
+      ]
+     },
+     {
+      "model": "lwgmcc",
+      "V": 3,
+      "N": 3,
+      "S": 0,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Flat black three-shelf AV-style cart on casters; 0.57 x 0.99 x 0.86 m; plain uniform black, footprint too large.",
+      "bbox": [
+       0.567,
+       0.985,
+       0.855
+      ]
+     },
+     {
+      "model": "vvtcby",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Light-grey boxy cabinet cart with two drawer seams on four casters; 0.38 x 0.52 x 0.64 m; plain, near-untextured grey but complete.",
+      "bbox": [
+       0.375,
+       0.519,
+       0.643
+      ]
+     },
+     {
+      "model": "yaabya",
+      "V": 4,
+      "N": 3,
+      "S": 0,
+      "rest_ok": true,
+      "score": 14,
+      "valid": false,
+      "note": "Dark ornate wooden tea trolley with large wheels and curved handles; 0.66 x 1.15 x 1.18 m; very dark, too large.",
+      "bbox": [
+       0.657,
+       1.151,
+       1.175
+      ]
+     }
+    ],
+    "valid_models": [
+     "heqtlk",
+     "vvtcby"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/serving_cart.json",
+    "round": 2
+   }
+  ],
+  "3": [
+   {
+    "task": "obst",
+    "category": "alphabet_abacus",
+    "group": "toys",
+    "n_ready": 1,
+    "n_reviewed": 1,
+    "n_valid": 1,
+    "n_unreviewed": 0,
+    "category_score": 16.0,
+    "verdict": "weak",
+    "category_note": "Colourful standing toy abacus ~0.32 x 0.39 m, a natural floor toy in a family home or flat; good size; only one model so no pair, and only 0.15 m deep.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int"
+    ],
+    "in_scene": {},
+    "picks": [
+     "wojwvu"
+    ],
+    "alternate": null,
+    "models": [
+     {
+      "model": "wojwvu",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Wooden toddler abacus, coloured letter beads on curved A-frame legs, 0.15 x 0.32 x 0.39 m; textured, clean, stands upright.",
+      "bbox": [
+       0.153,
+       0.322,
+       0.393
+      ]
+     }
+    ],
+    "valid_models": [
+     "wojwvu"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/alphabet_abacus.json",
+    "round": 3
+   },
+   {
+    "task": "obst",
+    "category": "doll",
+    "group": "toys",
+    "n_ready": 1,
+    "n_reviewed": 1,
+    "n_valid": 1,
+    "n_unreviewed": 0,
+    "category_score": 16.0,
+    "verdict": "weak",
+    "category_note": "Large sitting rag doll ~0.45 x 0.37 x 0.35 m, clean and stable; a natural floor toy in a house or flat; only one model, so no pair.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int"
+    ],
+    "in_scene": {},
+    "picks": [
+     "fhdgrp"
+    ],
+    "alternate": null,
+    "models": [
+     {
+      "model": "fhdgrp",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Rag doll in red dress sitting with legs stretched out, brown yarn hair, 0.45 x 0.37 x 0.35 m; complete textures; sits stably.",
+      "bbox": [
+       0.446,
+       0.37,
+       0.352
+      ]
+     }
+    ],
+    "valid_models": [
+     "fhdgrp"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/doll.json",
+    "round": 3
+   },
+   {
+    "task": "obst",
+    "category": "toy_car",
+    "group": "toys",
+    "n_ready": 4,
+    "n_reviewed": 4,
+    "n_valid": 3,
+    "n_unreviewed": 0,
+    "category_score": 15.5,
+    "verdict": "good",
+    "category_note": "Toy vehicles on wheels: two sizes of a red Beetle with luggage, a yellow dump truck and an oversized ride-on pedal car. Typical 0.45-0.58 m long, 0.2-0.3 m high, stable on wheels. Natural toy clutter in house rooms and corridors.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int"
+    ],
+    "in_scene": {},
+    "picks": [
+     "ksijjl",
+     "nhtywr"
+    ],
+    "alternate": "kvjpue",
+    "models": [
+     {
+      "model": "dgnnin",
+      "V": 4,
+      "N": 3,
+      "S": 0,
+      "rest_ok": true,
+      "score": 14,
+      "valid": false,
+      "note": "Grey vintage ride-on pedal car with red wheels and steering wheel, 0.89 x 0.40 x 0.39 m; clean; too long for a corridor.",
+      "bbox": [
+       0.886,
+       0.402,
+       0.387
+      ]
+     },
+     {
+      "model": "ksijjl",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Dark red VW Beetle toy with roof-rack luggage, 0.45 x 0.18 x 0.25 m; detailed textures, sits on four wheels.",
+      "bbox": [
+       0.448,
+       0.177,
+       0.247
+      ]
+     },
+     {
+      "model": "kvjpue",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Same Beetle with roof-rack luggage, scaled up, 0.58 x 0.23 x 0.32 m; clean; footprint borderline.",
+      "bbox": [
+       0.579,
+       0.228,
+       0.319
+      ]
+     },
+     {
+      "model": "nhtywr",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Yellow and red toy dump truck with blue wheels, 0.56 x 0.29 x 0.20 m; clean, colourful; footprint borderline, low.",
+      "bbox": [
+       0.56,
+       0.289,
+       0.202
+      ]
+     }
+    ],
+    "valid_models": [
+     "ksijjl",
+     "kvjpue",
+     "nhtywr"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/toy_car.json",
+    "round": 3
+   },
+   {
+    "task": "obst",
+    "category": "swivel_chair",
+    "group": "seats",
+    "n_ready": 56,
+    "n_reviewed": 8,
+    "n_valid": 8,
+    "n_unreviewed": 48,
+    "category_score": 15.0,
+    "verdict": "weak",
+    "category_note": "Eight clean office chairs on 5-wheel bases, all valid; a chair rolled into the walkway is a natural N = 3 obstacle in offices, bedrooms, hotel desks. Footprint 0.59-0.75 m is borderline for every model: use open rooms, not corridors.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int",
+     "office_cubicles_right",
+     "hotel_suite_large"
+    ],
+    "in_scene": {
+     "house_single_floor": [
+      "bedroom",
+      "childs_room",
+      "living_room"
+     ],
+     "house_double_floor_upper": [
+      "bedroom"
+     ],
+     "Rs_int": [
+      "living_room"
+     ],
+     "office_cubicles_right": [
+      "lobby",
+      "meeting_room",
+      "private_office",
+      "shared_office"
+     ]
+    },
+    "picks": [
+     "jhipgz",
+     "aqobyj"
+    ],
+    "alternate": "dmedmy",
+    "models": [
+     {
+      "model": "aqobyj",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Teal dotted-fabric high-back office chair with chrome arms, black 5-star wheeled base, 0.61 x 0.64 x 1.00 m; clean, footprint borderline.",
+      "bbox": [
+       0.609,
+       0.64,
+       1.004
+      ]
+     },
+     {
+      "model": "bvqqps",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Black tufted low-back executive chair with arms, grey wheeled base, 0.69 x 0.62 x 0.83 m; dark but clean.",
+      "bbox": [
+       0.686,
+       0.618,
+       0.833
+      ]
+     },
+     {
+      "model": "dmedmy",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Brown textured armless task chair, black wheeled base, 0.63 x 0.64 x 0.94 m; clean, distinct colour.",
+      "bbox": [
+       0.626,
+       0.64,
+       0.943
+      ]
+     },
+     {
+      "model": "fieiyo",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Black tall-back executive chair with chrome base, 0.60 x 0.64 x 1.30 m; clean but height 1.30 m is borderline as well.",
+      "bbox": [
+       0.604,
+       0.635,
+       1.295
+      ]
+     },
+     {
+      "model": "gfixyb",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Black office chair with armrests and chrome wheeled base, 0.72 x 0.73 x 0.93 m; clean, wider footprint.",
+      "bbox": [
+       0.72,
+       0.731,
+       0.934
+      ]
+     },
+     {
+      "model": "iiihwn",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Dark grey task chair with arms, black wheeled base, 0.59 x 0.63 x 1.00 m; clean, smallest footprint of the set.",
+      "bbox": [
+       0.593,
+       0.634,
+       0.997
+      ]
+     },
+     {
+      "model": "iyruig",
+      "V": 4,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 15,
+      "valid": true,
+      "note": "Black padded executive chair with arms, black wheeled base, 0.75 x 0.65 x 1.04 m; very dark render, geometry fine, widest footprint.",
+      "bbox": [
+       0.746,
+       0.648,
+       1.039
+      ]
+     },
+     {
+      "model": "jhipgz",
+      "V": 5,
+      "N": 3,
+      "S": 1,
+      "rest_ok": true,
+      "score": 17,
+      "valid": true,
+      "note": "Grey mesh ergonomic chair (Aeron-style) with arms, chrome/black wheeled base, 0.69 x 0.71 x 0.99 m; sharp, very recognisable.",
+      "bbox": [
+       0.685,
+       0.705,
+       0.988
+      ]
+     }
+    ],
+    "valid_models": [
+     "jhipgz",
+     "aqobyj",
+     "bvqqps",
+     "dmedmy",
+     "fieiyo",
+     "gfixyb",
+     "iiihwn",
+     "iyruig"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/swivel_chair.json",
+    "round": 3
+   },
+   {
+    "task": "obst",
+    "category": "backpack",
+    "group": "luggage",
+    "n_ready": 1,
+    "n_reviewed": 1,
+    "n_valid": 1,
+    "n_unreviewed": 0,
+    "category_score": 14.0,
+    "verdict": "weak",
+    "category_note": "Single model: a plain black upright backpack of ideal obstacle size (~0.5 m), stable, natural floor clutter in any of the seven scenes. Weak only because there is one model.",
+    "natural_scenes": [
+     "house_single_floor",
+     "house_double_floor_upper",
+     "house_double_floor_lower",
+     "Rs_int",
+     "restaurant_diner",
+     "hotel_suite_large",
+     "office_cubicles_right"
+    ],
+    "in_scene": {},
+    "picks": [
+     "gvbiwl"
+    ],
+    "alternate": null,
+    "models": [
+     {
+      "model": "gvbiwl",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "All-black backpack standing upright on its flat base, straps up; 0.49 x 0.40 x 0.48 m; dark but complete, clean geometry.",
+      "bbox": [
+       0.489,
+       0.401,
+       0.475
+      ]
+     }
+    ],
+    "valid_models": [
+     "gvbiwl"
+    ],
+    "used_by_other_tasks": [],
+    "used_in_round1_elsewhere": false,
+    "used_elsewhere": false,
+    "review_file": "review/backpack.json",
+    "override": "replaces highchair: classic mid-path obstacle, score 16, natural in all seven scenes (single ready model)",
+    "round": 3
+   }
+  ]
+ },
+ "not_selected": [
+  {
+   "task": "obst",
+   "category": "highchair",
+   "group": "seats",
+   "n_ready": 2,
+   "n_reviewed": 2,
+   "n_valid": 2,
+   "n_unreviewed": 0,
+   "category_score": 16.0,
+   "verdict": "good",
+   "category_note": "Both models are bar-height chairs (counter stools with backs), not baby high chairs; ~0.3 m footprint, 0.78 m tall, stable on four legs. Natural as a pulled-out stool in a diner or a kitchen with a counter.",
+   "natural_scenes": [
+    "restaurant_diner",
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "picks": [
+    "eteuuf",
+    "pahqnp"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "eteuuf",
+     "V": 4,
+     "N": 3,
+     "S": 2,
+     "rest_ok": true,
+     "score": 16,
+     "valid": true,
+     "note": "Dark brown bar-height chair with upholstered seat and back, four legs with stretchers, 0.35 x 0.31 x 0.78 m; clean, stable.",
+     "bbox": [
+      0.347,
+      0.307,
+      0.78
+     ]
+    },
+    {
+     "model": "pahqnp",
+     "V": 4,
+     "N": 3,
+     "S": 2,
+     "rest_ok": true,
+     "score": 16,
+     "valid": true,
+     "note": "Dark wooden bar stool with slatted back, four legs with stretchers, 0.31 x 0.29 x 0.78 m; clean, well textured, stable.",
+     "bbox": [
+      0.312,
+      0.285,
+      0.78
+     ]
+    }
+   ],
+   "valid_models": [
+    "eteuuf",
+    "pahqnp"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/highchair.json",
+   "override": "third stool category (both models are counter stools, not high chairs); replaced by backpack"
+  },
+  {
+   "task": "obst",
+   "category": "box_of_fruit",
+   "group": "containers",
+   "n_ready": 2,
+   "n_reviewed": 2,
+   "n_valid": 2,
+   "n_unreviewed": 0,
+   "category_score": 15.0,
+   "verdict": "weak",
+   "category_note": "Flat printed produce/gift cartons ~0.4 x 0.55 x 0.15 m, both clean and lying flat; natural as cardboard boxes in kitchen, garage or diner kitchen, but only 15 cm tall so size is borderline for both.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "picks": [
+    "jzfgwc",
+    "jsgbcz"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "jsgbcz",
+     "V": 4,
+     "N": 3,
+     "S": 1,
+     "rest_ok": true,
+     "score": 15,
+     "valid": true,
+     "note": "Brown cardboard produce box with Chinese fruit print, 0.40 x 0.53 x 0.15 m; small white blob on one side; only 15 cm tall.",
+     "bbox": [
+      0.398,
+      0.534,
+      0.154
+     ]
+    },
+    {
+     "model": "jzfgwc",
+     "V": 5,
+     "N": 3,
+     "S": 1,
+     "rest_ok": true,
+     "score": 17,
+     "valid": true,
+     "note": "White fruit-print gift carton 'Quality Fruit', 0.39 x 0.58 x 0.15 m; sharp textures, mirrored text on one side; only 15 cm tall.",
+     "bbox": [
+      0.39,
+      0.576,
+      0.154
+     ]
+    }
+   ],
+   "valid_models": [
+    "jzfgwc",
+    "jsgbcz"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/box_of_fruit.json"
+  },
+  {
+   "task": "obst",
+   "category": "rocking_chair",
+   "group": "seats",
+   "n_ready": 4,
+   "n_reviewed": 4,
+   "n_valid": 4,
+   "n_unreviewed": 0,
+   "category_score": 14.0,
+   "verdict": "weak",
+   "category_note": "Four clean rocking chairs, all valid but 0.60-0.79 m wide (borderline) and furniture normally kept in place beside other furniture, so N=2. Rockers rest stably but may rock when dropped.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "picks": [
+    "drpbxj",
+    "zgmspi"
+   ],
+   "alternate": "wkduul",
+   "models": [
+    {
+     "model": "drpbxj",
+     "V": 5,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 15,
+     "valid": true,
+     "note": "Dark wooden slat-back rocker with maroon seat cushion, 0.60 x 0.46 x 0.66 m; clean; rests on curved rockers.",
+     "bbox": [
+      0.599,
+      0.463,
+      0.66
+     ]
+    },
+    {
+     "model": "tjaphm",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "All-black wooden rocker, 0.64 x 0.42 x 0.65 m; flat dark render hides detail but geometry intact.",
+     "bbox": [
+      0.637,
+      0.421,
+      0.647
+     ]
+    },
+    {
+     "model": "wkduul",
+     "V": 5,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 15,
+     "valid": true,
+     "note": "Brown wooden slat-back rocker, 0.67 x 0.44 x 0.73 m; clean, recognisable.",
+     "bbox": [
+      0.673,
+      0.437,
+      0.732
+     ]
+    },
+    {
+     "model": "zgmspi",
+     "V": 5,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 15,
+     "valid": true,
+     "note": "Modern grey shell rocker on wire base and wooden runners, 0.79 x 0.61 x 0.75 m; clean; largest footprint.",
+     "bbox": [
+      0.793,
+      0.614,
+      0.754
+     ]
+    }
+   ],
+   "valid_models": [
+    "drpbxj",
+    "wkduul",
+    "zgmspi",
+    "tjaphm"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/rocking_chair.json"
+  },
+  {
+   "task": "obst",
+   "category": "rubber_boot",
+   "group": "clutter",
+   "n_ready": 4,
+   "n_reviewed": 4,
+   "n_valid": 4,
+   "n_unreviewed": 0,
+   "category_score": 14.0,
+   "verdict": "weak",
+   "category_note": "Four single boots standing on the sole, 0.26-0.44 m tall, good size. Only zzwsnw is a true yellow wellington; the others are dark leather-style boots. A lone boot is credible entryway clutter but not a mid-path object (N = 2).",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "picks": [
+    "zzwsnw",
+    "fajzct"
+   ],
+   "alternate": "wsjpfi",
+   "models": [
+    {
+     "model": "ejwnhl",
+     "V": 3,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 12,
+     "valid": true,
+     "note": "Black heeled ankle boot (leather look, not rubber), 0.31 x 0.11 x 0.29 m; very dark, shaft interior shows through to white in top view.",
+     "bbox": [
+      0.313,
+      0.109,
+      0.288
+     ]
+    },
+    {
+     "model": "fajzct",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Black lace-up work boot, 0.34 x 0.13 x 0.26 m; dark but clean geometry, laces visible; not a wellington. Near-duplicate of wsjpfi.",
+     "bbox": [
+      0.337,
+      0.127,
+      0.255
+     ]
+    },
+    {
+     "model": "wsjpfi",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Black lace-up work boot, 0.34 x 0.12 x 0.26 m; same look as fajzct (other foot), clean, dark.",
+     "bbox": [
+      0.337,
+      0.123,
+      0.255
+     ]
+    },
+    {
+     "model": "zzwsnw",
+     "V": 5,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 16,
+     "valid": true,
+     "note": "Yellow tall wellington with dark sole, 0.32 x 0.12 x 0.44 m; crisp textures, clearly a rubber boot, stands on sole.",
+     "bbox": [
+      0.323,
+      0.12,
+      0.438
+     ]
+    }
+   ],
+   "valid_models": [
+    "zzwsnw",
+    "fajzct",
+    "wsjpfi",
+    "ejwnhl"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/rubber_boot.json"
+  },
+  {
+   "task": "obst",
+   "category": "ice_bucket",
+   "group": "cleaning",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 14.0,
+   "verdict": "weak",
+   "category_note": "Single model: a plain metal bucket with ring handles, about 0.4 m wide and tall, stable; unremarkable as floor clutter in a diner, hotel or house. Only one model, so weak.",
+   "natural_scenes": [
+    "restaurant_diner",
+    "hotel_suite_large",
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "picks": [
+    "vlurir"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "vlurir",
+     "V": 4,
+     "N": 3,
+     "S": 2,
+     "rest_ok": true,
+     "score": 16,
+     "valid": true,
+     "note": "Grey galvanised metal pail with two ring handles, tapered, 0.34 x 0.41 x 0.39 m, flat bottom; reads as an ordinary bucket.",
+     "bbox": [
+      0.338,
+      0.411,
+      0.393
+     ]
+    }
+   ],
+   "valid_models": [
+    "vlurir"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/ice_bucket.json"
+  },
+  {
+   "task": "obst",
+   "category": "litter_box",
+   "group": "toys",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 14.0,
+   "verdict": "weak",
+   "category_note": "One well-made hooded litter box, ideal size and stable. Natural on a house or flat floor (bathroom, utility, corridor) but normally against a wall (N=2); not for hotel, diner or office; single model.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "picks": [
+    "rwnakn"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "rwnakn",
+     "V": 5,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 16,
+     "valid": true,
+     "note": "Covered litter box: beige hood, navy base, top handle, front opening with litter visible; 0.53 x 0.36 x 0.52 m; clean.",
+     "bbox": [
+      0.531,
+      0.364,
+      0.522
+     ]
+    }
+   ],
+   "valid_models": [
+    "rwnakn"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/litter_box.json"
+  },
+  {
+   "task": "obst",
+   "category": "tote",
+   "group": "luggage",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 14.0,
+   "verdict": "weak",
+   "category_note": "Single model: a large upright leather tote 0.47 m tall. A bag set down on the floor is unremarkable in homes, hotel, office or diner, but only one model, so weak.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [
+    "bnkjle"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "bnkjle",
+     "V": 4,
+     "N": 3,
+     "S": 2,
+     "rest_ok": true,
+     "score": 16,
+     "valid": true,
+     "note": "Dark brown leather tote standing upright, two handles, open top with grey lining; good textures; 0.34 x 0.24 x 0.47 m.",
+     "bbox": [
+      0.336,
+      0.244,
+      0.474
+     ]
+    }
+   ],
+   "valid_models": [
+    "bnkjle"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/tote.json"
+  },
+  {
+   "task": "obst",
+   "category": "bucket",
+   "group": "cleaning",
+   "n_ready": 3,
+   "n_reviewed": 3,
+   "n_valid": 3,
+   "n_unreviewed": 0,
+   "category_score": 13.5,
+   "verdict": "good",
+   "category_note": "Three dark, flatly shaded buckets 0.25-0.35 m wide; two are pot-like and under 0.20 m tall, only bdhvnt clears 0.29 m. Natural cleaning clutter in any of the seven scenes; visually plain.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [
+    "bdhvnt",
+    "lsmlzi"
+   ],
+   "alternate": "wlilma",
+   "models": [
+    {
+     "model": "bdhvnt",
+     "V": 3,
+     "N": 3,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Black tapered bucket with faceted base and two side lugs, no bail handle; renders uniformly black; 0.28 x 0.35 x 0.29 m; flat base.",
+     "bbox": [
+      0.281,
+      0.347,
+      0.291
+     ]
+    },
+    {
+     "model": "lsmlzi",
+     "V": 3,
+     "N": 3,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Dark grey cylindrical bucket with two loop handles, looks like a stock pot; flat shading; only 0.18 m high (borderline).",
+     "bbox": [
+      0.247,
+      0.3,
+      0.181
+     ]
+    },
+    {
+     "model": "wlilma",
+     "V": 3,
+     "N": 3,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Dark grey pot-like bucket with flared rim, loop handles and perforated inner insert; flat shading; 0.19 m high (borderline).",
+     "bbox": [
+      0.249,
+      0.3,
+      0.19
+     ]
+    }
+   ],
+   "valid_models": [
+    "bdhvnt",
+    "lsmlzi",
+    "wlilma"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/bucket.json"
+  },
+  {
+   "task": "obst",
+   "category": "gift_box",
+   "group": "containers",
+   "n_ready": 3,
+   "n_reviewed": 3,
+   "n_valid": 3,
+   "n_unreviewed": 0,
+   "category_score": 13.5,
+   "verdict": "weak",
+   "category_note": "Small wrapped presents ~0.2 m, fine textures, all stable. Credible floor clutter in a living room, bedroom or hotel suite but not a typical mid-path object; small size and N=2 cap the category.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [
+    "mfalrc",
+    "pnprrx"
+   ],
+   "alternate": "wpmksn",
+   "models": [
+    {
+     "model": "mfalrc",
+     "V": 5,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 15,
+     "valid": true,
+     "note": "Red patterned cube with gold ribbon and bow, 0.20 x 0.19 x 0.19 m; sharp texture; slightly low.",
+     "bbox": [
+      0.203,
+      0.193,
+      0.185
+     ]
+    },
+    {
+     "model": "pnprrx",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Grey cylindrical box with dark-red ribbon and bow standing on its end, 0.24 x 0.18 x 0.28 m; plain but clean.",
+     "bbox": [
+      0.243,
+      0.182,
+      0.283
+     ]
+    },
+    {
+     "model": "wpmksn",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Plain white tapered box with red polka dots, no lid or ribbon, blank top; 0.18 x 0.18 x 0.15 m; small.",
+     "bbox": [
+      0.18,
+      0.18,
+      0.15
+     ]
+    }
+   ],
+   "valid_models": [
+    "mfalrc",
+    "pnprrx",
+    "wpmksn"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/gift_box.json"
+  },
+  {
+   "task": "obst",
+   "category": "floor_lamp",
+   "group": "appliances",
+   "n_ready": 15,
+   "n_reviewed": 15,
+   "n_valid": 10,
+   "n_unreviewed": 0,
+   "category_score": 13.0,
+   "verdict": "weak",
+   "category_note": "Fifteen lamps, ten valid: mostly slim 0.35-0.55 m footprints but all 1.24-1.96 m tall, so size is borderline at best. Natural in living rooms, bedrooms and hotel suites but normally beside furniture (N=2); several arc lamps too wide.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+   ],
+   "in_scene": {
+    "house_single_floor": [
+     "childs_room",
+     "living_room"
+    ],
+    "house_double_floor_upper": [
+     "bedroom"
+    ],
+    "Rs_int": [
+     "living_room"
+    ]
+   },
+   "picks": [
+    "cosjfl",
+    "jqsuky"
+   ],
+   "alternate": "imgsrd",
+   "models": [
+    {
+     "model": "chjeoy",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Very thin grey arc lamp with small cone shade and small oval base; low detail; 0.37 x 0.20 x 1.64 m.",
+     "bbox": [
+      0.373,
+      0.201,
+      1.643
+     ]
+    },
+    {
+     "model": "cosjfl",
+     "V": 5,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 15,
+     "valid": true,
+     "note": "Beige drum shade on dark wooden tripod; complete sharp textures, very typical lamp; 0.45 m footprint, 1.35 m tall.",
+     "bbox": [
+      0.454,
+      0.447,
+      1.35
+     ]
+    },
+    {
+     "model": "fanocp",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Jointed arc lamp with dark cone shade offset far from a small round base; 0.70 x 0.20 x 1.28 m, wide footprint.",
+     "bbox": [
+      0.698,
+      0.195,
+      1.283
+     ]
+    },
+    {
+     "model": "hdfnqb",
+     "V": 4,
+     "N": 2,
+     "S": 0,
+     "rest_ok": true,
+     "score": 12,
+     "valid": false,
+     "note": "Black torchiere with bowl shade on round base; clean, but 1.96 m tall exceeds the height limit.",
+     "bbox": [
+      0.433,
+      0.433,
+      1.961
+     ]
+    },
+    {
+     "model": "imgsrd",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Black bent-arm task floor lamp with dome shade and round base; clean; 0.42 x 0.30 x 1.25 m.",
+     "bbox": [
+      0.423,
+      0.301,
+      1.252
+     ]
+    },
+    {
+     "model": "jcbvfi",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Dark pole and round base with a busy petal-ball shade; atypical design, shade looks noisy; 0.42 m footprint, 1.30 m tall.",
+     "bbox": [
+      0.423,
+      0.424,
+      1.302
+     ]
+    },
+    {
+     "model": "jqsuky",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Simple dark pole lamp with black dome shade and round base; clean, compact; 0.42 m footprint, 1.24 m tall.",
+     "bbox": [
+      0.423,
+      0.423,
+      1.243
+     ]
+    },
+    {
+     "model": "lcmuvd",
+     "V": 2,
+     "N": 1,
+     "S": 0,
+     "rest_ok": true,
+     "score": 6,
+     "valid": false,
+     "note": "Industrial contraption: box base, pipes, wire cage and sphere; not recognisable as a floor lamp; 0.85 m wide.",
+     "bbox": [
+      0.459,
+      0.848,
+      1.615
+     ]
+    },
+    {
+     "model": "lqdmym",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Uniform grey pole with flexible arm and bell shade, round base; flat low-detail look; 0.57 x 0.35 x 1.35 m.",
+     "bbox": [
+      0.565,
+      0.346,
+      1.348
+     ]
+    },
+    {
+     "model": "ogolip",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Dark drum shade on thin pole with X-shaped legs; clean; 0.54 x 0.38 x 1.66 m, height borderline.",
+     "bbox": [
+      0.538,
+      0.383,
+      1.662
+     ]
+    },
+    {
+     "model": "ozknkr",
+     "V": 4,
+     "N": 2,
+     "S": 0,
+     "rest_ok": true,
+     "score": 12,
+     "valid": false,
+     "note": "Long horizontal-arm arc lamp with cone shade; clean, but 0.85 m footprint exceeds the limit.",
+     "bbox": [
+      0.846,
+      0.281,
+      1.564
+     ]
+    },
+    {
+     "model": "pfuqec",
+     "V": 2,
+     "N": 0,
+     "S": 0,
+     "rest_ok": false,
+     "score": 4,
+     "valid": false,
+     "note": "Grey dish-shade lamp lying nearly horizontal in canonical pose (0.84 x 0.24 x 0.48 m); not standing, unusable.",
+     "bbox": [
+      0.839,
+      0.236,
+      0.476
+     ]
+    },
+    {
+     "model": "smfygn",
+     "V": 2,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 9,
+     "valid": false,
+     "note": "Uniform grey cone body with tapered shade; no texture detail, reads as a bollard not a lamp; 0.49 m footprint, 1.66 m.",
+     "bbox": [
+      0.488,
+      0.466,
+      1.664
+     ]
+    },
+    {
+     "model": "uivlzf",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Black studio-style tripod spotlight lamp with round grilled head; decent detail; 0.46 x 0.51 x 1.49 m.",
+     "bbox": [
+      0.455,
+      0.509,
+      1.489
+     ]
+    },
+    {
+     "model": "vdxlda",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Wooden three-column torchiere with dark patterned bowl shade; textured, stable; 0.35 m footprint, 1.33 m tall.",
+     "bbox": [
+      0.353,
+      0.353,
+      1.332
+     ]
+    }
+   ],
+   "valid_models": [
+    "cosjfl",
+    "fanocp",
+    "imgsrd",
+    "jqsuky",
+    "ogolip",
+    "uivlzf",
+    "vdxlda",
+    "chjeoy",
+    "jcbvfi",
+    "lqdmym"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/floor_lamp.json"
+  },
+  {
+   "task": "obst",
+   "category": "gym_shoe",
+   "group": "clutter",
+   "n_ready": 22,
+   "n_reviewed": 6,
+   "n_valid": 6,
+   "n_unreviewed": 16,
+   "category_score": 13.0,
+   "verdict": "weak",
+   "category_note": "Six well-textured single sneakers ~0.31 x 0.11 x 0.13 m, all resting on the sole. Credible floor clutter in bedrooms/entryways/hotel (N = 2), but only 0.11-0.14 m tall so size is borderline for every model.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+   ],
+   "in_scene": {},
+   "picks": [
+    "mcfcwq",
+    "uuvwev"
+   ],
+   "alternate": "wfmrpw",
+   "models": [
+    {
+     "model": "lqzooz",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Dark grey running shoe with neon yellow sole and white stripes, 0.31 x 0.11 x 0.12 m; sharp textures, low height.",
+     "bbox": [
+      0.306,
+      0.109,
+      0.124
+     ]
+    },
+    {
+     "model": "mcfcwq",
+     "V": 5,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 15,
+     "valid": true,
+     "note": "White retro sneaker with teal and red trim, 0.31 x 0.12 x 0.14 m; crisp textures, tallest of the set, clean sole.",
+     "bbox": [
+      0.307,
+      0.115,
+      0.143
+     ]
+    },
+    {
+     "model": "uuvwev",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Black sneaker with orange stripes and yellow heel, 0.31 x 0.11 x 0.14 m; sharp; near-duplicate look of womypz.",
+     "bbox": [
+      0.307,
+      0.114,
+      0.138
+     ]
+    },
+    {
+     "model": "wfmrpw",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Blue and black trail-style sneaker, 0.31 x 0.11 x 0.13 m; good textures, clean geometry.",
+     "bbox": [
+      0.307,
+      0.114,
+      0.133
+     ]
+    },
+    {
+     "model": "wkvcsn",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Plain grey canvas low-top, smallest at 0.27 x 0.10 x 0.11 m; low-contrast texture, barely above the 0.10 m height floor.",
+     "bbox": [
+      0.265,
+      0.099,
+      0.107
+     ]
+    },
+    {
+     "model": "womypz",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Black sneaker with orange stripes and yellow heel, 0.31 x 0.11 x 0.14 m; same look as uuvwev (other foot).",
+     "bbox": [
+      0.307,
+      0.11,
+      0.138
+     ]
+    }
+   ],
+   "valid_models": [
+    "mcfcwq",
+    "lqzooz",
+    "uuvwev",
+    "wfmrpw",
+    "womypz",
+    "wkvcsn"
+   ],
+   "used_by_other_tasks": [
+    {
+     "task": "world_alignment-0",
+     "round": 2,
+     "role": "target"
+    }
+   ],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": true,
+   "review_file": "review/gym_shoe.json"
+  },
+  {
+   "task": "obst",
+   "category": "pillow",
+   "group": "clutter",
+   "n_ready": 127,
+   "n_reviewed": 6,
+   "n_valid": 4,
+   "n_unreviewed": 121,
+   "category_score": 13.0,
+   "verdict": "weak",
+   "category_note": "Pillows lying flat, ~0.4-0.5 m across and only ~0.22 m high; four usable. Credible floor clutter in bedrooms, living rooms and the hotel suite but never more than N=2, and low for the camera.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+   ],
+   "in_scene": {
+    "house_double_floor_upper": [
+     "bedroom",
+     "living_room"
+    ]
+   },
+   "picks": [
+    "byzkkw",
+    "gksezx"
+   ],
+   "alternate": "gitbli",
+   "models": [
+    {
+     "model": "byzkkw",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Plain grey square cushion lying flat, 0.47 x 0.47 x 0.22 m; clean, unremarkable.",
+     "bbox": [
+      0.474,
+      0.465,
+      0.223
+     ]
+    },
+    {
+     "model": "dmnvmr",
+     "V": 4,
+     "N": 2,
+     "S": 0,
+     "rest_ok": true,
+     "score": 12,
+     "valid": false,
+     "note": "Blue/grey striped rectangular pillow with crumpled corners, 0.60 x 0.81 x 0.24 m; footprint just over 0.80 m.",
+     "bbox": [
+      0.597,
+      0.81,
+      0.236
+     ]
+    },
+    {
+     "model": "gitbli",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Grey-brown waffle-knit cushion, slightly curled, 0.39 x 0.51 x 0.23 m; clean.",
+     "bbox": [
+      0.391,
+      0.507,
+      0.228
+     ]
+    },
+    {
+     "model": "gksezx",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Grey pillow with blue floral applique on top, 0.39 x 0.42 x 0.21 m; decoration a little busy but intact.",
+     "bbox": [
+      0.387,
+      0.42,
+      0.213
+     ]
+    },
+    {
+     "model": "ilcleb",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Dark patterned flat cushion, 0.34 x 0.48 x 0.16 m; clean but low.",
+     "bbox": [
+      0.339,
+      0.481,
+      0.164
+     ]
+    },
+    {
+     "model": "kqjtnx",
+     "V": 3,
+     "N": 2,
+     "S": 0,
+     "rest_ok": true,
+     "score": 10,
+     "valid": false,
+     "note": "Large black body pillow with splayed corners, 0.71 x 1.0 x 0.23 m; dark and shapeless; too big.",
+     "bbox": [
+      0.713,
+      1.005,
+      0.233
+     ]
+    }
+   ],
+   "valid_models": [
+    "byzkkw",
+    "gitbli",
+    "gksezx",
+    "ilcleb"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/pillow.json"
+  },
+  {
+   "task": "obst",
+   "category": "plant_pot",
+   "group": "plants",
+   "n_ready": 4,
+   "n_reviewed": 4,
+   "n_valid": 4,
+   "n_unreviewed": 0,
+   "category_score": 13.0,
+   "verdict": "weak",
+   "category_note": "Empty pots ~0.22 m wide, 0.13-0.25 m tall, all standing; plausible near a garden door, garage or corridor wall but an empty pot mid-path is only borderline natural (N=2); two urns show no bottom from above.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "picks": [
+    "vhglly",
+    "wvgsqk"
+   ],
+   "alternate": "gtnmis",
+   "models": [
+    {
+     "model": "gtnmis",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Dark brown glazed urn-shaped pot with rolled lip, 0.22 x 0.22 x 0.24 m; very dark; no bottom face visible from top; narrow flat base.",
+     "bbox": [
+      0.22,
+      0.22,
+      0.237
+     ]
+    },
+    {
+     "model": "ihnfbi",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Small octagonal dark ornate pot with panel reliefs, 0.16 x 0.16 x 0.13 m; complete with bottom; borderline small.",
+     "bbox": [
+      0.164,
+      0.164,
+      0.126
+     ]
+    },
+    {
+     "model": "vhglly",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Grey speckled concrete cylinder pot with visible inner floor, 0.24 x 0.24 x 0.24 m; clean, bland texture; flat base.",
+     "bbox": [
+      0.237,
+      0.237,
+      0.244
+     ]
+    },
+    {
+     "model": "wvgsqk",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Olive-brown mottled glazed urn-shaped pot with lip, 0.22 x 0.22 x 0.25 m; no bottom face visible from top; narrow flat base.",
+     "bbox": [
+      0.22,
+      0.22,
+      0.247
+     ]
+    }
+   ],
+   "valid_models": [
+    "gtnmis",
+    "vhglly",
+    "wvgsqk",
+    "ihnfbi"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/plant_pot.json"
+  },
+  {
+   "task": "obst",
+   "category": "terrarium",
+   "group": "toys",
+   "n_ready": 2,
+   "n_reviewed": 2,
+   "n_valid": 2,
+   "n_unreviewed": 0,
+   "category_score": 13.0,
+   "verdict": "weak",
+   "category_note": "Two near-identical 0.4 x 0.4 x 0.84 m floor vivariums, good size and stable. A niche pet item plausible on a house living-room floor but normally against a wall or on a stand (N=2); odd in office, hotel, diner.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "picks": [
+    "eqxkys",
+    "zjyscx"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "eqxkys",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Tall dark-framed vivarium with plants, rocks and a lizard, solid back; glass omitted; 0.39 x 0.43 x 0.84 m; clean.",
+     "bbox": [
+      0.386,
+      0.43,
+      0.836
+     ]
+    },
+    {
+     "model": "zjyscx",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Near duplicate of eqxkys: dark-framed vivarium with plants and lizard; 0.40 x 0.44 x 0.84 m; clean.",
+     "bbox": [
+      0.403,
+      0.437,
+      0.842
+     ]
+    }
+   ],
+   "valid_models": [
+    "eqxkys",
+    "zjyscx"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/terrarium.json"
+  },
+  {
+   "task": "obst",
+   "category": "mop_bucket",
+   "group": "cleaning",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 13.0,
+   "verdict": "weak",
+   "category_note": "Commercial mop bucket with wringer, 0.59 m long footprint (borderline), 0.43 m tall; natural in office corridors, diner kitchen, hotel housekeeping and a garage, odd in a flat; single model only.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [
+    "xjzyfc"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "xjzyfc",
+     "V": 4,
+     "N": 3,
+     "S": 1,
+     "rest_ok": true,
+     "score": 15,
+     "valid": true,
+     "note": "Green plastic janitor bucket with wringer on top and wire handle, 0.35 x 0.59 x 0.43 m; flat colour, clean geometry; stands on base.",
+     "bbox": [
+      0.351,
+      0.593,
+      0.432
+     ]
+    }
+   ],
+   "valid_models": [
+    "xjzyfc"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/mop_bucket.json"
+  },
+  {
+   "task": "obst",
+   "category": "suitcase",
+   "group": "luggage",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 13.0,
+   "verdict": "weak",
+   "category_note": "Single ready model: a hard-shell suitcase lying flat, 0.62 m long, only 0.21 m high, stable. Natural in a hotel suite, bedroom or corridor; footprint and height both borderline, and the low profile is a small visual target.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+   ],
+   "in_scene": {},
+   "picks": [
+    "fqsjey"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "fqsjey",
+     "V": 4,
+     "N": 3,
+     "S": 1,
+     "rest_ok": true,
+     "score": 15,
+     "valid": true,
+     "note": "Dark blue-grey hard-shell suitcase lying flat on its back with wheels and handle, 0.43 x 0.62 x 0.21 m; clean; stable flat pose.",
+     "bbox": [
+      0.43,
+      0.623,
+      0.205
+     ]
+    }
+   ],
+   "valid_models": [
+    "fqsjey"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/suitcase.json"
+  },
+  {
+   "task": "obst",
+   "category": "standing_loudspeaker",
+   "group": "appliances",
+   "n_ready": 5,
+   "n_reviewed": 5,
+   "n_valid": 4,
+   "n_unreviewed": 0,
+   "category_score": 12.5,
+   "verdict": "weak",
+   "category_note": "Speakers 0.27-0.85 m tall: a stand-mounted speaker and a PA cabinet are the best; one cabinet has missing drivers. Speakers normally sit against a wall or beside furniture, so N=2 at best; plausible in living rooms/bedrooms and a diner.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner"
+   ],
+   "in_scene": {
+    "house_double_floor_upper": [
+     "bedroom"
+    ]
+   },
+   "picks": [
+    "suzqfe",
+    "wsghki"
+   ],
+   "alternate": "ogytka",
+   "models": [
+    {
+     "model": "lgkhqt",
+     "V": 2,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 10,
+     "valid": false,
+     "note": "Brown wooden cabinet whose driver cut-outs are see-through holes (drivers missing), holes also visible from top; 0.12 x 0.33 x 0.38 m; broken.",
+     "bbox": [
+      0.124,
+      0.325,
+      0.375
+     ]
+    },
+    {
+     "model": "ogytka",
+     "V": 3,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 12,
+     "valid": true,
+     "note": "Small black bookshelf speaker with one driver and two ports, 0.27 x 0.16 x 0.27 m; flat black, clean, shelf-size rather than floor-standing.",
+     "bbox": [
+      0.265,
+      0.156,
+      0.266
+     ]
+    },
+    {
+     "model": "snbvop",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Slim dark tower speaker with two small drivers at top, 0.13 x 0.09 x 0.44 m; flat texture, footprint borderline, narrow base.",
+     "bbox": [
+      0.132,
+      0.089,
+      0.439
+     ]
+    },
+    {
+     "model": "suzqfe",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Dark speaker box on a pole stand with round black base, 0.26 x 0.26 x 0.44 m; clean, stable disc base.",
+     "bbox": [
+      0.264,
+      0.264,
+      0.439
+     ]
+    },
+    {
+     "model": "wsghki",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Grey PA speaker with black baffle, woofer and horn, 0.39 x 0.62 x 0.85 m; clean, footprint borderline.",
+     "bbox": [
+      0.392,
+      0.624,
+      0.85
+     ]
+    }
+   ],
+   "valid_models": [
+    "suzqfe",
+    "wsghki",
+    "ogytka",
+    "snbvop"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/standing_loudspeaker.json"
+  },
+  {
+   "task": "obst",
+   "category": "paper_bag",
+   "group": "containers",
+   "n_ready": 3,
+   "n_reviewed": 3,
+   "n_valid": 3,
+   "n_unreviewed": 0,
+   "category_score": 12.5,
+   "verdict": "weak",
+   "category_note": "Three upright paper bags (grocery, gift, tall shopping). All stand on a flat base; a set-down bag is credible kitchen/entryway clutter (N = 2). Two are small/thin (borderline size); wvhmww is the only comfortably sized one.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "picks": [
+    "wvhmww",
+    "ruryqd"
+   ],
+   "alternate": "bzsxgw",
+   "models": [
+    {
+     "model": "bzsxgw",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Plain brown crumpled grocery bag, open top, 0.10 x 0.15 x 0.24 m; thin-walled, flat texture, footprint borderline.",
+     "bbox": [
+      0.101,
+      0.15,
+      0.24
+     ]
+    },
+    {
+     "model": "ruryqd",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Tan gusseted gift bag with green rope handles, open, 0.12 x 0.20 x 0.20 m; clean, height just under 0.20 m.",
+     "bbox": [
+      0.115,
+      0.202,
+      0.199
+     ]
+    },
+    {
+     "model": "wvhmww",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Tall dark brown shopping bag with twisted rope handles, 0.14 x 0.29 x 0.51 m; good size, thin but flat base.",
+     "bbox": [
+      0.137,
+      0.291,
+      0.508
+     ]
+    }
+   ],
+   "valid_models": [
+    "wvhmww",
+    "ruryqd",
+    "bzsxgw"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/paper_bag.json"
+  },
+  {
+   "task": "obst",
+   "category": "shoulder_bag",
+   "group": "luggage",
+   "n_ready": 2,
+   "n_reviewed": 2,
+   "n_valid": 2,
+   "n_unreviewed": 0,
+   "category_score": 12.5,
+   "verdict": "weak",
+   "category_note": "Two clean bags standing upright; the brown one (0.32 x 0.42 m) is usable, the grey handbag is only 0.15 m and borderline. A dropped bag is credible clutter anywhere but N = 2; both are thin and may tip.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [
+    "pxvcyu",
+    "mcualj"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "mcualj",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Small grey handbag with black handles, standing upright on narrow base; 0.06 x 0.15 x 0.15 m; clean but tiny, thin, easy to miss.",
+     "bbox": [
+      0.059,
+      0.15,
+      0.146
+     ]
+    },
+    {
+     "model": "pxvcyu",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Brown leather shoulder bag standing upright, long strap held straight up in the air; 0.13 x 0.32 x 0.42 m; clean, strap pose unnatural.",
+     "bbox": [
+      0.132,
+      0.32,
+      0.421
+     ]
+    }
+   ],
+   "valid_models": [
+    "pxvcyu",
+    "mcualj"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/shoulder_bag.json"
+  },
+  {
+   "task": "obst",
+   "category": "pop_case",
+   "group": "containers",
+   "n_ready": 13,
+   "n_reviewed": 6,
+   "n_valid": 6,
+   "n_unreviewed": 7,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "Six identical-shape 12-can cartons (0.13 x 0.39 x 0.13 m) differing only in print. Lying flat and stable; believable near a fridge or in a garage/diner storage (N = 2) but only 0.13 m tall, so borderline size for all.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "picks": [
+    "sqiatv",
+    "zxguap"
+   ],
+   "alternate": "seiatm",
+   "models": [
+    {
+     "model": "dufbnv",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Orange 12-pack carton, 0.13 x 0.39 x 0.13 m; print is blurry/smeared, otherwise clean box.",
+     "bbox": [
+      0.13,
+      0.394,
+      0.126
+     ]
+    },
+    {
+     "model": "oarbks",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Pink citrus 12-pack carton, 0.13 x 0.39 x 0.13 m; readable print, clean box, low.",
+     "bbox": [
+      0.13,
+      0.394,
+      0.126
+     ]
+    },
+    {
+     "model": "qwtbon",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Dark red T&T 12-pack carton, 0.13 x 0.39 x 0.13 m; clean print, low box.",
+     "bbox": [
+      0.13,
+      0.394,
+      0.126
+     ]
+    },
+    {
+     "model": "seiatm",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Grey ginger-ale 12-pack carton with green banner, 0.13 x 0.39 x 0.13 m; clean, low.",
+     "bbox": [
+      0.13,
+      0.394,
+      0.126
+     ]
+    },
+    {
+     "model": "sqiatv",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Red cherry-cola 12-pack carton, 0.13 x 0.39 x 0.13 m; sharp print, clean box, low.",
+     "bbox": [
+      0.13,
+      0.394,
+      0.126
+     ]
+    },
+    {
+     "model": "zxguap",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Blue iced-tea 12-pack carton, 0.13 x 0.39 x 0.13 m; sharp print, clean box, low.",
+     "bbox": [
+      0.13,
+      0.394,
+      0.126
+     ]
+    }
+   ],
+   "valid_models": [
+    "oarbks",
+    "qwtbon",
+    "seiatm",
+    "sqiatv",
+    "zxguap",
+    "dufbnv"
+   ],
+   "used_by_other_tasks": [
+    {
+     "task": "inter_object_relation_satisfaction-4",
+     "round": 1,
+     "role": "partner"
+    }
+   ],
+   "used_in_round1_elsewhere": true,
+   "used_elsewhere": true,
+   "review_file": "review/pop_case.json"
+  },
+  {
+   "task": "obst",
+   "category": "bucket_of_paint",
+   "group": "cleaning",
+   "n_ready": 3,
+   "n_reviewed": 3,
+   "n_valid": 3,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "Three clean paint cans, all ~0.16 m wide and 0.16-0.19 m tall: stable but borderline small for the base to notice. Credible floor clutter in a house garage/utility area only, odd in hotel, diner or office.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "picks": [
+    "gjjugj",
+    "ycnaho"
+   ],
+   "alternate": "mxyrzd",
+   "models": [
+    {
+     "model": "gjjugj",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "White/red labelled paint can with wire handle and black lid; 0.16 x 0.15 x 0.19 m, small; clean textures.",
+     "bbox": [
+      0.159,
+      0.15,
+      0.192
+     ]
+    },
+    {
+     "model": "mxyrzd",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "White paint can with colour-wheel label, black lid and handle; 0.16 x 0.15 x 0.19 m, small; clean textures.",
+     "bbox": [
+      0.158,
+      0.149,
+      0.191
+     ]
+    },
+    {
+     "model": "ycnaho",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Green bucket with yellow lid, paint smears and handle; 0.17 x 0.17 x 0.16 m, small and low; clean.",
+     "bbox": [
+      0.165,
+      0.172,
+      0.156
+     ]
+    }
+   ],
+   "valid_models": [
+    "gjjugj",
+    "mxyrzd",
+    "ycnaho"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/bucket_of_paint.json"
+  },
+  {
+   "task": "obst",
+   "category": "coatrack",
+   "group": "appliances",
+   "n_ready": 4,
+   "n_reviewed": 4,
+   "n_valid": 3,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "Tall slim coat stands (0.4-0.6 m footprint, 1.5-1.9 m). Natural near entrances, offices and diners but normally against a wall (N=2), and height is borderline for every model; one exceeds 1.7 m.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [
+    "hmedjt",
+    "zypzqh"
+   ],
+   "alternate": "qyjssf",
+   "models": [
+    {
+     "model": "hmedjt",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Slim black coat stand, round disc base, small hooks at top and a mid ring; 0.38 m footprint, 1.66 m tall.",
+     "bbox": [
+      0.375,
+      0.375,
+      1.656
+     ]
+    },
+    {
+     "model": "qyjssf",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Thick uniform-grey post with cross pegs on a heavy round base; looks like a bollard; 0.62 m footprint, 1.50 m tall.",
+     "bbox": [
+      0.623,
+      0.621,
+      1.501
+     ]
+    },
+    {
+     "model": "tcnxtu",
+     "V": 4,
+     "N": 2,
+     "S": 0,
+     "rest_ok": true,
+     "score": 12,
+     "valid": false,
+     "note": "Classic black bentwood coat stand with curved hooks and legs; clean, but 1.93 m tall exceeds the height limit.",
+     "bbox": [
+      0.538,
+      0.469,
+      1.932
+     ]
+    },
+    {
+     "model": "zypzqh",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Thin black pole on four cross feet with two hooks at top; 0.50 m footprint, 1.67 m tall; clean geometry.",
+     "bbox": [
+      0.5,
+      0.5,
+      1.667
+     ]
+    }
+   ],
+   "valid_models": [
+    "hmedjt",
+    "zypzqh",
+    "qyjssf"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/coatrack.json"
+  },
+  {
+   "task": "obst",
+   "category": "printer",
+   "group": "appliances",
+   "n_ready": 3,
+   "n_reviewed": 3,
+   "n_valid": 3,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "Three clean printers: two desktop MFPs ~0.5-0.6 m wide and 0.35-0.40 m tall, one low inkjet. Credible on an office floor beside a desk or in a copy corner, but odd mid-corridor and sizes are borderline; office scene only.",
+   "natural_scenes": [
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [
+    "icxhbx",
+    "oyqbtq"
+   ],
+   "alternate": "tiioui",
+   "models": [
+    {
+     "model": "icxhbx",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Dark grey/black HP-style laser MFP with light lower body, control panel and tray, 0.46 x 0.62 x 0.35 m; clean, footprint borderline.",
+     "bbox": [
+      0.457,
+      0.621,
+      0.347
+     ]
+    },
+    {
+     "model": "oyqbtq",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Light grey office copier/MFP with control panel and paper tray, 0.58 x 0.53 x 0.40 m; clean, footprint borderline.",
+     "bbox": [
+      0.582,
+      0.529,
+      0.4
+     ]
+    },
+    {
+     "model": "tiioui",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Compact grey inkjet printer with small display, 0.30 x 0.44 x 0.14 m; clean, but only 14 cm tall (height borderline).",
+     "bbox": [
+      0.302,
+      0.44,
+      0.144
+     ]
+    }
+   ],
+   "valid_models": [
+    "icxhbx",
+    "oyqbtq",
+    "tiioui"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/printer.json"
+  },
+  {
+   "task": "obst",
+   "category": "recycling_bin",
+   "group": "bins",
+   "n_ready": 3,
+   "n_reviewed": 3,
+   "n_valid": 3,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "Three colour variants of a 0.57 m wide, 0.8-0.9 m tall outdoor wheelie bin, stable on wheels and feet. Plausible in an office or diner corridor or a garage but normally parked against a wall; footprint borderline. Weak.",
+   "natural_scenes": [
+    "office_cubicles_right",
+    "house_single_floor",
+    "house_double_floor_lower",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "picks": [
+    "pdmzhv",
+    "nuoypc"
+   ],
+   "alternate": "mdojox",
+   "models": [
+    {
+     "model": "mdojox",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Black two-wheel wheelie bin with lid and handle, 0.57 x 0.52 x 0.88 m; very dark but clean; large outdoor-style bin.",
+     "bbox": [
+      0.573,
+      0.517,
+      0.88
+     ]
+    },
+    {
+     "model": "nuoypc",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Dark green wheelie bin with recycling symbol on the front, 0.57 x 0.49 x 0.77 m; clean; stands on wheels and front feet.",
+     "bbox": [
+      0.573,
+      0.49,
+      0.765
+     ]
+    },
+    {
+     "model": "pdmzhv",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Grey wheelie bin with lid and handle, 0.57 x 0.43 x 0.82 m; clean, most readable textures of the three.",
+     "bbox": [
+      0.573,
+      0.432,
+      0.815
+     ]
+    }
+   ],
+   "valid_models": [
+    "mdojox",
+    "nuoypc",
+    "pdmzhv"
+   ],
+   "used_by_other_tasks": [
+    {
+     "task": "configuration_matching-1/-2",
+     "round": 3,
+     "role": "target"
+    }
+   ],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": true,
+   "review_file": "review/recycling_bin.json"
+  },
+  {
+   "task": "obst",
+   "category": "hiking_boot",
+   "group": "clutter",
+   "n_ready": 2,
+   "n_reviewed": 2,
+   "n_valid": 2,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "Two near-identical single boots (a pair split into two models), 0.155 m high, 0.10 m wide. Credible entryway or hotel-room floor clutter (N=2 at best) and borderline small for the base.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+   ],
+   "in_scene": {},
+   "picks": [
+    "ljiila",
+    "tariyy"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "ljiila",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Grey-black mid-cut hiking boot standing on its sole, sharp scan textures, clean; 0.27 x 0.10 x 0.16 m, low and narrow.",
+     "bbox": [
+      0.265,
+      0.102,
+      0.155
+     ]
+    },
+    {
+     "model": "tariyy",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Near-identical boot to ljiila (other half of the pair), same sharp textures and size; single boot, low and narrow.",
+     "bbox": [
+      0.265,
+      0.101,
+      0.155
+     ]
+    }
+   ],
+   "valid_models": [
+    "ljiila",
+    "tariyy"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/hiking_boot.json"
+  },
+  {
+   "task": "obst",
+   "category": "skates",
+   "group": "toys",
+   "n_ready": 2,
+   "n_reviewed": 2,
+   "n_valid": 2,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "Two near-identical pairs of hockey skates lying on their sides, ~0.35 x 0.37 m footprint but only 14-15 cm tall; credible entryway/child's-room floor clutter in the houses, but low and visually the same model twice.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "picks": [
+    "igyveo",
+    "sjehwr"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "igyveo",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Pair of blue/black hockey skates lying on their sides in a heap (natural for dropped skates), 0.34 x 0.37 x 0.15 m; nice textures, low.",
+     "bbox": [
+      0.335,
+      0.369,
+      0.152
+     ]
+    },
+    {
+     "model": "sjehwr",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Near-duplicate of igyveo: same blue/black skates lying on their sides, 0.35 x 0.37 x 0.14 m; clean textures, only 14 cm tall.",
+     "bbox": [
+      0.345,
+      0.37,
+      0.138
+     ]
+    }
+   ],
+   "valid_models": [
+    "igyveo",
+    "sjehwr"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/skates.json"
+  },
+  {
+   "task": "obst",
+   "category": "bag_of_mulch",
+   "group": "containers",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "Single upright tied sack ~0.6 m tall, good size and stable flat-ish base. Plausible garage/utility floor clutter but normally against a wall; only one model so the category cannot span variants.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "picks": [
+    "foxqdk"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "foxqdk",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Upright brown burlap sack tied with a dark strap, 0.33x0.30x0.59 m; clean textured mesh, reads as generic tied sack rather than plastic mulch bag.",
+     "bbox": [
+      0.327,
+      0.3,
+      0.592
+     ]
+    }
+   ],
+   "valid_models": [
+    "foxqdk"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/bag_of_mulch.json"
+  },
+  {
+   "task": "obst",
+   "category": "birdcage",
+   "group": "toys",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "Single medium wire birdcage, good size and stable. Plausible on a house living-room floor but normally on a stand or against a wall, so only N=2; one model only.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "picks": [
+    "ogkdoh"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "ogkdoh",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "House-shaped wire cage, blue tray, perches and feeders; 0.36 x 0.31 x 0.50 m; clean textured mesh, flat base.",
+     "bbox": [
+      0.364,
+      0.312,
+      0.502
+     ]
+    }
+   ],
+   "valid_models": [
+    "ogkdoh"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/birdcage.json"
+  },
+  {
+   "task": "obst",
+   "category": "burlap_bag",
+   "group": "containers",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "One sack model, good size and stable. Plausible on the floor of a diner kitchen, pantry or garage but normally beside a wall or shelf, not mid-room; N=2 at best.",
+   "natural_scenes": [
+    "restaurant_diner",
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "picks": [
+    "hlqrxm"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "hlqrxm",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Brown open-top burlap sack with wide flat bottom, 0.27 x 0.37 x 0.24 m; texture slightly uniform but clean.",
+     "bbox": [
+      0.273,
+      0.367,
+      0.243
+     ]
+    }
+   ],
+   "valid_models": [
+    "hlqrxm"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/burlap_bag.json"
+  },
+  {
+   "task": "obst",
+   "category": "carpet_sweeper",
+   "group": "cleaning",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "One clean, very dark sweeper standing upright on its small wheeled head with a thin 0.8 m handle. Plausible cleaning gear in homes, hotel and diner, but normally leans on a wall; the thin stick is a slight obstacle.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "picks": [
+    "xboreo"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "xboreo",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Black manual carpet sweeper: small wheeled head with thin near-vertical stick handle and loop grip; 0.25 x 0.28 x 0.83 m; clean, very dark.",
+     "bbox": [
+      0.251,
+      0.284,
+      0.826
+     ]
+    }
+   ],
+   "valid_models": [
+    "xboreo"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/carpet_sweeper.json"
+  },
+  {
+   "task": "obst",
+   "category": "compost_bin",
+   "group": "bins",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "Single model: a plain tall dark kitchen waste/compost bin (0.42 x 0.28 x 0.82 m), good obstacle size and stable; reads as a generic bin. Natural in kitchens and a diner. Weak only because there is one model.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "picks": [
+    "fvkdos"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "fvkdos",
+     "V": 3,
+     "N": 3,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Tall slim dark-grey tapered bin with slanted top, 0.42 x 0.28 x 0.82 m; near-uniform grey, no visible lid/pedal detail, flat base.",
+     "bbox": [
+      0.421,
+      0.277,
+      0.824
+     ]
+    }
+   ],
+   "valid_models": [
+    "fvkdos"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/compost_bin.json"
+  },
+  {
+   "task": "obst",
+   "category": "dehumidifier",
+   "group": "appliances",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "One grey portable dehumidifier, ideal obstacle size and stable on a flat base. Plausible floor appliance in a house, flat or office but normally parked against a wall (N=2); only one model.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [
+    "ppadfd"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "ppadfd",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Grey boxy dehumidifier with front grille, top handle and rear drain; 0.30 x 0.39 x 0.59 m; textures somewhat flat but complete.",
+     "bbox": [
+      0.301,
+      0.385,
+      0.59
+     ]
+    }
+   ],
+   "valid_models": [
+    "ppadfd"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/dehumidifier.json"
+  },
+  {
+   "task": "obst",
+   "category": "electric_fan",
+   "group": "appliances",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "One tall desk / small floor fan, 0.53 m high on a stable round base, good size. Plausible on the floor in any scene but normally beside a wall or desk, so N=2; single model.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner",
+    "hotel_suite_large",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [
+    "lclkju"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "lclkju",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Grey/teal desk-style fan on a round flat base, wire cage rendered as mesh; 0.30 x 0.41 x 0.53 m; clean.",
+     "bbox": [
+      0.303,
+      0.407,
+      0.534
+     ]
+    }
+   ],
+   "valid_models": [
+    "lclkju"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/electric_fan.json"
+  },
+  {
+   "task": "obst",
+   "category": "flour_sack",
+   "group": "containers",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "Single open burlap sack, good size and stable. Credible as a kitchen/pantry floor sack in the diner or a house, but a flour sack mid-path is somewhat odd and it shares its mesh with petfood_bag/soil_bag. One model only.",
+   "natural_scenes": [
+    "restaurant_diner",
+    "house_single_floor"
+   ],
+   "in_scene": {},
+   "picks": [
+    "zhsjcs"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "zhsjcs",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Brown burlap sack with rolled-down open top and grey FLOUR label, 0.27 x 0.37 x 0.24 m; clean textured mesh, flat base.",
+     "bbox": [
+      0.271,
+      0.367,
+      0.244
+     ]
+    }
+   ],
+   "valid_models": [
+    "zhsjcs"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/flour_sack.json"
+  },
+  {
+   "task": "obst",
+   "category": "packing_box",
+   "group": "containers",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "Single model: an open, flatly grey moving box 0.47 m wide and 0.22 m tall. A cardboard box is a very natural mid-path obstacle, but only one model exists and it reads as grey plastic.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [
+    "cjhskr"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "cjhskr",
+     "V": 3,
+     "N": 3,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Open box with inner flaps folded in, clean geometry but uniform light grey, not obviously cardboard; 0.38 x 0.47 x 0.22 m.",
+     "bbox": [
+      0.38,
+      0.468,
+      0.224
+     ]
+    }
+   ],
+   "valid_models": [
+    "cjhskr"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/packing_box.json"
+  },
+  {
+   "task": "obst",
+   "category": "petfood_bag",
+   "group": "containers",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "Single open sack ~0.37 m wide, 0.24 m tall, stable. An opened pet-food bag on a kitchen/utility floor is believable in the houses but usually sits by a wall; generic sack look with label. One model only.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "picks": [
+    "fhfqys"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "fhfqys",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Brown burlap sack with rolled-down open top and grey PETFOOD label, 0.27 x 0.37 x 0.24 m; same mesh as flour_sack/soil_bag, flat base.",
+     "bbox": [
+      0.27,
+      0.367,
+      0.244
+     ]
+    }
+   ],
+   "valid_models": [
+    "fhfqys"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/petfood_bag.json"
+  },
+  {
+   "task": "obst",
+   "category": "satchel",
+   "group": "luggage",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "Single black shoulder bag ~0.46 x 0.54 x 0.24 m lying on the floor; credible floor clutter in office, hotel and entryway but usually beside a desk or chair; only one model.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [
+    "ppzjuj"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "ppzjuj",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Black leather satchel lying flat with flap, buckles and shoulder strap, 0.46 x 0.54 x 0.24 m; flat black but clean; rests on its base.",
+     "bbox": [
+      0.459,
+      0.544,
+      0.241
+     ]
+    }
+   ],
+   "valid_models": [
+    "ppzjuj"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/satchel.json"
+  },
+  {
+   "task": "obst",
+   "category": "shredder",
+   "group": "appliances",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "One clean shredder of ideal size and stable; natural only in the office scene and normally beside a desk or wall rather than mid-corridor (N=2); single model.",
+   "natural_scenes": [
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [
+    "wkconu"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "wkconu",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Black paper shredder with grey top and front window, flat base, 0.25 x 0.34 x 0.47 m; clean, plain.",
+     "bbox": [
+      0.25,
+      0.338,
+      0.472
+     ]
+    }
+   ],
+   "valid_models": [
+    "wkconu"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/shredder.json"
+  },
+  {
+   "task": "obst",
+   "category": "soil_bag",
+   "group": "containers",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "Single open sack ~0.37 m wide, 0.24 m tall, stable. Plausible garage/garden-door clutter in the houses but odd in living areas and usually against a wall; generic labelled sack shared with two other categories. One model only.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "picks": [
+    "gzcqwx"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "gzcqwx",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Brown burlap sack with rolled-down open top and grey SOIL label, 0.27 x 0.37 x 0.24 m; same mesh as flour_sack/petfood_bag, flat base.",
+     "bbox": [
+      0.271,
+      0.367,
+      0.244
+     ]
+    }
+   ],
+   "valid_models": [
+    "gzcqwx"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/soil_bag.json"
+  },
+  {
+   "task": "obst",
+   "category": "space_heater",
+   "group": "appliances",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "Single clean orange workshop-style fan heater, 0.26 x 0.28 x 0.39 m, stable on tubular feet. Heaters normally sit against a wall or beside furniture, and this industrial look is out of place in a hotel suite; N = 2.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [
+    "kxzqpr"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "kxzqpr",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Orange industrial fan heater box with rear fan grille on black tubular stand with handle; 0.26 x 0.28 x 0.39 m; clean, workshop-style variant.",
+     "bbox": [
+      0.257,
+      0.279,
+      0.39
+     ]
+    }
+   ],
+   "valid_models": [
+    "kxzqpr"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/space_heater.json"
+  },
+  {
+   "task": "obst",
+   "category": "water_dispenser",
+   "group": "appliances",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 12.0,
+   "verdict": "weak",
+   "category_note": "Single clean blue water jug with pump dispenser, 0.26 x 0.25 x 0.60 m, stands stably. Common on office and diner floors but normally against a wall or beside a counter, so N = 2; only one model.",
+   "natural_scenes": [
+    "office_cubicles_right",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "picks": [
+    "rwmotb"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "rwmotb",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Blue 5-gallon water jug with manual hand pump and spout on top, upright on flat base; 0.26 x 0.25 x 0.60 m; clean, flat colour.",
+     "bbox": [
+      0.264,
+      0.252,
+      0.603
+     ]
+    }
+   ],
+   "valid_models": [
+    "rwmotb"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/water_dispenser.json"
+  },
+  {
+   "task": "obst",
+   "category": "car_wheel",
+   "group": "appliances",
+   "n_ready": 2,
+   "n_reviewed": 2,
+   "n_valid": 2,
+   "n_unreviewed": 0,
+   "category_score": 11.5,
+   "verdict": "weak",
+   "category_note": "Two rimless tyres lying flat, 0.55-0.61 m across, 0.23 m high, stable. Only plausible in the garages of the two house scenes (both contain a car); odd in any other room.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "picks": [
+    "lnbowh",
+    "xeedbe"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "lnbowh",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Tyre lying flat, no rim, hollow centre; dark muddy tread texture; 0.55 x 0.55 x 0.23 m; stable on its sidewall.",
+     "bbox": [
+      0.549,
+      0.548,
+      0.227
+     ]
+    },
+    {
+     "model": "xeedbe",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Flat black tyre lying flat, no rim; inner wall shows a white tread pattern (texture oddity); 0.61 x 0.61 x 0.24 m.",
+     "bbox": [
+      0.608,
+      0.608,
+      0.236
+     ]
+    }
+   ],
+   "valid_models": [
+    "lnbowh",
+    "xeedbe"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/car_wheel.json"
+  },
+  {
+   "task": "obst",
+   "category": "cedar_chest",
+   "group": "containers",
+   "n_ready": 2,
+   "n_reviewed": 2,
+   "n_valid": 2,
+   "n_unreviewed": 0,
+   "category_score": 11.5,
+   "verdict": "weak",
+   "category_note": "Two small trunk-style chests, both stable flat boxes. Plausible in bedrooms/living rooms/hotel but chests normally sit against a wall or at a bed foot, so N tops at 2; gbdzls is only 0.14 m tall.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+   ],
+   "in_scene": {},
+   "picks": [
+    "fwstpx",
+    "gbdzls"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "fwstpx",
+     "V": 4,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 14,
+     "valid": true,
+     "note": "Dark wooden domed-lid trunk with black metal straps and latch, 0.40 x 0.54 x 0.26 m; good textures, more treasure-trunk than blanket chest.",
+     "bbox": [
+      0.399,
+      0.535,
+      0.258
+     ]
+    },
+    {
+     "model": "gbdzls",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Small flat maroon patterned box with black corner caps, 0.40 x 0.19 x 0.14 m; plain dark box, low (height borderline).",
+     "bbox": [
+      0.399,
+      0.193,
+      0.142
+     ]
+    }
+   ],
+   "valid_models": [
+    "fwstpx",
+    "gbdzls"
+   ],
+   "used_by_other_tasks": [
+    {
+     "task": "configuration_matching-1/-2",
+     "round": 3,
+     "role": "target"
+    }
+   ],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": true,
+   "review_file": "review/cedar_chest.json"
+  },
+  {
+   "task": "obst",
+   "category": "briefcase",
+   "group": "luggage",
+   "n_ready": 7,
+   "n_reviewed": 7,
+   "n_valid": 2,
+   "n_unreviewed": 0,
+   "category_score": 11.0,
+   "verdict": "weak",
+   "category_note": "All seven briefcases lie flat, 0.23-0.42 m footprint but only 0.06-0.12 m tall; five fall below the 0.10 m height floor. Credible floor clutter in office, hotel and homes, but low and hard to see; one lid looks broken.",
+   "natural_scenes": [
+    "office_cubicles_right",
+    "hotel_suite_large",
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "picks": [
+    "lwbctq",
+    "haecvf"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "fdpjtj",
+     "V": 4,
+     "N": 2,
+     "S": 0,
+     "rest_ok": true,
+     "score": 12,
+     "valid": false,
+     "note": "Slim dark-grey hard attache case lying flat; 0.31 x 0.40 x 0.06 m; clean but only 6 cm tall, base would barely notice it.",
+     "bbox": [
+      0.309,
+      0.4,
+      0.061
+     ]
+    },
+    {
+     "model": "haecvf",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Plain black hard briefcase lying flat with small handle bump; 0.28 x 0.42 x 0.12 m; featureless uniform black but complete.",
+     "bbox": [
+      0.282,
+      0.422,
+      0.116
+     ]
+    },
+    {
+     "model": "lwbctq",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Brown soft leather briefcase lying flat, handle on +x side, slightly lumpy; 0.27 x 0.33 x 0.12 m; good texture.",
+     "bbox": [
+      0.269,
+      0.33,
+      0.12
+     ]
+    },
+    {
+     "model": "ohelib",
+     "V": 4,
+     "N": 2,
+     "S": 0,
+     "rest_ok": true,
+     "score": 12,
+     "valid": false,
+     "note": "Black hard briefcase with brass latches lying flat; 0.33 x 0.40 x 0.08 m; clean and recognisable but too low.",
+     "bbox": [
+      0.33,
+      0.398,
+      0.077
+     ]
+    },
+    {
+     "model": "psvdau",
+     "V": 4,
+     "N": 2,
+     "S": 0,
+     "rest_ok": true,
+     "score": 12,
+     "valid": false,
+     "note": "Dark brown soft briefcase lying flat with handle; 0.28 x 0.33 x 0.10 m; clean, just under the 0.10 m height floor.",
+     "bbox": [
+      0.284,
+      0.332,
+      0.097
+     ]
+    },
+    {
+     "model": "rxvbea",
+     "V": 2,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 9,
+     "valid": false,
+     "note": "Dark-grey hard case whose lid shows odd light triangular wedges (missing or open top faces); 0.33 x 0.33 x 0.11 m; broken-looking.",
+     "bbox": [
+      0.33,
+      0.329,
+      0.106
+     ]
+    },
+    {
+     "model": "uquevd",
+     "V": 4,
+     "N": 2,
+     "S": 0,
+     "rest_ok": true,
+     "score": 12,
+     "valid": false,
+     "note": "Grey fabric document bag with ornate corner print and handle cut-out, lying flat; 0.23 x 0.27 x 0.08 m; too low.",
+     "bbox": [
+      0.23,
+      0.266,
+      0.08
+     ]
+    }
+   ],
+   "valid_models": [
+    "lwbctq",
+    "haecvf"
+   ],
+   "used_by_other_tasks": [
+    {
+     "task": "inter_object_relation_satisfaction",
+     "round": 1,
+     "role": "target"
+    },
+    {
+     "task": "inter_object_relation_satisfaction-1",
+     "round": 1,
+     "role": "target"
+    },
+    {
+     "task": "mental_rotation-0",
+     "round": 2,
+     "role": "target"
+    }
+   ],
+   "used_in_round1_elsewhere": true,
+   "used_elsewhere": true,
+   "review_file": "review/briefcase.json"
+  },
+  {
+   "task": "obst",
+   "category": "shopping_basket",
+   "group": "containers",
+   "n_ready": 2,
+   "n_reviewed": 2,
+   "n_valid": 2,
+   "n_unreviewed": 0,
+   "category_score": 11.0,
+   "verdict": "weak",
+   "category_note": "Two dark plastic baskets, both stable and flat-based. They are set-down items rather than mid-room objects in homes or a diner (N = 2); nedrsh is a wide 0.61 m tub, vsxhsv only 0.18 m tall: borderline size for both.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "picks": [
+    "vsxhsv",
+    "nedrsh"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "nedrsh",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Near-black tapered plastic tub without handles, 0.61 x 0.40 x 0.33 m; reads as a bus tub / storage crate, very dark; footprint borderline.",
+     "bbox": [
+      0.614,
+      0.397,
+      0.328
+     ]
+    },
+    {
+     "model": "vsxhsv",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Dark red perforated supermarket basket with folded-down handles, 0.37 x 0.24 x 0.18 m; clearly a shopping basket, height borderline.",
+     "bbox": [
+      0.369,
+      0.238,
+      0.182
+     ]
+    }
+   ],
+   "valid_models": [
+    "vsxhsv",
+    "nedrsh"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/shopping_basket.json"
+  },
+  {
+   "task": "obst",
+   "category": "bar_stool",
+   "group": "seats",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 11.0,
+   "verdict": "weak",
+   "category_note": "Single model: a pedestal bar stool whose dish seat is tilted, looking more like a design chair than a diner stool; 0.59 m footprint borderline. Natural pulled out at a diner bar or kitchen island.",
+   "natural_scenes": [
+    "restaurant_diner",
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "picks": [
+    "haaiau"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "haaiau",
+     "V": 3,
+     "N": 3,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Pedestal stool with round wooden base and bowl-shaped seat tilted ~45 deg (odd shape), 0.52 x 0.59 x 0.77 m; textured, footprint borderline.",
+     "bbox": [
+      0.523,
+      0.59,
+      0.768
+     ]
+    }
+   ],
+   "valid_models": [
+    "haaiau"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/bar_stool.json"
+  },
+  {
+   "task": "obst",
+   "category": "boxing_gloves",
+   "group": "toys",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 11.0,
+   "verdict": "weak",
+   "category_note": "One model only: a single glove (not a pair) lying flat, 0.18 m high. Credible bedroom floor clutter but never mid-corridor; low height is borderline for the base to notice.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "picks": [
+    "jlfuaf"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "jlfuaf",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Single dark-red boxing glove lying flat along +x, black cuff; clean textures; 0.37 x 0.25 x 0.18 m, low; broad underside, will not roll.",
+     "bbox": [
+      0.372,
+      0.254,
+      0.178
+     ]
+    }
+   ],
+   "valid_models": [
+    "jlfuaf"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/boxing_gloves.json"
+  },
+  {
+   "task": "obst",
+   "category": "easel",
+   "group": "appliances",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 11.0,
+   "verdict": "weak",
+   "category_note": "Single model, a 1.66 m tall tripod easel with 0.77 m footprint (both borderline). Plausible in a living room or meeting room but normally parked against a wall, not mid-path.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [
+    "jsvaph"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "jsvaph",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Dark wooden A-frame tripod easel, clean wood texture, stands on three legs; 0.54 x 0.77 x 1.66 m: tall and wide-footed.",
+     "bbox": [
+      0.539,
+      0.77,
+      1.657
+     ]
+    }
+   ],
+   "valid_models": [
+    "jsvaph"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/easel.json"
+  },
+  {
+   "task": "obst",
+   "category": "tackle_box",
+   "group": "containers",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 11.0,
+   "verdict": "weak",
+   "category_note": "One toolbox-like tackle box, 0.60 m long but only 0.24 m tall and wide; stable flat base. Credible garage/utility floor clutter in a house, odd elsewhere; single model with borderline footprint.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "picks": [
+    "inboqz"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "inboqz",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Green and beige plastic tackle/tool box with top handle and latch; 0.24 x 0.60 x 0.24 m, long and low; clean.",
+     "bbox": [
+      0.235,
+      0.596,
+      0.239
+     ]
+    }
+   ],
+   "valid_models": [
+    "inboqz"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/tackle_box.json"
+  },
+  {
+   "task": "obst",
+   "category": "toolbox",
+   "group": "containers",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 11.0,
+   "verdict": "weak",
+   "category_note": "Single red steel toolbox 0.61 m long (borderline footprint), 0.35 m tall; plausible floor clutter in a garage or utility room of the houses, odd in other scenes.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "picks": [
+    "redmtl"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "redmtl",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Red metal toolbox with black top handle and two front latches, 0.26 x 0.61 x 0.35 m; flat red, clean geometry; flat base.",
+     "bbox": [
+      0.26,
+      0.608,
+      0.35
+     ]
+    }
+   ],
+   "valid_models": [
+    "redmtl"
+   ],
+   "used_by_other_tasks": [
+    {
+     "task": "configuration_matching-1",
+     "round": 1,
+     "role": "spec:artic"
+    },
+    {
+     "task": "configuration_matching-1/-2",
+     "round": 1,
+     "role": "artic"
+    },
+    {
+     "task": "configuration_matching-2",
+     "round": 1,
+     "role": "spec:artic"
+    },
+    {
+     "task": "configuration_matching-1/-2",
+     "round": 3,
+     "role": "target"
+    }
+   ],
+   "used_in_round1_elsewhere": true,
+   "used_elsewhere": true,
+   "review_file": "review/toolbox.json"
+  },
+  {
+   "task": "obst",
+   "category": "violin_case",
+   "group": "luggage",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 11.0,
+   "verdict": "weak",
+   "category_note": "One case lying flat: 0.65 m long but only 0.13 m high, so borderline in both size dimensions; credible floor clutter in a house bedroom or living room, N=2; single model.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "picks": [
+    "jlasop"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "jlasop",
+     "V": 4,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 13,
+     "valid": true,
+     "note": "Black violin case lying flat with handle and latches, 0.30 x 0.65 x 0.13 m; dark but detailed; low.",
+     "bbox": [
+      0.303,
+      0.651,
+      0.129
+     ]
+    }
+   ],
+   "valid_models": [
+    "jlasop"
+   ],
+   "used_by_other_tasks": [
+    {
+     "task": "configuration_matching-1/-2",
+     "round": 3,
+     "role": "target"
+    }
+   ],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": true,
+   "review_file": "review/violin_case.json"
+  },
+  {
+   "task": "obst",
+   "category": "plastic_bag",
+   "group": "containers",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 10.0,
+   "verdict": "weak",
+   "category_note": "Single plain grey shopping bag standing upright, 0.39 m tall but only 0.17 m thin; plausible kitchen/entryway clutter yet small and flimsy-looking, and its rounded base may tip after the drop. Marginal obstacle.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "picks": [
+    "fwxfpe"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "fwxfpe",
+     "V": 3,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 12,
+     "valid": true,
+     "note": "Upright filled grey carrier bag with handles, 0.17 x 0.31 x 0.39 m; uniform grey but wrinkled geometry ok; narrow rounded base, may settle tilted.",
+     "bbox": [
+      0.167,
+      0.31,
+      0.387
+     ]
+    }
+   ],
+   "valid_models": [
+    "fwxfpe"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/plastic_bag.json"
+  },
+  {
+   "task": "obst",
+   "category": "water_cooler",
+   "group": "appliances",
+   "n_ready": 2,
+   "n_reviewed": 2,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 10.0,
+   "verdict": "weak",
+   "category_note": "Two dispensers: a 1.07 m tall floor unit (valid, but naturally against a wall) and a 0.55 m countertop unit that looks out of place on a floor. Office corridor or diner only; N=2 at best.",
+   "natural_scenes": [
+    "office_cubicles_right",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "picks": [
+    "essxzr"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "essxzr",
+     "V": 3,
+     "N": 2,
+     "S": 2,
+     "rest_ok": true,
+     "score": 12,
+     "valid": true,
+     "note": "Dark grey floor-standing dispenser, tapered body, front recess with red/blue buttons, no bottle; header z 1.074 m (hint said 1.489); flat shading.",
+     "bbox": [
+      0.323,
+      0.342,
+      1.489
+     ]
+    },
+    {
+     "model": "nqmdal",
+     "V": 4,
+     "N": 1,
+     "S": 2,
+     "rest_ok": true,
+     "score": 12,
+     "valid": false,
+     "note": "Boxy grey countertop-style dispenser with taps, display and drip tray; good textures; 0.46 x 0.43 x 0.55 m; squat appliance odd on a floor.",
+     "bbox": [
+      0.457,
+      0.432,
+      0.55
+     ]
+    }
+   ],
+   "valid_models": [
+    "essxzr"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/water_cooler.json"
+  },
+  {
+   "task": "obst",
+   "category": "plant_pot_stand",
+   "group": "plants",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 9.0,
+   "verdict": "weak",
+   "category_note": "Single grey scrollwork plant stand without plants, 0.26 x 0.56 x 0.83 m on four feet. Plausible in living rooms, corridors, diner and office but normally against a wall; flat grey look, open wiry geometry and borderline footprint.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [
+    "dylpyb"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "dylpyb",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Ornate wrought-iron tiered stand with three empty basket holders and top plate, uniform light grey; 0.26 x 0.56 x 0.83 m; wiry, feet, stable.",
+     "bbox": [
+      0.262,
+      0.563,
+      0.828
+     ]
+    }
+   ],
+   "valid_models": [
+    "dylpyb"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/plant_pot_stand.json"
+  },
+  {
+   "task": "obst",
+   "category": "rolled_yoga_mat",
+   "group": "toys",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 9.0,
+   "verdict": "weak",
+   "category_note": "Single rolled mat whose canonical pose is upright on its end: thin (0.13 m) and unstable-looking; if it tips it becomes a 0.13 m low roll. Credible bedroom/living-room clutter but odd standing mid-path.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+   ],
+   "in_scene": {},
+   "picks": [
+    "podgkd"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "podgkd",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Plain maroon cylinder standing on end, faint spiral on top; 0.13 m diameter, 0.61 m tall; low detail, tips easily.",
+     "bbox": [
+      0.131,
+      0.128,
+      0.61
+     ]
+    }
+   ],
+   "valid_models": [
+    "podgkd"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/rolled_yoga_mat.json"
+  },
+  {
+   "task": "obst",
+   "category": "shoe_rack",
+   "group": "appliances",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 9.0,
+   "verdict": "weak",
+   "category_note": "Single flat-grey shoe rack 0.68 m wide, 0.81 m tall. Natural in entryways and hotel rooms but always against a wall; mid-corridor it is furniture out of place and nearly blocks a 1 m path.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+   ],
+   "in_scene": {},
+   "picks": [
+    "spdrzb"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "spdrzb",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Four-tier open slatted shoe rack on four legs, uniform grey flat shading, clean; 0.31 x 0.68 x 0.81 m, footprint borderline.",
+     "bbox": [
+      0.306,
+      0.682,
+      0.805
+     ]
+    }
+   ],
+   "valid_models": [
+    "spdrzb"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/shoe_rack.json"
+  },
+  {
+   "task": "obst",
+   "category": "stand",
+   "group": "seats",
+   "n_ready": 5,
+   "n_reviewed": 5,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 9.0,
+   "verdict": "weak",
+   "category_note": "Heterogeneous category: a 7.5 m rail, two black L-brackets, a grey low table and one black two-tier cart on casters; only the cart (0.76 m footprint, borderline) is usable, plausible in hotel or office.",
+   "natural_scenes": [
+    "hotel_suite_large",
+    "office_cubicles_right",
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {
+    "hotel_suite_large": [
+     "bedroom"
+    ]
+   },
+   "picks": [
+    "vyrick"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "dbskvf",
+     "V": 1,
+     "N": 0,
+     "S": 0,
+     "rest_ok": false,
+     "score": 2,
+     "valid": false,
+     "note": "7.5 m long thin dark board standing on edge, 0.56 x 7.54 x 0.38 m; rail/shelf outlier, not a stand; balances on an edge.",
+     "bbox": [
+      0.559,
+      7.539,
+      0.376
+     ]
+    },
+    {
+     "model": "kwkcjq",
+     "V": 2,
+     "N": 1,
+     "S": 1,
+     "rest_ok": true,
+     "score": 7,
+     "valid": false,
+     "note": "Flat black L-bracket: base plate with upright back panel, 0.40 x 0.63 x 0.46 m; uniform black, not recognisable as furniture.",
+     "bbox": [
+      0.4,
+      0.626,
+      0.456
+     ]
+    },
+    {
+     "model": "oyenza",
+     "V": 2,
+     "N": 1,
+     "S": 1,
+     "rest_ok": true,
+     "score": 7,
+     "valid": false,
+     "note": "Duplicate of kwkcjq: flat black L-bracket base plate with upright panel, 0.40 x 0.63 x 0.46 m; uniform black.",
+     "bbox": [
+      0.4,
+      0.626,
+      0.456
+     ]
+    },
+    {
+     "model": "vyrick",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Black two-tier utility stand/cart on four legs with small casters, 0.61 x 0.76 x 0.89 m; uniform black, clean; borderline footprint.",
+     "bbox": [
+      0.61,
+      0.762,
+      0.894
+     ]
+    },
+    {
+     "model": "waxtja",
+     "V": 3,
+     "N": 1,
+     "S": 1,
+     "rest_ok": true,
+     "score": 9,
+     "valid": false,
+     "note": "Plain grey low square four-legged table, 0.60 x 0.60 x 0.37 m; looks untextured; furniture, odd in the middle of a path.",
+     "bbox": [
+      0.6,
+      0.6,
+      0.368
+     ]
+    }
+   ],
+   "valid_models": [
+    "vyrick"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/stand.json"
+  },
+  {
+   "task": "obst",
+   "category": "storage_box",
+   "group": "containers",
+   "n_ready": 4,
+   "n_reviewed": 4,
+   "n_valid": 1,
+   "n_unreviewed": 0,
+   "category_score": 9.0,
+   "verdict": "weak",
+   "category_note": "Weak set: two models are flat trays under 8 cm, the one well-sized box (izcglf) has broken geometry, leaving only a 20 x 14 cm teal tub as a marginal, low obstacle. Boxes would be natural floor clutter in houses/office.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [
+    "aqdbdu"
+   ],
+   "alternate": null,
+   "models": [
+    {
+     "model": "aqdbdu",
+     "V": 3,
+     "N": 2,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": true,
+     "note": "Small round teal open tub, 0.20 x 0.20 x 0.14 m; flat colour, clean geometry; more a small bin than a storage box, low.",
+     "bbox": [
+      0.204,
+      0.204,
+      0.143
+     ]
+    },
+    {
+     "model": "bwbpvg",
+     "V": 3,
+     "N": 1,
+     "S": 0,
+     "rest_ok": true,
+     "score": 8,
+     "valid": false,
+     "note": "Very flat grey grid-textured tray, 0.24 x 0.25 x 0.06 m; clean but 6 cm tall, a lid/tray, too flat to matter.",
+     "bbox": [
+      0.235,
+      0.251,
+      0.057
+     ]
+    },
+    {
+     "model": "eicujj",
+     "V": 3,
+     "N": 1,
+     "S": 0,
+     "rest_ok": true,
+     "score": 8,
+     "valid": false,
+     "note": "Flat black shallow tray, 0.29 x 0.31 x 0.07 m; clean but 7 cm tall, too flat.",
+     "bbox": [
+      0.29,
+      0.311,
+      0.071
+     ]
+    },
+    {
+     "model": "izcglf",
+     "V": 2,
+     "N": 3,
+     "S": 2,
+     "rest_ok": true,
+     "score": 12,
+     "valid": false,
+     "note": "Brown tapered box, 0.40 x 0.41 x 0.21 m, good size, but top view renders nothing and sides are flat panels: missing faces/flipped normals.",
+     "bbox": [
+      0.403,
+      0.406,
+      0.214
+     ]
+    }
+   ],
+   "valid_models": [
+    "aqdbdu"
+   ],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/storage_box.json"
+  },
+  {
+   "task": "obst",
+   "category": "balloon",
+   "group": "toys",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 0,
+   "n_unreviewed": 0,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "Single unweighted balloon lying on its side. A loose balloon is not a floor-standing object in any of the seven scenes and would roll when dropped, so it is unusable as a mid-path obstacle.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "ixhbmk",
+     "V": 3,
+     "N": 0,
+     "S": 2,
+     "rest_ok": false,
+     "score": 8,
+     "valid": false,
+     "note": "Dark navy inflated balloon lying on its side, knot end along +x; 0.41 x 0.33 x 0.33 m; no string or weight; rolls.",
+     "bbox": [
+      0.409,
+      0.328,
+      0.328
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/balloon.json"
+  },
+  {
+   "task": "obst",
+   "category": "beer_keg",
+   "group": "appliances",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 0,
+   "n_unreviewed": 0,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "Single black keg/drum, 0.42 m wide, 0.60 m tall, stable and well sized, but a keg only belongs behind a diner bar; in the middle of a dining room or corridor it is odd. No valid model.",
+   "natural_scenes": [
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "xtqbuf",
+     "V": 4,
+     "N": 1,
+     "S": 2,
+     "rest_ok": true,
+     "score": 12,
+     "valid": false,
+     "note": "Black ribbed steel drum with two handle slots, 0.42 x 0.42 x 0.60 m, clean geometry; looks like a barrel; odd mid-path outside a bar.",
+     "bbox": [
+      0.416,
+      0.416,
+      0.6
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/beer_keg.json"
+  },
+  {
+   "task": "obst",
+   "category": "bowling_ball",
+   "group": "toys",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 0,
+   "n_unreviewed": 0,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "Single 0.22 m sphere: would roll when dropped and a bowling ball mid-path is odd outside a garage or closet; no valid model.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "qzzett",
+     "V": 5,
+     "N": 1,
+     "S": 2,
+     "rest_ok": false,
+     "score": 14,
+     "valid": false,
+     "note": "Blue marbled bowling ball with three finger holes, 0.22 m sphere; clean texture; rolls; odd in the middle of a room.",
+     "bbox": [
+      0.22,
+      0.22,
+      0.22
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/bowling_ball.json"
+  },
+  {
+   "task": "obst",
+   "category": "camera_tripod",
+   "group": "appliances",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 0,
+   "n_unreviewed": 0,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "Only model is a well-made extended tripod, but its 0.83 m leg spread is over the 0.80 m footprint limit (S = 0) and it stands 1.28 m tall; thin legs are also a poor visual blocker. No valid model.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "hnpofr",
+     "V": 4,
+     "N": 2,
+     "S": 0,
+     "rest_ok": true,
+     "score": 12,
+     "valid": false,
+     "note": "Standard three-leg camera tripod with pan head, legs spread, 0.72 x 0.83 x 1.28 m; clean thin geometry, but footprint exceeds 0.80 m.",
+     "bbox": [
+      0.721,
+      0.829,
+      1.281
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/camera_tripod.json"
+  },
+  {
+   "task": "obst",
+   "category": "cooler",
+   "group": "containers",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 0,
+   "n_unreviewed": 0,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "One large picnic chest cooler, 1.03 m long, flat-based and stable; it would block a 1 m corridor. Plausible on a garage or diner floor but normally against a wall. No valid model.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "pnkiag",
+     "V": 4,
+     "N": 2,
+     "S": 0,
+     "rest_ok": true,
+     "score": 12,
+     "valid": false,
+     "note": "Red chest cooler with grey moulded lid and front latch, 0.51 x 1.03 x 0.52 m, clean textures; footprint over the 0.80 m limit.",
+     "bbox": [
+      0.51,
+      1.03,
+      0.515
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [
+    {
+     "task": "configuration_matching-1/-2",
+     "round": 3,
+     "role": "target"
+    }
+   ],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": true,
+   "review_file": "review/cooler.json"
+  },
+  {
+   "task": "obst",
+   "category": "folding_chair",
+   "group": "seats",
+   "n_ready": 3,
+   "n_reviewed": 3,
+   "n_valid": 0,
+   "n_unreviewed": 0,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "All three models are in collapsed or reclined canonical poses (0.86-0.98 m long, only 0.53-0.66 m tall) rather than upright chairs; footprints exceed 0.8 m; textures fine but no valid model.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "dqhazh",
+     "V": 3,
+     "N": 1,
+     "S": 0,
+     "rest_ok": true,
+     "score": 8,
+     "valid": false,
+     "note": "Wooden slatted X-frame folding chair in a low reclined / half-open pose, 0.88 x 0.51 x 0.66 m; rests on leg ends; footprint too long.",
+     "bbox": [
+      0.877,
+      0.505,
+      0.658
+     ]
+    },
+    {
+     "model": "dxergu",
+     "V": 3,
+     "N": 0,
+     "S": 0,
+     "rest_ok": false,
+     "score": 6,
+     "valid": false,
+     "note": "Bentwood folding chair collapsed on its back, loops lying flat with seat panel upright, 0.86 x 0.42 x 0.53 m; not the standing form.",
+     "bbox": [
+      0.86,
+      0.419,
+      0.53
+     ]
+    },
+    {
+     "model": "vngcqu",
+     "V": 3,
+     "N": 0,
+     "S": 0,
+     "rest_ok": false,
+     "score": 6,
+     "valid": false,
+     "note": "Black padded tubular folding chair lying on its back, backrest flat on floor, seat upright, 0.98 x 0.48 x 0.59 m; not standing.",
+     "bbox": [
+      0.981,
+      0.479,
+      0.593
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/folding_chair.json"
+  },
+  {
+   "task": "obst",
+   "category": "free_weight",
+   "group": "toys",
+   "n_ready": 2,
+   "n_reviewed": 2,
+   "n_valid": 0,
+   "n_unreviewed": 0,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "Neither model works: one is a 10 cm, 1 cm thick weight plate (too small to matter), the other a 0.49 m black ball that rolls. Free weights would be natural bedroom/living-room clutter, but no usable model.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "coqlph",
+     "V": 4,
+     "N": 2,
+     "S": 0,
+     "rest_ok": true,
+     "score": 12,
+     "valid": false,
+     "note": "Small black rubber weight plate with grey hub lying flat, 0.10 x 0.10 x 0.01 m; clean but coaster-sized, too small and flat.",
+     "bbox": [
+      0.099,
+      0.097,
+      0.011
+     ]
+    },
+    {
+     "model": "frucyx",
+     "V": 3,
+     "N": 2,
+     "S": 2,
+     "rest_ok": false,
+     "score": 12,
+     "valid": false,
+     "note": "Uniform black sphere 0.49 m diameter (medicine/slam ball); no detail, rolls.",
+     "bbox": [
+      0.489,
+      0.488,
+      0.49
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/free_weight.json"
+  },
+  {
+   "task": "obst",
+   "category": "fuel_can",
+   "group": "cleaning",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 0,
+   "n_unreviewed": 0,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "Single clean upright jerrycan, 0.23 x 0.11 x 0.31 m, stands well. A fuel can belongs in a garage; mid-room in a living room, flat, hotel suite, diner or office it is odd, so it fails the naturalness bar.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "bfaqfe",
+     "V": 4,
+     "N": 1,
+     "S": 2,
+     "rest_ok": true,
+     "score": 12,
+     "valid": false,
+     "note": "Dark red jerrycan with handle, spout and X ribbing, upright on flat base; 0.23 x 0.11 x 0.31 m; clean, flat colour.",
+     "bbox": [
+      0.23,
+      0.107,
+      0.309
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/fuel_can.json"
+  },
+  {
+   "task": "obst",
+   "category": "hose_cart",
+   "group": "appliances",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 0,
+   "n_unreviewed": 0,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "Well-modelled garden hose reel cart, 0.67 m footprint and 1.0 m tall; only plausible in a garage, odd in the middle of any room or corridor of the seven indoor scenes. Not a natural indoor obstacle.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "gavrvw",
+     "V": 4,
+     "N": 1,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": false,
+     "note": "Two-wheeled hose reel cart, yellow hose on blue reel, black handle frame, 0.67 x 0.59 x 1.00 m; detailed, rests on wheels and stand.",
+     "bbox": [
+      0.671,
+      0.593,
+      1.002
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/hose_cart.json"
+  },
+  {
+   "task": "obst",
+   "category": "magazine_rack",
+   "group": "appliances",
+   "n_ready": 5,
+   "n_reviewed": 5,
+   "n_valid": 0,
+   "n_unreviewed": 0,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "All five models are desktop magazine file holders (~0.25 x 0.08 x 0.30 m), not floor-standing racks. They belong on a desk or shelf, are thin and tip-prone; not a natural floor obstacle in any scene.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "office_cubicles_right"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "cdhybw",
+     "V": 4,
+     "N": 0,
+     "S": 2,
+     "rest_ok": true,
+     "score": 10,
+     "valid": false,
+     "note": "Black perforated-mesh desktop magazine file, slanted front; 0.22 x 0.09 x 0.28 m; desk item, not a floor rack.",
+     "bbox": [
+      0.223,
+      0.089,
+      0.283
+     ]
+    },
+    {
+     "model": "enzfco",
+     "V": 4,
+     "N": 0,
+     "S": 2,
+     "rest_ok": true,
+     "score": 10,
+     "valid": false,
+     "note": "Grey speckled cardboard-style desktop magazine file with label; 0.28 x 0.08 x 0.30 m; desk item, thin.",
+     "bbox": [
+      0.28,
+      0.075,
+      0.302
+     ]
+    },
+    {
+     "model": "fvkjpt",
+     "V": 4,
+     "N": 0,
+     "S": 2,
+     "rest_ok": true,
+     "score": 10,
+     "valid": false,
+     "note": "Near duplicate of enzfco: grey speckled desktop magazine file; 0.28 x 0.08 x 0.30 m; desk item, thin.",
+     "bbox": [
+      0.28,
+      0.075,
+      0.302
+     ]
+    },
+    {
+     "model": "szdjbr",
+     "V": 3,
+     "N": 0,
+     "S": 2,
+     "rest_ok": true,
+     "score": 8,
+     "valid": false,
+     "note": "Plain uniform-grey desktop magazine file, no texture detail; 0.24 x 0.13 x 0.38 m; desk item.",
+     "bbox": [
+      0.239,
+      0.129,
+      0.383
+     ]
+    },
+    {
+     "model": "yvhjht",
+     "V": 3,
+     "N": 0,
+     "S": 2,
+     "rest_ok": true,
+     "score": 8,
+     "valid": false,
+     "note": "Plain uniform-grey rounded desktop magazine file; 0.22 x 0.08 x 0.28 m; desk item, thin.",
+     "bbox": [
+      0.218,
+      0.079,
+      0.284
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/magazine_rack.json"
+  },
+  {
+   "task": "obst",
+   "category": "marigold",
+   "group": "plants",
+   "n_ready": 10,
+   "n_reviewed": 6,
+   "n_valid": 0,
+   "n_unreviewed": 4,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "All six models are bare marigold plants without a pot: leaves and flowers only, 0.12-0.15 m high. Not a floor-standing object and would rest on foliage, so unusable as an obstacle.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "arvona",
+     "V": 3,
+     "N": 0,
+     "S": 1,
+     "rest_ok": false,
+     "score": 7,
+     "valid": false,
+     "note": "Bare marigold plant, no pot or soil: card leaves and orange flowers resting on leaf tips; 0.24 x 0.23 x 0.15 m.",
+     "bbox": [
+      0.235,
+      0.232,
+      0.151
+     ]
+    },
+    {
+     "model": "jmomsu",
+     "V": 3,
+     "N": 0,
+     "S": 1,
+     "rest_ok": false,
+     "score": 7,
+     "valid": false,
+     "note": "Bare potless marigold, three flowers, low card leaves; 0.20 x 0.19 x 0.15 m; not a floor-standing form.",
+     "bbox": [
+      0.199,
+      0.19,
+      0.152
+     ]
+    },
+    {
+     "model": "nghkfn",
+     "V": 3,
+     "N": 0,
+     "S": 1,
+     "rest_ok": false,
+     "score": 7,
+     "valid": false,
+     "note": "Bare potless marigold with four flowers, dark low-poly leaves; 0.18 x 0.18 x 0.14 m; rests on foliage, no base.",
+     "bbox": [
+      0.184,
+      0.18,
+      0.141
+     ]
+    },
+    {
+     "model": "rlapyi",
+     "V": 3,
+     "N": 0,
+     "S": 1,
+     "rest_ok": false,
+     "score": 7,
+     "valid": false,
+     "note": "Bare potless marigold, five flowers, leaf mound; 0.21 x 0.19 x 0.14 m; rests on leaves, no base.",
+     "bbox": [
+      0.205,
+      0.19,
+      0.143
+     ]
+    },
+    {
+     "model": "ugezjo",
+     "V": 3,
+     "N": 0,
+     "S": 1,
+     "rest_ok": false,
+     "score": 7,
+     "valid": false,
+     "note": "Bare potless marigold, three flowers; 0.16 x 0.19 x 0.13 m; small, no base.",
+     "bbox": [
+      0.162,
+      0.188,
+      0.125
+     ]
+    },
+    {
+     "model": "zdlpfb",
+     "V": 3,
+     "N": 0,
+     "S": 1,
+     "rest_ok": false,
+     "score": 7,
+     "valid": false,
+     "note": "Sparse potless marigold with thin exposed stems and few leaves; 0.15 x 0.16 x 0.12 m; smallest, spindly.",
+     "bbox": [
+      0.152,
+      0.161,
+      0.117
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/marigold.json"
+  },
+  {
+   "task": "obst",
+   "category": "pet_bed",
+   "group": "toys",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 0,
+   "n_unreviewed": 0,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "Single wicker pet bed; natural on a house floor (kitchen, living room) but its 0.88 m footprint exceeds the 0.80 m limit and it normally sits against a wall. No valid model.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "ynznsw",
+     "V": 4,
+     "N": 2,
+     "S": 0,
+     "rest_ok": true,
+     "score": 12,
+     "valid": false,
+     "note": "Oval wicker pet basket with dark navy cushion, 0.66 x 0.88 x 0.23 m; clean; footprint too large (>0.80 m).",
+     "bbox": [
+      0.661,
+      0.881,
+      0.231
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/pet_bed.json"
+  },
+  {
+   "task": "obst",
+   "category": "pottable_dahlia",
+   "group": "plants",
+   "n_ready": 2,
+   "n_reviewed": 2,
+   "n_valid": 0,
+   "n_unreviewed": 0,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "Both models are the loose plant only (no pot), low and sprawling with thin stems; not a floor-standing object and cannot rest stably on the floor. Drop.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "shchvh",
+     "V": 3,
+     "N": 0,
+     "S": 1,
+     "rest_ok": false,
+     "score": 7,
+     "valid": false,
+     "note": "Bare dahlia plant with flowers and leaves, no pot, sprawling sideways 0.41 x 0.18 x 0.17 m; thin stems, no base.",
+     "bbox": [
+      0.407,
+      0.181,
+      0.166
+     ]
+    },
+    {
+     "model": "wcgqlj",
+     "V": 3,
+     "N": 0,
+     "S": 1,
+     "rest_ok": false,
+     "score": 7,
+     "valid": false,
+     "note": "Bare dahlia plant without pot, stem trailing downward, 0.28 x 0.16 x 0.15 m; no flat base, would topple.",
+     "bbox": [
+      0.28,
+      0.156,
+      0.148
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/pottable_dahlia.json"
+  },
+  {
+   "task": "obst",
+   "category": "power_washer",
+   "group": "appliances",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 0,
+   "n_unreviewed": 0,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "Single garage tool: a wheeled pressure washer with a protruding lance, 0.66 m wide, 0.82 m tall, stable. Plausible only in a garage; odd mid-path in any room or corridor of these scenes. No valid model.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_lower"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "pkhrip",
+     "V": 4,
+     "N": 1,
+     "S": 1,
+     "rest_ok": true,
+     "score": 11,
+     "valid": false,
+     "note": "Upright orange/black pressure washer on two rear wheels with handle and side-mounted lance, 0.25 x 0.66 x 0.82 m; clean; lance sets the footprint.",
+     "bbox": [
+      0.252,
+      0.663,
+      0.824
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/power_washer.json"
+  },
+  {
+   "task": "obst",
+   "category": "snack_rack",
+   "group": "appliances",
+   "n_ready": 3,
+   "n_reviewed": 3,
+   "n_valid": 0,
+   "n_unreviewed": 0,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "Store display fixtures: one 3 m shelving gondola and two countertop snack displays. None is a floor object met mid-path in the seven scenes; sizes are either huge or borderline. No valid model.",
+   "natural_scenes": [
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "bfdnho",
+     "V": 3,
+     "N": 0,
+     "S": 0,
+     "rest_ok": true,
+     "score": 6,
+     "valid": false,
+     "note": "Huge L-shaped green store shelving unit 3.1 x 2.1 x 0.96 m; shop fixture, far too large for any path.",
+     "bbox": [
+      3.094,
+      2.141,
+      0.956
+     ]
+    },
+    {
+     "model": "mmaeua",
+     "V": 2,
+     "N": 1,
+     "S": 0,
+     "rest_ok": true,
+     "score": 6,
+     "valid": false,
+     "note": "Stepped counter display of stacked snack boxes, most boxes untextured grey, cluttered; 0.44 x 0.80 x 0.45 m, footprint just over limit.",
+     "bbox": [
+      0.444,
+      0.802,
+      0.453
+     ]
+    },
+    {
+     "model": "ytrmpz",
+     "V": 3,
+     "N": 1,
+     "S": 1,
+     "rest_ok": true,
+     "score": 9,
+     "valid": false,
+     "note": "Wire-grid counter display panel on a tray base, grey, clean; 0.23 x 0.64 x 0.48 m; counter item, odd on the floor.",
+     "bbox": [
+      0.23,
+      0.637,
+      0.481
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/snack_rack.json"
+  },
+  {
+   "task": "obst",
+   "category": "soccer_ball",
+   "group": "toys",
+   "n_ready": 2,
+   "n_reviewed": 2,
+   "n_valid": 0,
+   "n_unreviewed": 0,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "Two well-made 0.25 m soccer balls; a natural toy on a house floor and a good size, but a ball rolls when settled and will not stay on the sampled cell. No valid model.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "ikagkc",
+     "V": 5,
+     "N": 3,
+     "S": 2,
+     "rest_ok": false,
+     "score": 18,
+     "valid": false,
+     "note": "Classic black-and-white soccer ball, 0.24 m diameter, sharp textures, clean; rolls, will not stay where dropped.",
+     "bbox": [
+      0.243,
+      0.242,
+      0.243
+     ]
+    },
+    {
+     "model": "nlpvzv",
+     "V": 5,
+     "N": 3,
+     "S": 2,
+     "rest_ok": false,
+     "score": 18,
+     "valid": false,
+     "note": "Classic black-and-white soccer ball, 0.25 m diameter, clean textures; rolls.",
+     "bbox": [
+      0.255,
+      0.254,
+      0.255
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/soccer_ball.json"
+  },
+  {
+   "task": "obst",
+   "category": "stroller",
+   "group": "appliances",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 0,
+   "n_unreviewed": 0,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "Good-looking, stable stroller that would be natural in a hallway, living room or diner, but its 0.85 m footprint is over the 0.80 m limit and would block a ~1 m corridor; no valid model.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "restaurant_diner"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "jtraqt",
+     "V": 4,
+     "N": 3,
+     "S": 0,
+     "rest_ok": true,
+     "score": 14,
+     "valid": false,
+     "note": "Mustard umbrella stroller with grey frame and four wheel pairs, 0.85 x 0.51 x 0.93 m; clean and recognisable, but 0.85 m footprint exceeds 0.80.",
+     "bbox": [
+      0.851,
+      0.513,
+      0.93
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/stroller.json"
+  },
+  {
+   "task": "obst",
+   "category": "volleyball",
+   "group": "toys",
+   "n_ready": 1,
+   "n_reviewed": 1,
+   "n_valid": 0,
+   "n_unreviewed": 0,
+   "category_score": -1.0,
+   "verdict": "drop",
+   "category_note": "A single well-made 0.24 m ball; a toy ball on a child's-room or garage floor is natural and the size is right, but a sphere rolls when dropped and will not stay where placed (rest_ok false). No valid model.",
+   "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int"
+   ],
+   "in_scene": {},
+   "picks": [],
+   "alternate": null,
+   "models": [
+    {
+     "model": "nofzds",
+     "V": 4,
+     "N": 3,
+     "S": 2,
+     "rest_ok": false,
+     "score": 16,
+     "valid": false,
+     "note": "Blue and yellow panelled volleyball, 0.24 m sphere; clean recognisable texture, good size, but rolls.",
+     "bbox": [
+      0.236,
+      0.236,
+      0.236
+     ]
+    }
+   ],
+   "valid_models": [],
+   "used_by_other_tasks": [],
+   "used_in_round1_elsewhere": false,
+   "used_elsewhere": false,
+   "review_file": "review/volleyball.json"
+  }
+ ]
+}

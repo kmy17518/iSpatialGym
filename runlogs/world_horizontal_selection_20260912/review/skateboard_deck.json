@@ -1,0 +1,26 @@
+{
+  "category": "skateboard_deck",
+  "task": "wa2",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "tgfidu",
+      "V": 3,
+      "L": 3,
+      "H": 1,
+      "score": 13,
+      "valid": true,
+      "front_axis": "-z",
+      "level_axis": "y",
+      "up_axis": "+x",
+      "symmetric_180": true,
+      "thin_axis": "z",
+      "note": "Black deck 1.04 m along y with trucks at -z, 0.26 wide, 0.11 thick; flat dark texture; long for a skateboard deck."
+    }
+  ],
+  "picks": ["tgfidu"],
+  "alternate": null,
+  "category_verdict": "weak",
+  "category_note": "Single black deck with trucks, 1.04 x 0.26 x 0.11 m; 4:1 board reads level at a glance and boards hang on wall racks, but length and thickness are both borderline."
+}

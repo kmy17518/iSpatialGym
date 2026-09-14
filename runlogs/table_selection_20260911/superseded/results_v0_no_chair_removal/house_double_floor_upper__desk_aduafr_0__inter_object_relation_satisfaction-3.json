@@ -1,0 +1,224 @@
+{
+ "scene": "house_double_floor_upper",
+ "table": "desk_aduafr_0",
+ "category": "desk",
+ "model": "aduafr",
+ "rooms": [
+  "bedroom_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-3",
+ "inventory": {
+  "top_z": 0.778,
+  "bbox_x": 0.63,
+  "bbox_y": 1.513,
+  "bbox_z": 0.785,
+  "verdict": "keep"
+ },
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 21:00:15",
+ "precheck": {
+  "aabb": [
+   [
+    -5.991,
+    -0.287,
+    -0.002
+   ],
+   [
+    -4.483,
+    0.338,
+    0.773
+   ]
+  ],
+  "support": {
+   "name": "desk_aduafr_0",
+   "z": 0.7734153270721436,
+   "yaw": 1.5662397146224976,
+   "local_bounds": [
+    -0.30406495928764343,
+    0.24267323315143585,
+    4.499657154083252,
+    5.982101917266846
+   ],
+   "n_free_cells": 2100,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -5.24,
+     0.267
+    ],
+    "length": 1.482
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -5.242,
+     -0.28
+    ],
+    "length": 1.482
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -5.982,
+     -0.003
+    ],
+    "length": 0.547
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -4.5,
+     -0.01
+    ],
+    "length": 0.547
+   }
+  ],
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    -5.239719390869141,
+    0.26655128598213196
+   ],
+   "inward": [
+    -0.004556596279144287,
+    -0.9999896287918091
+   ],
+   "tangent": [
+    0.9999896287918091,
+    -0.004556596279144287
+   ],
+   "base_pose2d": [
+    -5.433813571929932,
+    0.7926017642021179,
+    -1.575352938795802
+   ],
+   "edge_depth": 0.525160551071167,
+   "view": {
+    "translate": 0.5,
+    "tilt": -0.699999988079071,
+    "axis_angle": 0.0003452669847162036
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.5
+ },
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {},
+ "template_meta": {
+  "support": {
+   "name": "desk_aduafr_0",
+   "z": 0.7734154462814331,
+   "yaw": 1.566239595413208,
+   "local_bounds": [
+    -0.3040657043457031,
+    0.24267266690731049,
+    4.499657154083252,
+    5.982101917266846
+   ],
+   "n_free_cells": 2100,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    -5.239719390869141,
+    0.26655134558677673
+   ],
+   "inward": [
+    -0.004556715488433838,
+    -0.9999896287918091
+   ],
+   "tangent": [
+    0.9999896287918091,
+    -0.004556715488433838
+   ],
+   "base_pose2d": [
+    -5.433813095092773,
+    0.7926018834114075,
+    -1.5753530580038528
+   ],
+   "edge_depth": 0.5251606702804565,
+   "view": {
+    "translate": 0.25,
+    "tilt": -0.75,
+    "axis_angle": 0.006108405982625406
+   }
+  },
+  "view_arms": "untucked",
+  "n_reachable_cells": 7,
+  "n_grasp_cells": 7,
+  "n_grasp_combos": 81,
+  "n_region_cells": 630,
+  "n_visible_cells": 591,
+  "stand_off": 0.45,
+  "edge": null,
+  "load_room_instances": [
+   "bedroom_0",
+   "bathroom_0",
+   "living_room_0"
+  ],
+  "task_rooms": [
+   "bedroom_0"
+  ],
+  "rejections": {},
+  "n_written": 1,
+  "timings": {
+   "bind_spawn_s": 103.57,
+   "prepare_template_s": 1.67,
+   "save_template_s": 0.05
+  }
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_table_sel/house_double_floor_upper/house_double_floor_upper__desk_aduafr_0__inter_object_relation_satisfaction-3/instances/inter_object_relation_satisfaction-3__house_double_floor_upper__desk_aduafr_0__inter_object_relation_satisfaction-3__0000.summary.json",
+   "wall_time_s": 14.7,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    -5.433813095092773,
+    0.7926018834114075,
+    -1.5753530580038528
+   ],
+   "trunk": [
+    0.2499999611274068,
+    -0.7500000596046448
+   ],
+   "grasp": {
+    "key": "spatula__hkvsep__t",
+    "name": "grasp_2",
+    "translate": 0.5,
+    "yaw": -1.5798970815777529
+   },
+   "view": {
+    "translate": 0.25,
+    "tilt": -0.75
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_table_sel/house_double_floor_upper/house_double_floor_upper__desk_aduafr_0__inter_object_relation_satisfaction-3",
+ "bound_table": "desk_aduafr_0",
+ "setup_s": 105.2,
+ "run_s": 14.7,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "ok",
+   "n_written": 1,
+   "rejections": {},
+   "reject_reason": null,
+   "setup_s": 105.2,
+   "run_s": 14.7
+  }
+ ],
+ "job_s": 128.7,
+ "finished": "2026-09-11 21:02:23"
+}

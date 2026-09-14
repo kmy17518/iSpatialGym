@@ -1,0 +1,161 @@
+{
+ "scene": "house_double_floor_upper",
+ "table": "serving_cart_vvtcby_0",
+ "category": "serving_cart",
+ "model": "vvtcby",
+ "rooms": [
+  "bathroom_0"
+ ],
+ "partner": null,
+ "problem": "disembedding-0",
+ "inventory": {
+  "top_z": 0.643,
+  "bbox_x": 0.375,
+  "bbox_y": 0.519,
+  "bbox_z": 0.643,
+  "verdict": "keep"
+ },
+ "n_requested": 1,
+ "max_attempts": 8,
+ "started": "2026-09-11 20:29:05",
+ "precheck": {
+  "aabb": [
+   [
+    -1.25,
+    1.401,
+    0.0
+   ],
+   [
+    -0.873,
+    1.922,
+    0.644
+   ]
+  ],
+  "support": {
+   "name": "serving_cart_vvtcby_0",
+   "z": 0.5829386711120605,
+   "yaw": 2.687009555302211e-06,
+   "local_bounds": [
+    -1.220054268836975,
+    -0.8800529837608337,
+    1.4107884168624878,
+    1.8907884359359741
+   ],
+   "n_free_cells": 393,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -0.88,
+     1.651
+    ],
+    "length": 0.48
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -1.22,
+     1.651
+    ],
+    "length": 0.48
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -1.05,
+     1.891
+    ],
+    "length": 0.34
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -1.05,
+     1.411
+    ],
+    "length": 0.34
+   }
+  ],
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    -1.0500587224960327,
+    1.890785574913025
+   ],
+   "inward": [
+    2.687009555302211e-06,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    2.687009555302211e-06
+   ],
+   "base_pose2d": [
+    -1.0500599145889282,
+    2.340785503387451,
+    -1.5707936397853413
+   ],
+   "edge_depth": 0.44999992847442627,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.06915861347801276
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 0.9
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "distractors": {
+   "same_category": true,
+   "models": [
+    "box_of_cereal-yorray"
+   ],
+   "requested": 1,
+   "footprint_fraction": 0.18
+  },
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/house_double_floor_upper/house_double_floor_upper__serving_cart_vvtcby_0__disembedding-0__s2",
+ "setup_s": 5.1,
+ "reject_reason": "no_support",
+ "error": "[no_support] serving_cart_vvtcby_0: [support] untucked: [support] edge +u: [no_stance] no collision-free stance around serving_cart_vvtcby_0; edge -u: [no_stance] no collision-free stance around serving_cart_vvtcby_0; edge +v lateral +0.00: [support] source tray not fully supported at the canonical position (stance lateral -0.00, footprint u -1.27..-0.83 vs support (-1.22005295753479, -0.88005131483078, 1.4107892513275146, 1.890789270401001)); edge +v lateral +0.25: [no_stance] no stance near lateral +0.25 on edge +v; edge +v lateral -0.25: [no_stance] no stance near lateral -0.25 on edge +v; edge +v lateral +0.35: [no_stance] no stance near lateral +0.35 on edge +v; edge +v lateral -0.35: [no_stance] no stance near lateral -0.35 on edge +v; edge -v: [no_stance] no collision-free stance around serving_cart_vvtcby_0; edge +u: [no_stance] no collision-free stance around serving_cart_vvtcby_0; edge -u: [no_stance] no collision-free stance around serving_cart_vvtcby_0; edge +v lateral +0.00 (yaw allowed): [support] source tray not fully supported at the canonical position (stance lateral -0.00, footprint u -1.27..-0.83 vs support (-1.22005295753479, -0.88005131483078, 1.4107892513275146, 1.890789270401001)); edge +v lateral +0.25 (yaw allowed): [no_stance] no stance near lateral +0.25 on edge +v; edge +v lateral -0.25 (yaw allowed): [no_stance] no stance near lateral -0.25 on edge +v; edge +v lateral +0.35 (yaw allowed): [no_stance] no stance near lateral +0.35 on edge +v; edge +v lateral -0.35 (yaw allowed): [no_stance] no stance near lateral -0.35 on edge +v; edge -v: [no_stance] no collision-free stance around serving_cart_vvtcby_0; ready: [support] edge +u: [no_stance] no collision-free stance around serving_cart_vvtcby_0; edge -u: [no_stance] no collision-free stance around serving_cart_vvtcby_0; edge +v lateral +0.00: [support] source tray not fully supported at the canonical position (stance lateral -0.00, footprint u -1.27..-0.83 vs support (-1.22005295753479, -",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 7.9,
+   "run_s": null
+  },
+  {
+   "seed": 1000,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 8.4,
+   "run_s": null
+  },
+  {
+   "seed": 2000,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 5.1,
+   "run_s": null
+  }
+ ],
+ "job_s": 30.5,
+ "finished": "2026-09-11 20:29:35"
+}

@@ -1,0 +1,35 @@
+{
+ "category": "can_of_corn",
+ "model": "pddtfk",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/can_of_corn__pddtfk__y0.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 0.6,
+   "on_tray": true,
+   "settled_z": 0.0457,
+   "seg_pixels": 7718,
+   "aabb_extent": [
+    0.087,
+    0.086,
+    0.092
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/can_of_corn__pddtfk__y1.png",
+   "drift_m": 0.0006,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.0457
+  }
+ },
+ "stable": true,
+ "visible": true
+}

@@ -440,6 +440,7 @@ Used by `pose_reached(g)` and `layout_reached(g)`:
 | Configuration Matching | `configuration_matching` | `problem3` | `attachment` |
 | World Alignment | `world_alignment` | `problem0` | `table_surface` |
 | World Alignment | `world_alignment` | `problem1` | `world_vertical` |
+| World Alignment | `world_alignment` | `problem2` | `world_horizontal` |
 | Inter-object Relation Satisfaction | `inter_object_relation_satisfaction` | `problem0` to `problem4` | `ontop`, `under`, `inside`, `nextto`, `touching` |
 
 ## 1. Camera Relocalization
@@ -1027,7 +1028,7 @@ Additional TRO specification:
 
 ## 6. World Alignment
 
-One activity, two problem files.
+One activity, three problem files.
 
 ### 6a. Table surface (`problem0`, alias `table_surface`)
 
@@ -1172,6 +1173,90 @@ Additional TRO specification:
   only if the hinge guarantees contact.
 - The painting has one degree of freedom, so the full world-frame target
   effectively evaluates the in-plane angle; no axis-only predicate is needed.
+
+### 6c. World horizontal (`problem2`, alias `world_horizontal`)
+
+The same wall hinge as 6b, but the object is an elongated wall item with one
+clear horizontal direction (a towel bar, a hook rail, a shelf, a wide sign or
+screen): it starts tilted in the wall plane and the goal is the level pose (its
+long axis / reference edge horizontal). The BDDL structure is identical to 6b
+with the representative synset changed.
+
+```lisp
+(define (problem world_alignment-2)
+    (:domain ispatialgym)
+
+    (:alias world_horizontal)
+
+    (:objects
+        towel_rack.n.01_1 - towel_rack.n.01
+        wall.n.01_1 - wall.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (pose_reached ?towel_rack.n.01_1)
+            (not (grasped ?agent.n.01_1 ?towel_rack.n.01_1))
+            (pose_settled ?towel_rack.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+)
+```
+
+Additional TRO specification:
+
+```json
+{
+  "constraints": [
+    {
+      "type": "revolute",
+      "child": "towel_rack.n.01_1",
+      "parent": "wall.n.01_1",
+      "parent_link": "WALL_LINK",
+      "anchor_position": [0.0, 0.0, 0.0],
+      "axis": [0.0, 0.0, 0.0],
+      "limits": null
+    }
+  ],
+  "pose_targets": {
+    "towel_rack.n.01_1": {
+      "link": null,
+      "frame": "world",
+      "position": null,
+      "orientation": [0.0, 0.0, 0.0, 1.0],
+      "position_metric": null,
+      "orientation_metric": "full",
+      "position_tolerance": null,
+      "orientation_tolerance": 0.0,
+      "orientation_equivalences": [[1.0, 0.0, 0.0, 0.0]]
+    }
+  }
+}
+```
+
+- Binary success: the object is released and its orientation is within
+  `orientation_tolerance` of the level pose; the position is fixed by the hinge
+  and is not evaluated. `constraints`, `anchor_position`, `axis` and the loader
+  behaviour are exactly those of 6b.
+- "Horizontal" is an undirected direction: a plain bar, a blank screen or a
+  rolling pin looks the same after a half turn about the wall normal, so such
+  models list the 180-degree rotation about their front axis (the object-frame
+  axis that points out of the wall, here `+x`) in `orientation_equivalences`;
+  the example above is that quaternion for a `+x` front axis. Objects with a
+  readable top and bottom (a shelf with brackets below, a rail with hooks
+  below, a text sign) list no equivalence and the goal is the single level pose
+  with the object upright.
+- `towel_rack.n.01` is representative; the chosen category needs one dominant
+  horizontal axis (bars, rails, shelves, wide boards / signs with aspect ratio
+  well above 1) so that the level direction is unambiguous - a square or round
+  object is unusable here even when it has a readable "up".
 
 ## 7. Inter-object Relation Satisfaction
 

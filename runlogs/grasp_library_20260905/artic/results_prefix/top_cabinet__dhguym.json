@@ -1,0 +1,16 @@
+{
+ "key": "top_cabinet__dhguym",
+ "category": "top_cabinet",
+ "model": "dhguym",
+ "scene": "Rs_int",
+ "host": "top_cabinet_lsyzkh_3",
+ "host_rank": 2,
+ "host_model": "lsyzkh",
+ "swap": true,
+ "joints": [],
+ "error": "RuntimeError('swap skipped: host/test aspect mismatch, scale factors [4.17, 0.5, 1.88]')",
+ "previous_hosts": [
+  "top_cabinet_lsyzkh_2",
+  "top_cabinet_lsyzkh_1"
+ ]
+}

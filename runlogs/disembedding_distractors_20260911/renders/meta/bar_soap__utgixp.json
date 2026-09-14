@@ -1,0 +1,53 @@
+{
+ "category": "bar_soap",
+ "model": "utgixp",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0,
+  180.0,
+  270.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bar_soap__utgixp__y0.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0056,
+   "seg_pixels": 781,
+   "aabb_extent": [
+    0.047,
+    0.029,
+    0.011
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bar_soap__utgixp__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0056
+  },
+  "y2": {
+   "yaw_deg": 180.0,
+   "png": "renders/bar_soap__utgixp__y2.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0056
+  },
+  "y3": {
+   "yaw_deg": 270.0,
+   "png": "renders/bar_soap__utgixp__y3.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0056
+  }
+ },
+ "stable": true,
+ "visible": true
+}

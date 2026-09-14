@@ -1,0 +1,267 @@
+{
+ "group": "mental_rotation__crab__r1",
+ "task": "mental_rotation",
+ "category": "crab",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "ohjsdr",
+   "key": "crab__ohjsdr",
+   "strip": "/tmp/glib/strips/crab__ohjsdr.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on leg segment near joint"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on leg segment near joint"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on leg segment near joint"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on leg segment near joint"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on leg segment near joint"
+    }
+   ],
+   "object_note": "bent two-segment leg; all pinches near the knee, close to CoM",
+   "bbox_mm": [
+    147,
+    108,
+    27
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "bkkzhf",
+   "key": "crab__bkkzhf",
+   "strip": "/tmp/glib/strips/crab__bkkzhf.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on thick leg segment at body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at leg joint near body, antipodal 0.36"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on leg segment, mid-cluster"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on thick red segment"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on thick claw/leg segment, 42 mm from CoM"
+    }
+   ],
+   "object_note": "leg cluster; all grasps pinch 9-15 mm leg segments near body, rigid mesh so acceptable",
+   "bbox_mm": [
+    118,
+    169,
+    30
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "eqfklx",
+   "key": "crab__eqfklx",
+   "strip": "/tmp/glib/strips/crab__eqfklx.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-leg pinch on thick section, coverage 0.75"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-leg pinch near CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-leg pinch near CoM"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-leg pinch near CoM"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-leg pinch, coverage 0.75"
+    }
+   ],
+   "object_note": "single king crab leg; all pinches on thick middle section",
+   "bbox_mm": [
+    181,
+    141,
+    31
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "kmeddb",
+   "key": "crab__kmeddb",
+   "strip": "/tmp/glib/strips/crab__kmeddb.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-leg pinch near CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on thick end section, antipodal 0.61"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on thick joint section, firm"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-leg pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "mid-leg pinch, coverage 0.50, width 16 vs 41 mm pads"
+    }
+   ],
+   "object_note": "single long crab leg; rank 5 has weakest contact metrics but no visible gap",
+   "bbox_mm": [
+    221,
+    179,
+    34
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "tjkiva",
+   "key": "crab__tjkiva",
+   "strip": "/tmp/glib/strips/crab__tjkiva.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on leg segment at body"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on leg segment at body"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on leg segment near body"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on thick leg segment"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on leg segment near body"
+    }
+   ],
+   "object_note": "leg cluster; all grasps on 13-15 mm leg segments near body",
+   "bbox_mm": [
+    154,
+    138,
+    35
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

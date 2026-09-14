@@ -1,0 +1,42 @@
+[
+ {
+  "json": "/tmp/glib/artic/handles/laptop__nvulcs.json",
+  "strip": "/tmp/glib/artic/strips/laptop__nvulcs.png"
+ },
+ {
+  "json": "/tmp/glib/artic/handles/openable_window__cbudyv.json",
+  "strip": "/tmp/glib/artic/strips/openable_window__cbudyv.png"
+ },
+ {
+  "json": "/tmp/glib/artic/handles/openable_window__dpngol.json",
+  "strip": "/tmp/glib/artic/strips/openable_window__dpngol.png"
+ },
+ {
+  "json": "/tmp/glib/artic/handles/openable_window__eyvzfu.json",
+  "strip": "/tmp/glib/artic/strips/openable_window__eyvzfu.png"
+ },
+ {
+  "json": "/tmp/glib/artic/handles/openable_window__qdkcdn.json",
+  "strip": "/tmp/glib/artic/strips/openable_window__qdkcdn.png"
+ },
+ {
+  "json": "/tmp/glib/artic/handles/oven__ffitak.json",
+  "strip": "/tmp/glib/artic/strips/oven__ffitak.png"
+ },
+ {
+  "json": "/tmp/glib/artic/handles/oven__kfftgk.json",
+  "strip": "/tmp/glib/artic/strips/oven__kfftgk.png"
+ },
+ {
+  "json": "/tmp/glib/artic/handles/oven__leqtlc.json",
+  "strip": "/tmp/glib/artic/strips/oven__leqtlc.png"
+ },
+ {
+  "json": "/tmp/glib/artic/handles/oven__nkxhvf.json",
+  "strip": "/tmp/glib/artic/strips/oven__nkxhvf.png"
+ },
+ {
+  "json": "/tmp/glib/artic/handles/oven__rwuazb.json",
+  "strip": "/tmp/glib/artic/strips/oven__rwuazb.png"
+ }
+]

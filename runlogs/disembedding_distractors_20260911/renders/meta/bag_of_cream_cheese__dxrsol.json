@@ -1,0 +1,35 @@
+{
+ "category": "bag_of_cream_cheese",
+ "model": "dxrsol",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bag_of_cream_cheese__dxrsol__y0.png",
+   "drift_m": 0.0015,
+   "tilt_deg": 7.5,
+   "on_tray": true,
+   "settled_z": 0.0121,
+   "seg_pixels": 8281,
+   "aabb_extent": [
+    0.146,
+    0.101,
+    0.024
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bag_of_cream_cheese__dxrsol__y1.png",
+   "drift_m": 0.0014,
+   "tilt_deg": 7.3,
+   "on_tray": true,
+   "settled_z": 0.0121
+  }
+ },
+ "stable": true,
+ "visible": true
+}

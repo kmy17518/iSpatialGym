@@ -1,0 +1,35 @@
+{
+ "category": "bottle_of_sake",
+ "model": "swlykk",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/bottle_of_sake__swlykk__y0.png",
+   "drift_m": 0.0013,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0901,
+   "seg_pixels": 8546,
+   "aabb_extent": [
+    0.061,
+    0.06,
+    0.247
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/bottle_of_sake__swlykk__y1.png",
+   "drift_m": 0.0043,
+   "tilt_deg": 2.9,
+   "on_tray": true,
+   "settled_z": 0.09
+  }
+ },
+ "stable": true,
+ "visible": true
+}

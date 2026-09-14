@@ -1,0 +1,29 @@
+{
+ "scene": "Rs_int",
+ "table": "breakfast_table_skczfi_0",
+ "category": "breakfast_table",
+ "model": "skczfi",
+ "rooms": [
+  "living_room_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-2",
+ "inventory": {
+  "top_z": 0.749,
+  "bbox_x": 0.753,
+  "bbox_y": 0.958,
+  "bbox_z": 0.739,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "straight_chair_amgwaw_0",
+  "straight_chair_amgwaw_1",
+  "straight_chair_amgwaw_2"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 01:50:54",
+ "status": "skipped",
+ "reason": "configuration_matching-1 produced no instance on this support"
+}

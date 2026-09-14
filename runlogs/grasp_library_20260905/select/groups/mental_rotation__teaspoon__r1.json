@@ -1,0 +1,342 @@
+{
+ "group": "mental_rotation__teaspoon__r1",
+ "task": "mental_rotation",
+ "category": "teaspoon",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "vgbcmo",
+   "key": "teaspoon__vgbcmo",
+   "strip": "/tmp/glib/strips/teaspoon__vgbcmo.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    123,
+    24,
+    7
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "eilfij",
+   "key": "teaspoon__eilfij",
+   "strip": "/tmp/glib/strips/teaspoon__eilfij.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on rear of bowl"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    187,
+    43,
+    11
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "fgeimy",
+   "key": "teaspoon__fgeimy",
+   "strip": "/tmp/glib/strips/teaspoon__fgeimy.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/bowl-junction pinch"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    132,
+    28,
+    12
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "piqabk",
+   "key": "teaspoon__piqabk",
+   "strip": "/tmp/glib/strips/teaspoon__piqabk.png",
+   "n_valid": 1,
+   "n_clean": 1,
+   "n_clean_strict": 1,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    147,
+    31,
+    16
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "qdepdj",
+   "key": "teaspoon__qdepdj",
+   "strip": "/tmp/glib/strips/teaspoon__qdepdj.png",
+   "n_valid": 2,
+   "n_clean": 2,
+   "n_clean_strict": 2,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch at neck, bowl below fingertips"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    130,
+    29,
+    16
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "nxddfp",
+   "key": "teaspoon__nxddfp",
+   "strip": "/tmp/glib/strips/teaspoon__nxddfp.png",
+   "n_valid": 2,
+   "n_clean": 2,
+   "n_clean_strict": 2,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on rear of bowl"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    130,
+    29,
+    17
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "prbhag",
+   "key": "teaspoon__prbhag",
+   "strip": "/tmp/glib/strips/teaspoon__prbhag.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle pinch near neck"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck pinch behind bowl"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    130,
+    29,
+    17
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "bjzgmj",
+   "key": "teaspoon__bjzgmj",
+   "strip": "/tmp/glib/strips/teaspoon__bjzgmj.png",
+   "n_valid": 1,
+   "n_clean": 1,
+   "n_clean_strict": 1,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "handle-tip pinch, long lever arm, natural handle grasp"
+    }
+   ],
+   "object_note": null,
+   "bbox_mm": [
+    250,
+    55,
+    19
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": [
+  {
+   "model": "mgdfcz",
+   "key": "teaspoon__mgdfcz",
+   "reason": "no candidates"
+  }
+ ]
+}

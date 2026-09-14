@@ -1,0 +1,20 @@
+{
+  "key": "oven__kfftgk",
+  "category": "oven",
+  "model": "kfftgk",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_dof_rootd_aa001_r",
+      "kind": "flap",
+      "chosen": "B",
+      "pinch": "horizontal_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Horizontal bar handle along the top of the drop-down door (bottom hinge); B is the bar's middle, A/C its end blocks. 26 mm standoff.",
+      "height_concern": "",
+      "confidence": "high"
+    }
+  ],
+  "object_note": "Good detection. The large red sphere among the control-panel knobs is a mesh knob, not a marker."
+}

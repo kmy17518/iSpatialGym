@@ -1,0 +1,124 @@
+{
+ "group": "configuration_matching__skateboard_wheel_assembly__r3",
+ "task": "configuration_matching",
+ "category": "skateboard_wheel_assembly",
+ "round": 3,
+ "relation": null,
+ "partner": "M -> skateboard_deck",
+ "requirements": "Attachment task: the object is picked from a table and attached to its partner. The pads must leave the mating side of the object completely free.",
+ "candidates": [
+  {
+   "model": "jljqtt",
+   "key": "skateboard_wheel_assembly__jljqtt__a",
+   "strip": "/tmp/glib/strips/skateboard_wheel_assembly__jljqtt__a.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on central hanger between wheels"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on central hanger between wheels"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "pinch on central hanger between wheels"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "30 deg tilt, still central hanger pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "central hanger pinch, 22 mm lateral offset"
+    }
+   ],
+   "object_note": "all grasps at truck centre; baseplate mating side not covered by pads",
+   "bbox_mm": [
+    327,
+    113,
+    135
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "attachment_free"
+  },
+  {
+   "model": "acmbvb",
+   "key": "skateboard_wheel_assembly__acmbvb__a",
+   "strip": "/tmp/glib/strips/skateboard_wheel_assembly__acmbvb__a.png",
+   "n_valid": 5,
+   "n_clean": 1,
+   "n_clean_strict": 1,
+   "flags": [
+    "end_grasp"
+   ],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "axial pinch on end wheel; truck cantilevers ~80 mm"
+    },
+    {
+     "rank": 2,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "axial pinch on end wheel; truck cantilevers ~80 mm"
+    },
+    {
+     "rank": 3,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "axial pinch on end wheel; truck cantilevers ~80 mm"
+    },
+    {
+     "rank": 4,
+     "verdict": "flag",
+     "flags": [
+      "end_grasp"
+     ],
+     "note": "vertical axial pinch on end wheel, 34 mm CoM offset"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "central hanger pinch between wheels"
+    }
+   ],
+   "object_note": "rows 1-4 hold one wheel at axle end (60 mm); wheel would spin in reality, truck hangs off-axis",
+   "bbox_mm": [
+    316,
+    136,
+    140
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "a1",
+   "constraint": "attachment_free"
+  }
+ ],
+ "excluded": []
+}

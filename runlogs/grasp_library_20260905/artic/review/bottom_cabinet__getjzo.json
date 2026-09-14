@@ -1,0 +1,20 @@
+{
+  "key": "bottom_cabinet__getjzo",
+  "category": "bottom_cabinet",
+  "model": "getjzo",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_1",
+      "kind": "flap",
+      "chosen": "A",
+      "pinch": "horizontal_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Small horizontal pull at the bottom +y corner of the top-hinged flap; bottom edge swings out and up. Bottom-edge fallback unusable (floor level).",
+      "height_concern": "handle only ~2 cm above the floor, likely unreachable",
+      "confidence": "low"
+    }
+  ],
+  "object_note": "Low sideboard: the flap occupies 0-0.25 m above the floor and its only protrusion is a small pull 2 cm off the ground. Decorative X mouldings correctly ignored."
+}

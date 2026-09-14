@@ -1,0 +1,52 @@
+{
+ "key": "fridge__jtqazu",
+ "category": "fridge",
+ "model": "jtqazu",
+ "scene": "restaurant_diner",
+ "host": "fridge_jtqazu_0",
+ "host_rank": 0,
+ "host_model": "jtqazu",
+ "swap": false,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     -8.407,
+     -0.413,
+     1.531
+    ],
+    "translate": 0.5,
+    "sign": 1.0
+   },
+   "reachable": true,
+   "ag": true,
+   "dq": 0.7878,
+   "dq_target": 0.785,
+   "opened": true,
+   "open_state": true,
+   "base_shifts": 0,
+   "steps": [
+    "stance ok",
+    "grasped"
+   ],
+   "error": null,
+   "contact_world": [
+    -8.175,
+    0.378,
+    1.16
+   ],
+   "handle_height_above_floor": 1.093
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.941,
+  1.601,
+  1.267
+ ],
+ "time_s": 75.4
+}

@@ -1,0 +1,140 @@
+{
+ "scene": "house_single_floor",
+ "table": "bar_udatjt_0",
+ "category": "bar",
+ "model": "udatjt",
+ "rooms": [
+  "living_room_0",
+  "kitchen_0"
+ ],
+ "partner": "sofa_lugrhk_1",
+ "problem": "inter_object_relation_satisfaction-1",
+ "inventory": {
+  "top_z": 1.052,
+  "bbox_x": 1.145,
+  "bbox_y": 2.994,
+  "bbox_z": 1.051,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:50:18",
+ "precheck": {
+  "aabb": [
+   [
+    5.789,
+    -0.305,
+    0.001
+   ],
+   [
+    8.786,
+    0.848,
+    1.052
+   ]
+  ],
+  "support": {
+   "name": "bar_udatjt_0",
+   "z": 1.0505356788635254,
+   "yaw": -1.5733394622802734,
+   "local_bounds": [
+    -0.8629434704780579,
+    0.2797994017601013,
+    5.796337127685547,
+    8.77922534942627
+   ],
+   "n_free_cells": 8605,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     7.287,
+     -0.298
+    ],
+    "length": 2.983
+   },
+   {
+    "name": "-u",
+    "mid": [
+     7.29,
+     0.844
+    ],
+    "length": 2.983
+   },
+   {
+    "name": "+v",
+    "mid": [
+     8.78,
+     0.269
+    ],
+    "length": 1.143
+   },
+   {
+    "name": "-v",
+    "mid": [
+     5.797,
+     0.277
+    ],
+    "length": 1.143
+   }
+  ],
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    8.779938697814941,
+    0.26924437284469604
+   ],
+   "inward": [
+    -0.9999967813491821,
+    0.0025431327521800995
+   ],
+   "tangent": [
+    -0.0025431327521800995,
+    -0.9999967813491821
+   ],
+   "base_pose2d": [
+    9.229937553405762,
+    0.26809996366500854,
+    3.139049518134753
+   ],
+   "edge_depth": 0.4500003159046173,
+   "view": {
+    "translate": 0.75,
+    "tilt": 0.10000002384185791,
+    "axis_angle": 0.0004882812548506386
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 7.3
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "view_arms": "untucked",
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/house_single_floor/house_single_floor__bar_udatjt_0__under_sofa_lugrhk_1__inter_object_relation_satisfaction-1",
+ "setup_s": 207.6,
+ "reject_reason": "no_support",
+ "error": "[no_support] bar_udatjt_0: [no_stance] stand_off 0.45 edge None: [partner_not_visible] sofa_lugrhk_1 corners in view: 0/8; stand_off 0.45 edge +u: [partner_not_visible] sofa_lugrhk_1 corners in view: 1/8; stand_off 0.45 edge -u: [stance_collision] untucked: [no_stance] no collision-free stance around bar_udatjt_0; stand_off 0.45 edge +v: [partner_not_visible] sofa_lugrhk_1 corners in view: 0/8; stand_off 0.45 edge -v: [partner_far] geodesic to sofa_lugrhk_1: 5.63137149810791; stand_off 0.35 edge None: [stance_collision] untucked: [stance_collision] no collision-free viewing trunk configuration (39 candidates); stand_off 0.35 edge +u: [stance_collision] untucked: [stance_collision] no collision-free viewing trunk configuration (39 candidates); stand_off 0.35 edge -u: [stance_collision] untucked: [no_stance] no collision-free stance around bar_udatjt_0; stand_off 0.35 edge +v: [stance_collision] untucked: [no_stance] no collision-free stance around bar_udatjt_0; stand_off 0.35 edge -v: [stance_collision] untucked: [no_stance] no collision-free stance around bar_udatjt_0; stand_off 0.55 edge None: [partner_not_visible] sofa_lugrhk_1 corners in view: 0/8; stand_off 0.55 edge +u: [partner_not_visible] sofa_lugrhk_1 corners in view: 1/8; stand_off 0.55 edge -u: [partner_not_visible] sofa_lugrhk_1 corners in view: 0/8; stand_off 0.55 edge +v: [partner_not_visible] sofa_lugrhk_1 corners in view: 0/8; stand_off 0.55 edge -v: [partner_far] geodesic to sofa_lugrhk_1: 5.672792434692383; sofa_lugrhk_1: [no_stance] stand_off 0.45 edge None: [unreachable] no reachable cell on the support; stand_off 0.45 edge +u: [unreachable] no reachable cell on the support; stand_off 0.45 edge -u: [support] placement region empty; stand_off 0.45 edge +v: [unreachable] no reachable cell on the support; stand_off 0.45 edge -v: [stance_collision] untucked: [no_stance] no traversable stance around sofa_lugrhk_1; stand_off 0.35 edge None: [unreachable] no reachable cell on the support; stand_off 0.35",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 207.6,
+   "run_s": null
+  }
+ ],
+ "job_s": 209.4,
+ "finished": "2026-09-12 02:55:15"
+}

@@ -1,0 +1,98 @@
+{
+ "key": "bottom_cabinet_no_top__pluwfl",
+ "category": "bottom_cabinet_no_top",
+ "model": "pluwfl",
+ "scene": "house_single_floor",
+ "host": "bottom_cabinet_no_top_gjrero_1",
+ "host_rank": 1,
+ "host_model": "gjrero",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     23.798,
+     1.329,
+     0.0
+    ],
+    "translate": 0.5,
+    "sign": 1.0,
+    "orientation": "front_down45"
+   },
+   "reachable": true,
+   "ag": true,
+   "dq": 0.4495,
+   "dq_target": 0.785,
+   "opened": true,
+   "open_state": true,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [24.19847869873047, 1.1292476654052734, 0.5517792105674744]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [24.19847869873047, 1.1292476654052734, 0.5517792105674744]})",
+    "stance ok (teleported)",
+    "grasped",
+    "pull chunk 6: base shift failed: [planning] no collision-free base path to (23.64894676208496, 1.317371129989624, -1.6689300537109375e-05) {'curobo_status': 'IK failed: goal pose unreachable for the active joints (best pose error 4571.7 mm / 0.009 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad) [start configuration is in collision]'}",
+    "pull chunk 6: arm+base could not follow"
+   ],
+   "error": null,
+   "contact_world": [
+    24.198,
+    1.129,
+    0.552
+   ],
+   "handle_height_above_floor": 0.547,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 5,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0
+   }
+  },
+  {
+   "joint": "j_link_1",
+   "kind": "drawer",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     23.803,
+     1.156,
+     0.0
+    ],
+    "translate": 0.5,
+    "sign": 1.0,
+    "orientation": "front"
+   },
+   "reachable": true,
+   "ag": true,
+   "dq": 0.1434,
+   "dq_target": 0.15,
+   "opened": true,
+   "open_state": true,
+   "base_shifts": 0,
+   "steps": [
+    "stance ok (teleported)",
+    "grasped"
+   ],
+   "error": null,
+   "contact_world": [
+    24.203,
+    0.956,
+    0.79
+   ],
+   "handle_height_above_floor": 0.784
+  }
+ ],
+ "error": null,
+ "previous_hosts": [
+  "bottom_cabinet_no_top_gjrero_0"
+ ],
+ "scale": [
+  1.466,
+  1.359,
+  1.47
+ ],
+ "time_s": 591.0
+}

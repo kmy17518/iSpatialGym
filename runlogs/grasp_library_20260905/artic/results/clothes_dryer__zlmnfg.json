@@ -1,0 +1,61 @@
+{
+ "key": "clothes_dryer__zlmnfg",
+ "category": "clothes_dryer",
+ "model": "zlmnfg",
+ "scene": "house_single_floor",
+ "host": "clothes_dryer_xsuyua_0",
+ "host_rank": 0,
+ "host_model": "xsuyua",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "manual",
+   "stance": {
+    "base": [
+     22.756,
+     0.741,
+     3.139
+    ],
+    "translate": 0.5,
+    "sign": 1.0,
+    "orientation": "front"
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [22.306882858276367, 1.1454023122787476, 0.5578347444534302]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [22.306882858276367, 1.1454023122787476, 0.5578347444534302]})",
+    "stance ok (teleported)",
+    "sign +1: grasp: [grasp] o_clothes_dryer__zlmnfg not in hand after closing gripper {'in_hand': None}"
+   ],
+   "error": "grasp: [grasp] o_clothes_dryer__zlmnfg not in hand after closing gripper {'in_hand': None}",
+   "contact_world": [
+    22.306,
+    0.942,
+    0.775
+   ],
+   "handle_height_above_floor": 0.77,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 4,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.039,
+  0.996,
+  1.064
+ ],
+ "time_s": 217.0
+}

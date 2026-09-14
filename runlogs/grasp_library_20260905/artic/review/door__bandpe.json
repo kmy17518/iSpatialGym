@@ -1,0 +1,31 @@
+{
+  "key": "door__bandpe",
+  "category": "door",
+  "model": "bandpe",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_leaf0",
+      "kind": "door",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "swing",
+      "graspable": false,
+      "handle_description": "No knob/pull; A marks the full-width push band (~0.3 m tall plate), not a pinchable bar. Hinge at outer -y edge, opens away from viewer.",
+      "height_concern": "",
+      "confidence": "medium"
+    },
+    {
+      "joint": "j_leaf1",
+      "kind": "door",
+      "chosen": "none",
+      "pinch": "none",
+      "motion": "swing",
+      "graspable": false,
+      "handle_description": "No knob/pull; A marks the full-width push band (~0.3 m tall plate), not a pinchable bar. Hinge at outer +y edge, opens away from viewer.",
+      "height_concern": "",
+      "confidence": "medium"
+    }
+  ],
+  "object_note": "No graspable handle on either leaf: the mid-height light band is a flat full-width push plate, portholes are windows. JSON hinge points look mirrored; render shows outer-edge hinges."
+}

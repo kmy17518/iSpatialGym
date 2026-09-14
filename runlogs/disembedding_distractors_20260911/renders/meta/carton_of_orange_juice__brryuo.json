@@ -1,0 +1,35 @@
+{
+ "category": "carton_of_orange_juice",
+ "model": "brryuo",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/carton_of_orange_juice__brryuo__y0.png",
+   "drift_m": 0.0007,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.1091,
+   "seg_pixels": 29435,
+   "aabb_extent": [
+    0.085,
+    0.124,
+    0.218
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/carton_of_orange_juice__brryuo__y1.png",
+   "drift_m": 0.0007,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.109
+  }
+ },
+ "stable": true,
+ "visible": true
+}

@@ -1,0 +1,102 @@
+{
+ "scene": "house_single_floor",
+ "table": "countertop_kelker_0",
+ "rooms": [
+  "kitchen_0"
+ ],
+ "removed_chairs": [],
+ "aabb": [
+  [
+   3.868,
+   -2.201,
+   0.851
+  ],
+  [
+   4.494,
+   1.211,
+   0.888
+  ]
+ ],
+ "support": {
+  "name": "countertop_kelker_0",
+  "z": 0.8875322341918945,
+  "yaw": 0.06981239467859268,
+  "local_bounds": [
+   3.737177848815918,
+   4.550144672393799,
+   -2.4781057834625244,
+   0.9355144500732422
+  ],
+  "n_free_cells": 3592,
+  "occupants": [
+   "burner_mjvqii_0",
+   "microwave_abzvij_0",
+   "walls_cnqnew_0",
+   "walls_ivezzr_0",
+   "walls_udqkcs_0"
+  ],
+  "resolution": 0.02
+ },
+ "edges": [
+  {
+   "name": "+u",
+   "mid": [
+    4.593,
+    -0.452
+   ],
+   "length": 3.414
+  },
+  {
+   "name": "-u",
+   "mid": [
+    3.782,
+    -0.509
+   ],
+   "length": 3.414
+  },
+  {
+   "name": "+v",
+   "mid": [
+    4.068,
+    1.222
+   ],
+   "length": 0.813
+  },
+  {
+   "name": "-v",
+   "mid": [
+    4.306,
+    -2.183
+   ],
+   "length": 0.813
+  }
+ ],
+ "stance": {
+  "edge": "+u",
+  "edge_mid": [
+   4.5928635597229,
+   -0.4520183205604553
+  ],
+  "inward": [
+   -0.9975640773773193,
+   -0.06975570321083069
+  ],
+  "tangent": [
+   0.06975570321083069,
+   -0.9975640773773193
+  ],
+  "base_pose2d": [
+   5.038263320922852,
+   -0.3705157935619354,
+   -3.0717802540579755
+  ],
+  "edge_depth": 0.4500000774860382,
+  "view": {
+   "translate": 0.75,
+   "tilt": -0.25,
+   "axis_angle": 0.03648287450445565
+  }
+ },
+ "view_arms": "untucked",
+ "precheck_s": 2.0
+}

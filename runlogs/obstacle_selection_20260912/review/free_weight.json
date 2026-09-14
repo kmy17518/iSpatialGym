@@ -1,0 +1,39 @@
+{
+  "category": "free_weight",
+  "task": "obst",
+  "n_models": 2,
+  "n_opened": 2,
+  "models": [
+    {
+      "model": "coqlph",
+      "V": 4,
+      "N": 2,
+      "S": 0,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Small black rubber weight plate with grey hub lying flat, 0.10 x 0.10 x 0.01 m; clean but coaster-sized, too small and flat."
+    },
+    {
+      "model": "frucyx",
+      "V": 3,
+      "N": 2,
+      "S": 2,
+      "rest_ok": false,
+      "score": 12,
+      "valid": false,
+      "note": "Uniform black sphere 0.49 m diameter (medicine/slam ball); no detail, rolls."
+    }
+  ],
+  "picks": [],
+  "alternate": null,
+  "natural_scenes": [
+    "house_single_floor",
+    "house_double_floor_upper",
+    "house_double_floor_lower",
+    "Rs_int",
+    "hotel_suite_large"
+  ],
+  "category_verdict": "drop",
+  "category_note": "Neither model works: one is a 10 cm, 1 cm thick weight plate (too small to matter), the other a 0.49 m black ball that rolls. Free weights would be natural bedroom/living-room clutter, but no usable model."
+}

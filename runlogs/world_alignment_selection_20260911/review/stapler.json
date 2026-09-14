@@ -1,0 +1,26 @@
+{
+ "category": "stapler",
+ "task": "wa0",
+ "n_models": 1,
+ "n_opened": 1,
+ "models": [
+  {
+   "model": "kgnsas",
+   "V": 3,
+   "O": 2,
+   "F": 1,
+   "score": 11,
+   "valid": true,
+   "long_axis": "x",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Tiny dark stapler 0.087x0.018x0.045 m in open pose, hinge at -x, tapered head at +x; plain colour; very narrow sliver from above."
+  }
+ ],
+ "picks": [
+  "kgnsas"
+ ],
+ "alternate": null,
+ "category_verdict": "weak",
+ "category_note": "Only one small (8.7 cm) dark stapler; head/hinge asymmetry gives a yaw but the object is a thin sliver that will be hard to read from the robot view."
+}

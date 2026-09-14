@@ -1,0 +1,35 @@
+{
+ "category": "marker",
+ "model": "bwwkmb",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/marker__bwwkmb__y0.png",
+   "drift_m": 0.0005,
+   "tilt_deg": 5.7,
+   "on_tray": true,
+   "settled_z": 0.0059,
+   "seg_pixels": 1061,
+   "aabb_extent": [
+    0.154,
+    0.018,
+    0.014
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/marker__bwwkmb__y1.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.0062
+  }
+ },
+ "stable": true,
+ "visible": true
+}

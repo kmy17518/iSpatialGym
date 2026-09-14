@@ -1,0 +1,158 @@
+{
+ "bar_soap": [
+  "grids/pool_other/bar_soap__p1.png",
+  "grids/pool_other/bar_soap__p2.png"
+ ],
+ "beaker": [
+  "grids/pool_other/beaker__p1.png",
+  "grids/pool_other/beaker__p2.png"
+ ],
+ "bottle_of_beer": [
+  "grids/pool_other/bottle_of_beer__p1.png",
+  "grids/pool_other/bottle_of_beer__p2.png"
+ ],
+ "bottle_of_medicine": [
+  "grids/pool_other/bottle_of_medicine__p1.png",
+  "grids/pool_other/bottle_of_medicine__p2.png"
+ ],
+ "bottle_of_milk": [
+  "grids/pool_other/bottle_of_milk__p1.png",
+  "grids/pool_other/bottle_of_milk__p2.png"
+ ],
+ "bottle_of_pop": [
+  "grids/pool_other/bottle_of_pop__p1.png",
+  "grids/pool_other/bottle_of_pop__p2.png"
+ ],
+ "bottle_of_shampoo": [
+  "grids/pool_other/bottle_of_shampoo__p1.png",
+  "grids/pool_other/bottle_of_shampoo__p2.png"
+ ],
+ "bottle_of_wine": [
+  "grids/pool_other/bottle_of_wine__p1.png",
+  "grids/pool_other/bottle_of_wine__p2.png"
+ ],
+ "box_of_baking_mix": [
+  "grids/pool_other/box_of_baking_mix__p1.png",
+  "grids/pool_other/box_of_baking_mix__p2.png"
+ ],
+ "box_of_butter": [
+  "grids/pool_other/box_of_butter__p1.png",
+  "grids/pool_other/box_of_butter__p2.png"
+ ],
+ "box_of_cane_sugar": [
+  "grids/pool_other/box_of_cane_sugar__p1.png",
+  "grids/pool_other/box_of_cane_sugar__p2.png"
+ ],
+ "box_of_cereal": [
+  "grids/pool_other/box_of_cereal__p1.png",
+  "grids/pool_other/box_of_cereal__p2.png"
+ ],
+ "box_of_cookies": [
+  "grids/pool_other/box_of_cookies__p1.png",
+  "grids/pool_other/box_of_cookies__p2.png"
+ ],
+ "box_of_granola_bars": [
+  "grids/pool_other/box_of_granola_bars__p1.png",
+  "grids/pool_other/box_of_granola_bars__p2.png"
+ ],
+ "box_of_oatmeal": [
+  "grids/pool_other/box_of_oatmeal__p1.png",
+  "grids/pool_other/box_of_oatmeal__p2.png"
+ ],
+ "box_of_rice": [
+  "grids/pool_other/box_of_rice__p1.png",
+  "grids/pool_other/box_of_rice__p2.png"
+ ],
+ "box_of_sanitary_napkins": [
+  "grids/pool_other/box_of_sanitary_napkins__p1.png",
+  "grids/pool_other/box_of_sanitary_napkins__p2.png"
+ ],
+ "box_of_shampoo": [
+  "grids/pool_other/box_of_shampoo__p1.png",
+  "grids/pool_other/box_of_shampoo__p2.png"
+ ],
+ "box_of_tissues": [
+  "grids/pool_other/box_of_tissues__p1.png",
+  "grids/pool_other/box_of_tissues__p2.png"
+ ],
+ "box_of_yogurt": [
+  "grids/pool_other/box_of_yogurt__p1.png",
+  "grids/pool_other/box_of_yogurt__p2.png"
+ ],
+ "can_of_soda": [
+  "grids/pool_other/can_of_soda__p1.png",
+  "grids/pool_other/can_of_soda__p2.png"
+ ],
+ "carton_of_milk": [
+  "grids/pool_other/carton_of_milk__p1.png",
+  "grids/pool_other/carton_of_milk__p2.png"
+ ],
+ "cellulose_tape": [
+  "grids/pool_other/cellulose_tape__p1.png",
+  "grids/pool_other/cellulose_tape__p2.png"
+ ],
+ "chili": [
+  "grids/pool_other/chili__p1.png",
+  "grids/pool_other/chili__p2.png"
+ ],
+ "conditioner_dispenser": [
+  "grids/pool_other/conditioner_dispenser__p1.png",
+  "grids/pool_other/conditioner_dispenser__p2.png"
+ ],
+ "cookie_cutter": [
+  "grids/pool_other/cookie_cutter__p1.png",
+  "grids/pool_other/cookie_cutter__p2.png"
+ ],
+ "jar_of_bath_salt": [
+  "grids/pool_other/jar_of_bath_salt__p1.png",
+  "grids/pool_other/jar_of_bath_salt__p2.png"
+ ],
+ "mouse": [
+  "grids/pool_other/mouse__p1.png",
+  "grids/pool_other/mouse__p2.png"
+ ],
+ "mug": [
+  "grids/pool_other/mug__p1.png",
+  "grids/pool_other/mug__p2.png"
+ ],
+ "notebook": [
+  "grids/pool_other/notebook__p1.png",
+  "grids/pool_other/notebook__p2.png"
+ ],
+ "pack_of_cigarettes": [
+  "grids/pool_other/pack_of_cigarettes__p1.png",
+  "grids/pool_other/pack_of_cigarettes__p2.png"
+ ],
+ "pencil_case": [
+  "grids/pool_other/pencil_case__p1.png",
+  "grids/pool_other/pencil_case__p2.png"
+ ],
+ "pencil_holder": [
+  "grids/pool_other/pencil_holder__p1.png",
+  "grids/pool_other/pencil_holder__p2.png"
+ ],
+ "soap_dispenser": [
+  "grids/pool_other/soap_dispenser__p1.png",
+  "grids/pool_other/soap_dispenser__p2.png"
+ ],
+ "tablefork": [
+  "grids/pool_other/tablefork__p1.png",
+  "grids/pool_other/tablefork__p2.png"
+ ],
+ "teaspoon": [
+  "grids/pool_other/teaspoon__p1.png",
+  "grids/pool_other/teaspoon__p2.png"
+ ],
+ "tortilla_chips": [
+  "grids/pool_other/tortilla_chips__p1.png",
+  "grids/pool_other/tortilla_chips__p2.png"
+ ],
+ "toy_dice": [
+  "grids/pool_other/toy_dice__p1.png",
+  "grids/pool_other/toy_dice__p2.png"
+ ],
+ "video_game": [
+  "grids/pool_other/video_game__p1.png",
+  "grids/pool_other/video_game__p2.png"
+ ]
+}

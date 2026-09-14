@@ -1,0 +1,136 @@
+{
+ "scene": "restaurant_diner",
+ "table": "bench_xwphjd_3",
+ "category": "bench",
+ "model": "xwphjd",
+ "rooms": [
+  "dining_room_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-2",
+ "inventory": {
+  "top_z": 0.952,
+  "bbox_x": 0.664,
+  "bbox_y": 1.241,
+  "bbox_z": 0.952,
+  "verdict": "keep"
+ },
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-11 21:26:42",
+ "precheck": {
+  "aabb": [
+   [
+    -1.001,
+    -9.775,
+    -0.005
+   ],
+   [
+    -0.328,
+    -8.53,
+    0.956
+   ]
+  ],
+  "support": {
+   "name": "bench_xwphjd_3",
+   "z": 0.3970634341239929,
+   "yaw": 0.0,
+   "local_bounds": [
+    -0.9105526804924011,
+    -0.35055264830589294,
+    -9.765419960021973,
+    -8.54542064666748
+   ],
+   "n_free_cells": 1415,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -0.351,
+     -9.155
+    ],
+    "length": 1.22
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -0.911,
+     -9.155
+    ],
+    "length": 1.22
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -0.631,
+     -8.545
+    ],
+    "length": 0.56
+   },
+   {
+    "name": "-v",
+    "mid": [
+     -0.631,
+     -9.765
+    ],
+    "length": 0.56
+   }
+  ],
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    -0.6305526494979858,
+    -8.54542064666748
+   ],
+   "inward": [
+    0.0,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    0.0
+   ],
+   "base_pose2d": [
+    -0.6605526804924011,
+    -8.095420837402344,
+    -1.5707963267948966
+   ],
+   "edge_depth": 0.4499998092651367,
+   "view": {
+    "translate": 0.0,
+    "tilt": -0.7999999523162842,
+    "axis_angle": 0.24748906293868864
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 4.4
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "view_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/restaurant_diner/restaurant_diner__bench_xwphjd_3__inter_object_relation_satisfaction-2",
+ "setup_s": 59.2,
+ "reject_reason": "no_support",
+ "error": "[no_support] bench_xwphjd_3: [no_stance] stand_off 0.45 edge None: [unreachable] no reachable cell on the support; stand_off 0.35 edge None: [unreachable] no reachable cell on the support; stand_off 0.55 edge None: [unreachable] no reachable cell on the support; stand_off 0.65 edge None: [unreachable] no reachable cell on the support",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 59.2,
+   "run_s": null
+  }
+ ],
+ "job_s": 79.7,
+ "finished": "2026-09-11 21:28:02"
+}

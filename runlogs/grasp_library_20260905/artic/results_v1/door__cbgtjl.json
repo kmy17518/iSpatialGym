@@ -1,0 +1,16 @@
+{
+ "key": "door__cbgtjl",
+ "category": "door",
+ "model": "cbgtjl",
+ "scene": "restaurant_diner",
+ "host": "door_cvvumy_0",
+ "host_rank": 2,
+ "host_model": "cvvumy",
+ "swap": true,
+ "joints": [],
+ "error": "AttributeError(\"'NoneType' object has no attribute 'scene'\")",
+ "previous_hosts": [
+  "door_adejun_0",
+  "door_mkcndz_0"
+ ]
+}

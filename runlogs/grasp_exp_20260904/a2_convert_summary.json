@@ -1,0 +1,168 @@
+{
+ "brussels_sprouts_hkwyzk": {
+  "raw_top100_from_above": 29,
+  "big_top500_from_above": 142,
+  "big_table_ok": 75,
+  "raw_top5_tilt_deg": [
+   52.5,
+   25.6,
+   44.5,
+   144.4,
+   42.8
+  ],
+  "tab_top5_conf": [
+   0.99,
+   0.99,
+   0.989,
+   0.989,
+   0.989
+  ]
+ },
+ "mushroom_zlukhz": {
+  "raw_top100_from_above": 12,
+  "big_top500_from_above": 86,
+  "big_table_ok": 9,
+  "raw_top5_tilt_deg": [
+   112.5,
+   78.3,
+   96.5,
+   99.1,
+   93.4
+  ],
+  "tab_top5_conf": [
+   0.946,
+   0.94,
+   0.94,
+   0.94,
+   0.939
+  ]
+ },
+ "tube_of_toothpaste_vsclsj": {
+  "raw_top100_from_above": 20,
+  "big_top500_from_above": 99,
+  "big_table_ok": 9,
+  "raw_top5_tilt_deg": [
+   80.0,
+   104.3,
+   99.3,
+   92.4,
+   18.1
+  ],
+  "tab_top5_conf": [
+   0.979,
+   0.978,
+   0.977,
+   0.976,
+   0.976
+  ]
+ },
+ "vidalia_onion_buyxll": {
+  "raw_top100_from_above": 14,
+  "big_top500_from_above": 71,
+  "big_table_ok": 58,
+  "raw_top5_tilt_deg": [
+   79.2,
+   70.1,
+   89.9,
+   96.3,
+   77.4
+  ],
+  "tab_top5_conf": [
+   0.888,
+   0.888,
+   0.887,
+   0.874,
+   0.867
+  ]
+ },
+ "broccolini_rlsytp": {
+  "raw_top100_from_above": 28,
+  "big_top500_from_above": 112,
+  "big_table_ok": 20,
+  "raw_top5_tilt_deg": [
+   83.4,
+   68.8,
+   78.6,
+   135.3,
+   62.6
+  ],
+  "tab_top5_conf": [
+   0.973,
+   0.966,
+   0.966,
+   0.965,
+   0.965
+  ]
+ },
+ "half_apple_pie_grcock": {
+  "raw_top100_from_above": 0,
+  "big_top500_from_above": 1,
+  "big_table_ok": 0,
+  "raw_top5_tilt_deg": [
+   88.7,
+   87.8,
+   83.8,
+   89.0,
+   86.7
+  ],
+  "tab_top5_conf": []
+ },
+ "steel_wool_egeolq": {
+  "raw_top100_from_above": 2,
+  "big_top500_from_above": 22,
+  "big_table_ok": 0,
+  "raw_top5_tilt_deg": [
+   90.0,
+   89.5,
+   90.6,
+   89.3,
+   91.5
+  ],
+  "tab_top5_conf": []
+ },
+ "toy_figure_orunry": {
+  "raw_top100_from_above": 1,
+  "big_top500_from_above": 8,
+  "big_table_ok": 0,
+  "raw_top5_tilt_deg": [
+   96.3,
+   90.1,
+   84.4,
+   96.5,
+   83.1
+  ],
+  "tab_top5_conf": []
+ },
+ "tablefork_flexrc": {
+  "raw_top100_from_above": 2,
+  "big_top500_from_above": 13,
+  "big_table_ok": 0,
+  "raw_top5_tilt_deg": [
+   90.4,
+   89.9,
+   89.0,
+   88.5,
+   91.0
+  ],
+  "tab_top5_conf": []
+ },
+ "zucchini_udvfaz": {
+  "raw_top100_from_above": 44,
+  "big_top500_from_above": 184,
+  "big_table_ok": 70,
+  "raw_top5_tilt_deg": [
+   95.8,
+   174.2,
+   87.7,
+   27.5,
+   176.5
+  ],
+  "tab_top5_conf": [
+   0.975,
+   0.963,
+   0.958,
+   0.958,
+   0.957
+  ]
+ }
+}

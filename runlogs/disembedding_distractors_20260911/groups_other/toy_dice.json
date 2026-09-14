@@ -1,0 +1,9 @@
+{
+  "category": "toy_dice",
+  "pages_opened": ["grids/pool_other/toy_dice__p1.png", "grids/pool_other/toy_dice__p2.png"],
+  "n_models": 21,
+  "exclude": [
+    {"model": "battery/dcjyzg", "reason": "stray tan strip attached across the battery's middle; extra floating part, not a clean model"}
+  ],
+  "notes": "Others are intact small boxy or pocket-sized objects (toy boxes, match box, bath-salt jars, soap, tape roll, cookie cutter, game case, tissue and butter boxes, yogurt cups, cans, keys, padlock, webcam, charger) resting naturally. toy_figure/acymin is dark and spiky but reads as a monster toy figure. jar_of_bath_salt/erglwp is already marked excluded by grasp status; visually fine."
+}

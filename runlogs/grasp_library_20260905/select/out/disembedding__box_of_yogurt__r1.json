@@ -1,0 +1,53 @@
+{
+  "group": "disembedding__box_of_yogurt__r1",
+  "task": "disembedding",
+  "category": "box_of_yogurt",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 2,
+  "n_opened": 2,
+  "candidates": [
+    {
+      "model": "znhjgm",
+      "key": "box_of_yogurt__znhjgm",
+      "G": 5,
+      "T": 3,
+      "V": 3,
+      "R": 2,
+      "score": 21,
+      "note": "Five near-identical mid-height side pinches (50/15), cup off-centre but both pads touch, bottom free; white/beige cup with blurry low-res label and visible faceting."
+    },
+    {
+      "model": "jkemqc",
+      "key": "box_of_yogurt__jkemqc",
+      "G": 5,
+      "T": 3,
+      "V": 4,
+      "R": 2,
+      "score": 23,
+      "note": "Same five clean mid-height side pinches, bottom free, cup stable; blue/white branded yogurt cup, label soft but recognisable, slight faceting."
+    }
+  ],
+  "selected": [
+    {
+      "model": "jkemqc",
+      "key": "box_of_yogurt__jkemqc",
+      "rank": 1,
+      "reason": "Top row clean mid-body pinch with four clean backups, cup bottom free for placing; most recognisable yogurt-cup label in the group."
+    },
+    {
+      "model": "znhjgm",
+      "key": "box_of_yogurt__znhjgm",
+      "rank": 2,
+      "reason": "Equally clean side pinches and stable flat-bottomed cup; white variant gives colour variety, though its label texture is blurry."
+    }
+  ],
+  "alternate": null,
+  "short": true,
+  "warnings": [
+    "Group has only 2 candidates; both selected.",
+    "Both models appear to share the same cup mesh (bbox 64-65 x 64 x 54 mm); they differ only in label texture.",
+    "All grasps use a one-finger closure (50/15) with the cup pressed against the open pad; label textures are low resolution on both."
+  ],
+  "confidence": "medium"
+}

@@ -1,0 +1,139 @@
+{
+ "scene": "house_single_floor",
+ "table": "coffee_table_qtwqqb_0",
+ "category": "coffee_table",
+ "model": "qtwqqb",
+ "rooms": [
+  "living_room_1"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-1",
+ "inventory": {
+  "top_z": 0.478,
+  "bbox_x": 0.874,
+  "bbox_y": 1.739,
+  "bbox_z": 0.469,
+  "verdict": "low"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 15,
+ "started": "2026-09-12 04:11:47",
+ "precheck": {
+  "aabb": [
+   [
+    0.868,
+    3.364,
+    0.0
+   ],
+   [
+    1.765,
+    5.123,
+    0.488
+   ]
+  ],
+  "support": {
+   "name": "coffee_table_qtwqqb_0",
+   "z": 0.48769259452819824,
+   "yaw": -3.139047861099243,
+   "local_bounds": [
+    -1.748988151550293,
+    -0.9086855053901672,
+    -5.089759349822998,
+    -3.391138792037964
+   ],
+   "n_free_cells": 3547,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     0.898,
+     4.243
+    ],
+    "length": 1.699
+   },
+   {
+    "name": "-u",
+    "mid": [
+     1.738,
+     4.245
+    ],
+    "length": 1.699
+   },
+   {
+    "name": "+v",
+    "mid": [
+     1.32,
+     3.395
+    ],
+    "length": 0.84
+   },
+   {
+    "name": "-v",
+    "mid": [
+     1.316,
+     5.093
+    ],
+    "length": 0.84
+   }
+  ],
+  "stance": {
+   "edge": "-v",
+   "edge_mid": [
+    1.3158801794052124,
+    5.093124866485596
+   ],
+   "inward": [
+    0.002544789807870984,
+    -0.9999967813491821
+   ],
+   "tangent": [
+    0.9999967813491821,
+    0.002544789807870984
+   ],
+   "base_pose2d": [
+    1.258018136024475,
+    5.542978763580322,
+    -1.568251534289556
+   ],
+   "edge_depth": 0.44999969005584717,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.8999999761581421,
+    "axis_angle": 0.10005837468672148
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 1.0
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "view_arms": "untucked",
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/house_single_floor/house_single_floor__coffee_table_qtwqqb_0__configuration_matching-1",
+ "setup_s": 30.9,
+ "reject_reason": "no_support",
+ "error": "[no_support] coffee_table_qtwqqb_0: [unreachable] handle not reachable from any of 3 cells (e.g. handle at [1.2160460948944092, 4.780270099639893, 0.8430641293525696], base (1.2577643394470215, 5.642963409423828, -1.5682512958717538), translates [0.0, 0.25, 0.5])",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 30.9,
+   "run_s": null
+  }
+ ],
+ "job_s": 31.9,
+ "finished": "2026-09-12 04:12:19"
+}

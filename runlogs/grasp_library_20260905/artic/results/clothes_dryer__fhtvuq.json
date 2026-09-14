@@ -1,0 +1,50 @@
+{
+ "key": "clothes_dryer__fhtvuq",
+ "category": "clothes_dryer",
+ "model": "fhtvuq",
+ "scene": "house_single_floor",
+ "host": "clothes_dryer_xsuyua_0",
+ "host_rank": 0,
+ "host_model": "xsuyua",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "kind": "door",
+   "grasp_source": "manual",
+   "stance": null,
+   "reachable": false,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "sign +1: no stance ([planning] stance_for: no feasible stance found {'target': [22.305551528930664, 1.0778356790542603, 0.45023879408836365]})",
+    "sign -1: no stance ([planning] stance_for: no feasible stance found {'target': [22.305551528930664, 1.0778356790542603, 0.45023879408836365]})"
+   ],
+   "error": "unreachable: no collision-free stance with IK to the handle",
+   "contact_world": [
+    22.306,
+    1.078,
+    0.45
+   ],
+   "handle_height_above_floor": 0.445,
+   "diag_stance": {
+    "probed": 15,
+    "collision_free": 4,
+    "grasp_ik_from_free_stance": 0,
+    "grasp_ik_without_obstacles": 0
+   }
+  }
+ ],
+ "error": null,
+ "previous_hosts": [],
+ "scale": [
+  1.007,
+  0.999,
+  1.752
+ ],
+ "time_s": 141.9
+}

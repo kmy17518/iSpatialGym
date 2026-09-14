@@ -1,0 +1,67 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "bottom_cabinet_immwzb_1",
+ "category": "bottom_cabinet",
+ "model": "immwzb",
+ "rooms": [
+  "shared_office_0"
+ ],
+ "partner": null,
+ "problem": "inter_object_relation_satisfaction-0",
+ "inventory": {
+  "top_z": 0.712,
+  "bbox_x": 0.603,
+  "bbox_y": 0.395,
+  "bbox_z": 0.71,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "swivel_chair_ryznxk_1",
+  "swivel_chair_ryznxk_7"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 00:45:11",
+ "precheck": {
+  "aabb": [
+   [
+    8.988,
+    -0.699,
+    0.003
+   ],
+   [
+    9.381,
+    -0.096,
+    0.711
+   ]
+  ],
+  "error": "RuntimeError(\"min(): Expected reduction dim to be specified for input.numel() == 0. Specify the reduction dim with the 'dim' argument.\")",
+  "precheck_s": 11.5
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/office_cubicles_right/office_cubicles_right__bottom_cabinet_immwzb_1__inter_object_relation_satisfaction-0",
+ "setup_s": 5.6,
+ "reject_reason": "no_support",
+ "error": "[no_support] bottom_cabinet_immwzb_1: [support] bottom_cabinet_immwzb_1 has too little free top surface",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 5.6,
+   "run_s": null
+  }
+ ],
+ "job_s": 10.7,
+ "finished": "2026-09-12 00:46:36"
+}

@@ -1,0 +1,28 @@
+{
+ "key": "violin_case__jlasop",
+ "category": "violin_case",
+ "model": "jlasop",
+ "aabb_extent": [
+  0.306876003742218,
+  0.6566003561019897,
+  0.13521242141723633
+ ],
+ "support": "table",
+ "joints": [
+  {
+   "joint": "j_lid",
+   "kind": "flap",
+   "grasp_source": "review: No lid handle; lid rim sits flush on base rim, no lip to pinch; three front latches must open first. F marks lid's front edge",
+   "stance": null,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": null,
+   "opened": false,
+   "open_state": null,
+   "steps": [],
+   "error": "no graspable handle"
+  }
+ ],
+ "error": null,
+ "time_s": 2.0
+}

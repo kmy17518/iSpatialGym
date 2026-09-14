@@ -1,0 +1,16 @@
+{
+ "key": "door__dlncrt",
+ "category": "door",
+ "model": "dlncrt",
+ "scene": "house_double_floor_upper",
+ "host": "door_pxhbim_0",
+ "host_rank": 2,
+ "host_model": "pxhbim",
+ "swap": true,
+ "joints": [],
+ "error": "RuntimeError('swap skipped: host/test aspect mismatch, scale factors [11.64, 0.16, 1.08]')",
+ "previous_hosts": [
+  "door_pevmgl_0",
+  "door_dlncrt_0"
+ ]
+}

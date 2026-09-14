@@ -1,0 +1,22 @@
+{
+ "scene": "house_single_floor",
+ "table": "bottom_cabinet_no_top_gjeoer_0",
+ "rooms": [
+  "kitchen_0"
+ ],
+ "removed_chairs": [],
+ "aabb": [
+  [
+   3.868,
+   -1.613,
+   0.12
+  ],
+  [
+   4.485,
+   1.201,
+   0.851
+  ]
+ ],
+ "error": "RuntimeError(\"min(): Expected reduction dim to be specified for input.numel() == 0. Specify the reduction dim with the 'dim' argument.\")",
+ "precheck_s": 1.7
+}

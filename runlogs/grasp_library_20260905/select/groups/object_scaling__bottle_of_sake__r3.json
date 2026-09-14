@@ -1,0 +1,216 @@
+{
+ "group": "object_scaling__bottle_of_sake__r3",
+ "task": "object_scaling",
+ "category": "bottle_of_sake",
+ "round": 3,
+ "relation": null,
+ "partner": "",
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. Rotationally symmetric bodies are preferred for this task.",
+ "candidates": [
+  {
+   "model": "swlykk",
+   "key": "bottle_of_sake__swlykk__f",
+   "strip": "/tmp/glib/strips/bottle_of_sake__swlykk__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body diameter pinch near CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch toward shoulder, full diameter"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "upper-body/shoulder pinch, body between pads"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "shoulder pinch 50 of 59 mm, body wedged"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch near base, full diameter"
+    }
+   ],
+   "object_note": "",
+   "bbox_mm": [
+    57,
+    58,
+    245
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "utwglw",
+   "key": "bottle_of_sake__utwglw__f",
+   "strip": "/tmp/glib/strips/bottle_of_sake__utwglw__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/shoulder pinch, pads contact at pinch line, body below"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/shoulder pinch, body 98 mm below"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/shoulder pinch, body 89 mm below"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/shoulder pinch, body 96 mm below"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck/shoulder pinch, body 93 mm below"
+    }
+   ],
+   "object_note": "all grasps hold the bottle by the neck/shoulder (handle-like); wider body below cannot pass pads",
+   "bbox_mm": [
+    73,
+    74,
+    304
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "vfxfuj",
+   "key": "bottle_of_sake__vfxfuj__f",
+   "strip": "/tmp/glib/strips/bottle_of_sake__vfxfuj__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "38 mm neck cylinder pinch, body 119 mm below"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck cylinder pinch, body 122 mm below"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck cylinder pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck cylinder pinch"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "neck cylinder pinch"
+    }
+   ],
+   "object_note": "wine-style bottle held by neck (handle-like); pads snug on neck",
+   "bbox_mm": [
+    85,
+    82,
+    287
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "pwtebq",
+   "key": "bottle_of_sake__pwtebq__f",
+   "strip": "/tmp/glib/strips/bottle_of_sake__pwtebq__f.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tapered neck pinch, pads contact, body 120 mm below"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tapered neck pinch, body 131 mm below"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tapered neck pinch"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tapered neck pinch, 42 mm chord, pads catch wider part"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "tapered neck pinch"
+    }
+   ],
+   "object_note": "conical bottle held near narrow neck; body wider than pads below, so wedged rather than friction-only",
+   "bbox_mm": [
+    99,
+    99,
+    328
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

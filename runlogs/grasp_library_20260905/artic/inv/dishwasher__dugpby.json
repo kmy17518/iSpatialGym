@@ -1,0 +1,100 @@
+{
+ "category": "dishwasher",
+ "model": "dugpby",
+ "key": "dishwasher__dugpby",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.30359703302383423
+ ],
+ "aabb_extent": [
+  0.5756174325942993,
+  0.5330312252044678,
+  0.652862548828125
+ ],
+ "aabb_min_rel_root": [
+  -0.2667526304721832,
+  -0.2769103944301605,
+  -0.30359703302383423
+ ],
+ "aabb_max_rel_root": [
+  0.3088647723197937,
+  0.25612080097198486,
+  0.34926551580429077
+ ],
+ "link_tags": {
+  "base_link": [],
+  "link_0": [
+   "openable"
+  ]
+ },
+ "openable_joint_ids": [
+  [
+   1,
+   "j_link_0"
+  ]
+ ],
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "type": "RevoluteJoint",
+   "child_link": "link_0",
+   "lower": 0.0,
+   "upper": 1.570796012878418,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.26304,
+    -0.01039,
+    -0.26105
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    1.0,
+    -0.0
+   ],
+   "hinge_point_obj": [
+    0.26304,
+    0.08448,
+    -0.26105
+   ],
+   "measured_angle": 0.2503,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/dishwasher__dugpby__link_0.obj",
+   "n_pieces": 2,
+   "link_bbox_min": [
+    0.217,
+    -0.2769,
+    -0.2661
+   ],
+   "link_bbox_max": [
+    0.3089,
+    0.2561,
+    0.337
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.2668,
+   -0.2759,
+   -0.3036
+  ],
+  "bbox_max": [
+   0.2372,
+   0.2556,
+   0.3493
+  ],
+  "n_pieces": 8
+ }
+}

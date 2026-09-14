@@ -1,0 +1,100 @@
+{
+ "category": "violin_case",
+ "model": "jlasop",
+ "key": "violin_case__jlasop",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.034899305552244186
+ ],
+ "aabb_extent": [
+  0.306876003742218,
+  0.6566003561019897,
+  0.13521242141723633
+ ],
+ "aabb_min_rel_root": [
+  -0.13697363436222076,
+  -0.34978431463241577,
+  -0.034899305552244186
+ ],
+ "aabb_max_rel_root": [
+  0.16990238428115845,
+  0.3068160116672516,
+  0.10031311213970184
+ ],
+ "link_tags": {
+  "base_link": [],
+  "lid": [
+   "openable"
+  ]
+ },
+ "openable_joint_ids": [
+  [
+   0,
+   "j_lid"
+  ]
+ ],
+ "joints": [
+  {
+   "joint": "j_lid",
+   "type": "RevoluteJoint",
+   "child_link": "lid",
+   "lower": 0.0,
+   "upper": 2.134766101837158,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    -0.10826,
+    -0.00561,
+    0.03397
+   ],
+   "link_quat_obj": [
+    -0.0,
+    0.0,
+    -0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.12049999833106995,
+    -0.9927099943161011,
+    0.00026000000070780516
+   ],
+   "hinge_point_obj": [
+    -0.10826,
+    -0.00561,
+    0.03397
+   ],
+   "measured_angle": 0.244,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/violin_case__jlasop__lid.obj",
+   "n_pieces": 8,
+   "link_bbox_min": [
+    -0.1309,
+    -0.3498,
+    0.0314
+   ],
+   "link_bbox_max": [
+    0.1253,
+    0.3068,
+    0.1003
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.137,
+   -0.3486,
+   -0.0349
+  ],
+  "bbox_max": [
+   0.1699,
+   0.3055,
+   0.0447
+  ],
+  "n_pieces": 25
+ }
+}

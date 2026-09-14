@@ -1,0 +1,24 @@
+{
+  "group": "disembedding__bottle_of_shampoo__r3", "task": "disembedding", "category": "bottle_of_shampoo", "round": 3, "relation": null,
+  "n_candidates": 4, "n_opened": 4,
+  "candidates": [
+    {"model": "dvrzmy", "key": "bottle_of_shampoo__dvrzmy__t", "G": 5, "T": 3, "V": 4, "R": 1, "score": 22,
+     "note": "Cyan squeeze tube, yellow band; five clean flat-end pinches 25-30 mm, one finger at 0, row 4 tilts 31 deg; crisp print, tube less bottle-like."},
+    {"model": "hlkpwd", "key": "bottle_of_shampoo__hlkpwd__t", "G": 5, "T": 3, "V": 4, "R": 1, "score": 22,
+     "note": "Pale yellow-green CURLS tube, twin geometry of dvrzmy; five clean flat-end pinches 26-31 mm, one finger at 0, tilt 6-14; low-contrast faint label."},
+    {"model": "stjjjm", "key": "bottle_of_shampoo__stjjjm__t", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "White cylindrical bottle, silver cap, small blue label; five identical 59 mm body pinches below shoulder, 50/10, tilt 0, antipodal 1.0; plain texture."},
+    {"model": "lvvkhx", "key": "bottle_of_shampoo__lvvkhx__t", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Near-duplicate of stjjjm with yellow label accents; five 59 mm shoulder pinches 50/10-11, tilt 0, CoM 0-1 mm; plain white, faint label."}
+  ],
+  "selected": [
+    {"model": "stjjjm", "key": "bottle_of_shampoo__stjjjm__t", "rank": 1,
+     "reason": "Top score 23: every row a stable 59 mm two-pad body pinch just below the shoulder, tilt 0, bottom free, stands flat; clean representative bottle."},
+    {"model": "dvrzmy", "key": "bottle_of_shampoo__dvrzmy__t", "rank": 2,
+     "reason": "Score 22, within 2 of lvvkhx (a duplicate of #1); chosen for appearance spread: bright cyan squeeze tube, sharp print, clean flat-end pinches, cap bottom free."}
+  ],
+  "alternate": {"model": "lvvkhx", "key": "bottle_of_shampoo__lvvkhx__t"},
+  "short": false,
+  "warnings": ["stjjjm/lvvkhx and dvrzmy/hlkpwd are near-duplicate meshes differing only in label", "tube grasps close one finger to 0 (R 1); white bottles have a very plain low-contrast label"],
+  "confidence": "high"
+}

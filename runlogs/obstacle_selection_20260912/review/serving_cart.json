@@ -1,0 +1,53 @@
+{
+  "category": "serving_cart",
+  "task": "obst",
+  "n_models": 4,
+  "n_opened": 4,
+  "models": [
+    {
+      "model": "serving_cart/heqtlk",
+      "V": 5,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 18,
+      "valid": true,
+      "note": "Black three-tier rolling utility cart with grey mesh baskets and handle, on casters; 0.39 x 0.44 x 0.85 m; clean, sharp."
+    },
+    {
+      "model": "serving_cart/lwgmcc",
+      "V": 3,
+      "N": 3,
+      "S": 0,
+      "rest_ok": true,
+      "score": 12,
+      "valid": false,
+      "note": "Flat black three-shelf AV-style cart on casters; 0.57 x 0.99 x 0.86 m; plain uniform black, footprint too large."
+    },
+    {
+      "model": "serving_cart/vvtcby",
+      "V": 3,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Light-grey boxy cabinet cart with two drawer seams on four casters; 0.38 x 0.52 x 0.64 m; plain, near-untextured grey but complete."
+    },
+    {
+      "model": "serving_cart/yaabya",
+      "V": 4,
+      "N": 3,
+      "S": 0,
+      "rest_ok": true,
+      "score": 14,
+      "valid": false,
+      "note": "Dark ornate wooden tea trolley with large wheels and curved handles; 0.66 x 1.15 x 1.18 m; very dark, too large."
+    }
+  ],
+  "picks": ["serving_cart/heqtlk", "serving_cart/vvtcby"],
+  "alternate": null,
+  "natural_scenes": ["restaurant_diner", "hotel_suite_large", "office_cubicles_right", "house_double_floor_upper", "house_single_floor"],
+  "category_verdict": "good",
+  "category_note": "Four carts on casters; the mesh utility cart (0.44 x 0.85 m) and grey cabinet cart (0.52 x 0.64 m) fit, the AV cart and wooden trolley exceed 0.8 m. Parked carts are natural in diner, hotel, office, homes."
+}

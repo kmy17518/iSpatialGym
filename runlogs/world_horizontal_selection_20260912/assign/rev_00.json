@@ -1,0 +1,21 @@
+{
+ "reviewer": "rev_00",
+ "task": "wa2",
+ "categories": [
+  "shelf",
+  "bookcase_shelf",
+  "board",
+  "frame"
+ ],
+ "grids": [
+  "renders/grids/board_00.png",
+  "renders/grids/bookcase_shelf_00.png",
+  "renders/grids/frame_00.png",
+  "renders/grids/shelf_00.png",
+  "renders/grids/shelf_01.png",
+  "renders/grids/shelf_02.png",
+  "renders/grids/shelf_03.png",
+  "renders/grids/shelf_04.png"
+ ],
+ "n_models": 18
+}

@@ -1,0 +1,40 @@
+{
+  "category": "highchair",
+  "task": "obst",
+  "n_models": 2,
+  "n_opened": 2,
+  "models": [
+    {
+      "model": "eteuuf",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Dark brown bar-height chair with upholstered seat and back, four legs with stretchers, 0.35 x 0.31 x 0.78 m; clean, stable."
+    },
+    {
+      "model": "pahqnp",
+      "V": 4,
+      "N": 3,
+      "S": 2,
+      "rest_ok": true,
+      "score": 16,
+      "valid": true,
+      "note": "Dark wooden bar stool with slatted back, four legs with stretchers, 0.31 x 0.29 x 0.78 m; clean, well textured, stable."
+    }
+  ],
+  "picks": [
+    "eteuuf",
+    "pahqnp"
+  ],
+  "alternate": null,
+  "natural_scenes": [
+    "restaurant_diner",
+    "house_single_floor",
+    "house_double_floor_lower"
+  ],
+  "category_verdict": "good",
+  "category_note": "Both models are bar-height chairs (counter stools with backs), not baby high chairs; ~0.3 m footprint, 0.78 m tall, stable on four legs. Natural as a pulled-out stool in a diner or a kitchen with a counter."
+}

@@ -1,0 +1,40 @@
+{
+  "category": "baseball_bat",
+  "task": "wa2",
+  "n_models": 2,
+  "n_opened": 2,
+  "models": [
+    {
+      "model": "spcxrt",
+      "V": 4,
+      "L": 3,
+      "H": 2,
+      "score": 16,
+      "valid": true,
+      "front_axis": "-y",
+      "level_axis": "x",
+      "up_axis": "+z",
+      "symmetric_180": false,
+      "thin_axis": "y",
+      "note": "Light tan wooden bat 0.76 m, knob at +x, barrel -x; clean smooth mesh, plain low-contrast texture, no logo; front arbitrary."
+    },
+    {
+      "model": "yalgei",
+      "V": 4,
+      "L": 3,
+      "H": 2,
+      "score": 16,
+      "valid": true,
+      "front_axis": "-y",
+      "level_axis": "x",
+      "up_axis": "+z",
+      "symmetric_180": false,
+      "thin_axis": "y",
+      "note": "Two-tone bat 0.81 m, dark brown barrel, black grip and knob at +x; clean, recognisable; round so front face arbitrary."
+    }
+  ],
+  "picks": ["yalgei", "spcxrt"],
+  "alternate": null,
+  "category_verdict": "good",
+  "category_note": "Two clean wooden bats 0.76-0.81 m, round 5-7 cm, lying along x; a bar that reads level instantly, either end left is fine; no logo, so displayed face is arbitrary."
+}

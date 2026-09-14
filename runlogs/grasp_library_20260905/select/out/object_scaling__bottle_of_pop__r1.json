@@ -1,0 +1,48 @@
+{
+  "group": "object_scaling__bottle_of_pop__r1",
+  "task": "object_scaling",
+  "category": "bottle_of_pop",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 12,
+  "n_opened": 12,
+  "candidates": [
+    {"model": "pfjzkn", "key": "bottle_of_pop__pfjzkn", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Silver TRIAL cola label, blue cap; sharp texture, faceted body. Five identical horizontal mid-body 50/0 pushes through CoM; row 1 V1 render empty."},
+    {"model": "hjrwqb", "key": "bottle_of_pop__hjrwqb", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Vivid pink CREAMY SODA label, black cap, sharp text. Five identical horizontal mid-body 50/0 pinches; row 2 coverage 0.75; row 1 V1 empty."},
+    {"model": "oeipjl", "key": "bottle_of_pop__oeipjl", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Black NO SUGAR cola label with red text, blue cap. Five identical horizontal mid-body 50/0 pinches through CoM; row 1 V1 render empty."},
+    {"model": "msmlud", "key": "bottle_of_pop__msmlud", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Silver DIET cola label, red cap, sharp text. Five identical horizontal mid-body 50/0 pinches through CoM; row 1 V1 render empty."},
+    {"model": "ubazru", "key": "bottle_of_pop__ubazru", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Red-black Cherry cola label, red cap, sharp texture. Five identical horizontal mid-body 50/0 pinches through CoM; row 1 V1 render empty."},
+    {"model": "rhclfg", "key": "bottle_of_pop__rhclfg", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Bright orange soda label with fruit art, orange cap. Five identical horizontal mid-body 50/0 pinches through CoM; row 1 V1 render empty."},
+    {"model": "pyrics", "key": "bottle_of_pop__pyrics", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Blue cola label, yellow cap, sharp text. Five identical horizontal mid-body 50/0 pinches through CoM; row 1 V1 render empty."},
+    {"model": "pvabxf", "key": "bottle_of_pop__pvabxf", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Green lemon-lime label, green cap, sharp text, all views rendered. Five identical horizontal mid-body 50/0 pinches; row 3 coverage 0.75."},
+    {"model": "jnoksl", "key": "bottle_of_pop__jnoksl", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Green-black CRYSTAL lime label, white cap, sharp text, all views rendered. Five identical horizontal mid-body 50/0 pinches, antipodal 0.99-1.00."},
+    {"model": "twtsry", "key": "bottle_of_pop__twtsry", "G": 3, "T": 3, "V": 1, "R": 2, "score": 13,
+     "note": "Flat untextured pale-blue body with plain yellow base and cap, no label; placeholder-looking asset. Five horizontal body pushes 50/7-9; width metric wrong."},
+    {"model": "iynssk", "key": "bottle_of_pop__iynssk", "G": 3, "T": 3, "V": 3, "R": 2, "score": 17,
+     "note": "Blue-white Eau Minerale water-bottle label, ribbed low-poly PET body; reads as water not pop. Five horizontal mid-body 50/7-13 pushes."},
+    {"model": "oghrnk", "key": "bottle_of_pop__oghrnk", "G": 3, "T": 3, "V": 4, "R": 2, "score": 19,
+     "note": "Orange CITRUS label, wider 57 mm body, all views rendered; visibly faceted silhouette. Five identical horizontal mid-body 50/8-10 pushes; antipodal 0.89-0.98."}
+  ],
+  "selected": [
+    {"model": "jnoksl", "key": "bottle_of_pop__jnoksl", "rank": 1,
+     "reason": "Ten candidates tie at 19; jnoksl chosen for complete strip evidence (all V1 rendered), antipodal 0.99-1.00 and coverage 1.0 in every row, sharp green lime label."},
+    {"model": "ubazru", "key": "bottle_of_pop__ubazru", "rank": 2,
+     "reason": "Tied score; red Cherry cola look is the most iconic pop bottle and contrasts with green #1; all rows coverage 1.0, sharp label, same clean mid-body grasp."}
+  ],
+  "alternate": {"model": "oghrnk", "key": "bottle_of_pop__oghrnk"},
+  "short": false,
+  "warnings": [
+    "Every candidate offers only one grasp pose (horizontal mid-body pinch, tilt ~90, CoM offset <= 10 mm); in-hand transform diversity is limited to axial roll, so G is capped at 3 for all models.",
+    "twtsry is not selectable: flat untextured pale-blue/yellow material with no label (V=1)."
+  ],
+  "confidence": "medium"
+}

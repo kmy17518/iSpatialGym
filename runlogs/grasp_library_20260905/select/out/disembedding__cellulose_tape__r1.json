@@ -1,0 +1,25 @@
+{
+  "group": "disembedding__cellulose_tape__r1",
+  "task": "disembedding",
+  "category": "cellulose_tape",
+  "round": 1,
+  "relation": null,
+  "n_candidates": 3,
+  "n_opened": 3,
+  "candidates": [
+    {"model": "sklkyc", "key": "cellulose_tape__sklkyc", "G": 5, "T": 3, "V": 3, "R": 1, "score": 20,
+     "note": "Plain white roll with tan core, only 9 mm thick; five clean diametral rim pinches (50/0, ~50 mm) at 30 deg. Little pad overlap."},
+    {"model": "gchdhk", "key": "cellulose_tape__gchdhk", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "Grey duct-tape-like roll, 17 mm thick, printed label inside core; five clean rim pinches across 50 mm (50/0), four at 30 deg, one vertical."},
+    {"model": "kavsnx", "key": "cellulose_tape__kavsnx", "G": 5, "T": 3, "V": 4, "R": 2, "score": 23,
+     "note": "White 62 mm roll with green core, 22 mm thick; rows 1-4 clean rim pinches (50/12), row 5 off-centre chord pinch (CoM 21 mm) holds."}
+  ],
+  "selected": [
+    {"model": "kavsnx", "key": "cellulose_tape__kavsnx", "rank": 1, "reason": "Tied top score; thickest roll (22 mm) with centred top-row rim pinch (antipodal 1.00), clean white Scotch-style look, lies flat and stable."},
+    {"model": "gchdhk", "key": "cellulose_tape__gchdhk", "rank": 2, "reason": "Tied score and visually different (grey roll with printed core); all five rows clean rim pinches across 50 mm, 17 mm thickness robust."}
+  ],
+  "alternate": {"model": "sklkyc", "key": "cellulose_tape__sklkyc"},
+  "short": false,
+  "warnings": [],
+  "confidence": "medium"
+}

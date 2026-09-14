@@ -1,0 +1,118 @@
+{
+ "scene": "house_double_floor_upper",
+ "table": "bottom_cabinet_no_top_ncgmqr_0",
+ "category": "bottom_cabinet_no_top",
+ "model": "ncgmqr",
+ "rooms": [
+  "bedroom_2"
+ ],
+ "partner": "bed_tjfzsb_0",
+ "problem": "inter_object_relation_satisfaction-1",
+ "inventory": {
+  "top_z": 0.697,
+  "bbox_x": 0.624,
+  "bbox_y": 0.417,
+  "bbox_z": 0.696,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "swivel_chair_iiihwn_0"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:50:28",
+ "precheck": {
+  "aabb": [
+   [
+    3.655,
+    -4.698,
+    0.002
+   ],
+   [
+    4.081,
+    -4.074,
+    0.697
+   ]
+  ],
+  "support": {
+   "name": "bottom_cabinet_no_top_ncgmqr_0",
+   "z": 0.6718136668205261,
+   "yaw": 1.570796012878418,
+   "local_bounds": [
+    -4.087886810302734,
+    -4.087886810302734,
+    -3.8853156566619873,
+    -3.8653156757354736
+   ],
+   "n_free_cells": 2,
+   "occupants": [
+    "desk_uqcmzf_0"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     3.875,
+     -4.088
+    ],
+    "length": 0.02
+   },
+   {
+    "name": "-u",
+    "mid": [
+     3.875,
+     -4.088
+    ],
+    "length": 0.02
+   },
+   {
+    "name": "+v",
+    "mid": [
+     3.865,
+     -4.088
+    ],
+    "length": 0.0
+   },
+   {
+    "name": "-v",
+    "mid": [
+     3.885,
+     -4.088
+    ],
+    "length": 0.0
+   }
+  ],
+  "stance": null,
+  "stance_error": "too little free top surface",
+  "precheck_s": 0.8
+ },
+ "status": "setup_failed",
+ "n_written": 0,
+ "rejections": {},
+ "template_meta": {
+  "view_arms": "untucked",
+  "init_arms": "untucked",
+  "timings": {}
+ },
+ "instances": [],
+ "work_dir": "/tmp/isg_table_sel/house_double_floor_upper/house_double_floor_upper__bottom_cabinet_no_top_ncgmqr_0__under_bed_tjfzsb_0__inter_object_relation_satisfaction-1",
+ "setup_s": 4.8,
+ "reject_reason": "no_support",
+ "error": "[no_support] bottom_cabinet_no_top_ncgmqr_0: [support] bottom_cabinet_no_top_ncgmqr_0 has too little free top surface; bed_tjfzsb_0: [no_stance] stand_off 0.45 edge None: [unreachable] no reachable cell on the support; stand_off 0.45 edge +u: [unreachable] no reachable cell on the support; stand_off 0.45 edge -u: [stance_collision] untucked: [no_stance] no collision-free stance around bed_tjfzsb_0; stand_off 0.45 edge +v: [stance_collision] untucked: [no_stance] no collision-free stance around bed_tjfzsb_0; stand_off 0.45 edge -v: [unreachable] no reachable cell on the support; stand_off 0.35 edge None: [unreachable] no reachable cell on the support; stand_off 0.35 edge +u: [unreachable] no reachable cell on the support; stand_off 0.35 edge -u: [stance_collision] untucked: [no_stance] no collision-free stance around bed_tjfzsb_0; stand_off 0.35 edge +v: [stance_collision] untucked: [no_stance] no collision-free stance around bed_tjfzsb_0; stand_off 0.35 edge -v: [unreachable] no reachable cell on the support; stand_off 0.55 edge None: [unreachable] no reachable cell on the support; stand_off 0.55 edge +u: [unreachable] no reachable cell on the support; stand_off 0.55 edge -u: [stance_collision] untucked: [no_stance] no collision-free stance around bed_tjfzsb_0; stand_off 0.55 edge +v: [stance_collision] untucked: [no_stance] no collision-free stance around bed_tjfzsb_0; stand_off 0.55 edge -v: [unreachable] no reachable cell on the support",
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "setup_failed",
+   "n_written": 0,
+   "rejections": {},
+   "reject_reason": "no_support",
+   "setup_s": 4.8,
+   "run_s": null
+  }
+ ],
+ "job_s": 5.6,
+ "finished": "2026-09-12 02:51:12"
+}

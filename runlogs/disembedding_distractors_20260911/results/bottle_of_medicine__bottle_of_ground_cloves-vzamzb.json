@@ -1,0 +1,146 @@
+{
+ "target_category": "bottle_of_medicine",
+ "target_model": "zfbnjh",
+ "target_key": "bottle_of_medicine__zfbnjh__t",
+ "category": "bottle_of_ground_cloves",
+ "model": "vzamzb",
+ "kind": "diff",
+ "tier": 1,
+ "started": "2026-09-12 11:14:22",
+ "template": {
+  "support": {
+   "name": "breakfast_table_rhjoby_0",
+   "z": 0.8126288056373596,
+   "yaw": 1.5683172941207886,
+   "local_bounds": [
+    2.9354329109191895,
+    4.095628261566162,
+    -8.733465194702148,
+    -5.8306965827941895
+   ],
+   "n_free_cells": 8465,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "-v",
+   "edge_mid": [
+    8.74215316772461,
+    3.4938690662384033
+   ],
+   "inward": [
+    -0.9999969005584717,
+    0.0024790300521999598
+   ],
+   "tangent": [
+    -0.0024790300521999598,
+    -0.9999969005584717
+   ],
+   "base_pose2d": [
+    9.191333770751953,
+    3.162656784057617,
+    3.1391136209323567
+   ],
+   "edge_depth": 0.4500002861022949,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.4000000059604645,
+    "axis_angle": 0.1742506823704673
+   }
+  },
+  "place_stance": {
+   "edge": "-v",
+   "edge_mid": [
+    8.74215316772461,
+    3.4938690662384033
+   ],
+   "inward": [
+    -0.9999969005584717,
+    0.0024790300521999598
+   ],
+   "tangent": [
+    -0.0024790300521999598,
+    -0.9999969005584717
+   ],
+   "base_pose2d": [
+    9.192144393920898,
+    3.489689350128174,
+    3.1391136209323567
+   ],
+   "edge_depth": 0.45000019669532776
+  },
+  "view_arms": "untucked",
+  "yaw_adjust_deg": 0.0,
+  "dest_lateral_m": -0.6540670069125372,
+  "dest_side": "right",
+  "source_lateral_offset": 0.35,
+  "n_reachable_cells": 18,
+  "n_grasp_cells": 12,
+  "n_place_combos": 33,
+  "distractors": {
+   "same_category": true,
+   "pool": "same_category",
+   "requested_pool": "same_category",
+   "fallback": null,
+   "models": [
+    "bottle_of_medicine-kqkwoq"
+   ],
+   "requested": 1,
+   "pool_size": 1,
+   "pool_categories": [
+    "bottle_of_medicine"
+   ],
+   "lookalikes_excluded": [],
+   "footprint_fraction": 0.08
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 263.9,
+   "prepare_template_s": 0.15
+  },
+  "setup_s": 264.1
+ },
+ "footprint_fraction_with_target": 0.087,
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {
+  "occlusion": 1
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_dis_distractors/bottle_of_medicine-zfbnjh__bottle_of_ground_cloves-vzamzb/instances/disembedding-0__bottle_of_medicine-zfbnjh__bottle_of_ground_cloves-vzamzb__0000.summary.json",
+   "wall_time_s": 5.0,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    9.191333770751953,
+    3.162656784057617,
+    3.1391136209323567
+   ],
+   "trunk": [
+    0.749999987042469,
+    -0.40000003576278687
+   ],
+   "occluded_variant": false,
+   "grasp": {
+    "key": "bottle_of_medicine__zfbnjh__t",
+    "name": "grasp_1",
+    "translate": 0.5,
+    "place_translate": 0.5,
+    "yaw": -1.6784789547447596
+   },
+   "dest_pixels": 15334,
+   "source_pixels": 114667,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.4000000059604645
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_dis_distractors/bottle_of_medicine-zfbnjh__bottle_of_ground_cloves-vzamzb",
+ "job_s": 11.5,
+ "finished": "2026-09-12 11:14:34",
+ "occluded_variant": false,
+ "occlusion_ratio": null
+}

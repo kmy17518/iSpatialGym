@@ -1,0 +1,35 @@
+{
+ "category": "carton_of_soy_milk",
+ "model": "orgyvw",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/carton_of_soy_milk__orgyvw__y0.png",
+   "drift_m": 0.0008,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0973,
+   "seg_pixels": 19497,
+   "aabb_extent": [
+    0.086,
+    0.107,
+    0.193
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/carton_of_soy_milk__orgyvw__y1.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.1,
+   "on_tray": true,
+   "settled_z": 0.0972
+  }
+ },
+ "stable": true,
+ "visible": true
+}

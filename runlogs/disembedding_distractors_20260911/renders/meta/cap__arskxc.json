@@ -1,0 +1,35 @@
+{
+ "category": "cap",
+ "model": "arskxc",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/cap__arskxc__y0.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.5,
+   "on_tray": true,
+   "settled_z": 0.0426,
+   "seg_pixels": 2086,
+   "aabb_extent": [
+    0.028,
+    0.048,
+    0.077
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/cap__arskxc__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.1,
+   "on_tray": true,
+   "settled_z": 0.0426
+  }
+ },
+ "stable": true,
+ "visible": true
+}

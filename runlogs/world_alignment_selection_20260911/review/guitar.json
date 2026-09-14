@@ -1,0 +1,51 @@
+{
+  "category": "guitar",
+  "task": "wa1",
+  "n_models": 3,
+  "n_opened": 3,
+  "models": [
+    {
+      "model": "cybisc",
+      "V": 4,
+      "U": 3,
+      "H": 1,
+      "score": 15,
+      "valid": true,
+      "front_axis": "+z",
+      "up_axis": "-x",
+      "thin_axis": "z",
+      "note": "Brown Les Paul-style electric guitar 1.04 m lying face up, headstock at -x; pickups and frets visible, clean."
+    },
+    {
+      "model": "gysapt",
+      "V": 3,
+      "U": 3,
+      "H": 1,
+      "score": 13,
+      "valid": true,
+      "front_axis": "+z",
+      "up_axis": "-x",
+      "thin_axis": "z",
+      "note": "Brown Strat-like guitar 1.04 m with odd pointed headstock and smeared dark textures; headstock at -x."
+    },
+    {
+      "model": "hpqjrq",
+      "V": 3,
+      "U": 3,
+      "H": 1,
+      "score": 13,
+      "valid": true,
+      "front_axis": "+z",
+      "up_axis": "-x",
+      "thin_axis": "z",
+      "note": "Black pointed-body electric guitar 1.04 m, headstock at -x; very dark, low surface detail."
+    }
+  ],
+  "picks": [
+    "cybisc",
+    "hpqjrq"
+  ],
+  "alternate": "gysapt",
+  "category_verdict": "good",
+  "category_note": "Electric guitars 1.04 m long, 0.26-0.34 m wide, 3.5-6.7 cm thick, lying face up with the headstock at -x; body-vs-headstock silhouette makes the upright obvious. Length exceeds 0.90 m, so borderline for the head camera."
+}

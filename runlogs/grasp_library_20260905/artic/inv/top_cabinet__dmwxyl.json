@@ -1,0 +1,155 @@
+{
+ "category": "top_cabinet",
+ "model": "dmwxyl",
+ "key": "top_cabinet__dmwxyl",
+ "root_pos_world": [
+  0.0,
+  0.0,
+  0.31597524881362915
+ ],
+ "aabb_extent": [
+  0.23231980204582214,
+  0.48695099353790283,
+  0.6309534907341003
+ ],
+ "aabb_min_rel_root": [
+  -0.07930469512939453,
+  -0.24303193390369415,
+  -0.31597524881362915
+ ],
+ "aabb_max_rel_root": [
+  0.1530151069164276,
+  0.24391907453536987,
+  0.3149782419204712
+ ],
+ "link_tags": {
+  "base_link": [],
+  "link_0": [
+   "openable"
+  ],
+  "link_1": [
+   "openable"
+  ]
+ },
+ "openable_joint_ids": [
+  [
+   1,
+   "j_link_0"
+  ],
+  [
+   2,
+   "j_link_1"
+  ]
+ ],
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "type": "RevoluteJoint",
+   "child_link": "link_0",
+   "lower": 0.0,
+   "upper": 1.6398870944976807,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.12065,
+    0.22137,
+    -0.00421
+   ],
+   "link_quat_obj": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "hinge_point_obj": [
+    0.12065,
+    0.22137,
+    -0.00421
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/top_cabinet__dmwxyl__link_0.obj",
+   "n_pieces": 8,
+   "link_bbox_min": [
+    0.1152,
+    -0.0008,
+    -0.2986
+   ],
+   "link_bbox_max": [
+    0.153,
+    0.2285,
+    0.2976
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  },
+  {
+   "joint": "j_link_1",
+   "type": "RevoluteJoint",
+   "child_link": "link_1",
+   "lower": 0.0,
+   "upper": 1.6399047374725342,
+   "closed_q": 0.0,
+   "open_sign": 1,
+   "link_pos_obj": [
+    0.12042,
+    -0.21962,
+    -0.00421
+   ],
+   "link_quat_obj": [
+    -0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "axis_dir_obj": [
+    0.0,
+    -0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    0.12042,
+    -0.21962,
+    -0.00421
+   ],
+   "measured_angle": 0.25,
+   "expected_angle": 0.25,
+   "pieces_obj": "/tmp/glib/artic/inv/top_cabinet__dmwxyl__link_1.obj",
+   "n_pieces": 8,
+   "link_bbox_min": [
+    0.1152,
+    -0.2257,
+    -0.2986
+   ],
+   "link_bbox_max": [
+    0.153,
+    0.0037,
+    0.2976
+   ],
+   "link_tags": [
+    "openable"
+   ],
+   "sub_links": []
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0793,
+   -0.243,
+   -0.316
+  ],
+  "bbox_max": [
+   0.1199,
+   0.2439,
+   0.315
+  ],
+  "n_pieces": 32
+ }
+}

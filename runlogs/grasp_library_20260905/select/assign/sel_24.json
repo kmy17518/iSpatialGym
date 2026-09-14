@@ -1,0 +1,15 @@
+{
+ "assignment": "sel_24",
+ "groups": [
+  "/tmp/glib/select/groups/disembedding__bottle_of_shampoo__r3.json",
+  "/tmp/glib/select/groups/disembedding__box_of_cane_sugar__r1.json",
+  "/tmp/glib/select/groups/disembedding__box_of_shampoo__r1.json",
+  "/tmp/glib/select/groups/disembedding__box_of_tissues__r1.json",
+  "/tmp/glib/select/groups/disembedding__carton_of_milk__r1.json",
+  "/tmp/glib/select/groups/disembedding__chili__r1.json",
+  "/tmp/glib/select/groups/disembedding__pencil_holder__r3.json",
+  "/tmp/glib/select/groups/mental_rotation__tablefork__r1.json",
+  "/tmp/glib/select/groups/IORS__half_bagel__r3.json"
+ ],
+ "n_strips": 34
+}

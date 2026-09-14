@@ -1,0 +1,87 @@
+{
+ "category": "folder",
+ "task": "wa0",
+ "n_models": 6,
+ "n_opened": 6,
+ "models": [
+  {
+   "model": "guhatz",
+   "V": 4,
+   "O": 2,
+   "F": 2,
+   "score": 14,
+   "valid": true,
+   "long_axis": "x",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "Blue binder lying flat, black spine on -y edge, pages at +x/-x; no cover print."
+  },
+  {
+   "model": "inkwmw",
+   "V": 2,
+   "O": 3,
+   "F": 2,
+   "score": 12,
+   "valid": false,
+   "long_axis": "x",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "Red binder with large grey jagged patches (broken UV / missing texture); pattern asymmetric but looks defective."
+  },
+  {
+   "model": "lktggf",
+   "V": 4,
+   "O": 2,
+   "F": 2,
+   "score": 14,
+   "valid": true,
+   "long_axis": "x",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "Blue-grey box file, white spine label with ring holes on -y face; plain top."
+  },
+  {
+   "model": "piezyg",
+   "V": 3,
+   "O": 1,
+   "F": 2,
+   "score": 10,
+   "valid": false,
+   "long_axis": "x",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "Black box file, nearly square 0.24x0.22, plain top; label only on the -y side."
+  },
+  {
+   "model": "poqpux",
+   "V": 3,
+   "O": 1,
+   "F": 2,
+   "score": 10,
+   "valid": false,
+   "long_axis": "x",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "Black box file, nearly square, plain; only a finger hole on the -y side."
+  },
+  {
+   "model": "wauyns",
+   "V": 2,
+   "O": 0,
+   "F": 2,
+   "score": 6,
+   "valid": false,
+   "long_axis": "x",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "Flat plain grey sheet 0.23x0.21x0.005 m, no print; no readable yaw."
+  }
+ ],
+ "picks": [
+  "guhatz",
+  "lktggf"
+ ],
+ "alternate": null,
+ "category_verdict": "weak",
+ "category_note": "Binders and box files 0.21-0.38 m lying flat with no cover print; the spine on the -y edge is the only cue (180-degree risk). inkwmw has broken texture, wauyns is a plain sheet."
+}

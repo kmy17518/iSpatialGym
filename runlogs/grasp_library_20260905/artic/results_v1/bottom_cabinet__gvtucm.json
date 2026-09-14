@@ -1,0 +1,16 @@
+{
+ "key": "bottom_cabinet__gvtucm",
+ "category": "bottom_cabinet",
+ "model": "gvtucm",
+ "scene": "office_cubicles_right",
+ "host": "bottom_cabinet_rvunhj_2",
+ "host_rank": 2,
+ "host_model": "rvunhj",
+ "swap": true,
+ "joints": [],
+ "error": "AssertionError('Object with name o_bottom_cabinet__gvtucm already exists in scene!')",
+ "previous_hosts": [
+  "bottom_cabinet_rvunhj_1",
+  "bottom_cabinet_rvunhj_0"
+ ]
+}

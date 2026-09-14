@@ -1,0 +1,165 @@
+{
+ "group": "mental_rotation__cellulose_tape_dispenser__r1",
+ "task": "mental_rotation",
+ "category": "cellulose_tape_dispenser",
+ "round": 1,
+ "relation": null,
+ "partner": null,
+ "requirements": "In-hand task: the object starts in the gripper (no table). Several different object-in-hand transforms are needed per model, so a model should offer at least 3 visibly different clean grasps. The object must NOT be rotationally symmetric (its orientation must be readable).",
+ "candidates": [
+  {
+   "model": "budhaz",
+   "key": "cellulose_tape_dispenser__budhaz",
+   "strip": "/tmp/glib/strips/cellulose_tape_dispenser__budhaz.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across flat sides near CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across flat sides near CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, both pads adjacent in V2"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch from roll side, firm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across flat sides"
+    }
+   ],
+   "object_note": "fingers report 50/0 on every row, but V2 shows body spanning both pads; off-centre not one-finger",
+   "bbox_mm": [
+    112,
+    50,
+    68
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "fetnry",
+   "key": "cellulose_tape_dispenser__fetnry",
+   "strip": "/tmp/glib/strips/cellulose_tape_dispenser__fetnry.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across flat sides near CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across flat sides near CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, both pads adjacent in V2"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across flat sides"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch from roll side, firm"
+    }
+   ],
+   "object_note": "fingers report 50/1 on every row, but V2 shows body spanning both pads",
+   "bbox_mm": [
+    112,
+    50,
+    68
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  },
+  {
+   "model": "yyekns",
+   "key": "cellulose_tape_dispenser__yyekns",
+   "strip": "/tmp/glib/strips/cellulose_tape_dispenser__yyekns.png",
+   "n_valid": 5,
+   "n_clean": 5,
+   "n_clean_strict": 5,
+   "flags": [],
+   "grasp_notes": [
+    {
+     "rank": 1,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across flat sides near CoM"
+    },
+    {
+     "rank": 2,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across flat sides near CoM"
+    },
+    {
+     "rank": 3,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch, both pads adjacent in V2"
+    },
+    {
+     "rank": 4,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch from roll side, firm"
+    },
+    {
+     "rank": 5,
+     "verdict": "ok",
+     "flags": [],
+     "note": "body pinch across flat sides"
+    }
+   ],
+   "object_note": "fingers report 50/1 on every row, but V2 shows body spanning both pads",
+   "bbox_mm": [
+    112,
+    50,
+    68
+   ],
+   "scale": null,
+   "ready": true,
+   "pipeline": "graspgen",
+   "constraint": "floating"
+  }
+ ],
+ "excluded": []
+}

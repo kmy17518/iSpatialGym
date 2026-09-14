@@ -1,0 +1,23 @@
+{
+  "category": "bowling_ball",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "bowling_ball/qzzett",
+      "V": 5,
+      "N": 1,
+      "S": 2,
+      "rest_ok": false,
+      "score": 14,
+      "valid": false,
+      "note": "Blue marbled bowling ball with three finger holes, 0.22 m sphere; clean texture; rolls; odd in the middle of a room."
+    }
+  ],
+  "picks": [],
+  "alternate": null,
+  "natural_scenes": ["house_single_floor", "house_double_floor_lower"],
+  "category_verdict": "drop",
+  "category_note": "Single 0.22 m sphere: would roll when dropped and a bowling ball mid-path is odd outside a garage or closet; no valid model."
+}

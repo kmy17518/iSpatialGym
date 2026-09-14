@@ -1,0 +1,76 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "bottom_cabinet_immwzb_8",
+ "rooms": [
+  "shared_office_0"
+ ],
+ "removed_chairs": [
+  "swivel_chair_ryznxk_2",
+  "swivel_chair_ryznxk_8"
+ ],
+ "aabb": [
+  [
+   10.429,
+   -5.32,
+   0.003
+  ],
+  [
+   10.823,
+   -4.717,
+   0.711
+  ]
+ ],
+ "support": {
+  "name": "bottom_cabinet_immwzb_8",
+  "z": 0.668897807598114,
+  "yaw": -1.5708045959472656,
+  "local_bounds": [
+   5.309878349304199,
+   5.309879302978516,
+   10.639302253723145,
+   10.779302597045898
+  ],
+  "n_free_cells": 8,
+  "occupants": [
+   "cubicle_deceti_2"
+  ],
+  "resolution": 0.02
+ },
+ "edges": [
+  {
+   "name": "+u",
+   "mid": [
+    10.709,
+    -5.31
+   ],
+   "length": 0.14
+  },
+  {
+   "name": "-u",
+   "mid": [
+    10.709,
+    -5.31
+   ],
+   "length": 0.14
+  },
+  {
+   "name": "+v",
+   "mid": [
+    10.779,
+    -5.31
+   ],
+   "length": 0.0
+  },
+  {
+   "name": "-v",
+   "mid": [
+    10.639,
+    -5.31
+   ],
+   "length": 0.0
+  }
+ ],
+ "stance": null,
+ "stance_error": "too little free top surface",
+ "precheck_s": 0.7
+}

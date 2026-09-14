@@ -1,0 +1,25 @@
+{
+  "category": "shredder",
+  "task": "obst",
+  "n_models": 1,
+  "n_opened": 1,
+  "models": [
+    {
+      "model": "wkconu",
+      "V": 4,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Black paper shredder with grey top and front window, flat base, 0.25 x 0.34 x 0.47 m; clean, plain."
+    }
+  ],
+  "picks": ["wkconu"],
+  "alternate": null,
+  "natural_scenes": [
+    "office_cubicles_right"
+  ],
+  "category_verdict": "weak",
+  "category_note": "One clean shredder of ideal size and stable; natural only in the office scene and normally beside a desk or wall rather than mid-corridor (N=2); single model."
+}

@@ -1,0 +1,271 @@
+{
+ "scene": "hotel_suite_large",
+ "table": "desk_ohjotf_0",
+ "category": "desk",
+ "model": "ohjotf",
+ "rooms": [
+  "bedroom_0"
+ ],
+ "partner": null,
+ "problem": "world_alignment-0",
+ "inventory": {
+  "top_z": 0.671,
+  "bbox_x": 0.554,
+  "bbox_y": 1.638,
+  "bbox_z": 0.668,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "armchair_hfydou_0"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 02:00:08",
+ "precheck": {
+  "aabb": [
+   [
+    -1.274,
+    -4.894,
+    -0.006
+   ],
+   [
+    0.381,
+    -4.323,
+    0.68
+   ]
+  ],
+  "support": {
+   "name": "desk_ohjotf_0",
+   "z": 0.6792532801628113,
+   "yaw": 1.570794701576233,
+   "local_bounds": [
+    -4.883538722991943,
+    -4.323536396026611,
+    -0.3760008215904236,
+    1.2640000581741333
+   ],
+   "n_free_cells": 2403,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     -0.444,
+     -4.324
+    ],
+    "length": 1.64
+   },
+   {
+    "name": "-u",
+    "mid": [
+     -0.444,
+     -4.884
+    ],
+    "length": 1.64
+   },
+   {
+    "name": "+v",
+    "mid": [
+     -1.264,
+     -4.604
+    ],
+    "length": 0.56
+   },
+   {
+    "name": "-v",
+    "mid": [
+     0.376,
+     -4.604
+    ],
+    "length": 0.56
+   }
+  ],
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    -1.264007568359375,
+    -4.6035356521606445
+   ],
+   "inward": [
+    1.0,
+    -1.625218715162191e-06
+   ],
+   "tangent": [
+    1.625218715162191e-06,
+    1.0
+   ],
+   "base_pose2d": [
+    -1.7140076160430908,
+    -4.633535861968994,
+    -1.6252187151607602e-06
+   ],
+   "edge_depth": 0.44999998807907104,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.8499999642372131,
+    "axis_angle": 0.0003452669847162036
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 4.3
+ },
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {
+  "scene_reset": 1
+ },
+ "template_meta": {
+  "support": {
+   "name": "desk_ohjotf_0",
+   "z": 0.6792532801628113,
+   "yaw": 1.5708235502243042,
+   "local_bounds": [
+    -4.8836469650268555,
+    -4.323603630065918,
+    -0.3758728802204132,
+    1.2641417980194092
+   ],
+   "n_free_cells": 2403,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "+v",
+   "edge_mid": [
+    -1.2640165090560913,
+    -4.603659629821777
+   ],
+   "inward": [
+    1.0,
+    2.7223430151934735e-05
+   ],
+   "tangent": [
+    -2.7223430151934735e-05,
+    1.0
+   ],
+   "base_pose2d": [
+    -1.7140156030654907,
+    -4.633693695068359,
+    2.7223430145209504e-05
+   ],
+   "edge_depth": 0.4499998986721039,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.44999998807907104,
+    "axis_angle": 0.004858341873320892
+   }
+  },
+  "view_arms": "untucked",
+  "n_cells": 5,
+  "n_reachable_strip_cells": 13,
+  "load_room_instances": [
+   "bedroom_0",
+   "bathroom_0"
+  ],
+  "task_rooms": [
+   "bedroom_0"
+  ],
+  "rejections": {
+   "scene_reset": 1
+  },
+  "n_written": 1,
+  "scene_variant": {
+   "scene_file": "../../scene_variants/hotel_suite_large__781a10386c.json",
+   "removed_objects": [
+    "armchair_hfydou_0"
+   ],
+   "freed_footprints": {
+    "free": [
+     [
+      [
+       0.0029015839099884033,
+       -4.412550926208496
+      ],
+      [
+       -0.5612249374389648,
+       -4.421658992767334
+      ],
+      [
+       -0.5687189102172852,
+       -3.95751953125
+      ],
+      [
+       -0.004592388868331909,
+       -3.948411226272583
+      ]
+     ]
+    ],
+    "block": [
+     [
+      [
+       -1.2612974643707275,
+       -4.329516887664795
+      ],
+      [
+       0.3769025206565857,
+       -4.329520225524902
+      ],
+      [
+       0.3769013285636902,
+       -4.883920192718506
+      ],
+      [
+       -1.261298656463623,
+       -4.883916854858398
+      ]
+     ]
+    ]
+   }
+  },
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 23.27,
+   "prepare_template_s": 0.91,
+   "save_template_s": 0.03
+  }
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_table_sel/hotel_suite_large/hotel_suite_large__desk_ohjotf_0__world_alignment-0/instances/world_alignment-0__hotel_suite_large__desk_ohjotf_0__world_alignment-0__0000.summary.json",
+   "wall_time_s": 9.9,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    -1.7140156030654907,
+    -4.633693695068359,
+    2.7223430145209504e-05
+   ],
+   "trunk": [
+    0.749999987042469,
+    -0.44999998807907104
+   ],
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.44999998807907104
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_table_sel/hotel_suite_large/hotel_suite_large__desk_ohjotf_0__world_alignment-0",
+ "bound_table": "desk_ohjotf_0",
+ "setup_s": 24.2,
+ "run_s": 9.9,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "ok",
+   "n_written": 1,
+   "rejections": {
+    "scene_reset": 1
+   },
+   "reject_reason": null,
+   "setup_s": 24.2,
+   "run_s": 9.9
+  }
+ ],
+ "job_s": 35.1,
+ "finished": "2026-09-12 02:00:43"
+}

@@ -1,0 +1,35 @@
+{
+ "category": "cork",
+ "model": "ncxgpe",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/cork__ncxgpe__y0.png",
+   "drift_m": 0.0007,
+   "tilt_deg": 1.9,
+   "on_tray": true,
+   "settled_z": 0.0183,
+   "seg_pixels": 370,
+   "aabb_extent": [
+    0.018,
+    0.018,
+    0.035
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/cork__ncxgpe__y1.png",
+   "drift_m": 0.0006,
+   "tilt_deg": 1.6,
+   "on_tray": true,
+   "settled_z": 0.0183
+  }
+ },
+ "stable": true,
+ "visible": true
+}

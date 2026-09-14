@@ -1,0 +1,222 @@
+{
+ "scene": "house_single_floor",
+ "table": "countertop_sjxber_0",
+ "category": "countertop",
+ "model": "sjxber",
+ "rooms": [
+  "utility_room_0"
+ ],
+ "partner": null,
+ "problem": "configuration_matching-3",
+ "inventory": {
+  "top_z": 0.928,
+  "bbox_x": 0.443,
+  "bbox_y": 0.975,
+  "bbox_z": 0.038,
+  "verdict": "keep"
+ },
+ "removed_chairs": [],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 00:55:13",
+ "precheck": {
+  "aabb": [
+   [
+    23.21,
+    -2.284,
+    0.89
+   ],
+   [
+    24.186,
+    -1.838,
+    0.928
+   ]
+  ],
+  "support": {
+   "name": "countertop_sjxber_0",
+   "z": 0.9275417923927307,
+   "yaw": 1.5682528018951416,
+   "local_bounds": [
+    -2.2146389484405518,
+    -1.792198657989502,
+    -24.185483932495117,
+    -23.22442054748535
+   ],
+   "n_free_cells": 1078,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     23.7,
+     -1.852
+    ],
+    "length": 0.961
+   },
+   {
+    "name": "-u",
+    "mid": [
+     23.699,
+     -2.275
+    ],
+    "length": 0.961
+   },
+   {
+    "name": "+v",
+    "mid": [
+     23.219,
+     -2.062
+    ],
+    "length": 0.422
+   },
+   {
+    "name": "-v",
+    "mid": [
+     24.18,
+     -2.065
+    ],
+    "length": 0.422
+   }
+  ],
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    23.7003173828125,
+    -1.8524869680404663
+   ],
+   "inward": [
+    -0.0025435220450162888,
+    -0.9999967813491821
+   ],
+   "tangent": [
+    0.9999967813491821,
+    -0.0025435220450162888
+   ],
+   "base_pose2d": [
+    23.65535545349121,
+    -1.4023711681365967,
+    -1.5733398515415078
+   ],
+   "edge_depth": 0.44999998807907104,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.20000001788139343,
+    "axis_angle": 0.0023417151460382946
+   }
+  },
+  "view_arms": "untucked",
+  "precheck_s": 0.6
+ },
+ "status": "ok",
+ "n_written": 1,
+ "rejections": {},
+ "template_meta": {
+  "support": {
+   "name": "countertop_sjxber_0",
+   "z": 0.9275417923927307,
+   "yaw": 1.5682528018951416,
+   "local_bounds": [
+    -2.2146389484405518,
+    -1.792198657989502,
+    -24.185483932495117,
+    -23.22442054748535
+   ],
+   "n_free_cells": 1078,
+   "occupants": [],
+   "resolution": 0.02
+  },
+  "stance": {
+   "edge": "+u",
+   "edge_mid": [
+    23.7003173828125,
+    -1.8524869680404663
+   ],
+   "inward": [
+    -0.0025435220450162888,
+    -0.9999967813491821
+   ],
+   "tangent": [
+    0.9999967813491821,
+    -0.0025435220450162888
+   ],
+   "base_pose2d": [
+    23.65535545349121,
+    -1.4023711681365967,
+    -1.5733398515415078
+   ],
+   "edge_depth": 0.44999998807907104,
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.20000001788139343,
+    "axis_angle": 0.0023417151460382946
+   }
+  },
+  "view_arms": "untucked",
+  "n_reachable_cells": 14,
+  "n_grasp_cells": 12,
+  "load_room_instances": [
+   "utility_room_0",
+   "corridor_0"
+  ],
+  "task_rooms": [
+   "utility_room_0"
+  ],
+  "rejections": {},
+  "n_written": 1,
+  "scene_variant": null,
+  "init_arms": "untucked",
+  "timings": {
+   "bind_spawn_s": 16.16,
+   "prepare_template_s": 51.32,
+   "save_template_s": 0.27
+  }
+ },
+ "instances": [
+  {
+   "summary": "/tmp/isg_table_sel/house_single_floor/house_single_floor__countertop_sjxber_0__configuration_matching-3/instances/configuration_matching-3__house_single_floor__countertop_sjxber_0__configuration_matching-3__0000.summary.json",
+   "wall_time_s": 7.0,
+   "init_conditions_all_true": true,
+   "goal_false_at_init": true,
+   "goal_true_at_goal": true,
+   "base_pose2d": [
+    23.65535545349121,
+    -1.4023711681365967,
+    -1.5733398515415078
+   ],
+   "trunk": [
+    0.749999987042469,
+    -0.19999998807907104
+   ],
+   "grasp": {
+    "key": "cap__xxqyrt",
+    "name": "grasp_2",
+    "translate": 0.5,
+    "yaw": -1.5707963705062866
+   },
+   "view": {
+    "translate": 0.75,
+    "tilt": -0.20000001788139343
+   }
+  }
+ ],
+ "work_dir": "/tmp/isg_table_sel/house_single_floor/house_single_floor__countertop_sjxber_0__configuration_matching-3",
+ "bound_table": "countertop_sjxber_0",
+ "setup_s": 67.5,
+ "run_s": 7.0,
+ "attempts": [
+  {
+   "seed": 0,
+   "status": "ok",
+   "n_written": 1,
+   "rejections": {},
+   "reject_reason": null,
+   "setup_s": 67.5,
+   "run_s": 7.0
+  }
+ ],
+ "job_s": 76.3,
+ "finished": "2026-09-12 00:56:30"
+}

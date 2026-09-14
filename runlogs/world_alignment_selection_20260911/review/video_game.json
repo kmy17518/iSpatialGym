@@ -1,0 +1,159 @@
+{
+ "category": "video_game",
+ "task": "wa0",
+ "n_models": 12,
+ "n_opened": 12,
+ "models": [
+  {
+   "model": "apjpos",
+   "V": 4,
+   "O": 3,
+   "F": 1,
+   "score": 15,
+   "valid": true,
+   "long_axis": "x",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Wii U Super Mario 3D World case, 0.086 m; cover up=-x, spine at -y; miniature scale"
+  },
+  {
+   "model": "ceaxsd",
+   "V": 4,
+   "O": 3,
+   "F": 1,
+   "score": 15,
+   "valid": true,
+   "long_axis": "x",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Wii New Super Mario Bros case, 0.087 m; cover up=-x, spine at -y"
+  },
+  {
+   "model": "ckugyi",
+   "V": 4,
+   "O": 3,
+   "F": 0,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "3DS Pokemon Y case, only 0.066 m; cover upright in top view (up=+y)"
+  },
+  {
+   "model": "coiafo",
+   "V": 4,
+   "O": 3,
+   "F": 0,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "3DS Mario & Luigi case, 0.064 m; cover up=+y; too small"
+  },
+  {
+   "model": "lfdpse",
+   "V": 4,
+   "O": 3,
+   "F": 0,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "3DS Mario Party case, 0.067 m; cover up=+y; too small"
+  },
+  {
+   "model": "ppnzqm",
+   "V": 4,
+   "O": 3,
+   "F": 0,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "3DS Pokemon X case, 0.069 m; cover up=+y; too small"
+  },
+  {
+   "model": "pujfzk",
+   "V": 4,
+   "O": 3,
+   "F": 0,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "3DS Animal Crossing case, 0.069 m; cover up=+y; too small"
+  },
+  {
+   "model": "qsyyql",
+   "V": 4,
+   "O": 3,
+   "F": 0,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "3DS Persona Q case, only 0.042 m; cover up=+y"
+  },
+  {
+   "model": "quzjuo",
+   "V": 4,
+   "O": 3,
+   "F": 0,
+   "score": 14,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "3DS Luigi's Mansion case, 0.065 m; cover up=+y; too small"
+  },
+  {
+   "model": "rzaxlj",
+   "V": 3,
+   "O": 3,
+   "F": 0,
+   "score": 12,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "3DS Pokemon case only 0.033 m and disproportionately thick; cover up=+y"
+  },
+  {
+   "model": "veodkq",
+   "V": 3,
+   "O": 3,
+   "F": 0,
+   "score": 12,
+   "valid": false,
+   "long_axis": "x",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Wii U case only 0.024 m, chunky proportions; cover up=-x"
+  },
+  {
+   "model": "yyvkel",
+   "V": 4,
+   "O": 3,
+   "F": 1,
+   "score": 15,
+   "valid": true,
+   "long_axis": "x",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Wii Mario Party case, 0.085 m; cover up=-x, spine at -y"
+  }
+ ],
+ "picks": [
+  "apjpos",
+  "ceaxsd"
+ ],
+ "alternate": "yyvkel",
+ "category_verdict": "weak",
+ "category_note": "Game cases with excellent cover-art yaw cues, but every model is miniature (0.02-0.09 m): only three Wii/Wii U cases reach the 0.08 m floor. Wii covers have up=-x (front +x), 3DS covers up=+y (front -y)."
+}

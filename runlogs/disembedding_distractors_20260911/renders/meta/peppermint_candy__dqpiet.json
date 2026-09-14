@@ -1,0 +1,35 @@
+{
+ "category": "peppermint_candy",
+ "model": "dqpiet",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/peppermint_candy__dqpiet__y0.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0049,
+   "seg_pixels": 1102,
+   "aabb_extent": [
+    0.153,
+    0.052,
+    0.01
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/peppermint_candy__dqpiet__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0052
+  }
+ },
+ "stable": true,
+ "visible": true
+}

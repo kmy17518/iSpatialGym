@@ -1,0 +1,57 @@
+{
+ "key": "door__bexenl",
+ "category": "door",
+ "model": "bexenl",
+ "scene": "house_double_floor_lower",
+ "host": "door_vudhlc_0",
+ "host_rank": 2,
+ "host_model": "vudhlc",
+ "swap": true,
+ "joints": [
+  {
+   "joint": "j_leaf",
+   "kind": "door",
+   "grasp_source": "review:A",
+   "stance": {
+    "base": [
+     0.071,
+     6.305,
+     1.581
+    ],
+    "translate": 0.5,
+    "sign": -1.0
+   },
+   "reachable": true,
+   "ag": false,
+   "dq": 0.0,
+   "dq_target": 0.785,
+   "opened": false,
+   "open_state": null,
+   "base_shifts": 0,
+   "steps": [
+    "stance ok",
+    "sign +1: planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 50.1 mm / 0.036 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)",
+    "stance ok",
+    "sign -1: planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 51.0 mm / 0.034 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)"
+   ],
+   "error": "planning: [planning] move_eef(right) failed: IK failed: goal pose unreachable for the active joints (best pose error 51.0 mm / 0.034 rad over 32 seeds even without obstacles; tolerances 5 mm / 0.05 rad)",
+   "contact_world": [
+    0.263,
+    7.107,
+    1.247
+   ],
+   "handle_height_above_floor": 1.242
+  }
+ ],
+ "error": null,
+ "previous_hosts": [
+  "door_bexenl_1",
+  "door_bexenl_0"
+ ],
+ "scale": [
+  10.978,
+  0.171,
+  1.139
+ ],
+ "time_s": 64.5
+}

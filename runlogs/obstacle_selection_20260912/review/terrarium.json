@@ -1,0 +1,33 @@
+{
+  "category": "terrarium",
+  "task": "obst",
+  "n_models": 2,
+  "n_opened": 2,
+  "models": [
+    {
+      "model": "terrarium/eqxkys",
+      "V": 4,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Tall dark-framed vivarium with plants, rocks and a lizard, solid back; glass omitted; 0.39 x 0.43 x 0.84 m; clean."
+    },
+    {
+      "model": "terrarium/zjyscx",
+      "V": 4,
+      "N": 2,
+      "S": 2,
+      "rest_ok": true,
+      "score": 14,
+      "valid": true,
+      "note": "Near duplicate of eqxkys: dark-framed vivarium with plants and lizard; 0.40 x 0.44 x 0.84 m; clean."
+    }
+  ],
+  "picks": ["terrarium/eqxkys", "terrarium/zjyscx"],
+  "alternate": null,
+  "natural_scenes": ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int"],
+  "category_verdict": "weak",
+  "category_note": "Two near-identical 0.4 x 0.4 x 0.84 m floor vivariums, good size and stable. A niche pet item plausible on a house living-room floor but normally against a wall or on a stand (N=2); odd in office, hotel, diner."
+}

@@ -1,0 +1,95 @@
+{
+ "scene": "office_cubicles_right",
+ "table": "bottom_cabinet_immwzb_7",
+ "category": "bottom_cabinet",
+ "model": "immwzb",
+ "rooms": [
+  "shared_office_0"
+ ],
+ "partner": null,
+ "problem": "world_alignment-0",
+ "inventory": {
+  "top_z": 0.712,
+  "bbox_x": 0.603,
+  "bbox_y": 0.395,
+  "bbox_z": 0.71,
+  "verdict": "keep"
+ },
+ "removed_chairs": [
+  "swivel_chair_ryznxk_1",
+  "swivel_chair_ryznxk_7"
+ ],
+ "sampler_code": "/tmp/isg_table_sel/snapshot",
+ "n_requested": 1,
+ "max_attempts": 6,
+ "started": "2026-09-12 00:46:51",
+ "precheck": {
+  "aabb": [
+   [
+    8.988,
+    -1.397,
+    0.003
+   ],
+   [
+    9.381,
+    -0.794,
+    0.711
+   ]
+  ],
+  "support": {
+   "name": "bottom_cabinet_immwzb_7",
+   "z": 0.6689943075180054,
+   "yaw": -1.5708045959472656,
+   "local_bounds": [
+    1.3871773481369019,
+    1.3871785402297974,
+    9.197783470153809,
+    9.337783813476562
+   ],
+   "n_free_cells": 8,
+   "occupants": [
+    "cubicle_deceti_1"
+   ],
+   "resolution": 0.02
+  },
+  "edges": [
+   {
+    "name": "+u",
+    "mid": [
+     9.268,
+     -1.387
+    ],
+    "length": 0.14
+   },
+   {
+    "name": "-u",
+    "mid": [
+     9.268,
+     -1.387
+    ],
+    "length": 0.14
+   },
+   {
+    "name": "+v",
+    "mid": [
+     9.338,
+     -1.387
+    ],
+    "length": 0.0
+   },
+   {
+    "name": "-v",
+    "mid": [
+     9.198,
+     -1.387
+    ],
+    "length": 0.0
+   }
+  ],
+  "stance": null,
+  "stance_error": "too little free top surface",
+  "precheck_s": 2.6
+ },
+ "status": "skipped",
+ "reason": "inter_object_relation_satisfaction-0 found no stance / no reachable cell on the support top at any stand-off (precheck: no stance either)"
+}

@@ -1,0 +1,35 @@
+{
+ "category": "comb",
+ "model": "nybyjz",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/comb__nybyjz__y0.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0061,
+   "seg_pixels": 1110,
+   "aabb_extent": [
+    0.106,
+    0.032,
+    0.019
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/comb__nybyjz__y1.png",
+   "drift_m": 0.0,
+   "tilt_deg": 0.1,
+   "on_tray": true,
+   "settled_z": 0.0062
+  }
+ },
+ "stable": true,
+ "visible": true
+}

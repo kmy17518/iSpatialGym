@@ -1,0 +1,35 @@
+{
+ "category": "tomato_sauce_jar",
+ "model": "krfzqk",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/tomato_sauce_jar__krfzqk__y0.png",
+   "drift_m": 0.0004,
+   "tilt_deg": 0.3,
+   "on_tray": true,
+   "settled_z": 0.0898,
+   "seg_pixels": 28886,
+   "aabb_extent": [
+    0.156,
+    0.13,
+    0.206
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/tomato_sauce_jar__krfzqk__y1.png",
+   "drift_m": 0.0003,
+   "tilt_deg": 0.2,
+   "on_tray": true,
+   "settled_z": 0.0898
+  }
+ },
+ "stable": true,
+ "visible": true
+}

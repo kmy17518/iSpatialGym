@@ -1,0 +1,53 @@
+{
+ "category": "chili",
+ "model": "pbbkpz",
+ "status": "ok",
+ "yaws": [
+  0.0,
+  90.0,
+  180.0,
+  270.0
+ ],
+ "renders": {
+  "y0": {
+   "yaw_deg": 0.0,
+   "png": "renders/chili__pbbkpz__y0.png",
+   "drift_m": 0.0006,
+   "tilt_deg": 4.1,
+   "on_tray": true,
+   "settled_z": 0.0041,
+   "seg_pixels": 140,
+   "aabb_extent": [
+    0.043,
+    0.015,
+    0.009
+   ]
+  },
+  "y1": {
+   "yaw_deg": 90.0,
+   "png": "renders/chili__pbbkpz__y1.png",
+   "drift_m": 0.0002,
+   "tilt_deg": 2.6,
+   "on_tray": true,
+   "settled_z": 0.0041
+  },
+  "y2": {
+   "yaw_deg": 180.0,
+   "png": "renders/chili__pbbkpz__y2.png",
+   "drift_m": 0.0006,
+   "tilt_deg": 8.2,
+   "on_tray": true,
+   "settled_z": 0.0041
+  },
+  "y3": {
+   "yaw_deg": 270.0,
+   "png": "renders/chili__pbbkpz__y3.png",
+   "drift_m": 0.0001,
+   "tilt_deg": 1.2,
+   "on_tray": true,
+   "settled_z": 0.0041
+  }
+ },
+ "stable": true,
+ "visible": false
+}

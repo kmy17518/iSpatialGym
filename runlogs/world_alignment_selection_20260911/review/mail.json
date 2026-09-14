@@ -1,0 +1,75 @@
+{
+ "category": "mail",
+ "task": "wa0",
+ "n_models": 5,
+ "n_opened": 5,
+ "models": [
+  {
+   "model": "azunex",
+   "V": 3,
+   "O": 2,
+   "F": 2,
+   "score": 12,
+   "valid": true,
+   "long_axis": "y",
+   "front_axis": "+x",
+   "rest_ok": true,
+   "note": "Airmail envelope, faded red/blue border, stamp box and address lines; landscape layout with up=-x; 1 mm thick sheet."
+  },
+  {
+   "model": "gvivdi",
+   "V": 3,
+   "O": 2,
+   "F": 2,
+   "score": 12,
+   "valid": true,
+   "long_axis": "y",
+   "front_axis": "+y",
+   "rest_ok": true,
+   "note": "Plain grey window envelope, window at the +x,+y corner (read as upside-down portrait); mesh yawed ~7 deg off bbox; 3 mm thick."
+  },
+  {
+   "model": "mbbwhn",
+   "V": 3,
+   "O": 2,
+   "F": 2,
+   "score": 12,
+   "valid": true,
+   "long_axis": "y",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "Plain grey window envelope, window at the -x,-y corner (portrait, up=+y); 3 mm thick sheet."
+  },
+  {
+   "model": "ojkepk",
+   "V": 2,
+   "O": 1,
+   "F": 2,
+   "score": 8,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "Uniform grey sheet, no print or flap; no yaw cue."
+  },
+  {
+   "model": "qpwlor",
+   "V": 3,
+   "O": 1,
+   "F": 2,
+   "score": 10,
+   "valid": false,
+   "long_axis": "y",
+   "front_axis": "-y",
+   "rest_ok": true,
+   "note": "Plain brown kraft envelope, no print; 180-deg ambiguity."
+  }
+ ],
+ "picks": [
+  "azunex",
+  "mbbwhn"
+ ],
+ "alternate": "gvivdi",
+ "category_verdict": "weak",
+ "category_note": "Flat envelopes 0.19-0.28 m long and only 1-3 mm thick (hard to push at the edge); yaw comes only from a window position or a faint airmail print; two models are blank."
+}

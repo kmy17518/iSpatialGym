@@ -1,0 +1,20 @@
+{
+  "key": "top_cabinet__tactqn",
+  "category": "top_cabinet",
+  "model": "tactqn",
+  "strip_opened": true,
+  "joints": [
+    {
+      "joint": "j_link_0",
+      "kind": "door",
+      "chosen": "C",
+      "pinch": "horizontal_bar",
+      "motion": "swing",
+      "graspable": true,
+      "handle_description": "Long horizontal bar (~176 mm) along door's bottom edge; C is the bar's middle, A/B its end posts; hinge on right (+y) edge",
+      "height_concern": "~0.04 m above object base if floor-placed; wall cabinet, depends on mount height",
+      "confidence": "high"
+    }
+  ],
+  "object_note": "Bar handle clearly visible; marker letters not middle-first here (A/B are end posts, C the 176 mm bar). Door hinged on right; B end is farthest from hinge."
+}
