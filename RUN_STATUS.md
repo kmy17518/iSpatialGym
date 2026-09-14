@@ -1,7 +1,30 @@
 # iSpatialGym install + test run — status / handoff
 
-_Last updated: 2026-07-10. The env was rebuilt from scratch against the updated
-Behavior-1K checkout and fully re-validated. Complete._
+_Last updated: 2026-09-14 (RunPod validation); the 2026-07-10 workstation notes follow below._
+
+## 2026-09-14 — fresh-machine validation on RunPod (RTX 4090, Ubuntu 24.04, driver 580)
+- Repos: `git clone git@github.com:kmy17518/iSpatialGym.git` (private, over SSH) then
+  `./setup.sh --new-env ispatialgym --omnigibson --bddl --dataset --dev --primitives
+  --accept-conda-tos --accept-nvidia-eula --accept-dataset-tos` with Miniforge. `setup.sh`
+  cloned `Behavior-1K/` (kmy17518/BEHAVIOR-1K @ `ispatialgym`) itself; the SSH->HTTPS clone
+  fallback was verified separately.
+- **Install: 13 min end-to-end** (Isaac Sim 5.1 + OmniGibson 3.9.2 + bddl + torch 2.7.0+cu128,
+  36 GB datasets, cuRoboV2). Env 20 GB, datasets 36 GB, ~61 GB disk in total.
+- **Found + fixed**: cuRobo v0.8.0 built with setuptools_scm 10.3.x ships without
+  `curobo/content/**` (default IK/trajopt/robot configs) -> every planner construction fails with
+  `FileNotFoundError: .../curobo/content/configs/task/ik/lbfgs_ik.yml`. `setup.sh` now builds
+  cuRobo with `--no-build-isolation` and `setuptools_scm>=8,<10.3`, verifies the data files and
+  falls back to copying them from a shallow clone.
+- Checks: 79 non-sim unit tests pass; grasp library loads from `runlogs/grasp_library_20260905`;
+  `sample_instances` wrote 1 instance each for `camera_relocalization-0` and
+  `configuration_matching-0` (Kohs block from the vendored `ispatialgym-assets`): scene load
+  ~48 s, first cuRobo embodiment build 13–21 s (JIT), ~1:40 wall per problem, peak RSS 8–9 GB,
+  peak GPU memory 8–9.6 GB.
+- Pod notes: the RunPod proxy SSH (`ssh.runpod.io`) needs a PTY and cannot scp; use the exposed
+  TCP port (`RUNPOD_PUBLIC_IP:RUNPOD_TCP_PORT_22`) with `ssh -A` for GitHub access. `apt install
+  libegl1 libglu1-mesa libxt6 time` on the PyTorch image; export `HF_TOKEN` for HF downloads.
+
+## 2026-07-10 — workstation rebuild (historical)
 
 ## TL;DR
 - `Behavior-1K` was pulled forward (only new upstream commit: 770343a91

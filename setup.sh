@@ -52,6 +52,8 @@ CUROBO_REF="v0.8.0"
 #   packaging: <26       (cuRoboV2 pulls packaging 26, violating lerobot's <26)
 #   warp-lang: >=0.9,<1.13 (member of OmniGibson's `primitives` extra, which we
 #                         intercept, so we must install it ourselves)
+#   setuptools_scm: >=8,<10.3 (build dep of cuRoboV2; 10.3+ drops cuRobo's
+#                         curobo/content/** data files from the wheel)
 AV_SPEC="av>=15.0.0,<16.0.0"
 DATASETS_SPEC="datasets>=4.0.0,<5.0.0"
 PILLOW_SPEC="pillow~=11.0.0"
@@ -59,6 +61,7 @@ PANDAS_SPEC="pandas<3"
 NUMPY_SPEC="numpy<2"
 PACKAGING_SPEC="packaging<26"
 WARP_SPEC="warp-lang>=0.9.0,<1.13"
+SETUPTOOLS_SCM_SPEC="setuptools_scm>=8,<10.3"
 
 # --- locate (or clone) the bundled Behavior-1K checkout ----------------------
 # Behavior-1K/ is a separate git checkout (gitignored here): our fork of
@@ -246,7 +249,9 @@ if [ "${ISPATIALGYM_DRY_RUN:-0}" = "1" ]; then
     fi
     if [ "$PRIMITIVES" = true ]; then
         echo "[dry-run] would run: pip install \"ninja~=1.13.0\" \"$WARP_SPEC\""
-        echo "[dry-run] would run: SETUPTOOLS_SCM_PRETEND_VERSION_FOR_NVIDIA_CUROBO=${CUROBO_REF#v} pip install \"nvidia-curobo[${CUROBO_EXTRA}] @ git+${CUROBO_REPO}@${CUROBO_REF}\" \"$NUMPY_SPEC\""
+        echo "[dry-run] would run: pip install \"$SETUPTOOLS_SCM_SPEC\" \"setuptools>=61,<81\" wheel"
+        echo "[dry-run] would run: SETUPTOOLS_SCM_PRETEND_VERSION_FOR_NVIDIA_CUROBO=${CUROBO_REF#v} pip install --no-build-isolation \"nvidia-curobo[${CUROBO_EXTRA}] @ git+${CUROBO_REPO}@${CUROBO_REF}\" \"$SETUPTOOLS_SCM_SPEC\" \"$NUMPY_SPEC\""
+        echo "[dry-run] would verify curobo/content/** (fallback: copy from a shallow clone of $CUROBO_REF)"
         echo "[dry-run] would run: pip install \"$PACKAGING_SPEC\""
     fi
     exit 0
@@ -331,10 +336,37 @@ if [ "$PRIMITIVES" = true ]; then
 
     # cuRoboV2 derives its version via setuptools_scm. pip's VCS checkout can be
     # shallow and miss the tag, which breaks version detection, so pin it
-    # explicitly. DEFAULT build isolation (no --no-build-isolation) lets pip
-    # provision setuptools_scm/wheel for the build. numpy<2 guards the env.
+    # explicitly. numpy<2 guards the env.
+    #
+    # Build WITHOUT isolation, with pinned build deps: cuRobo's default configs
+    # and robot assets (curobo/content/**, e.g. configs/task/ik/lbfgs_ik.yml) are
+    # only picked up through setuptools_scm's git file finder, and setuptools_scm
+    # 10.3+ no longer includes them in the wheel (validated 2026-09-14: 10.2.x ->
+    # 150 files, 10.3.1 -> none; any setuptools 77-84 is fine). Without them
+    # every IK/motion-planner construction fails with FileNotFoundError.
+    pip install "$SETUPTOOLS_SCM_SPEC" "setuptools>=61,<81" wheel
     SETUPTOOLS_SCM_PRETEND_VERSION_FOR_NVIDIA_CUROBO="${CUROBO_REF#v}" \
-        pip install "nvidia-curobo[${CUROBO_EXTRA}] @ git+${CUROBO_REPO}@${CUROBO_REF}" "$NUMPY_SPEC"
+        pip install --no-build-isolation \
+            "nvidia-curobo[${CUROBO_EXTRA}] @ git+${CUROBO_REPO}@${CUROBO_REF}" "$SETUPTOOLS_SCM_SPEC" "$NUMPY_SPEC"
+
+    # Verify the package data made it; otherwise copy it from a shallow clone.
+    curobo_content_ok() {
+        python - <<'PY'
+import os, sys, curobo
+p = os.path.join(os.path.dirname(curobo.__file__), "content", "configs", "task", "ik", "lbfgs_ik.yml")
+sys.exit(0 if os.path.exists(p) else 1)
+PY
+    }
+    if ! curobo_content_ok; then
+        echo "WARNING: cuRobo wheel is missing curobo/content/*; copying it from a shallow clone of $CUROBO_REF"
+        CUROBO_TMP="$(mktemp -d)"
+        git clone -q --depth 1 --branch "$CUROBO_REF" "$CUROBO_REPO" "$CUROBO_TMP/curobo"
+        CUROBO_PKG_DIR="$(python -c 'import os, curobo; print(os.path.dirname(curobo.__file__))')"
+        cp -r "$CUROBO_TMP/curobo/curobo/content/." "$CUROBO_PKG_DIR/content/"
+        rm -rf "$CUROBO_TMP"
+        curobo_content_ok || { echo "ERROR: cuRobo content files still missing under $CUROBO_PKG_DIR/content"; exit 1; }
+    fi
+    echo "✓ cuRobo package data present (content/configs, content/assets)"
 
     # cuRoboV2's deps bump `packaging` to 26+, which violates lerobot's <26.
     # Restore a compatible version (curobo only needs packaging at build time).

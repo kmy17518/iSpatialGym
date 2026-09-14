@@ -37,7 +37,9 @@ Notes:
   clone URL/branch set `ISPATIALGYM_B1K_URL` / `ISPATIALGYM_B1K_BRANCH` before
   running `setup.sh`; if SSH to GitHub is not set up the clone falls back to HTTPS.
 - Datasets go to `Behavior-1K/datasets/` unless `OMNIGIBSON_DATA_PATH` is set.
-  Put them on a persistent volume on cloud machines; they are ~37 GB.
+  Put them on a persistent volume on cloud machines; they are ~37 GB. The
+  BEHAVIOR-1K assets come from the Hugging Face Hub: export `HF_TOKEN=<your token>`
+  before `setup.sh --dataset` for authenticated (faster, rate-limit-free) downloads.
 - The sampler reads the validated grasp library from
   `runlogs/grasp_library_20260905/{cands,results,review,artic/handles}` (committed;
   override with `ISPATIALGYM_GRASP_LIBRARY`) and the object selections under
