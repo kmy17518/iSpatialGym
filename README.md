@@ -33,6 +33,9 @@ OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.sample_instances \
 ```
 
 Notes:
+- Cloud pods: see [`ispatialgym/docs/runpod_setup.md`](ispatialgym/docs/runpod_setup.md)
+  (RunPod template settings, SSH, one-time prep, install/verify commands, measured
+  timings and pitfalls; validated on an RTX 4090 pod).
 - `Behavior-1K/` is a separate git checkout (gitignored here). To use a different
   clone URL/branch set `ISPATIALGYM_B1K_URL` / `ISPATIALGYM_B1K_BRANCH` before
   running `setup.sh`; if SSH to GitHub is not set up the clone falls back to HTTPS.
