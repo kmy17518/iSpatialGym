@@ -307,13 +307,22 @@ Rules that use them:
    distractors of one model; `distractors_group` members are unique models by default.
 4. **Model iteration** in `sample_isg` ("iterate over all models before reusing one") counts exact duplicates as one
    model and texture variants as distinct models.
-5. **Representative / test picks**: the representative is the pick-1 model of the (deduplicated) category; the two
-   test instances of a category are never exact duplicates or texture variants of each other (the selection contract's
-   pair rule).
-6. **Look-alike coverage beyond disembedding** (TODO A6): the init-view look-alike judgement exists only for the 39
-   disembedding categories; for the IORS pairs whose partner is of the same or a related category and for obstacle /
-   alignment categories only the geometry-based duplicate / variant flags exist. Until A6 delivers the review, rule 2
-   uses `duplicate_of` ∪ `geometry_group` as the look-alike proxy.
+5. **Which models are the representative and the test models of a category** (a constraint on `build_icl.py`, not a
+   runtime rule). Every category has one *representative* model (the one `ground_isg` tests first) and two *test*
+   models (the ones used for the benchmark's test instances, the reviewers' pick 1 and pick 2). After deduplication:
+   the representative is the surviving member of pick 1's exact-duplicate group, and the two test models must be two
+   different geometries — never an exact duplicate or a recolour of each other, otherwise the "two test models" would
+   be one object with two labels (the selection contract's pair rule already asked reviewers to pick a different-looking
+   second model; this makes it a check).
+
+Status note (not a rule): the init-view look-alike review ("cannot be told apart from the robot's initial view") was
+done only for the 39 disembedding categories, because that is where distractors are drawn. For the subtasks where two
+objects of the same or a related category can appear together for other reasons — IORS pairs such as salt shaker /
+pepper shaker, teacup / teapot, jar of spaghetti sauce / canned food — and for the obstacle and alignment categories,
+only the geometry-based flags (exact duplicate, same geometry) exist today. Until TODO A6 delivers that review, rule 2
+treats two models as look-alikes when one is the other's exact duplicate or texture variant (`duplicate_of` or the same
+`geometry_group`); that is a stand-in, weaker than the reviewed judgement (two differently shaped shakers are not
+caught, two recolours of one shaker are).
 
 ## 4. Tabletop initialization
 
