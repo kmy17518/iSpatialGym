@@ -1156,10 +1156,31 @@ def place_partner(s, rng, t_pose: Pose, t_hull: th.Tensor, p_hull: th.Tensor, p_
     _reject("partner_placement", f"no partner position with gap in [{g_lo:.2f}, {g_hi:.2f}] on the top and in frame after {n_tries} tries")
 
 
-def _polygons_overlap(a: th.Tensor, b: th.Tensor, margin: float = 0.0) -> bool:
+def polygon_gap(a: th.Tensor, b: th.Tensor) -> float:
+    """Exact clearance between two convex polygons (N, 2) / (M, 2): 0 when they intersect, else the smallest
+    vertex-to-edge distance (pure torch; the edge-normal SAT alone under-estimates the gap of small rotated bodies)."""
     from ispatialgym.sampling import geometry as G
 
-    return G.polygons_overlap(a, b, margin=margin)
+    if G.polygons_overlap(a, b, margin=0.0):
+        return 0.0
+
+    def seg_dist(p: th.Tensor, poly: th.Tensor) -> float:
+        n = poly.shape[0]
+        best = float("inf")
+        for i in range(n):
+            s0, s1 = poly[i], poly[(i + 1) % n]
+            e = s1 - s0
+            l2 = float(th.dot(e, e))
+            t = 0.0 if l2 < 1e-12 else max(0.0, min(1.0, float(th.dot(p - s0, e)) / l2))
+            best = min(best, float(th.linalg.norm(p - (s0 + t * e))))
+        return best
+
+    return min(min(seg_dist(p, b) for p in a), min(seg_dist(p, a) for p in b))
+
+
+def _polygons_overlap(a: th.Tensor, b: th.Tensor, margin: float = 0.0) -> bool:
+    """Whether two convex footprints are closer than ``margin`` (exact clearance, see :func:`polygon_gap`)."""
+    return polygon_gap(a, b) < float(margin)
 
 
 def place_distractors(s, rng, raster, z: float, target_pose: Pose, target_hull: th.Tensor, items: Sequence[Tuple[str, th.Tensor, Any]], *,

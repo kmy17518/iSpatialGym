@@ -304,9 +304,10 @@ class BlockDesign(SamplerV2):
         for a in range(n):
             for b in range(a + 1, n):
                 if TT._polygons_overlap(fps[a], fps[b], gap):
-                    ext_a = (fps[a].max(dim=0).values - fps[a].min(dim=0).values).tolist()
-                    raise Reject("layout", f"block footprints {a} / {b} closer than the gap {gap} (centres {float(th.linalg.norm(chosen[a] - chosen[b])):.3f} m apart, "
-                                           f"footprint extents {[round(v, 3) for v in ext_a]}, region cells {len(region)})")
+                    ext = [[round(v, 3) for v in (fps[i].max(dim=0).values - fps[i].min(dim=0).values).tolist()] for i in (a, b)]
+                    raise Reject("layout", f"block footprints {a} / {b} closer than the gap {gap} (clearance {TT.polygon_gap(fps[a], fps[b]):.3f} m, centres "
+                                           f"{float(th.linalg.norm(chosen[a] - chosen[b])):.3f} m apart, footprint extents {ext}, centres {[[round(float(v), 3) for v in fps[i].mean(dim=0).tolist()] for i in (a, b)]}, "
+                                           f"cells {[[round(float(v), 3) for v in chosen[i].tolist()] for i in (a, b)]})")
         missing = TT.all_in_frame(self, cam_init, [(names[bi], self.hull, poses[bi]) for bi in range(n)], TT.IN_FRAME_MARGIN)
         if missing:
             raise Reject("not_in_frame", f"{missing} not fully in the init image")
