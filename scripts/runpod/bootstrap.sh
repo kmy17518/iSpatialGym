@@ -87,6 +87,8 @@ touch /root/BOOTSTRAP_DONE
 if [ -n "${ISG_JOB:-}" ]; then
   case "${ISG_JOB}" in
     bench:*) K="${ISG_JOB#bench:}"; phase "job bench K=${K}"; bash /root/isg_boot/bench.sh "${K}" > /root/isg_bench.log 2>&1; phase "bench exit $?";;
+    inv:*)   S="${ISG_JOB#inv:}"; phase "job scene inventory ${S}"; mkdir -p /root/inv
+             ( cd /root/ispatialgym && python -m ispatialgym.sampling.scene_inventory --scene "${S}" --out /root/inv ) > /root/isg_inv.log 2>&1; phase "inventory exit $?";;
     rv:*)  # eef reach volume shards: rv:<arm>:<translate,translate,...>  (all tilts of the grid)
       spec="${ISG_JOB#rv:}"; arm="${spec%%:*}"; trs="${spec##*:}"; phase "job reach volume arm=${arm} translates=${trs}"
       python -m ispatialgym.sampling.eef_reach_volume compute --arm "${arm}" --translates ${trs//,/ } --out /root/rv > /root/isg_rv.log 2>&1
