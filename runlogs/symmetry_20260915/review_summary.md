@@ -1,6 +1,6 @@
-# Symmetry review — aggregation (2026-09-15T09:07:50)
+# Symmetry review — aggregation (2026-09-15T10:39:44)
 
-Review set 374 entries (9 scaled variants); reviewed 319, partially reviewed 39, unreviewed 55; verdicts {'broken': 282, 'preserved': 168, 'unsure': 4}.
+Review set 374 entries (9 scaled variants); reviewed 374, partially reviewed 0, unreviewed 0; verdicts {'broken': 343, 'preserved': 259, 'unsure': 4}.
 
 | batch | entries | verdicts | file present |
 |---|---|---|---|
@@ -15,55 +15,78 @@ Review set 374 entries (9 scaled variants); reviewed 319, partially reviewed 39,
 | rev_08 | 29 | 38 | yes |
 | rev_09 | 29 | 36 | yes |
 | rev_10 | 29 | 46 | yes |
-| rev_11 | 24 | 0 | no |
-| rev_12 | 24 | 0 | no |
-| rev_13 | 24 | 0 | no |
-| rev_14 | 22 | 0 | no |
+| rev_11 | 24 | 36 | yes |
+| rev_12 | 24 | 38 | yes |
+| rev_13 | 24 | 34 | yes |
+| rev_14 | 22 | 28 | yes |
+| rev_15 | 11 | 16 | yes |
 
 | tag | preserved | broken | unsure |
 |---|---|---|---|
-| `x2` | 40 | 49 | 1 |
-| `y2` | 13 | 46 | 2 |
-| `z2` | 25 | 64 | 0 |
-| `x4` | 2 | 6 | 1 |
-| `y4` | 2 | 2 | 0 |
-| `z4` | 7 | 13 | 0 |
-| `z3` | 1 | 4 | 0 |
-| `x5` | 5 | 7 | 0 |
-| `y5` | 0 | 2 | 0 |
-| `z5` | 6 | 8 | 0 |
-| `x6` | 8 | 9 | 0 |
-| `y6` | 1 | 1 | 0 |
-| `z6` | 5 | 11 | 0 |
-| `xinf` | 19 | 11 | 0 |
-| `yinf` | 2 | 3 | 0 |
-| `zinf` | 32 | 44 | 0 |
+| `x2` | 46 | 53 | 1 |
+| `y2` | 15 | 61 | 2 |
+| `z2` | 40 | 73 | 0 |
+| `x4` | 6 | 7 | 1 |
+| `y4` | 2 | 3 | 0 |
+| `z4` | 17 | 18 | 0 |
+| `x3` | 1 | 2 | 0 |
+| `z3` | 1 | 6 | 0 |
+| `x5` | 9 | 8 | 0 |
+| `y5` | 1 | 4 | 0 |
+| `z5` | 12 | 14 | 0 |
+| `x6` | 12 | 9 | 0 |
+| `y6` | 3 | 4 | 0 |
+| `z6` | 14 | 20 | 0 |
+| `xinf` | 33 | 11 | 0 |
+| `yinf` | 3 | 3 | 0 |
+| `zinf` | 44 | 45 | 0 |
 | `full` | 0 | 2 | 0 |
 
-## Models whose verdict changed (168)
+## Models whose verdict changed (241)
 
 | key | survey `symmetry` / `symmetry_near` | final `symmetry` / `symmetry_near` |
 |---|---|---|
 | `apple__agveuv` | `none` / `x6` | `x5 x6` / `-` |
+| `asparagus__eodozo` | `none` / `y6` | `y6` / `-` |
+| `asparagus__xguktb` | `none` / `y6` | `y5 y6` / `-` |
 | `bar_soap__feqemg` | `none` / `z2` | `z2` / `-` |
 | `baseball_bat__yalgei` | `none` / `-` | `xinf` / `-` |
 | `beaker__effbnc` | `none` / `zinf` | `zinf` / `-` |
 | `beefsteak_tomato__pnrdxh` | `none` / `-` | `z6` / `-` |
+| `beeswax_candle__nhdnje` | `none` / `zinf` | `zinf` / `-` |
+| `beeswax_candle__nxewyk` | `none` / `zinf` | `zinf` / `-` |
+| `beeswax_candle__oimgmh` | `z4 z5 z6` / `zinf` | `zinf` / `-` |
+| `beeswax_candle__ouzkdj` | `none` / `zinf` | `zinf` / `-` |
+| `beeswax_candle__pfewit` | `none` / `zinf` | `zinf` / `-` |
 | `biscuit__ukcwqw` | `none` / `z2` | `z2` / `-` |
+| `bottle_of_beer__zlmwyn` | `none` / `z4 z5 z6` | `none` / `-` |
 | `bottle_of_black_pepper__honise` | `none` / `-` | `z4` / `-` |
 | `bottle_of_black_pepper__ydzzrv` | `none` / `zinf` | `none` / `-` |
+| `bottle_of_catsup__bcqfxb` | `none` / `z2` | `z2` / `-` |
+| `bottle_of_coconut_water__lsixio` | `none` / `z2` | `z2` / `-` |
+| `bottle_of_essential_oil__eyyhld` | `none` / `z4 z5 z6` | `none` / `-` |
+| `bottle_of_essential_oil__wansva` | `none` / `z5 z6` | `none` / `-` |
 | `bottle_of_essential_oil__xhoipk` | `none` / `zinf` | `none` / `-` |
+| `bottle_of_essential_oil__xvqshn` | `none` / `z6` | `none` / `-` |
 | `bottle_of_essential_oil__yjxvpg` | `none` / `zinf` | `none` / `-` |
 | `bottle_of_fennel__ihlkfu` | `none` / `zinf` | `zinf` / `-` |
+| `bottle_of_ginger__drqhzo` | `none` / `z6` | `none` / `-` |
+| `bottle_of_ground_cloves__vzamzb` | `z4 z5 z6` / `zinf` | `zinf` / `-` |
+| `bottle_of_ground_nutmeg__qebruq` | `none` / `z5 z6` | `none` / `-` |
 | `bottle_of_lotion__tkryrh` | `none` / `-` | `zinf` / `-` |
 | `bottle_of_milk__ddvsgl` | `none` / `-` | `x2` / `-` |
 | `bottle_of_mustard_seeds__grryaf` | `none` / `-` | `zinf` / `-` |
+| `bottle_of_paprika__nrdgrp` | `z4 z5 z6` / `zinf` | `zinf` / `-` |
 | `bottle_of_pop__sevoto` | `none` / `-` | `z2` / `-` |
+| `bottle_of_pop__wuuoes` | `z2` / `z4 z3` | `z2` / `-` |
+| `bottle_of_pop__zjbqvb` | `z2` / `z4` | `z2` / `-` |
 | `bottle_of_poppy_seeds__xdtrgi` | `none` / `-` | `zinf` / `-` |
+| `bottle_of_sage__bterim` | `none` / `z4 z5 z6` | `z4 z5 z6` / `-` |
+| `bottle_of_salsa__nafwlf` | `none` / `z4 z5 z6` | `z4 z5 z6` / `-` |
 | `bottle_of_seasoning__vqwqqv` | `none` / `z5 z6` | `zinf` / `-` |
 | `bottle_of_sesame_seeds__lzndie` | `none` / `zinf` | `zinf` / `-` |
-| `bottle_of_tea_leaves__pfbtus` | `none` / `zinf` | `z2` / `zinf` |
-| `bottle_of_water__cyzaue` | `none` / `z6` | `zinf` / `-` |
+| `bottle_of_tea_leaves__pfbtus` | `none` / `zinf` | `zinf` / `-` |
+| `bottle_of_water__cyzaue` | `none` / `z6` | `z6` / `-` |
 | `bottle_of_water__emquat` | `none` / `-` | `zinf` / `-` |
 | `bottle_of_water__lkpaas` | `none` / `-` | `zinf` / `-` |
 | `bowl__belcml` | `z4` / `-` | `zinf` / `-` |
@@ -74,10 +97,15 @@ Review set 374 entries (9 scaled variants); reviewed 319, partially reviewed 39,
 | `bread_slice__pfggnm` | `none` / `-` | `y2` / `-` |
 | `butter_cookie__kukrla` | `z2` / `x2 zinf` | `x2 zinf` / `-` |
 | `cabinet_base__dcmhhh` | `none` / `x2` | `x2` / `-` |
+| `can_of_baking_mix__rxorlp` | `none` / `z2` | `z2` / `-` |
+| `can_of_corn__alphlq` | `none` / `z2` | `z2` / `-` |
+| `can_of_corn__kwwlfn` | `none` / `z2` | `z2` / `-` |
 | `can_of_soda__bfrzvk` | `z2` / `zinf` | `zinf` / `-` |
 | `can_of_soda__lugwcz` | `none` / `zinf` | `none` / `-` |
 | `can_of_soda__wbrrad` | `none` / `-` | `zinf` / `-` |
 | `canned_food__foetdd` | `none` / `-` | `z4` / `-` |
+| `cap__ghwjwe` | `z4 z5 z6` / `zinf` | `zinf` / `-` |
+| `cap__iqeyba` | `z4 z5 z6` / `zinf` | `zinf` / `-` |
 | `cap__rgtedj` | `z5 z6` / `zinf` | `zinf` / `-` |
 | `cap__ygsmgm` | `z6` / `zinf` | `zinf` / `-` |
 | `carrot__aucrah` | `none` / `x6` | `xinf` / `-` |
@@ -88,7 +116,8 @@ Review set 374 entries (9 scaled variants); reviewed 319, partially reviewed 39,
 | `cellulose_tape__sklkyc` | `zinf` / `x2 y2` | `x2 zinf` / `-` |
 | `cherry_tomato__dqjuub` | `none` / `z5 z6` | `z5 z6` / `-` |
 | `chopping_board__psabiv` | `none` / `-` | `x2` / `-` |
-| `cinnamon_stick__cdkjfo` | `none` / `x2 yinf` | `x2 yinf` / `-` |
+| `chopstick__bcwuwv` | `none` / `-` | `x4 x5 x6` / `-` |
+| `cinnamon_stick__cdkjfo` | `none` / `x2 z2 y4 y5 y6` | `x2 yinf` / `-` |
 | `cinnamon_stick__hjhcpm` | `none` / `z2` | `z2` / `-` |
 | `cinnamon_stick__kdaxdy` | `none` / `x2 y2 z2` | `x2 y2 z2` / `-` |
 | `cinnamon_stick__kdaxdy__scaled` | `none` / `y2` | `y2` / `-` |
@@ -97,23 +126,33 @@ Review set 374 entries (9 scaled variants); reviewed 319, partially reviewed 39,
 | `cinnamon_stick__qsqvgk` | `none` / `z2` | `x2 y2 z2` / `-` |
 | `cinnamon_stick__qsqvgk__scaled` | `none` / `z2` | `z2 y6` / `-` |
 | `cinnamon_stick__qxpzdm` | `none` / `x2 z2` | `x2 y2 z2` / `-` |
-| `cinnamon_stick__qxpzdm__scaled` | `none` / `x2 z2 y5 y6` | `none` / `z2 y5 y6` |
+| `cinnamon_stick__qxpzdm__scaled` | `none` / `x2 z2 y5 y6` | `z2` / `-` |
+| `cinnamon_stick__smfuqz` | `none` / `z2 y6` | `z2` / `-` |
 | `cinnamon_stick__smfuqz__scaled` | `none` / `z2` | `z2` / `-` |
 | `coaster__arjpcz` | `none` / `x2 zinf` | `x2 zinf` / `-` |
-| `colored_pencil__acumgp` | `x4 x5 x6` / `y2 xinf` | `xinf` / `-` |
-| `colored_pencil__bnsqcn` | `z2 x4 x5 x6` / `y2 xinf` | `z2 xinf` / `-` |
-| `colored_pencil__jnccuz` | `x4 x5 x6` / `y2 xinf` | `xinf` / `-` |
-| `colored_pencil__kgmapz` | `x4 x5 x6` / `y2 xinf` | `xinf` / `y2` |
-| `colored_pencil__nssris` | `z2 x4 x5 x6` / `y2 xinf` | `z2 xinf` / `-` |
-| `colored_pencil__qrxemk` | `x4 x5 x6` / `y2 xinf` | `xinf` / `y2` |
+| `colored_pencil__acumgp` | `x5 x6` / `z2` | `xinf` / `-` |
+| `colored_pencil__bkdqwb` | `x5 x6` / `z2` | `xinf` / `-` |
+| `colored_pencil__bnsqcn` | `z2 x4 x5 x6` / `-` | `z2 xinf` / `-` |
+| `colored_pencil__deuvcx` | `x6` / `x4 x5` | `xinf` / `-` |
+| `colored_pencil__egvqng` | `x5 x6` / `z2` | `xinf` / `-` |
+| `colored_pencil__jdqvdl` | `x5 x6` / `z2` | `xinf` / `-` |
+| `colored_pencil__jnccuz` | `x5 x6` / `z2` | `xinf` / `-` |
+| `colored_pencil__kadvlg` | `x5 x6` / `z2` | `xinf` / `-` |
+| `colored_pencil__kgmapz` | `x5 x6` / `-` | `xinf` / `-` |
+| `colored_pencil__kjwoqm` | `x4 x5 x6` / `-` | `xinf` / `-` |
+| `colored_pencil__nssris` | `z2 x4 x5 x6` / `-` | `z2 xinf` / `-` |
+| `colored_pencil__qrxemk` | `x5 x6` / `z2` | `xinf` / `-` |
+| `cookie_cutter__lqrfzo` | `none` / `z4` | `z4` / `-` |
 | `cork__lseuwf` | `none` / `zinf` | `zinf` / `-` |
 | `cork__ncxgpe` | `none` / `zinf` | `zinf` / `-` |
 | `cutting_board__aibvew` | `none` / `x2` | `x2` / `-` |
 | `cutting_board__jfrbuz` | `none` / `x2 y2 z2` | `x2 y2 z2` / `-` |
 | `cutting_board__nsvnai` | `y2` / `x2 z2` | `x2 y2 z2` / `-` |
-| `cutting_board__tcdrzs` | `none` / `x2 y2 z2` | `x2 z2` / `y2` |
+| `cutting_board__tcdrzs` | `none` / `x2 y2 z2` | `x2 y2 z2` / `-` |
+| `decorative_sign__hgonwj` | `none` / `x2` | `x2` / `-` |
 | `dip_candle__gbaons` | `zinf` / `x2 y2` | `zinf` / `-` |
-| `dip_candle__poexjo` | `none` / `x2 z4 z5 z6` | `z4 z5` / `z6` |
+| `dip_candle__mxjejs` | `none` / `x2 zinf` | `none` / `zinf` |
+| `dip_candle__poexjo` | `none` / `x2 z4 z5 z6` | `none` / `z4 z5 z6` |
 | `drumstick__jauzlc` | `x4 x5 x6` / `-` | `xinf` / `-` |
 | `drumstick__lkvzmj` | `y2 z2 x4 x5 x6` / `xinf` | `y2 xinf` / `-` |
 | `flashlight__jtrbkc` | `none` / `-` | `x6` / `-` |
@@ -123,7 +162,9 @@ Review set 374 entries (9 scaled variants); reviewed 319, partially reviewed 39,
 | `french_fries__uqsuef` | `none` / `z2` | `z2` / `-` |
 | `green_bean__dyjvwv` | `none` / `x2` | `x2` / `-` |
 | `green_bean__lvbjws` | `none` / `x2` | `x2` / `-` |
+| `half_lime__dtyjkb` | `none` / `z6` | `none` / `-` |
 | `half_lime__mxmmcp` | `none` / `zinf` | `zinf` / `-` |
+| `half_lime__wdadtn` | `none` / `z2` | `z2` / `-` |
 | `hamburger_bun__fqxumh` | `none` / `z4 z5 z6` | `zinf` / `-` |
 | `hamburger_bun__jeygaq` | `none` / `-` | `z4 z5 z6` / `-` |
 | `hamper__sijioo` | `none` / `z3` | `z3 z5` / `-` |
@@ -132,7 +173,8 @@ Review set 374 entries (9 scaled variants); reviewed 319, partially reviewed 39,
 | `ice_cube__lkirej` | `none` / `z4` | `z4` / `-` |
 | `jar_of_curry_powder__ozhftu` | `none` / `z4 z5 z6` | `zinf` / `-` |
 | `jar_of_dill_seed__reavkt` | `none` / `zinf` | `zinf` / `-` |
-| `keyboard__uwacaq` | `z2` / `-` | `none` / `-` |
+| `keyboard__uwacaq` | `none` / `z2` | `none` / `-` |
+| `lemon__asdada` | `none` / `x6` | `x6` / `-` |
 | `lemon__bbvonm` | `none` / `y2 z2 x5 x6` | `y2 z2 x5 x6` / `-` |
 | `lemon__bmvxas` | `none` / `-` | `xinf` / `-` |
 | `lemon__dsacfa` | `none` / `-` | `x5 x6` / `-` |
@@ -158,12 +200,22 @@ Review set 374 entries (9 scaled variants); reviewed 319, partially reviewed 39,
 | `marker__mznenj` | `none` / `xinf` | `none` / `-` |
 | `marker__oyjbhy` | `none` / `xinf` | `none` / `-` |
 | `marker__slgheo` | `none` / `x4 x5 x6` | `none` / `-` |
+| `marker__vjjsul` | `none` / `x4 x3 x5` | `none` / `-` |
+| `marker__vrjwkg` | `none` / `x3` | `none` / `-` |
 | `marker__xakoic` | `none` / `xinf` | `none` / `-` |
 | `marker__zvvovh` | `none` / `x4 x5 x6` | `none` / `-` |
 | `notebook__eijrqw` | `none` / `-` | `y2` / `-` |
+| `notebook__gqkaqu` | `none` / `x2` | `none` / `-` |
+| `notebook__zkmmnf` | `none` / `x2 y2 z2` | `none` / `x2 y2` |
+| `orange__ucstpm` | `none` / `z6` | `z6` / `-` |
+| `ottoman__qsnawv` | `none` / `z4` | `z4` / `-` |
+| `ottoman__xcmniq` | `none` / `z2` | `z2` / `-` |
 | `pack_of_chocolate_bar__bxgewr` | `none` / `z2` | `none` / `-` |
 | `pack_of_chocolate_bar__tidcst` | `none` / `-` | `x2` / `-` |
 | `pack_of_cigarettes__ohpqua` | `none` / `-` | `z2` / `-` |
+| `pack_of_cigarettes__qabdgg` | `none` / `z2` | `z2` / `-` |
+| `pack_of_cigarettes__wjfbhw` | `none` / `z2` | `z2` / `-` |
+| `pack_of_kielbasa__fwqdoy` | `none` / `x2` | `x2` / `-` |
 | `pack_of_kielbasa__rvhpal` | `none` / `-` | `x2` / `-` |
 | `paper_liners__yvuilk` | `z4 z5 z6` / `zinf` | `zinf` / `-` |
 | `paperback_book__aubynm` | `none` / `-` | `x2` / `-` |
@@ -172,38 +224,56 @@ Review set 374 entries (9 scaled variants); reviewed 319, partially reviewed 39,
 | `paperback_book__ncjkcg` | `none` / `-` | `x2` / `-` |
 | `paperback_book__phsgun` | `none` / `-` | `x2` / `-` |
 | `paperback_book__vciijb` | `none` / `-` | `x2` / `-` |
+| `pen__enfumt` | `none` / `x2` | `none` / `-` |
+| `pen__gzrbrx` | `none` / `xinf` | `xinf` / `-` |
+| `pen__hiyeki` | `x4 x3 x5` / `xinf` | `xinf` / `-` |
 | `pencil__fnlbpu__scaled` | `none` / `xinf` | `none` / `-` |
-| `pencil__lruiot` | `x5 x6` / `y2 xinf` | `xinf` / `y2` |
+| `pencil__heqkmr` | `x6` / `y2 xinf` | `xinf` / `-` |
+| `pencil__hmawzy` | `x5 x6` / `z2 x4` | `xinf` / `-` |
+| `pencil__lruiot` | `x5 x6` / `y2 xinf` | `xinf` / `-` |
+| `pencil__lykqoh` | `x4 x5 x6` / `y2 xinf` | `xinf` / `-` |
+| `pencil__mvmxfo` | `none` / `xinf` | `xinf` / `-` |
 | `pencil__rzscao` | `xinf` / `y2 z2` | `xinf` / `-` |
-| `pencil__vvofwr` | `x5 x6` / `y2 xinf` | `xinf` / `y2` |
+| `pencil__vpzhth` | `x4 x5 x6` / `y2 xinf` | `xinf` / `-` |
+| `pencil__vvofwr` | `x5 x6` / `y2 xinf` | `xinf` / `-` |
 | `pencil_case__acikzo` | `none` / `-` | `z2` / `-` |
 | `pepper_shaker__stbqbt` | `none` / `z5 z6` | `z5 z6` / `-` |
 | `pepper_shaker__tgcwtr` | `none` / `z5 z6` | `zinf` / `-` |
+| `pepper_shaker__ykujyn` | `z4 z5 z6` / `zinf` | `zinf` / `-` |
 | `pickle__ifterk` | `none` / `y4` | `y4` / `-` |
 | `pickle__iobrqp` | `none` / `y4` | `y4` / `-` |
 | `plate__bgxzec` | `zinf` / `-` | `x2 zinf` / `-` |
 | `plate__luhkiz` | `none` / `z4 z6` | `zinf` / `-` |
+| `plate__mtetqm` | `z2` / `z4` | `z4` / `-` |
 | `public_trash_can__leazin` | `none` / `-` | `zinf` / `-` |
 | `rolling_pin__mwrdae` | `none` / `x2 yinf` | `x2 yinf` / `-` |
+| `rolling_pin__smnklu` | `x2 z2 y4 y5 y6` / `yinf` | `x2 yinf` / `-` |
 | `salt_shaker__iomwtn` | `none` / `z4 z5 z6` | `zinf` / `-` |
 | `salt_shaker__qowouj` | `z4 z6` / `zinf` | `zinf` / `-` |
 | `shampoo_dispenser__nrthyl` | `none` / `z4` | `none` / `-` |
+| `shelf__kxvbui` | `x2` / `-` | `x2 z2` / `-` |
 | `soap_dispenser__edinmg` | `none` / `zinf` | `none` / `-` |
 | `soap_dispenser__zwudcz` | `z4` / `zinf` | `z4` / `-` |
 | `sponge__klwueh` | `none` / `z2` | `z2` / `-` |
+| `spray_can__tehmzy` | `z5 z6` / `z4` | `z4 z5 z6` / `-` |
 | `sugar_cookie__cgkiti` | `none` / `x2 zinf` | `x2 zinf` / `-` |
 | `sugar_cookie__hlyeaq` | `none` / `x2 zinf` | `x2 zinf` / `-` |
-| `table_knife__lrdmpf` | `x2` / `y2 z2` | `x2 y2 z2` / `-` |
+| `table_knife__lrdmpf` | `none` / `-` | `y2 z2` / `-` |
+| `taboret__bciekv` | `none` / `z4` | `z4` / `-` |
+| `taboret__wjrpwg` | `none` / `z3` | `none` / `-` |
+| `taboret__ysrhuw` | `none` / `z2` | `z2` / `-` |
+| `teacup__cpozxi` | `none` / `z5` | `z5` / `-` |
 | `tongs__gbjqyn` | `none` / `x2` | `x2` / `-` |
 | `tongs__igsklx` | `none` / `x2` | `x2` / `-` |
 | `towel_rack__crivoa` | `none` / `-` | `x2` / `-` |
-| `towel_rack__quznqx` | `none` / `x2 y2 z2` | `x2` / `y2 z2` |
+| `towel_rack__quznqx` | `none` / `x2 y2 z2` | `x2 y2 z2` / `-` |
 | `toy_dice__akguod` | `none` / `z2` | `none` / `-` |
 | `toy_dice__bjrxkj` | `y2` / `x2 z2` | `y2` / `-` |
 | `toy_dice__eqwazv` | `none` / `z2` | `none` / `-` |
 | `toy_dice__hbkqqp` | `none` / `z2` | `none` / `-` |
 | `toy_dice__ievnsq` | `none` / `z2` | `none` / `-` |
 | `toy_dice__kmagva` | `none` / `z2` | `none` / `-` |
+| `toy_dice__krpdji` | `none` / `x2` | `none` / `-` |
 | `toy_dice__nmhsvp` | `none` / `x2` | `none` / `-` |
 | `toy_dice__rbzyrv` | `none` / `z2` | `none` / `-` |
 | `toy_dice__xfqqhh` | `none` / `z2` | `none` / `-` |
@@ -211,6 +281,11 @@ Review set 374 entries (9 scaled variants); reviewed 319, partially reviewed 39,
 | `vase__aegxpb` | `none` / `-` | `zinf` / `-` |
 | `vase__stqkvx` | `z6` / `zinf` | `z6` / `-` |
 | `vidalia_onion__buyxll` | `none` / `xinf` | `xinf` / `-` |
+| `vidalia_onion__dejqhf` | `none` / `xinf` | `xinf` / `-` |
+| `wall_mounted_tv__dxyfxf` | `none` / `-` | `x2` / `-` |
+| `wall_mounted_tv__ggfznh` | `none` / `-` | `x2` / `-` |
+| `wall_mounted_tv__sodbbr` | `none` / `-` | `x2` / `-` |
+| `wall_mounted_tv__ylvjhb` | `none` / `-` | `x2` / `-` |
 | `whiteboard__gvkgsi` | `none` / `-` | `x2` / `-` |
 
 ## `symmetric_180` corrections (7)
@@ -225,59 +300,26 @@ Review set 374 entries (9 scaled variants); reviewed 319, partially reviewed 39,
 | `towel_rack__kqrmrh` | alignment-world_vertical | `x2` | (empty) | 1 |
 | `whiteboard__gvkgsi` | alignment-world_horizontal | `x2` | (empty) | 1 |
 
-## Unreviewed entries (55)
+## Coordinator overrides (3, `review/overrides.json`, applied after the reviewer files)
 
-`asparagus__eodozo` (rev_11), `asparagus__xguktb` (rev_11), `beeswax_candle__nhdnje` (rev_11), `beeswax_candle__nxewyk` (rev_11), `beeswax_candle__ouzkdj` (rev_11), `beeswax_candle__pfewit` (rev_11), `bottle_of_beer__zlmwyn` (rev_11), `bottle_of_catsup__bcqfxb` (rev_11), `bottle_of_ground_cloves__vzamzb` (rev_11), `bottle_of_paprika__nrdgrp` (rev_11), `bottle_of_pop__wuuoes` (rev_11), `bottle_of_pop__zjbqvb` (rev_11), `bottle_of_sage__bterim` (rev_11), `bottle_of_salsa__nafwlf` (rev_11), `can_of_corn__alphlq` (rev_12), `can_of_corn__kwwlfn` (rev_12), `cap__ghwjwe` (rev_12), `cap__iqeyba` (rev_12), `chopstick__bcwuwv` (rev_12), `colored_pencil__bkdqwb` (rev_12), `colored_pencil__deuvcx` (rev_12), `colored_pencil__egvqng` (rev_12), `colored_pencil__jdqvdl` (rev_12), `colored_pencil__kadvlg` (rev_12), `colored_pencil__kjwoqm` (rev_12), `cookie_cutter__lqrfzo` (rev_12), `decorative_sign__hgonwj` (rev_12), `dip_candle__mxjejs` (rev_12), `hamper__xhdtjn` (rev_13), `notebook__zkmmnf` (rev_13), `ottoman__qsnawv` (rev_13), `ottoman__xcmniq` (rev_13), `pack_of_cigarettes__qabdgg` (rev_13), `pack_of_cigarettes__wjfbhw` (rev_13), `pack_of_kielbasa__fwqdoy` (rev_13), `pen__gzrbrx` (rev_13), `pen__hiyeki` (rev_13), `pencil__heqkmr` (rev_13), `pencil__hmawzy` (rev_13), `pencil__lykqoh` (rev_13), `pencil__mvmxfo` (rev_13), `pencil__vpzhth` (rev_14), `plate__mtetqm` (rev_14), `rolling_pin__smnklu` (rev_14), `shelf__kxvbui` (rev_14), `spray_can__tehmzy` (rev_14), `taboret__bciekv` (rev_14), `taboret__wjrpwg` (rev_14), `taboret__ysrhuw` (rev_14), `trash_can__hqdnjz` (rev_14), `vidalia_onion__dejqhf` (rev_14), `wall_mounted_tv__dxyfxf` (rev_14), `wall_mounted_tv__ggfznh` (rev_14), `wall_mounted_tv__sodbbr` (rev_14), `wall_mounted_tv__ylvjhb` (rev_14)
+| key | tag | verdict | replaces | by | note |
+|---|---|---|---|---|---|
+| `bottle_of_water__cyzaue` | `zinf` | broken | preserved (rev_01) | coordinator | hexagonal prism: reads as six-fold, not as a body of revolution; z6 stays |
+| `wall_mounted_tv__dxyfxf` | `x2` | preserved | broken (rev_14) | coordinator | hung on the wall: the rear housing that broke the flip is against the wall and invisible from the room; symmetric_180 co |
+| `wall_mounted_tv__sodbbr` | `x2` | preserved | broken (rev_14) | coordinator | hung on the wall: the rear housing that broke the flip is against the wall and invisible from the room; symmetric_180 co |
 
-## Partially reviewed entries (39)
+## Unreviewed entries (0)
 
-- `beeswax_candle__oimgmh` missing ['zinf']
-- `bottle_of_coconut_water__lsixio` missing ['z2']
-- `bottle_of_essential_oil__eyyhld` missing ['z4', 'z5', 'z6']
-- `bottle_of_essential_oil__wansva` missing ['z5', 'z6']
-- `bottle_of_essential_oil__xvqshn` missing ['z6']
-- `bottle_of_ginger__drqhzo` missing ['z6']
-- `bottle_of_ground_nutmeg__qebruq` missing ['z5', 'z6']
-- `bottle_of_seasoning__vqwqqv` missing ['z5', 'z6']
-- `bottle_of_tea_leaves__pfbtus` missing ['zinf']
-- `bottle_of_water__cyzaue` missing ['z6']
-- `can_of_baking_mix__rxorlp` missing ['z2']
-- `carrot__aucrah` missing ['x6']
-- `carrot__qhmmmx` missing ['x4', 'x3', 'x5']
-- `cinnamon_stick__qxpzdm__scaled` missing ['z2', 'y5', 'y6']
-- `cinnamon_stick__smfuqz` missing ['z2', 'y6']
-- `colored_pencil__kgmapz` missing ['y2']
-- `colored_pencil__qrxemk` missing ['y2']
-- `cutting_board__tcdrzs` missing ['y2']
-- `dip_candle__poexjo` missing ['z6']
-- `half_lime__dtyjkb` missing ['z6']
-- `half_lime__wdadtn` missing ['z2']
-- `hamburger_bun__fqxumh` missing ['z4', 'z5', 'z6']
-- `jar_of_curry_powder__ozhftu` missing ['z4', 'z5', 'z6']
-- `lemon__asdada` missing ['x6']
-- `lemon__kvgfdl` missing ['x5', 'x6']
-- `marker__vjjsul` missing ['x4', 'x3', 'x5']
-- `marker__vrjwkg` missing ['x3']
-- `notebook__gqkaqu` missing ['x2']
-- `orange__ucstpm` missing ['z6']
-- `pen__enfumt` missing ['x2']
-- `pencil__lruiot` missing ['y2']
-- `pencil__vvofwr` missing ['y2']
-- `pepper_shaker__tgcwtr` missing ['z5', 'z6']
-- `pepper_shaker__ykujyn` missing ['zinf']
-- `plate__luhkiz` missing ['z4', 'z6']
-- `salt_shaker__iomwtn` missing ['z4', 'z5', 'z6']
-- `teacup__cpozxi` missing ['z5']
-- `towel_rack__quznqx` missing ['y2', 'z2']
-- `toy_dice__krpdji` missing ['x2']
+none
 
-## Verdicts on tags that are no longer survey candidates (304)
+## Verdicts on tags that are no longer survey candidates (342)
 
 The survey re-run classified these tags broken after the batch was issued; the verdicts are kept and applied (a human `preserved` still joins `symmetry`), listed here for a second look.
 
 - `address__pbfbxj` `x2`: reviewer broken (rev_00)
 - `address__pbfbxj` `y2`: reviewer broken (rev_00)
 - `apple__agveuv` `x5`: reviewer preserved (rev_00)
+- `asparagus__xguktb` `y5`: reviewer preserved (rev_11)
 - `bandage__riftxh` `x2`: reviewer broken (rev_00)
 - `bandage__riftxh` `y2`: reviewer broken (rev_00)
 - `baseball_bat__yalgei` `xinf`: reviewer preserved (rev_00)
@@ -327,7 +369,7 @@ The survey re-run classified these tags broken after the batch was issued; the v
 - `bottle_of_tea__iladfg` `z3`: reviewer broken (rev_01)
 - `bottle_of_tea__iladfg` `z5`: reviewer broken (rev_01)
 - `bottle_of_tea__yatmrs` `z2`: reviewer broken (rev_01)
-- `bottle_of_water__cyzaue` `zinf`: reviewer preserved (rev_01)
+- `bottle_of_water__cyzaue` `zinf`: reviewer broken (overrides)
 - `bottle_of_water__eeaimz` `zinf`: reviewer broken (rev_01)
 - `bottle_of_water__emquat` `zinf`: reviewer preserved (rev_01)
 - `bottle_of_water__lkpaas` `zinf`: reviewer preserved (rev_01)
@@ -386,6 +428,10 @@ The survey re-run classified these tags broken after the batch was issued; the v
 - `cellulose_tape__gchdhk` `z4`: reviewer preserved (rev_03)
 - `cellulose_tape__gchdhk` `z5`: reviewer preserved (rev_03)
 - `chopping_board__psabiv` `x2`: reviewer preserved (rev_03)
+- `chopstick__bcwuwv` `x4`: reviewer preserved (rev_12)
+- `chopstick__bcwuwv` `x5`: reviewer preserved (rev_12)
+- `chopstick__bcwuwv` `x6`: reviewer preserved (rev_12)
+- `cinnamon_stick__cdkjfo` `yinf`: reviewer preserved (rev_03)
 - `cinnamon_stick__qmlyim` `z2`: reviewer preserved (rev_03)
 - `cinnamon_stick__qmlyim__scaled` `x2`: reviewer preserved (rev_03)
 - `cinnamon_stick__qsqvgk` `x2`: reviewer preserved (rev_03)
@@ -399,6 +445,30 @@ The survey re-run classified these tags broken after the batch was issued; the v
 - `cinnamon_stick__smfuqz__scaled` `y5`: reviewer broken (rev_04)
 - `cinnamon_stick__smfuqz__scaled` `y6`: reviewer broken (rev_04)
 - `clipboard__envjqe` `z2`: reviewer broken (rev_04)
+- `colored_pencil__acumgp` `y2`: reviewer broken (rev_04)
+- `colored_pencil__acumgp` `xinf`: reviewer preserved (rev_04)
+- `colored_pencil__bkdqwb` `y2`: reviewer broken (rev_12)
+- `colored_pencil__bkdqwb` `xinf`: reviewer preserved (rev_12)
+- `colored_pencil__bnsqcn` `y2`: reviewer broken (rev_04)
+- `colored_pencil__bnsqcn` `xinf`: reviewer preserved (rev_04)
+- `colored_pencil__deuvcx` `y2`: reviewer broken (rev_12)
+- `colored_pencil__deuvcx` `xinf`: reviewer preserved (rev_12)
+- `colored_pencil__egvqng` `y2`: reviewer broken (rev_12)
+- `colored_pencil__egvqng` `xinf`: reviewer preserved (rev_12)
+- `colored_pencil__jdqvdl` `y2`: reviewer broken (rev_12)
+- `colored_pencil__jdqvdl` `xinf`: reviewer preserved (rev_12)
+- `colored_pencil__jnccuz` `y2`: reviewer broken (rev_04)
+- `colored_pencil__jnccuz` `xinf`: reviewer preserved (rev_04)
+- `colored_pencil__kadvlg` `y2`: reviewer broken (rev_12)
+- `colored_pencil__kadvlg` `xinf`: reviewer preserved (rev_12)
+- `colored_pencil__kgmapz` `xinf`: reviewer preserved (rev_04)
+- `colored_pencil__kgmapz` `y2`: reviewer broken (rev_12)
+- `colored_pencil__kjwoqm` `y2`: reviewer broken (rev_12)
+- `colored_pencil__kjwoqm` `xinf`: reviewer preserved (rev_12)
+- `colored_pencil__nssris` `y2`: reviewer broken (rev_04)
+- `colored_pencil__nssris` `xinf`: reviewer preserved (rev_04)
+- `colored_pencil__qrxemk` `xinf`: reviewer preserved (rev_04)
+- `colored_pencil__qrxemk` `y2`: reviewer broken (rev_12)
 - `conditioner_dispenser__njqnuo` `xinf`: reviewer broken (rev_04)
 - `conditioner_dispenser__udeflt` `zinf`: reviewer broken (rev_04)
 - `drumstick__jauzlc` `y2`: reviewer broken (rev_04)
@@ -497,6 +567,8 @@ The survey re-run classified these tags broken after the batch was issued; the v
 - `pen__enfumt` `xinf`: reviewer broken (rev_07)
 - `pencil__bfkwhb` `y2`: reviewer broken (rev_07)
 - `pencil__bfkwhb` `z2`: reviewer broken (rev_07)
+- `pencil__hmawzy` `y2`: reviewer broken (rev_13)
+- `pencil__hmawzy` `xinf`: reviewer preserved (rev_13)
 - `pencil__hmawzy__scaled` `z2`: reviewer broken (rev_07)
 - `pencil__rzscao__scaled` `z2`: reviewer broken (rev_08)
 - `pencil__vedvit__scaled` `z2`: reviewer broken (rev_08)
@@ -532,6 +604,7 @@ The survey re-run classified these tags broken after the batch was issued; the v
 - `shelf__iruewm` `x2`: reviewer broken (rev_09)
 - `shelf__iruewm` `y2`: reviewer broken (rev_09)
 - `shelf__iruewm` `z2`: reviewer broken (rev_09)
+- `shelf__kxvbui` `z2`: reviewer preserved (rev_14)
 - `shelf__qrmiur` `x2`: reviewer broken (rev_09)
 - `shelf__qrmiur` `y2`: reviewer broken (rev_09)
 - `shelf__qrmiur` `z2`: reviewer broken (rev_09)
@@ -541,6 +614,8 @@ The survey re-run classified these tags broken after the batch was issued; the v
 - `soap_dispenser__jmulpc` `z2`: reviewer broken (rev_09)
 - `table_knife__eebpap` `x2`: reviewer broken (rev_09)
 - `table_knife__jxdfyy` `x2`: reviewer broken (rev_09)
+- `table_knife__lrdmpf` `y2`: reviewer preserved (rev_09)
+- `table_knife__lrdmpf` `z2`: reviewer preserved (rev_09)
 - `taboret__ehaclu` `z2`: reviewer broken (rev_09)
 - `taboret__hugvml` `z3`: reviewer broken (rev_09)
 - `teacup__cpozxi` `z6`: reviewer broken (rev_09)
@@ -576,6 +651,10 @@ The survey re-run classified these tags broken after the batch was issued; the v
 - `wall_clock__xevvel` `x2`: reviewer broken (rev_10)
 - `wall_clock__zpctvp` `x4`: reviewer broken (rev_10)
 - `wall_clock__zpctvp` `x6`: reviewer broken (rev_10)
+- `wall_mounted_tv__dxyfxf` `x2`: reviewer preserved (overrides)
+- `wall_mounted_tv__ggfznh` `x2`: reviewer preserved (rev_14)
+- `wall_mounted_tv__sodbbr` `x2`: reviewer preserved (overrides)
+- `wall_mounted_tv__ylvjhb` `x2`: reviewer preserved (rev_14)
 - `whiteboard__gvkgsi` `x2`: reviewer preserved (rev_10)
 - `wicker_basket__jqfftz` `z4`: reviewer broken (rev_10)
 - `wicker_basket__tsjvyu` `z4`: reviewer broken (rev_10)

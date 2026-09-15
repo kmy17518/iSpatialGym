@@ -1,14 +1,14 @@
 {
- "generated": "2026-09-15T09:07:50",
+ "generated": "2026-09-15T10:39:44",
  "survey": "symmetry.json",
  "contract": "review_contract.md",
  "n_review_set": 374,
- "n_reviewed": 319,
- "n_partially_reviewed": 39,
- "n_unreviewed": 55,
+ "n_reviewed": 374,
+ "n_partially_reviewed": 0,
+ "n_unreviewed": 0,
  "verdict_counts": {
-  "broken": 282,
-  "preserved": 168,
+  "broken": 343,
+  "preserved": 259,
   "unsure": 4
  },
  "warnings": [],
@@ -37,7 +37,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
   },
   "apple__agveuv": {
    "category": "apple",
@@ -64,7 +65,58 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
+  },
+  "asparagus__eodozo": {
+   "category": "asparagus",
+   "model": "eodozo",
+   "scale": null,
+   "symmetry": [
+    "y6"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "y6": {
+     "verdict": "preserved",
+     "note": "Unprinted stalk of uniform green grain turned 60 deg about its own long axis: the tip and cut end stay where they are and the silhouette changes by at most 1-2 px of edge jitter (about 3-4 mm on a 190 mm stalk, the stalk's own bow is only ~4 mm), nothing a person at 1 m could read.",
+     "batch": "rev_11"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_11",
+   "flat_render": false
+  },
+  "asparagus__xguktb": {
+   "category": "asparagus",
+   "model": "xguktb",
+   "scale": null,
+   "symmetry": [
+    "y5",
+    "y6"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "y5": {
+     "verdict": "preserved",
+     "note": "Rotation about the stalk's long axis keeps tip and cut end in place; the stalk is nearly straight (~3 mm bow) with a uniform grain and no scale/knot stands out, so the 1-3 px centreline jitter in the tiles is not readable at 1 m.",
+     "batch": "rev_11"
+    },
+    "y6": {
+     "verdict": "preserved",
+     "note": "Same as y5: straight unprinted stalk with uniform grain rotated about its long axis, only sub-3 px edge jitter and no feature marks the turn.",
+     "batch": "rev_11"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_11",
+   "flat_render": false
   },
   "bandage__riftxh": {
    "category": "bandage",
@@ -90,7 +142,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
   },
   "bar_soap__feqemg": {
    "category": "bar_soap",
@@ -111,7 +164,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
   },
   "baseball_bat__yalgei": {
    "category": "baseball_bat",
@@ -132,7 +186,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
   },
   "beaker__effbnc": {
    "category": "beaker",
@@ -153,7 +208,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
   },
   "beefsteak_tomato__pnrdxh": {
    "category": "beefsteak_tomato",
@@ -174,20 +230,61 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
+  },
+  "beeswax_candle__nhdnje": {
+   "category": "beeswax_candle",
+   "model": "nhdnje",
+   "scale": null,
+   "symmetry": [
+    "zinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "zinf": {
+     "verdict": "preserved",
+     "note": "Plain uniform-wax cylinder; the faint wick sits on the axis (no measurable shift under rotation) and there is no seam, print or grain, only the polygon-corner effect.",
+     "batch": "rev_11"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_11",
+   "flat_render": false
+  },
+  "beeswax_candle__nxewyk": {
+   "category": "beeswax_candle",
+   "model": "nxewyk",
+   "scale": null,
+   "symmetry": [
+    "zinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "zinf": {
+     "verdict": "preserved",
+     "note": "Plain uniform-wax cylinder with a centred, barely visible wick and no seam or print; the rotated tiles are indistinguishable apart from polygon corners.",
+     "batch": "rev_11"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_11",
+   "flat_render": false
   },
   "beeswax_candle__oimgmh": {
    "category": "beeswax_candle",
    "model": "oimgmh",
    "scale": null,
    "symmetry": [
-    "z4",
-    "z5",
-    "z6"
-   ],
-   "symmetry_near": [
     "zinf"
    ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -200,11 +297,61 @@
      "verdict": "broken",
      "note": "Same as x2: the flip puts the wick end down and the plain flat bottom up, while the centred black band cannot tell the two apart.",
      "batch": "rev_00"
+    },
+    "zinf": {
+     "verdict": "preserved",
+     "note": "Plain uniform-wax cylinder, wick on the axis, no seam or print; nothing changes with the yaw beyond polygon corners.",
+     "batch": "rev_11"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00+rev_11"
+   "batch": "rev_00+rev_11",
+   "flat_render": false
+  },
+  "beeswax_candle__ouzkdj": {
+   "category": "beeswax_candle",
+   "model": "ouzkdj",
+   "scale": null,
+   "symmetry": [
+    "zinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "zinf": {
+     "verdict": "preserved",
+     "note": "Plain uniform-wax cylinder with a centred wick and no seam or print; the rotated tiles are identical to the eye.",
+     "batch": "rev_11"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_11",
+   "flat_render": false
+  },
+  "beeswax_candle__pfewit": {
+   "category": "beeswax_candle",
+   "model": "pfewit",
+   "scale": null,
+   "symmetry": [
+    "zinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "zinf": {
+     "verdict": "preserved",
+     "note": "Plain uniform-wax cylinder with a centred, low-contrast wick and no seam or print; only polygon corners move.",
+     "batch": "rev_11"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_11",
+   "flat_render": false
   },
   "biscuit__ukcwqw": {
    "category": "biscuit",
@@ -225,7 +372,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
   },
   "bottle_of_beer__fgzjnb": {
    "category": "bottle_of_beer",
@@ -246,7 +394,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
   },
   "bottle_of_beer__nfzzqc": {
    "category": "bottle_of_beer",
@@ -267,7 +416,40 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
+  },
+  "bottle_of_beer__zlmwyn": {
+   "category": "bottle_of_beer",
+   "model": "zlmwyn",
+   "scale": null,
+   "symmetry": [
+    "none"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z4": {
+     "verdict": "broken",
+     "note": "The single dark rectangular label on the lower body (visible from -y in the original) moves to the side under the quarter turn, so the labelled face and the blank faces swap.",
+     "batch": "rev_11"
+    },
+    "z5": {
+     "verdict": "broken",
+     "note": "The single dark rectangular label on the lower body is only on one side and moves round the bottle with the 72 deg turn.",
+     "batch": "rev_11"
+    },
+    "z6": {
+     "verdict": "broken",
+     "note": "The single dark rectangular label on the lower body is only on one side and moves round the bottle with the 60 deg turn.",
+     "batch": "rev_11"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_11",
+   "flat_render": false
   },
   "bottle_of_black_pepper__honise": {
    "category": "bottle_of_black_pepper",
@@ -288,7 +470,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
   },
   "bottle_of_black_pepper__ydzzrv": {
    "category": "bottle_of_black_pepper",
@@ -309,7 +492,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
   },
   "bottle_of_carrot_juice__jkuhio": {
    "category": "bottle_of_carrot_juice",
@@ -330,7 +514,30 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
+  },
+  "bottle_of_catsup__bcqfxb": {
+   "category": "bottle_of_catsup",
+   "model": "bcqfxb",
+   "scale": null,
+   "symmetry": [
+    "z2"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z2": {
+     "verdict": "preserved",
+     "note": "A blank grey label of the same notched shape sits on both wide faces and cap and body are symmetric, so the half turn shows an identical bottle (both sides alike).",
+     "batch": "rev_11"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_11",
+   "flat_render": false
   },
   "bottle_of_coconut_milk__idenxg": {
    "category": "bottle_of_coconut_milk",
@@ -361,18 +568,17 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
   },
   "bottle_of_coconut_water__lsixio": {
    "category": "bottle_of_coconut_water",
    "model": "lsixio",
    "scale": null,
    "symmetry": [
-    "none"
-   ],
-   "symmetry_near": [
     "z2"
    ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -380,11 +586,17 @@
      "verdict": "broken",
      "note": "Octagonal low-poly bottle, but the dark label carries a small light glyph on two opposite faces and a darker panel on a side face; the 251 degree yaw moves them to other cameras.",
      "batch": "rev_00"
+    },
+    "z2": {
+     "verdict": "preserved",
+     "note": "The palm-tree logo panel is printed identically on front and back; the only residual is a very faint (~15/255) shift of the dark panel edge in the side views that a person at 1 m would not notice.",
+     "batch": "rev_11"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00+rev_11"
+   "batch": "rev_00+rev_11",
+   "flat_render": false
   },
   "bottle_of_disinfectant__faedff": {
    "category": "bottle_of_disinfectant",
@@ -405,7 +617,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
   },
   "bottle_of_essential_oil__eyyhld": {
    "category": "bottle_of_essential_oil",
@@ -414,11 +627,7 @@
    "symmetry": [
     "none"
    ],
-   "symmetry_near": [
-    "z4",
-    "z5",
-    "z6"
-   ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -426,11 +635,27 @@
      "verdict": "broken",
      "note": "The green label has a light title block on the front and fine print on the back; the yaw moves the title block to the -x camera, visible even at this 22 mm bottle's size.",
      "batch": "rev_00"
+    },
+    "z4": {
+     "verdict": "broken",
+     "note": "The 'ESSENTIAL OIL' text block on the pale wrap-around label is on one side only and moves to another side under the quarter turn.",
+     "batch": "rev_11"
+    },
+    "z5": {
+     "verdict": "broken",
+     "note": "The 'ESSENTIAL OIL' text block on the pale label moves round the bottle with the 72 deg turn, a readable print cue.",
+     "batch": "rev_11"
+    },
+    "z6": {
+     "verdict": "broken",
+     "note": "The 'ESSENTIAL OIL' text block on the pale label moves round the bottle with the 60 deg turn, a readable print cue.",
+     "batch": "rev_11"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00+rev_11"
+   "batch": "rev_00+rev_11",
+   "flat_render": false
   },
   "bottle_of_essential_oil__wansva": {
    "category": "bottle_of_essential_oil",
@@ -439,10 +664,7 @@
    "symmetry": [
     "none"
    ],
-   "symmetry_near": [
-    "z5",
-    "z6"
-   ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -450,11 +672,22 @@
      "verdict": "broken",
      "note": "The orange label has a light title block on the front and fine print on the back; the yaw moves the title block round to the -x camera.",
      "batch": "rev_00"
+    },
+    "z5": {
+     "verdict": "broken",
+     "note": "The 'ESSENTIAL OIL' text block on the pale wrap-around label is on one side only and moves with the 72 deg turn.",
+     "batch": "rev_11"
+    },
+    "z6": {
+     "verdict": "broken",
+     "note": "The 'ESSENTIAL OIL' text block on the pale wrap-around label is on one side only and moves with the 60 deg turn.",
+     "batch": "rev_11"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00+rev_11"
+   "batch": "rev_00+rev_11",
+   "flat_render": false
   },
   "bottle_of_essential_oil__xhoipk": {
    "category": "bottle_of_essential_oil",
@@ -475,7 +708,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
   },
   "bottle_of_essential_oil__xvqshn": {
    "category": "bottle_of_essential_oil",
@@ -484,9 +718,7 @@
    "symmetry": [
     "none"
    ],
-   "symmetry_near": [
-    "z6"
-   ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -494,11 +726,17 @@
      "verdict": "broken",
      "note": "The yellow label has a title block on the front and fine print on the back; the yaw moves the title block round to the -x camera.",
      "batch": "rev_00"
+    },
+    "z6": {
+     "verdict": "broken",
+     "note": "The 'ESSENTIAL OIL' text block on the pale wrap-around label is on one side only and moves with the 60 deg turn.",
+     "batch": "rev_11"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00+rev_11"
+   "batch": "rev_00+rev_11",
+   "flat_render": false
   },
   "bottle_of_essential_oil__yjxvpg": {
    "category": "bottle_of_essential_oil",
@@ -519,7 +757,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
   },
   "bottle_of_face_cream__dztaed": {
    "category": "bottle_of_face_cream",
@@ -545,7 +784,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
   },
   "bottle_of_fennel__ihlkfu": {
    "category": "bottle_of_fennel",
@@ -566,7 +806,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
   },
   "bottle_of_fruit_punch__azcigi": {
    "category": "bottle_of_fruit_punch",
@@ -587,7 +828,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
   },
   "bottle_of_ginger__drqhzo": {
    "category": "bottle_of_ginger",
@@ -596,9 +838,7 @@
    "symmetry": [
     "none"
    ],
-   "symmetry_near": [
-    "z6"
-   ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -606,11 +846,17 @@
      "verdict": "broken",
      "note": "Plain cap, but the ginger powder's fill surface is tilted: the cap-to-contents gap is ~1 px on one side and ~5 px (about 7 mm) on the other and moves round with the yaw, a slant visible through the glass.",
      "batch": "rev_00"
+    },
+    "z6": {
+     "verdict": "broken",
+     "note": "The spice fill's top surface is heaped to one side (about 3-5 mm higher, a lip that nearly touches the floating lid on one side and leaves a gap on the other) and the 60 deg turn moves the heap to a different side, a real silhouette change rather than polygon corners, though marginal at 1 m.",
+     "batch": "rev_11"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00+rev_11"
+   "batch": "rev_00+rev_11",
+   "flat_render": false
   },
   "bottle_of_ginger_beer__zkocwb": {
    "category": "bottle_of_ginger_beer",
@@ -636,7 +882,30 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
+  },
+  "bottle_of_ground_cloves__vzamzb": {
+   "category": "bottle_of_ground_cloves",
+   "model": "vzamzb",
+   "scale": null,
+   "symmetry": [
+    "zinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "zinf": {
+     "verdict": "preserved",
+     "note": "Plain grey lid over a level, uniformly speckled fill with no label, print or seam; only the speckle noise and polygon corners change with the yaw.",
+     "batch": "rev_11"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_11",
+   "flat_render": false
   },
   "bottle_of_ground_mace__lgpxro": {
    "category": "bottle_of_ground_mace",
@@ -657,7 +926,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00"
+   "batch": "rev_00",
+   "flat_render": false
   },
   "bottle_of_ground_nutmeg__qebruq": {
    "category": "bottle_of_ground_nutmeg",
@@ -666,10 +936,7 @@
    "symmetry": [
     "none"
    ],
-   "symmetry_near": [
-    "z5",
-    "z6"
-   ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -677,11 +944,22 @@
      "verdict": "broken",
      "note": "Plain cap, but the nutmeg powder's fill surface is tilted: the cap-to-contents gap is ~1 px on one side and ~5 px (about 7 mm) on the other and moves round with the yaw, a slant visible through the glass.",
      "batch": "rev_00"
+    },
+    "z5": {
+     "verdict": "broken",
+     "note": "The fill's top surface is heaped to one side (about 3-5 mm, visible as a lip in the gap under the lid) and the 72 deg turn moves the heap to another side, a silhouette change beyond polygon corners, though marginal at 1 m.",
+     "batch": "rev_11"
+    },
+    "z6": {
+     "verdict": "broken",
+     "note": "Same heaped fill surface (about 3-5 mm lip under the lid) swaps sides under the 60 deg turn, a silhouette change beyond polygon corners, though marginal at 1 m.",
+     "batch": "rev_11"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_00+rev_11"
+   "batch": "rev_00+rev_11",
+   "flat_render": false
   },
   "bottle_of_lotion__tkryrh": {
    "category": "bottle_of_lotion",
@@ -702,7 +980,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_medicine__qqsukh": {
    "category": "bottle_of_medicine",
@@ -723,7 +1002,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_milk__ddvsgl": {
    "category": "bottle_of_milk",
@@ -744,7 +1024,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_milk__qsnnbp": {
    "category": "bottle_of_milk",
@@ -770,7 +1051,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_mustard_seeds__grryaf": {
    "category": "bottle_of_mustard_seeds",
@@ -791,7 +1073,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_onion_powder__xruqod": {
    "category": "bottle_of_onion_powder",
@@ -812,7 +1095,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_papaya_juice__nmfmxy": {
    "category": "bottle_of_papaya_juice",
@@ -833,7 +1117,30 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
+  },
+  "bottle_of_paprika__nrdgrp": {
+   "category": "bottle_of_paprika",
+   "model": "nrdgrp",
+   "scale": null,
+   "symmetry": [
+    "zinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "zinf": {
+     "verdict": "preserved",
+     "note": "Plain grey lid over a level, uniformly speckled red fill with no label, print or seam; only the speckle noise and polygon corners change with the yaw.",
+     "batch": "rev_11"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_11",
+   "flat_render": false
   },
   "bottle_of_pop__bqretx": {
    "category": "bottle_of_pop",
@@ -864,7 +1171,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_pop__cmqubs": {
    "category": "bottle_of_pop",
@@ -885,7 +1193,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_pop__kviogj": {
    "category": "bottle_of_pop",
@@ -906,7 +1215,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_pop__sevoto": {
    "category": "bottle_of_pop",
@@ -927,7 +1237,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_pop__twtsry": {
    "category": "bottle_of_pop",
@@ -948,7 +1259,57 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
+  },
+  "bottle_of_pop__wuuoes": {
+   "category": "bottle_of_pop",
+   "model": "wuuoes",
+   "scale": null,
+   "symmetry": [
+    "z2"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z4": {
+     "verdict": "broken",
+     "note": "A dark elongated mark printed on the cap top (about 12 x 5 mm, ~70/255 contrast) turns from vertical to horizontal with the quarter turn and is readable from above; the octagonal body and base are otherwise identical.",
+     "batch": "rev_11"
+    },
+    "z3": {
+     "verdict": "broken",
+     "note": "The same dark mark on the cap top turns to a diagonal under 120 deg; the octagonal body's corner shift alone would only be the polygon-corner effect.",
+     "batch": "rev_11"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_11",
+   "flat_render": false
+  },
+  "bottle_of_pop__zjbqvb": {
+   "category": "bottle_of_pop",
+   "model": "zjbqvb",
+   "scale": null,
+   "symmetry": [
+    "z2"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z4": {
+     "verdict": "broken",
+     "note": "A dark elongated mark printed on the cap top (about 20 x 7 mm) turns from vertical to horizontal with the quarter turn and is readable from above; the octagonal body and base are otherwise identical.",
+     "batch": "rev_11"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_11",
+   "flat_render": false
   },
   "bottle_of_poppy_seeds__xdtrgi": {
    "category": "bottle_of_poppy_seeds",
@@ -969,7 +1330,76 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
+  },
+  "bottle_of_sage__bterim": {
+   "category": "bottle_of_sage",
+   "model": "bterim",
+   "scale": null,
+   "symmetry": [
+    "z4",
+    "z5",
+    "z6"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z5": {
+     "verdict": "preserved",
+     "note": "Plain grey lid over a level, uniformly speckled green fill with no print or seam; only the speckle noise pattern changes.",
+     "batch": "rev_11"
+    },
+    "z6": {
+     "verdict": "preserved",
+     "note": "Plain grey lid over a level, uniformly speckled green fill with no print or seam; only the speckle noise pattern changes.",
+     "batch": "rev_11"
+    },
+    "z4": {
+     "verdict": "preserved",
+     "note": "Plain grey lid over a uniform random speckle of sage leaves (the glass body is not rendered); no label, seam or readable mark anywhere, and the 90-degree tiles are indistinguishable from the original in all six cameras - the survey's blob is only noise-pattern mismatch.",
+     "batch": "rev_15"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_11+rev_15",
+   "flat_render": false
+  },
+  "bottle_of_salsa__nafwlf": {
+   "category": "bottle_of_salsa",
+   "model": "nafwlf",
+   "scale": null,
+   "symmetry": [
+    "z4",
+    "z5",
+    "z6"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z4": {
+     "verdict": "preserved",
+     "note": "Plain dark cap and a uniformly speckled orange fill (largest speck under 3 mm), no label or distinct chunk a person could read, silhouettes identical.",
+     "batch": "rev_11"
+    },
+    "z5": {
+     "verdict": "preserved",
+     "note": "Plain dark cap and uniformly speckled orange fill with no readable feature; the tiles differ only in speckle noise.",
+     "batch": "rev_11"
+    },
+    "z6": {
+     "verdict": "preserved",
+     "note": "Plain dark cap and uniformly speckled orange fill with no readable feature; the tiles differ only in speckle noise.",
+     "batch": "rev_11"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_11",
+   "flat_render": false
   },
   "bottle_of_seasoning__vqwqqv": {
    "category": "bottle_of_seasoning",
@@ -986,11 +1416,22 @@
      "verdict": "preserved",
      "note": "Black lid and a uniform brown body with no label or print; round shape, silhouettes match in all views.",
      "batch": "rev_01"
+    },
+    "z5": {
+     "verdict": "broken",
+     "note": "The fill's top surface is heaped to one side (about 3-5 mm, visible as a lip in the gap under the lid) and the 72 deg turn moves the heap to another side, a silhouette change beyond polygon corners, though marginal at 1 m.",
+     "batch": "rev_11"
+    },
+    "z6": {
+     "verdict": "broken",
+     "note": "Same heaped fill surface (about 3-5 mm lip under the lid) swaps sides under the 60 deg turn, a silhouette change beyond polygon corners, though marginal at 1 m.",
+     "batch": "rev_11"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01+rev_11"
+   "batch": "rev_01+rev_11",
+   "flat_render": false
   },
   "bottle_of_sesame_seeds__lzndie": {
    "category": "bottle_of_sesame_seeds",
@@ -1011,7 +1452,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_shampoo__lvvkhx": {
    "category": "bottle_of_shampoo",
@@ -1032,7 +1474,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_shampoo__stjjjm": {
    "category": "bottle_of_shampoo",
@@ -1053,7 +1496,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_tea__iladfg": {
    "category": "bottle_of_tea",
@@ -1084,7 +1528,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_tea__yatmrs": {
    "category": "bottle_of_tea",
@@ -1105,34 +1550,12 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_tea_leaves__pfbtus": {
    "category": "bottle_of_tea_leaves",
    "model": "pfbtus",
-   "scale": null,
-   "symmetry": [
-    "z2"
-   ],
-   "symmetry_near": [
-    "zinf"
-   ],
-   "symmetry_scaled": null,
-   "symmetry_near_scaled": null,
-   "reviewed": {
-    "z2": {
-     "verdict": "preserved",
-     "note": "Plain grey lid and a uniform tea-leaf speckle body with no label; the 1-2 mm unevenness of the fill top is not visible at 1 m.",
-     "batch": "rev_01"
-    }
-   },
-   "reviewed_scaled": {},
-   "symmetric_180": [],
-   "batch": "rev_01+rev_11"
-  },
-  "bottle_of_water__cyzaue": {
-   "category": "bottle_of_water",
-   "model": "cyzaue",
    "scale": null,
    "symmetry": [
     "zinf"
@@ -1141,15 +1564,49 @@
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
+    "z2": {
+     "verdict": "preserved",
+     "note": "Plain grey lid and a uniform tea-leaf speckle body with no label; the 1-2 mm unevenness of the fill top is not visible at 1 m.",
+     "batch": "rev_01"
+    },
     "zinf": {
      "verdict": "preserved",
-     "note": "Unprinted black hexagonal-prism bottle (44 faces) with a plain cap; only the polygon corners move (silhouette changes by 1-2 px), polygon count alone.",
-     "batch": "rev_01"
+     "note": "Plain grey lid over a level, uniformly speckled dark fill with no label, print or seam; only the speckle noise and polygon corners change with the yaw.",
+     "batch": "rev_11"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01+rev_11"
+   "batch": "rev_01+rev_11",
+   "flat_render": false
+  },
+  "bottle_of_water__cyzaue": {
+   "category": "bottle_of_water",
+   "model": "cyzaue",
+   "scale": null,
+   "symmetry": [
+    "z6"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "zinf": {
+     "verdict": "broken",
+     "note": "hexagonal prism: reads as six-fold, not as a body of revolution; z6 stays",
+     "batch": "overrides",
+     "by": "coordinator"
+    },
+    "z6": {
+     "verdict": "preserved",
+     "note": "The hexagonal prism body maps onto itself under 60 deg, the cork-like cap shows only a uniform mottled texture with no knot or print, and the base is plain.",
+     "batch": "rev_11"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_01+rev_11",
+   "flat_render": false
   },
   "bottle_of_water__eeaimz": {
    "category": "bottle_of_water",
@@ -1170,7 +1627,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_water__emquat": {
    "category": "bottle_of_water",
@@ -1191,7 +1649,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_water__lkpaas": {
    "category": "bottle_of_water",
@@ -1212,7 +1671,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_water__migvlt": {
    "category": "bottle_of_water",
@@ -1233,7 +1693,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_water__rmtdxh": {
    "category": "bottle_of_water",
@@ -1259,7 +1720,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_water__sxffiv": {
    "category": "bottle_of_water",
@@ -1280,7 +1742,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_wine__cldder": {
    "category": "bottle_of_wine",
@@ -1301,7 +1764,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_wine__dijgvu": {
    "category": "bottle_of_wine",
@@ -1322,7 +1786,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_01"
+   "batch": "rev_01",
+   "flat_render": false
   },
   "bottle_of_wine__nhmtvt": {
    "category": "bottle_of_wine",
@@ -1348,7 +1813,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "bottle_of_wine__oldpru": {
    "category": "bottle_of_wine",
@@ -1369,7 +1835,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "bowl__belcml": {
    "category": "bowl",
@@ -1390,7 +1857,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "bowl__eawgwj": {
    "category": "bowl",
@@ -1412,7 +1880,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "bowl__jpvcjv": {
    "category": "bowl",
@@ -1433,7 +1902,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_baking_mix__lgusnr": {
    "category": "box_of_baking_mix",
@@ -1454,7 +1924,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_barley__lxpwnw": {
    "category": "box_of_barley",
@@ -1475,7 +1946,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_butter__mfjuil": {
    "category": "box_of_butter",
@@ -1496,7 +1968,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_cane_sugar__rvsivw": {
    "category": "box_of_cane_sugar",
@@ -1517,7 +1990,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_cereal__ihedod": {
    "category": "box_of_cereal",
@@ -1548,7 +2022,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_cereal__ykuyqb": {
    "category": "box_of_cereal",
@@ -1579,7 +2054,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_coffee__cjtadw": {
    "category": "box_of_coffee",
@@ -1600,7 +2076,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_cookies__jtalxs": {
    "category": "box_of_cookies",
@@ -1621,7 +2098,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_cookies__lwhbid": {
    "category": "box_of_cookies",
@@ -1642,7 +2120,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_granola_bars__awombj": {
    "category": "box_of_granola_bars",
@@ -1663,7 +2142,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_granola_bars__bqeeki": {
    "category": "box_of_granola_bars",
@@ -1684,7 +2164,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_granola_bars__tqwhvz": {
    "category": "box_of_granola_bars",
@@ -1705,7 +2186,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_sanitary_napkins__cmnpuv": {
    "category": "box_of_sanitary_napkins",
@@ -1726,7 +2208,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_sanitary_napkins__mxdefq": {
    "category": "box_of_sanitary_napkins",
@@ -1747,7 +2230,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_tissues__xwstls": {
    "category": "box_of_tissues",
@@ -1768,7 +2252,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_tissues__zutrxn": {
    "category": "box_of_tissues",
@@ -1789,7 +2274,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_whiskey__ftapxo": {
    "category": "box_of_whiskey",
@@ -1820,7 +2306,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "box_of_yogurt__jtjcrx": {
    "category": "box_of_yogurt",
@@ -1841,7 +2328,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "bread_slice__pfggnm": {
    "category": "bread_slice",
@@ -1867,7 +2355,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "butter_cookie__kukrla": {
    "category": "butter_cookie",
@@ -1894,7 +2383,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "cabinet_base__dcmhhh": {
    "category": "cabinet_base",
@@ -1915,7 +2405,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "cabinet_door__ertkre": {
    "category": "cabinet_door",
@@ -1936,7 +2427,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "can_of_baking_mix__orwvfx": {
    "category": "can_of_baking_mix",
@@ -1957,18 +2449,17 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02"
+   "batch": "rev_02",
+   "flat_render": false
   },
   "can_of_baking_mix__rxorlp": {
    "category": "can_of_baking_mix",
    "model": "rxorlp",
    "scale": null,
    "symmetry": [
-    "none"
-   ],
-   "symmetry_near": [
     "z2"
    ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -1976,11 +2467,61 @@
      "verdict": "broken",
      "note": "The COOKIE MIX text panel and the cookie image repeat only twice around the label and the lid photo has a fixed orientation; at 101\u00b0 they are visibly moved.",
      "batch": "rev_02"
+    },
+    "z2": {
+     "verdict": "preserved",
+     "note": "The 'COOKIE MIX' text band and the round cookie picture are printed identically on the +x and -x faces (label edges match on +y/-y too), and the brown crumb picture on the lid is a noise-like texture whose 180\u00b0 turn leaves only a faint diffuse difference that a person could not read at 1 m.",
+     "batch": "rev_12"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_02+rev_12"
+   "batch": "rev_02+rev_12",
+   "flat_render": false
+  },
+  "can_of_corn__alphlq": {
+   "category": "can_of_corn",
+   "model": "alphlq",
+   "scale": null,
+   "symmetry": [
+    "z2"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z2": {
+     "verdict": "preserved",
+     "note": "The red corn label with its logo is printed on both opposite faces so the +x/-x and +y/-y tiles match after the half turn, and the teal lid's diagonal streak pattern is two-fold, leaving only a faint diffuse 6 mm patch that is not readable at 1 m.",
+     "batch": "rev_12"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_12",
+   "flat_render": false
+  },
+  "can_of_corn__kwwlfn": {
+   "category": "can_of_corn",
+   "model": "kwwlfn",
+   "scale": null,
+   "symmetry": [
+    "z2"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z2": {
+     "verdict": "preserved",
+     "note": "Same design as the other corn can: the red label and logo repeat on the opposite face and the teal streaked lid is two-fold, so the half-turn tiles match apart from a faint 4 mm low-contrast patch invisible at 1 m.",
+     "batch": "rev_12"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_12",
+   "flat_render": false
   },
   "can_of_icetea__ifrjsc": {
    "category": "can_of_icetea",
@@ -2001,7 +2542,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
   },
   "can_of_soda__bfrzvk": {
    "category": "can_of_soda",
@@ -2022,7 +2564,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
   },
   "can_of_soda__evcxlr": {
    "category": "can_of_soda",
@@ -2043,7 +2586,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
   },
   "can_of_soda__lugwcz": {
    "category": "can_of_soda",
@@ -2064,7 +2608,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
   },
   "can_of_soda__wbrrad": {
    "category": "can_of_soda",
@@ -2085,7 +2630,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
   },
   "canned_food__foetdd": {
    "category": "canned_food",
@@ -2106,7 +2652,52 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
+  },
+  "cap__ghwjwe": {
+   "category": "cap",
+   "model": "ghwjwe",
+   "scale": null,
+   "symmetry": [
+    "zinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "zinf": {
+     "verdict": "preserved",
+     "note": "Black-topped cork stopper whose brown mottled cork grain is a uniform texture noise with no seam, print or dent anywhere around it; the 5 mm low-contrast blob is not visible in the sheet.",
+     "batch": "rev_12"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_12",
+   "flat_render": false
+  },
+  "cap__iqeyba": {
+   "category": "cap",
+   "model": "iqeyba",
+   "scale": null,
+   "symmetry": [
+    "zinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "zinf": {
+     "verdict": "preserved",
+     "note": "A flat uniform grey 10-gon disc: the odd-angle turn only moves the polygon corners (rule 1) and there is no print, notch or lug to read the yaw from.",
+     "batch": "rev_12"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_12",
+   "flat_render": false
   },
   "cap__rgtedj": {
    "category": "cap",
@@ -2127,7 +2718,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
   },
   "cap__ygsmgm": {
    "category": "cap",
@@ -2148,7 +2740,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
   },
   "carrot__aucrah": {
    "category": "carrot",
@@ -2165,11 +2758,17 @@
      "verdict": "preserved",
      "note": "Uniform dark-brown tapered rod with no visible skin texture, stem or bend; every camera shows the same silhouette after the roll.",
      "batch": "rev_03"
+    },
+    "x6": {
+     "verdict": "preserved",
+     "note": "Uniform dark reddish-brown carrot rolled 60\u00b0 about its long axis, no stem or leaf tuft; the silhouette differs only by a 1-px outline shift from the slightly asymmetric taper, not readable on a 25 cm carrot at 1 m.",
+     "batch": "rev_12"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03+rev_12"
+   "batch": "rev_03+rev_12",
+   "flat_render": false
   },
   "carrot__nktmff": {
    "category": "carrot",
@@ -2190,7 +2789,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
   },
   "carrot__qhmmmx": {
    "category": "carrot",
@@ -2207,11 +2807,27 @@
      "verdict": "preserved",
      "note": "Uniform brown body; the green leaf tuft is a three-dimensional spray around the axis, so the roll only rearranges thin strands inside the same tuft shape, which is not readable at 1 m.",
      "batch": "rev_03"
+    },
+    "x4": {
+     "verdict": "preserved",
+     "note": "Roll about the long axis: the skin is uniform and the leaf tuft at the -x end is an even cone of thin stalks whose 90\u00b0 rearrangement is a millimetre-scale shift of 1-px stalks in the sheet, with only a ~4 mm tip wobble from the slight bend, not readable at 1 m.",
+     "batch": "rev_12"
+    },
+    "x3": {
+     "verdict": "preserved",
+     "note": "Same roll about the long axis by 120\u00b0: uniform skin, the even cone of leaf stalks looks alike in every tile and the tip silhouette moves by a few millimetres only, not readable at 1 m.",
+     "batch": "rev_12"
+    },
+    "x5": {
+     "verdict": "preserved",
+     "note": "Same roll about the long axis by 72\u00b0: uniform skin, the even cone of leaf stalks looks alike in every tile and the tip silhouette moves by a few millimetres only, not readable at 1 m.",
+     "batch": "rev_12"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03+rev_12"
+   "batch": "rev_03+rev_12",
+   "flat_render": false
   },
   "carton__ylrxhe": {
    "category": "carton",
@@ -2237,7 +2853,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
   },
   "carton_of_eggs__rixhgu": {
    "category": "carton_of_eggs",
@@ -2258,7 +2875,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
   },
   "carton_of_orange_juice__brryuo": {
    "category": "carton_of_orange_juice",
@@ -2279,7 +2897,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
   },
   "carton_of_pineapple_juice__vzueyg": {
    "category": "carton_of_pineapple_juice",
@@ -2300,7 +2919,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
   },
   "case_of_eyeshadow__zgervc": {
    "category": "case_of_eyeshadow",
@@ -2321,7 +2941,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
   },
   "cellulose_tape__gchdhk": {
    "category": "cellulose_tape",
@@ -2354,7 +2975,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
   },
   "cellulose_tape__sklkyc": {
    "category": "cellulose_tape",
@@ -2381,7 +3003,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
   },
   "cherry_tomato__dqjuub": {
    "category": "cherry_tomato",
@@ -2408,7 +3031,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
   },
   "chopping_board__psabiv": {
    "category": "chopping_board",
@@ -2429,7 +3053,42 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
+  },
+  "chopstick__bcwuwv": {
+   "category": "chopstick",
+   "model": "bcwuwv",
+   "scale": null,
+   "symmetry": [
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "x4": {
+     "verdict": "preserved",
+     "note": "Unprinted two-tone chopstick (dark tip, light body) rolled 90\u00b0 about its long axis: no flat side, seam or print, the stick's pixel area does not change in any tile, so the low silhouette IoU is only the thin-object pixel effect.",
+     "batch": "rev_12"
+    },
+    "x5": {
+     "verdict": "preserved",
+     "note": "Roll by 72\u00b0 about the long axis of the same unprinted two-tone stick: colours, taper and thickness match the original in every tile; the IoU is the thin-object effect.",
+     "batch": "rev_12"
+    },
+    "x6": {
+     "verdict": "preserved",
+     "note": "Roll by 60\u00b0 about the long axis of the same unprinted two-tone stick: colours, taper and thickness match the original in every tile; the IoU is the thin-object effect.",
+     "batch": "rev_12"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_12",
+   "flat_render": false
   },
   "cinnamon_stick__cdkjfo": {
    "category": "cinnamon_stick",
@@ -2458,11 +3117,32 @@
      "verdict": "preserved",
      "note": "Uniform unprinted quill that is nearly round; rolled about its axis it shows the same thin bar with no seam or flat side to read.",
      "batch": "rev_03"
+    },
+    "z2": {
+     "verdict": "preserved",
+     "note": "End-to-end flip about the vertical: both ends show the same two-lobed quill outline and blunt cut, the bark is a uniform fleck texture with no knot or mark, and the flipped stick looks identical in every camera.",
+     "batch": "rev_15"
+    },
+    "y4": {
+     "verdict": "broken",
+     "note": "Rotation about the long axis: the quill's cross-section is a flattened two-lobed scroll (12 x 8 mm) with a slit groove, so the end-on tiles change from a two-lobed to a rounded outline and the stick's apparent width changes by roughly a quarter - the groove/seam position is readable.",
+     "batch": "rev_15"
+    },
+    "y5": {
+     "verdict": "broken",
+     "note": "Same as y4: the two-lobed scroll cross-section with its slit is not a body of revolution; the 72-degree tiles show a different end outline and a narrower stick from above, so the seam position gives the rotation away.",
+     "batch": "rev_15"
+    },
+    "y6": {
+     "verdict": "broken",
+     "note": "Same as y4: the slit groove of the two-lobed quill moves around the stick under a 60-degree turn, visible as a changed end outline and apparent width in the tiles.",
+     "batch": "rev_15"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03+rev_15",
+   "flat_render": false
   },
   "cinnamon_stick__hjhcpm": {
    "category": "cinnamon_stick",
@@ -2489,7 +3169,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_03"
+   "batch": "rev_03",
+   "flat_render": false
   },
   "cinnamon_stick__kdaxdy": {
    "category": "cinnamon_stick",
@@ -2535,6 +3216,7 @@
    },
    "symmetric_180": [],
    "batch": "rev_03",
+   "flat_render": false,
    "batch_scaled": "rev_03"
   },
   "cinnamon_stick__qmlyim": {
@@ -2575,6 +3257,7 @@
    },
    "symmetric_180": [],
    "batch": "rev_03",
+   "flat_render": false,
    "batch_scaled": "rev_03"
   },
   "cinnamon_stick__qsqvgk": {
@@ -2627,6 +3310,7 @@
    },
    "symmetric_180": [],
    "batch": "rev_03",
+   "flat_render": false,
    "batch_scaled": "rev_03"
   },
   "cinnamon_stick__qxpzdm": {
@@ -2644,13 +3328,9 @@
    ],
    "symmetry_near": [],
    "symmetry_scaled": [
-    "none"
+    "z2"
    ],
-   "symmetry_near_scaled": [
-    "z2",
-    "y5",
-    "y6"
-   ],
+   "symmetry_near_scaled": [],
    "reviewed": {
     "x2": {
      "verdict": "preserved",
@@ -2678,10 +3358,26 @@
      "verdict": "broken",
      "note": "Rotating about the long axis moves the bark's curl seam and slit off the top, changing the end profile from forked to plain and the apparent thickness of the non-round curl.",
      "batch": "rev_04"
+    },
+    "z2": {
+     "verdict": "preserved",
+     "note": "The end swap about z keeps the bark slit facing up, both ends show the same forked notch profile in the +z/-z and end-on tiles, and the only difference is a 1-2 px outline shift from the slight bow of the quill.",
+     "batch": "rev_12"
+    },
+    "y5": {
+     "verdict": "broken",
+     "note": "The 72\u00b0 roll about the long axis turns the bark slit off the top face: the forked notch seen at the far end in the original end-on tiles becomes a plain rounded end and the quill reads visibly narrower in the -y view.",
+     "batch": "rev_12"
+    },
+    "y6": {
+     "verdict": "broken",
+     "note": "The 60\u00b0 roll about the long axis turns the bark slit off the top face: the forked notch of the original end-on tiles is replaced by a plain rounded end and the quill's apparent thickness changes, a few-millimetre feature readable at 1 m.",
+     "batch": "rev_12"
     }
    },
    "symmetric_180": [],
    "batch": "rev_03",
+   "flat_render": false,
    "batch_scaled": "rev_04+rev_12"
   },
   "cinnamon_stick__smfuqz": {
@@ -2693,12 +3389,9 @@
     1.8
    ],
    "symmetry": [
-    "none"
+    "z2"
    ],
-   "symmetry_near": [
-    "z2",
-    "y6"
-   ],
+   "symmetry_near": [],
    "symmetry_scaled": [
     "z2"
    ],
@@ -2713,6 +3406,16 @@
      "verdict": "broken",
      "note": "The single bark slit/seam turns with the roll and the non-round curled cross-section changes width, so any angle about the long axis is readable.",
      "batch": "rev_04"
+    },
+    "z2": {
+     "verdict": "preserved",
+     "note": "The end swap about z keeps the slit on top with the same notch visible at the far end in both the original and rotated end-on tiles; only a 1-2 mm bow-reversal outline shift remains, not readable at 1 m.",
+     "batch": "rev_12"
+    },
+    "y6": {
+     "verdict": "broken",
+     "note": "The 60\u00b0 roll moves the bark slit off the top face so the forked notch at the far end disappears and the bar looks narrower in the end-on tiles, a couple-of-millimetre change a person could see at 1 m.",
+     "batch": "rev_12"
     }
    },
    "reviewed_scaled": {
@@ -2739,6 +3442,7 @@
    },
    "symmetric_180": [],
    "batch": "rev_04+rev_12",
+   "flat_render": false,
    "batch_scaled": "rev_04"
   },
   "clipboard__envjqe": {
@@ -2760,17 +3464,20 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
   },
   "clipboard__gmxyfo": {
    "category": "clipboard",
    "model": "gmxyfo",
    "scale": null,
    "symmetry": [
+    "none"
+   ],
+   "symmetry_near": [
     "x2",
     "z2"
    ],
-   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -2792,7 +3499,8 @@
      "note": "The asset renders as a uniform black slab with no print, clip or edge feature, so the two half-turn views are identical; survey right, reviewer's empty value wrong, judged about the +z (up) axis of the canonical frame."
     }
    ],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": true
   },
   "coaster__arjpcz": {
    "category": "coaster",
@@ -2819,7 +3527,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
   },
   "colored_pencil__acumgp": {
    "category": "colored_pencil",
@@ -2841,11 +3550,49 @@
      "verdict": "preserved",
      "note": "Rolling about the long axis leaves an unprinted, uniformly coloured pencil body with the tip at the same end; the polygon corners of the hexagon are the only change.",
      "batch": "rev_04"
+    },
+    "z2": {
+     "verdict": "broken",
+     "note": "The end-to-end flip swaps the sharpened tip (exposed wood cone and dark lead) with the plain yellow blunt end; a person sees at once which end is the point.",
+     "batch": "rev_15"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04+rev_15",
+   "flat_render": false
+  },
+  "colored_pencil__bkdqwb": {
+   "category": "colored_pencil",
+   "model": "bkdqwb",
+   "scale": null,
+   "symmetry": [
+    "xinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "y2": {
+     "verdict": "broken",
+     "note": "The end-to-end flip about y swaps the sharpened wood-and-lead tip with the flat butt end (tip at +x in the original, at -x after the turn), which a person sees at once.",
+     "batch": "rev_12"
+    },
+    "xinf": {
+     "verdict": "preserved",
+     "note": "Roll about the long axis of an unprinted uniform-colour pencil: the tip stays at the same end, there is no print or logo on the body, and the silhouette differs only by the thin-object sub-pixel shift.",
+     "batch": "rev_12"
+    },
+    "z2": {
+     "verdict": "broken",
+     "note": "One end is sharpened (wood cone and lead), the other is a plain purple blunt end; the z flip puts the tip at the opposite end.",
+     "batch": "rev_15"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_12+rev_15",
+   "flat_render": false
   },
   "colored_pencil__bnsqcn": {
    "category": "colored_pencil",
@@ -2872,7 +3619,109 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
+  },
+  "colored_pencil__deuvcx": {
+   "category": "colored_pencil",
+   "model": "deuvcx",
+   "scale": null,
+   "symmetry": [
+    "xinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "y2": {
+     "verdict": "broken",
+     "note": "The end-to-end flip about y swaps the sharpened wood-and-lead tip with the flat butt end (tip at +x in the original, at -x after the turn), which a person sees at once.",
+     "batch": "rev_12"
+    },
+    "xinf": {
+     "verdict": "preserved",
+     "note": "Roll about the long axis of an unprinted uniform-colour pencil: the tip stays at the same end, there is no print or logo on the body, and the silhouette differs only by the thin-object sub-pixel shift.",
+     "batch": "rev_12"
+    },
+    "x4": {
+     "verdict": "preserved",
+     "note": "Unprinted hexagonal pencil turned about its own axis: only the facet corners move, the blue body, blunt end and sharpened tip look the same in every camera and there is no print or logo.",
+     "batch": "rev_15"
+    },
+    "x5": {
+     "verdict": "preserved",
+     "note": "Same as x4: a 72-degree turn about the long axis of an unprinted hexagonal pencil changes nothing a person could read; body and tip look identical.",
+     "batch": "rev_15"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_12+rev_15",
+   "flat_render": false
+  },
+  "colored_pencil__egvqng": {
+   "category": "colored_pencil",
+   "model": "egvqng",
+   "scale": null,
+   "symmetry": [
+    "xinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "y2": {
+     "verdict": "broken",
+     "note": "The end-to-end flip about y swaps the sharpened wood-and-lead tip with the flat butt end (tip at +x in the original, at -x after the turn), which a person sees at once.",
+     "batch": "rev_12"
+    },
+    "xinf": {
+     "verdict": "preserved",
+     "note": "Roll about the long axis of an unprinted uniform-colour pencil: the tip stays at the same end, there is no print or logo on the body, and the silhouette differs only by the thin-object sub-pixel shift.",
+     "batch": "rev_12"
+    },
+    "z2": {
+     "verdict": "broken",
+     "note": "Sharpened wood-and-lead tip at one end, plain green blunt end at the other; the z flip swaps them.",
+     "batch": "rev_15"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_12+rev_15",
+   "flat_render": false
+  },
+  "colored_pencil__jdqvdl": {
+   "category": "colored_pencil",
+   "model": "jdqvdl",
+   "scale": null,
+   "symmetry": [
+    "xinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "y2": {
+     "verdict": "broken",
+     "note": "The end-to-end flip about y swaps the sharpened wood-and-lead tip with the flat butt end (tip at +x in the original, at -x after the turn), which a person sees at once.",
+     "batch": "rev_12"
+    },
+    "xinf": {
+     "verdict": "preserved",
+     "note": "Roll about the long axis of an unprinted uniform-colour pencil: the tip stays at the same end, there is no print or logo on the body, and the silhouette differs only by the thin-object sub-pixel shift.",
+     "batch": "rev_12"
+    },
+    "z2": {
+     "verdict": "broken",
+     "note": "Sharpened wood-and-lead tip at one end, plain orange blunt end at the other; the z flip swaps them.",
+     "batch": "rev_15"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_12+rev_15",
+   "flat_render": false
   },
   "colored_pencil__jnccuz": {
    "category": "colored_pencil",
@@ -2894,11 +3743,49 @@
      "verdict": "preserved",
      "note": "The body is unprinted and uniformly coloured, so a roll about the long axis is invisible apart from hexagon corners.",
      "batch": "rev_04"
+    },
+    "z2": {
+     "verdict": "broken",
+     "note": "Sharpened wood-and-lead tip at one end, plain pink blunt end at the other; the z flip swaps them.",
+     "batch": "rev_15"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04+rev_15",
+   "flat_render": false
+  },
+  "colored_pencil__kadvlg": {
+   "category": "colored_pencil",
+   "model": "kadvlg",
+   "scale": null,
+   "symmetry": [
+    "xinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "y2": {
+     "verdict": "broken",
+     "note": "The end-to-end flip about y swaps the sharpened wood-and-lead tip with the flat butt end (tip at +x in the original, at -x after the turn), which a person sees at once.",
+     "batch": "rev_12"
+    },
+    "xinf": {
+     "verdict": "preserved",
+     "note": "Roll about the long axis of an unprinted uniform-colour pencil: the tip stays at the same end, there is no print or logo on the body, and the silhouette differs only by the thin-object sub-pixel shift.",
+     "batch": "rev_12"
+    },
+    "z2": {
+     "verdict": "broken",
+     "note": "Sharpened wood-and-lead tip at one end, plain lime-green blunt end at the other; the z flip swaps them.",
+     "batch": "rev_15"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_12+rev_15",
+   "flat_render": false
   },
   "colored_pencil__kgmapz": {
    "category": "colored_pencil",
@@ -2907,9 +3794,7 @@
    "symmetry": [
     "xinf"
    ],
-   "symmetry_near": [
-    "y2"
-   ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -2917,11 +3802,44 @@
      "verdict": "preserved",
      "note": "Uniform unprinted body with the tip staying at the same end; nothing around the pencil marks its roll angle.",
      "batch": "rev_04"
+    },
+    "y2": {
+     "verdict": "broken",
+     "note": "The end-to-end flip about y swaps the sharpened wood-and-lead tip with the flat butt end (tip at +x in the original, at -x after the turn), which a person sees at once.",
+     "batch": "rev_12"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04+rev_12"
+   "batch": "rev_04+rev_12",
+   "flat_render": false
+  },
+  "colored_pencil__kjwoqm": {
+   "category": "colored_pencil",
+   "model": "kjwoqm",
+   "scale": null,
+   "symmetry": [
+    "xinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "y2": {
+     "verdict": "broken",
+     "note": "The end-to-end flip about y swaps the sharpened wood-and-lead tip with the flat butt end (tip at +x in the original, at -x after the turn), which a person sees at once.",
+     "batch": "rev_12"
+    },
+    "xinf": {
+     "verdict": "preserved",
+     "note": "Roll about the long axis of an unprinted uniform-colour pencil: the tip stays at the same end, there is no print or logo on the body, and the silhouette differs only by the thin-object sub-pixel shift.",
+     "batch": "rev_12"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_12",
+   "flat_render": false
   },
   "colored_pencil__nssris": {
    "category": "colored_pencil",
@@ -2948,7 +3866,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
   },
   "colored_pencil__qrxemk": {
    "category": "colored_pencil",
@@ -2957,9 +3876,7 @@
    "symmetry": [
     "xinf"
    ],
-   "symmetry_near": [
-    "y2"
-   ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -2967,11 +3884,22 @@
      "verdict": "preserved",
      "note": "Uniform unprinted pencil body, tip stays at the same end; the roll is invisible.",
      "batch": "rev_04"
+    },
+    "y2": {
+     "verdict": "broken",
+     "note": "The end-to-end flip about y swaps the sharpened wood-and-lead tip with the flat butt end (tip at +x in the original, at -x after the turn), which a person sees at once.",
+     "batch": "rev_12"
+    },
+    "z2": {
+     "verdict": "broken",
+     "note": "Sharpened wood-and-lead tip at one end, plain teal blunt end at the other; the z flip swaps them.",
+     "batch": "rev_15"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04+rev_12"
+   "batch": "rev_04+rev_12+rev_15",
+   "flat_render": false
   },
   "conditioner_dispenser__njqnuo": {
    "category": "conditioner_dispenser",
@@ -2992,7 +3920,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
   },
   "conditioner_dispenser__udeflt": {
    "category": "conditioner_dispenser",
@@ -3013,7 +3942,30 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
+  },
+  "cookie_cutter__lqrfzo": {
+   "category": "cookie_cutter",
+   "model": "lqrfzo",
+   "scale": null,
+   "symmetry": [
+    "z4"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z4": {
+     "verdict": "preserved",
+     "note": "Four-lobed black clover cutter with a thin dark-red rim: the quarter turn maps the four identical lobes onto each other and the difference is only the outline plus a faint low-contrast inner-wall patch that is not visible in the sheet.",
+     "batch": "rev_12"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_12",
+   "flat_render": false
   },
   "cork__lseuwf": {
    "category": "cork",
@@ -3034,7 +3986,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
   },
   "cork__ncxgpe": {
    "category": "cork",
@@ -3055,7 +4008,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
   },
   "cutting_board__aibvew": {
    "category": "cutting_board",
@@ -3076,7 +4030,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
   },
   "cutting_board__jfrbuz": {
    "category": "cutting_board",
@@ -3109,7 +4064,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
   },
   "cutting_board__nsvnai": {
    "category": "cutting_board",
@@ -3137,7 +4093,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
   },
   "cutting_board__tcdrzs": {
    "category": "cutting_board",
@@ -3145,11 +4102,10 @@
    "scale": null,
    "symmetry": [
     "x2",
+    "y2",
     "z2"
    ],
-   "symmetry_near": [
-    "y2"
-   ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -3162,11 +4118,49 @@
      "verdict": "preserved",
      "note": "The parallel plank strips stay parallel and equally faint after the half turn, with no knot or mark to read the orientation from.",
      "batch": "rev_04"
+    },
+    "y2": {
+     "verdict": "preserved",
+     "note": "Plain wooden board flipped about y: both faces show the same faint uniform plank-strip grain along the long axis with no knot, print or handle, and the 6 mm silhouette difference is a 1-px edge shift.",
+     "batch": "rev_12"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04+rev_12"
+   "batch": "rev_04+rev_12",
+   "flat_render": false
+  },
+  "decorative_sign__hgonwj": {
+   "category": "decorative_sign",
+   "model": "hgonwj",
+   "scale": null,
+   "symmetry": [
+    "x2"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "x2": {
+     "verdict": "preserved",
+     "note": "The black lightning-bolt / Z-shaped plate is point-symmetric, so after the half turn about the +x (front, wall-normal) axis the +x and -x tiles are identical apart from a 1-px outline: the selection reviewer's symmetric_180 = 1 is right and the survey's symmetry_near was over-cautious; judged about the +x axis.",
+     "batch": "rev_12"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [
+    {
+     "subtask": "alignment-world_horizontal",
+     "tag": "x2",
+     "axis": "+x (front)",
+     "reviewer_value": "1",
+     "verdict": "preserved",
+     "value": "1",
+     "note": "The black lightning-bolt / Z-shaped plate is point-symmetric, so after the half turn about the +x (front, wall-normal) axis the +x and -x tiles are identical apart from a 1-px outline: the selection reviewer's symmetric_180 = 1 is right and the survey's symmetry_near was over-cautious; judged about the +x axis."
+    }
+   ],
+   "batch": "rev_12",
+   "flat_render": false
   },
   "dip_candle__gbaons": {
    "category": "dip_candle",
@@ -3192,17 +4186,48 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
+  },
+  "dip_candle__mxjejs": {
+   "category": "dip_candle",
+   "model": "mxjejs",
+   "scale": null,
+   "symmetry": [
+    "none"
+   ],
+   "symmetry_near": [
+    "zinf"
+   ],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "x2": {
+     "verdict": "broken",
+     "note": "The flip about x puts the wick and the narrow tapered top at the bottom and the flat wide base on top, so the candle is visibly upside down.",
+     "batch": "rev_12"
+    },
+    "y2": {
+     "verdict": "broken",
+     "note": "The flip about y likewise swaps the wick end with the flat base and reverses the taper, visibly upside down.",
+     "batch": "rev_12"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_12",
+   "flat_render": true
   },
   "dip_candle__poexjo": {
    "category": "dip_candle",
    "model": "poexjo",
    "scale": null,
    "symmetry": [
-    "z4",
-    "z5"
+    "none"
    ],
    "symmetry_near": [
+    "z4",
+    "z5",
     "z6"
    ],
    "symmetry_scaled": null,
@@ -3222,11 +4247,17 @@
      "verdict": "preserved",
      "note": "Uniform unprinted hexagonal body with an axial wick; a 72\u00b0 turn changes only the facet corner positions, not what a person sees.",
      "batch": "rev_04"
+    },
+    "z6": {
+     "verdict": "preserved",
+     "note": "Uniform navy faceted taper candle with the wick on the axis: the 60\u00b0 turn maps the facets onto themselves and the only difference is a 1-px outline shift from the slightly bent wick and tilted candle, not readable at 1 m.",
+     "batch": "rev_12"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04+rev_12"
+   "batch": "rev_04+rev_12",
+   "flat_render": true
   },
   "drumstick__jauzlc": {
    "category": "drumstick",
@@ -3267,7 +4298,8 @@
      "note": "The half turn swaps the bead tip and the butt end of the stick, so it is not symmetric; the selection reviewer's empty value is right and the survey wrong, judged about the +z (front) axis of the canonical frame."
     }
    ],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
   },
   "drumstick__lkvzmj": {
    "category": "drumstick",
@@ -3289,7 +4321,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
   },
   "flashlight__jtrbkc": {
    "category": "flashlight",
@@ -3310,7 +4343,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
   },
   "footstool__sghekm": {
    "category": "footstool",
@@ -3331,7 +4365,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
   },
   "french_fries__nfgqwu": {
    "category": "french_fries",
@@ -3358,7 +4393,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
   },
   "french_fries__oeterg": {
    "category": "french_fries",
@@ -3385,7 +4421,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
   },
   "french_fries__uqsuef": {
    "category": "french_fries",
@@ -3412,7 +4449,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_04"
+   "batch": "rev_04",
+   "flat_render": false
   },
   "goblet__nawrfs": {
    "category": "goblet",
@@ -3433,7 +4471,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "green_bean__dyjvwv": {
    "category": "green_bean",
@@ -3454,7 +4493,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "green_bean__lvbjws": {
    "category": "green_bean",
@@ -3475,7 +4515,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "guitar__hpqjrq": {
    "category": "guitar",
@@ -3496,7 +4537,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "half_lime__dtyjkb": {
    "category": "half_lime",
@@ -3505,9 +4547,7 @@
    "symmetry": [
     "none"
    ],
-   "symmetry_near": [
-    "z6"
-   ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -3515,11 +4555,17 @@
      "verdict": "broken",
      "note": "The cut face (seen from -z) shows white radial segment membranes around a pith whose angle changes with yaw; only the uniform dark-green dome side is yaw-invariant.",
      "batch": "rev_05"
+    },
+    "z6": {
+     "verdict": "broken",
+     "note": "The cut face (-z view) shows the pith with irregularly spaced radial segment membranes that have no 60\u00b0 period (the pattern matches the original only after undoing the turn), so the spokes sit at new angles after z6 while the dome side is uniform; the same feature that breaks zinf.",
+     "batch": "rev_12"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05+rev_12"
+   "batch": "rev_05+rev_12",
+   "flat_render": false
   },
   "half_lime__mxmmcp": {
    "category": "half_lime",
@@ -3540,18 +4586,17 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "half_lime__wdadtn": {
    "category": "half_lime",
    "model": "wdadtn",
    "scale": null,
    "symmetry": [
-    "none"
-   ],
-   "symmetry_near": [
     "z2"
    ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -3559,11 +4604,17 @@
      "verdict": "broken",
      "note": "The cut face (seen from -z) shows white radial segment membranes and a pith whose angle changes with yaw; the dome side is uniform but the cut face reads the rotation.",
      "batch": "rev_05"
+    },
+    "z2": {
+     "verdict": "preserved",
+     "note": "Uniform green dome with the white pith on the axis; after the half turn the cut face (the underside) shows the same quasi-regular radial segment pattern and only the exact membrane positions and a ~2 mm dome lopsidedness differ, nothing a person at 1 m could read.",
+     "batch": "rev_13"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05+rev_13"
+   "batch": "rev_05+rev_13",
+   "flat_render": false
   },
   "hamburger_bun__fqxumh": {
    "category": "hamburger_bun",
@@ -3580,11 +4631,27 @@
      "verdict": "preserved",
      "note": "Uniform dark-brown top and sides; the underside shows only a faint, roughly concentric mottling with no distinct patch, and the outline is round to within 2 %, so nothing reads the yaw.",
      "batch": "rev_05"
+    },
+    "z4": {
+     "verdict": "preserved",
+     "note": "Golden top and sides are uniform and the pale underside carries only speckle-like toasting with a faint off-centre darker patch (~6 % contrast) that is not readable at 1 m; the ~1 mm outline changes are the low-poly rim.",
+     "batch": "rev_13"
+    },
+    "z5": {
+     "verdict": "preserved",
+     "note": "Same as z4: uniform golden top, noise-like speckle on the underside with no distinct patch, round outline; nothing reads the 72 degree turn.",
+     "batch": "rev_13"
+    },
+    "z6": {
+     "verdict": "preserved",
+     "note": "Same as z4: uniform golden top, noise-like speckle on the underside with no distinct patch, round outline; nothing reads the 60 degree turn.",
+     "batch": "rev_13"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05+rev_13"
+   "batch": "rev_05+rev_13",
+   "flat_render": false
   },
   "hamburger_bun__jeygaq": {
    "category": "hamburger_bun",
@@ -3617,7 +4684,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "hamper__pdzaca": {
    "category": "hamper",
@@ -3638,7 +4706,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "hamper__sijioo": {
    "category": "hamper",
@@ -3665,7 +4734,30 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
+  },
+  "hamper__xhdtjn": {
+   "category": "hamper",
+   "model": "xhdtjn",
+   "scale": null,
+   "symmetry": [
+    "zinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "zinf": {
+     "verdict": "preserved",
+     "note": "Plain dark-brown tapered bin with a uniform mottled texture and no handle, seam or label; at z163 only the low-poly rim corners move in the top view (rule 1).",
+     "batch": "rev_13"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_13",
+   "flat_render": false
   },
   "hanger__anobre": {
    "category": "hanger",
@@ -3686,7 +4778,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "hardback__bgtbdp": {
    "category": "hardback",
@@ -3707,7 +4800,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "ice_cube__dueotq": {
    "category": "ice_cube",
@@ -3728,7 +4822,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "ice_cube__lkirej": {
    "category": "ice_cube",
@@ -3749,7 +4844,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "jar_of_curry_powder__ozhftu": {
    "category": "jar_of_curry_powder",
@@ -3766,11 +4862,27 @@
      "verdict": "preserved",
      "note": "Round jar with a uniform fine-grained powder texture and a plain dark lid (the glass is omitted, so the lid floats); no label, seam or mark anywhere.",
      "batch": "rev_05"
+    },
+    "z4": {
+     "verdict": "broken",
+     "note": "The orange powder body (glass absent) has an uneven top with a one-sided ~8-10 mm dip/notch that sits at a different corner of the side tiles after the quarter turn, readable through the jar at 1 m.",
+     "batch": "rev_13"
+    },
+    "z5": {
+     "verdict": "broken",
+     "note": "Same one-sided notch in the powder surface: after 72 degrees it shows up at a different side of the +x/-y tiles than in the original.",
+     "batch": "rev_13"
+    },
+    "z6": {
+     "verdict": "broken",
+     "note": "Same one-sided notch in the powder surface: after 60 degrees the slanted top edge is on a different side of the side tiles than in the original.",
+     "batch": "rev_13"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05+rev_13"
+   "batch": "rev_05+rev_13",
+   "flat_render": false
   },
   "jar_of_dill_seed__reavkt": {
    "category": "jar_of_dill_seed",
@@ -3791,7 +4903,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "jar_of_mayonnaise__ktmjvg": {
    "category": "jar_of_mayonnaise",
@@ -3812,7 +4925,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "jar_of_tumeric__miivhi": {
    "category": "jar_of_tumeric",
@@ -3833,7 +4947,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "keyboard__jtdyix": {
    "category": "keyboard",
@@ -3854,7 +4969,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "keyboard__uwacaq": {
    "category": "keyboard",
@@ -3895,18 +5011,17 @@
      "note": "symmetric_180 (alignment-axial), judged about the +z (up) axis: the faint grey key-legend groups sit at one end of the top face and move to the other end after the half turn, so the selection reviewer's value (not symmetric) is right and the survey is wrong; the flat-shaded render hides the key relief, which would only add to the difference."
     }
    ],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": true
   },
   "lemon__asdada": {
    "category": "lemon",
    "model": "asdada",
    "scale": null,
    "symmetry": [
-    "none"
-   ],
-   "symmetry_near": [
     "x6"
    ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -3919,11 +5034,17 @@
      "verdict": "broken",
      "note": "The dark stem scar on the +x tip and the nipple on the -x tip swap ends under the half turn about z.",
      "batch": "rev_05"
+    },
+    "x6": {
+     "verdict": "preserved",
+     "note": "The dark calyx star sits on the x axis and stays in place in the +x tile, the other end is a plain nipple, and the 60 degree turn changes only low-contrast skin mottling (<= ~12 % over a few mm patches) with no blemish or print.",
+     "batch": "rev_13"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05+rev_13"
+   "batch": "rev_05+rev_13",
+   "flat_render": false
   },
   "lemon__bbvonm": {
    "category": "lemon",
@@ -3962,7 +5083,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "lemon__bmvxas": {
    "category": "lemon",
@@ -3988,7 +5110,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "lemon__dsacfa": {
    "category": "lemon",
@@ -4020,7 +5143,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "lemon__gkrfha": {
    "category": "lemon",
@@ -4046,7 +5170,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "lemon__hoghjl": {
    "category": "lemon",
@@ -4072,7 +5197,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "lemon__kvgfdl": {
    "category": "lemon",
@@ -4094,11 +5220,22 @@
      "verdict": "preserved",
      "note": "Scar and nipple sit on the long axis and stay put under any turn about x, uniform skin, exact body of revolution otherwise.",
      "batch": "rev_05"
+    },
+    "x5": {
+     "verdict": "preserved",
+     "note": "Calyx star on the x axis (same place in the +x tile), plain nipple at the other end, uniform yellow skin whose mottling differences are a few-mm low-contrast noise, nothing readable at 1 m.",
+     "batch": "rev_13"
+    },
+    "x6": {
+     "verdict": "preserved",
+     "note": "Same as x5: on-axis calyx, plain tip, only low-contrast skin mottling changes after the 60 degree turn.",
+     "batch": "rev_13"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05+rev_13"
+   "batch": "rev_05+rev_13",
+   "flat_render": false
   },
   "lemon__ovbcff": {
    "category": "lemon",
@@ -4124,7 +5261,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_05"
+   "batch": "rev_05",
+   "flat_render": false
   },
   "lemon__peqwoa": {
    "category": "lemon",
@@ -4150,7 +5288,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "lemon__pffkae": {
    "category": "lemon",
@@ -4176,7 +5315,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "lemon__pqweio": {
    "category": "lemon",
@@ -4214,7 +5354,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "lemon__pwqedq": {
    "category": "lemon",
@@ -4252,7 +5393,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "lemon__vuwehu": {
    "category": "lemon",
@@ -4273,7 +5415,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "letter__bdlpry": {
    "category": "letter",
@@ -4294,7 +5437,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "letter__csncjv": {
    "category": "letter",
@@ -4315,7 +5459,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "letter__dyvllf": {
    "category": "letter",
@@ -4336,7 +5481,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "letter__esmoua": {
    "category": "letter",
@@ -4367,7 +5513,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "letter__igvnic": {
    "category": "letter",
@@ -4388,7 +5535,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "letter__jafvfh": {
    "category": "letter",
@@ -4409,7 +5557,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "letter__oheufk": {
    "category": "letter",
@@ -4440,7 +5589,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "letter__qrykxc": {
    "category": "letter",
@@ -4461,7 +5611,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "lid__fnqhbz": {
    "category": "lid",
@@ -4487,7 +5638,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "lid__kdswwr": {
    "category": "lid",
@@ -4518,7 +5670,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "lid__qferch": {
    "category": "lid",
@@ -4539,7 +5692,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "lipstick__albshz": {
    "category": "lipstick",
@@ -4560,7 +5714,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": true
   },
   "marker__ablbdc": {
    "category": "marker",
@@ -4591,7 +5746,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "marker__bwwkmb": {
    "category": "marker",
@@ -4617,7 +5773,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "marker__erhlbb": {
    "category": "marker",
@@ -4648,7 +5805,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "marker__gldosk": {
    "category": "marker",
@@ -4679,7 +5837,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "marker__jlvneb": {
    "category": "marker",
@@ -4700,7 +5859,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "marker__mcpkkq": {
    "category": "marker",
@@ -4721,7 +5881,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "marker__mznenj": {
    "category": "marker",
@@ -4742,7 +5903,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "marker__oyjbhy": {
    "category": "marker",
@@ -4763,7 +5925,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "marker__slgheo": {
    "category": "marker",
@@ -4794,7 +5957,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "marker__vjjsul": {
    "category": "marker",
@@ -4803,11 +5967,7 @@
    "symmetry": [
     "none"
    ],
-   "symmetry_near": [
-    "x4",
-    "x3",
-    "x5"
-   ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -4815,11 +5975,27 @@
      "verdict": "broken",
      "note": "One-sided pocket clip on the cap: on top of the cap in the original \u2212z tile, at the lower edge at x197 (and now visible in the \u2212y tile).",
      "batch": "rev_06"
+    },
+    "x4": {
+     "verdict": "broken",
+     "note": "The yellow cap carries a one-sided pale clip (a ~30 mm stripe seen in the -z/+z tiles of the original) that after the quarter turn shows in the -y tile instead, so the marker is distinguishable at 1 m.",
+     "batch": "rev_13"
+    },
+    "x3": {
+     "verdict": "broken",
+     "note": "The one-sided cap clip moves to the +y/-y side after 120 degrees (it leaves the -z tile), a visible change.",
+     "batch": "rev_13"
+    },
+    "x5": {
+     "verdict": "broken",
+     "note": "The one-sided cap clip is seen from -y after 72 degrees instead of from -z/+z in the original.",
+     "batch": "rev_13"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06+rev_13"
+   "batch": "rev_06+rev_13",
+   "flat_render": false
   },
   "marker__vrjwkg": {
    "category": "marker",
@@ -4828,9 +6004,7 @@
    "symmetry": [
     "none"
    ],
-   "symmetry_near": [
-    "x3"
-   ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -4838,11 +6012,17 @@
      "verdict": "broken",
      "note": "One-sided pocket clip on the cap: on top of the cap in the original \u2212z tile, at the cap's lower edge at x163.",
      "batch": "rev_06"
+    },
+    "x3": {
+     "verdict": "broken",
+     "note": "The purple cap has a one-sided pale clip stripe (in the -z/+z tiles of the original) that appears in the +y tile after the 120 degree turn, readable at 1 m.",
+     "batch": "rev_13"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06+rev_13"
+   "batch": "rev_06+rev_13",
+   "flat_render": false
   },
   "marker__xakoic": {
    "category": "marker",
@@ -4863,7 +6043,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_06"
+   "batch": "rev_06",
+   "flat_render": false
   },
   "marker__zvvovh": {
    "category": "marker",
@@ -4894,7 +6075,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "newspaper__edarlp": {
    "category": "newspaper",
@@ -4915,7 +6097,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "notebook__eijrqw": {
    "category": "notebook",
@@ -4936,7 +6119,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "notebook__ffdjzp": {
    "category": "notebook",
@@ -4967,7 +6151,8 @@
      "note": "The red ribbon tail hanging out at one corner and the elastic band strip move to the opposite corner/side after the half turn about the +z (up) axis; the selection reviewer (not symmetric) is right and the survey's 'in symmetry' is wrong."
     }
    ],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "notebook__gqkaqu": {
    "category": "notebook",
@@ -4976,9 +6161,7 @@
    "symmetry": [
     "none"
    ],
-   "symmetry_near": [
-    "x2"
-   ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -4986,6 +6169,11 @@
      "verdict": "broken",
      "note": "The spiral binding runs along one long edge and ends up on the opposite edge after the half turn about the +z (up) axis, which anyone would see; the selection reviewer (not symmetric) is right and the survey's 'in symmetry' is wrong.",
      "batch": "rev_07"
+    },
+    "x2": {
+     "verdict": "broken",
+     "note": "The spiral coil runs along one long edge (-y): after the half turn about x it sits on the +y edge (bottom to top of the +z/-z tiles, near to far edge in the +y/-y tiles), a clearly visible change.",
+     "batch": "rev_13"
     }
    },
    "reviewed_scaled": {},
@@ -5000,7 +6188,33 @@
      "note": "The spiral binding runs along one long edge and ends up on the opposite edge after the half turn about the +z (up) axis, which anyone would see; the selection reviewer (not symmetric) is right and the survey's 'in symmetry' is wrong."
     }
    ],
-   "batch": "rev_07+rev_13"
+   "batch": "rev_07+rev_13",
+   "flat_render": true
+  },
+  "notebook__zkmmnf": {
+   "category": "notebook",
+   "model": "zkmmnf",
+   "scale": null,
+   "symmetry": [
+    "none"
+   ],
+   "symmetry_near": [
+    "x2",
+    "y2"
+   ],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z2": {
+     "verdict": "broken",
+     "note": "The spiral coil along one long edge swaps from the -y to the +y side under the half turn about z (bottom to top of the +z/-z tiles, near edge of the -y tile to near edge of the +y tile), visible at 1 m.",
+     "batch": "rev_13"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_13",
+   "flat_render": true
   },
   "notepad__awcyha": {
    "category": "notepad",
@@ -5021,18 +6235,17 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "orange__ucstpm": {
    "category": "orange",
    "model": "ucstpm",
    "scale": null,
    "symmetry": [
-    "none"
-   ],
-   "symmetry_near": [
     "z6"
    ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -5040,11 +6253,61 @@
      "verdict": "broken",
      "note": "The small green stem/calyx spot near the top of the orange moves off to the side under the random rotation; the peel is otherwise uniform but that one feature gives the orientation away.",
      "batch": "rev_07"
+    },
+    "z6": {
+     "verdict": "preserved",
+     "note": "Plain orange sphere whose green stem spot lies on the z axis (it stays at the same place in the +z tile for every z rotation, including the z6 row of the earlier sheet and the z2/z4/zinf rows of the re-rendered one); only low-poly silhouette corners and skin mottling change.",
+     "batch": "rev_13"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07+rev_13"
+   "batch": "rev_07+rev_13",
+   "flat_render": false
+  },
+  "ottoman__qsnawv": {
+   "category": "ottoman",
+   "model": "qsnawv",
+   "scale": null,
+   "symmetry": [
+    "z4"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z4": {
+     "verdict": "preserved",
+     "note": "Uniform grey rounded cube with no seam, label or handle on any face; the quarter turn changes only a ~5 mm outline shift of the base plate in the -z tile, not readable.",
+     "batch": "rev_13"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_13",
+   "flat_render": false
+  },
+  "ottoman__xcmniq": {
+   "category": "ottoman",
+   "model": "xcmniq",
+   "scale": null,
+   "symmetry": [
+    "z2"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z2": {
+     "verdict": "preserved",
+     "note": "Grey tufted body with four identical wooden feet; the only one-sided mark is a very faint lighter dashed patch on the +x face (<= ~15/255 above the fabric, at the weave's own contrast, no survey blob) that a person could not read at 1 m - flagged in case the coordinator wants to override.",
+     "batch": "rev_13"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_13",
+   "flat_render": false
   },
   "pack_of_chocolate_bar__bxgewr": {
    "category": "pack_of_chocolate_bar",
@@ -5065,7 +6328,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "pack_of_chocolate_bar__tidcst": {
    "category": "pack_of_chocolate_bar",
@@ -5086,7 +6350,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "pack_of_cigarettes__ajphvf": {
    "category": "pack_of_cigarettes",
@@ -5107,7 +6372,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "pack_of_cigarettes__ghbqav": {
    "category": "pack_of_cigarettes",
@@ -5128,7 +6394,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "pack_of_cigarettes__ohpqua": {
    "category": "pack_of_cigarettes",
@@ -5149,7 +6416,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "pack_of_cigarettes__ppbmak": {
    "category": "pack_of_cigarettes",
@@ -5180,7 +6448,30 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
+  },
+  "pack_of_cigarettes__qabdgg": {
+   "category": "pack_of_cigarettes",
+   "model": "qabdgg",
+   "scale": null,
+   "symmetry": [
+    "z2"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z2": {
+     "verdict": "preserved",
+     "note": "Both end faces carry the same print (white panel, pill logo, dark-red warning picture) and the green sides are plain, so the half turn leaves only sub-mm differences inside the picture that are not readable at 1 m.",
+     "batch": "rev_13"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_13",
+   "flat_render": false
   },
   "pack_of_cigarettes__tngixy": {
    "category": "pack_of_cigarettes",
@@ -5206,7 +6497,52 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
+  },
+  "pack_of_cigarettes__wjfbhw": {
+   "category": "pack_of_cigarettes",
+   "model": "wjfbhw",
+   "scale": null,
+   "symmetry": [
+    "z2"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z2": {
+     "verdict": "preserved",
+     "note": "Both end faces show the identical chevron band and medallion design and the sides a uniform repeating vertical stripe pattern; only a slight stripe phase shift remains after the half turn, not readable at 1 m.",
+     "batch": "rev_13"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_13",
+   "flat_render": false
+  },
+  "pack_of_kielbasa__fwqdoy": {
+   "category": "pack_of_kielbasa",
+   "model": "fwqdoy",
+   "scale": null,
+   "symmetry": [
+    "x2"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "x2": {
+     "verdict": "preserved",
+     "note": "The wrap print is two-fold about the long axis (top and bottom tiles identical) and both ends match; the only change is a ~12 mm grey end-clip mark on the +x end shifting by a few mm, which does not read as a different orientation at 1 m.",
+     "batch": "rev_13"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_13",
+   "flat_render": false
   },
   "pack_of_kielbasa__rvhpal": {
    "category": "pack_of_kielbasa",
@@ -5227,7 +6563,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "painting__eexydp": {
    "category": "painting",
@@ -5248,7 +6585,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "painting__ejhanr": {
    "category": "painting",
@@ -5269,7 +6607,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "painting__gardkz": {
    "category": "painting",
@@ -5290,7 +6629,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "paper_liners__yvuilk": {
    "category": "paper_liners",
@@ -5311,7 +6651,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "paperback_book__aubynm": {
    "category": "paperback_book",
@@ -5332,7 +6673,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "paperback_book__eqzjjk": {
    "category": "paperback_book",
@@ -5353,7 +6695,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "paperback_book__jhaltj": {
    "category": "paperback_book",
@@ -5374,7 +6717,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "paperback_book__ncjkcg": {
    "category": "paperback_book",
@@ -5395,7 +6739,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "paperback_book__phsgun": {
    "category": "paperback_book",
@@ -5416,7 +6761,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "paperback_book__vciijb": {
    "category": "paperback_book",
@@ -5437,7 +6783,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "pen__enfumt": {
    "category": "pen",
@@ -5446,9 +6793,7 @@
    "symmetry": [
     "none"
    ],
-   "symmetry_near": [
-    "x2"
-   ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -5456,11 +6801,61 @@
      "verdict": "broken",
      "note": "The pen clip stands off one side of the barrel (visible above the body from +y in the original) and swings around with any rotation about x, so its new position gives the angle away.",
      "batch": "rev_07"
+    },
+    "x2": {
+     "verdict": "broken",
+     "note": "The pen has a one-sided clip (a bar parallel to the barrel near the cap) that moves from above to below the barrel in the +y/-y tiles after the half turn about x.",
+     "batch": "rev_13"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07+rev_13"
+   "batch": "rev_07+rev_13",
+   "flat_render": false
+  },
+  "pen__gzrbrx": {
+   "category": "pen",
+   "model": "gzrbrx",
+   "scale": null,
+   "symmetry": [
+    "xinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "xinf": {
+     "verdict": "preserved",
+     "note": "Plain red pen with rotationally symmetric rings and tip, no clip or print; the x163 row differs only by a ~1 px wobble of the slightly tilted axis.",
+     "batch": "rev_13"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_13",
+   "flat_render": false
+  },
+  "pen__hiyeki": {
+   "category": "pen",
+   "model": "hiyeki",
+   "scale": null,
+   "symmetry": [
+    "xinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "xinf": {
+     "verdict": "preserved",
+     "note": "Plain light-grey pen with two rings and a dark tip, no clip or print; the x251 row is identical apart from a tiny axis wobble.",
+     "batch": "rev_13"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_13",
+   "flat_render": false
   },
   "pencil__bfkwhb": {
    "category": "pencil",
@@ -5486,7 +6881,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_07"
+   "batch": "rev_07",
+   "flat_render": false
   },
   "pencil__fnlbpu": {
    "category": "pencil",
@@ -5514,7 +6910,41 @@
    },
    "symmetric_180": [],
    "batch": null,
+   "flat_render": false,
    "batch_scaled": "rev_07"
+  },
+  "pencil__heqkmr": {
+   "category": "pencil",
+   "model": "heqkmr",
+   "scale": [
+    1.0,
+    3.345,
+    5.081
+   ],
+   "symmetry": [
+    "xinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": [
+    "none"
+   ],
+   "symmetry_near_scaled": [],
+   "reviewed": {
+    "y2": {
+     "verdict": "broken",
+     "note": "The pale sharpened tip (-x end) and the blunt dark end swap ends after the half turn about y, a different end shape visible at 1 m.",
+     "batch": "rev_13"
+    },
+    "xinf": {
+     "verdict": "preserved",
+     "note": "Unprinted dark-brown pencil; rotation about its long axis leaves tip and end in place and the tiles identical apart from a ~1-2 mm wobble of the thin rod.",
+     "batch": "rev_13"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_13",
+   "flat_render": false
   },
   "pencil__hmawzy": {
    "category": "pencil",
@@ -5525,18 +6955,35 @@
     4.998
    ],
    "symmetry": [
-    "x5",
-    "x6"
-   ],
-   "symmetry_near": [
-    "y2",
     "xinf"
    ],
+   "symmetry_near": [],
    "symmetry_scaled": [
     "none"
    ],
    "symmetry_near_scaled": [],
-   "reviewed": {},
+   "reviewed": {
+    "y2": {
+     "verdict": "broken",
+     "note": "The pale sharpened tip moves from the -x to the +x end after the half turn about y (tip swaps sides in every side tile).",
+     "batch": "rev_13"
+    },
+    "xinf": {
+     "verdict": "preserved",
+     "note": "Unprinted golden pencil; the x131 row is identical apart from a ~1-2 mm wobble of the thin rod, no print or seam anywhere around it.",
+     "batch": "rev_13"
+    },
+    "z2": {
+     "verdict": "broken",
+     "note": "The end-to-end flip swaps the sharpened tip (wood cone and dark lead) with the plain orange blunt end; the point is obvious to a person.",
+     "batch": "rev_15"
+    },
+    "x4": {
+     "verdict": "preserved",
+     "note": "Unprinted hexagonal pencil turned 90 degrees about its own axis: only the facet tones shift slightly, no print or logo, and the tip and body look the same in every camera.",
+     "batch": "rev_15"
+    }
+   },
    "reviewed_scaled": {
     "z2": {
      "verdict": "broken",
@@ -5545,7 +6992,8 @@
     }
    },
    "symmetric_180": [],
-   "batch": "rev_13",
+   "batch": "rev_13+rev_15",
+   "flat_render": false,
    "batch_scaled": "rev_07"
   },
   "pencil__lruiot": {
@@ -5559,9 +7007,7 @@
    "symmetry": [
     "xinf"
    ],
-   "symmetry_near": [
-    "y2"
-   ],
+   "symmetry_near": [],
    "symmetry_scaled": [
     "none"
    ],
@@ -5571,11 +7017,78 @@
      "verdict": "preserved",
      "note": "Turn about the long axis of a plain, uniformly navy hexagonal pencil: the sharpened tip stays at the same end and no print or seam is visible on the body in any tile (same mesh whose xinf the survey accepted for rzscao); the texture difference is only the dark edge pixels of a 4 mm rod.",
      "batch": "rev_08"
+    },
+    "y2": {
+     "verdict": "broken",
+     "note": "The light wooden sharpened tip and the blunt blue end swap ends after the half turn about y.",
+     "batch": "rev_13"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08+rev_13"
+   "batch": "rev_08+rev_13",
+   "flat_render": false
+  },
+  "pencil__lykqoh": {
+   "category": "pencil",
+   "model": "lykqoh",
+   "scale": [
+    1.0,
+    3.596,
+    5.119
+   ],
+   "symmetry": [
+    "xinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": [
+    "none"
+   ],
+   "symmetry_near_scaled": [],
+   "reviewed": {
+    "y2": {
+     "verdict": "broken",
+     "note": "The pale sharpened tip swaps from the -x to the +x end after the half turn about y, visible in every side tile despite the survey's 'preserved' texture class.",
+     "batch": "rev_13"
+    },
+    "xinf": {
+     "verdict": "preserved",
+     "note": "Unprinted navy pencil; the x131 row is identical apart from a ~1-2 mm wobble of the thin rod.",
+     "batch": "rev_13"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_13",
+   "flat_render": false
+  },
+  "pencil__mvmxfo": {
+   "category": "pencil",
+   "model": "mvmxfo",
+   "scale": [
+    1.0,
+    3.327,
+    5.106
+   ],
+   "symmetry": [
+    "xinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": [
+    "none"
+   ],
+   "symmetry_near_scaled": [],
+   "reviewed": {
+    "xinf": {
+     "verdict": "preserved",
+     "note": "Unprinted black pencil with the pale tip on the axis; the x197 row is identical apart from a ~1-2 mm wobble of the thin rod.",
+     "batch": "rev_13"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_13",
+   "flat_render": false
   },
   "pencil__rzscao": {
    "category": "pencil",
@@ -5614,6 +7127,7 @@
    },
    "symmetric_180": [],
    "batch": "rev_08",
+   "flat_render": false,
    "batch_scaled": "rev_08"
   },
   "pencil__vedvit": {
@@ -5643,7 +7157,41 @@
    },
    "symmetric_180": [],
    "batch": null,
+   "flat_render": false,
    "batch_scaled": "rev_08"
+  },
+  "pencil__vpzhth": {
+   "category": "pencil",
+   "model": "vpzhth",
+   "scale": [
+    1.0,
+    3.361,
+    5.096
+   ],
+   "symmetry": [
+    "xinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": [
+    "none"
+   ],
+   "symmetry_near_scaled": [],
+   "reviewed": {
+    "y2": {
+     "verdict": "broken",
+     "note": "The end-to-end flip about y swaps the sharpened, tapering tip with the flat-cut end; the taper is plainly visible in the +y/-y/+z/-z tiles and a person at 1 m reads which end is the point, even though the body is one uniform dark colour.",
+     "batch": "rev_14"
+    },
+    "xinf": {
+     "verdict": "preserved",
+     "note": "Uniform dark unprinted body of revolution about its own axis: the tile thickness stays about 2.4 px in every view after x101 and x90, and the only change is a sub-pixel shift of the ends from the pencil's slight tilt against the frame x axis (the 6 x 4 mm bbox), not readable at 1 m.",
+     "batch": "rev_14"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_14",
+   "flat_render": false
   },
   "pencil__vvofwr": {
    "category": "pencil",
@@ -5656,9 +7204,7 @@
    "symmetry": [
     "xinf"
    ],
-   "symmetry_near": [
-    "y2"
-   ],
+   "symmetry_near": [],
    "symmetry_scaled": [
     "none"
    ],
@@ -5668,11 +7214,17 @@
      "verdict": "preserved",
      "note": "Rotation about the long axis of a uniformly dark-teal hexagonal pencil: the tip remains at the same end and no print, logo or seam can be seen on the body in any tile; only edge pixels of the thin rod differ.",
      "batch": "rev_08"
+    },
+    "y2": {
+     "verdict": "broken",
+     "note": "The end-to-end flip about y swaps the sharpened, tapering tip with the flat-cut end, clearly visible in the side and top tiles; the uniform dark teal body carries no print, so the differing ends are what break it.",
+     "batch": "rev_14"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08+rev_14"
+   "batch": "rev_08+rev_14",
+   "flat_render": false
   },
   "pencil_case__acikzo": {
    "category": "pencil_case",
@@ -5693,7 +7245,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "pepper_shaker__stbqbt": {
    "category": "pepper_shaker",
@@ -5720,7 +7273,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "pepper_shaker__tgcwtr": {
    "category": "pepper_shaker",
@@ -5737,24 +7291,31 @@
      "verdict": "preserved",
      "note": "Black cap, uniformly speckled dark-green body (noise texture, not a print) and plain black base band; all four side tiles and the top/bottom look the same at any yaw, no label or seam.",
      "batch": "rev_08"
+    },
+    "z5": {
+     "verdict": "preserved",
+     "note": "Plain black cap and base with a green speckle-noise body; the amplified difference against the z72 row is uniform speckle only, with no label, seam or band anywhere and nothing on the bottom, so nothing marks the turn.",
+     "batch": "rev_14"
+    },
+    "z6": {
+     "verdict": "preserved",
+     "note": "Same object seen at z60: black cap and base unchanged, the green body differs only in its fine speckle noise, no readable feature on the sides or the bottom.",
+     "batch": "rev_14"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08+rev_14"
+   "batch": "rev_08+rev_14",
+   "flat_render": false
   },
   "pepper_shaker__ykujyn": {
    "category": "pepper_shaker",
    "model": "ykujyn",
    "scale": null,
    "symmetry": [
-    "z4",
-    "z5",
-    "z6"
-   ],
-   "symmetry_near": [
     "zinf"
    ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -5767,11 +7328,17 @@
      "verdict": "broken",
      "note": "Same as x2: the upside-down shaker shows its large black cap at the bottom and the red-brown speckled body on top, clearly different from the original from the side and from above.",
      "batch": "rev_08"
+    },
+    "zinf": {
+     "verdict": "preserved",
+     "note": "Black cap and dark brown speckle body with no label, seam or bottom mark; z2-z6 already match and the z131 row differs only in the fine speckle noise, so any yaw is invisible.",
+     "batch": "rev_14"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08+rev_14"
+   "batch": "rev_08+rev_14",
+   "flat_render": false
   },
   "pickle__ifterk": {
    "category": "pickle",
@@ -5792,7 +7359,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "pickle__iobrqp": {
    "category": "pickle",
@@ -5813,7 +7381,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "picture__watgtj": {
    "category": "picture",
@@ -5834,7 +7403,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "plate__bgxzec": {
    "category": "plate",
@@ -5861,7 +7431,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "plate__luhkiz": {
    "category": "plate",
@@ -5878,11 +7449,44 @@
      "verdict": "preserved",
      "note": "Dark grey plate with a fine, uniform beaded black rim (dozens of identical beads, no print or gap); the odd-angle rows read exactly the same as the original, the bead phase is a polygon-corner effect not readable at 1 m.",
      "batch": "rev_08"
+    },
+    "z4": {
+     "verdict": "preserved",
+     "note": "Plain grey face; the dark beaded rim is a fine repeating pattern whose period divides 90 deg (rim differences at z90 are two to three times smaller than at z72/z197 and stay at polygon-corner level), so the quarter turn is invisible.",
+     "batch": "rev_14"
+    },
+    "z6": {
+     "verdict": "preserved",
+     "note": "Plain grey face; the beaded rim realigns at 60 deg as well (differences at z60 are as small as at z90/z180, unlike z72/z197), so the sixth turn is invisible.",
+     "batch": "rev_14"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08+rev_14"
+   "batch": "rev_08+rev_14",
+   "flat_render": false
+  },
+  "plate__mtetqm": {
+   "category": "plate",
+   "model": "mtetqm",
+   "scale": null,
+   "symmetry": [
+    "z4"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z4": {
+     "verdict": "preserved",
+     "note": "Uniform grey rounded-square plate with a centred round well; the 214 vs 219 mm x/y bbox difference (2 %) and the low-poly corner positions move the outline by about one tile pixel only, which a person at 1 m could not see.",
+     "batch": "rev_14"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_14",
+   "flat_render": false
   },
   "plate__spppps": {
    "category": "plate",
@@ -5903,7 +7507,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "pop_case__gwgaqb": {
    "category": "pop_case",
@@ -5924,7 +7529,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "pop_case__pldtgy": {
    "category": "pop_case",
@@ -5945,7 +7551,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "pop_case__qcfxec": {
    "category": "pop_case",
@@ -5966,7 +7573,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "public_trash_can__aefcem": {
    "category": "public_trash_can",
@@ -5987,7 +7595,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "public_trash_can__hxsyxo": {
    "category": "public_trash_can",
@@ -6013,7 +7622,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "public_trash_can__leazin": {
    "category": "public_trash_can",
@@ -6034,7 +7644,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "public_trash_can__xkqkbf": {
    "category": "public_trash_can",
@@ -6055,7 +7666,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "radiator__arsjbe": {
    "category": "radiator",
@@ -6076,7 +7688,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "radiator__dwmloz": {
    "category": "radiator",
@@ -6107,7 +7720,8 @@
      "note": "Judged the half turn about the +x front (wall-normal) axis: a single pipe elbow protrudes at one bottom corner of the panel and after x180 it sits at the opposite top corner (front, back and end tiles), a feature a person sees at 1 m; the selection reviewer's value (not symmetric) is right and the survey's exact x2 is wrong."
     }
    ],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "radiator__xnoiwp": {
    "category": "radiator",
@@ -6128,7 +7742,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "rolling_pin__mwrdae": {
    "category": "rolling_pin",
@@ -6165,7 +7780,31 @@
      "note": "Judged the half turn about the +x front axis, which swaps the ends: both ends carry the same round knob handle and the dark wood shows only a faint grain with no knot or seam readable at 1 m, so the x180 row is identical; the selection reviewer's symmetric_180 = 1 is right, the survey's symmetry_near was over-cautious."
     }
    ],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
+  },
+  "rolling_pin__smnklu": {
+   "category": "rolling_pin",
+   "model": "smnklu",
+   "scale": null,
+   "symmetry": [
+    "x2",
+    "yinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "yinf": {
+     "verdict": "preserved",
+     "note": "Turned barrel and handles in one uniform colour each (barrel colour spread about 2/255, no grain, no print); the y163 row is identical up to polygon corners.",
+     "batch": "rev_14"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_14",
+   "flat_render": false
   },
   "ruler__ujizkx": {
    "category": "ruler",
@@ -6198,7 +7837,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "ruler__vmnaih": {
    "category": "ruler",
@@ -6224,7 +7864,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08"
+   "batch": "rev_08",
+   "flat_render": false
   },
   "salt_shaker__iomwtn": {
    "category": "salt_shaker",
@@ -6241,11 +7882,27 @@
      "verdict": "preserved",
      "note": "Plain dark turned-wood mill with a black knob: no label, seam or readable grain from any side (checked with brightened tiles) and the base opening is centred, so any yaw looks the same.",
      "batch": "rev_08"
+    },
+    "z4": {
+     "verdict": "preserved",
+     "note": "Very dark, uniformly coloured turned body (luma spread about 10/255) with a centred knob and a centred bottom filling hole; no grain or print readable, differences only at the polygonal rim of the hole.",
+     "batch": "rev_14"
+    },
+    "z5": {
+     "verdict": "preserved",
+     "note": "Same dark uniform turned body; the z72 row matches the original in every view, knob and bottom hole stay centred, no readable grain or print.",
+     "batch": "rev_14"
+    },
+    "z6": {
+     "verdict": "preserved",
+     "note": "Same dark uniform turned body; the z60 row matches the original in every view, differences limited to the polygonal rim of the bottom hole.",
+     "batch": "rev_14"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_08+rev_14"
+   "batch": "rev_08+rev_14",
+   "flat_render": false
   },
   "salt_shaker__qowouj": {
    "category": "salt_shaker",
@@ -6266,7 +7923,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "saucepot__chjetk": {
    "category": "saucepot",
@@ -6287,7 +7945,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "shampoo_dispenser__eblcnw": {
    "category": "shampoo_dispenser",
@@ -6308,7 +7967,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "shampoo_dispenser__eywylh": {
    "category": "shampoo_dispenser",
@@ -6329,7 +7989,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "shampoo_dispenser__kkbhzw": {
    "category": "shampoo_dispenser",
@@ -6350,7 +8011,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "shampoo_dispenser__nrthyl": {
    "category": "shampoo_dispenser",
@@ -6371,7 +8033,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": true
   },
   "shelf__iruewm": {
    "category": "shelf",
@@ -6412,7 +8075,41 @@
      "note": "Judged the half turn about the +z (front) axis: the plank seam is off-centre (39 % from one end, ~55 % after z180 in the +z tile) and the two knots move from the upper-right to the lower-left of the board - the selection reviewer's symmetric_180 = 1 is wrong, the survey's doubt is right."
     }
    ],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
+  },
+  "shelf__kxvbui": {
+   "category": "shelf",
+   "model": "kxvbui",
+   "scale": null,
+   "symmetry": [
+    "x2",
+    "z2"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z2": {
+     "verdict": "preserved",
+     "note": "Plain black rectangular slab with no visible edge feature: the z180 tiles match the originals to a few single edge pixels in all six views (as few as the accepted x2 row), and the survey's ~1 cm silhouette sliver on a 1.24 m board is not readable at 1 m; judged about the +z (front) axis, the selection reviewer's value 1 is right and the survey is wrong.",
+     "batch": "rev_14"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [
+    {
+     "subtask": "alignment-world_horizontal",
+     "tag": "z2",
+     "axis": "+z (front)",
+     "reviewer_value": "1",
+     "verdict": "preserved",
+     "value": "1",
+     "note": "Plain black rectangular slab with no visible edge feature: the z180 tiles match the originals to a few single edge pixels in all six views (as few as the accepted x2 row), and the survey's ~1 cm silhouette sliver on a 1.24 m board is not readable at 1 m; judged about the +z (front) axis, the selection reviewer's value 1 is right and the survey is wrong."
+    }
+   ],
+   "batch": "rev_14",
+   "flat_render": false
   },
   "shelf__qrmiur": {
    "category": "shelf",
@@ -6453,7 +8150,8 @@
      "note": "Judged the half turn about the +z (front) axis: the darker grain band along one long edge of the top face moves to the other edge after z180 (the +z tile brightness gradient reverses) - the selection reviewer's symmetric_180 = 1 is wrong, the survey's doubt is right."
     }
    ],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "shelf__wvkefp": {
    "category": "shelf",
@@ -6484,7 +8182,8 @@
      "note": "Judged the half turn about the +z (front) axis: a raised grey rail runs along one long edge only (right edge in the original +z tile, left edge after z180; far edge vs near edge in the +x tile), so the two placements are clearly different - the survey (not symmetric) is right and the selection reviewer's symmetric_180 = 1 is wrong."
     }
    ],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "soap_dispenser__cgxrwd": {
    "category": "soap_dispenser",
@@ -6505,7 +8204,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "soap_dispenser__edinmg": {
    "category": "soap_dispenser",
@@ -6526,7 +8226,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "soap_dispenser__ijxawq": {
    "category": "soap_dispenser",
@@ -6547,7 +8248,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "soap_dispenser__jmulpc": {
    "category": "soap_dispenser",
@@ -6568,7 +8270,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "soap_dispenser__zwudcz": {
    "category": "soap_dispenser",
@@ -6589,7 +8292,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "sponge__klwueh": {
    "category": "sponge",
@@ -6610,7 +8314,32 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
+  },
+  "spray_can__tehmzy": {
+   "category": "spray_can",
+   "model": "tehmzy",
+   "scale": null,
+   "symmetry": [
+    "z4",
+    "z5",
+    "z6"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z4": {
+     "verdict": "preserved",
+     "note": "Uniform dark green can with a centred grey nozzle cap and no label; the only +z differences are the same cap-edge ring seen for the accepted z5/z6 rows, with no off-centre spray hole or tab.",
+     "batch": "rev_14"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_14",
+   "flat_render": false
   },
   "sugar_cookie__cgkiti": {
    "category": "sugar_cookie",
@@ -6637,7 +8366,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "sugar_cookie__hlyeaq": {
    "category": "sugar_cookie",
@@ -6664,7 +8394,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "table_knife__eebpap": {
    "category": "table_knife",
@@ -6685,7 +8416,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "table_knife__jxdfyy": {
    "category": "table_knife",
@@ -6706,14 +8438,14 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "table_knife__lrdmpf": {
    "category": "table_knife",
    "model": "lrdmpf",
    "scale": null,
    "symmetry": [
-    "x2",
     "y2",
     "z2"
    ],
@@ -6734,7 +8466,30 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
+  },
+  "taboret__bciekv": {
+   "category": "taboret",
+   "model": "bciekv",
+   "scale": null,
+   "symmetry": [
+    "z4"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z4": {
+     "verdict": "preserved",
+     "note": "The four sides carry the same carved volute face and the top the same square relief; the grey stone mottling is a low-contrast noise texture (differences spread as speckle, no coherent patch), so the quarter turn cannot be read.",
+     "batch": "rev_14"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_14",
+   "flat_render": false
   },
   "taboret__ehaclu": {
    "category": "taboret",
@@ -6755,7 +8510,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "taboret__hugvml": {
    "category": "taboret",
@@ -6776,18 +8532,61 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
+  },
+  "taboret__wjrpwg": {
+   "category": "taboret",
+   "model": "wjrpwg",
+   "scale": null,
+   "symmetry": [
+    "none"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z3": {
+     "verdict": "broken",
+     "note": "The round wooden seat shows a plank seam and grain running in one direction; after z120 the grain runs 120 deg differently (a structured difference across the whole 40 cm seat), readable at 1 m even though the three legs and the ring map onto each other.",
+     "batch": "rev_14"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_14",
+   "flat_render": false
+  },
+  "taboret__ysrhuw": {
+   "category": "taboret",
+   "model": "ysrhuw",
+   "scale": null,
+   "symmetry": [
+    "z2"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "z2": {
+     "verdict": "preserved",
+     "note": "The four-leg black frame and the mottled red seat map onto themselves at 180 deg (seat differences stay at noise level with no patch); only z4 breaks on the seat pattern.",
+     "batch": "rev_14"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_14",
+   "flat_render": false
   },
   "teacup__cpozxi": {
    "category": "teacup",
    "model": "cpozxi",
    "scale": null,
    "symmetry": [
-    "none"
-   ],
-   "symmetry_near": [
     "z5"
    ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -6795,11 +8594,17 @@
      "verdict": "broken",
      "note": "The tan-on-navy petal pattern repeats five times, so a 60 deg turn leaves it 12 deg off: in every side tile the large navy ovals sit visibly off their original place (the brown V moves from the centre to one side); z5 is the true symmetry.",
      "batch": "rev_09"
+    },
+    "z5": {
+     "verdict": "preserved",
+     "note": "Five identical dark-blue petal motifs around the cup with a plain rim band and base; the base bottom shows the same faint centre smudge under every rotation, so the 72 deg step is invisible.",
+     "batch": "rev_14"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09+rev_14"
+   "batch": "rev_09+rev_14",
+   "flat_render": false
   },
   "tennis_ball__rgekxe": {
    "category": "tennis_ball",
@@ -6820,7 +8625,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "tongs__gbjqyn": {
    "category": "tongs",
@@ -6841,7 +8647,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "tongs__igsklx": {
    "category": "tongs",
@@ -6862,7 +8669,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "towel_rack__crivoa": {
    "category": "towel_rack",
@@ -6893,7 +8701,8 @@
      "note": "Judged the half turn about the +x (front) axis: a plain black bar with seven identical pegs spaced symmetrically about its middle; the x180 tiles match the original to within ~1 px (about 5 mm) - the survey (symmetric) is right and the selection reviewer's empty symmetric_180 is wrong."
     }
    ],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "towel_rack__kqrmrh": {
    "category": "towel_rack",
@@ -6924,7 +8733,8 @@
      "note": "Judged the half turn about the +x (front) axis: a straight bar with two identical round-flange brackets centred on the bar; the x180 row is pixel-identical to the original - the survey (symmetric) is right and the selection reviewer's empty symmetric_180 is wrong."
     }
    ],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "towel_rack__nhlijv": {
    "category": "towel_rack",
@@ -6945,19 +8755,19 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_09"
+   "batch": "rev_09",
+   "flat_render": false
   },
   "towel_rack__quznqx": {
    "category": "towel_rack",
    "model": "quznqx",
    "scale": null,
    "symmetry": [
-    "x2"
-   ],
-   "symmetry_near": [
+    "x2",
     "y2",
     "z2"
    ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -6970,6 +8780,16 @@
      "verdict": "broken",
      "note": "The bar's 19 x 30 mm cross-section is not round: a quarter turn about the long axis (y4 row) makes it visibly thicker from above and thinner from the side, so not every angle about y is invisible.",
      "batch": "rev_10"
+    },
+    "y2": {
+     "verdict": "preserved",
+     "note": "Plain grey bar of one colour; the half turn about its long axis reproduces every tile pixel for pixel.",
+     "batch": "rev_14"
+    },
+    "z2": {
+     "verdict": "preserved",
+     "note": "Both ends of the plain grey bar are identical plain cuts and the profile is symmetric: the z180 tiles equal the original's opposite-camera views exactly and the geometry matches within a millimetre.",
+     "batch": "rev_14"
     }
    },
    "reviewed_scaled": {},
@@ -6984,7 +8804,8 @@
      "note": "Plain uniform grey bar with alike ends and a top/bottom-symmetric section: the half turn about the +x (front) axis leaves only a sub-pixel outline shift in the tiles, so the selection reviewer's symmetric_180 = 1 is right and the survey's symmetry_near is too cautious."
     }
    ],
-   "batch": "rev_10+rev_14"
+   "batch": "rev_10+rev_14",
+   "flat_render": false
   },
   "toy_dice__akguod": {
    "category": "toy_dice",
@@ -7005,7 +8826,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "toy_dice__bjrxkj": {
    "category": "toy_dice",
@@ -7031,7 +8853,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "toy_dice__cmqtch": {
    "category": "toy_dice",
@@ -7062,7 +8885,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "toy_dice__eqwazv": {
    "category": "toy_dice",
@@ -7083,7 +8907,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "toy_dice__hbkqqp": {
    "category": "toy_dice",
@@ -7114,7 +8939,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "toy_dice__ievnsq": {
    "category": "toy_dice",
@@ -7135,7 +8961,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "toy_dice__kmagva": {
    "category": "toy_dice",
@@ -7166,7 +8993,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "toy_dice__krpdji": {
    "category": "toy_dice",
@@ -7175,9 +9003,7 @@
    "symmetry": [
     "none"
    ],
-   "symmetry_near": [
-    "x2"
-   ],
+   "symmetry_near": [],
    "symmetry_scaled": null,
    "symmetry_near_scaled": null,
    "reviewed": {
@@ -7185,11 +9011,17 @@
      "verdict": "broken",
      "note": "The H faces and the 6 on top/bottom do line up, but the fish on the +x/-x faces ends up belly-up (dorsal fin below, ventral fin on top) after the half turn about y, which a person at 1 m can read on the 2.5 cm outline.",
      "batch": "rev_10"
+    },
+    "x2": {
+     "verdict": "broken",
+     "note": "After the half turn the engraved fish outlines on the +x/-x faces face the other way and the top digit reads 9 instead of 6 (only the 180-deg-symmetric H faces still match); thin dark lines that a person reads easily at 1 m, which the survey's blob metric under-weights.",
+     "batch": "rev_14"
     }
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10+rev_14"
+   "batch": "rev_10+rev_14",
+   "flat_render": false
   },
   "toy_dice__mqvaaa": {
    "category": "toy_dice",
@@ -7220,7 +9052,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "toy_dice__nmhsvp": {
    "category": "toy_dice",
@@ -7241,7 +9074,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "toy_dice__rbzyrv": {
    "category": "toy_dice",
@@ -7272,7 +9106,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "toy_dice__xfqqhh": {
    "category": "toy_dice",
@@ -7303,7 +9138,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "toy_figure__gqspnb": {
    "category": "toy_figure",
@@ -7324,7 +9160,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "toy_figure__jddrck": {
    "category": "toy_figure",
@@ -7345,7 +9182,30 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
+  },
+  "trash_can__hqdnjz": {
+   "category": "trash_can",
+   "model": "hqdnjz",
+   "scale": null,
+   "symmetry": [
+    "zinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "zinf": {
+     "verdict": "preserved",
+     "note": "Plain tapered grey-brown bin with black rim and base, uniform colour (spread about 5/255) and no print; the z131 row differs only by polygon corners.",
+     "batch": "rev_14"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_14",
+   "flat_render": false
   },
   "tray__mkdcha": {
    "category": "tray",
@@ -7371,7 +9231,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "tray__xzcnjq": {
    "category": "tray",
@@ -7392,7 +9253,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "umbrella__hdfkbc": {
    "category": "umbrella",
@@ -7413,7 +9275,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "vase__aegxpb": {
    "category": "vase",
@@ -7434,7 +9297,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "vase__atgnsc": {
    "category": "vase",
@@ -7455,7 +9319,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "vase__stqkvx": {
    "category": "vase",
@@ -7476,7 +9341,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "vidalia_onion__buyxll": {
    "category": "vidalia_onion",
@@ -7497,7 +9363,30 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
+  },
+  "vidalia_onion__dejqhf": {
+   "category": "vidalia_onion",
+   "model": "dejqhf",
+   "scale": null,
+   "symmetry": [
+    "xinf"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "xinf": {
+     "verdict": "preserved",
+     "note": "Near-black uniform onion with the stem/root on the x axis (its end-on spot stays put in the +x view); only the ~4 mm curl of the stem tip changes direction, too small to read at 1 m.",
+     "batch": "rev_14"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [],
+   "batch": "rev_14",
+   "flat_render": false
   },
   "vidalia_onion__ldeuli": {
    "category": "vidalia_onion",
@@ -7518,7 +9407,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "wall_clock__jerval": {
    "category": "wall_clock",
@@ -7539,7 +9429,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "wall_clock__xevvel": {
    "category": "wall_clock",
@@ -7575,7 +9466,8 @@
      "note": "Judged about the +x (front) axis: the half turn puts the XII at the bottom and VI at the top, upside down, so the selection reviewer's 'not symmetric' is right and the survey's exact-geometry/preserved-texture verdict misses the thin numerals."
     }
    ],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "wall_clock__zpctvp": {
    "category": "wall_clock",
@@ -7601,7 +9493,138 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
+  },
+  "wall_mounted_tv__dxyfxf": {
+   "category": "wall_mounted_tv",
+   "model": "dxyfxf",
+   "scale": null,
+   "symmetry": [
+    "x2"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "x2": {
+     "verdict": "preserved",
+     "note": "hung on the wall: the rear housing that broke the flip is against the wall and invisible from the room; symmetric_180 concerns the front view, so the selection reviewer's 1 stands",
+     "batch": "overrides",
+     "by": "coordinator"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [
+    {
+     "subtask": "alignment-world_horizontal",
+     "tag": "x2",
+     "axis": "+x (front)",
+     "reviewer_value": "1",
+     "verdict": "preserved",
+     "value": "1",
+     "note": "hung on the wall: the rear housing that broke the flip is against the wall and invisible from the room; symmetric_180 concerns the front view, so the selection reviewer's 1 stands"
+    }
+   ],
+   "batch": "rev_14",
+   "flat_render": false
+  },
+  "wall_mounted_tv__ggfznh": {
+   "category": "wall_mounted_tv",
+   "model": "ggfznh",
+   "scale": null,
+   "symmetry": [
+    "x2"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "x2": {
+     "verdict": "preserved",
+     "note": "Plain grey screen in a black bezel with a plain black back: the flipped tiles match to single edge pixels in all six views, the screen sits at most ~5 mm off-centre in its bezel on a 56 cm set and the rear notch is ~16 mm, neither readable at 1 m; judged about the +x (front) axis, the selection reviewer's value 1 is right and the survey is wrong.",
+     "batch": "rev_14"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [
+    {
+     "subtask": "alignment-world_horizontal",
+     "tag": "x2",
+     "axis": "+x (front)",
+     "reviewer_value": "1",
+     "verdict": "preserved",
+     "value": "1",
+     "note": "Plain grey screen in a black bezel with a plain black back: the flipped tiles match to single edge pixels in all six views, the screen sits at most ~5 mm off-centre in its bezel on a 56 cm set and the rear notch is ~16 mm, neither readable at 1 m; judged about the +x (front) axis, the selection reviewer's value 1 is right and the survey is wrong."
+    }
+   ],
+   "batch": "rev_14",
+   "flat_render": false
+  },
+  "wall_mounted_tv__sodbbr": {
+   "category": "wall_mounted_tv",
+   "model": "sodbbr",
+   "scale": null,
+   "symmetry": [
+    "x2"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "x2": {
+     "verdict": "preserved",
+     "note": "hung on the wall: the rear housing that broke the flip is against the wall and invisible from the room; symmetric_180 concerns the front view, so the selection reviewer's 1 stands",
+     "batch": "overrides",
+     "by": "coordinator"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [
+    {
+     "subtask": "alignment-world_horizontal",
+     "tag": "x2",
+     "axis": "+x (front)",
+     "reviewer_value": "1",
+     "verdict": "preserved",
+     "value": "1",
+     "note": "hung on the wall: the rear housing that broke the flip is against the wall and invisible from the room; symmetric_180 concerns the front view, so the selection reviewer's 1 stands"
+    }
+   ],
+   "batch": "rev_14",
+   "flat_render": false
+  },
+  "wall_mounted_tv__ylvjhb": {
+   "category": "wall_mounted_tv",
+   "model": "ylvjhb",
+   "scale": null,
+   "symmetry": [
+    "x2"
+   ],
+   "symmetry_near": [],
+   "symmetry_scaled": null,
+   "symmetry_near_scaled": null,
+   "reviewed": {
+    "x2": {
+     "verdict": "preserved",
+     "note": "Simple box TV with a plain grey screen, a bezel equal top and bottom to under 1 mm and a plain black back; the flipped tiles differ only by one-pixel edge slivers (~1 cm on a 0.9 m set), so the half turn is invisible; judged about the +x (front) axis, the selection reviewer's value 1 is right and the survey is wrong.",
+     "batch": "rev_14"
+    }
+   },
+   "reviewed_scaled": {},
+   "symmetric_180": [
+    {
+     "subtask": "alignment-world_horizontal",
+     "tag": "x2",
+     "axis": "+x (front)",
+     "reviewer_value": "1",
+     "verdict": "preserved",
+     "value": "1",
+     "note": "Simple box TV with a plain grey screen, a bezel equal top and bottom to under 1 mm and a plain black back; the flipped tiles differ only by one-pixel edge slivers (~1 cm on a 0.9 m set), so the half turn is invisible; judged about the +x (front) axis, the selection reviewer's value 1 is right and the survey is wrong."
+    }
+   ],
+   "batch": "rev_14",
+   "flat_render": false
   },
   "whiteboard__gvkgsi": {
    "category": "whiteboard",
@@ -7632,7 +9655,8 @@
      "note": "Plain white board in a uniform thin frame with a plain grey back and no tray, print or asymmetric frame feature: the half turn about the +x (front) axis leaves every tile identical, so the survey is right and symmetric_180 should be 1, not the selection reviewer's empty value."
     }
    ],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "wicker_basket__jqfftz": {
    "category": "wicker_basket",
@@ -7653,7 +9677,8 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   },
   "wicker_basket__tsjvyu": {
    "category": "wicker_basket",
@@ -7674,207 +9699,12 @@
    },
    "reviewed_scaled": {},
    "symmetric_180": [],
-   "batch": "rev_10"
+   "batch": "rev_10",
+   "flat_render": false
   }
  },
- "unreviewed": [
-  "asparagus__eodozo",
-  "asparagus__xguktb",
-  "beeswax_candle__nhdnje",
-  "beeswax_candle__nxewyk",
-  "beeswax_candle__ouzkdj",
-  "beeswax_candle__pfewit",
-  "bottle_of_beer__zlmwyn",
-  "bottle_of_catsup__bcqfxb",
-  "bottle_of_ground_cloves__vzamzb",
-  "bottle_of_paprika__nrdgrp",
-  "bottle_of_pop__wuuoes",
-  "bottle_of_pop__zjbqvb",
-  "bottle_of_sage__bterim",
-  "bottle_of_salsa__nafwlf",
-  "can_of_corn__alphlq",
-  "can_of_corn__kwwlfn",
-  "cap__ghwjwe",
-  "cap__iqeyba",
-  "chopstick__bcwuwv",
-  "colored_pencil__bkdqwb",
-  "colored_pencil__deuvcx",
-  "colored_pencil__egvqng",
-  "colored_pencil__jdqvdl",
-  "colored_pencil__kadvlg",
-  "colored_pencil__kjwoqm",
-  "cookie_cutter__lqrfzo",
-  "decorative_sign__hgonwj",
-  "dip_candle__mxjejs",
-  "hamper__xhdtjn",
-  "notebook__zkmmnf",
-  "ottoman__qsnawv",
-  "ottoman__xcmniq",
-  "pack_of_cigarettes__qabdgg",
-  "pack_of_cigarettes__wjfbhw",
-  "pack_of_kielbasa__fwqdoy",
-  "pen__gzrbrx",
-  "pen__hiyeki",
-  "pencil__heqkmr",
-  "pencil__hmawzy",
-  "pencil__lykqoh",
-  "pencil__mvmxfo",
-  "pencil__vpzhth",
-  "plate__mtetqm",
-  "rolling_pin__smnklu",
-  "shelf__kxvbui",
-  "spray_can__tehmzy",
-  "taboret__bciekv",
-  "taboret__wjrpwg",
-  "taboret__ysrhuw",
-  "trash_can__hqdnjz",
-  "vidalia_onion__dejqhf",
-  "wall_mounted_tv__dxyfxf",
-  "wall_mounted_tv__ggfznh",
-  "wall_mounted_tv__sodbbr",
-  "wall_mounted_tv__ylvjhb"
- ],
- "partially_reviewed": {
-  "beeswax_candle__oimgmh": [
-   "zinf"
-  ],
-  "bottle_of_coconut_water__lsixio": [
-   "z2"
-  ],
-  "bottle_of_essential_oil__eyyhld": [
-   "z4",
-   "z5",
-   "z6"
-  ],
-  "bottle_of_essential_oil__wansva": [
-   "z5",
-   "z6"
-  ],
-  "bottle_of_essential_oil__xvqshn": [
-   "z6"
-  ],
-  "bottle_of_ginger__drqhzo": [
-   "z6"
-  ],
-  "bottle_of_ground_nutmeg__qebruq": [
-   "z5",
-   "z6"
-  ],
-  "bottle_of_seasoning__vqwqqv": [
-   "z5",
-   "z6"
-  ],
-  "bottle_of_tea_leaves__pfbtus": [
-   "zinf"
-  ],
-  "bottle_of_water__cyzaue": [
-   "z6"
-  ],
-  "can_of_baking_mix__rxorlp": [
-   "z2"
-  ],
-  "carrot__aucrah": [
-   "x6"
-  ],
-  "carrot__qhmmmx": [
-   "x4",
-   "x3",
-   "x5"
-  ],
-  "cinnamon_stick__qxpzdm__scaled": [
-   "z2",
-   "y5",
-   "y6"
-  ],
-  "cinnamon_stick__smfuqz": [
-   "z2",
-   "y6"
-  ],
-  "colored_pencil__kgmapz": [
-   "y2"
-  ],
-  "colored_pencil__qrxemk": [
-   "y2"
-  ],
-  "cutting_board__tcdrzs": [
-   "y2"
-  ],
-  "dip_candle__poexjo": [
-   "z6"
-  ],
-  "half_lime__dtyjkb": [
-   "z6"
-  ],
-  "half_lime__wdadtn": [
-   "z2"
-  ],
-  "hamburger_bun__fqxumh": [
-   "z4",
-   "z5",
-   "z6"
-  ],
-  "jar_of_curry_powder__ozhftu": [
-   "z4",
-   "z5",
-   "z6"
-  ],
-  "lemon__asdada": [
-   "x6"
-  ],
-  "lemon__kvgfdl": [
-   "x5",
-   "x6"
-  ],
-  "marker__vjjsul": [
-   "x4",
-   "x3",
-   "x5"
-  ],
-  "marker__vrjwkg": [
-   "x3"
-  ],
-  "notebook__gqkaqu": [
-   "x2"
-  ],
-  "orange__ucstpm": [
-   "z6"
-  ],
-  "pen__enfumt": [
-   "x2"
-  ],
-  "pencil__lruiot": [
-   "y2"
-  ],
-  "pencil__vvofwr": [
-   "y2"
-  ],
-  "pepper_shaker__tgcwtr": [
-   "z5",
-   "z6"
-  ],
-  "pepper_shaker__ykujyn": [
-   "zinf"
-  ],
-  "plate__luhkiz": [
-   "z4",
-   "z6"
-  ],
-  "salt_shaker__iomwtn": [
-   "z4",
-   "z5",
-   "z6"
-  ],
-  "teacup__cpozxi": [
-   "z5"
-  ],
-  "towel_rack__quznqx": [
-   "y2",
-   "z2"
-  ],
-  "toy_dice__krpdji": [
-   "x2"
-  ]
- },
+ "unreviewed": [],
+ "partially_reviewed": {},
  "verdicts_on_non_candidates": [
   {
    "key": "address__pbfbxj",
@@ -7893,6 +9723,12 @@
    "tag": "x5",
    "verdict": "preserved",
    "batch": "rev_00"
+  },
+  {
+   "key": "asparagus__xguktb",
+   "tag": "y5",
+   "verdict": "preserved",
+   "batch": "rev_11"
   },
   {
    "key": "bandage__riftxh",
@@ -8191,8 +10027,8 @@
   {
    "key": "bottle_of_water__cyzaue",
    "tag": "zinf",
-   "verdict": "preserved",
-   "batch": "rev_01"
+   "verdict": "broken",
+   "batch": "overrides"
   },
   {
    "key": "bottle_of_water__eeaimz",
@@ -8543,6 +10379,30 @@
    "batch": "rev_03"
   },
   {
+   "key": "chopstick__bcwuwv",
+   "tag": "x4",
+   "verdict": "preserved",
+   "batch": "rev_12"
+  },
+  {
+   "key": "chopstick__bcwuwv",
+   "tag": "x5",
+   "verdict": "preserved",
+   "batch": "rev_12"
+  },
+  {
+   "key": "chopstick__bcwuwv",
+   "tag": "x6",
+   "verdict": "preserved",
+   "batch": "rev_12"
+  },
+  {
+   "key": "cinnamon_stick__cdkjfo",
+   "tag": "yinf",
+   "verdict": "preserved",
+   "batch": "rev_03"
+  },
+  {
    "key": "cinnamon_stick__qmlyim",
    "tag": "z2",
    "verdict": "preserved",
@@ -8619,6 +10479,150 @@
    "tag": "z2",
    "verdict": "broken",
    "batch": "rev_04"
+  },
+  {
+   "key": "colored_pencil__acumgp",
+   "tag": "y2",
+   "verdict": "broken",
+   "batch": "rev_04"
+  },
+  {
+   "key": "colored_pencil__acumgp",
+   "tag": "xinf",
+   "verdict": "preserved",
+   "batch": "rev_04"
+  },
+  {
+   "key": "colored_pencil__bkdqwb",
+   "tag": "y2",
+   "verdict": "broken",
+   "batch": "rev_12"
+  },
+  {
+   "key": "colored_pencil__bkdqwb",
+   "tag": "xinf",
+   "verdict": "preserved",
+   "batch": "rev_12"
+  },
+  {
+   "key": "colored_pencil__bnsqcn",
+   "tag": "y2",
+   "verdict": "broken",
+   "batch": "rev_04"
+  },
+  {
+   "key": "colored_pencil__bnsqcn",
+   "tag": "xinf",
+   "verdict": "preserved",
+   "batch": "rev_04"
+  },
+  {
+   "key": "colored_pencil__deuvcx",
+   "tag": "y2",
+   "verdict": "broken",
+   "batch": "rev_12"
+  },
+  {
+   "key": "colored_pencil__deuvcx",
+   "tag": "xinf",
+   "verdict": "preserved",
+   "batch": "rev_12"
+  },
+  {
+   "key": "colored_pencil__egvqng",
+   "tag": "y2",
+   "verdict": "broken",
+   "batch": "rev_12"
+  },
+  {
+   "key": "colored_pencil__egvqng",
+   "tag": "xinf",
+   "verdict": "preserved",
+   "batch": "rev_12"
+  },
+  {
+   "key": "colored_pencil__jdqvdl",
+   "tag": "y2",
+   "verdict": "broken",
+   "batch": "rev_12"
+  },
+  {
+   "key": "colored_pencil__jdqvdl",
+   "tag": "xinf",
+   "verdict": "preserved",
+   "batch": "rev_12"
+  },
+  {
+   "key": "colored_pencil__jnccuz",
+   "tag": "y2",
+   "verdict": "broken",
+   "batch": "rev_04"
+  },
+  {
+   "key": "colored_pencil__jnccuz",
+   "tag": "xinf",
+   "verdict": "preserved",
+   "batch": "rev_04"
+  },
+  {
+   "key": "colored_pencil__kadvlg",
+   "tag": "y2",
+   "verdict": "broken",
+   "batch": "rev_12"
+  },
+  {
+   "key": "colored_pencil__kadvlg",
+   "tag": "xinf",
+   "verdict": "preserved",
+   "batch": "rev_12"
+  },
+  {
+   "key": "colored_pencil__kgmapz",
+   "tag": "xinf",
+   "verdict": "preserved",
+   "batch": "rev_04"
+  },
+  {
+   "key": "colored_pencil__kgmapz",
+   "tag": "y2",
+   "verdict": "broken",
+   "batch": "rev_12"
+  },
+  {
+   "key": "colored_pencil__kjwoqm",
+   "tag": "y2",
+   "verdict": "broken",
+   "batch": "rev_12"
+  },
+  {
+   "key": "colored_pencil__kjwoqm",
+   "tag": "xinf",
+   "verdict": "preserved",
+   "batch": "rev_12"
+  },
+  {
+   "key": "colored_pencil__nssris",
+   "tag": "y2",
+   "verdict": "broken",
+   "batch": "rev_04"
+  },
+  {
+   "key": "colored_pencil__nssris",
+   "tag": "xinf",
+   "verdict": "preserved",
+   "batch": "rev_04"
+  },
+  {
+   "key": "colored_pencil__qrxemk",
+   "tag": "xinf",
+   "verdict": "preserved",
+   "batch": "rev_04"
+  },
+  {
+   "key": "colored_pencil__qrxemk",
+   "tag": "y2",
+   "verdict": "broken",
+   "batch": "rev_12"
   },
   {
    "key": "conditioner_dispenser__njqnuo",
@@ -9209,6 +11213,18 @@
    "batch": "rev_07"
   },
   {
+   "key": "pencil__hmawzy",
+   "tag": "y2",
+   "verdict": "broken",
+   "batch": "rev_13"
+  },
+  {
+   "key": "pencil__hmawzy",
+   "tag": "xinf",
+   "verdict": "preserved",
+   "batch": "rev_13"
+  },
+  {
    "key": "pencil__hmawzy__scaled",
    "tag": "z2",
    "verdict": "broken",
@@ -9419,6 +11435,12 @@
    "batch": "rev_09"
   },
   {
+   "key": "shelf__kxvbui",
+   "tag": "z2",
+   "verdict": "preserved",
+   "batch": "rev_14"
+  },
+  {
    "key": "shelf__qrmiur",
    "tag": "x2",
    "verdict": "broken",
@@ -9470,6 +11492,18 @@
    "key": "table_knife__jxdfyy",
    "tag": "x2",
    "verdict": "broken",
+   "batch": "rev_09"
+  },
+  {
+   "key": "table_knife__lrdmpf",
+   "tag": "y2",
+   "verdict": "preserved",
+   "batch": "rev_09"
+  },
+  {
+   "key": "table_knife__lrdmpf",
+   "tag": "z2",
+   "verdict": "preserved",
    "batch": "rev_09"
   },
   {
@@ -9683,6 +11717,30 @@
    "batch": "rev_10"
   },
   {
+   "key": "wall_mounted_tv__dxyfxf",
+   "tag": "x2",
+   "verdict": "preserved",
+   "batch": "overrides"
+  },
+  {
+   "key": "wall_mounted_tv__ggfznh",
+   "tag": "x2",
+   "verdict": "preserved",
+   "batch": "rev_14"
+  },
+  {
+   "key": "wall_mounted_tv__sodbbr",
+   "tag": "x2",
+   "verdict": "preserved",
+   "batch": "overrides"
+  },
+  {
+   "key": "wall_mounted_tv__ylvjhb",
+   "tag": "x2",
+   "verdict": "preserved",
+   "batch": "rev_14"
+  },
+  {
    "key": "whiteboard__gvkgsi",
    "tag": "x2",
    "verdict": "preserved",
@@ -9699,6 +11757,32 @@
    "tag": "z4",
    "verdict": "broken",
    "batch": "rev_10"
+  }
+ ],
+ "overrides": [
+  {
+   "key": "bottle_of_water__cyzaue",
+   "tag": "zinf",
+   "verdict": "broken",
+   "note": "hexagonal prism: reads as six-fold, not as a body of revolution; z6 stays",
+   "by": "coordinator",
+   "replaces": "preserved (rev_01)"
+  },
+  {
+   "key": "wall_mounted_tv__dxyfxf",
+   "tag": "x2",
+   "verdict": "preserved",
+   "note": "hung on the wall: the rear housing that broke the flip is against the wall and invisible from the room; symmetric_180 concerns the front view, so the selection reviewer's 1 stands",
+   "by": "coordinator",
+   "replaces": "broken (rev_14)"
+  },
+  {
+   "key": "wall_mounted_tv__sodbbr",
+   "tag": "x2",
+   "verdict": "preserved",
+   "note": "hung on the wall: the rear housing that broke the flip is against the wall and invisible from the room; symmetric_180 concerns the front view, so the selection reviewer's 1 stands",
+   "by": "coordinator",
+   "replaces": "broken (rev_14)"
   }
  ],
  "batches": {
@@ -9759,23 +11843,28 @@
   },
   "rev_11": {
    "n_entries": 24,
-   "n_verdicts": 0,
-   "reviewed": false
+   "n_verdicts": 36,
+   "reviewed": true
   },
   "rev_12": {
    "n_entries": 24,
-   "n_verdicts": 0,
-   "reviewed": false
+   "n_verdicts": 38,
+   "reviewed": true
   },
   "rev_13": {
    "n_entries": 24,
-   "n_verdicts": 0,
-   "reviewed": false
+   "n_verdicts": 34,
+   "reviewed": true
   },
   "rev_14": {
    "n_entries": 22,
-   "n_verdicts": 0,
-   "reviewed": false
+   "n_verdicts": 28,
+   "reviewed": true
+  },
+  "rev_15": {
+   "n_entries": 11,
+   "n_verdicts": 16,
+   "reviewed": true
   }
  }
 }

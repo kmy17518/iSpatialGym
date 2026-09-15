@@ -478,16 +478,21 @@ TODO A8: geometry by Chamfer test and texture by rendering the object against it
 evaluated at the grasp-tested `scale` when the row has one). Tags name the generators of the rotations under which
 the object looks identical: `x2 y2 z2` (half turns about a canonical axis), `x4 z4 …` (quarter turns), `z3 z5 z6`,
 `xinf yinf zinf` (bodies of revolution), `full` (spheres); `none` = surveyed and asymmetric; empty = not surveyed.
-`symmetry_near` lists candidates that were geometrically or texturally borderline and await the review round
-(`runlogs/symmetry_20260915/report.md`, 302 models); until reviewed they count as asymmetric (a symmetry only
-takes effect once it is confirmed).
+`symmetry_near` lists candidates that are geometrically or texturally borderline and not confirmed; such a tag
+counts as asymmetric (a symmetry only takes effect once it is confirmed). The review round is closed (2026-09-15,
+`runlogs/symmetry_20260915/review_summary.md`): 374 borderline entries in 16 batches were judged by human
+reviewers and 3 coordinator overrides applied, so `symmetry` holds the confirmed set — 380 of the 1480 surveyed
+models are symmetric, 1100 are `none`, and 18 keep a `symmetry_near` entry: 17 `flat_render` models (assets whose
+reflection / emissive map carries the visible pattern, which the albedo render cannot show — their tags stay in
+`symmetry_near` until they are rendered with their reflection maps) and one `unsure` verdict (`ruler/ujizkx` `y2`).
 
 1. **Mental rotation targets must be asymmetric** (decision 2026-09-15): rotationally symmetric models are
    **removed from the candidate list** — `build_icl.py` drops every `mental_rotation` / `target` row whose
    `symmetry ≠ none` and promotes the next-ranked model of the category to `representative` / `test` when a pick was
    dropped (the drop is listed in the build report and the row's `note`). The five symmetric picks of the selection
-   sheet (`teacup/zdvgol`, `teacup/cpozxi`, `teacup/tfzfam`, `hook/wmvozo`, `cookie_cutter/lqrfzo`) go first; a
-   borderline model follows as soon as the review round confirms its symmetry. The models stay candidates for every
+   sheet (`teacup/zdvgol`, `teacup/cpozxi`, `teacup/tfzfam`, `hook/wmvozo`, `cookie_cutter/lqrfzo`) and the four
+   the review round confirmed (`pickle/ifterk`, `pickle/iobrqp`, `tongs/igsklx`, `tongs/gbjqyn`) are dropped
+   (`runlogs/symmetry_20260915/dropped_mental_rotation.csv`, 9 rows). The models stay candidates for every
    other role. `ground_isg` additionally rejects a symmetric model that reaches it through a customs-list override
    (`symmetric_target`). Object scaling has no such rule (its goal is a depth, symmetric bodies are welcome).
 2. **Equivalences from the tags**: for every orientation-evaluated target (held object, disembedding measure,
@@ -496,8 +501,10 @@ takes effect once it is confirmed).
    box gives 4 elements, `z4 x2` gives 8), continuous axes are enumerated at 5° steps (72 quaternions per axis, finer
    than any orientation tolerance in section 8), `full` marks the target `orientation_metric: null`. Blocks keep no
    equivalences (six distinct faces). Wall targets: the reviewed `symmetric_180` column stays the source of the
-   half-turn about the wall normal; the 15 disagreements listed in the survey report go to the review round and the
-   column is corrected from its outcome, not from the geometry alone.
+   half-turn about the wall normal; the survey's disagreements went to the review round as explicit questions and
+   the column was corrected from its outcome, not from the geometry alone (21 rows answered, 7 values changed:
+   `clipboard/gmxyfo`, `towel_rack/crivoa`, `towel_rack/kqrmrh`, `whiteboard/gvkgsi` → `1`; `shelf/iruewm`,
+   `shelf/qrmiur`, `shelf/wvkefp` → `0`).
 3. **Look-alikes**: a rotational symmetry is not a look-alike relation (3.12); the two columns are independent.
 
 ### 3.14 What the TRO must let `run_isg` restore (loader contract, TODO F1)

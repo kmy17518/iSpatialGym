@@ -16,8 +16,10 @@ Modes::
                                                               # next free number (existing batches are never rewritten)
     python scripts/symmetry/prepare_review.py --layout        # write assign/render_layout.json: the sheet row order and
                                                               # displayed rotations of the issued batches (from the
-                                                              # superseded v1 texture scores), for
-                                                              # survey_symmetry.py texture --layout-file
+                                                              # superseded v1 texture scores) plus every issued
+                                                              # candidate tag, for survey_symmetry.py texture --layout-file
+    python scripts/symmetry/prepare_review.py --check         # every issued (batch, key, tag) has its sheet row? re-render
+                                                              # the sheets that lack one (rows appended, order kept)
 
 Outputs: ``assign/rev_XX.json`` (batches of <= ``--batch-size`` models: key, sheet, candidate tags with the survey's
 scores and classes, ``symmetric_180`` questions, uses, scale), ``assign/index.json``, ``assign/review_tags.json`` (what
@@ -232,11 +234,59 @@ def mode_layout(args):
             pin = {t: rec[v][t]["worst"] for t in asked.get(ekey, {}).get("candidates", set()) if t in rec[v]}
             if first or pin:
                 layout.setdefault(key, {})[v] = {"first": first, "pin": pin}
+    # every tag an issued batch asks about must stay on the sheet, whatever pass re-renders it
+    for ekey, a in asked.items():
+        key, v = split_key(ekey)
+        d = layout.setdefault(key, {}).setdefault(v, {"first": [], "pin": {}})
+        d["first"] = list(dict.fromkeys(list(d["first"]) + [t for t in S.TAG_ORDER if t in a["candidates"]]))
     path = os.path.join(args.out, "assign", "render_layout.json")
     with open(path, "w") as f:
         json.dump(layout, f, indent=1)
     print(f"{rel(path)}: {len(layout)} models, {sum(len(d.get('pin', {})) for m in layout.values() for d in m.values())} pinned rows "
-          f"(v1 sheet layout for the re-render; issued batches: {len(asked)} entries)")
+          f"(v1 sheet layout + every issued candidate tag; issued batches: {len(asked)} entries)")
+
+
+def mode_check(args):
+    """Verify that every issued (batch, key, tag) has its row on the current sheet (``tex/<key>.json`` ``sheet_rows``);
+    re-render the sheets that lack one with the missing tags appended (row order kept), add them to the layout file,
+    refresh the report, and verify again."""
+    asked, files = load_assignments(args.out)
+    models = {m["key"]: m for m in json.load(open(os.path.join(args.out, "models.json")))}
+    layout_path = os.path.join(args.out, "assign", "render_layout.json")
+    layout = json.load(open(layout_path)) if os.path.exists(layout_path) else {}
+
+    def missing_rows():
+        out = []
+        for ekey, a in asked.items():
+            key, v = split_key(ekey)
+            rows = sheet_rows_of(args.out, ekey, v)
+            sheet = os.path.join(args.out, "renders", ekey + ".jpg")
+            miss = [t for t in S.TAG_ORDER if t in a["candidates"] and (t not in rows or not os.path.exists(sheet))]
+            if miss:
+                out.append((ekey, v, miss, rows))
+        return out
+
+    miss = missing_rows()
+    n_issued = sum(len(a["candidates"]) for a in asked.values())
+    print(f"{n_issued} issued (key, tag) rows in {len(files)} batches; sheets lacking a row: {len(miss)}")
+    if not miss:
+        return
+    need: Dict[str, Dict[str, List[str]]] = {}
+    for ekey, v, tags, rows in miss:
+        key = split_key(ekey)[0]
+        first = list(dict.fromkeys(list(rows) + tags))
+        need.setdefault(key, {})[v] = first
+        d = layout.setdefault(key, {}).setdefault(v, {"first": [], "pin": {}})
+        d["first"] = list(dict.fromkeys(list(d["first"]) + first))
+        print(f"  {ekey}: missing {tags} -> re-render with rows {first}")
+    with open(layout_path, "w") as f:
+        json.dump(layout, f, indent=1)
+    if args.no_render:
+        return
+    render_missing(args.out, models, need, layout)
+    SV.stage_report(argparse.Namespace(out=args.out, icl=args.icl, only=None, limit=None))
+    still = missing_rows()
+    print(f"after the re-render: {len(still)} sheets still lack an issued row" + (f": {still}" if still else " - every issued tag is on its sheet"))
 
 
 def main():
@@ -247,10 +297,14 @@ def main():
     ap.add_argument("--no-render", action="store_true", help="only list the sheets that lack rows, do not render them")
     ap.add_argument("--supplement", action="store_true", help="add batches for the candidates no existing batch asked about")
     ap.add_argument("--layout", action="store_true", help="write assign/render_layout.json from the superseded v1 records and exit")
+    ap.add_argument("--check", action="store_true", help="verify every issued (batch, key, tag) has its sheet row; re-render the sheets that lack one")
     args = ap.parse_args()
     os.makedirs(os.path.join(args.out, "assign"), exist_ok=True)
     if args.layout:
         mode_layout(args)
+        return
+    if args.check:
+        mode_check(args)
         return
 
     sym = json.load(open(os.path.join(args.out, "symmetry.json")))

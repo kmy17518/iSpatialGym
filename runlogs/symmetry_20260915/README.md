@@ -8,6 +8,14 @@ symmetric placement is not scored as an error. Result: the `symmetry` / `symmetr
 `ispatialgym/assets/icl/roles/candidates.csv` (`scripts/icl/build_icl.py --symmetry runlogs/symmetry_20260915/symmetry.json`,
 the default when the file exists).
 
+**Status (2026-09-15 10:45): review round closed.** All 16 reviewer batches are in (`review/rev_00..15.json`, 374 of
+374 entries, 606 verdicts) and 3 coordinator overrides applied; `review_verdicts.json` / `review_summary.md` are the
+aggregation of everything, `candidates.csv` is rebuilt from them. Final: **380 of the 1480 models have a `symmetry`,
+1100 are `none`, 18 keep a `symmetry_near` entry** — 17 `flat_render` models whose confirmed-looking symmetries are
+held until the assets are rendered with their reflection maps (see *Flat renders*) and `ruler/ujizkx` `y2` (the one
+`unsure` verdict on a still-candidate tag). Open: the flat-render re-render (a renderer that applies the VRay
+reflection / emissive maps, then `texture --only` for the 40 models and a small review batch), and nothing else.
+
 Scripts: `scripts/symmetry/` (`survey_symmetry.py` stages `models` / `geom` / `texture` / `report`, `symcore.py`
 rotations + scores + thresholds, `meshload.py` offline USD loader factored out of the world-alignment render script).
 `base` conda env (usd-core `pxr`, trimesh 4.11, scipy 1.17, pyrender 0.1.45 / EGL); no OmniGibson.
@@ -190,35 +198,38 @@ writes the scaled verdict into the rows whose `scale` matches.
 1480 models surveyed, 0 loader failures (the 18 all-glass wineglasses / bottles that the world-alignment loader
 dropped are loaded here), 0 render failures. Survey alone: **243 models have a final `symmetry`, 1237 are `none`, 190
 have a `symmetry_near` entry** (v1: 377 / 1103 / 302; 17 of the near models are `flat_render` demotions, see below);
-965 models have at least one geometric candidate (sheet). With the reviewer verdicts of the first round applied
-(`review_verdicts.json`, still the rev_00–10 aggregation): 362 symmetric models, 79 with a `symmetry_near` entry.
+965 models have at least one geometric candidate (sheet). **With the closed review round applied
+(`review_verdicts.json`, rev_00–15 + overrides): 380 symmetric models, 1100 `none`, 18 with a `symmetry_near` entry
+(17 flat-render holds + 1 `unsure`).** Of the 367 reviewed models 137 gained a symmetry, 42 changed their tag set
+(mostly a finite fold widened to `xinf` / `zinf`), 188 kept the survey's verdict; none lost a survey symmetry.
 
-| tag | `symmetry` (survey) | `symmetry_near` (review) | geometry exact (before texture) |
-|---|---|---|---|
-| `x2` | 17 | 33 | 278 |
-| `y2` | 15 | 18 | 267 |
-| `z2` | 72 | 56 | 364 |
-| `x4` | 9 | 9 | 31 |
-| `y4` | 2 | 3 | 17 |
-| `z4` | 29 | 19 | 82 |
-| `x3` | 1 | 3 | 1 |
-| `y3` | 0 | 0 | 2 |
-| `z3` | 1 | 4 | 5 |
-| `x5` | 19 | 10 | 22 |
-| `y5` | 1 | 1 | 1 |
-| `z5` | 9 | 15 | 55 |
-| `x6` | 20 | 11 | 24 |
-| `y6` | 1 | 4 | 1 |
-| `z6` | 14 | 20 | 64 |
-| `xinf` | 8 | 16 | 42 |
-| `yinf` | 0 | 2 | 2 |
-| `zinf` | 96 | 44 | 266 |
-| `full` | 1 | 0 | 2 |
-| `none` | 1237 | – | 624 |
+| tag | `symmetry` (survey) | `symmetry_near` (survey, issued for review) | `symmetry` (final) | `symmetry_near` (final) | geometry exact (before texture) |
+|---|---|---|---|---|---|
+| `x2` | 17 | 33 | 61 | 2 | 278 |
+| `y2` | 15 | 18 | 27 | 3 | 267 |
+| `z2` | 72 | 56 | 101 | 5 | 364 |
+| `x4` | 9 | 9 | 4 | 0 | 31 |
+| `y4` | 2 | 3 | 3 | 0 | 17 |
+| `z4` | 29 | 19 | 33 | 1 | 82 |
+| `x3` | 1 | 3 | 0 | 0 | 1 |
+| `y3` | 0 | 0 | 0 | 0 | 2 |
+| `z3` | 1 | 4 | 2 | 0 | 5 |
+| `x5` | 19 | 10 | 6 | 0 | 22 |
+| `y5` | 1 | 1 | 1 | 0 | 1 |
+| `z5` | 9 | 15 | 9 | 1 | 55 |
+| `x6` | 20 | 11 | 10 | 0 | 24 |
+| `y6` | 1 | 4 | 2 | 0 | 1 |
+| `z6` | 14 | 20 | 13 | 1 | 64 |
+| `xinf` | 8 | 16 | 41 | 0 | 42 |
+| `yinf` | 0 | 2 | 3 | 0 | 2 |
+| `zinf` | 96 | 44 | 138 | 9 | 266 |
+| `full` | 1 | 0 | 1 | 0 | 2 |
+| `none` | 1237 | – | 1100 | – | 624 |
 
-(The `symmetry_near` column counts a tag once per model; 62 of the near tags on 24 models are *relaxations held for
-review*: the v2 criterion calls them preserved but the v1 pass did not — a re-tuned criterion may only tighten on its
-own, `relaxed_awaiting_review` in `symmetry.json`.)
+(Tags are generators, counted once per model: a pencil whose `xinf` the reviewers confirmed no longer lists `x5 x6`,
+which is why the finite x-folds shrink in the final column. 62 of the survey's near tags on 24 models were
+*relaxations held for review*: the v2 criterion called them preserved but the v1 pass did not — a re-tuned criterion
+may only tighten on its own, `relaxed_awaiting_review` in `symmetry.json`; the reviewers settled them all.)
 
 Texture is the main filter: 856 models are geometrically symmetric under some rotation, 261 stay symmetric with their
 texture before the review (labels, prints, wood grain, seams, tips break the rest).
@@ -251,7 +262,8 @@ the reviewers accepted, both-sides-alike prints the survey finds slightly misali
 broken / survey preserved: the faint engraved letter blocks, a wrapper's faint text, marker cap clips, pencil / candle
 end-to-end flips — features below what the pixel statistics separate from rendering noise), 180 land in `borderline`,
 4 are `unsure`. The human verdict wins in the aggregation either way (the reviewers judged the 40 %-brightness sheets;
-the re-rendered sheets are brighter with the same layout).
+the re-rendered sheets are brighter with the same layout). The closed-round statistics over all 606 verdicts, judged
+on the final `symmetry` / `none` classes, are under *Review round* below.
 
 ### Flat renders (`flat_render.json`, `survey_symmetry.py flatcheck`)
 
@@ -311,12 +323,14 @@ holds reviewer `preserved` verdicts on them the same way. All 1480 assets use th
 ### `mental_rotation` targets with a symmetry (removed from the candidate list, spec §3.13 rule 1)
 
 Survey: 3 of 196 — `teacup/zdvgol` (`zinf`), `teacup/tfzfam` (`zinf`), `hook/wmvozo` (`zinf`). Review-confirmed near
-tags: `pickle/ifterk` (y4, pick 1), `pickle/iobrqp` (y4, pick 2), `tongs/igsklx` (x2, pick 2), `tongs/gbjqyn` (x2).
-`build_icl.py` drops the seven (`dropped_mental_rotation.csv`) and promotes `teacup/oxfzfe` → representative,
-`teacup/vckahe` → test, `pickle/vuspsy` → representative + test, `pickle/rxuimv` → test (tongs keeps its one remaining
-test model). `teacup/cpozxi` (z5, v1: symmetric) and `cookie_cutter/lqrfzo` (v1: `z2`) are candidates again — v2 puts
-them in `symmetry_near` (supplementary batches). The reviewer notes of the selection sheet agree with the dropped ones
-("handle-less, near-symmetric", "fully rotationally symmetric", "nearly rotationally symmetric, tiny outlier").
+tags: `pickle/ifterk` (y4, pick 1), `pickle/iobrqp` (y4, pick 2), `tongs/igsklx` (x2, pick 2), `tongs/gbjqyn` (x2),
+`teacup/cpozxi` (z5; rev_09 broke its `z6`, rev_14 confirmed `z5`) and `cookie_cutter/lqrfzo` (z4, rev_12). Final:
+`build_icl.py` drops the nine (`dropped_mental_rotation.csv`, 196 → 187 targets) and promotes `teacup/oxfzfe` →
+representative, `teacup/vckahe` → test, `pickle/vuspsy` → representative + test, `pickle/rxuimv` → test (tongs keeps
+its one remaining test model); no category is left empty, no other subtask / role lost a row, and no remaining
+mental-rotation target carries a `symmetry` or `symmetry_near` entry. The reviewer notes of the selection sheet agree
+with the dropped ones ("handle-less, near-symmetric", "fully rotationally symmetric", "nearly rotationally symmetric,
+tiny outlier").
 
 ### `symmetric_180` (alignment targets) vs the survey
 
@@ -327,9 +341,14 @@ column (`preserved` → 1, `broken` → 0; `review_verdicts.json` → `build_icl
 `towel_rack/kqrmrh` → 1, `towel_rack/crivoa` → 1, `whiteboard/gvkgsi` → 1 (unflagged, symmetric), `shelf/qrmiur`,
 `shelf/iruewm`, `shelf/wvkefp` → 0 (flagged 1, the reviewers judged the planks' knots / end lips visible),
 `keyboard/uwacaq`, `notebook/ffdjzp`, `notebook/gqkaqu`, `wall_clock/xevvel`, `radiator/dwmloz`, `drumstick/jauzlc` → 0
-(the survey's half turn was rejected by the reviewers); `rolling_pin/mwrdae` and `towel_rack/quznqx` stay at the sheet's
-1 (reviewer verdicts preserved). The remaining v2 disagreements (14 rows, 6 of them new) are questions in the
-supplementary batches (`report.md` lists the current table).
+(the survey's half turn was rejected by the reviewers; the cell goes from empty to an explicit 0); `rolling_pin/mwrdae`,
+`towel_rack/quznqx`, `decorative_sign/hgonwj`, `shelf/kxvbui`, `wall_mounted_tv/ggfznh`, `wall_mounted_tv/ylvjhb` stay
+at the sheet's 1 (reviewer verdicts preserved); `wall_mounted_tv/dxyfxf` and `wall_mounted_tv/sodbbr` stay at 1 by
+coordinator override (rev_14 broke the flip on the rear housing, which hangs against the wall and is invisible from
+the room — `symmetric_180` concerns the front view). Closed round: 21 alignment rows answered, 7 values changed (4
+empty → 1, 3 × 1 → 0). After the review a single row still differs from its `symmetry` column: `clipboard/gmxyfo`
+(`alignment-axial`, `symmetric_180 = 1` from the review) is a `flat_render` model, so its `z2` sits in `symmetry_near`
+until the reflection-map render — the explicit answer stands for the alignment scoring.
 
 ### Scaled variants
 
@@ -366,16 +385,53 @@ the full survey is ≈ 1 h on the local 4090 box.
   variant. 55 of the 94 entries are models no earlier batch covered, 39 add tags to already reviewed models.
   `assign/rev_15.json` — 11 entries / 16 tags that the brightness fix moved into `symmetry_near` (pencil end-to-end
   flips and quarter turns, a spice bottle, a cinnamon stick). `flat_render` models are left out of every batch.
+  **All 16 batches are reviewed** (`review/rev_00..15.json`: 374 of 374 entries, 606 verdicts — 344 broken, 258
+  preserved, 4 unsure in the reviewer files; 343 / 259 / 4 after the three overrides — 0 unreviewed, 0 partially
+  reviewed, 0 schema warnings).
+- Sheet integrity: `prepare_review.py --check` verifies that every issued (batch, key, tag) has its row on the current
+  sheet (`tex/<key>.json` `sheet_rows`) and re-renders the sheets that lack one. The brightness re-render had dropped
+  one row — `orange/ucstpm` `z6` (rev_13), a tag forced by the supplementary batch that `render_layout.json` did not
+  yet list; the layout file now carries every issued candidate tag (`--layout`), the sheet was re-rendered with its
+  12 rows, and the check passes: 606 of 606 issued rows present.
 - `review/overrides.json` — coordinator decisions (`{"<key>": {"<tag>": {"verdict", "note", "by": "coordinator"}}}`),
-  applied by `aggregate_review.py` after the reviewer files (an override wins and is listed in `review_summary.md`);
-  first entry: `bottle_of_water/cyzaue` `zinf` → broken (hexagonal prism, `z6` stays).
+  applied by `aggregate_review.py` after the reviewer files (an override wins and is listed in `review_summary.md`).
+  Three entries: `bottle_of_water/cyzaue` `zinf` → broken (hexagonal prism, `z6` stays; replaces rev_01 preserved),
+  `wall_mounted_tv/dxyfxf` and `wall_mounted_tv/sodbbr` `x2` → preserved (hung on the wall, the rear housing that broke
+  the flip is invisible from the room; replaces rev_14 broken — so their `symmetric_180 = 1` stands).
 - `scripts/symmetry/aggregate_review.py` merges `review/*.json` into `review_verdicts.json` + `review_summary.md`
   (`preserved` → joins `symmetry`, `broken` → leaves `symmetry` and `symmetry_near`, `unsure` → stays / moves to
   `symmetry_near`; `symmetric_180` value per alignment subtask; unreviewed and partially reviewed entries; verdicts on
-  tags the v2 survey no longer lists as candidates are kept, applied and flagged — 304 of the 454, the v2 criterion is
-  that much stricter). `build_icl.py --symmetry` uses `review_verdicts.json` when it sits next to `symmetry.json`.
+  tags the v2 survey no longer lists as candidates are kept, applied and flagged — 342 of the 606, the v2 criterion is
+  that much stricter; `flat_render` models keep reviewer-preserved tags in `symmetry_near`). `build_icl.py --symmetry`
+  uses `review_verdicts.json` when it sits next to `symmetry.json`.
+- Reviewers vs the survey's final (v2) classes, over the 606 verdicts: 258 were on tags the survey left undecided
+  (`symmetry_near`: 154 preserved / 104 broken); of the 344 on tags the survey had decided, 242 agree (239 broken on
+  `none`, 3 preserved on `symmetry`), 102 are a human `preserved` on a tag the survey broke (survey stricter — faint
+  or engraved prints, polygon-of-revolution silhouettes, thin tips, stochastic textures; the verdict wins), and 0 are
+  a human `broken` on a survey `symmetry` (no false symmetry was found in the final class after v2). The 4 `unsure`
+  verdicts: `ruler/ujizkx` `y2` (still a candidate → stays in `symmetry_near`), `tray/mkdcha` `x2` `y2` and
+  `umbrella/hdfkbc` `x4` (the survey broke them, so they are `none`).
+- Result on the candidate list (`build_icl.py`, 4775 → 4773 rows): 513 rows use reviewed values, 68 `symmetry` and
+  81 `symmetry_near` cells changed against the rev_00–10 build, 21 alignment rows have their `symmetric_180` from the
+  review, the two review-confirmed mental-rotation drops above; no other subtask / role changed.
 
-## Caveats for the review round
+## What remains open
+
+- The 40 `flat_render` models (17 of them with survey symmetries demoted to `symmetry_near`: `trash_can/djgllo`,
+  `trash_can/gilsji`, `lid/wtjthb`, `lid/snklci`, `bottle_of_wine/uoykwx`, `bottle_of_wine/jdqahn`, `notebook/zkmmnf`,
+  `hardback/acaxtl`, `canister/xcppkc`, `dip_candle/poexjo`, `dip_candle/ghctun`, `dip_candle/mxjejs`,
+  `clipboard/gmxyfo`, `tray/zcmnji`, `saucepot/tfzijn`, `saucepot/uvzmss`, `salt_shaker/fonexa`; `flat_render.json`): their
+  visible pattern lives in a VRay reflection / emissive map that the albedo renderer cannot show, so no reviewer was
+  asked and their tags stay in `symmetry_near` (asymmetric for the benchmark). Closing them needs a render path that
+  applies those maps (Isaac Sim / OmniGibson, or a pyrender approximation with the reflection map as a second albedo
+  layer), `survey_symmetry.py texture --only <keys>` and one review batch.
+- `ruler/ujizkx` `y2` (`unsure`, the end-to-end flip about the long axis; the sheet cannot show whether the scale
+  print reads) could be settled by a second reviewer. The model is an `alignment-world_horizontal` target whose
+  alignment axis is the front (`x2`, reviewed broken), so nothing in the evaluation depends on it.
+- Nothing else: every issued verdict is aggregated, every `symmetric_180` disagreement answered, every mental-rotation
+  target asymmetric.
+
+## Caveats of the survey
 
 - Only frame-axis rotations are tested; a symmetry about a tilted axis (egg, scaled pencils) is reported as `none`.
 - Low-poly meshes (181 models < 200 faces) are polygons of revolution: the finite fold is exact; `zinf` lands in
