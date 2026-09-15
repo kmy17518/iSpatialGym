@@ -47,12 +47,11 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tupl
 
 import torch as th
 
-from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.actions import Action
 from ispatialgym.oracle.execute import check_postcondition, is_manipulation, run_action
 from ispatialgym.oracle.motions import Motions, SkillError
 from ispatialgym.oracle.qa import CameraModel, Monitors, QAStats, Verdict, category_of
-from ispatialgym.oracle.recorder import PHASE_GOAL, PHASE_ORACLE, PHASE_SETTLE, Recorder, json_default, to_uint8_rgb
+from ispatialgym.oracle.recorder import PHASE_GOAL, PHASE_ORACLE, PHASE_SETTLE, Recorder, to_uint8_rgb
 from ispatialgym.robot import conventions as C
 
 log = logging.getLogger(__name__)
