@@ -7,7 +7,7 @@ compiled with :mod:`ispatialgym.activity.problem` before it is written, so a mal
 
 Roles per activity (``*`` = list role):
 
-* camera_relocalization: floor
+* camera_relocalization: floor [, obstacles* (obstructed variant: alias ``obstructed``, group ``ontop`` the floor)]
 * object_scaling / mental_rotation: target, floor
 * disembedding: target, distractors*, tray_source, tray_dest, table, floor
 * configuration_matching-0 (block_design): blocks*, table, floor
@@ -31,6 +31,7 @@ GROUP_NAMES = {
     "distractors": "distractors_group.n.01_1",
     "blocks": "blocks_group.n.01_1",
     "attachment": "attachment_group.n.01_1",
+    "obstacles": "obstacles_group.n.01_1",
 }
 
 IORS_RELATIONS = ["ontop", "under", "inside", "nextto", "touching"]
@@ -163,11 +164,22 @@ def build_problem_text(activity: str, definition_id: int, b: Bindings) -> str:
     floor = b.one("floor").name
     on_floor = f"(ontop {agent} {floor})"
     if activity == "camera_relocalization":
+        init, groups, alias = [on_floor], {}, None
+        comment = ("Binary success: the head-camera sensor pose (TRO pose_targets[agent], link = sensor key) is within "
+                   "both tolerances of the goal camera pose.")
+        if b.has("obstacles"):
+            # obstructed variant (docs/task_bddl_formats.md 1b): the obstacles group stands on the floor on the shortest
+            # path and is never manipulated; its blocked footprints are in the TRO scene block (scene_variant)
+            g = GROUP_NAMES["obstacles"]
+            groups = {g: [o.name for o in b.many("obstacles")]}
+            init = [f"(ontop {g} {floor})", on_floor]
+            alias = "obstructed"
+            comment += (" Obstructed: the obstacles group stands on the floor on the shortest path (never manipulated); "
+                        "its footprints are recorded as scene_variant.blocked_footprints in the TRO.")
         return render_problem(
-            activity, definition_id, None, b.all(), {}, [on_floor],
+            activity, definition_id, alias, b.all(), groups, init,
             [f"(pose_reached {_q(agent)})", f"(pose_settled {_q(agent)})"], [],
-            comment="Binary success: the head-camera sensor pose (TRO pose_targets[agent], link = sensor key) is within "
-            "both tolerances of the goal camera pose.",
+            comment=comment,
         )
     if activity in ("object_scaling", "mental_rotation"):
         t = b.one("target").name

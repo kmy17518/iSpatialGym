@@ -9,6 +9,11 @@ obstacle. :func:`patch_trav_map` frees those cells in the loaded ``TraversableMa
 floor, and not under a remaining object's footprint). Templates record the freed footprints
 (``template_meta.scene_variant.freed_footprints``) so that evaluation can apply the same patch
 (:func:`patch_trav_map_from_meta`) - the oracle's base planner otherwise still treats the chair spots as blocked.
+
+The inverse patch exists for objects *added* to the scene: the obstacles of the obstructed camera-relocalization
+variant stand on the floor after the map was baked, so their footprints must be blocked. :func:`blocked_footprints`
+builds the record (same ``{"free", "block"}`` structure, written per instance to the TRO scene block as
+``scene_variant.blocked_footprints``) and :func:`block_trav_map` / :func:`block_trav_map_from_meta` apply it.
 """
 
 from __future__ import annotations
@@ -249,3 +254,79 @@ def patch_trav_map_from_meta(scene, template_meta: dict) -> int:
     if not fps:
         return 0
     return patch_trav_map(scene, fps)
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Objects added to the scene (obstacles): the counterpart of the freed footprints
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def polygon_cells(trav_map, poly: Sequence[Sequence[float]], floor: int = 0) -> th.Tensor:
+    """Map indices ``(K, 2)`` of the cells of ``trav_map.floor_map[floor]`` whose centre lies inside the convex polygon
+    ``poly`` (world xy vertices in consistent order)."""
+    m = trav_map.floor_map[floor]
+    h, w = m.shape
+    pts = th.tensor(poly, dtype=th.float32)
+    ij = trav_map.world_to_map(pts)
+    i0, i1 = int(th.floor(ij[:, 0].min())) - 1, int(th.ceil(ij[:, 0].max())) + 1
+    j0, j1 = int(th.floor(ij[:, 1].min())) - 1, int(th.ceil(ij[:, 1].max())) + 1
+    i0, j0 = max(i0, 0), max(j0, 0)
+    i1, j1 = min(i1, h - 1), min(j1, w - 1)
+    if i1 < i0 or j1 < j0:
+        return th.zeros(0, 2, dtype=th.long)
+    ii, jj = th.meshgrid(th.arange(i0, i1 + 1), th.arange(j0, j1 + 1), indexing="ij")
+    cells = th.stack([ii.flatten(), jj.flatten()], dim=1).float()
+    xy = trav_map.map_to_world(cells)
+    n = len(pts)
+    signs = []
+    for k in range(n):
+        a, b = pts[k], pts[(k + 1) % n]
+        signs.append((b[0] - a[0]) * (xy[:, 1] - a[1]) - (b[1] - a[1]) * (xy[:, 0] - a[0]))
+    sg = th.stack(signs, dim=1)
+    inside = (sg >= -1e-6).all(dim=1) | (sg <= 1e-6).all(dim=1)
+    return cells[inside].long()
+
+
+def footprint_free(trav_map, poly: Sequence[Sequence[float]], floor: int = 0) -> bool:
+    """True when every cell under the convex polygon (and the cell of each vertex) is free floor on the *un-eroded*
+    map ``trav_map.floor_map[floor]``: the object stands entirely on floor the map knows to be free of furniture."""
+    m = trav_map.floor_map[floor]
+    verts = trav_map.world_to_map(th.tensor(poly, dtype=th.float32)).long()
+    cells = th.cat([polygon_cells(trav_map, poly, floor), verts], dim=0)
+    if bool(((cells[:, 0] < 0) | (cells[:, 1] < 0) | (cells[:, 0] >= m.shape[0]) | (cells[:, 1] >= m.shape[1])).any()):
+        return False
+    return bool((m[cells[:, 0], cells[:, 1]] == 255).all())
+
+
+def aabb_footprint(lo, hi, margin: float = 0.0) -> List[List[float]]:
+    """World xy corners (4 x 2, counter-clockwise) of an axis-aligned box projected to the floor, grown by ``margin``."""
+    x0, y0 = float(lo[0]) - margin, float(lo[1]) - margin
+    x1, y1 = float(hi[0]) + margin, float(hi[1]) + margin
+    return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
+
+
+def blocked_footprints(aabbs: Sequence[Tuple[Sequence[float], Sequence[float]]], margin: float = 0.02) -> Dict[str, List]:
+    """Footprints to *block* in the traversability map for objects added to the scene after the map was baked (the
+    obstacles of the obstructed camera-relocalization variant): ``{"free": [], "block": [footprint, ...]}``, one
+    AABB floor projection grown by ``margin`` per ``(lo, hi)`` box. Same structure as :func:`freed_footprints`."""
+    return {"free": [], "block": [aabb_footprint(lo, hi, margin) for lo, hi in aabbs]}
+
+
+def block_trav_map(scene, footprints: Dict[str, List]) -> int:
+    """Block ``footprints['block']`` in ``scene.trav_map`` (cells set to 0). Returns the number of cells blocked. The
+    map is modified in place: the sampler plans on a temporary copy (``floor_map[0]`` swapped in and restored), the
+    evaluator applies it to the map of the loaded instance."""
+    trav = scene.trav_map
+    before = int((trav.floor_map[0] == 255).sum())
+    _rasterise(trav, footprints.get("block", []), 0)
+    return before - int((trav.floor_map[0] == 255).sum())
+
+
+def block_trav_map_from_meta(scene, meta: dict) -> int:
+    """Apply ``meta['scene_variant']['blocked_footprints']`` (a TRO scene block or a template meta; no-op when absent).
+    Per instance, after :func:`patch_trav_map_from_meta`: the obstacles differ from instance to instance."""
+    sv = meta.get("scene_variant") or {}
+    fps = sv.get("blocked_footprints")
+    if not fps:
+        return 0
+    return block_trav_map(scene, fps)
