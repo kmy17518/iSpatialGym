@@ -53,3 +53,7 @@ runlogs/**/*.usdc
 
 # RunPod fleet state (pod ids, billing samples, benchmark pulls)
 runlogs/runpod/
+
+# scene inventory renders (review material, regenerable with --parts renders)
+runlogs/scene_inventory_*/**/renders/
+runlogs/scene_inventory_*/**/strips/
