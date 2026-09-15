@@ -823,7 +823,9 @@ def test_epilogue_ordering_not_reached_tolerance_settled_goal_image(tmp_path):
     ex, *_ = make_executor(env, sc, exec_cfg=ExecutorConfig(goal_image=True))
     result = ex.run_program(expand(sc.alias, sc))
     assert result["reason"] == "tolerance" and result["verdict"]["details"]["targets"] == ["plate.n.04_1"]
-    # 3) the goal holds but the task never reports settled -> not_settled
+    # 3) the goal holds, nothing moves over the window, but the evaluator's pose_settled never fires: a success by
+    #    default (the §6.4 "motion after the window" is measured by the executor), not_settled when the evaluator's
+    #    verdict is required
     sc, env = iors_world()
 
     def eval_unsettled(env_):
@@ -832,9 +834,31 @@ def test_epilogue_ordering_not_reached_tolerance_settled_goal_image(tmp_path):
         return d
 
     env.evaluate = eval_unsettled
-    ex, *_ = make_executor(env, sc, exec_cfg=ExecutorConfig(goal_image=True))
+    ex, *_ = make_executor(env, sc, exec_cfg=ExecutorConfig(goal_image=False))
     result = ex.run_program(expand(sc.alias, sc))
-    assert result["reason"] == "not_settled"
+    assert result["success"] and result["settled_success"] is False
+    sc, env = iors_world()
+    env.evaluate = eval_unsettled
+    ex, *_ = make_executor(env, sc, exec_cfg=ExecutorConfig(goal_image=True, require_task_settled=True))
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["reason"] == "not_settled" and result["verdict"]["details"]["task_settled_success"] is False
+    # 3b) the goal held once but not at the last step -> not_settled
+    sc, env = iors_world()
+    hits = {"n": 0}
+
+    def eval_transient(env_):
+        d = success_eval("apple.n.01_1", goal, tol=0.08)(env_)
+        if d["binary_success"]:
+            hits["n"] += 1
+            if hits["n"] > 3:
+                d["binary_success"] = False
+                d["binary_success_ever"] = True
+        return d
+
+    env.evaluate = eval_transient
+    ex, *_ = make_executor(env, sc)
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["reason"] == "not_settled" and "no longer holds" in result["verdict"]["message"]
     # 4) success: the goal image is captured after >= 3 renders with the physics-synced camera pose
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", goal, tol=0.08)

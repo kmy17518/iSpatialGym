@@ -73,6 +73,11 @@ class ExecutorConfig:
     settled_pos_tol: float = 0.005
     settled_rot_tol: float = 0.01
     settled_joint_tol: float = 0.02
+    #: also require the evaluator's own ``settled_success`` (PoseSettled of every settled entity) at the last step.
+    #: Off by default: PoseSettled's 1 mm/s root-velocity threshold is never met by an object held at the end of a
+    #: position-controlled arm (0 / 74 v1 held-object demos ever settled by that measure while being motionless
+    #: within 0.1 mm over the window), so the §6.4 "motion after the final no-op window" is measured here instead.
+    require_task_settled: bool = False
     #: goal image
     goal_image: bool = False
     goal_image_renders: int = 10
@@ -581,8 +586,14 @@ class Executor:
         if verdict is None and out_of_tol:
             verdict = Verdict("tolerance", "measured error above tolerance for " + ", ".join(out_of_tol), step=self.n, details={"targets": out_of_tol})
             self.stats.record(verdict)
-        if verdict is None and (moved or not (binary_final and settled_task)):
-            verdict = Verdict("not_settled", "motion after the final no-op window" if moved else "goal not settled at the last step", step=self.n, details={"motion": motion})
+        if verdict is None and (moved or not binary_final or (self.cfg.require_task_settled and not settled_task)):
+            if moved:
+                msg = "robot / object motion after the final no-op window"
+            elif not binary_final:
+                msg = "the binary goal no longer holds at the last step"
+            else:
+                msg = "the evaluator's pose_settled atoms do not hold at the last step"
+            verdict = Verdict("not_settled", msg, step=self.n, details={"motion": motion, "task_settled_success": settled_task})
             self.stats.record(verdict)
         self.timings["settle_s"] = time.time() - t0
         goal_obs = None
