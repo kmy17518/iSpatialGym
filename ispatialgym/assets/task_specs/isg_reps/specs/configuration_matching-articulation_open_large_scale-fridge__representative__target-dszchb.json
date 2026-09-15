@@ -1,0 +1,59 @@
+{
+ "_comment": "ground_isg v1-bridge: configuration_matching-articulation_open_large_scale-fridge (configuration_matching-articulation_open_large_scale#04, slot representative)",
+ "configuration_matching-1": {
+  "alias": "articulation",
+  "roles": {
+   "artic": {
+    "fixed": true,
+    "joint": "j_link_0",
+    "handle_key": "fridge__dszchb",
+    "handle_file": "runlogs/scene_inventory_20260915/house_single_floor/artic/fridge_dszchb_0.json"
+   },
+   "floor": {
+    "fixed": true
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "fixed": {
+     "artic": [
+      "fridge_dszchb_0"
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    }
+   }
+  },
+  "generation": {
+   "instances_per_template": 2,
+   "open_fraction_range": [
+    0.5,
+    0.95
+   ],
+   "tolerances": {
+    "revolute": 0.1,
+    "prismatic": 0.02
+   }
+  },
+  "_isg": {
+   "subtask": "configuration_matching-articulation_open_large_scale",
+   "alias": "configuration_matching-articulation_open_large_scale-fridge",
+   "pick": "configuration_matching-articulation_open_large_scale#04",
+   "slot": "representative",
+   "iddl": "configuration_matching/articulation_open_large_scale.iddl",
+   "require": [
+    {
+     "kind": "handle",
+     "role": "target",
+     "pipeline": null
+    }
+   ],
+   "scene": "house_single_floor",
+   "note": []
+  }
+ }
+}

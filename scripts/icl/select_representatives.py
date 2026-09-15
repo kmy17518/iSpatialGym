@@ -697,7 +697,8 @@ class Selector:
             near = [s for s in sup if s["scene"] == prep["scene"] and s["name"] in prep["near_supports"]]
             snote = []
             if near:
-                srep = sorted(near, key=lambda s: -s["run"])[0]
+                tables = ("breakfast_table", "desk", "coffee_table", "countertop", "bar", "nightstand", "console_table", "table")
+                srep = sorted(near, key=lambda s: (s["category"] not in tables, -s["area"], -s["run"]))[0]
                 self.rows.append({"family": IORS, "subtask": subtask, "pick": pick, "role": "support", "slot": "representative", "category": srep["category"],
                                   "model": "", "scene": srep["scene"], "name": srep["name"], "joint": "", "kind": "scene", "grasp_key": "", "scale": "",
                                   "geometry_group": "", "exact_group": "", "status": "geometric_ok", "note": f"init surface within 3 m of {prep['name']}"})

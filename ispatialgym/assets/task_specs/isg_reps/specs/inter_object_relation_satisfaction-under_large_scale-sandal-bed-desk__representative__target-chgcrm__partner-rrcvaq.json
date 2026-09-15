@@ -1,0 +1,80 @@
+{
+ "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk (inter_object_relation_satisfaction-under_large_scale#01, slot representative)",
+ "inter_object_relation_satisfaction-1": {
+  "alias": "under",
+  "roles": {
+   "target": {
+    "models": {
+     "sandal": [
+      "chgcrm"
+     ]
+    },
+    "grasps": {
+     "key": "sandal__chgcrm"
+    }
+   },
+   "partner": {
+    "fixed": true
+   },
+   "table": {
+    "fixed": true
+   },
+   "floor": {
+    "fixed": true
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "childs_room_0"
+    ],
+    "fixed": {
+     "partner": [
+      "bed_rrcvaq_0"
+     ],
+     "table": [
+      "desk_xhjsub_0"
+     ],
+     "floor": {
+      "room": "childs_room_0"
+     }
+    }
+   }
+  },
+  "generation": {
+   "instances_per_template": 2,
+   "max_partner_geodesic": 3.0,
+   "depth_range": [
+    0.08,
+    0.35
+   ],
+   "lateral_half": 0.3,
+   "stand_offs": [
+    0.45,
+    0.35,
+    0.55
+   ],
+   "try_all_edges": true,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2
+   }
+  },
+  "_isg": {
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#01",
+   "slot": "representative",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "require": [
+    {
+     "kind": "grasps",
+     "role": "target",
+     "pipeline": "tabletop"
+    }
+   ],
+   "scene": "house_single_floor",
+   "note": []
+  }
+ }
+}

@@ -1,0 +1,1279 @@
+{
+ "_comment": "ground_isg v1-bridge: disembedding-beaker-distractors-breakfast_table (disembedding#10, slot representative)",
+ "disembedding-0": {
+  "alias": null,
+  "roles": {
+   "target": {
+    "models": {
+     "beaker": [
+      "jdijek"
+     ]
+    },
+    "grasps": {
+     "key": "beaker__jdijek__t"
+    }
+   },
+   "tray_source": {
+    "models": {
+     "tray": [
+      "gsxbym"
+     ]
+    }
+   },
+   "tray_dest": {
+    "models": {
+     "tray": [
+      "hvlfig"
+     ]
+    }
+   },
+   "table": {
+    "fixed": true
+   },
+   "floor": {
+    "fixed": true
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "fixed": {
+     "table": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    }
+   }
+  },
+  "generation": {
+   "instances_per_template": 2,
+   "same_category_prob": 0.5,
+   "max_distractors": 3,
+   "occlusion": {
+    "prob": 0.5,
+    "ratio_range": [
+     0.3,
+     0.7
+    ],
+    "min_visible_pixels": 400,
+    "unoccluded_max_ratio": 0.1
+   },
+   "tray_edge_offset": 0.08,
+   "dest_visible_width": 0.04,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2
+   }
+  },
+  "distractors": {
+   "_comment": "Per-category distractor pools for disembedding targets (built by runlogs/grasp_library_20260905/scripts/build_disembedding_pools.py; details in select/disembedding_distractor_pools.json). For a target C/m: same-category pool = pools[C].same_category minus m and minus its look-alikes; other-category pool = the same_category lists of pools[C].other_categories minus look-alikes. Look-alike groups are models that cannot be told apart from the robot's initial view; members are never drawn as each other's distractors.",
+   "families": {
+    "cartons": [
+     "box_of_cereal",
+     "box_of_rice",
+     "box_of_cane_sugar",
+     "box_of_shampoo",
+     "box_of_oatmeal",
+     "carton_of_milk",
+     "box_of_baking_mix",
+     "box_of_granola_bars",
+     "box_of_butter",
+     "box_of_cookies",
+     "bottle_of_milk"
+    ],
+    "packs": [
+     "pack_of_cigarettes",
+     "video_game",
+     "notebook",
+     "box_of_tissues",
+     "box_of_sanitary_napkins",
+     "box_of_butter",
+     "box_of_cookies",
+     "box_of_granola_bars",
+     "pencil_case",
+     "bar_soap"
+    ],
+    "bottles": [
+     "bottle_of_wine",
+     "bottle_of_beer",
+     "bottle_of_pop",
+     "bottle_of_medicine",
+     "bottle_of_milk",
+     "bottle_of_shampoo",
+     "soap_dispenser",
+     "conditioner_dispenser",
+     "can_of_soda",
+     "jar_of_bath_salt"
+    ],
+    "vessels": [
+     "mug",
+     "beaker",
+     "box_of_yogurt",
+     "pencil_holder",
+     "can_of_soda",
+     "jar_of_bath_salt"
+    ],
+    "small_items": [
+     "teaspoon",
+     "tablefork",
+     "cookie_cutter",
+     "tortilla_chips",
+     "chili",
+     "cellulose_tape",
+     "mouse",
+     "bar_soap",
+     "toy_dice",
+     "video_game",
+     "pack_of_cigarettes",
+     "box_of_yogurt",
+     "pencil_case"
+    ]
+   },
+   "lookalike_groups": [
+    [
+     "beaker/jdijek",
+     "beaker/rhohgs",
+     "beaker/uobdoq"
+    ],
+    [
+     "beaker/effbnc",
+     "beaker/sfvswx"
+    ],
+    [
+     "bottle_of_beer/crfcwo",
+     "bottle_of_beer/meqliv",
+     "bottle_of_beer/zbsxro"
+    ],
+    [
+     "bottle_of_beer/fgzjnb",
+     "bottle_of_beer/gxxbhh",
+     "bottle_of_beer/saslsh"
+    ],
+    [
+     "bottle_of_beer/kqskmv",
+     "bottle_of_beer/qepxvl"
+    ],
+    [
+     "bottle_of_medicine/kasbsy",
+     "bottle_of_medicine/zfbnjh"
+    ],
+    [
+     "bottle_of_medicine/egondf",
+     "bottle_of_medicine/syfpak"
+    ],
+    [
+     "bottle_of_milk/ddvsgl",
+     "bottle_of_milk/utfsmp"
+    ],
+    [
+     "bottle_of_pop/mhzttm",
+     "bottle_of_pop/nyupqh",
+     "bottle_of_pop/sevoto"
+    ],
+    [
+     "bottle_of_pop/vfjhav",
+     "bottle_of_pop/xoldze"
+    ],
+    [
+     "bottle_of_shampoo/lvvkhx",
+     "bottle_of_shampoo/stjjjm"
+    ],
+    [
+     "bottle_of_wine/lacaoa",
+     "bottle_of_wine/njoeiz",
+     "bottle_of_wine/yaxufs"
+    ],
+    [
+     "bottle_of_wine/oslewp",
+     "bottle_of_wine/ynfvhg"
+    ],
+    [
+     "box_of_baking_mix/fmewsz",
+     "box_of_baking_mix/ltccey",
+     "box_of_baking_mix/luwlfd"
+    ],
+    [
+     "box_of_baking_mix/uhvkxj",
+     "box_of_baking_mix/xcxrek"
+    ],
+    [
+     "box_of_cereal/ihedod",
+     "box_of_cereal/yorray"
+    ],
+    [
+     "box_of_cereal/iucshm",
+     "box_of_cereal/qirvmd"
+    ],
+    [
+     "box_of_cookies/nirfva",
+     "box_of_cookies/nnfisz",
+     "box_of_cookies/sjcnoq"
+    ],
+    [
+     "box_of_sanitary_napkins/acaivd",
+     "box_of_sanitary_napkins/ykpeja",
+     "box_of_sanitary_napkins/cmnpuv"
+    ],
+    [
+     "box_of_sanitary_napkins/mxdefq",
+     "box_of_sanitary_napkins/tkrzkb",
+     "box_of_sanitary_napkins/skltgp"
+    ],
+    [
+     "box_of_tissues/ntbrtz",
+     "box_of_tissues/uglbjc"
+    ],
+    [
+     "can_of_soda/opivig",
+     "can_of_soda/wbrrad"
+    ],
+    [
+     "can_of_soda/evcxlr",
+     "can_of_soda/xmjfcg"
+    ],
+    [
+     "carton_of_milk/kszoro",
+     "carton_of_milk/xmugpm"
+    ],
+    [
+     "cookie_cutter/fvxiun",
+     "cookie_cutter/jpscvj",
+     "cookie_cutter/lqrfzo"
+    ],
+    [
+     "mouse/cduwda",
+     "mouse/fjljxp",
+     "mouse/ihpnjx",
+     "mouse/pljjtu"
+    ],
+    [
+     "mug/fapsrj",
+     "mug/lgxhsc",
+     "mug/ntgftr"
+    ],
+    [
+     "mug/waqrdy",
+     "mug/yxaapv"
+    ],
+    [
+     "notebook/zkpswz",
+     "notebook/zkmmnf"
+    ],
+    [
+     "pack_of_cigarettes/ajphvf",
+     "pack_of_cigarettes/wpmpcf"
+    ],
+    [
+     "pack_of_cigarettes/ipmejr",
+     "pack_of_cigarettes/qldhnm"
+    ],
+    [
+     "pencil_case/cqxkgl",
+     "pencil_case/otcmih"
+    ],
+    [
+     "soap_dispenser/zwudcz",
+     "soap_dispenser/ijxawq"
+    ],
+    [
+     "tablefork/flexrc",
+     "tablefork/pqrtkc"
+    ],
+    [
+     "tablefork/hktwlm",
+     "tablefork/uodzrq"
+    ],
+    [
+     "teaspoon/qdepdj",
+     "teaspoon/prbhag",
+     "teaspoon/piqabk",
+     "teaspoon/vgbcmo"
+    ],
+    [
+     "teaspoon/bjzgmj",
+     "teaspoon/eilfij"
+    ],
+    [
+     "tortilla_chips/aiohfb",
+     "tortilla_chips/herjym",
+     "tortilla_chips/mhbnsy"
+    ],
+    [
+     "toy_dice/akguod",
+     "toy_dice/cmqtch",
+     "toy_dice/eqwazv",
+     "toy_dice/gcevml",
+     "toy_dice/hbkqqp",
+     "toy_dice/ievnsq",
+     "toy_dice/kmagva",
+     "toy_dice/krpdji",
+     "toy_dice/mqvaaa",
+     "toy_dice/rbzyrv",
+     "toy_dice/xfqqhh"
+    ],
+    [
+     "video_game/ceaxsd",
+     "video_game/yyvkel"
+    ],
+    [
+     "video_game/ckugyi",
+     "video_game/quzjuo"
+    ],
+    [
+     "video_game/coiafo",
+     "video_game/ppnzqm"
+    ],
+    [
+     "video_game/qsyyql",
+     "video_game/rzaxlj",
+     "video_game/veodkq"
+    ],
+    [
+     "box_of_butter/mfjuil",
+     "box_of_cookies/apjokz"
+    ],
+    [
+     "beaker/fyrkzs",
+     "beaker/zycgen"
+    ],
+    [
+     "bottle_of_beer/dcwvkg",
+     "bottle_of_beer/vhscym"
+    ],
+    [
+     "pencil_holder/jkuiqg",
+     "pencil_holder/mrrpay"
+    ],
+    [
+     "pencil_holder/jyetcl",
+     "pencil_holder/taixcy"
+    ]
+   ],
+   "pools": {
+    "bar_soap": {
+     "same_category": [
+      "feqemg",
+      "ofargb",
+      "ozifwa"
+     ],
+     "other_categories": [
+      "pack_of_cigarettes",
+      "video_game",
+      "notebook",
+      "box_of_tissues",
+      "box_of_sanitary_napkins",
+      "box_of_butter",
+      "box_of_cookies",
+      "box_of_granola_bars",
+      "pencil_case",
+      "teaspoon",
+      "tablefork",
+      "cookie_cutter",
+      "tortilla_chips",
+      "chili",
+      "cellulose_tape",
+      "mouse",
+      "toy_dice",
+      "box_of_yogurt"
+     ]
+    },
+    "beaker": {
+     "same_category": [
+      "dtjmai",
+      "effbnc",
+      "fyrkzs",
+      "jdijek",
+      "rhohgs",
+      "sfvswx",
+      "uobdoq",
+      "zycgen"
+     ],
+     "other_categories": [
+      "mug",
+      "box_of_yogurt",
+      "pencil_holder",
+      "can_of_soda",
+      "jar_of_bath_salt"
+     ]
+    },
+    "bottle_of_beer": {
+     "same_category": [
+      "crfcwo",
+      "dcwvkg",
+      "fgzjnb",
+      "gxxbhh",
+      "kqskmv",
+      "meqliv",
+      "phdimo",
+      "qepxvl",
+      "saslsh",
+      "vhscym",
+      "zbsxro"
+     ],
+     "other_categories": [
+      "bottle_of_wine",
+      "bottle_of_pop",
+      "bottle_of_medicine",
+      "bottle_of_milk",
+      "bottle_of_shampoo",
+      "soap_dispenser",
+      "conditioner_dispenser",
+      "can_of_soda",
+      "jar_of_bath_salt"
+     ]
+    },
+    "bottle_of_medicine": {
+     "same_category": [
+      "egondf",
+      "fmfwng",
+      "hvocpc",
+      "kasbsy",
+      "kqkwoq",
+      "syfpak",
+      "zfbnjh"
+     ],
+     "other_categories": [
+      "bottle_of_wine",
+      "bottle_of_beer",
+      "bottle_of_pop",
+      "bottle_of_milk",
+      "bottle_of_shampoo",
+      "soap_dispenser",
+      "conditioner_dispenser",
+      "can_of_soda",
+      "jar_of_bath_salt"
+     ]
+    },
+    "bottle_of_milk": {
+     "same_category": [
+      "ddvsgl",
+      "debqen",
+      "mrejrs",
+      "qsnnbp",
+      "utfsmp"
+     ],
+     "other_categories": [
+      "box_of_cereal",
+      "box_of_rice",
+      "box_of_cane_sugar",
+      "box_of_shampoo",
+      "box_of_oatmeal",
+      "carton_of_milk",
+      "box_of_baking_mix",
+      "box_of_granola_bars",
+      "box_of_butter",
+      "box_of_cookies",
+      "bottle_of_wine",
+      "bottle_of_beer",
+      "bottle_of_pop",
+      "bottle_of_medicine",
+      "bottle_of_shampoo",
+      "soap_dispenser",
+      "conditioner_dispenser",
+      "can_of_soda",
+      "jar_of_bath_salt"
+     ]
+    },
+    "bottle_of_pop": {
+     "same_category": [
+      "ghxeqz",
+      "mdznsn",
+      "mhzttm",
+      "nyupqh",
+      "ribekf",
+      "sevoto",
+      "vfjhav",
+      "wrgmdt",
+      "xoldze",
+      "zxambx"
+     ],
+     "other_categories": [
+      "bottle_of_wine",
+      "bottle_of_beer",
+      "bottle_of_medicine",
+      "bottle_of_milk",
+      "bottle_of_shampoo",
+      "soap_dispenser",
+      "conditioner_dispenser",
+      "can_of_soda",
+      "jar_of_bath_salt"
+     ]
+    },
+    "bottle_of_shampoo": {
+     "same_category": [
+      "dvrzmy",
+      "lvvkhx",
+      "stjjjm"
+     ],
+     "other_categories": [
+      "bottle_of_wine",
+      "bottle_of_beer",
+      "bottle_of_pop",
+      "bottle_of_medicine",
+      "bottle_of_milk",
+      "soap_dispenser",
+      "conditioner_dispenser",
+      "can_of_soda",
+      "jar_of_bath_salt"
+     ]
+    },
+    "bottle_of_wine": {
+     "same_category": [
+      "fzuiwy",
+      "klbwkf",
+      "lacaoa",
+      "njoeiz",
+      "oldpru",
+      "oslewp",
+      "rztiuc",
+      "vmdwln",
+      "wcokej",
+      "xkjyby",
+      "yaxufs",
+      "ynfvhg"
+     ],
+     "other_categories": [
+      "bottle_of_beer",
+      "bottle_of_pop",
+      "bottle_of_medicine",
+      "bottle_of_milk",
+      "bottle_of_shampoo",
+      "soap_dispenser",
+      "conditioner_dispenser",
+      "can_of_soda",
+      "jar_of_bath_salt"
+     ]
+    },
+    "box_of_baking_mix": {
+     "same_category": [
+      "fmewsz",
+      "lgusnr",
+      "ltccey",
+      "luwlfd",
+      "qkvqkm",
+      "uhvkxj",
+      "xcxrek"
+     ],
+     "other_categories": [
+      "box_of_cereal",
+      "box_of_rice",
+      "box_of_cane_sugar",
+      "box_of_shampoo",
+      "box_of_oatmeal",
+      "carton_of_milk",
+      "box_of_granola_bars",
+      "box_of_butter",
+      "box_of_cookies",
+      "bottle_of_milk"
+     ]
+    },
+    "box_of_butter": {
+     "same_category": [
+      "mfjuil",
+      "oixapu"
+     ],
+     "other_categories": [
+      "box_of_cereal",
+      "box_of_rice",
+      "box_of_cane_sugar",
+      "box_of_shampoo",
+      "box_of_oatmeal",
+      "carton_of_milk",
+      "box_of_baking_mix",
+      "box_of_granola_bars",
+      "box_of_cookies",
+      "bottle_of_milk",
+      "pack_of_cigarettes",
+      "video_game",
+      "notebook",
+      "box_of_tissues",
+      "box_of_sanitary_napkins",
+      "pencil_case",
+      "bar_soap"
+     ]
+    },
+    "box_of_cane_sugar": {
+     "same_category": [
+      "cqlofx",
+      "gpbobo",
+      "qvjiti"
+     ],
+     "other_categories": [
+      "box_of_cereal",
+      "box_of_rice",
+      "box_of_shampoo",
+      "box_of_oatmeal",
+      "carton_of_milk",
+      "box_of_baking_mix",
+      "box_of_granola_bars",
+      "box_of_butter",
+      "box_of_cookies",
+      "bottle_of_milk"
+     ]
+    },
+    "box_of_cereal": {
+     "same_category": [
+      "hcwbzw",
+      "hosfhj",
+      "ihedod",
+      "iucshm",
+      "pfwgkm",
+      "qirvmd",
+      "surzft",
+      "tiykku",
+      "wdkcbu",
+      "ykuyqb",
+      "yorray"
+     ],
+     "other_categories": [
+      "box_of_rice",
+      "box_of_cane_sugar",
+      "box_of_shampoo",
+      "box_of_oatmeal",
+      "carton_of_milk",
+      "box_of_baking_mix",
+      "box_of_granola_bars",
+      "box_of_butter",
+      "box_of_cookies",
+      "bottle_of_milk"
+     ]
+    },
+    "box_of_cookies": {
+     "same_category": [
+      "apjokz",
+      "dlhqft",
+      "fzlaol",
+      "hdgsxz",
+      "jtalxs",
+      "lwhbid",
+      "nirfva",
+      "nnfisz",
+      "ohhshb",
+      "sjcnoq"
+     ],
+     "other_categories": [
+      "box_of_cereal",
+      "box_of_rice",
+      "box_of_cane_sugar",
+      "box_of_shampoo",
+      "box_of_oatmeal",
+      "carton_of_milk",
+      "box_of_baking_mix",
+      "box_of_granola_bars",
+      "box_of_butter",
+      "bottle_of_milk",
+      "pack_of_cigarettes",
+      "video_game",
+      "notebook",
+      "box_of_tissues",
+      "box_of_sanitary_napkins",
+      "pencil_case",
+      "bar_soap"
+     ]
+    },
+    "box_of_granola_bars": {
+     "same_category": [
+      "awombj",
+      "bqeeki",
+      "tqwhvz"
+     ],
+     "other_categories": [
+      "box_of_cereal",
+      "box_of_rice",
+      "box_of_cane_sugar",
+      "box_of_shampoo",
+      "box_of_oatmeal",
+      "carton_of_milk",
+      "box_of_baking_mix",
+      "box_of_butter",
+      "box_of_cookies",
+      "bottle_of_milk",
+      "pack_of_cigarettes",
+      "video_game",
+      "notebook",
+      "box_of_tissues",
+      "box_of_sanitary_napkins",
+      "pencil_case",
+      "bar_soap"
+     ]
+    },
+    "box_of_oatmeal": {
+     "same_category": [
+      "jtqeef",
+      "rabeel"
+     ],
+     "other_categories": [
+      "box_of_cereal",
+      "box_of_rice",
+      "box_of_cane_sugar",
+      "box_of_shampoo",
+      "carton_of_milk",
+      "box_of_baking_mix",
+      "box_of_granola_bars",
+      "box_of_butter",
+      "box_of_cookies",
+      "bottle_of_milk"
+     ]
+    },
+    "box_of_rice": {
+     "same_category": [
+      "fvulow",
+      "pstqvm"
+     ],
+     "other_categories": [
+      "box_of_cereal",
+      "box_of_cane_sugar",
+      "box_of_shampoo",
+      "box_of_oatmeal",
+      "carton_of_milk",
+      "box_of_baking_mix",
+      "box_of_granola_bars",
+      "box_of_butter",
+      "box_of_cookies",
+      "bottle_of_milk"
+     ]
+    },
+    "box_of_sanitary_napkins": {
+     "same_category": [
+      "acaivd",
+      "cmnpuv",
+      "humkqw",
+      "mxdefq",
+      "skltgp",
+      "tkrzkb",
+      "ykpeja",
+      "zqinib"
+     ],
+     "other_categories": [
+      "pack_of_cigarettes",
+      "video_game",
+      "notebook",
+      "box_of_tissues",
+      "box_of_butter",
+      "box_of_cookies",
+      "box_of_granola_bars",
+      "pencil_case",
+      "bar_soap"
+     ]
+    },
+    "box_of_shampoo": {
+     "same_category": [
+      "bclpiq",
+      "jccyom",
+      "nijidu"
+     ],
+     "other_categories": [
+      "box_of_cereal",
+      "box_of_rice",
+      "box_of_cane_sugar",
+      "box_of_oatmeal",
+      "carton_of_milk",
+      "box_of_baking_mix",
+      "box_of_granola_bars",
+      "box_of_butter",
+      "box_of_cookies",
+      "bottle_of_milk"
+     ]
+    },
+    "box_of_tissues": {
+     "same_category": [
+      "ntbrtz",
+      "uglbjc",
+      "zutrxn"
+     ],
+     "other_categories": [
+      "pack_of_cigarettes",
+      "video_game",
+      "notebook",
+      "box_of_sanitary_napkins",
+      "box_of_butter",
+      "box_of_cookies",
+      "box_of_granola_bars",
+      "pencil_case",
+      "bar_soap"
+     ]
+    },
+    "box_of_yogurt": {
+     "same_category": [
+      "jkemqc",
+      "znhjgm"
+     ],
+     "other_categories": [
+      "mug",
+      "beaker",
+      "pencil_holder",
+      "can_of_soda",
+      "jar_of_bath_salt",
+      "teaspoon",
+      "tablefork",
+      "cookie_cutter",
+      "tortilla_chips",
+      "chili",
+      "cellulose_tape",
+      "mouse",
+      "bar_soap",
+      "toy_dice",
+      "video_game",
+      "pack_of_cigarettes",
+      "pencil_case"
+     ]
+    },
+    "can_of_soda": {
+     "same_category": [
+      "bfrzvk",
+      "evcxlr",
+      "frewxk",
+      "itolcg",
+      "opivig",
+      "ttxyui",
+      "wbrrad",
+      "xmjfcg"
+     ],
+     "other_categories": [
+      "bottle_of_wine",
+      "bottle_of_beer",
+      "bottle_of_pop",
+      "bottle_of_medicine",
+      "bottle_of_milk",
+      "bottle_of_shampoo",
+      "soap_dispenser",
+      "conditioner_dispenser",
+      "jar_of_bath_salt",
+      "mug",
+      "beaker",
+      "box_of_yogurt",
+      "pencil_holder"
+     ]
+    },
+    "carton_of_milk": {
+     "same_category": [
+      "atyqub",
+      "kszoro",
+      "xmugpm"
+     ],
+     "other_categories": [
+      "box_of_cereal",
+      "box_of_rice",
+      "box_of_cane_sugar",
+      "box_of_shampoo",
+      "box_of_oatmeal",
+      "box_of_baking_mix",
+      "box_of_granola_bars",
+      "box_of_butter",
+      "box_of_cookies",
+      "bottle_of_milk"
+     ]
+    },
+    "cellulose_tape": {
+     "same_category": [
+      "gchdhk",
+      "kavsnx"
+     ],
+     "other_categories": [
+      "teaspoon",
+      "tablefork",
+      "cookie_cutter",
+      "tortilla_chips",
+      "chili",
+      "mouse",
+      "bar_soap",
+      "toy_dice",
+      "video_game",
+      "pack_of_cigarettes",
+      "box_of_yogurt",
+      "pencil_case"
+     ]
+    },
+    "chili": {
+     "same_category": [
+      "agecro",
+      "pbbkpz",
+      "rafkbt"
+     ],
+     "other_categories": [
+      "teaspoon",
+      "tablefork",
+      "cookie_cutter",
+      "tortilla_chips",
+      "cellulose_tape",
+      "mouse",
+      "bar_soap",
+      "toy_dice",
+      "video_game",
+      "pack_of_cigarettes",
+      "box_of_yogurt",
+      "pencil_case"
+     ]
+    },
+    "conditioner_dispenser": {
+     "same_category": [
+      "njqnuo",
+      "uncljo"
+     ],
+     "other_categories": [
+      "bottle_of_wine",
+      "bottle_of_beer",
+      "bottle_of_pop",
+      "bottle_of_medicine",
+      "bottle_of_milk",
+      "bottle_of_shampoo",
+      "soap_dispenser",
+      "can_of_soda",
+      "jar_of_bath_salt"
+     ]
+    },
+    "cookie_cutter": {
+     "same_category": [
+      "fvxiun",
+      "jpscvj",
+      "lqrfzo"
+     ],
+     "other_categories": [
+      "teaspoon",
+      "tablefork",
+      "tortilla_chips",
+      "chili",
+      "cellulose_tape",
+      "mouse",
+      "bar_soap",
+      "toy_dice",
+      "video_game",
+      "pack_of_cigarettes",
+      "box_of_yogurt",
+      "pencil_case"
+     ]
+    },
+    "jar_of_bath_salt": {
+     "same_category": [
+      "dtrjxi"
+     ],
+     "other_categories": [
+      "bottle_of_wine",
+      "bottle_of_beer",
+      "bottle_of_pop",
+      "bottle_of_medicine",
+      "bottle_of_milk",
+      "bottle_of_shampoo",
+      "soap_dispenser",
+      "conditioner_dispenser",
+      "can_of_soda",
+      "mug",
+      "beaker",
+      "box_of_yogurt",
+      "pencil_holder"
+     ]
+    },
+    "mouse": {
+     "same_category": [
+      "cduwda",
+      "fjljxp",
+      "ihpnjx",
+      "pljjtu",
+      "wwyopp"
+     ],
+     "other_categories": [
+      "teaspoon",
+      "tablefork",
+      "cookie_cutter",
+      "tortilla_chips",
+      "chili",
+      "cellulose_tape",
+      "bar_soap",
+      "toy_dice",
+      "video_game",
+      "pack_of_cigarettes",
+      "box_of_yogurt",
+      "pencil_case"
+     ]
+    },
+    "mug": {
+     "same_category": [
+      "fapsrj",
+      "jgethp",
+      "lgxhsc",
+      "ntgftr",
+      "ppdqbj",
+      "ppzttc",
+      "waqrdy",
+      "ycbmug",
+      "yxaapv"
+     ],
+     "other_categories": [
+      "beaker",
+      "box_of_yogurt",
+      "pencil_holder",
+      "can_of_soda",
+      "jar_of_bath_salt"
+     ]
+    },
+    "notebook": {
+     "same_category": [
+      "ksxknp",
+      "umxsmd",
+      "yibctu",
+      "zkmmnf",
+      "zkpswz"
+     ],
+     "other_categories": [
+      "pack_of_cigarettes",
+      "video_game",
+      "box_of_tissues",
+      "box_of_sanitary_napkins",
+      "box_of_butter",
+      "box_of_cookies",
+      "box_of_granola_bars",
+      "pencil_case",
+      "bar_soap"
+     ]
+    },
+    "pack_of_cigarettes": {
+     "same_category": [
+      "ajphvf",
+      "cfmlhf",
+      "dthkix",
+      "ghbqav",
+      "gzxueq",
+      "hmhqkq",
+      "ipmejr",
+      "qabdgg",
+      "qldhnm",
+      "rmrubd",
+      "wpmpcf"
+     ],
+     "other_categories": [
+      "video_game",
+      "notebook",
+      "box_of_tissues",
+      "box_of_sanitary_napkins",
+      "box_of_butter",
+      "box_of_cookies",
+      "box_of_granola_bars",
+      "pencil_case",
+      "bar_soap",
+      "teaspoon",
+      "tablefork",
+      "cookie_cutter",
+      "tortilla_chips",
+      "chili",
+      "cellulose_tape",
+      "mouse",
+      "toy_dice",
+      "box_of_yogurt"
+     ]
+    },
+    "pencil_case": {
+     "same_category": [
+      "cqxkgl",
+      "otcmih"
+     ],
+     "other_categories": [
+      "pack_of_cigarettes",
+      "video_game",
+      "notebook",
+      "box_of_tissues",
+      "box_of_sanitary_napkins",
+      "box_of_butter",
+      "box_of_cookies",
+      "box_of_granola_bars",
+      "bar_soap",
+      "teaspoon",
+      "tablefork",
+      "cookie_cutter",
+      "tortilla_chips",
+      "chili",
+      "cellulose_tape",
+      "mouse",
+      "toy_dice",
+      "box_of_yogurt"
+     ]
+    },
+    "pencil_holder": {
+     "same_category": [
+      "jkuiqg",
+      "jyetcl",
+      "mrrpay",
+      "taixcy"
+     ],
+     "other_categories": [
+      "mug",
+      "beaker",
+      "box_of_yogurt",
+      "can_of_soda",
+      "jar_of_bath_salt"
+     ]
+    },
+    "soap_dispenser": {
+     "same_category": [
+      "cgxrwd",
+      "edinmg",
+      "ijxawq",
+      "jmulpc",
+      "zwudcz"
+     ],
+     "other_categories": [
+      "bottle_of_wine",
+      "bottle_of_beer",
+      "bottle_of_pop",
+      "bottle_of_medicine",
+      "bottle_of_milk",
+      "bottle_of_shampoo",
+      "conditioner_dispenser",
+      "can_of_soda",
+      "jar_of_bath_salt"
+     ]
+    },
+    "tablefork": {
+     "same_category": [
+      "flexrc",
+      "hktwlm",
+      "pqrtkc",
+      "uodzrq"
+     ],
+     "other_categories": [
+      "teaspoon",
+      "cookie_cutter",
+      "tortilla_chips",
+      "chili",
+      "cellulose_tape",
+      "mouse",
+      "bar_soap",
+      "toy_dice",
+      "video_game",
+      "pack_of_cigarettes",
+      "box_of_yogurt",
+      "pencil_case"
+     ]
+    },
+    "teaspoon": {
+     "same_category": [
+      "bjzgmj",
+      "eilfij",
+      "piqabk",
+      "prbhag",
+      "qdepdj",
+      "vgbcmo"
+     ],
+     "other_categories": [
+      "tablefork",
+      "cookie_cutter",
+      "tortilla_chips",
+      "chili",
+      "cellulose_tape",
+      "mouse",
+      "bar_soap",
+      "toy_dice",
+      "video_game",
+      "pack_of_cigarettes",
+      "box_of_yogurt",
+      "pencil_case"
+     ]
+    },
+    "tortilla_chips": {
+     "same_category": [
+      "aiohfb",
+      "herjym",
+      "mhbnsy"
+     ],
+     "other_categories": [
+      "teaspoon",
+      "tablefork",
+      "cookie_cutter",
+      "chili",
+      "cellulose_tape",
+      "mouse",
+      "bar_soap",
+      "toy_dice",
+      "video_game",
+      "pack_of_cigarettes",
+      "box_of_yogurt",
+      "pencil_case"
+     ]
+    },
+    "toy_dice": {
+     "same_category": [
+      "akguod",
+      "cmqtch",
+      "eqwazv",
+      "gcevml",
+      "hbkqqp",
+      "ievnsq",
+      "kmagva",
+      "krpdji",
+      "mqvaaa",
+      "rbzyrv",
+      "xfqqhh"
+     ],
+     "other_categories": [
+      "teaspoon",
+      "tablefork",
+      "cookie_cutter",
+      "tortilla_chips",
+      "chili",
+      "cellulose_tape",
+      "mouse",
+      "bar_soap",
+      "video_game",
+      "pack_of_cigarettes",
+      "box_of_yogurt",
+      "pencil_case"
+     ]
+    },
+    "video_game": {
+     "same_category": [
+      "apjpos",
+      "ceaxsd",
+      "ckugyi",
+      "coiafo",
+      "ppnzqm",
+      "pujfzk",
+      "qsyyql",
+      "quzjuo",
+      "rzaxlj",
+      "veodkq",
+      "yyvkel"
+     ],
+     "other_categories": [
+      "pack_of_cigarettes",
+      "notebook",
+      "box_of_tissues",
+      "box_of_sanitary_napkins",
+      "box_of_butter",
+      "box_of_cookies",
+      "box_of_granola_bars",
+      "pencil_case",
+      "bar_soap",
+      "teaspoon",
+      "tablefork",
+      "cookie_cutter",
+      "tortilla_chips",
+      "chili",
+      "cellulose_tape",
+      "mouse",
+      "toy_dice",
+      "box_of_yogurt"
+     ]
+    }
+   }
+  },
+  "_isg": {
+   "subtask": "disembedding",
+   "alias": "disembedding-beaker-distractors-breakfast_table",
+   "pick": "disembedding#10",
+   "slot": "representative",
+   "iddl": "disembedding/disembedding.iddl",
+   "require": [
+    {
+     "kind": "grasps",
+     "role": "target",
+     "pipeline": "tabletop"
+    }
+   ],
+   "scene": "house_single_floor",
+   "note": []
+  }
+ }
+}

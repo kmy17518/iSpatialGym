@@ -1,0 +1,62 @@
+{
+ "_comment": "ground_isg v1-bridge: camera_relocalization-obstructed-ottoman_1 (camera_relocalization-obstructed#10, slot representative)",
+ "camera_relocalization-0": {
+  "alias": null,
+  "roles": {
+   "floor": {
+    "fixed": true
+   },
+   "obstacles": {
+    "models": {
+     "ottoman": [
+      "miftfy"
+     ]
+    },
+    "count": 1
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "fixed": {
+     "floor": {
+      "room": "living_room_0"
+     }
+    }
+   }
+  },
+  "generation": {
+   "instances_per_template": 2,
+   "max_euclidean_m": 5.0,
+   "max_geodesic_m": 10.0,
+   "max_heading_deg": 60.0,
+   "goal_translate_range": [
+    0.0,
+    1.25
+   ],
+   "goal_tilt_range": [
+    -0.5,
+    0.5
+   ],
+   "min_goal_objects": 3,
+   "min_shared_visible_fraction": 0.3,
+   "min_object_pixels": 200,
+   "tolerances": {
+    "position": 0.05,
+    "orientation": 0.1
+   }
+  },
+  "_isg": {
+   "subtask": "camera_relocalization-obstructed",
+   "alias": "camera_relocalization-obstructed-ottoman_1",
+   "pick": "camera_relocalization-obstructed#10",
+   "slot": "representative",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "require": [],
+   "scene": "house_single_floor",
+   "note": []
+  }
+ }
+}

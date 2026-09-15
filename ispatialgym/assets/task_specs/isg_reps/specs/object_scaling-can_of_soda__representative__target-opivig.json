@@ -1,0 +1,60 @@
+{
+ "_comment": "ground_isg v1-bridge: object_scaling-can_of_soda (object_scaling#12, slot representative)",
+ "object_scaling-0": {
+  "alias": null,
+  "roles": {
+   "floor": {
+    "fixed": true
+   },
+   "target": {
+    "models": {
+     "can_of_soda": [
+      "opivig"
+     ]
+    },
+    "grasps": {
+     "key": "can_of_soda__opivig"
+    }
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "fixed": {
+     "floor": {
+      "room": "living_room_0"
+     }
+    }
+   }
+  },
+  "generation": {
+   "instances_per_template": 2,
+   "init_depth": 0.55,
+   "goal_depth_range": [
+    0.35,
+    0.85
+   ],
+   "min_depth_change": 0.1,
+   "max_self_occlusion": 0.6,
+   "depth_tolerance": 0.03
+  },
+  "_isg": {
+   "subtask": "object_scaling",
+   "alias": "object_scaling-can_of_soda",
+   "pick": "object_scaling#12",
+   "slot": "representative",
+   "iddl": "object_scaling/object_scaling.iddl",
+   "require": [
+    {
+     "kind": "grasps",
+     "role": "target",
+     "pipeline": "floating"
+    }
+   ],
+   "scene": "house_single_floor",
+   "note": []
+  }
+ }
+}

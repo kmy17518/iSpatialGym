@@ -1,0 +1,69 @@
+{
+ "_comment": "ground_isg v1-bridge: configuration_matching-block_design-block_4-breakfast_table (configuration_matching-block_design#01, slot representative)",
+ "configuration_matching-0": {
+  "alias": "block_design",
+  "roles": {
+   "blocks": {
+    "models": {
+     "toy_dice": [
+      "isgblk"
+     ]
+    },
+    "dataset": "ispatialgym-assets",
+    "count": 4
+   },
+   "table": {
+    "fixed": true
+   },
+   "floor": {
+    "fixed": true
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "fixed": {
+     "table": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    }
+   }
+  },
+  "generation": {
+   "instances_per_template": 2,
+   "grid": [
+    2,
+    2
+   ],
+   "patterns": {
+    "test_rbbr": [
+     "red",
+     "blue",
+     "blue",
+     "red"
+    ]
+   },
+   "block_gap": 0.001,
+   "scatter_min_gap": 0.03,
+   "tolerances": {
+    "position": 0.01,
+    "orientation": 0.15
+   }
+  },
+  "_isg": {
+   "subtask": "configuration_matching-block_design",
+   "alias": "configuration_matching-block_design-block_4-breakfast_table",
+   "pick": "configuration_matching-block_design#01",
+   "slot": "representative",
+   "iddl": "configuration_matching/block_design.iddl",
+   "require": [],
+   "scene": "house_single_floor",
+   "note": []
+  }
+ }
+}

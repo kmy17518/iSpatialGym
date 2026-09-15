@@ -1,0 +1,4159 @@
+[
+ {
+  "id": "alignment-axial-paperback_book-breakfast_table__representative__target-jhaltj",
+  "alias": "alignment-axial-paperback_book-breakfast_table",
+  "subtask": "alignment-axial",
+  "pick": "alignment-axial#01",
+  "slot": "representative",
+  "v1_key": "world_alignment-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "paperback_book",
+    "model": "jhaltj",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-axial-magazine-breakfast_table__representative__target-tfovwy",
+  "alias": "alignment-axial-magazine-breakfast_table",
+  "subtask": "alignment-axial",
+  "pick": "alignment-axial#02",
+  "slot": "representative",
+  "v1_key": "world_alignment-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "magazine",
+    "model": "tfovwy",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-axial-board_game-breakfast_table__representative__target-qgvsnb",
+  "alias": "alignment-axial-board_game-breakfast_table",
+  "subtask": "alignment-axial",
+  "pick": "alignment-axial#03",
+  "slot": "representative",
+  "v1_key": "world_alignment-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "board_game",
+    "model": "qgvsnb",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-axial-gym_shoe-breakfast_table__representative__target-kmcbym",
+  "alias": "alignment-axial-gym_shoe-breakfast_table",
+  "subtask": "alignment-axial",
+  "pick": "alignment-axial#04",
+  "slot": "representative",
+  "v1_key": "world_alignment-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "gym_shoe",
+    "model": "kmcbym",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-axial-hardback-breakfast_table__representative__target-acbrnv",
+  "alias": "alignment-axial-hardback-breakfast_table",
+  "subtask": "alignment-axial",
+  "pick": "alignment-axial#05",
+  "slot": "representative",
+  "v1_key": "world_alignment-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "hardback",
+    "model": "acbrnv",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-axial-letter-breakfast_table__representative__target-oheufk",
+  "alias": "alignment-axial-letter-breakfast_table",
+  "subtask": "alignment-axial",
+  "pick": "alignment-axial#06",
+  "slot": "representative",
+  "v1_key": "world_alignment-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "letter",
+    "model": "oheufk",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-axial-bag_of_chips-breakfast_table__representative__target-dwkdko",
+  "alias": "alignment-axial-bag_of_chips-breakfast_table",
+  "subtask": "alignment-axial",
+  "pick": "alignment-axial#07",
+  "slot": "representative",
+  "v1_key": "world_alignment-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bag_of_chips",
+    "model": "dwkdko",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-axial-frying_pan-breakfast_table__representative__target-jpzusm",
+  "alias": "alignment-axial-frying_pan-breakfast_table",
+  "subtask": "alignment-axial",
+  "pick": "alignment-axial#08",
+  "slot": "representative",
+  "v1_key": "world_alignment-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "frying_pan",
+    "model": "jpzusm",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-axial-keyboard-breakfast_table__representative__target-injrgc",
+  "alias": "alignment-axial-keyboard-breakfast_table",
+  "subtask": "alignment-axial",
+  "pick": "alignment-axial#09",
+  "slot": "representative",
+  "v1_key": "world_alignment-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "keyboard",
+    "model": "injrgc",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-axial-catalog-breakfast_table__representative__target-aygcnt",
+  "alias": "alignment-axial-catalog-breakfast_table",
+  "subtask": "alignment-axial",
+  "pick": "alignment-axial#10",
+  "slot": "representative",
+  "v1_key": "world_alignment-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "catalog",
+    "model": "aygcnt",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_horizontal-towel_rack-walls__representative__target-kqrmrh",
+  "alias": "alignment-world_horizontal-towel_rack-walls",
+  "subtask": "alignment-world_horizontal",
+  "pick": "alignment-world_horizontal#01",
+  "slot": "representative",
+  "v1_key": "world_alignment-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "towel_rack",
+    "model": "kqrmrh",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_horizontal-radiator-walls__representative__target-arfdpk",
+  "alias": "alignment-world_horizontal-radiator-walls",
+  "subtask": "alignment-world_horizontal",
+  "pick": "alignment-world_horizontal#02",
+  "slot": "representative",
+  "v1_key": "world_alignment-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "radiator",
+    "model": "arfdpk",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_horizontal-shelf-walls__representative__target-xogqqm",
+  "alias": "alignment-world_horizontal-shelf-walls",
+  "subtask": "alignment-world_horizontal",
+  "pick": "alignment-world_horizontal#03",
+  "slot": "representative",
+  "v1_key": "world_alignment-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "shelf",
+    "model": "xogqqm",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_horizontal-umbrella-walls__representative__target-frpfnc",
+  "alias": "alignment-world_horizontal-umbrella-walls",
+  "subtask": "alignment-world_horizontal",
+  "pick": "alignment-world_horizontal#04",
+  "slot": "representative",
+  "v1_key": "world_alignment-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "umbrella",
+    "model": "frpfnc",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_horizontal-wall_mounted_tv-walls__representative__target-ggfznh",
+  "alias": "alignment-world_horizontal-wall_mounted_tv-walls",
+  "subtask": "alignment-world_horizontal",
+  "pick": "alignment-world_horizontal#05",
+  "slot": "representative",
+  "v1_key": "world_alignment-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "wall_mounted_tv",
+    "model": "ggfznh",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_horizontal-picture-walls__representative__target-qavxsz",
+  "alias": "alignment-world_horizontal-picture-walls",
+  "subtask": "alignment-world_horizontal",
+  "pick": "alignment-world_horizontal#06",
+  "slot": "representative",
+  "v1_key": "world_alignment-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "picture",
+    "model": "qavxsz",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_horizontal-decorative_sign-walls__representative__target-rypeha",
+  "alias": "alignment-world_horizontal-decorative_sign-walls",
+  "subtask": "alignment-world_horizontal",
+  "pick": "alignment-world_horizontal#07",
+  "slot": "representative",
+  "v1_key": "world_alignment-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "decorative_sign",
+    "model": "rypeha",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_horizontal-hanger-walls__representative__target-nadesv",
+  "alias": "alignment-world_horizontal-hanger-walls",
+  "subtask": "alignment-world_horizontal",
+  "pick": "alignment-world_horizontal#08",
+  "slot": "representative",
+  "v1_key": "world_alignment-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "hanger",
+    "model": "nadesv",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_horizontal-signpost-walls__representative__target-ivvjfv",
+  "alias": "alignment-world_horizontal-signpost-walls",
+  "subtask": "alignment-world_horizontal",
+  "pick": "alignment-world_horizontal#09",
+  "slot": "representative",
+  "v1_key": "world_alignment-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "signpost",
+    "model": "ivvjfv",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_horizontal-license_plate-walls__representative__target-nwfbxn",
+  "alias": "alignment-world_horizontal-license_plate-walls",
+  "subtask": "alignment-world_horizontal",
+  "pick": "alignment-world_horizontal#10",
+  "slot": "representative",
+  "v1_key": "world_alignment-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "license_plate",
+    "model": "nwfbxn",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_vertical-picture-walls__representative__target-jmvdxm",
+  "alias": "alignment-world_vertical-picture-walls",
+  "subtask": "alignment-world_vertical",
+  "pick": "alignment-world_vertical#01",
+  "slot": "representative",
+  "v1_key": "world_alignment-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "picture",
+    "model": "jmvdxm",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_vertical-painting-walls__representative__target-dacihj",
+  "alias": "alignment-world_vertical-painting-walls",
+  "subtask": "alignment-world_vertical",
+  "pick": "alignment-world_vertical#02",
+  "slot": "representative",
+  "v1_key": "world_alignment-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "painting",
+    "model": "dacihj",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_vertical-hanger-walls__representative__target-agrpio",
+  "alias": "alignment-world_vertical-hanger-walls",
+  "subtask": "alignment-world_vertical",
+  "pick": "alignment-world_vertical#03",
+  "slot": "representative",
+  "v1_key": "world_alignment-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "hanger",
+    "model": "agrpio",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_vertical-signpost-walls__representative__target-vvjtkv",
+  "alias": "alignment-world_vertical-signpost-walls",
+  "subtask": "alignment-world_vertical",
+  "pick": "alignment-world_vertical#04",
+  "slot": "representative",
+  "v1_key": "world_alignment-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "signpost",
+    "model": "vvjtkv",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_vertical-license_plate-walls__representative__target-hjdaqn",
+  "alias": "alignment-world_vertical-license_plate-walls",
+  "subtask": "alignment-world_vertical",
+  "pick": "alignment-world_vertical#05",
+  "slot": "representative",
+  "v1_key": "world_alignment-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "license_plate",
+    "model": "hjdaqn",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_vertical-wall_clock-walls__representative__target-zpctvp",
+  "alias": "alignment-world_vertical-wall_clock-walls",
+  "subtask": "alignment-world_vertical",
+  "pick": "alignment-world_vertical#06",
+  "slot": "representative",
+  "v1_key": "world_alignment-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "wall_clock",
+    "model": "zpctvp",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_vertical-fire_extinguisher-walls__representative__target-bejaeu",
+  "alias": "alignment-world_vertical-fire_extinguisher-walls",
+  "subtask": "alignment-world_vertical",
+  "pick": "alignment-world_vertical#07",
+  "slot": "representative",
+  "v1_key": "world_alignment-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "fire_extinguisher",
+    "model": "bejaeu",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_vertical-picture_frame-walls__representative__target-guatvs",
+  "alias": "alignment-world_vertical-picture_frame-walls",
+  "subtask": "alignment-world_vertical",
+  "pick": "alignment-world_vertical#08",
+  "slot": "representative",
+  "v1_key": "world_alignment-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "picture_frame",
+    "model": "guatvs",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_vertical-paper_towel_dispenser-walls__representative__target-jacqxv",
+  "alias": "alignment-world_vertical-paper_towel_dispenser-walls",
+  "subtask": "alignment-world_vertical",
+  "pick": "alignment-world_vertical#09",
+  "slot": "representative",
+  "v1_key": "world_alignment-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "paper_towel_dispenser",
+    "model": "jacqxv",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "alignment-world_vertical-guitar-walls__representative__target-cybisc",
+  "alias": "alignment-world_vertical-guitar-walls",
+  "subtask": "alignment-world_vertical",
+  "pick": "alignment-world_vertical#10",
+  "slot": "representative",
+  "v1_key": "world_alignment-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "guitar",
+    "model": "cybisc",
+    "name": ""
+   },
+   "support": {
+    "category": "walls",
+    "model": "walls_dhsptd_0",
+    "name": "living_room_0/walls_dhsptd_0/r00"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-obstructed-hamper_1__representative__obstacles-clziqw",
+  "alias": "camera_relocalization-obstructed-hamper_1",
+  "subtask": "camera_relocalization-obstructed",
+  "pick": "camera_relocalization-obstructed#01",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "obstacles": {
+    "category": "hamper",
+    "model": "clziqw",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-obstructed-pot_plant_1__representative__obstacles-imhfnc",
+  "alias": "camera_relocalization-obstructed-pot_plant_1",
+  "subtask": "camera_relocalization-obstructed",
+  "pick": "camera_relocalization-obstructed#02",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "obstacles": {
+    "category": "pot_plant",
+    "model": "imhfnc",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-obstructed-public_trash_can_1__representative__obstacles-duugbb",
+  "alias": "camera_relocalization-obstructed-public_trash_can_1",
+  "subtask": "camera_relocalization-obstructed",
+  "pick": "camera_relocalization-obstructed#03",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "obstacles": {
+    "category": "public_trash_can",
+    "model": "duugbb",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-obstructed-straight_chair_1__representative__obstacles-amgwaw",
+  "alias": "camera_relocalization-obstructed-straight_chair_1",
+  "subtask": "camera_relocalization-obstructed",
+  "pick": "camera_relocalization-obstructed#04",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "obstacles": {
+    "category": "straight_chair",
+    "model": "amgwaw",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-obstructed-swivel_chair_1__representative__obstacles-jhipgz",
+  "alias": "camera_relocalization-obstructed-swivel_chair_1",
+  "subtask": "camera_relocalization-obstructed",
+  "pick": "camera_relocalization-obstructed#05",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "obstacles": {
+    "category": "swivel_chair",
+    "model": "jhipgz",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-obstructed-trash_can_1__representative__obstacles-cdzyew",
+  "alias": "camera_relocalization-obstructed-trash_can_1",
+  "subtask": "camera_relocalization-obstructed",
+  "pick": "camera_relocalization-obstructed#06",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "obstacles": {
+    "category": "trash_can",
+    "model": "cdzyew",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-obstructed-taboret_1__representative__obstacles-hugvml",
+  "alias": "camera_relocalization-obstructed-taboret_1",
+  "subtask": "camera_relocalization-obstructed",
+  "pick": "camera_relocalization-obstructed#07",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "obstacles": {
+    "category": "taboret",
+    "model": "hugvml",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-obstructed-wicker_basket_1__representative__obstacles-drxfmr",
+  "alias": "camera_relocalization-obstructed-wicker_basket_1",
+  "subtask": "camera_relocalization-obstructed",
+  "pick": "camera_relocalization-obstructed#08",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "obstacles": {
+    "category": "wicker_basket",
+    "model": "drxfmr",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-obstructed-carton_1__representative__obstacles-cdmmwy",
+  "alias": "camera_relocalization-obstructed-carton_1",
+  "subtask": "camera_relocalization-obstructed",
+  "pick": "camera_relocalization-obstructed#09",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "obstacles": {
+    "category": "carton",
+    "model": "cdmmwy",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-obstructed-ottoman_1__representative__obstacles-miftfy",
+  "alias": "camera_relocalization-obstructed-ottoman_1",
+  "subtask": "camera_relocalization-obstructed",
+  "pick": "camera_relocalization-obstructed#10",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "obstacles": {
+    "category": "ottoman",
+    "model": "miftfy",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-obstructed-teddy_bear_1__representative__obstacles-faxvha",
+  "alias": "camera_relocalization-obstructed-teddy_bear_1",
+  "subtask": "camera_relocalization-obstructed",
+  "pick": "camera_relocalization-obstructed#11",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "obstacles": {
+    "category": "teddy_bear",
+    "model": "faxvha",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-obstructed-poinsettia_1__representative__obstacles-qdcipo",
+  "alias": "camera_relocalization-obstructed-poinsettia_1",
+  "subtask": "camera_relocalization-obstructed",
+  "pick": "camera_relocalization-obstructed#12",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "obstacles": {
+    "category": "poinsettia",
+    "model": "qdcipo",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-obstructed-toy_car_1__representative__obstacles-ksijjl",
+  "alias": "camera_relocalization-obstructed-toy_car_1",
+  "subtask": "camera_relocalization-obstructed",
+  "pick": "camera_relocalization-obstructed#13",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "obstacles": {
+    "category": "toy_car",
+    "model": "ksijjl",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-obstructed-vacuum_1__representative__obstacles-wikhik",
+  "alias": "camera_relocalization-obstructed-vacuum_1",
+  "subtask": "camera_relocalization-obstructed",
+  "pick": "camera_relocalization-obstructed#14",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "obstacles": {
+    "category": "vacuum",
+    "model": "wikhik",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-obstructed-footstool_1__representative__obstacles-mysfnz",
+  "alias": "camera_relocalization-obstructed-footstool_1",
+  "subtask": "camera_relocalization-obstructed",
+  "pick": "camera_relocalization-obstructed#15",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "obstacles": {
+    "category": "footstool",
+    "model": "mysfnz",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-obstructed-music_stool_1__representative__obstacles-dqvlff",
+  "alias": "camera_relocalization-obstructed-music_stool_1",
+  "subtask": "camera_relocalization-obstructed",
+  "pick": "camera_relocalization-obstructed#16",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "obstacles": {
+    "category": "music_stool",
+    "model": "dqvlff",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-obstructed-serving_cart_1__representative__obstacles-heqtlk",
+  "alias": "camera_relocalization-obstructed-serving_cart_1",
+  "subtask": "camera_relocalization-obstructed",
+  "pick": "camera_relocalization-obstructed#17",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "obstacles": {
+    "category": "serving_cart",
+    "model": "heqtlk",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-articulation_close_large_scale-door__representative__target-crtrpa",
+  "alias": "configuration_matching-articulation_close_large_scale-door",
+  "subtask": "configuration_matching-articulation_close_large_scale",
+  "pick": "configuration_matching-articulation_close_large_scale#01",
+  "slot": "representative",
+  "v1_key": "configuration_matching-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "door",
+    "model": "crtrpa",
+    "name": "door_crtrpa_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-articulation_close_large_scale-bottom_cabinet__representative__target-fancyy",
+  "alias": "configuration_matching-articulation_close_large_scale-bottom_cabinet",
+  "subtask": "configuration_matching-articulation_close_large_scale",
+  "pick": "configuration_matching-articulation_close_large_scale#02",
+  "slot": "representative",
+  "v1_key": "configuration_matching-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottom_cabinet",
+    "model": "fancyy",
+    "name": "bottom_cabinet_fancyy_0"
+   }
+  },
+  "note": [
+   "handle from the B4 heuristic (no canonical annotation)"
+  ]
+ },
+ {
+  "id": "configuration_matching-articulation_close_large_scale-bottom_cabinet_no_top__representative__target-gjrero",
+  "alias": "configuration_matching-articulation_close_large_scale-bottom_cabinet_no_top",
+  "subtask": "configuration_matching-articulation_close_large_scale",
+  "pick": "configuration_matching-articulation_close_large_scale#03",
+  "slot": "representative",
+  "v1_key": "configuration_matching-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottom_cabinet_no_top",
+    "model": "gjrero",
+    "name": "bottom_cabinet_no_top_gjrero_4"
+   }
+  },
+  "note": [
+   "handle from the B4 heuristic (no canonical annotation)"
+  ]
+ },
+ {
+  "id": "configuration_matching-articulation_close_large_scale-fridge__representative__target-dszchb",
+  "alias": "configuration_matching-articulation_close_large_scale-fridge",
+  "subtask": "configuration_matching-articulation_close_large_scale",
+  "pick": "configuration_matching-articulation_close_large_scale#04",
+  "slot": "representative",
+  "v1_key": "configuration_matching-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "fridge",
+    "model": "dszchb",
+    "name": "fridge_dszchb_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-articulation_close_large_scale-oven__representative__target-amblrk",
+  "alias": "configuration_matching-articulation_close_large_scale-oven",
+  "subtask": "configuration_matching-articulation_close_large_scale",
+  "pick": "configuration_matching-articulation_close_large_scale#05",
+  "slot": "representative",
+  "v1_key": "configuration_matching-2",
+  "scene": "restaurant_diner",
+  "roles": {
+   "target": {
+    "category": "oven",
+    "model": "amblrk",
+    "name": "oven_amblrk_0"
+   }
+  },
+  "note": [
+   "handle from the B4 heuristic (no canonical annotation)"
+  ]
+ },
+ {
+  "id": "configuration_matching-articulation_close_large_scale-dishwasher__representative__target-ynrhuk",
+  "alias": "configuration_matching-articulation_close_large_scale-dishwasher",
+  "subtask": "configuration_matching-articulation_close_large_scale",
+  "pick": "configuration_matching-articulation_close_large_scale#06",
+  "slot": "representative",
+  "v1_key": "configuration_matching-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "dishwasher",
+    "model": "ynrhuk",
+    "name": "dishwasher_ynrhuk_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-articulation_close_small_scale-blender-breakfast_table__representative__target-cwkvib",
+  "alias": "configuration_matching-articulation_close_small_scale-blender-breakfast_table",
+  "subtask": "configuration_matching-articulation_close_small_scale",
+  "pick": "configuration_matching-articulation_close_small_scale#01",
+  "slot": "representative",
+  "v1_key": "configuration_matching-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "blender",
+    "model": "cwkvib",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-articulation_close_small_scale-hinged_jar-breakfast_table__representative__target-gqtsam",
+  "alias": "configuration_matching-articulation_close_small_scale-hinged_jar-breakfast_table",
+  "subtask": "configuration_matching-articulation_close_small_scale",
+  "pick": "configuration_matching-articulation_close_small_scale#02",
+  "slot": "representative",
+  "v1_key": "configuration_matching-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "hinged_jar",
+    "model": "gqtsam",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-articulation_close_small_scale-laptop-breakfast_table__representative__target-nvulcs",
+  "alias": "configuration_matching-articulation_close_small_scale-laptop-breakfast_table",
+  "subtask": "configuration_matching-articulation_close_small_scale",
+  "pick": "configuration_matching-articulation_close_small_scale#03",
+  "slot": "representative",
+  "v1_key": "configuration_matching-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "laptop",
+    "model": "nvulcs",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-articulation_close_small_scale-toolbox-breakfast_table__representative__target-redmtl",
+  "alias": "configuration_matching-articulation_close_small_scale-toolbox-breakfast_table",
+  "subtask": "configuration_matching-articulation_close_small_scale",
+  "pick": "configuration_matching-articulation_close_small_scale#04",
+  "slot": "representative",
+  "v1_key": "configuration_matching-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "toolbox",
+    "model": "redmtl",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-articulation_close_small_scale-carton-breakfast_table__representative__target-causya",
+  "alias": "configuration_matching-articulation_close_small_scale-carton-breakfast_table",
+  "subtask": "configuration_matching-articulation_close_small_scale",
+  "pick": "configuration_matching-articulation_close_small_scale#05",
+  "slot": "representative",
+  "v1_key": "configuration_matching-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "carton",
+    "model": "causya",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-articulation_open_large_scale-door__representative__target-crtrpa",
+  "alias": "configuration_matching-articulation_open_large_scale-door",
+  "subtask": "configuration_matching-articulation_open_large_scale",
+  "pick": "configuration_matching-articulation_open_large_scale#01",
+  "slot": "representative",
+  "v1_key": "configuration_matching-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "door",
+    "model": "crtrpa",
+    "name": "door_crtrpa_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-articulation_open_large_scale-bottom_cabinet__representative__target-fancyy",
+  "alias": "configuration_matching-articulation_open_large_scale-bottom_cabinet",
+  "subtask": "configuration_matching-articulation_open_large_scale",
+  "pick": "configuration_matching-articulation_open_large_scale#02",
+  "slot": "representative",
+  "v1_key": "configuration_matching-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottom_cabinet",
+    "model": "fancyy",
+    "name": "bottom_cabinet_fancyy_0"
+   }
+  },
+  "note": [
+   "handle from the B4 heuristic (no canonical annotation)"
+  ]
+ },
+ {
+  "id": "configuration_matching-articulation_open_large_scale-bottom_cabinet_no_top__representative__target-gjrero",
+  "alias": "configuration_matching-articulation_open_large_scale-bottom_cabinet_no_top",
+  "subtask": "configuration_matching-articulation_open_large_scale",
+  "pick": "configuration_matching-articulation_open_large_scale#03",
+  "slot": "representative",
+  "v1_key": "configuration_matching-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottom_cabinet_no_top",
+    "model": "gjrero",
+    "name": "bottom_cabinet_no_top_gjrero_4"
+   }
+  },
+  "note": [
+   "handle from the B4 heuristic (no canonical annotation)"
+  ]
+ },
+ {
+  "id": "configuration_matching-articulation_open_large_scale-fridge__representative__target-dszchb",
+  "alias": "configuration_matching-articulation_open_large_scale-fridge",
+  "subtask": "configuration_matching-articulation_open_large_scale",
+  "pick": "configuration_matching-articulation_open_large_scale#04",
+  "slot": "representative",
+  "v1_key": "configuration_matching-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "fridge",
+    "model": "dszchb",
+    "name": "fridge_dszchb_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-articulation_open_large_scale-oven__representative__target-amblrk",
+  "alias": "configuration_matching-articulation_open_large_scale-oven",
+  "subtask": "configuration_matching-articulation_open_large_scale",
+  "pick": "configuration_matching-articulation_open_large_scale#05",
+  "slot": "representative",
+  "v1_key": "configuration_matching-1",
+  "scene": "restaurant_diner",
+  "roles": {
+   "target": {
+    "category": "oven",
+    "model": "amblrk",
+    "name": "oven_amblrk_0"
+   }
+  },
+  "note": [
+   "handle from the B4 heuristic (no canonical annotation)"
+  ]
+ },
+ {
+  "id": "configuration_matching-articulation_open_large_scale-dishwasher__representative__target-ynrhuk",
+  "alias": "configuration_matching-articulation_open_large_scale-dishwasher",
+  "subtask": "configuration_matching-articulation_open_large_scale",
+  "pick": "configuration_matching-articulation_open_large_scale#06",
+  "slot": "representative",
+  "v1_key": "configuration_matching-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "dishwasher",
+    "model": "ynrhuk",
+    "name": "dishwasher_ynrhuk_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-articulation_open_small_scale-blender-breakfast_table__representative__target-cwkvib",
+  "alias": "configuration_matching-articulation_open_small_scale-blender-breakfast_table",
+  "subtask": "configuration_matching-articulation_open_small_scale",
+  "pick": "configuration_matching-articulation_open_small_scale#01",
+  "slot": "representative",
+  "v1_key": "configuration_matching-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "blender",
+    "model": "cwkvib",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-articulation_open_small_scale-hinged_jar-breakfast_table__representative__target-gqtsam",
+  "alias": "configuration_matching-articulation_open_small_scale-hinged_jar-breakfast_table",
+  "subtask": "configuration_matching-articulation_open_small_scale",
+  "pick": "configuration_matching-articulation_open_small_scale#02",
+  "slot": "representative",
+  "v1_key": "configuration_matching-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "hinged_jar",
+    "model": "gqtsam",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-articulation_open_small_scale-laptop-breakfast_table__representative__target-nvulcs",
+  "alias": "configuration_matching-articulation_open_small_scale-laptop-breakfast_table",
+  "subtask": "configuration_matching-articulation_open_small_scale",
+  "pick": "configuration_matching-articulation_open_small_scale#03",
+  "slot": "representative",
+  "v1_key": "configuration_matching-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "laptop",
+    "model": "nvulcs",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-articulation_open_small_scale-toolbox-breakfast_table__representative__target-redmtl",
+  "alias": "configuration_matching-articulation_open_small_scale-toolbox-breakfast_table",
+  "subtask": "configuration_matching-articulation_open_small_scale",
+  "pick": "configuration_matching-articulation_open_small_scale#04",
+  "slot": "representative",
+  "v1_key": "configuration_matching-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "toolbox",
+    "model": "redmtl",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-articulation_open_small_scale-carton-breakfast_table__representative__target-causya",
+  "alias": "configuration_matching-articulation_open_small_scale-carton-breakfast_table",
+  "subtask": "configuration_matching-articulation_open_small_scale",
+  "pick": "configuration_matching-articulation_open_small_scale#05",
+  "slot": "representative",
+  "v1_key": "configuration_matching-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "carton",
+    "model": "causya",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-attachment-dip_candle-candle_holder-breakfast_table__representative__target-poexjo__partner-wiufnv",
+  "alias": "configuration_matching-attachment-dip_candle-candle_holder-breakfast_table",
+  "subtask": "configuration_matching-attachment",
+  "pick": "configuration_matching-attachment#01",
+  "slot": "representative",
+  "v1_key": "configuration_matching-3",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "dip_candle",
+    "model": "poexjo",
+    "name": ""
+   },
+   "partner": {
+    "category": "candle_holder",
+    "model": "wiufnv",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-attachment-cork-vinegar_bottle-breakfast_table__representative__target-ncxgpe__partner-hbsbwt",
+  "alias": "configuration_matching-attachment-cork-vinegar_bottle-breakfast_table",
+  "subtask": "configuration_matching-attachment",
+  "pick": "configuration_matching-attachment#02",
+  "slot": "representative",
+  "v1_key": "configuration_matching-3",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "cork",
+    "model": "ncxgpe",
+    "name": ""
+   },
+   "partner": {
+    "category": "vinegar_bottle",
+    "model": "hbsbwt",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-attachment-light_bulb-table_lamp-breakfast_table__representative__target-kfmkwd__partner-ehjsdz",
+  "alias": "configuration_matching-attachment-light_bulb-table_lamp-breakfast_table",
+  "subtask": "configuration_matching-attachment",
+  "pick": "configuration_matching-attachment#03",
+  "slot": "representative",
+  "v1_key": "configuration_matching-3",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "light_bulb",
+    "model": "kfmkwd",
+    "name": ""
+   },
+   "partner": {
+    "category": "table_lamp",
+    "model": "ehjsdz",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-attachment-skateboard_wheel_assembly-skateboard_deck-breakfast_table__representative__target-jljqtt__partner-tgfidu",
+  "alias": "configuration_matching-attachment-skateboard_wheel_assembly-skateboard_deck-breakfast_table",
+  "subtask": "configuration_matching-attachment",
+  "pick": "configuration_matching-attachment#04",
+  "slot": "representative",
+  "v1_key": "configuration_matching-3",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "skateboard_wheel_assembly",
+    "model": "jljqtt",
+    "name": ""
+   },
+   "partner": {
+    "category": "skateboard_deck",
+    "model": "tgfidu",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-attachment-lid-teapot-breakfast_table__representative__target-tnwisp__partner-mvrhya",
+  "alias": "configuration_matching-attachment-lid-teapot-breakfast_table",
+  "subtask": "configuration_matching-attachment",
+  "pick": "configuration_matching-attachment#05",
+  "slot": "representative",
+  "v1_key": "configuration_matching-3",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "lid",
+    "model": "tnwisp",
+    "name": ""
+   },
+   "partner": {
+    "category": "teapot",
+    "model": "mvrhya",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table__representative__target-xxqyrt__partner-yprkek",
+  "alias": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table",
+  "subtask": "configuration_matching-attachment",
+  "pick": "configuration_matching-attachment#06",
+  "slot": "representative",
+  "v1_key": "configuration_matching-3",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "cap",
+    "model": "xxqyrt",
+    "name": ""
+   },
+   "partner": {
+    "category": "lemonade_bottle",
+    "model": "yprkek",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "configuration_matching-block_design-block_4-breakfast_table__representative__targets-isgblk",
+  "alias": "configuration_matching-block_design-block_4-breakfast_table",
+  "subtask": "configuration_matching-block_design",
+  "pick": "configuration_matching-block_design#01",
+  "slot": "representative",
+  "v1_key": "configuration_matching-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "targets": {
+    "category": "toy_dice",
+    "model": "isgblk",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-box_of_shampoo-distractors-breakfast_table__representative__target-bclpiq",
+  "alias": "disembedding-box_of_shampoo-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#01",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "box_of_shampoo",
+    "model": "bclpiq",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-box_of_cereal-distractors-breakfast_table__representative__target-iucshm",
+  "alias": "disembedding-box_of_cereal-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#02",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "box_of_cereal",
+    "model": "iucshm",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-box_of_cookies-distractors-breakfast_table__representative__target-apjokz",
+  "alias": "disembedding-box_of_cookies-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#03",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "box_of_cookies",
+    "model": "apjokz",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-box_of_sanitary_napkins-distractors-breakfast_table__representative__target-tkrzkb",
+  "alias": "disembedding-box_of_sanitary_napkins-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#04",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "box_of_sanitary_napkins",
+    "model": "tkrzkb",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-video_game-distractors-breakfast_table__representative__target-ceaxsd",
+  "alias": "disembedding-video_game-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#05",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "video_game",
+    "model": "ceaxsd",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-bottle_of_shampoo-distractors-breakfast_table__representative__target-stjjjm",
+  "alias": "disembedding-bottle_of_shampoo-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#06",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottle_of_shampoo",
+    "model": "stjjjm",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-bottle_of_milk-distractors-breakfast_table__representative__target-mrejrs",
+  "alias": "disembedding-bottle_of_milk-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#07",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottle_of_milk",
+    "model": "mrejrs",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-notebook-distractors-breakfast_table__representative__target-umxsmd",
+  "alias": "disembedding-notebook-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#08",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "notebook",
+    "model": "umxsmd",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-soap_dispenser-distractors-breakfast_table__representative__target-zwudcz",
+  "alias": "disembedding-soap_dispenser-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#09",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "soap_dispenser",
+    "model": "zwudcz",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-beaker-distractors-breakfast_table__representative__target-jdijek",
+  "alias": "disembedding-beaker-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#10",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "beaker",
+    "model": "jdijek",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-bottle_of_beer-distractors-breakfast_table__representative__target-meqliv",
+  "alias": "disembedding-bottle_of_beer-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#11",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottle_of_beer",
+    "model": "meqliv",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-box_of_cane_sugar-distractors-breakfast_table__representative__target-gpbobo",
+  "alias": "disembedding-box_of_cane_sugar-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#12",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "box_of_cane_sugar",
+    "model": "gpbobo",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-carton_of_milk-distractors-breakfast_table__representative__target-kszoro",
+  "alias": "disembedding-carton_of_milk-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#13",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "carton_of_milk",
+    "model": "kszoro",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-chili-distractors-breakfast_table__representative__target-agecro",
+  "alias": "disembedding-chili-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#14",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "chili",
+    "model": "agecro",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-pack_of_cigarettes-distractors-breakfast_table__representative__target-ghbqav",
+  "alias": "disembedding-pack_of_cigarettes-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#15",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "pack_of_cigarettes",
+    "model": "ghbqav",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-teaspoon-distractors-breakfast_table__representative__target-qdepdj",
+  "alias": "disembedding-teaspoon-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#16",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "teaspoon",
+    "model": "qdepdj",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-box_of_rice-distractors-breakfast_table__representative__target-pstqvm",
+  "alias": "disembedding-box_of_rice-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#17",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "box_of_rice",
+    "model": "pstqvm",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-cellulose_tape-distractors-breakfast_table__representative__target-kavsnx",
+  "alias": "disembedding-cellulose_tape-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#18",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "cellulose_tape",
+    "model": "kavsnx",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-conditioner_dispenser-distractors-breakfast_table__representative__target-njqnuo",
+  "alias": "disembedding-conditioner_dispenser-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#19",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "conditioner_dispenser",
+    "model": "njqnuo",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-pencil_case-distractors-breakfast_table__representative__target-otcmih",
+  "alias": "disembedding-pencil_case-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#20",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "pencil_case",
+    "model": "otcmih",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-box_of_baking_mix-distractors-breakfast_table__representative__target-fmewsz",
+  "alias": "disembedding-box_of_baking_mix-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#21",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "box_of_baking_mix",
+    "model": "fmewsz",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-bottle_of_medicine-distractors-breakfast_table__representative__target-syfpak",
+  "alias": "disembedding-bottle_of_medicine-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#22",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottle_of_medicine",
+    "model": "syfpak",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-bottle_of_wine-distractors-breakfast_table__representative__target-lacaoa",
+  "alias": "disembedding-bottle_of_wine-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#23",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottle_of_wine",
+    "model": "lacaoa",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-can_of_soda-distractors-breakfast_table__representative__target-bfrzvk",
+  "alias": "disembedding-can_of_soda-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#24",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "can_of_soda",
+    "model": "bfrzvk",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-mug-distractors-breakfast_table__representative__target-ycbmug",
+  "alias": "disembedding-mug-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#25",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "mug",
+    "model": "ycbmug",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-toy_dice-distractors-breakfast_table__representative__target-hbkqqp",
+  "alias": "disembedding-toy_dice-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#26",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "toy_dice",
+    "model": "hbkqqp",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-box_of_tissues-distractors-breakfast_table__representative__target-uglbjc",
+  "alias": "disembedding-box_of_tissues-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#27",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "box_of_tissues",
+    "model": "uglbjc",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-mouse-distractors-breakfast_table__representative__target-wwyopp",
+  "alias": "disembedding-mouse-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#28",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "mouse",
+    "model": "wwyopp",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-tablefork-distractors-breakfast_table__representative__target-pqrtkc",
+  "alias": "disembedding-tablefork-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#29",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "tablefork",
+    "model": "pqrtkc",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "disembedding-bar_soap-distractors-breakfast_table__representative__target-ofargb",
+  "alias": "disembedding-bar_soap-distractors-breakfast_table",
+  "subtask": "disembedding",
+  "pick": "disembedding#30",
+  "slot": "representative",
+  "v1_key": "disembedding-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bar_soap",
+    "model": "ofargb",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table__representative__target-mbkrxe__partner-belcml",
+  "alias": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-inside",
+  "pick": "inter_object_relation_satisfaction-inside#01",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "brussels_sprouts",
+    "model": "mbkrxe",
+    "name": ""
+   },
+   "partner": {
+    "category": "bowl",
+    "model": "belcml",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-breakfast_table__representative__target-vwegtt__partner-lvuvbf",
+  "alias": "inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-inside",
+  "pick": "inter_object_relation_satisfaction-inside#02",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "hard_candy",
+    "model": "vwegtt",
+    "name": ""
+   },
+   "partner": {
+    "category": "hingeless_jar",
+    "model": "lvuvbf",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-inside-quartz-saucepot-breakfast_table__representative__target-vfuilh__partner-tfzijn",
+  "alias": "inter_object_relation_satisfaction-inside-quartz-saucepot-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-inside",
+  "pick": "inter_object_relation_satisfaction-inside#03",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "quartz",
+    "model": "vfuilh",
+    "name": ""
+   },
+   "partner": {
+    "category": "saucepot",
+    "model": "tfzijn",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-inside-ice_cube-beer_glass-breakfast_table__representative__target-ujmgkb__partner-lymciz",
+  "alias": "inter_object_relation_satisfaction-inside-ice_cube-beer_glass-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-inside",
+  "pick": "inter_object_relation_satisfaction-inside#04",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "ice_cube",
+    "model": "ujmgkb",
+    "name": ""
+   },
+   "partner": {
+    "category": "beer_glass",
+    "model": "lymciz",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-inside-sunflower-vase-breakfast_table__representative__target-dkajbh__partner-rusmlm",
+  "alias": "inter_object_relation_satisfaction-inside-sunflower-vase-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-inside",
+  "pick": "inter_object_relation_satisfaction-inside#05",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-2",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "sunflower",
+    "model": "dkajbh",
+    "name": ""
+   },
+   "partner": {
+    "category": "vase",
+    "model": "rusmlm",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-nextto-pencil-ruler-breakfast_table__representative__target-hmawzy__partner-rutqab",
+  "alias": "inter_object_relation_satisfaction-nextto-pencil-ruler-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-nextto",
+  "pick": "inter_object_relation_satisfaction-nextto#01",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-3",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "pencil",
+    "model": "hmawzy",
+    "name": ""
+   },
+   "partner": {
+    "category": "ruler",
+    "model": "rutqab",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table__representative__target-xakoic__partner-acumgp",
+  "alias": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-nextto",
+  "pick": "inter_object_relation_satisfaction-nextto#02",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-3",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "marker",
+    "model": "xakoic",
+    "name": ""
+   },
+   "partner": {
+    "category": "colored_pencil",
+    "model": "acumgp",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table__representative__target-osqisk__partner-qhmmmx",
+  "alias": "inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-nextto",
+  "pick": "inter_object_relation_satisfaction-nextto#03",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-3",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "parsnip",
+    "model": "osqisk",
+    "name": ""
+   },
+   "partner": {
+    "category": "carrot",
+    "model": "qhmmmx",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-nextto-cinnamon_stick-star_anise-breakfast_table__representative__target-qxpzdm__partner-fwjuab",
+  "alias": "inter_object_relation_satisfaction-nextto-cinnamon_stick-star_anise-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-nextto",
+  "pick": "inter_object_relation_satisfaction-nextto#04",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-3",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "cinnamon_stick",
+    "model": "qxpzdm",
+    "name": ""
+   },
+   "partner": {
+    "category": "star_anise",
+    "model": "fwjuab",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-nextto-jar_of_spaghetti_sauce-canned_food-breakfast_table__representative__target-exmsmm__partner-acgdtc",
+  "alias": "inter_object_relation_satisfaction-nextto-jar_of_spaghetti_sauce-canned_food-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-nextto",
+  "pick": "inter_object_relation_satisfaction-nextto#05",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-3",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "jar_of_spaghetti_sauce",
+    "model": "exmsmm",
+    "name": ""
+   },
+   "partner": {
+    "category": "canned_food",
+    "model": "acgdtc",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-ontop_large_scale-pen-bed-desk__representative__target-gzrbrx__partner-rrcvaq",
+  "alias": "inter_object_relation_satisfaction-ontop_large_scale-pen-bed-desk",
+  "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+  "pick": "inter_object_relation_satisfaction-ontop_large_scale#01",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "pen",
+    "model": "gzrbrx",
+    "name": ""
+   },
+   "partner": {
+    "category": "bed",
+    "model": "rrcvaq",
+    "name": "bed_rrcvaq_0"
+   },
+   "support": {
+    "category": "desk",
+    "model": "",
+    "name": "desk_xhjsub_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-countertop__representative__target-zoyyia__partner-fjkase",
+  "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-countertop",
+  "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+  "pick": "inter_object_relation_satisfaction-ontop_large_scale#02",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "shampoo_dispenser",
+    "model": "zoyyia",
+    "name": ""
+   },
+   "partner": {
+    "category": "countertop",
+    "model": "fjkase",
+    "name": "countertop_fjkase_0"
+   },
+   "support": {
+    "category": "countertop",
+    "model": "",
+    "name": "countertop_ikwqer_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor__representative__target-gbzzcg__partner-xhjsub",
+  "alias": "inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor",
+  "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+  "pick": "inter_object_relation_satisfaction-ontop_large_scale#03",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "pencil",
+    "model": "gbzzcg",
+    "name": ""
+   },
+   "partner": {
+    "category": "desk",
+    "model": "xhjsub",
+    "name": "desk_xhjsub_0"
+   },
+   "support": {
+    "category": "floor",
+    "model": "",
+    "name": "floor"
+   }
+  },
+  "note": [
+   "init surface = floor requested; v1 uses a table of the task rooms / the partner top (under)"
+  ]
+ },
+ {
+  "id": "inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar__representative__target-bclpiq__partner-lugrhk",
+  "alias": "inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar",
+  "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+  "pick": "inter_object_relation_satisfaction-ontop_large_scale#04",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "box_of_shampoo",
+    "model": "bclpiq",
+    "name": ""
+   },
+   "partner": {
+    "category": "sofa",
+    "model": "lugrhk",
+    "name": "sofa_lugrhk_1"
+   },
+   "support": {
+    "category": "bar",
+    "model": "",
+    "name": "bar_udatjt_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-ontop_large_scale-beaker-bed-desk__representative__target-fyrkzs__partner-rrcvaq",
+  "alias": "inter_object_relation_satisfaction-ontop_large_scale-beaker-bed-desk",
+  "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+  "pick": "inter_object_relation_satisfaction-ontop_large_scale#05",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "beaker",
+    "model": "fyrkzs",
+    "name": ""
+   },
+   "partner": {
+    "category": "bed",
+    "model": "rrcvaq",
+    "name": "bed_rrcvaq_0"
+   },
+   "support": {
+    "category": "desk",
+    "model": "",
+    "name": "desk_xhjsub_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table__representative__target-dgodnn__partner-csanbr",
+  "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
+  "pick": "inter_object_relation_satisfaction-ontop_small_scale#01",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "pack_of_kielbasa",
+    "model": "dgodnn",
+    "name": ""
+   },
+   "partner": {
+    "category": "platter",
+    "model": "csanbr",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table__representative__target-zlxfxt__partner-kkjiko",
+  "alias": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
+  "pick": "inter_object_relation_satisfaction-ontop_small_scale#02",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "apple",
+    "model": "zlxfxt",
+    "name": ""
+   },
+   "partner": {
+    "category": "plate",
+    "model": "kkjiko",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-ontop_small_scale-coffee_cup-saucer-breakfast_table__representative__target-siksnl__partner-mgbeah",
+  "alias": "inter_object_relation_satisfaction-ontop_small_scale-coffee_cup-saucer-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
+  "pick": "inter_object_relation_satisfaction-ontop_small_scale#03",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "coffee_cup",
+    "model": "siksnl",
+    "name": ""
+   },
+   "partner": {
+    "category": "saucer",
+    "model": "mgbeah",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-ontop_small_scale-pickle-cutting_board-breakfast_table__representative__target-vuspsy__partner-tcdrzs",
+  "alias": "inter_object_relation_satisfaction-ontop_small_scale-pickle-cutting_board-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
+  "pick": "inter_object_relation_satisfaction-ontop_small_scale#04",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "pickle",
+    "model": "vuspsy",
+    "name": ""
+   },
+   "partner": {
+    "category": "cutting_board",
+    "model": "tcdrzs",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-ontop_small_scale-half_bagel-plate-breakfast_table__representative__target-gywbkh__partner-luhkiz",
+  "alias": "inter_object_relation_satisfaction-ontop_small_scale-half_bagel-plate-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
+  "pick": "inter_object_relation_satisfaction-ontop_small_scale#05",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "half_bagel",
+    "model": "gywbkh",
+    "name": ""
+   },
+   "partner": {
+    "category": "plate",
+    "model": "luhkiz",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table__representative__target-humkqw__partner-ntbrtz",
+  "alias": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-touching",
+  "pick": "inter_object_relation_satisfaction-touching#01",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-4",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "box_of_sanitary_napkins",
+    "model": "humkqw",
+    "name": ""
+   },
+   "partner": {
+    "category": "box_of_tissues",
+    "model": "ntbrtz",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-touching-teacup-teapot-breakfast_table__representative__target-cpozxi__partner-foaehs",
+  "alias": "inter_object_relation_satisfaction-touching-teacup-teapot-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-touching",
+  "pick": "inter_object_relation_satisfaction-touching#02",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-4",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "teacup",
+    "model": "cpozxi",
+    "name": ""
+   },
+   "partner": {
+    "category": "teapot",
+    "model": "foaehs",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-touching-carton_of_milk-box_of_cookies-breakfast_table__representative__target-xmugpm__partner-lwhbid",
+  "alias": "inter_object_relation_satisfaction-touching-carton_of_milk-box_of_cookies-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-touching",
+  "pick": "inter_object_relation_satisfaction-touching#03",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-4",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "carton_of_milk",
+    "model": "xmugpm",
+    "name": ""
+   },
+   "partner": {
+    "category": "box_of_cookies",
+    "model": "lwhbid",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-touching-bottle_of_medicine-first_aid_kit-breakfast_table__representative__target-kasbsy__partner-flctdz",
+  "alias": "inter_object_relation_satisfaction-touching-bottle_of_medicine-first_aid_kit-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-touching",
+  "pick": "inter_object_relation_satisfaction-touching#04",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-4",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottle_of_medicine",
+    "model": "kasbsy",
+    "name": ""
+   },
+   "partner": {
+    "category": "first_aid_kit",
+    "model": "flctdz",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk__representative__target-chgcrm__partner-rrcvaq",
+  "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk",
+  "subtask": "inter_object_relation_satisfaction-under_large_scale",
+  "pick": "inter_object_relation_satisfaction-under_large_scale#01",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "sandal",
+    "model": "chgcrm",
+    "name": ""
+   },
+   "partner": {
+    "category": "bed",
+    "model": "rrcvaq",
+    "name": "bed_rrcvaq_0"
+   },
+   "support": {
+    "category": "desk",
+    "model": "",
+    "name": "desk_xhjsub_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-under_large_scale-marker-desk-floor__representative__target-gldosk__partner-xhjsub",
+  "alias": "inter_object_relation_satisfaction-under_large_scale-marker-desk-floor",
+  "subtask": "inter_object_relation_satisfaction-under_large_scale",
+  "pick": "inter_object_relation_satisfaction-under_large_scale#02",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "marker",
+    "model": "gldosk",
+    "name": ""
+   },
+   "partner": {
+    "category": "desk",
+    "model": "xhjsub",
+    "name": "desk_xhjsub_0"
+   },
+   "support": {
+    "category": "floor",
+    "model": "",
+    "name": "floor"
+   }
+  },
+  "note": [
+   "init surface = floor requested; v1 uses a table of the task rooms / the partner top (under)"
+  ]
+ },
+ {
+  "id": "inter_object_relation_satisfaction-under_large_scale-pencil-sofa-desk__representative__target-lykqoh__partner-ukfaaz",
+  "alias": "inter_object_relation_satisfaction-under_large_scale-pencil-sofa-desk",
+  "subtask": "inter_object_relation_satisfaction-under_large_scale",
+  "pick": "inter_object_relation_satisfaction-under_large_scale#03",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-1",
+  "scene": "house_double_floor_upper",
+  "roles": {
+   "target": {
+    "category": "pencil",
+    "model": "lykqoh",
+    "name": ""
+   },
+   "partner": {
+    "category": "sofa",
+    "model": "ukfaaz",
+    "name": "sofa_ukfaaz_0"
+   },
+   "support": {
+    "category": "desk",
+    "model": "",
+    "name": "desk_aduafr_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-under_large_scale-briefcase-bed-desk__representative__target-lwbctq__partner-rrcvaq",
+  "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-bed-desk",
+  "subtask": "inter_object_relation_satisfaction-under_large_scale",
+  "pick": "inter_object_relation_satisfaction-under_large_scale#04",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "briefcase",
+    "model": "lwbctq",
+    "name": ""
+   },
+   "partner": {
+    "category": "bed",
+    "model": "rrcvaq",
+    "name": "bed_rrcvaq_0"
+   },
+   "support": {
+    "category": "desk",
+    "model": "",
+    "name": "desk_xhjsub_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-under_large_scale-apple-desk-floor__representative__target-omzprq__partner-xhjsub",
+  "alias": "inter_object_relation_satisfaction-under_large_scale-apple-desk-floor",
+  "subtask": "inter_object_relation_satisfaction-under_large_scale",
+  "pick": "inter_object_relation_satisfaction-under_large_scale#05",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "apple",
+    "model": "omzprq",
+    "name": ""
+   },
+   "partner": {
+    "category": "desk",
+    "model": "xhjsub",
+    "name": "desk_xhjsub_0"
+   },
+   "support": {
+    "category": "floor",
+    "model": "",
+    "name": "floor"
+   }
+  },
+  "note": [
+   "init surface = floor requested; v1 uses a table of the task rooms / the partner top (under)"
+  ]
+ },
+ {
+  "id": "inter_object_relation_satisfaction-under_small_scale-french_fries-platter-breakfast_table__representative__target-kxpfcj__partner-kiiamx",
+  "alias": "inter_object_relation_satisfaction-under_small_scale-french_fries-platter-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-under_small_scale",
+  "pick": "inter_object_relation_satisfaction-under_small_scale#01",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "french_fries",
+    "model": "kxpfcj",
+    "name": ""
+   },
+   "partner": {
+    "category": "platter",
+    "model": "kiiamx",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table__representative__target-cpozxi__partner-mgbeah",
+  "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-under_small_scale",
+  "pick": "inter_object_relation_satisfaction-under_small_scale#02",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "teacup",
+    "model": "cpozxi",
+    "name": ""
+   },
+   "partner": {
+    "category": "saucer",
+    "model": "mgbeah",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-under_small_scale-bottle_of_supplements-tray-breakfast_table__representative__target-oqakev__partner-hjxczh",
+  "alias": "inter_object_relation_satisfaction-under_small_scale-bottle_of_supplements-tray-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-under_small_scale",
+  "pick": "inter_object_relation_satisfaction-under_small_scale#03",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottle_of_supplements",
+    "model": "oqakev",
+    "name": ""
+   },
+   "partner": {
+    "category": "tray",
+    "model": "hjxczh",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-breakfast_table__representative__target-mxsliu__partner-httqaj",
+  "alias": "inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-breakfast_table",
+  "subtask": "inter_object_relation_satisfaction-under_small_scale",
+  "pick": "inter_object_relation_satisfaction-under_small_scale#04",
+  "slot": "representative",
+  "v1_key": "inter_object_relation_satisfaction-1",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "beer_glass",
+    "model": "mxsliu",
+    "name": ""
+   },
+   "partner": {
+    "category": "coaster",
+    "model": "httqaj",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-coffee_cup__representative__target-dkxddg",
+  "alias": "mental_rotation-coffee_cup",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#01",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "coffee_cup",
+    "model": "dkxddg",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-mug__representative__target-ppzttc",
+  "alias": "mental_rotation-mug",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#02",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "mug",
+    "model": "ppzttc",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-spatula__representative__target-hkvsep",
+  "alias": "mental_rotation-spatula",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#03",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "spatula",
+    "model": "hkvsep",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-sunflower__representative__target-ysogni",
+  "alias": "mental_rotation-sunflower",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#04",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "sunflower",
+    "model": "ysogni",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-teaspoon__representative__target-eilfij",
+  "alias": "mental_rotation-teaspoon",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#05",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "teaspoon",
+    "model": "eilfij",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-toy_figure__representative__target-zuntus",
+  "alias": "mental_rotation-toy_figure",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#06",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "toy_figure",
+    "model": "zuntus",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-walker__representative__target-glrsok",
+  "alias": "mental_rotation-walker",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#07",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "walker",
+    "model": "glrsok",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-mouse__representative__target-cduwda",
+  "alias": "mental_rotation-mouse",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#08",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "mouse",
+    "model": "cduwda",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-quartz__representative__target-klgses",
+  "alias": "mental_rotation-quartz",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#09",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "quartz",
+    "model": "klgses",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-sandal__representative__target-uhzfis",
+  "alias": "mental_rotation-sandal",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#10",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "sandal",
+    "model": "uhzfis",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-carving_knife__representative__target-alekva",
+  "alias": "mental_rotation-carving_knife",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#11",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "carving_knife",
+    "model": "alekva",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-crab__representative__target-ohjsdr",
+  "alias": "mental_rotation-crab",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#12",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "crab",
+    "model": "ohjsdr",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-pickle__representative__target-ifterk",
+  "alias": "mental_rotation-pickle",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#13",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "pickle",
+    "model": "ifterk",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-soup_ladle__representative__target-cfzneb",
+  "alias": "mental_rotation-soup_ladle",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#14",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "soup_ladle",
+    "model": "cfzneb",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-garlic_clove__representative__target-xotobt",
+  "alias": "mental_rotation-garlic_clove",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#15",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "garlic_clove",
+    "model": "xotobt",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-hook__representative__target-hewhtl",
+  "alias": "mental_rotation-hook",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#16",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "hook",
+    "model": "hewhtl",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-statue__representative__target-tuldri",
+  "alias": "mental_rotation-statue",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#17",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "statue",
+    "model": "tuldri",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-tablefork__representative__target-hktwlm",
+  "alias": "mental_rotation-tablefork",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#18",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "tablefork",
+    "model": "hktwlm",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-toothbrush__representative__target-vkrjps",
+  "alias": "mental_rotation-toothbrush",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#19",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "toothbrush",
+    "model": "vkrjps",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-briefcase__representative__target-uquevd",
+  "alias": "mental_rotation-briefcase",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#20",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "briefcase",
+    "model": "uquevd",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-tablespoon__representative__target-tqqwys",
+  "alias": "mental_rotation-tablespoon",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#21",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "tablespoon",
+    "model": "tqqwys",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-teacup__representative__target-oxfzfe",
+  "alias": "mental_rotation-teacup",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#22",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "teacup",
+    "model": "oxfzfe",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-tongs__representative__target-rcpjld",
+  "alias": "mental_rotation-tongs",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#23",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "tongs",
+    "model": "rcpjld",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-bell_pepper__representative__target-ihctxa",
+  "alias": "mental_rotation-bell_pepper",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#24",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bell_pepper",
+    "model": "ihctxa",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-potato__representative__target-ljfitc",
+  "alias": "mental_rotation-potato",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#25",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "potato",
+    "model": "ljfitc",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-cellulose_tape_dispenser__representative__target-fetnry",
+  "alias": "mental_rotation-cellulose_tape_dispenser",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#26",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "cellulose_tape_dispenser",
+    "model": "fetnry",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-banana__representative__target-znakxm",
+  "alias": "mental_rotation-banana",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#27",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "banana",
+    "model": "znakxm",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-cookie_cutter__representative__target-jpscvj",
+  "alias": "mental_rotation-cookie_cutter",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#28",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "cookie_cutter",
+    "model": "jpscvj",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-ginger_root__representative__target-wqcasl",
+  "alias": "mental_rotation-ginger_root",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#29",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "ginger_root",
+    "model": "wqcasl",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "mental_rotation-hammer__representative__target-fcrlbo",
+  "alias": "mental_rotation-hammer",
+  "subtask": "mental_rotation",
+  "pick": "mental_rotation#30",
+  "slot": "representative",
+  "v1_key": "mental_rotation-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "hammer",
+    "model": "fcrlbo",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-beaker__representative__target-rhohgs",
+  "alias": "object_scaling-beaker",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#01",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "beaker",
+    "model": "rhohgs",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-bottle_of_beer__representative__target-gxxbhh",
+  "alias": "object_scaling-bottle_of_beer",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#02",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottle_of_beer",
+    "model": "gxxbhh",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-bottle_of_medicine__representative__target-kqkwoq",
+  "alias": "object_scaling-bottle_of_medicine",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#03",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottle_of_medicine",
+    "model": "kqkwoq",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-bottle_of_pop__representative__target-jnoksl",
+  "alias": "object_scaling-bottle_of_pop",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#04",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottle_of_pop",
+    "model": "jnoksl",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-apple__representative__target-omzprq",
+  "alias": "object_scaling-apple",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#05",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "apple",
+    "model": "omzprq",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-hard_candy__representative__target-qptjgv",
+  "alias": "object_scaling-hard_candy",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#06",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "hard_candy",
+    "model": "qptjgv",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-soda_cup__representative__target-fsfsas",
+  "alias": "object_scaling-soda_cup",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#07",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "soda_cup",
+    "model": "fsfsas",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-pack_of_cigarettes__representative__target-kienyo",
+  "alias": "object_scaling-pack_of_cigarettes",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#08",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "pack_of_cigarettes",
+    "model": "kienyo",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-bottle_of_water__representative__target-sxffiv",
+  "alias": "object_scaling-bottle_of_water",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#09",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottle_of_water",
+    "model": "sxffiv",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-bottle_of_wine__representative__target-nhmtvt",
+  "alias": "object_scaling-bottle_of_wine",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#10",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottle_of_wine",
+    "model": "nhmtvt",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-box_of_cereal__representative__target-wrlalk",
+  "alias": "object_scaling-box_of_cereal",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#11",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "box_of_cereal",
+    "model": "wrlalk",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-can_of_soda__representative__target-opivig",
+  "alias": "object_scaling-can_of_soda",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#12",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "can_of_soda",
+    "model": "opivig",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-cap__representative__target-rgtedj",
+  "alias": "object_scaling-cap",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#13",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "cap",
+    "model": "rgtedj",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-lid__representative__target-wtjthb",
+  "alias": "object_scaling-lid",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#14",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "lid",
+    "model": "wtjthb",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-marker__representative__target-rsxbso",
+  "alias": "object_scaling-marker",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#15",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "marker",
+    "model": "rsxbso",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-wineglass__representative__target-oadvet",
+  "alias": "object_scaling-wineglass",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#16",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "wineglass",
+    "model": "oadvet",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-lemon__representative__target-bmvxas",
+  "alias": "object_scaling-lemon",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#17",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "lemon",
+    "model": "bmvxas",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-canned_food__representative__target-ycbspm",
+  "alias": "object_scaling-canned_food",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#18",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "canned_food",
+    "model": "ycbspm",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-jar_of_spaghetti_sauce__representative__target-zahyds",
+  "alias": "object_scaling-jar_of_spaghetti_sauce",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#19",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "jar_of_spaghetti_sauce",
+    "model": "zahyds",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-shampoo_dispenser__representative__target-thurmw",
+  "alias": "object_scaling-shampoo_dispenser",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#20",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "shampoo_dispenser",
+    "model": "thurmw",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-toy_dice__representative__target-eqwazv",
+  "alias": "object_scaling-toy_dice",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#21",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "toy_dice",
+    "model": "eqwazv",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-beeswax_candle__representative__target-nhdnje",
+  "alias": "object_scaling-beeswax_candle",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#22",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "beeswax_candle",
+    "model": "nhdnje",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-bell_pepper__representative__target-ukkycp",
+  "alias": "object_scaling-bell_pepper",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#23",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bell_pepper",
+    "model": "ukkycp",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-bottle_of_catsup__representative__target-hvxkso",
+  "alias": "object_scaling-bottle_of_catsup",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#24",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottle_of_catsup",
+    "model": "hvxkso",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-potato__representative__target-lqjear",
+  "alias": "object_scaling-potato",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#25",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "potato",
+    "model": "lqjear",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-bar_soap__representative__target-feqemg",
+  "alias": "object_scaling-bar_soap",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#26",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bar_soap",
+    "model": "feqemg",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-beefsteak_tomato__representative__target-pnrdxh",
+  "alias": "object_scaling-beefsteak_tomato",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#27",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "beefsteak_tomato",
+    "model": "pnrdxh",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-bottle_of_olive_oil__representative__target-cqycjk",
+  "alias": "object_scaling-bottle_of_olive_oil",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#28",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottle_of_olive_oil",
+    "model": "cqycjk",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-bottle_of_sake__representative__target-swlykk",
+  "alias": "object_scaling-bottle_of_sake",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#29",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "bottle_of_sake",
+    "model": "swlykk",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "object_scaling-cherry_tomato__representative__target-dqjuub",
+  "alias": "object_scaling-cherry_tomato",
+  "subtask": "object_scaling",
+  "pick": "object_scaling#30",
+  "slot": "representative",
+  "v1_key": "object_scaling-0",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "cherry_tomato",
+    "model": "dqjuub",
+    "name": ""
+   }
+  },
+  "note": []
+ },
+ {
+  "id": "camera_relocalization-standard__representative__",
+  "alias": "camera_relocalization-standard",
+  "subtask": "camera_relocalization-standard",
+  "pick": "camera_relocalization-standard#01",
+  "slot": "representative",
+  "v1_key": "camera_relocalization-0",
+  "scene": "house_single_floor",
+  "roles": {},
+  "note": []
+ }
+]

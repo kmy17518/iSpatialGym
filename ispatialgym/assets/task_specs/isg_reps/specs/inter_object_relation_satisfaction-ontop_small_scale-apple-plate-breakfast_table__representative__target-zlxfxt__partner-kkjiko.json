@@ -1,0 +1,69 @@
+{
+ "_comment": "ground_isg v1-bridge: inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table (inter_object_relation_satisfaction-ontop_small_scale#02, slot representative)",
+ "inter_object_relation_satisfaction-0": {
+  "alias": "ontop",
+  "roles": {
+   "target": {
+    "models": {
+     "apple": [
+      "zlxfxt"
+     ]
+    },
+    "grasps": {
+     "key": "apple__zlxfxt__t"
+    }
+   },
+   "partner": {
+    "models": {
+     "plate": [
+      "kkjiko"
+     ]
+    }
+   },
+   "table": {
+    "fixed": true
+   },
+   "floor": {
+    "fixed": true
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "fixed": {
+     "table": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    }
+   }
+  },
+  "generation": {
+   "instances_per_template": 2,
+   "tolerances": {
+    "position": 0.03,
+    "orientation": 0.2
+   }
+  },
+  "_isg": {
+   "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
+   "alias": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table",
+   "pick": "inter_object_relation_satisfaction-ontop_small_scale#02",
+   "slot": "representative",
+   "iddl": "inter_object_relation_satisfaction/ontop_small_scale.iddl",
+   "require": [
+    {
+     "kind": "grasps",
+     "role": "target",
+     "pipeline": "tabletop"
+    }
+   ],
+   "scene": "house_single_floor",
+   "note": []
+  }
+ }
+}
