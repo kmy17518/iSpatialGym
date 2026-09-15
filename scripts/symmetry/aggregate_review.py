@@ -44,11 +44,17 @@ def tags_of(v) -> List[str]:
 
 
 def merge(survey_sym: List[str], survey_near: List[str], reviewed: Dict[str, dict]) -> Tuple[List[str], List[str]]:
+    """Human verdicts win over the survey: ``preserved`` joins ``symmetry``; ``broken`` leaves both ``symmetry`` and
+    ``symmetry_near`` (also when a re-run of the survey later called the tag preserved); ``unsure`` on a tag the
+    survey calls preserved moves it to ``symmetry_near`` (a symmetry only takes effect once it is confirmed)."""
     preserved = {t for t, r in reviewed.items() if r["verdict"] == "preserved"}
     broken = {t for t, r in reviewed.items() if r["verdict"] == "broken"}
-    sym = S.reduce_tags(set(S.expand_tags(tags_of(survey_sym))) | preserved)
+    unsure = {t for t, r in reviewed.items() if r["verdict"] == "unsure"}
+    sym_raw = (set(S.expand_tags(tags_of(survey_sym))) | preserved) - broken - unsure
+    sym = S.reduce_tags(sym_raw)
     implied = set(S.expand_tags(sym))
     near = [t for t in tags_of(survey_near) if t not in preserved and t not in broken and t not in implied]
+    near += [t for t in unsure if t in set(S.expand_tags(tags_of(survey_sym))) and t not in implied and t not in near]
     return sym or ["none"], S.reduce_tags(near) if near else []
 
 
@@ -65,8 +71,17 @@ def main():
     for f in assign_files:
         d = json.load(open(f))
         for e in d["models"]:
-            entries[e["key"]] = e
-            batch_of[e["key"]] = d["batch_id"]
+            if e["key"] in entries:  # a supplementary batch adds candidates to a model an earlier batch already asked about
+                prev = entries[e["key"]]
+                merged = dict(prev)
+                merged["candidates"] = {**prev["candidates"], **e["candidates"]}
+                merged["symmetric_180"] = prev.get("symmetric_180", []) + [q for q in e.get("symmetric_180", [])
+                                                                          if (q["subtask"], q["tag"]) not in {(p["subtask"], p["tag"]) for p in prev.get("symmetric_180", [])}]
+                entries[e["key"]] = merged
+                batch_of[e["key"]] = f"{batch_of[e['key']]}+{d['batch_id']}"
+            else:
+                entries[e["key"]] = e
+                batch_of[e["key"]] = d["batch_id"]
     # ---- read the verdicts
     warnings: List[str] = []
     reviewed: Dict[str, Dict[str, dict]] = collections.defaultdict(dict)
@@ -103,7 +118,7 @@ def main():
                 per_batch[bid] += 1
     # ---- merge
     models: Dict[str, dict] = {}
-    unreviewed, partial = [], []
+    unreviewed, partial, stale = [], [], []
     changed, corrections = [], []
     verdict_counts = collections.Counter()
     tag_counts: Dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
@@ -116,9 +131,14 @@ def main():
             unreviewed.append(key)
         elif missing:
             partial.append((key, missing))
+        cur_sym = rec["symmetry"] if e["variant"] == "base" else (rec.get("symmetry_scaled") or [])
+        cur_near = rec["symmetry_near"] if e["variant"] == "base" else (rec.get("symmetry_near_scaled") or [])
+        still_candidate = set(S.expand_tags(tags_of(cur_sym))) | set(cur_near) | set(S.expand_tags(cur_near))
         for t, r in rv.items():
             verdict_counts[r["verdict"]] += 1
             tag_counts[t][r["verdict"]] += 1
+            if t not in still_candidate:  # a survey re-run classified the tag broken since the batch was issued: kept, applied, flagged
+                stale.append((key, t, r["verdict"], r["batch"]))
         if not rv:
             continue  # unreviewed: not listed in "models" -> build_icl.py keeps the survey values
         m = models.setdefault(base_key, {"category": rec["category"], "model": rec["model"], "scale": rec["scale"],
@@ -148,6 +168,7 @@ def main():
            "n_review_set": len(entries), "n_reviewed": n_rev, "n_partially_reviewed": len(partial), "n_unreviewed": len(unreviewed),
            "verdict_counts": dict(verdict_counts), "warnings": warnings, "models": models, "unreviewed": unreviewed,
            "partially_reviewed": {k: miss for k, miss in partial},
+           "verdicts_on_non_candidates": [{"key": k, "tag": t, "verdict": v, "batch": b} for k, t, v, b in stale],
            "batches": {os.path.splitext(os.path.basename(f))[0]: {"n_entries": len(json.load(open(f))["models"]),
                                                                  "n_verdicts": per_batch.get(os.path.splitext(os.path.basename(f))[0], 0),
                                                                  "reviewed": os.path.exists(os.path.join(args.out, "review", os.path.basename(f)))}
@@ -177,6 +198,11 @@ def main():
     if partial:
         L.append(f"\n## Partially reviewed entries ({len(partial)})\n")
         L += [f"- `{k}` missing {miss}" for k, miss in partial]
+    if stale:
+        L.append(f"\n## Verdicts on tags that are no longer survey candidates ({len(stale)})\n\n"
+                 "The survey re-run classified these tags broken after the batch was issued; the verdicts are kept and applied "
+                 "(a human `preserved` still joins `symmetry`), listed here for a second look.\n")
+        L += [f"- `{k}` `{t}`: reviewer {v} ({b})" for k, t, v, b in stale]
     if warnings:
         L.append(f"\n## Warnings ({len(warnings)})\n")
         L += [f"- {w}" for w in warnings]

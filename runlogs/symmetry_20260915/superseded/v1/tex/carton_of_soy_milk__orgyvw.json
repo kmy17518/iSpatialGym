@@ -1,0 +1,1 @@
+{"key": "carton_of_soy_milk__orgyvw", "category": "carton_of_soy_milk", "model": "orgyvw", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.041374646313634536, "p95": 0.17647058823529413, "p99": 0.21176470588235294, "mad_union": 0.04082778518742778, "iou": 1.0, "worst": "z180"}}, "render_s": 0.112}

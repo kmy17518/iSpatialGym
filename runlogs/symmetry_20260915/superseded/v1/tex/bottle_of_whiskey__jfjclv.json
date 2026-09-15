@@ -1,0 +1,1 @@
+{"key": "bottle_of_whiskey__jfjclv", "category": "bottle_of_whiskey", "model": "jfjclv", "scale": null, "n_glass": 1, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.03716700345672433, "p95": 0.1830065359477124, "p99": 0.28104575163398693, "mad_union": 0.03855995673537061, "iou": 0.9952708219923789, "worst": "z180"}}, "render_s": 0.146}

@@ -1,0 +1,1 @@
+{"key": "bag_of_chips__dwkdko", "category": "bag_of_chips", "model": "dwkdko", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.048496961459773176, "p95": 0.22535947712418491, "p99": 0.3071895424836601, "mad_union": 0.19024468155131952, "iou": 0.8399793854280745, "worst": "x180"}}, "render_s": 0.109}

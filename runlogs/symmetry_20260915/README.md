@@ -66,20 +66,47 @@ perpendicular half turns (a plain cylinder → `zinf x2`), `a6` absorbs `a3` / `
 different axes are kept (a box → `x2 y2 z2`); two coprime folds about one axis (`z5 z6`) mean the mesh is a 30-gon of
 revolution whose `zinf` test failed on a detail (a ribbed cap, a seam) — the group they generate is the equivalence.
 
-**Texture** (`tex/<key>.json`, GPU, 3 processes, 4.3 min for the 1207 models with a rotation within the near mean
-threshold). pyrender `RenderFlags.FLAT` (colour = albedo texture, no lighting, so shading cannot break a symmetry),
-white background, six fixed cameras (from ±x, ±y at 25° elevation and 20° azimuth offset; from ±z tilted 25°, so no
-face is edge-on), distance 1.55 × diagonal, 192 px rendered at 384 px and box-downsampled (bodies ≥ 4.5× longer than
-wide — pencils, rods — at 384 px, since a 19 cm pencil is 4 px thick at 192 px). The model and the model rotated by
-every rotation of the candidate tag are rendered with the same cameras and compared: `mad` / `p95` / `p99` of the
-per-pixel channel-mean |diff| over the pixels **fully covered by the object in both renders** (partially covered
-silhouette pixels mix the background in and move with the sub-pixel position of the edge; for an exact geometric
-symmetry the two silhouettes coincide anyway — the raw union-mask `mad_union` and the mask IoU are recorded too, and
-the union MAD is what a 16-gon bowl's `zinf` fails on: IoU 0.945, union MAD 12/255, texture MAD 0.3/255). OmniGlass
-parts are left out of the texture renders (they are transparent in Isaac Sim: the clock face under its glass cover is
-what the policy sees — rendered opaque, the glass hid the numerals and two numeral clocks came out `xinf`); an
+**Texture** (`tex/<key>.json`, GPU, 3 processes; v2 re-run 2026-09-15 06:xx, 33 min for the 1207 models with a
+rotation within the near mean threshold; the v1 pass took 4.3 min at 192 px). pyrender `RenderFlags.FLAT` (colour =
+albedo texture, no lighting, so shading cannot break a symmetry), white background, six fixed cameras (from ±x, ±y at
+25° elevation and 20° azimuth offset; from ±z tilted 25°, so no face is edge-on), distance 1.55 × diagonal, **384 px**
+rendered at 768 px and box-downsampled (bodies ≥ 4.5× longer than wide — pencils, rods — at 768 px). The model and
+the model rotated by every rotation of the candidate tag are rendered with the same cameras and compared on the
+pixels **fully covered by the object in both renders** (partially covered silhouette pixels mix the background in
+and move with the sub-pixel position of the edge; for an exact geometric symmetry the two silhouettes coincide anyway
+— the raw union-mask `mad_union` and the mask IoU are recorded too). Both renders are blurred with a Gaussian of
+σ = 1.0 mm at the render scale (a person at 0.5–1.5 m does not resolve pixel-scale speckle, grain or mottle), then:
+
+- `mad` / `p95` / `p99` of the per-pixel channel-mean |diff| (the v1 statistics, on the blurred renders);
+- the **local-feature test** (v2): D = 3 × 3 median of the channel-max |diff|; a pixel is *hot* when D > 25/255 (a
+  high-contrast feature) **or** when the local standard deviation of D over a 5 mm window exceeds 6/255 (a
+  low-contrast but *structured* feature — dark-on-dark text, a pale print; a smooth baked-shading gradient has D of
+  the same size but no local structure); the hot mask is opened with a 2.5 mm disc (facet edges of low-poly bodies,
+  rim corners and grain streaks are thinner than that, print strokes and logos are not; high-contrast pixels with
+  D > 60/255 — a black stroke on a light face — are exempt down to a 1 mm opening) and its largest connected blob is
+  measured: `blob_px`, its share of the view (`blob_frac`), the camera (`blob_view`), its mean D (`blob_d`),
+  which test lit it (`blob_kind`), its side in mm (`blob_mm`) and `n6` = the pixel area of a 6 × 6 mm patch at the
+  render scale (`m_per_px` = 2 · dist · tan(fov/2) / size);
+- the **silhouette test** (v2): the XOR of the two coverage masks — a part of the object present in one render and
+  absent in the other: a pencil tip swapped with the flat end, a pump nozzle, a swing-top bail, a keyboard flipped
+  face-down — opened with a 4 mm disc (`sil_px`, a shape difference at least that thick) and a 3 mm disc
+  (`sil_px_weak`), largest blob in pixels, `sil_view`, `sil_mm`. The v1 percentile statistics only saw pixels covered
+  in both renders and were blind to these (the first review round found the end-to-end flips of coloured pencils,
+  drumsticks, dip candles and the pump heads of dispensers "preserved" by the survey).
+
+OmniGlass parts are left out of the texture renders (they are transparent in Isaac Sim: the clock face under its glass
+cover is what the policy sees — rendered opaque, the glass hid the numerals and two numeral clocks came out `xinf`); an
 all-glass model is rendered in a uniform tint, its visual symmetry is its geometric one. Textures larger than 1024 px
 are downsampled on load.
+
+*Rejected in the v2 tuning* (code paths kept behind options, off by default): (1) a global per-view **contrast
+normalisation** (object 2nd–98th percentiles stretched to 0–255, gain ≤ 4 or ≤ 2): it amplifies smooth baked shading
+and stochastic texture exactly like a print — a dark-grey 12-gon beaker, a mottled apple, a wooden bat and a jar of
+speckled seeds (all `preserved` by the reviewers) came out `broken`; the structural local-std test achieves the
+intended sensitivity for dark-on-dark labels without it. (2) **Depth matching** (pixels whose depth differs by > 1.5 %
+of the diagonal excluded as "geometry"): after a symmetry rotation a pixel legitimately shows another part of the
+object — a thin painting flipped by `y2` shows its white back at a depth that differs by its thickness and the mask
+hid the picture (`painting/fwuole` y2 came out preserved).
 
 **Thresholds** (all fractions of the bbox diagonal, resp. of 255; tuned on the cases below):
 
@@ -87,22 +114,34 @@ are downsampled on load.
 |---|---|
 | geometry `exact` | mean ≤ 0.5 % and p95 ≤ 1.2 % and frac2 ≤ 1 % |
 | geometry `near` | mean ≤ 1.5 % and frac2 ≤ 3 % (and not exact) |
-| texture `preserved` | MAD < 3 and p95 < 20 and p99 < 60 |
-| texture `borderline` | MAD ≤ 12 and p95 ≤ 25 and p99 ≤ 60 (and not preserved) |
-| texture `broken` | otherwise |
+| texture `preserved` | MAD < 3 and p95 < 20 and p99 < 60 and blob < n6 / 4 (no structured difference ≥ 3 × 3 mm) and no ≥ 3 mm-thick silhouette difference of ≥ 6 × 6 mm |
+| texture `borderline` | MAD ≤ 12 and p95 ≤ 25 and p99 ≤ 60 and blob < 4 · n6 and not (blob ≥ n6 with mean D ≥ 30) and no ≥ 4 mm-thick silhouette difference of ≥ 6 × 6 mm — and not preserved |
+| texture `broken` | otherwise: a difference blob ≥ 4 × (6 × 6 mm), or ≥ 6 × 6 mm with mean D ≥ 30/255, or a ≥ 4 mm-thick silhouette difference of ≥ 6 × 6 mm, or percentiles beyond the borderline band |
 
 The spec's mean thresholds (0.5 % / 1.5 %) are kept; `frac2` was added because a mean over the whole surface dilutes a
 small asymmetric part — a mug handle is 6 % of the surface displaced by 20 % of the diagonal and scores a mean of
 1.25–1.4 % under z4 / z5 / z6 (would be "near"), frac2 = 6–24 %; a 16-gon bowl rotated by 17° has frac2 = 2 %. The
-texture rule keeps the spec's MAD < 3 / p95 < 20 for `preserved` and adds `p99 < 60`: features that cover 1–5 % of the
-object's pixels (die pips, letters, clock numerals, small logos) barely move the mean and p95 (numeral clock: MAD 5.5,
-p95 23, p99 71). The borderline band (spec: MAD in [3, 12]) is closed by p95 ≤ 25 and p99 ≤ 60 because a muted label
-on a medicine bottle or a wrapper logo moves the mean by only 7–12/255 while ≥ 5 % of the pixels differ by > 25/255.
-Tuning cases: plain bowl / plate / cap / beaker / plain box → preserved (MAD 0.1–1.1); can with a one-sided label,
-medicine bottle, cereal / cookie boxes, board games, letter block (under 90°), magazine cover, licence plate →
-broken; letter block under 180° (low-contrast grey letters: MAD 4, p95 20, p99 48), tennis-ball seam (MAD 3–4, p95
-13–18), pencil tip under an end-to-end flip, candle wick → borderline (review). A can whose label is printed twice
-(front = back) is genuinely `z2` (six `can_of_baking_mix` models, `can_of_coffee`, boxes of baking mix).
+texture percentile rules are the v1 ones (MAD < 3 / p95 < 20 / p99 < 60 for `preserved`; the borderline band closed
+by p95 ≤ 25 and p99 ≤ 60 because a muted label moves the mean by only 7–12/255 while ≥ 5 % of the pixels differ by
+> 25/255). The v2 blob rule was tuned on: `bottle_of_beer/fgzjnb` z6 (near-black bottle, dark-red logo; v1 MAD 2.8,
+p95 18, p99 30 → *preserved*; v2 blob 43 × n6 → broken), `bottle_of_face_cream/dztaed` zinf ("Put your Own Label"
+text wrapping the side, contrast ≈ 15/255; v2 blob 13 × n6 by the structural test → broken),
+`bottle_of_coconut_water/lsixio` z4 (a glyph on two faces; blob 18 × n6 → broken), medicine bottle, essential-oil
+bottles, bandage pad, board games (broken); plain teacup / plate / bowl / cap / bar of soap / pencil / wineglass /
+biscuit / seed jar, the twice-printed `can_of_baking_mix/blrqqz`, `can_of_coffee/zubwua` and `box_of_baking_mix/fmewsz`
+(preserved); silhouette controls: drumstick / keyboard / cinnamon-stick flips, a dispenser's pump nozzle under yaw, a
+swing-top bottle (broken); plate, bowl, teacup, pencil about its axis (preserved). Known false brokens of the rule —
+stochastic textures and slight shape irregularities that are asymmetric pixel by pixel but not to a person: the
+mottled `apple/agveuv` x5, the wood-grain `baseball_bat/yalgei` xinf, the wicker `hamper/pqzyxx` z2, the calyx of
+`beefsteak_tomato/pnrdxh` z6, the wire basket `hamper/djrdum` z2 (blobs 4–18 × n6 with mean D 13–22, or wire
+silhouettes); the 12-gon `beaker/effbnc` zinf, the lopsided `bar_soap/feqemg` z2 (2.5 mm silhouette crescent) and the
+mottled `lemon/asdada` x6 land in borderline. Known misses (features below what pixel statistics can separate from
+rendering noise): faint engraved line drawings and digits on the letter blocks (`toy_dice/bjrxkj` x2 / z2, D ≈ 12–14
+after the blur, reviewers: broken), a wrapper's faint brand text (`pack_of_chocolate_bar/bxgewr` z2), a marker's thin
+cap clip (`marker/zvvovh`, < 3 mm), a thin pencil's end-to-end flip (`colored_pencil/acumgp` y2, tip 4 mm) and a dip
+candle's taper reversal — these stay preserved / borderline. The reviewer verdicts of the first round settle the
+reviewed ones (a human verdict wins in the aggregation); the rest err on the strict side — a false `broken` costs an
+equivalence, a false `preserved` would relax the evaluation.
 
 **Final verdict** (`report` stage, re-runnable without new renders): `symmetry` = geometry exact ∩ texture preserved;
 `symmetry_near` = geometry exact ∩ texture borderline, plus geometry near ∩ texture preserved-or-borderline (minus
@@ -129,156 +168,187 @@ writes the scaled verdict into the rows whose `scale` matches.
   `report` again: no recomputation needed).
 - `dropped_mental_rotation.csv` — written by `scripts/icl/build_icl.py`: the `mental_rotation` / `target` rows removed
   from `roles/candidates.csv` because their `symmetry` is confirmed (spec §3.13 rule 1; candidates columns + `reason`).
+- `superseded/v1/` — the first pass (192 px, percentile statistics only): `symmetry.json`, `symmetry.csv`, `report.md`,
+  the per-model `tex/` records and the forced-row file; `report_diff.md` compares it with the current pass;
+  `assign/render_layout.json` is the v1 sheet layout the re-render preserved for the issued review batches.
 
-## Results
+## Results (v2 pass, 2026-09-15 09:00; the v1 pass is under `superseded/v1/`)
 
 1480 models surveyed, 0 loader failures (the 18 all-glass wineglasses / bottles that the world-alignment loader
-dropped are loaded here), 0 render failures. **377 models have a final `symmetry`, 1103 are `none`, 302 have a
-`symmetry_near` entry to review**; 965 models have at least one geometric candidate (sheet).
+dropped are loaded here), 0 render failures. Survey alone: **261 models have a final `symmetry`, 1219 are `none`, 183
+have a `symmetry_near` entry** (v1: 377 / 1103 / 302); 965 models have at least one geometric candidate (sheet). With
+the reviewer verdicts of the first round applied (`review_verdicts.json`): 362 symmetric models, 79 still carry a
+`symmetry_near` entry (the supplementary batches, see below).
 
-| tag | `symmetry` (final) | `symmetry_near` (review) | geometry exact (before texture) |
+| tag | `symmetry` (survey) | `symmetry_near` (review) | geometry exact (before texture) |
 |---|---|---|---|
-| `x2` | 47 | 82 | 278 |
-| `y2` | 28 | 60 | 267 |
-| `z2` | 117 | 78 | 364 |
-| `x4` | 24 | 9 | 31 |
-| `y4` | 3 | 4 | 17 |
-| `z4` | 41 | 20 | 82 |
-| `x3` | 0 | 0 | 1 |
+| `x2` | 23 | 28 | 278 |
+| `y2` | 23 | 26 | 267 |
+| `z2` | 86 | 34 | 364 |
+| `x4` | 15 | 8 | 31 |
+| `y4` | 2 | 2 | 17 |
+| `z4` | 33 | 18 | 82 |
+| `x3` | 1 | 3 | 1 |
 | `y3` | 0 | 0 | 2 |
-| `z3` | 4 | 5 | 5 |
-| `x5` | 23 | 12 | 22 |
-| `y5` | 0 | 1 | 1 |
-| `z5` | 13 | 14 | 55 |
-| `x6` | 27 | 17 | 24 |
-| `y6` | 0 | 0 | 1 |
-| `z6` | 17 | 16 | 64 |
-| `xinf` | 13 | 29 | 42 |
-| `yinf` | 1 | 4 | 2 |
-| `zinf` | 132 | 76 | 266 |
-| `full` | 1 | 2 | 2 |
-| `none` | 1103 | – | 624 |
+| `z3` | 1 | 4 | 5 |
+| `x5` | 14 | 10 | 22 |
+| `y5` | 1 | 1 | 1 |
+| `z5` | 13 | 15 | 55 |
+| `x6` | 15 | 11 | 24 |
+| `y6` | 1 | 3 | 1 |
+| `z6` | 19 | 20 | 64 |
+| `xinf` | 15 | 22 | 42 |
+| `yinf` | 0 | 3 | 2 |
+| `zinf` | 106 | 34 | 266 |
+| `full` | 1 | 0 | 2 |
+| `none` | 1219 | – | 624 |
 
-Texture is the main filter: 856 models are geometrically symmetric under some rotation, 377 stay symmetric with their
-texture (labels, prints, wood grain, seams break the rest). The review list splits into 228 tag entries geometry-exact /
-texture-borderline (low-contrast features: seams, tips, wicks, grey letters), 111 geometry-near / texture-preserved
-(mostly low-poly bodies of revolution: 181 models have < 200 faces; 36 models are a finite fold with `zinf` near, e.g.
-the 8-gon `bowl/belcml` = `z4` + near `zinf`) and 90 geometry-near / texture-borderline.
+(The `symmetry_near` column counts a tag once per model; 62 of the near tags on 24 models are *relaxations held for
+review*: the v2 criterion calls them preserved but the v1 pass did not — a re-tuned criterion may only tighten on its
+own, `relaxed_awaiting_review` in `symmetry.json`.)
 
-### Sanity table (~30 categories with an obvious answer; the most common verdicts)
+Texture is the main filter: 856 models are geometrically symmetric under some rotation, 261 stay symmetric with their
+texture before the review (labels, prints, wood grain, seams, tips break the rest).
+
+### v1 → v2 diff (`report_diff.md`)
+
+The first review batch found false positives in the v1 *final* verdicts — `bottle_of_beer/fgzjnb` z6 (near-black
+bottle, dark-on-dark logo: MAD 2.8, p95 18, p99 30 → preserved), `bottle_of_face_cream/dztaed` zinf (low-contrast text
+wrapping the side), `bottle_of_coconut_water/lsixio` z4 (a glyph on two faces). The v2 texture stage (384 px,
+perceptual blur, blob + silhouette tests, see *Method*) re-scored every (model, tag) with a geometric candidate:
+
+| flip of the texture class | (model, tag) pairs |
+|---|---|
+| preserved → broken | 944 |
+| preserved → borderline | 232 |
+| borderline → broken | 861 |
+| borderline → preserved | 81 (held in `symmetry_near` as relaxations, see above) |
+| broken → borderline | 30 |
+| broken → preserved | 43 (held in `symmetry_near`) |
+
+338 models changed their final verdict; tags removed from `symmetry`: `z2` 43, `zinf` 29, `x2` 28, `z4` 19, `y2` 12,
+`z6` 12, `z5` 11, `x4` 7, `x6` 7, `xinf` 5, `x5` 4, `z3` 3, `y4` 2, `yinf` 1; none added. 88 models gained a
+`symmetry_near` tag (5 of them were `none` without a near entry before); the three reported false positives are
+`broken` now (blobs 43 ×, 13 × and 18 × a 6 × 6 mm patch).
+
+**Agreement with the reviewer verdicts** (all 454 verdicts of `rev_00..10`, judged on the v2 texture class): 271 agree
+(224 broken, 47 preserved), 96 disagree — 77 where the survey is the stricter side (reviewer preserved / survey
+broken: mottled apple, wooden bat, tomato calyx, peppercorn block, wicker hampers, low-poly bottles whose facet corners
+the reviewers accepted, both-sides-alike prints the survey finds slightly misaligned) and 19 the other way (reviewer
+broken / survey preserved: the faint engraved letter blocks, a wrapper's faint text, marker cap clips, pencil / candle
+end-to-end flips — features below what the pixel statistics separate from rendering noise), 83 land in `borderline`,
+4 are `unsure`. `rev_00` alone: 26 agree, 4 disagree (all on the strict side), 7 borderline — 87 % of the decided
+calls. The human verdict wins in the aggregation either way.
+
+### Sanity table (~30 categories with an obvious answer; the survey's most common verdicts, before the review)
 
 | category | models | most common `symmetry` | most common geometry-exact | expectation | match |
 |---|---|---|---|---|---|
-| bowl | 12 | `zinf` ×6, `none` ×3, `z4` ×2 | `zinf` ×9, `z4` ×2, `z2` ×1 | zinf (plain bowls; a decorated rim breaks it) | yes (the `none` ones are decorated, `z4` = 8-gon meshes with `zinf` near) |
-| plate | 12 | `zinf` ×5, `z4` ×3, `none` ×3 | `zinf` ×9, `z4` ×3 | zinf | yes (`z4` = polygonal meshes, `none` = patterned) |
+| bowl | 12 | `zinf` ×6, `none` ×3, `z4` ×2 | `zinf` ×9, `z4` ×2, `z2` ×1 | zinf (plain bowls; a decorated rim breaks it) | yes (the `none` ones are decorated; `z4` = 8-gon meshes whose `zinf` the silhouette test now calls broken — the reviewer's "polygon count" call restores it) |
+| plate | 12 | `zinf` ×5, `none` ×4, `z4` ×2 | `zinf` ×9, `z4` ×3 | zinf | yes (`z4` = polygonal meshes, `none` = patterned) |
 | mug | 10 | `none` ×10 | `none` ×10 | none (handle) | yes |
-| teacup | 6 | `none` ×3, `zinf` ×2, `z5` ×1 | `zinf` ×3, `none` ×3 | zinf if handle-less, else none | yes (`z5` = handle-less cup with a 5× repeating pattern, reviewer: "near-symmetric") |
+| teacup | 6 | `none` ×4, `zinf` ×2 | `zinf` ×3, `none` ×3 | zinf if handle-less, else none | yes (`teacup/cpozxi`'s 5× repeating pattern is `z5` borderline now → review) |
 | teapot | 3 | `none` ×3 | `none` ×3 | none | yes |
 | sunflower | 17 | `none` ×17 | `none` ×17 | none | yes |
-| pencil | 13 | `xinf` ×5, `x5 x6` ×2, `x4 x5 x6` ×2 | `y2 xinf` ×12, `z2 x4 x5 x6` ×1 | revolution about the long axis (x) if unprinted | yes; the end-to-end flip `y2` is geometrically exact (a 4 mm tip on a 19 cm pencil) but the tip colour makes it borderline → review |
+| pencil | 13 | `xinf` ×5, `x5 x6` ×3, `x4 x5 x6` ×2 | `y2 xinf` ×12, `z2 x4 x5 x6` ×1 | revolution about the long axis (x) if unprinted | yes; the end-to-end flip `y2` is geometrically exact (a 4 mm tip on a 19 cm pencil) and only partly caught by the silhouette test → review / reviewer verdicts |
 | bottle_of_medicine | 8 | `none` ×8 | `zinf` ×4, `none` ×2, `z5 z6` ×1 | zinf geometry; the label breaks it → none | yes |
-| can_of_baking_mix | 6 | `z2` ×6 | `zinf` ×3, `x2 zinf` ×3 | zinf geometry; label → none | asset-specific: the label is printed twice (front = back), so `z2` is right; `zinf` broken as expected |
-| can_of_soda | 9 | `none` ×6, `zinf` ×1, `z2` ×1 | `z4` ×4, `zinf` ×3, `z2` ×1 | zinf geometry; label → none | yes (one unlabelled can) |
+| can_of_baking_mix | 6 | `z2` ×4, `none` ×2 | `zinf` ×3, `x2 zinf` ×3 | zinf geometry; label → none | asset-specific: four cans carry the label twice (front = back) → `z2`; on two the lid photo / fine print differs under the half turn → none |
+| can_of_soda | 9 | `none` ×7, `zinf` ×1, `z2` ×1 | `z4` ×4, `zinf` ×3, `z2` ×1 | zinf geometry; label → none | yes (one unlabelled can) |
 | board_game | 16 | `none` ×16 | `x2 y2 z2` ×13 | box geometry; artwork → none | yes |
 | box_of_cookies | 14 | `none` ×12, `x2` ×1, `y2` ×1 | `x2 y2 z2` ×6, `x2 y2 z4` ×4 | box geometry; print → none | yes (two boxes with an identical top / bottom or front / back print) |
 | box_of_cereal | 14 | `none` ×14 | `x2 y2 z2` ×14 | box geometry; print → none | yes |
 | apple | 7 | `none` ×7 | `none` ×7 | none / near zinf (stem) | yes |
-| orange | 2 | `x2 zinf` ×1, `full` ×1 | same | full or zinf; texture decides | yes (one is slightly oblate: `full` geometry near, its stem dot too small to break the texture) |
-| tennis_ball | 1 | `y2 x4 z5 z6` | `full` | full (plain) or none (seam) | debatable: the seam is low-contrast (MAD 2–4, p99 23–25), some tags fall on each side of MAD 3 → `full` in `symmetry_near`, review |
-| toy_dice | 20 | `none` ×19, `y2` ×1 | `x2 z2 y4` ×9, `none` ×6 | cube geometry; pips / letters → none | yes (letter blocks; the geometry-exact set says the block meshes are not perfect cubes) |
-| jar_of_grains | 12 | `none` ×12 | `none` ×12 | zinf geometry; label → none | none already in geometry (the jars are not bodies of revolution about a frame axis: z2 mean 0.85 %, zinf 1.4 %, frac2 above the near bound) |
-| cap | 19 | `zinf` ×13, `z2` ×2, `z5 z6` ×1 | `zinf` ×12, `z2` ×2 | zinf | yes |
-| lid | 17 | `zinf` ×9, `z2` ×6, `none` ×1 | `zinf` ×9, `z2` ×6 | zinf | yes (`z2` = oval / rectangular lids) |
-| keyboard | 6 | `none` ×5, `z2` ×1 | `none` ×4, `y2` ×1, `z2` ×1 | none | yes; `keyboard/uwacaq` is the reviewer's "very dark flat slab with faint key texture, little relief" → `z2` is real for that asset (axial alignment cannot tell its front from its back) |
+| orange | 2 | `none` ×1, `full` ×1 | `x2 zinf` ×1, `full` ×1 | full or zinf; texture decides | yes (the oblate one's stem dot now breaks it) |
+| tennis_ball | 1 | `x2` | `full` | full (plain) or none (seam) | the seam breaks everything but one half turn (low contrast, MAD 2–4) → `x2` stays; reviewer: `full` broken |
+| toy_dice | 20 | `none` ×19, `y2` ×1 | `x2 z2 y4` ×9, `none` ×6 | cube geometry; pips / letters → none | yes; the faint engraved `toy_dice/bjrxkj` y2 stays (reviewer: broken → removed by the verdict) |
+| jar_of_grains | 12 | `none` ×12 | `none` ×12 | zinf geometry; label → none | none already in geometry (not bodies of revolution about a frame axis) |
+| cap | 19 | `zinf` ×11, `z4 z5 z6` ×2, `z2` ×2 | `zinf` ×12, `z2` ×2 | zinf | yes (`z4 z5 z6` = 12-gon caps whose `zinf` the silhouette test holds for review) |
+| lid | 17 | `zinf` ×8, `z2` ×6, `none` ×2 | `zinf` ×9, `z2` ×6 | zinf | yes (`z2` = oval / rectangular lids) |
+| keyboard | 6 | `none` ×5, `z2` ×1 | `none` ×4, `y2` ×1, `z2` ×1 | none | `keyboard/uwacaq` (dark slab, faint legends) keeps `z2` in the survey; the reviewer read the legends → broken, applied |
 | painting | 11 | `none` ×11 | `x2 y2 z2` ×6, `x2` ×2, `x4` ×2 | none | yes |
-| beaker | 10 | `zinf` ×6, `z2` ×2, `z6` ×1 | `zinf` ×7 | zinf | yes |
-| bar_soap | 4 | `x2 y2 z2` ×2, `none` ×1, `x2 zinf` ×1 | same | zinf or x2 y2 z2 | yes |
+| beaker | 10 | `zinf` ×6, `z2` ×2, `none` ×1 | `zinf` ×7 | zinf | yes (the dark 12-gon `beaker/effbnc` is borderline: facet shading) |
+| bar_soap | 4 | `x2 y2 z2` ×2, `none` ×1, `x2 zinf` ×1 | same | zinf or x2 y2 z2 | yes (`bar_soap/feqemg` z2 borderline: a 2.5 mm silhouette crescent; reviewer preserved) |
 | wineglass | 12 | `zinf` ×12 | `zinf` ×12 | zinf | yes (all glass, geometry only) |
 | egg | 1 | `none` | `none` | zinf about the long axis | no: the egg mesh is not a body of revolution about a frame axis (tilted / bumpy) |
-| wall_clock | 5 | `none` ×4, `x4` ×1 | `xinf` ×2, `y2 xinf` ×2 | none (numerals) | yes for the four numeral faces; `wall_clock/xevvel` is an open-work face with 12 look-alike hour markers (geometry `x4 x3`), its `x4` sits exactly on the MAD 3 threshold (`x3` borderline) → review |
-| vase | 6 | `none` ×2, `z4` ×1, `zinf` ×1 | mixed | zinf unless decorated | yes |
-| platter | 6 | `z2` ×5, `z3` ×1 | same | z2 (oval) | yes |
-| tray | 12 | `z2` ×7, `none` ×2, `x2 y2 z2` ×1 | `z2` ×9 | z2 / x2 y2 z2 (rectangular) | yes (`z2` only when the underside differs from the top) |
+| wall_clock | 5 | `none` ×5 | `xinf` ×2, `y2 xinf` ×2, `x4 x3` ×1 | none (numerals) | yes (the open-work 12-marker clock `xevvel` is borderline now) |
+| vase | 6 | `none` ×2, `z4` ×2, `z2` ×1 | mixed | zinf unless decorated | yes |
+| platter | 6 | `none` ×3, `z2` ×2, `z3` ×1 | `z2` ×5, `z3` ×1 | z2 (oval) | partly: three oval platters lost `z2` to faint rim details |
+| tray | 12 | `z2` ×8, `none` ×2, `zinf` ×1 | `z2` ×9 | z2 / x2 y2 z2 (rectangular) | yes |
 
-### `mental_rotation` targets with a symmetry (must be excluded or get `orientation_equivalences`)
+### `mental_rotation` targets with a symmetry (removed from the candidate list, spec §3.13 rule 1)
 
-5 of 196: `teacup/zdvgol` (`zinf`), `teacup/cpozxi` (`z5`, near `z6`), `teacup/tfzfam` (`zinf`), `hook/wmvozo`
-(`zinf`), `cookie_cutter/lqrfzo` (`z2`). Five more have only a `symmetry_near` entry and should be reviewed before
-use: `toy_figure/jddrck` (z4), `pickle/ifterk` (y4), `pickle/iobrqp` (y4), `tongs/igsklx` (x2), `tongs/gbjqyn` (x2).
-The reviewer notes of the selection sheet agree ("handle-less, near-symmetric", "fully rotationally symmetric",
-"nearly rotationally symmetric, tiny outlier").
+Survey: 3 of 196 — `teacup/zdvgol` (`zinf`), `teacup/tfzfam` (`zinf`), `hook/wmvozo` (`zinf`). Review-confirmed near
+tags: `pickle/ifterk` (y4, pick 1), `pickle/iobrqp` (y4, pick 2), `tongs/igsklx` (x2, pick 2), `tongs/gbjqyn` (x2).
+`build_icl.py` drops the seven (`dropped_mental_rotation.csv`) and promotes `teacup/oxfzfe` → representative,
+`teacup/vckahe` → test, `pickle/vuspsy` → representative + test, `pickle/rxuimv` → test (tongs keeps its one remaining
+test model). `teacup/cpozxi` (z5, v1: symmetric) and `cookie_cutter/lqrfzo` (v1: `z2`) are candidates again — v2 puts
+them in `symmetry_near` (supplementary batches). The reviewer notes of the selection sheet agree with the dropped ones
+("handle-less, near-symmetric", "fully rotationally symmetric", "nearly rotationally symmetric, tiny outlier").
 
 ### `symmetric_180` (alignment targets) vs the survey
 
 The half turn that matters is about the alignment axis: the wall normal = `frame_front` for the wall subtasks, the
-vertical (`frame_up`, else canonical z) for `alignment-axial`. `symmetric_180` is set for 14 `alignment-world_horizontal`
-rows only; the column is left untouched. 15 rows disagree:
-
-| subtask | category | model | half-turn axis | `symmetric_180` | survey | `symmetry` | `symmetry_near` |
-|---|---|---|---|---|---|---|---|
-| alignment-axial | keyboard | uwacaq | +z (up) | – | yes | `z2` | `x2 y2` |
-| alignment-axial | notebook | ffdjzp | +z (up) | – | yes | `x2 y2 z2` | – |
-| alignment-axial | notebook | gqkaqu | +z (up) | – | yes | `x2 y2 z2` | – |
-| alignment-axial | clipboard | gmxyfo | +z (up) | – | yes | `x2 y2 z2` | – |
-| alignment-world_vertical | wall_clock | xevvel | +x (front) | – | yes | `x4` | `x6` |
-| alignment-world_vertical | towel_rack | kqrmrh | +x (front) | – | yes | `x2` | – |
-| alignment-world_horizontal | rolling_pin | mwrdae | +x (front) | 1 | near | `none` | `x2 yinf` |
-| alignment-world_horizontal | shelf | qrmiur | +z (front) | 1 | near | `none` | `x2 y2 z2` |
-| alignment-world_horizontal | shelf | iruewm | +z (front) | 1 | near | `none` | `x2 y2 z2` |
-| alignment-world_horizontal | shelf | wvkefp | +z (front) | 1 | no | `none` | – |
-| alignment-world_horizontal | radiator | dwmloz | +x (front) | – | yes | `x2` | – |
-| alignment-world_horizontal | drumstick | jauzlc | +z (front) | – | yes | `z2 x4 x5 x6` | `y2 xinf` |
-| alignment-world_horizontal | whiteboard | gvkgsi | +x (front) | – | yes | `x2` | – |
-| alignment-world_horizontal | towel_rack | crivoa | +x (front) | – | yes | `x2` | – |
-| alignment-world_horizontal | towel_rack | quznqx | +x (front) | 1 | near | `none` | `x2 yinf` |
-
-Five rows are flagged `symmetric_180 = 1` without a confirmed survey half turn (four are `near`: the geometry is
-exact but wood grain / knots make the texture borderline, MAD 4–9; `shelf/wvkefp` is geometrically asymmetric, z2
-frac2 5 %, and its texture broken); ten rows have a survey half turn the sheet does not record (plain notebooks, a
-clipboard, a plain whiteboard, radiator, towel racks, the open-work clock, the dark keyboard — the axial and
-world-vertical reviewers never filled the column, so these are additions rather than contradictions). The 9 flagged
-rows that agree are not listed.
+vertical (`frame_up`, else canonical z) for `alignment-axial`. `symmetric_180` was set for 14 `alignment-world_horizontal`
+rows only. The survey's disagreements went to the review round as explicit questions; the answered ones now set the
+column (`preserved` → 1, `broken` → 0; `review_verdicts.json` → `build_icl.py`): `clipboard/gmxyfo` → 1,
+`towel_rack/kqrmrh` → 1, `towel_rack/crivoa` → 1, `whiteboard/gvkgsi` → 1 (unflagged, symmetric), `shelf/qrmiur`,
+`shelf/iruewm`, `shelf/wvkefp` → 0 (flagged 1, the reviewers judged the planks' knots / end lips visible),
+`keyboard/uwacaq`, `notebook/ffdjzp`, `notebook/gqkaqu`, `wall_clock/xevvel`, `radiator/dwmloz`, `drumstick/jauzlc` → 0
+(the survey's half turn was rejected by the reviewers); `rolling_pin/mwrdae` and `towel_rack/quznqx` stay at the sheet's
+1 (reviewer verdicts preserved). The remaining v2 disagreements (14 rows, 6 of them new) are questions in the
+supplementary batches (`report.md` lists the current table).
 
 ### Scaled variants
 
 41 models carry a grasp-tested spawn scale (garlic cloves uniform, `cap/xxqyrt` z-stretched, french fries,
-cinnamon sticks and pencils non-uniform). The verdict changes for 21 of them (11 in `symmetry`, the rest in
-`symmetry_near`), all non-uniform: the pencils lose `xinf` / `x5 x6` (the canonical pencil axis is slightly tilted
-against the frame's x axis; the y × 3.4–4.2, z × 5.0–5.1 scale that makes them 2 cm thick amplifies the tilt into a
-visible wobble under every rotation about the frame axis — the spawned rod is still symmetric about its own axis, but
-not about a frame axis, which is what `orientation_equivalences` are expressed in), cinnamon sticks and fries change
-their near set. `build_icl.py` writes the scaled verdict into the rows that carry the matching `scale`.
+cinnamon sticks and pencils non-uniform). The verdict changes for 21 of them, all non-uniform: the pencils lose
+`xinf` / `x5 x6` (the canonical pencil axis is slightly tilted against the frame's x axis; the y × 3.4–4.2, z × 5.0–5.1
+scale that makes them 2 cm thick amplifies the tilt into a visible wobble under every rotation about the frame axis —
+the spawned rod is still symmetric about its own axis, but not about a frame axis, which is what
+`orientation_equivalences` are expressed in), cinnamon sticks and fries change their near set. `build_icl.py` writes
+the scaled verdict into the rows that carry the matching `scale`.
 
 ## Runtime
 
 `models` < 1 s; `geom` 997 s on 24 CPU workers (≈ 0.7 s wall per model, 16 core-seconds: 400k + 20k + 20k surface
-samples, ≈ 20 coarse and ≈ 5–40 full KD-tree passes); `texture` 4.3 min on 3 GPU processes (≈ 0.3 GB each, 1207
-models, 6 × (1 + Σ rotations) renders per model; 1.5–3 s for the 384 px pencils); `report` 2 s. Everything is
-idempotent (`--force` recomputes); the full survey is ≈ 25 min on the local 4090 box.
+samples, ≈ 20 coarse and ≈ 5–40 full KD-tree passes); `texture` v2 41 min on 3 GPU processes (≈ 0.3 GB each, 1207
+models, 6 × (1 + Σ rotations) renders at 768 px + the blur / median / local-std / opening filters — CPU-bound, GPU
+utilisation ≈ 15 %; the v1 pass at 192 px took 4.3 min); `report` / `diff` 2 s each. Everything is idempotent
+(`--force` recomputes); the full survey is ≈ 1 h on the local 4090 box.
 
-## Review round (prepared, not yet run)
+## Review round
 
 - `review_contract.md` — the reviewer's question (identical from the robot's head camera at 0.5–1.5 m?), the three
   verdicts `preserved` / `broken` / `unsure`, rules of thumb, the tag / axis convention, the output schema.
-- `assign/rev_00.json … rev_10.json` (`scripts/symmetry/prepare_review.py`) — 11 batches of ≤ 29 entries, 319 entries in
-  all: the 302 models with a `symmetry_near` entry, the 9 spawn-scaled variants with a `symmetry_near_scaled` entry
-  (`<key>__scaled`, judged on `renders/<key>__scaled.jpg`) and the 8 further alignment targets of the 15
-  `symmetric_180` disagreement rows (the other 7 were already in the set); 454 candidate tags, 15 entries carry a
-  `symmetric_180` question. Each entry: key, sheet, candidate tags with the survey's scores / classes and the sheet row
-  to look at, uses, scale, bbox. `assign/index.json` lists the batches; `assign/review_tags.json` the one sheet that had
-  to be rendered for the round (`shelf/wvkefp`, no geometric candidate, its `z2` row forced).
-- Reviewers write `review/rev_XX.json`; `scripts/symmetry/aggregate_review.py` merges them into `review_verdicts.json`
-  + `review_summary.md` (`preserved` → joins `symmetry`, `broken` → leaves `symmetry_near`, `unsure` → stays;
-  `symmetric_180` value per alignment subtask), and `build_icl.py --symmetry` uses `review_verdicts.json` when it sits
-  next to `symmetry.json`.
+- `assign/rev_00.json … rev_10.json` (`scripts/symmetry/prepare_review.py`, first round on the v1 survey) — 11 batches
+  of ≤ 29 entries, 319 entries: the 302 v1 models with a `symmetry_near` entry, 9 spawn-scaled variants
+  (`<key>__scaled`, judged on `renders/<key>__scaled.jpg`) and 8 further alignment targets of the 15 v1 `symmetric_180`
+  disagreement rows; 454 candidate tags. **All 11 are reviewed** (`review/rev_00..10.json`: 282 broken, 168 preserved,
+  4 unsure). The v2 re-render kept every issued sheet's row order and displayed rotations
+  (`assign/render_layout.json`), so the batches stayed valid; the labels and the top-row renders were refreshed.
+- `assign/rev_11.json … rev_14.json` (`prepare_review.py --supplement`) — 4 supplementary batches, 94 entries / 136
+  candidate tags no earlier batch asked about: the v2 `symmetry_near` tags (tags that moved from preserved to
+  borderline, the relaxations held for review, newly borderline models) and 6 new `symmetric_180` questions; 1 scaled
+  variant. 55 of the 94 entries are models no earlier batch covered, 39 add tags to already reviewed models.
+- `scripts/symmetry/aggregate_review.py` merges `review/*.json` into `review_verdicts.json` + `review_summary.md`
+  (`preserved` → joins `symmetry`, `broken` → leaves `symmetry` and `symmetry_near`, `unsure` → stays / moves to
+  `symmetry_near`; `symmetric_180` value per alignment subtask; unreviewed and partially reviewed entries; verdicts on
+  tags the v2 survey no longer lists as candidates are kept, applied and flagged — 304 of the 454, the v2 criterion is
+  that much stricter). `build_icl.py --symmetry` uses `review_verdicts.json` when it sits next to `symmetry.json`.
 
 ## Caveats for the review round
 
 - Only frame-axis rotations are tested; a symmetry about a tilted axis (egg, scaled pencils) is reported as `none`.
-- Low-poly meshes (181 models < 200 faces) are polygons of revolution: the finite fold is exact, `zinf` lands in
-  `symmetry_near` with a preserved texture — a reviewer can promote it when the render rows look identical.
+- Low-poly meshes (181 models < 200 faces) are polygons of revolution: the finite fold is exact; `zinf` lands in
+  `symmetry_near` (geometry near) or, when the corner sagitta exceeds 4 mm (an 8-gon bowl), fails the v2 silhouette
+  test — the reviewer's rule 1 ("polygon count is not a difference") restores it, and the aggregation keeps such
+  verdicts even though the survey no longer lists the tag as a candidate.
 - Flat shading hides relief; a feature that is geometry only (key caps, embossing) is judged by the geometric score.
 - OmniGlass parts are opaque in the geometry sample but absent from the texture renders (transparent in Isaac Sim);
   refraction effects are not modelled.
-- Texture scores are computed on fully covered pixels of both renders; the union-mask MAD (`mad_union`) and the mask
-  IoU are recorded for reference.
+- Texture statistics are computed on the blurred, fully covered pixels of both renders; shape differences are caught
+  by the silhouette test (≥ 3–4 mm thick, ≥ 6 × 6 mm), thinner ones (a pencil tip, a wick, a marker clip) are not —
+  the union-mask MAD (`mad_union`) and the mask IoU are recorded for reference.
+- Pixel statistics cannot separate faint engraved / low-contrast prints (D ≲ 15/255 after the blur) or stochastic
+  textures (mottle, grain, weave) from rendering noise; the former stay preserved / borderline, the latter become
+  broken — the review verdicts settle both where they exist.

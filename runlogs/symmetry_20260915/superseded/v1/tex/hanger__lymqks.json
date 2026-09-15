@@ -1,0 +1,1 @@
+{"key": "hanger__lymqks", "category": "hanger", "model": "lymqks", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.018200158588965617, "p95": 0.050980392156862744, "p99": 0.19869281045751633, "mad_union": 0.27748620127742296, "iou": 0.651701384396429, "worst": "x180"}}, "render_s": 0.112}

@@ -1,0 +1,1 @@
+{"key": "box_of_candy__jodwfv", "category": "box_of_candy", "model": "jodwfv", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.03367089882364021, "p95": 0.13594771241830064, "p99": 0.24444444444444446, "mad_union": 0.04063314431396741, "iou": 0.9872945462023178, "worst": "z180"}}, "render_s": 0.108}

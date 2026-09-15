@@ -1,0 +1,1 @@
+{"key": "hard_candy__vwegtt", "category": "hard_candy", "model": "vwegtt", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.05618945875856161, "p95": 0.17516339869281045, "p99": 0.2261437908496732, "mad_union": 0.1358931923911404, "iou": 0.8520247822573404, "worst": "z180"}}, "render_s": 0.103}

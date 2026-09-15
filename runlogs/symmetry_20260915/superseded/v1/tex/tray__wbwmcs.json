@@ -1,0 +1,1 @@
+{"key": "tray__wbwmcs", "category": "tray", "model": "wbwmcs", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.0008965910623896582, "p95": 0.00392156862745098, "p99": 0.023529411764705882, "mad_union": 0.001482426209364205, "iou": 0.9988482843092448, "worst": "z180"}}, "render_s": 0.114}

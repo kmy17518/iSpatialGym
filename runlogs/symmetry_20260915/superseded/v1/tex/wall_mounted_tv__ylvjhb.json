@@ -1,0 +1,1 @@
+{"key": "wall_mounted_tv__ylvjhb", "category": "wall_mounted_tv", "model": "ylvjhb", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.003118917825405732, "p95": 0.00784313725490196, "p99": 0.06274509803921569, "mad_union": 0.01353469805727683, "iou": 0.9892463774412895, "worst": "x180"}}, "render_s": 0.117}

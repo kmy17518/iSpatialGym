@@ -1,0 +1,1 @@
+{"key": "public_trash_can__duugbb", "category": "public_trash_can", "model": "duugbb", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 2, "base": {"z2": {"mad": 0.015225128513951074, "p95": 0.08143790849672632, "p99": 0.265359477124183, "mad_union": 0.03320603089049815, "iou": 0.9762725643998134, "worst": "z180"}}, "render_s": 0.139}

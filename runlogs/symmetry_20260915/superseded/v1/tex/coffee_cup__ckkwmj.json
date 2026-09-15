@@ -1,0 +1,1 @@
+{"key": "coffee_cup__ckkwmj", "category": "coffee_cup", "model": "ckkwmj", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z6": {"mad": 0.0139692776365869, "p95": 0.047058823529411764, "p99": 0.24836601307189543, "mad_union": 0.1083201348810339, "iou": 0.8409827432552864, "worst": "z60"}}, "render_s": 0.112}

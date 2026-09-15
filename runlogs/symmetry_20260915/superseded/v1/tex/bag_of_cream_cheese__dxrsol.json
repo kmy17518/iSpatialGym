@@ -1,0 +1,1 @@
+{"key": "bag_of_cream_cheese__dxrsol", "category": "bag_of_cream_cheese", "model": "dxrsol", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"y2": {"mad": 0.07517284975582868, "p95": 0.17647058823529413, "p99": 0.21568627450980393, "mad_union": 0.07459427586632397, "iou": 0.99818385318776, "worst": "y180"}}, "render_s": 0.102}

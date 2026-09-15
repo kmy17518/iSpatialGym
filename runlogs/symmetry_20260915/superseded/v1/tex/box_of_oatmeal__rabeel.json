@@ -1,0 +1,1 @@
+{"key": "box_of_oatmeal__rabeel", "category": "box_of_oatmeal", "model": "rabeel", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.052794974807589164, "p95": 0.1450980392156863, "p99": 0.20392156862745098, "mad_union": 0.09919119761202108, "iou": 0.9347254819361698, "worst": "z180"}}, "render_s": 0.12}

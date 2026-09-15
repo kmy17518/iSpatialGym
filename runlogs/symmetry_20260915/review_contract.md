@@ -30,10 +30,13 @@ The contact sheet of the model, `runlogs/symmetry_20260915/renders/<key>.jpg` (`
   in azimuth) and from **+z** (above) and **−z** (below), tilted 25°;
 - **every further row** = the object rotated by the candidate named at the left, seen from the **same six cameras**.
   Compare each tile with the tile above it in the top row. The label gives the tag, the rotation shown (`z163` = 163°
-  about z — for `zinf` / `full` the worst of the tested angles is shown), the survey's texture class, the geometry
-  scores (mean / p95 / frac2 = fraction of surface points displaced by > 2 % of the bbox diagonal) and the texture scores
-  (MAD / p95 / p99 of the pixel difference in /255 over the pixels covered in both renders, the union-mask MAD and the
-  silhouette IoU). Renders are flat-shaded (albedo only, no lighting): shading can never differ, only shape and print.
+  about z — for `zinf` / `full` the worst of the tested angles is shown; a row that an earlier batch was issued with
+  keeps its rotation, then `scores <rotation>` names the angle the scores belong to), the survey's texture class, the
+  geometry scores (mean / p95 / frac2 = fraction of surface points displaced by > 2 % of the bbox diagonal) and the
+  texture scores (MAD / p95 / p99 of the pixel difference in /255 over the pixels covered in both renders; `blob` = the
+  largest connected patch of difference the survey found, its side in mm, the camera it was seen from and its pixel
+  count over the pixel count of a 6 × 6 mm patch; the union-mask MAD and the silhouette IoU). Renders are flat-shaded
+  (albedo only, no lighting): shading can never differ, only shape and print.
 
 Your assignment lists per model the **candidate tags** to judge (`candidates`), with `sheet_row` = the label of the row
 to look at, and the survey's reasoning (`survey_geometry`, `survey_texture`, `asked_because`). Judge only those tags;
@@ -116,5 +119,11 @@ the `review/` directory if needed), with one entry per model of your batch and o
 - do not include scores, do not copy the assignment; do not touch `symmetry.json`, `symmetry.csv` or the sheets.
 
 `scripts/symmetry/aggregate_review.py` merges the `review/*.json` files: `preserved` tags join the model's `symmetry`
-(they become `orientation_equivalences`), `broken` tags leave `symmetry_near`, `unsure` tags stay in `symmetry_near`
-for a second look.
+(they become `orientation_equivalences`), `broken` tags leave `symmetry` and `symmetry_near`, `unsure` tags stay in
+`symmetry_near` for a second look. Your verdict stands even if a later re-run of the survey re-classified the tag
+(such verdicts are listed separately in the aggregation summary).
+
+Supplementary batches (`rev_11` and up) were issued after the survey's texture test was tightened (higher-resolution
+renders, a local-feature test that catches small and low-contrast prints): they contain only the (model, tag)
+candidates no earlier batch asked about; the sheets of the earlier batches kept their row order, only the labels and
+the top-row renders were refreshed.

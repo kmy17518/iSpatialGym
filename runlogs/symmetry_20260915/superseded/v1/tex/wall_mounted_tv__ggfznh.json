@@ -1,0 +1,1 @@
+{"key": "wall_mounted_tv__ggfznh", "category": "wall_mounted_tv", "model": "ggfznh", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.010077309493180846, "p95": 0.03398692810457516, "p99": 0.1542483660130719, "mad_union": 0.015162630101784006, "iou": 0.9925438316184146, "worst": "x180"}}, "render_s": 0.113}

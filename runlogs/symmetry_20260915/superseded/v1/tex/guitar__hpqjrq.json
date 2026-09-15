@@ -1,0 +1,1 @@
+{"key": "guitar__hpqjrq", "category": "guitar", "model": "hpqjrq", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.020982631761706044, "p95": 0.054901960784313725, "p99": 0.1973856209150327, "mad_union": 0.13540890378225798, "iou": 0.8596011679194882, "worst": "x180"}}, "render_s": 0.124}

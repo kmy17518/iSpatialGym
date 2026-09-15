@@ -1,0 +1,12923 @@
+{
+ "address__pbfbxj": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "apple__agveuv": {
+  "base": {
+   "first": [
+    "x5",
+    "x6",
+    "x2",
+    "x4",
+    "y4",
+    "z4",
+    "x3",
+    "y3",
+    "z3",
+    "xinf"
+   ],
+   "pin": {
+    "x6": "x60",
+    "x5": "x72"
+   }
+  }
+ },
+ "asparagus__eodozo": {
+  "base": {
+   "first": [
+    "y5",
+    "y6",
+    "y4",
+    "y3",
+    "x2",
+    "y2",
+    "z2",
+    "yinf"
+   ],
+   "pin": {}
+  }
+ },
+ "asparagus__xguktb": {
+  "base": {
+   "first": [
+    "y5",
+    "y6",
+    "x2",
+    "y2",
+    "z2",
+    "y4",
+    "y3",
+    "yinf"
+   ],
+   "pin": {}
+  }
+ },
+ "bag_of_cookies__ikivgk": {
+  "base": {
+   "first": [
+    "x2"
+   ],
+   "pin": {}
+  }
+ },
+ "bag_of_cookies__vafomx": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "bag_of_cream_cheese__dxrsol": {
+  "base": {
+   "first": [
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "bag_of_flour__fntqmd": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "bag_of_ice_cream__himfgn": {
+  "base": {
+   "first": [
+    "z2",
+    "y2",
+    "x2"
+   ],
+   "pin": {}
+  }
+ },
+ "bag_of_ice_cream__jwalbo": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "bag_of_tea__jjweyi": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "bandage__riftxh": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "bar_soap__feqemg": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "bar_soap__ofargb": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "bar_soap__ozifwa": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bar_soap__utgixp": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "baseball_bat__spcxrt": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "baseball_bat__yalgei": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "xinf": "x197"
+   }
+  }
+ },
+ "beaker__dtjmai": {
+  "base": {
+   "first": [
+    "z2",
+    "z3",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "beaker__effbnc": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "beaker__exzsal": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "beaker__fxrsyi": {
+  "base": {
+   "first": [
+    "z4",
+    "z2",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "beaker__fyrkzs": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "beaker__jdijek": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "beaker__rhohgs": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "beaker__sfvswx": {
+  "base": {
+   "first": [
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "beaker__uobdoq": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "beaker__zycgen": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "beefsteak_tomato__pnrdxh": {
+  "base": {
+   "first": [
+    "z6",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "zinf"
+   ],
+   "pin": {
+    "z6": "z60"
+   }
+  }
+ },
+ "beer_glass__lymciz": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "beer_glass__mxsliu": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "beer_glass__rxscji": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "beeswax_candle__nhdnje": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "beeswax_candle__nxewyk": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "beeswax_candle__oimgmh": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "beeswax_candle__ouzkdj": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "beeswax_candle__pfewit": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "biscuit__ukcwqw": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "board_game__eoywpy": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "board_game__frgdqh": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "board_game__fzyuip": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "board_game__gcfkqa": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "board_game__gumkqh": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "board_game__ibzhzu": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "board_game__iqfvfl": {
+  "base": {
+   "first": [
+    "x4",
+    "y4",
+    "z4",
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "board_game__lzslbu": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "board_game__nfewft": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "board_game__ovttum": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "board_game__phwwnx": {
+  "base": {
+   "first": [
+    "y2",
+    "z2",
+    "x4",
+    "x2"
+   ],
+   "pin": {}
+  }
+ },
+ "board_game__qdkyzl": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "board_game__qgvsnb": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "board_game__rgvkmy": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "board_game__twkglv": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "bookcase_baseboard__hlhneo": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "y3",
+    "y6"
+   ],
+   "pin": {}
+  }
+ },
+ "bookcase_side__bxfkjj": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_antihistamines__agavwx": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_apple_juice__xvrbdy": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_beer__crfcwo": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_beer__dcwvkg": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_beer__fgzjnb": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "bottle_of_beer__gxxbhh": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_beer__kqskmv": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_beer__meqliv": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_beer__nfzzqc": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "bottle_of_beer__phdimo": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_beer__qepxvl": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_beer__rdnopv": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_beer__saslsh": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_beer__vhscym": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_beer__zbsxro": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_beer__zlmwyn": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_black_pepper__ejtiig": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_black_pepper__honise": {
+  "base": {
+   "first": [
+    "z4",
+    "z2",
+    "z3",
+    "z5",
+    "z6",
+    "zinf",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "z4": "z90"
+   }
+  }
+ },
+ "bottle_of_black_pepper__ydzzrv": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "bottle_of_black_pepper__zybfok": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_carrot_juice__jkuhio": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "bottle_of_catsup__ahoiqe": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_catsup__bcqfxb": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_catsup__dmyfdf": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_catsup__ialodu": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_chili_pepper__hjalqq": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_coconut_milk__idenxg": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "z6": "z60",
+    "z5": "z72",
+    "z4": "z90"
+   }
+  }
+ },
+ "bottle_of_coconut_water__lsixio": {
+  "base": {
+   "first": [
+    "zinf",
+    "z3",
+    "z5",
+    "z6",
+    "z2",
+    "z4"
+   ],
+   "pin": {
+    "zinf": "z251"
+   }
+  }
+ },
+ "bottle_of_cologne__lyipur": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_cranberry_juice__heoxnw": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_dish_soap__bnmixt": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_disinfectant__faedff": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "bottle_of_essential_oil__eyyhld": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "bottle_of_essential_oil__wansva": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "bottle_of_essential_oil__xhoipk": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "bottle_of_essential_oil__xvqshn": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "bottle_of_essential_oil__yjxvpg": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "bottle_of_face_cream__dztaed": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "bottle_of_fennel__ihlkfu": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "x2",
+    "y2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z251"
+   }
+  }
+ },
+ "bottle_of_fruit_punch__azcigi": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "bottle_of_gin__qzgcdx": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_ginger__drqhzo": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z101"
+   }
+  }
+ },
+ "bottle_of_ginger_beer__zkocwb": {
+  "base": {
+   "first": [
+    "z2",
+    "zinf",
+    "z5",
+    "z6",
+    "z4",
+    "z3"
+   ],
+   "pin": {
+    "z6": "z60",
+    "z5": "z72"
+   }
+  }
+ },
+ "bottle_of_ground_cloves__vzamzb": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "x2",
+    "y2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_ground_mace__lgpxro": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "bottle_of_ground_nutmeg__qebruq": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z101"
+   }
+  }
+ },
+ "bottle_of_lotion__tkryrh": {
+  "base": {
+   "first": [
+    "z4",
+    "z6",
+    "zinf",
+    "z2",
+    "z3",
+    "z5"
+   ],
+   "pin": {
+    "zinf": "z163"
+   }
+  }
+ },
+ "bottle_of_medicine__egondf": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_medicine__fmfwng": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_medicine__hvocpc": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z4",
+    "z2",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_medicine__kqkwoq": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_medicine__qqsukh": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "z4",
+    "z3",
+    "z2",
+    "zinf"
+   ],
+   "pin": {
+    "z6": "z60"
+   }
+  }
+ },
+ "bottle_of_medicine__syfpak": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_milk__czblzn": {
+  "base": {
+   "first": [
+    "x4",
+    "x2",
+    "y2",
+    "z2",
+    "x3",
+    "x5",
+    "x6",
+    "xinf"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_milk__ddvsgl": {
+  "base": {
+   "first": [
+    "x4",
+    "x2",
+    "x5"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "bottle_of_milk__debqen": {
+  "base": {
+   "first": [
+    "x2"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_milk__mrejrs": {
+  "base": {
+   "first": [
+    "x4",
+    "x5",
+    "x6",
+    "x2",
+    "x3",
+    "xinf"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_milk__qsnnbp": {
+  "base": {
+   "first": [
+    "x6",
+    "x3",
+    "x5",
+    "x2",
+    "x4",
+    "xinf"
+   ],
+   "pin": {
+    "x6": "x60",
+    "x5": "x72"
+   }
+  }
+ },
+ "bottle_of_milk__utfsmp": {
+  "base": {
+   "first": [
+    "x4",
+    "x2",
+    "x5"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_mustard_seeds__grryaf": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "zinf": "z39"
+   }
+  }
+ },
+ "bottle_of_olive_oil__cqycjk": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_olive_oil__luikop": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_olive_oil__wztvie": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_onion_powder__xruqod": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "bottle_of_orange_juice__edltwh": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_orange_juice__rtqqor": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_papaya_juice__nmfmxy": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "x2",
+    "y2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "bottle_of_paprika__nrdgrp": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "x2",
+    "y2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_perfume__ipurzb": {
+  "base": {
+   "first": [
+    "z4",
+    "z2",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__bqretx": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "z3",
+    "z2"
+   ],
+   "pin": {
+    "z3": "z120",
+    "z5": "z72",
+    "z4": "z90"
+   }
+  }
+ },
+ "bottle_of_pop__cmqubs": {
+  "base": {
+   "first": [
+    "z6",
+    "zinf",
+    "z2",
+    "x2",
+    "y2",
+    "z4",
+    "z3",
+    "z5"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "bottle_of_pop__dlqmit": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__drqbiy": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__exapzb": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__ghxeqz": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__haoywb": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__hjrwqb": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__iynssk": {
+  "base": {
+   "first": [
+    "z2",
+    "zinf",
+    "x2",
+    "y2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__jnoksl": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__kviogj": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z3"
+   ],
+   "pin": {
+    "zinf": "z251"
+   }
+  }
+ },
+ "bottle_of_pop__mdznsn": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__mhzttm": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__msmlud": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__nepfjl": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__nyupqh": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__oeipjl": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__oghrnk": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__pfjzkn": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__pvabxf": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__pyrics": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__rhclfg": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__ribekf": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__sevoto": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z3"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "bottle_of_pop__twtsry": {
+  "base": {
+   "first": [
+    "z2",
+    "zinf",
+    "x2",
+    "y2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z251"
+   }
+  }
+ },
+ "bottle_of_pop__ubazru": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__uwdeok": {
+  "base": {
+   "first": [
+    "z6",
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__uwmchl": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__vfjhav": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__wmqhul": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__wrgmdt": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__wuuoes": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__xoldze": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__xvxcvv": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__zjbqvb": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pop__zxambx": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_poppy_seeds__xdtrgi": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "zinf": "z39"
+   }
+  }
+ },
+ "bottle_of_protein_powder__rbvrrp": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_pumpkin_pie_spice__oindrv": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_rum__oidmvy": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_rum__xdaefn": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_sage__bterim": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_sake__pwtebq": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_sake__swlykk": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_sake__utwglw": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_sake__vfxfuj": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_salsa__dvxotd": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_salsa__mavope": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_salsa__nafwlf": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_seasoning__vqwqqv": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z251"
+   }
+  }
+ },
+ "bottle_of_sesame_seeds__lzndie": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "bottle_of_shampoo__lvvkhx": {
+  "base": {
+   "first": [
+    "zinf",
+    "z6",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5"
+   ],
+   "pin": {
+    "z6": "z60"
+   }
+  }
+ },
+ "bottle_of_shampoo__stjjjm": {
+  "base": {
+   "first": [
+    "zinf",
+    "z6",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5"
+   ],
+   "pin": {
+    "z6": "z60"
+   }
+  }
+ },
+ "bottle_of_soda__eqyqlx": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_sour_cream__pmawft": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_soy_milk__mcjlhs": {
+  "base": {
+   "first": [
+    "z6",
+    "z5",
+    "z2",
+    "z4",
+    "z3",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_strawberry_juice__mlnuza": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_supplements__oqakev": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_tea__iladfg": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "x2",
+    "y2",
+    "z6"
+   ],
+   "pin": {
+    "z3": "z120",
+    "z5": "z72",
+    "z4": "z90"
+   }
+  }
+ },
+ "bottle_of_tea__yatmrs": {
+  "base": {
+   "first": [
+    "z6",
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "bottle_of_tea_leaves__pfbtus": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "x2",
+    "y2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "bottle_of_tequila__gbozpr": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_tomato_juice__csumos": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_vodka__nwegts": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_water__atvnqy": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_water__cyzaue": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {
+    "zinf": "z163"
+   }
+  }
+ },
+ "bottle_of_water__eeaimz": {
+  "base": {
+   "first": [
+    "zinf",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "zinf": "z101"
+   }
+  }
+ },
+ "bottle_of_water__emquat": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z3"
+   ],
+   "pin": {
+    "zinf": "z131"
+   }
+  }
+ },
+ "bottle_of_water__jmwngr": {
+  "base": {
+   "first": [
+    "z6",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_water__lkpaas": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {
+    "zinf": "z131"
+   }
+  }
+ },
+ "bottle_of_water__migvlt": {
+  "base": {
+   "first": [
+    "zinf",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "zinf": "z101"
+   }
+  }
+ },
+ "bottle_of_water__rmtdxh": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "z2",
+    "z4",
+    "z3",
+    "zinf"
+   ],
+   "pin": {
+    "z6": "z60",
+    "z5": "z72"
+   }
+  }
+ },
+ "bottle_of_water__rrkhva": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_water__suytyi": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_water__sxffiv": {
+  "base": {
+   "first": [
+    "z2",
+    "z6",
+    "z3"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "bottle_of_whiskey__aipxlu": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_whiskey__hejqyo": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_whiskey__jfjclv": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__bmudli": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__cldder": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z251"
+   }
+  }
+ },
+ "bottle_of_wine__dijgvu": {
+  "base": {
+   "first": [
+    "zinf",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "z2"
+   ],
+   "pin": {
+    "zinf": "z251"
+   }
+  }
+ },
+ "bottle_of_wine__fzuiwy": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__hnkiog": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__ivuvbv": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__jdqahn": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__klbwkf": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__lacaoa": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__nhmtvt": {
+  "base": {
+   "first": [
+    "zinf",
+    "z5",
+    "z6",
+    "x2",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {
+    "z6": "z60",
+    "z5": "z72"
+   }
+  }
+ },
+ "bottle_of_wine__njoeiz": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__oldpru": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z163"
+   }
+  }
+ },
+ "bottle_of_wine__oslewp": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__pgfplm": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__pzhwxn": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__qvsnjo": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__rztiuc": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__tisclo": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__uoykwx": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__vecadn": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "z4",
+    "x2",
+    "z2",
+    "z3",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__vmdwln": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__wcokej": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__wzdrcl": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__xkjyby": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__xzipsi": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__yaxufs": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bottle_of_wine__ynfvhg": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bowl__belcml": {
+  "base": {
+   "first": [
+    "z4",
+    "zinf",
+    "z2",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z163"
+   }
+  }
+ },
+ "bowl__bexgtn": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bowl__cypjlv": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bowl__eawgwj": {
+  "base": {
+   "first": [
+    "z4",
+    "z6",
+    "z2",
+    "z3",
+    "z5",
+    "zinf"
+   ],
+   "pin": {
+    "z6": "z60"
+   }
+  }
+ },
+ "bowl__feuaak": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "bowl__hpqjug": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bowl__hynhgz": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bowl__jpvcjv": {
+  "base": {
+   "first": [
+    "zinf",
+    "z3",
+    "z2",
+    "z4",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "z3": "z120"
+   }
+  }
+ },
+ "bowl__kasebx": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bowl__pihjqa": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bowl__szgdpc": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "bowl__tvtive": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_apple_juice__pttzdw": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_baking_mix__fmewsz": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_baking_mix__fnbgwd": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_baking_mix__lgusnr": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "box_of_baking_mix__ltccey": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_baking_mix__luwlfd": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_baking_mix__qkvqkm": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_baking_mix__uhvkxj": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_baking_mix__xcxrek": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_baking_powder__vzgrlv": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_baking_powder__zevydc": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_baking_soda__pskrgy": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_barley__lxpwnw": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "box_of_brown_sugar__kqyevo": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_butter__mfjuil": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "box_of_butter__oixapu": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_candy__gvreky": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_candy__jodwfv": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cane_sugar__cqlofx": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cane_sugar__gpbobo": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cane_sugar__qvjiti": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cane_sugar__rvsivw": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z4",
+    "z2"
+   ],
+   "pin": {
+    "z4": "z90"
+   }
+  }
+ },
+ "box_of_cereal__dkhgxn": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cereal__hcwbzw": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cereal__hosfhj": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cereal__ihedod": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "box_of_cereal__iucshm": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cereal__pfwgkm": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cereal__qirvmd": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cereal__sgirte": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cereal__surzft": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cereal__tiykku": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cereal__wdkcbu": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cereal__wrlalk": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cereal__ykuyqb": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "box_of_cereal__yorray": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_champagne__rjsibn": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_coffee__cjtadw": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "box_of_coffee__mreyla": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cookies__apjokz": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cookies__dlhqft": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cookies__fsdjun": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cookies__fzlaol": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z4",
+    "z2",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cookies__hdgsxz": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z4",
+    "z2",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cookies__jtalxs": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z4",
+    "z2",
+    "z5"
+   ],
+   "pin": {
+    "y2": "y180"
+   }
+  }
+ },
+ "box_of_cookies__levwda": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cookies__lwhbid": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "box_of_cookies__nirfva": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z4"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cookies__nnfisz": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z4"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cookies__ohhshb": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z4",
+    "z2",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cookies__qkzrdd": {
+  "base": {
+   "first": [
+    "z2",
+    "x5",
+    "x6",
+    "x2",
+    "y2",
+    "x4",
+    "x3",
+    "xinf"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cookies__sjcnoq": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_cookies__swilxz": {
+  "base": {
+   "first": [
+    "z2",
+    "z5",
+    "zinf",
+    "x2",
+    "y2",
+    "z4",
+    "z3",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_crackers__cmdigf": {
+  "base": {
+   "first": [
+    "x2",
+    "z2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_flour__ylezpk": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_granola_bars__awombj": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "box_of_granola_bars__bqeeki": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "box_of_granola_bars__tqwhvz": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "box_of_lasagna__oaonbr": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_oatmeal__rabeel": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_oatmeal__zkggxm": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_rice__fvulow": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_rice__pstqvm": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_rice__yyheuw": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_rum__lnjbjj": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z4",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_sanitary_napkins__acaivd": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_sanitary_napkins__arqcyu": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "x4"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_sanitary_napkins__cmnpuv": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "box_of_sanitary_napkins__humkqw": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_sanitary_napkins__mxdefq": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "box_of_sanitary_napkins__skltgp": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_sanitary_napkins__tkrzkb": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "x4"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_sanitary_napkins__ykpeja": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_sanitary_napkins__zqinib": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "x4"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_shampoo__bclpiq": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_shampoo__jccyom": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_shampoo__nijidu": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_shampoo__tzghev": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_tissues__ntbrtz": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_tissues__uglbjc": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_tissues__xwstls": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "box_of_tissues__zutrxn": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "box_of_vegetable_juice__jsnnlv": {
+  "base": {
+   "first": [
+    "z6",
+    "z5",
+    "z2",
+    "z4",
+    "z3",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_vegetable_juice__qgjdbn": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_whiskey__ftapxo": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "box_of_yogurt__jkemqc": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "box_of_yogurt__jtjcrx": {
+  "base": {
+   "first": [
+    "z2",
+    "z5",
+    "zinf",
+    "x2",
+    "y2",
+    "z4",
+    "z3",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z251"
+   }
+  }
+ },
+ "box_of_yogurt__znhjgm": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "boxed_ink_cartridge__ltblou": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "bread_slice__pfggnm": {
+  "base": {
+   "first": [
+    "y2",
+    "z4",
+    "x2",
+    "z2",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {
+    "y2": "y180",
+    "z4": "z90"
+   }
+  }
+ },
+ "butter__ovirmc": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "butter_cookie__kukrla": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "zinf",
+    "y2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "x2": "x180",
+    "zinf": "z39"
+   }
+  }
+ },
+ "cabinet_base__dcmhhh": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z4"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "cabinet_door__ertkre": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "can_of_baking_mix__blrqqz": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_baking_mix__fpbxfp": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_baking_mix__ohtiap": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_baking_mix__orwvfx": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "zinf": "z101"
+   }
+  }
+ },
+ "can_of_baking_mix__rxorlp": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "zinf": "z101"
+   }
+  }
+ },
+ "can_of_baking_mix__xefopo": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_beans__kclbuu": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_beans__ojqgjz": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_coffee__zubwua": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_corn__alphlq": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_corn__kwwlfn": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_corn__pddtfk": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_icetea__ifrjsc": {
+  "base": {
+   "first": [
+    "z4",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z251"
+   }
+  }
+ },
+ "can_of_oatmeal__qyukhm": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_sardines__dpgmry": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_soda__bfrzvk": {
+  "base": {
+   "first": [
+    "z2",
+    "zinf",
+    "x2",
+    "y2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z251"
+   }
+  }
+ },
+ "can_of_soda__evcxlr": {
+  "base": {
+   "first": [
+    "z4",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z101"
+   }
+  }
+ },
+ "can_of_soda__frewxk": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_soda__itolcg": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_soda__lugwcz": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "zinf": "z131"
+   }
+  }
+ },
+ "can_of_soda__opivig": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_soda__ttxyui": {
+  "base": {
+   "first": [
+    "z4",
+    "z6",
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z3",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_soda__wbrrad": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "can_of_soda__xmjfcg": {
+  "base": {
+   "first": [
+    "z4",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_tomato_paste__sqqdzb": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "can_of_tomatoes__ckdouu": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "candle_holder__nygnlp": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "candle_holder__wiufnv": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "canister__xcppkc": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "canned_food__acgdtc": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "canned_food__byakrm": {
+  "base": {
+   "first": [
+    "z4",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "canned_food__cbmndg": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "canned_food__foetdd": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {
+    "z4": "z90"
+   }
+  }
+ },
+ "canned_food__pkopdw": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "canned_food__qhgdys": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "canned_food__ycbspm": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "cap__arskxc": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "cap__ciopwh": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "cap__clhquh": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  },
+  "scaled": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "cap__eukcfr": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "cap__ghwjwe": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "cap__gmdwwe": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "cap__gxkbcd": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "cap__hbafeb": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "cap__iqeyba": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "cap__mgirzi": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "cap__pwsngg": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "cap__qscujv": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "cap__rgtedj": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "cap__uxpeaz": {
+  "base": {
+   "first": [
+    "z4",
+    "z2",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "cap__vnpjfn": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "cap__xeswtq": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "cap__xxqyrt": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "cap__ygsmgm": {
+  "base": {
+   "first": [
+    "z6",
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5"
+   ],
+   "pin": {
+    "zinf": "z131"
+   }
+  }
+ },
+ "cap__yqvild": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  },
+  "scaled": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "carrot__aucrah": {
+  "base": {
+   "first": [
+    "x4",
+    "x5",
+    "x6",
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x3"
+   ],
+   "pin": {
+    "xinf": "x53"
+   }
+  }
+ },
+ "carrot__nktmff": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "xinf",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "carrot__qhmmmx": {
+  "base": {
+   "first": [
+    "xinf",
+    "y2",
+    "z2",
+    "x2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "xinf": "x131"
+   }
+  }
+ },
+ "carton__cdmmwy": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "carton__hhlmbi": {
+  "base": {
+   "first": [
+    "z4",
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "carton__libote": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z4",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "carton__ylrxhe": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z4",
+    "z2"
+   ],
+   "pin": {
+    "y2": "y180",
+    "z4": "z90"
+   }
+  }
+ },
+ "carton_of_eggs__rixhgu": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z4"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "carton_of_eggs__stxfxb": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "carton_of_milk__atyqub": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "carton_of_milk__kklgxk": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "carton_of_milk__kszoro": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "carton_of_milk__xmugpm": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "carton_of_orange_juice__brryuo": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "carton_of_orange_juice__gpbmnk": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "carton_of_pineapple_juice__vzueyg": {
+  "base": {
+   "first": [
+    "z6",
+    "z5",
+    "z2",
+    "z4",
+    "z3",
+    "zinf"
+   ],
+   "pin": {
+    "z6": "z60"
+   }
+  }
+ },
+ "carton_of_soy_milk__orgyvw": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "case_of_eyeshadow__zgervc": {
+  "base": {
+   "first": [
+    "y2",
+    "x2",
+    "z2"
+   ],
+   "pin": {
+    "y2": "y180"
+   }
+  }
+ },
+ "catalog__aygcnt": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "catalog__deirql": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "catalog__uilzqm": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "cellulose_tape__gchdhk": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "z4",
+    "z3",
+    "z5",
+    "y2",
+    "z2",
+    "z6"
+   ],
+   "pin": {
+    "x2": "x180",
+    "z5": "z72",
+    "z4": "z90"
+   }
+  }
+ },
+ "cellulose_tape__kavsnx": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "cellulose_tape__sklkyc": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "cherry_tomato__dqjuub": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "y4",
+    "z4",
+    "x3",
+    "y3"
+   ],
+   "pin": {
+    "z6": "z60",
+    "z5": "z72"
+   }
+  }
+ },
+ "chip__obgeiz": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "chocolate_bar__amutpr": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "chocolate_bar__bcfudr": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "chocolate_bar__dxnisi": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "chocolate_chip_cookie__oyhoth": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "chocolate_chip_cookie__xprsse": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "chopping_board__psabiv": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "chopping_board__sygezm": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "chopstick__bcwuwv": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6",
+    "xinf",
+    "x2",
+    "y2",
+    "x3"
+   ],
+   "pin": {}
+  }
+ },
+ "cigar__kslnuf": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "cinnamon_stick__cdkjfo": {
+  "base": {
+   "first": [
+    "y2",
+    "z2",
+    "x2",
+    "yinf",
+    "y4",
+    "y3",
+    "y5",
+    "y6"
+   ],
+   "pin": {
+    "yinf": "y131",
+    "x2": "x180"
+   }
+  }
+ },
+ "cinnamon_stick__hjhcpm": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "y5",
+    "y6"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "cinnamon_stick__kdaxdy": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "y4",
+    "y3",
+    "y5",
+    "y6",
+    "yinf"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  },
+  "scaled": {
+   "first": [
+    "y2",
+    "x2",
+    "z2",
+    "y4",
+    "y3",
+    "y5",
+    "y6",
+    "yinf"
+   ],
+   "pin": {
+    "y2": "y180"
+   }
+  }
+ },
+ "cinnamon_stick__qmlyim": {
+  "base": {
+   "first": [
+    "x2",
+    "z2",
+    "y2",
+    "y4",
+    "y3",
+    "y5",
+    "y6",
+    "yinf"
+   ],
+   "pin": {
+    "z2": "z180",
+    "x2": "x180"
+   }
+  },
+  "scaled": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "y4",
+    "y3",
+    "y5",
+    "y6",
+    "yinf"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "cinnamon_stick__qsqvgk": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "y4",
+    "y3",
+    "y5",
+    "y6",
+    "yinf"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  },
+  "scaled": {
+   "first": [
+    "z2",
+    "y6",
+    "x2",
+    "y2",
+    "y4",
+    "y3",
+    "y5",
+    "yinf"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y6": "y60"
+   }
+  }
+ },
+ "cinnamon_stick__qxpzdm": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "y4",
+    "y3",
+    "y5",
+    "y6",
+    "yinf"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  },
+  "scaled": {
+   "first": [
+    "x2",
+    "yinf",
+    "y2",
+    "z2",
+    "y4",
+    "y3",
+    "y5",
+    "y6"
+   ],
+   "pin": {
+    "yinf": "y131",
+    "x2": "x180"
+   }
+  }
+ },
+ "cinnamon_stick__smfuqz": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "yinf",
+    "y2",
+    "y4",
+    "y3",
+    "y5",
+    "y6"
+   ],
+   "pin": {
+    "yinf": "y131",
+    "x2": "x180"
+   }
+  },
+  "scaled": {
+   "first": [
+    "x2",
+    "z2",
+    "y5",
+    "y6",
+    "y2",
+    "y4",
+    "y3",
+    "yinf"
+   ],
+   "pin": {
+    "y5": "y72",
+    "z2": "z180",
+    "x2": "x180",
+    "y6": "y60"
+   }
+  }
+ },
+ "clipboard__envjqe": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "clipboard__gmxyfo": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z6"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "coaster__arjpcz": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "x2": "x180",
+    "zinf": "z53"
+   }
+  }
+ },
+ "cola_bottle__oyqdtz": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "colored_pencil__acumgp": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6",
+    "y2",
+    "xinf",
+    "x2",
+    "x3"
+   ],
+   "pin": {
+    "y2": "y180",
+    "xinf": "x101"
+   }
+  }
+ },
+ "colored_pencil__bkdqwb": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6",
+    "y2",
+    "xinf",
+    "x2",
+    "x3"
+   ],
+   "pin": {}
+  }
+ },
+ "colored_pencil__bnsqcn": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6",
+    "y2",
+    "xinf",
+    "x2",
+    "x3"
+   ],
+   "pin": {
+    "y2": "y180",
+    "xinf": "x163"
+   }
+  }
+ },
+ "colored_pencil__deuvcx": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6",
+    "y2",
+    "xinf",
+    "x2",
+    "x3"
+   ],
+   "pin": {}
+  }
+ },
+ "colored_pencil__egvqng": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6",
+    "y2",
+    "xinf",
+    "x2",
+    "x3"
+   ],
+   "pin": {}
+  }
+ },
+ "colored_pencil__jdqvdl": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6",
+    "y2",
+    "xinf",
+    "x2",
+    "x3"
+   ],
+   "pin": {}
+  }
+ },
+ "colored_pencil__jnccuz": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6",
+    "y2",
+    "xinf",
+    "x2",
+    "x3"
+   ],
+   "pin": {
+    "y2": "y180",
+    "xinf": "x101"
+   }
+  }
+ },
+ "colored_pencil__kadvlg": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6",
+    "y2",
+    "xinf",
+    "x2",
+    "x3"
+   ],
+   "pin": {}
+  }
+ },
+ "colored_pencil__kgmapz": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6",
+    "y2",
+    "xinf",
+    "x2",
+    "x3"
+   ],
+   "pin": {
+    "xinf": "x163"
+   }
+  }
+ },
+ "colored_pencil__kjwoqm": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6",
+    "y2",
+    "xinf",
+    "x2",
+    "x3"
+   ],
+   "pin": {}
+  }
+ },
+ "colored_pencil__nssris": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6",
+    "y2",
+    "xinf",
+    "x2",
+    "x3"
+   ],
+   "pin": {
+    "y2": "y180",
+    "xinf": "x101"
+   }
+  }
+ },
+ "colored_pencil__qrxemk": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6",
+    "y2",
+    "xinf",
+    "x2",
+    "x3"
+   ],
+   "pin": {
+    "xinf": "x163"
+   }
+  }
+ },
+ "comic_book__nekxsh": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "comic_book__qkczyc": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "comic_book__scycof": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "comic_book__vzejnl": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "comic_book__xmbxfm": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "conditioner_dispenser__njqnuo": {
+  "base": {
+   "first": [
+    "x4",
+    "x5",
+    "x6",
+    "xinf",
+    "x2",
+    "x3"
+   ],
+   "pin": {
+    "xinf": "x251"
+   }
+  }
+ },
+ "conditioner_dispenser__udeflt": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z251"
+   }
+  }
+ },
+ "conditioner_dispenser__uncljo": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "cookie_cutter__fvxiun": {
+  "base": {
+   "first": [
+    "x2"
+   ],
+   "pin": {}
+  }
+ },
+ "cookie_cutter__jpscvj": {
+  "base": {
+   "first": [
+    "z6",
+    "x2",
+    "y2",
+    "z2",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "cookie_cutter__lqrfzo": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "cork__lseuwf": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "cork__ncxgpe": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z163"
+   }
+  }
+ },
+ "cork__uyceta": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "cup_of_yogurt__kihdsj": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "cutting_board__aibvew": {
+  "base": {
+   "first": [
+    "x2",
+    "z2",
+    "y2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "cutting_board__jfrbuz": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "cutting_board__nsvnai": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180",
+    "x2": "x180"
+   }
+  }
+ },
+ "cutting_board__tcdrzs": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180",
+    "x2": "x180"
+   }
+  }
+ },
+ "dartboard__zjenlc": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "decorative_sign__hgonwj": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "deodorant_atomizer__utjfug": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "deodorant_stick__albeyc": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "dip_candle__gbaons": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "dip_candle__ghctun": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "dip_candle__mxjejs": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "dip_candle__poexjo": {
+  "base": {
+   "first": [
+    "z6",
+    "x2",
+    "z4",
+    "z3",
+    "z5",
+    "y2",
+    "z2",
+    "zinf"
+   ],
+   "pin": {
+    "x2": "x180",
+    "z5": "z72",
+    "z4": "z90"
+   }
+  }
+ },
+ "drumstick__jauzlc": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "y2": "y180",
+    "z2": "z180",
+    "xinf": "x197"
+   }
+  }
+ },
+ "drumstick__lkvzmj": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "xinf": "x251"
+   }
+  }
+ },
+ "flashlight__jtrbkc": {
+  "base": {
+   "first": [
+    "x6",
+    "x2",
+    "x4",
+    "x3",
+    "x5",
+    "xinf"
+   ],
+   "pin": {
+    "x6": "x60"
+   }
+  }
+ },
+ "folder__lktggf": {
+  "base": {
+   "first": [
+    "y2",
+    "x2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "footstool__mysfnz": {
+  "base": {
+   "first": [
+    "z4",
+    "z2",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "footstool__sghekm": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "french_fries__nfgqwu": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "french_fries__oeterg": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "french_fries__uqsuef": {
+  "base": {
+   "first": [
+    "z2",
+    "y2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "goblet__nawrfs": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "green_bean__dyjvwv": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "y6"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "green_bean__lvbjws": {
+  "base": {
+   "first": [
+    "x2",
+    "y4",
+    "y3",
+    "y5",
+    "y6"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "guitar__cybisc": {
+  "base": {
+   "first": [
+    "x2"
+   ],
+   "pin": {}
+  }
+ },
+ "guitar__hpqjrq": {
+  "base": {
+   "first": [
+    "x2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "half_lime__dtyjkb": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z101"
+   }
+  }
+ },
+ "half_lime__mxmmcp": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {
+    "zinf": "z163"
+   }
+  }
+ },
+ "half_lime__wdadtn": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z101"
+   }
+  }
+ },
+ "hamburger_bun__fqxumh": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z4",
+    "z3"
+   ],
+   "pin": {
+    "zinf": "z163"
+   }
+  }
+ },
+ "hamburger_bun__jeygaq": {
+  "base": {
+   "first": [
+    "zinf",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z6": "z60",
+    "z5": "z72",
+    "z4": "z90"
+   }
+  }
+ },
+ "hamper__clziqw": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "hamper__djrdum": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "hamper__drgdfh": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "hamper__hlgjme": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "hamper__iofciz": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "hamper__pcyjbu": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "hamper__pdzaca": {
+  "base": {
+   "first": [
+    "z2",
+    "zinf",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z17"
+   }
+  }
+ },
+ "hamper__pgwdlg": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "hamper__pqzyxx": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "hamper__sijioo": {
+  "base": {
+   "first": [
+    "z4",
+    "z3",
+    "z5",
+    "zinf",
+    "z2",
+    "z6"
+   ],
+   "pin": {
+    "z3": "z120",
+    "z5": "z72"
+   }
+  }
+ },
+ "hamper__ssfvij": {
+  "base": {
+   "first": [
+    "z2",
+    "z4"
+   ],
+   "pin": {}
+  }
+ },
+ "hamper__wdsnjy": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "hamper__wqxrbf": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "hamper__xhdtjn": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "hamper__xjftlf": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "hanger__anobre": {
+  "base": {
+   "first": [
+    "x2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "hardback__acaxtl": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "hardback__acbrnv": {
+  "base": {
+   "first": [
+    "y2",
+    "x2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "hardback__aceozs": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "hardback__agbqsy": {
+  "base": {
+   "first": [
+    "y2",
+    "x2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "hardback__ajpulw": {
+  "base": {
+   "first": [
+    "y2",
+    "x2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "hardback__atxzzy": {
+  "base": {
+   "first": [
+    "y2",
+    "z2",
+    "x2"
+   ],
+   "pin": {}
+  }
+ },
+ "hardback__axvnml": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "hardback__bgtbdp": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "hardback__bobmzf": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "hardback__bpgluc": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "hardback__bqvvvx": {
+  "base": {
+   "first": [
+    "y2",
+    "x2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "hingeless_jar__bqpmsv": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "hingeless_jar__crlhmi": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "hingeless_jar__lvuvbf": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "hingeless_jar__mefezc": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "hingeless_jar__wcqjew": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "hook__wmvozo": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "ice_cube__dueotq": {
+  "base": {
+   "first": [
+    "z4",
+    "z2",
+    "x4",
+    "y4"
+   ],
+   "pin": {
+    "z4": "z90"
+   }
+  }
+ },
+ "ice_cube__kdlafa": {
+  "base": {
+   "first": [
+    "x4",
+    "y4",
+    "z4",
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "ice_cube__lkirej": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "y4"
+   ],
+   "pin": {
+    "z4": "z90"
+   }
+  }
+ },
+ "jar_of_bath_salt__dtrjxi": {
+  "base": {
+   "first": [
+    "z4",
+    "z2",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "jar_of_bath_salt__erglwp": {
+  "base": {
+   "first": [
+    "z4",
+    "z2",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "jar_of_clove__dlvall": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "jar_of_cumin__tsktnz": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "jar_of_curry_powder__ozhftu": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "jar_of_dill_seed__reavkt": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z3"
+   ],
+   "pin": {
+    "zinf": "z251"
+   }
+  }
+ },
+ "jar_of_jam__vxjbjf": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "jar_of_mayonnaise__ktmjvg": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "jar_of_orange_sauce__xfxfig": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "jar_of_puree__raagvm": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "jar_of_spaghetti_sauce__efrxze": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "jar_of_spaghetti_sauce__exmsmm": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "z4",
+    "z3",
+    "x2",
+    "y2",
+    "z2",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "jar_of_spaghetti_sauce__fyocnu": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "jar_of_spaghetti_sauce__xpasvb": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "jar_of_spaghetti_sauce__yqnmoy": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "jar_of_spaghetti_sauce__zahyds": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "jar_of_sugar__bholak": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "jar_of_tumeric__miivhi": {
+  "base": {
+   "first": [
+    "z4",
+    "z2"
+   ],
+   "pin": {
+    "z4": "z90"
+   }
+  }
+ },
+ "keyboard__injrgc": {
+  "base": {
+   "first": [
+    "y2",
+    "x2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "keyboard__jtdyix": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "keyboard__kzcreb": {
+  "base": {
+   "first": [
+    "y2",
+    "x2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "keyboard__uwacaq": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "lemon__asdada": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "z2",
+    "x2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "y2": "y180",
+    "z2": "z180"
+   }
+  }
+ },
+ "lemon__bbvonm": {
+  "base": {
+   "first": [
+    "y2",
+    "z2",
+    "x5",
+    "x6",
+    "x2",
+    "x4",
+    "x3",
+    "xinf"
+   ],
+   "pin": {
+    "x6": "x60",
+    "y2": "y180",
+    "z2": "z180",
+    "x5": "x72"
+   }
+  }
+ },
+ "lemon__bmvxas": {
+  "base": {
+   "first": [
+    "y2",
+    "x4",
+    "x5",
+    "x6",
+    "z2",
+    "xinf",
+    "x2",
+    "x3"
+   ],
+   "pin": {
+    "y2": "y180",
+    "xinf": "x101"
+   }
+  }
+ },
+ "lemon__dsacfa": {
+  "base": {
+   "first": [
+    "y2",
+    "x5",
+    "x6",
+    "z2",
+    "x4",
+    "x3",
+    "xinf",
+    "x2"
+   ],
+   "pin": {
+    "x6": "x60",
+    "y2": "y180",
+    "x5": "x72"
+   }
+  }
+ },
+ "lemon__gkrfha": {
+  "base": {
+   "first": [
+    "x6",
+    "y2",
+    "xinf",
+    "z2",
+    "x4",
+    "x5",
+    "x2",
+    "x3"
+   ],
+   "pin": {
+    "y2": "y180",
+    "xinf": "x101"
+   }
+  }
+ },
+ "lemon__hoghjl": {
+  "base": {
+   "first": [
+    "y2",
+    "x6",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "xinf",
+    "x2"
+   ],
+   "pin": {
+    "x6": "x60",
+    "y2": "y180"
+   }
+  }
+ },
+ "lemon__kvgfdl": {
+  "base": {
+   "first": [
+    "z2",
+    "xinf",
+    "y2",
+    "x2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "y2": "y180",
+    "xinf": "x101"
+   }
+  }
+ },
+ "lemon__ovbcff": {
+  "base": {
+   "first": [
+    "y2",
+    "x6",
+    "x4",
+    "x3",
+    "x5"
+   ],
+   "pin": {
+    "x6": "x60",
+    "y2": "y180"
+   }
+  }
+ },
+ "lemon__peqwoa": {
+  "base": {
+   "first": [
+    "y2",
+    "x4",
+    "x5",
+    "x6",
+    "z2",
+    "xinf",
+    "x2",
+    "x3"
+   ],
+   "pin": {
+    "y2": "y180",
+    "xinf": "x101"
+   }
+  }
+ },
+ "lemon__pffkae": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6",
+    "y2",
+    "xinf",
+    "x2",
+    "x3"
+   ],
+   "pin": {
+    "y2": "y180",
+    "xinf": "x101"
+   }
+  }
+ },
+ "lemon__pqweio": {
+  "base": {
+   "first": [
+    "y2",
+    "x4",
+    "x5",
+    "x6",
+    "z2",
+    "x3",
+    "xinf",
+    "x2"
+   ],
+   "pin": {
+    "x6": "x60",
+    "y2": "y180",
+    "x5": "x72",
+    "x4": "x90"
+   }
+  }
+ },
+ "lemon__pwqedq": {
+  "base": {
+   "first": [
+    "x6",
+    "y2",
+    "x4",
+    "x3",
+    "x5",
+    "z2",
+    "xinf",
+    "x2"
+   ],
+   "pin": {
+    "x6": "x60",
+    "y2": "y180",
+    "x5": "x72",
+    "x4": "x90"
+   }
+  }
+ },
+ "lemon__vuwehu": {
+  "base": {
+   "first": [
+    "y2",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6",
+    "xinf"
+   ],
+   "pin": {
+    "y2": "y180"
+   }
+  }
+ },
+ "lemonade_bottle__yprkek": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "letter__bdlpry": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "letter__csncjv": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "letter__dyvllf": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "letter__esmoua": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "z3",
+    "z6"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "letter__igvnic": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "letter__jafvfh": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "letter__oheufk": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "letter__qrykxc": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "license_plate__hjdaqn": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "license_plate__naclac": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "license_plate__nuqnlr": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "license_plate__nwfbxn": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "license_plate__yepdrj": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "lid__bemtjd": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "lid__dkncbi": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "lid__egfobe": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "lid__fnqhbz": {
+  "base": {
+   "first": [
+    "z2",
+    "z5",
+    "z6",
+    "z4",
+    "z3",
+    "zinf"
+   ],
+   "pin": {
+    "z6": "z60",
+    "z5": "z72"
+   }
+  }
+ },
+ "lid__kdswwr": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "lid__muczdt": {
+  "base": {
+   "first": [
+    "zinf",
+    "z4",
+    "z5",
+    "z6",
+    "x2",
+    "y2",
+    "z2",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "lid__niarsj": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "lid__pwgbsb": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "lid__qferch": {
+  "base": {
+   "first": [
+    "z2",
+    "zinf",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z101"
+   }
+  }
+ },
+ "lid__qhlsdq": {
+  "base": {
+   "first": [
+    "z4",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "lid__qkpdih": {
+  "base": {
+   "first": [
+    "z2",
+    "z4"
+   ],
+   "pin": {}
+  }
+ },
+ "lid__snklci": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "lid__tnwisp": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "lid__ugfmpq": {
+  "base": {
+   "first": [
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "lid__wtjthb": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "lid__xdyddo": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "z3",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "lid__zkderg": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "lipstick__albshz": {
+  "base": {
+   "first": [
+    "y4",
+    "y5",
+    "z2",
+    "y6",
+    "yinf",
+    "x2",
+    "y2",
+    "y3"
+   ],
+   "pin": {
+    "y5": "y72"
+   }
+  }
+ },
+ "magazine__ajitiv": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "magazine__ehdwsd": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "magazine__tfovwy": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "magazine__ymfwaz": {
+  "base": {
+   "first": [
+    "y2",
+    "x2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "magazine__zfeoeu": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "marker__ablbdc": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6",
+    "x2",
+    "y2",
+    "x3",
+    "xinf"
+   ],
+   "pin": {
+    "x6": "x60",
+    "x5": "x72",
+    "x4": "x90"
+   }
+  }
+ },
+ "marker__bwwkmb": {
+  "base": {
+   "first": [
+    "x5",
+    "x6",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "xinf"
+   ],
+   "pin": {
+    "x6": "x60",
+    "x5": "x72"
+   }
+  }
+ },
+ "marker__erhlbb": {
+  "base": {
+   "first": [
+    "x4",
+    "x5",
+    "x6",
+    "x2",
+    "y2",
+    "z2",
+    "x3",
+    "xinf"
+   ],
+   "pin": {
+    "x6": "x60",
+    "x5": "x72",
+    "x4": "x90"
+   }
+  }
+ },
+ "marker__gldosk": {
+  "base": {
+   "first": [
+    "x4",
+    "x5",
+    "x6",
+    "x2",
+    "y2",
+    "z2",
+    "x3",
+    "xinf"
+   ],
+   "pin": {
+    "x6": "x60",
+    "x5": "x72",
+    "x4": "x90"
+   }
+  }
+ },
+ "marker__hmlofs": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "marker__jlvneb": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "xinf": "x163"
+   }
+  }
+ },
+ "marker__kjxpdi": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "marker__mcpkkq": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "xinf": "x163"
+   }
+  }
+ },
+ "marker__mznenj": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "xinf": "x197"
+   }
+  }
+ },
+ "marker__oyjbhy": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "xinf": "x163"
+   }
+  }
+ },
+ "marker__qemval": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "marker__rsxbso": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "marker__slgheo": {
+  "base": {
+   "first": [
+    "x4",
+    "x5",
+    "x6",
+    "x2",
+    "y2",
+    "z2",
+    "x3",
+    "xinf"
+   ],
+   "pin": {
+    "x6": "x60",
+    "x5": "x72",
+    "x4": "x90"
+   }
+  }
+ },
+ "marker__tcsmqv": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "marker__vjjsul": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "xinf": "x197"
+   }
+  }
+ },
+ "marker__vrjwkg": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "xinf": "x163"
+   }
+  }
+ },
+ "marker__xakoic": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "xinf": "x197"
+   }
+  }
+ },
+ "marker__zmimhb": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "marker__zvvovh": {
+  "base": {
+   "first": [
+    "x4",
+    "x5",
+    "x6",
+    "x2",
+    "y2",
+    "z2",
+    "x3",
+    "xinf"
+   ],
+   "pin": {
+    "x6": "x60",
+    "x5": "x72",
+    "x4": "x90"
+   }
+  }
+ },
+ "newspaper__edarlp": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "z3",
+    "z6"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "newspaper__ukamcl": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "notebook__aanuhi": {
+  "base": {
+   "first": [
+    "y2",
+    "x2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "notebook__dlhxxl": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "notebook__eijrqw": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "y2": "y180"
+   }
+  }
+ },
+ "notebook__fckzgw": {
+  "base": {
+   "first": [
+    "y2",
+    "x2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "notebook__ffdjzp": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "notebook__gqkaqu": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "notebook__hwhisw": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "notebook__ksxknp": {
+  "base": {
+   "first": [
+    "y2",
+    "x2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "notebook__mtveio": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "notebook__qwhiqc": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "notebook__svisnb": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "notebook__umxsmd": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "notebook__zkmmnf": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "notebook__zkpswz": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "notepad__awcyha": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "notepad__hirdfd": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "notepad__oaikde": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "notepad__rvevdj": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "orange__nlygru": {
+  "base": {
+   "first": [
+    "full",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "y4",
+    "z4",
+    "x3",
+    "y3",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "orange__ucstpm": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "full",
+    "y2",
+    "z2",
+    "x4",
+    "y4",
+    "z4",
+    "x3",
+    "y3"
+   ],
+   "pin": {
+    "full": "rand1"
+   }
+  }
+ },
+ "ottoman__miftfy": {
+  "base": {
+   "first": [
+    "z4",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "ottoman__qsnawv": {
+  "base": {
+   "first": [
+    "x4",
+    "y4",
+    "z4",
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "ottoman__xcmniq": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "ottoman__ycfbsd": {
+  "base": {
+   "first": [
+    "z4",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_chocolate_bar__bxgewr": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "pack_of_chocolate_bar__tidcst": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "pack_of_chocolate_bar__wgrkhn": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_cigarettes__ajphvf": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "y2": "y180"
+   }
+  }
+ },
+ "pack_of_cigarettes__cfmlhf": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_cigarettes__dthkix": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_cigarettes__ghbqav": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "pack_of_cigarettes__gzxueq": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_cigarettes__hmhqkq": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_cigarettes__ipmejr": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_cigarettes__kienyo": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_cigarettes__ohpqua": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "pack_of_cigarettes__ppbmak": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "pack_of_cigarettes__qabdgg": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_cigarettes__qldhnm": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_cigarettes__rmrubd": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_cigarettes__tngixy": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "pack_of_cigarettes__wjfbhw": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_cigarettes__wpmpcf": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_kielbasa__bzlsuh": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_kielbasa__dgodnn": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_kielbasa__femhoz": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_kielbasa__fwqdoy": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_kielbasa__nhkuzn": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_kielbasa__rvhpal": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "pack_of_kielbasa__twgpur": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_pasta__gwqhko": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_protein_powder__rikjwx": {
+  "base": {
+   "first": [
+    "x2",
+    "z2",
+    "y4",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "pack_of_protein_powder__tpcsve": {
+  "base": {
+   "first": [
+    "x2",
+    "z2",
+    "y4",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "painting__dacihj": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6",
+    "xinf"
+   ],
+   "pin": {}
+  }
+ },
+ "painting__eexydp": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6",
+    "xinf"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "painting__ejhanr": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "painting__fmlmox": {
+  "base": {
+   "first": [
+    "x4",
+    "x2"
+   ],
+   "pin": {}
+  }
+ },
+ "painting__fwuole": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "painting__fyoxcq": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6",
+    "xinf"
+   ],
+   "pin": {}
+  }
+ },
+ "painting__gardkz": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "painting__ifdzgs": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "painting__jayvqq": {
+  "base": {
+   "first": [
+    "x2"
+   ],
+   "pin": {}
+  }
+ },
+ "painting__jfkvxh": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6",
+    "xinf"
+   ],
+   "pin": {}
+  }
+ },
+ "painting__ljabhq": {
+  "base": {
+   "first": [
+    "x4",
+    "y2",
+    "z2",
+    "x2",
+    "x3",
+    "x5",
+    "x6",
+    "xinf"
+   ],
+   "pin": {}
+  }
+ },
+ "paper_bag__bzsxgw": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "paper_cup__guobeq": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "paper_liners__yvuilk": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z3"
+   ],
+   "pin": {
+    "zinf": "z39"
+   }
+  }
+ },
+ "paperback_book__aubynm": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "paperback_book__bisnup": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "paperback_book__eqzjjk": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z6"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "paperback_book__fvzdec": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "paperback_book__hdhhqo": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "paperback_book__hrtflt": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "paperback_book__ixwtnb": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "paperback_book__jhaltj": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z6"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "paperback_book__ncjkcg": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z6"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "paperback_book__phsgun": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z6"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "paperback_book__vciijb": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z6"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "paperback_book__wfcxjv": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "paperback_book__xxknda": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "pen__enfumt": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "xinf": "x101"
+   }
+  }
+ },
+ "pen__gqwdor": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "pen__gzrbrx": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "pen__hiyeki": {
+  "base": {
+   "first": [
+    "x4",
+    "x5",
+    "x6",
+    "xinf",
+    "x3",
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "pen__nvyicz": {
+  "base": {
+   "first": [
+    "x4",
+    "x5",
+    "x6",
+    "x2",
+    "y2",
+    "z2",
+    "x3",
+    "xinf"
+   ],
+   "pin": {}
+  }
+ },
+ "pen__ubwjqa": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "pencil__bfkwhb": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "z2",
+    "x2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "y2": "y180",
+    "z2": "z180"
+   }
+  }
+ },
+ "pencil__fnlbpu": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  },
+  "scaled": {
+   "first": [
+    "z2",
+    "xinf",
+    "x2",
+    "y2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "xinf": "x251"
+   }
+  }
+ },
+ "pencil__gbzzcg": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  },
+  "scaled": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "x4",
+    "x3",
+    "x5",
+    "x6",
+    "xinf"
+   ],
+   "pin": {}
+  }
+ },
+ "pencil__heqkmr": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x3",
+    "x2",
+    "z2",
+    "x4",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  },
+  "scaled": {
+   "first": [
+    "z2",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "pencil__hmawzy": {
+  "base": {
+   "first": [
+    "z2",
+    "x4",
+    "x5",
+    "x6",
+    "y2",
+    "xinf",
+    "x2",
+    "x3"
+   ],
+   "pin": {}
+  },
+  "scaled": {
+   "first": [
+    "z2",
+    "x6"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "pencil__jntybl": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  },
+  "scaled": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "x4",
+    "x3",
+    "x5",
+    "x6",
+    "xinf"
+   ],
+   "pin": {}
+  }
+ },
+ "pencil__lruiot": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x4",
+    "x2",
+    "z2",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "xinf": "x101"
+   }
+  },
+  "scaled": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "pencil__lykqoh": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  },
+  "scaled": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "pencil__mvmxfo": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  },
+  "scaled": {
+   "first": [
+    "z2",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "pencil__rzscao": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "z2",
+    "x2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "y2": "y180",
+    "z2": "z180"
+   }
+  },
+  "scaled": {
+   "first": [
+    "z2",
+    "y2",
+    "x2",
+    "x4",
+    "x3",
+    "x5",
+    "x6",
+    "xinf"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "pencil__vedvit": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  },
+  "scaled": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "pencil__vpzhth": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  },
+  "scaled": {
+   "first": [
+    "z2",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "pencil__vvofwr": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x4",
+    "x2",
+    "z2",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "xinf": "x101"
+   }
+  },
+  "scaled": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "pencil_case__acikzo": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "y4",
+    "y3",
+    "y5",
+    "y6",
+    "yinf"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "pencil_holder__jkuiqg": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "pencil_holder__jyetcl": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "pencil_holder__mrrpay": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "pencil_holder__taixcy": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "pepper_shaker__stbqbt": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "z2",
+    "z4",
+    "z3",
+    "zinf"
+   ],
+   "pin": {
+    "z6": "z60",
+    "z5": "z72"
+   }
+  }
+ },
+ "pepper_shaker__tgcwtr": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "y2"
+   ],
+   "pin": {
+    "zinf": "z53"
+   }
+  }
+ },
+ "pepper_shaker__ykujyn": {
+  "base": {
+   "first": [
+    "x2",
+    "zinf",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "pickle__ifterk": {
+  "base": {
+   "first": [
+    "y4",
+    "y2",
+    "y3",
+    "y5",
+    "y6",
+    "yinf",
+    "x2"
+   ],
+   "pin": {
+    "y4": "y90"
+   }
+  }
+ },
+ "pickle__iobrqp": {
+  "base": {
+   "first": [
+    "y4",
+    "y2",
+    "y3",
+    "y5",
+    "y6",
+    "yinf",
+    "x2",
+    "z2"
+   ],
+   "pin": {
+    "y4": "y90"
+   }
+  }
+ },
+ "picture__alwmys": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "picture__bxpohm": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "picture__chfljy": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "picture__cltbty": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "picture__dogydw": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "picture__fhkzlm": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "picture__ggajdz": {
+  "base": {
+   "first": [
+    "z2",
+    "z4",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "picture__hffaxw": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "picture__hhxttu": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "picture__jmvdxm": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "picture__qavxsz": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "picture__watgtj": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "picture__wfdvzv": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "picture__ytxhyl": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "plate__aynjhg": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "plate__bgxzec": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "plate__kkjiko": {
+  "base": {
+   "first": [
+    "z4",
+    "z2",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "plate__luhkiz": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "plate__mtetqm": {
+  "base": {
+   "first": [
+    "z4",
+    "z2",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "plate__ntedfx": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "plate__odmjdd": {
+  "base": {
+   "first": [
+    "z4",
+    "z2",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "plate__pkkgzc": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "plate__qtfzeq": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "plate__spppps": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "plate__vtjwof": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "plate__zpddxu": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "platter__csanbr": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "platter__ekjpdj": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "platter__hnlivs": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "platter__iadlti": {
+  "base": {
+   "first": [
+    "z3",
+    "z2",
+    "z4",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "platter__ieoasd": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "platter__kiiamx": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "pop_case__gwgaqb": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "y2": "y180"
+   }
+  }
+ },
+ "pop_case__pldtgy": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "pop_case__qcfxec": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "pop_case__rzhvvk": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "pop_case__unmexe": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "pop_case__zfyatg": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "poster__dsrcyt": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "public_trash_can__aefcem": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z131"
+   }
+  }
+ },
+ "public_trash_can__duugbb": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "public_trash_can__fkosow": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "public_trash_can__glzckq": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "public_trash_can__gsgutn": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "public_trash_can__gvnfgj": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "public_trash_can__hxsyxo": {
+  "base": {
+   "first": [
+    "z5",
+    "z6",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "zinf"
+   ],
+   "pin": {
+    "z6": "z60",
+    "z5": "z72"
+   }
+  }
+ },
+ "public_trash_can__leazin": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z3",
+    "z6",
+    "z2",
+    "z4",
+    "z5"
+   ],
+   "pin": {
+    "zinf": "z101"
+   }
+  }
+ },
+ "public_trash_can__rteihy": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "public_trash_can__xkqkbf": {
+  "base": {
+   "first": [
+    "zinf",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "zinf": "z101"
+   }
+  }
+ },
+ "radiator__arsjbe": {
+  "base": {
+   "first": [
+    "y2",
+    "x2",
+    "z2"
+   ],
+   "pin": {
+    "y2": "y180"
+   }
+  }
+ },
+ "radiator__dwmloz": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "radiator__wntwxx": {
+  "base": {
+   "first": [
+    "y2",
+    "x2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "radiator__xnoiwp": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "y2": "y180"
+   }
+  }
+ },
+ "rolling_pin__mwrdae": {
+  "base": {
+   "first": [
+    "x2",
+    "yinf",
+    "y2",
+    "z2",
+    "y4",
+    "y3",
+    "y5",
+    "y6"
+   ],
+   "pin": {
+    "yinf": "y163",
+    "x2": "x180"
+   }
+  }
+ },
+ "rolling_pin__smnklu": {
+  "base": {
+   "first": [
+    "x2",
+    "yinf",
+    "y2",
+    "z2",
+    "y4",
+    "y3",
+    "y5",
+    "y6"
+   ],
+   "pin": {}
+  }
+ },
+ "ruler__ckywbx": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "ruler__gajhql": {
+  "base": {
+   "first": [
+    "z2",
+    "y3",
+    "x2",
+    "y2",
+    "y4",
+    "y5",
+    "yinf"
+   ],
+   "pin": {}
+  }
+ },
+ "ruler__rutqab": {
+  "base": {
+   "first": [
+    "z2",
+    "y3",
+    "x2",
+    "y2",
+    "y4",
+    "y5",
+    "y6",
+    "yinf"
+   ],
+   "pin": {}
+  }
+ },
+ "ruler__ujizkx": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "ruler__vmnaih": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180",
+    "x2": "x180"
+   }
+  }
+ },
+ "salt_shaker__fonexa": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "salt_shaker__iomwtn": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z5",
+    "z6",
+    "z3"
+   ],
+   "pin": {
+    "zinf": "z53"
+   }
+  }
+ },
+ "salt_shaker__qowouj": {
+  "base": {
+   "first": [
+    "z4",
+    "z6",
+    "zinf",
+    "z2",
+    "z3",
+    "z5"
+   ],
+   "pin": {
+    "zinf": "z163"
+   }
+  }
+ },
+ "saucepot__chjetk": {
+  "base": {
+   "first": [
+    "z2",
+    "zinf",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z197"
+   }
+  }
+ },
+ "saucepot__tfzijn": {
+  "base": {
+   "first": [
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "saucepot__uvzmss": {
+  "base": {
+   "first": [
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "saucepot__vqtkwq": {
+  "base": {
+   "first": [
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "saucepot__wfryvm": {
+  "base": {
+   "first": [
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "saucer__mgbeah": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "saucer__oxivmf": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "saucer__vghfkh": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "serving_cart__heqtlk": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "shampoo_dispenser__eblcnw": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z131"
+   }
+  }
+ },
+ "shampoo_dispenser__eywylh": {
+  "base": {
+   "first": [
+    "z4",
+    "z6",
+    "z2",
+    "z3",
+    "z5",
+    "zinf"
+   ],
+   "pin": {
+    "z4": "z90"
+   }
+  }
+ },
+ "shampoo_dispenser__kkbhzw": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z3"
+   ],
+   "pin": {
+    "zinf": "z251"
+   }
+  }
+ },
+ "shampoo_dispenser__nrthyl": {
+  "base": {
+   "first": [
+    "z4",
+    "z2",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {
+    "z4": "z90"
+   }
+  }
+ },
+ "shampoo_dispenser__thurmw": {
+  "base": {
+   "first": [
+    "z4",
+    "z2",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "shelf__iruewm": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "shelf__kxvbui": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "shelf__qrmiur": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "shelf__wvkefp": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "signpost__axhlim": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "signpost__ivvjfv": {
+  "base": {
+   "first": [
+    "x2"
+   ],
+   "pin": {}
+  }
+ },
+ "signpost__mexzmk": {
+  "base": {
+   "first": [
+    "y2",
+    "x2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "signpost__mlvfbp": {
+  "base": {
+   "first": [
+    "y2",
+    "x2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "signpost__vvjtkv": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "signpost__vwhtlm": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "soap_dish__gnndfy": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "soap_dish__ownvqj": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "soap_dish__slksbk": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "soap_dispenser__cgxrwd": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z251"
+   }
+  }
+ },
+ "soap_dispenser__edinmg": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z163"
+   }
+  }
+ },
+ "soap_dispenser__ijxawq": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z251"
+   }
+  }
+ },
+ "soap_dispenser__jmulpc": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "soap_dispenser__zwudcz": {
+  "base": {
+   "first": [
+    "zinf",
+    "z3",
+    "z5",
+    "z6",
+    "z2",
+    "z4"
+   ],
+   "pin": {
+    "zinf": "z131"
+   }
+  }
+ },
+ "soda_cup__fsfsas": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "soda_cup__gnzegv": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "soda_cup__lpanoc": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "soda_cup__vicaqs": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "soda_water_bottle__upfssc": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "sponge__aewrov": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "sponge__klwueh": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "spray_can__bgalkx": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "spray_can__buxqkr": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "spray_can__tehmzy": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "star_anise__fwjuab": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "star_anise__nbawoz": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "star_anise__njpqwe": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "sugar_cookie__cgkiti": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "x2": "x180",
+    "zinf": "z197"
+   }
+  }
+ },
+ "sugar_cookie__hlyeaq": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "x2": "x180",
+    "zinf": "z197"
+   }
+  }
+ },
+ "table_knife__eebpap": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "x3",
+    "x5",
+    "x6",
+    "xinf"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "table_knife__jxdfyy": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6",
+    "xinf"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "table_knife__lrdmpf": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "x3",
+    "x6"
+   ],
+   "pin": {
+    "y2": "y180",
+    "z2": "z180"
+   }
+  }
+ },
+ "table_lamp__ehjsdz": {
+  "base": {
+   "first": [
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "taboret__bciekv": {
+  "base": {
+   "first": [
+    "z4",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "taboret__ehaclu": {
+  "base": {
+   "first": [
+    "z2",
+    "z4"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "taboret__hugvml": {
+  "base": {
+   "first": [
+    "z3"
+   ],
+   "pin": {
+    "z3": "z120"
+   }
+  }
+ },
+ "taboret__vzzmir": {
+  "base": {
+   "first": [
+    "z3",
+    "z2",
+    "z4",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "taboret__wjrpwg": {
+  "base": {
+   "first": [
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "taboret__ysrhuw": {
+  "base": {
+   "first": [
+    "z4",
+    "z2",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "teacup__cpozxi": {
+  "base": {
+   "first": [
+    "zinf",
+    "z6",
+    "z2",
+    "z4",
+    "z3",
+    "z5"
+   ],
+   "pin": {
+    "z6": "z60"
+   }
+  }
+ },
+ "teacup__tfzfam": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "teacup__zdvgol": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "tennis_ball__rgekxe": {
+  "base": {
+   "first": [
+    "full",
+    "z2",
+    "y4",
+    "z4",
+    "x3",
+    "y3",
+    "z3",
+    "x5",
+    "y5",
+    "x6"
+   ],
+   "pin": {
+    "full": "rand0"
+   }
+  }
+ },
+ "tissue_dispenser__nflhrf": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z4",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "tomato_paste_can__krarex": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "tongs__gbjqyn": {
+  "base": {
+   "first": [
+    "x2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "tongs__igsklx": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "towel_rack__crivoa": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "y4",
+    "y3",
+    "y5",
+    "y6",
+    "yinf"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "towel_rack__kqrmrh": {
+  "base": {
+   "first": [
+    "x2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "towel_rack__nhlijv": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "towel_rack__qedffr": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "towel_rack__quznqx": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "yinf",
+    "y4",
+    "y3",
+    "y5",
+    "y6"
+   ],
+   "pin": {
+    "yinf": "y163",
+    "x2": "x180"
+   }
+  }
+ },
+ "toy_box__kvithq": {
+  "base": {
+   "first": [
+    "z2",
+    "z4"
+   ],
+   "pin": {}
+  }
+ },
+ "toy_box__uvhflb": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "toy_dice__akguod": {
+  "base": {
+   "first": [
+    "x2",
+    "z2",
+    "y4",
+    "y2",
+    "x4",
+    "z4"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "toy_dice__bjrxkj": {
+  "base": {
+   "first": [
+    "x2",
+    "z2",
+    "y4",
+    "y2",
+    "x4",
+    "z4"
+   ],
+   "pin": {
+    "z2": "z180",
+    "x2": "x180"
+   }
+  }
+ },
+ "toy_dice__cmqtch": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z4",
+    "z2",
+    "x4",
+    "y4"
+   ],
+   "pin": {
+    "y2": "y180",
+    "x2": "x180",
+    "z4": "z90"
+   }
+  }
+ },
+ "toy_dice__eqwazv": {
+  "base": {
+   "first": [
+    "x2",
+    "z2",
+    "y4",
+    "y2",
+    "x4",
+    "z4"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "toy_dice__gcevml": {
+  "base": {
+   "first": [
+    "y2",
+    "z2",
+    "x4",
+    "x2",
+    "y4",
+    "z4"
+   ],
+   "pin": {}
+  }
+ },
+ "toy_dice__haqumx": {
+  "base": {
+   "first": [
+    "x4",
+    "x2",
+    "y2",
+    "z2",
+    "y4",
+    "z4",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "toy_dice__hbkqqp": {
+  "base": {
+   "first": [
+    "y2",
+    "z2",
+    "x4",
+    "x2",
+    "y4",
+    "z4"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "toy_dice__ievnsq": {
+  "base": {
+   "first": [
+    "x2",
+    "z2",
+    "y4",
+    "y2",
+    "x4",
+    "z4"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "toy_dice__kmagva": {
+  "base": {
+   "first": [
+    "x2",
+    "z2",
+    "y4",
+    "y2",
+    "x4",
+    "z4"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "toy_dice__krpdji": {
+  "base": {
+   "first": [
+    "x2",
+    "z2",
+    "y4",
+    "y2",
+    "x4",
+    "z4"
+   ],
+   "pin": {
+    "y2": "y180"
+   }
+  }
+ },
+ "toy_dice__meyqyk": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "y4",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "toy_dice__mqvaaa": {
+  "base": {
+   "first": [
+    "x2",
+    "z2",
+    "y4",
+    "y2",
+    "x4",
+    "z4"
+   ],
+   "pin": {
+    "z2": "z180",
+    "x2": "x180",
+    "y4": "y90"
+   }
+  }
+ },
+ "toy_dice__nmhsvp": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z4",
+    "z2",
+    "x4",
+    "y4"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "toy_dice__rbzyrv": {
+  "base": {
+   "first": [
+    "x2",
+    "z2",
+    "y4",
+    "y2",
+    "x4",
+    "z4"
+   ],
+   "pin": {
+    "z2": "z180",
+    "x2": "x180",
+    "y4": "y90"
+   }
+  }
+ },
+ "toy_dice__wyxlhc": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z4",
+    "z2",
+    "x4",
+    "y4"
+   ],
+   "pin": {}
+  }
+ },
+ "toy_dice__xfqqhh": {
+  "base": {
+   "first": [
+    "x2",
+    "z2",
+    "y4",
+    "y2",
+    "x4",
+    "z4"
+   ],
+   "pin": {
+    "z2": "z180",
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "toy_dice__zublep": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "y4",
+    "z5"
+   ],
+   "pin": {}
+  }
+ },
+ "toy_figure__gqspnb": {
+  "base": {
+   "first": [
+    "x2",
+    "x3",
+    "x5",
+    "xinf",
+    "x4",
+    "x6"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "toy_figure__jddrck": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "z2",
+    "z3",
+    "zinf"
+   ],
+   "pin": {
+    "z4": "z90"
+   }
+  }
+ },
+ "trash_can__cdzyew": {
+  "base": {
+   "first": [
+    "y2",
+    "zinf",
+    "x2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "trash_can__djgllo": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "trash_can__dnvpag": {
+  "base": {
+   "first": [
+    "z4",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "trash_can__eahqyq": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "trash_can__gilsji": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "trash_can__hqdnjz": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "trash_can__jlawet": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "trash_can__rbqckd": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "trash_can__wklill": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "trash_can__wkxtxh": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "tray__gsxbym": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "tray__hbjdlb": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "tray__hjxczh": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "tray__hvlfig": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "tray__jpcflq": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "tray__mkdcha": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "y2": "y180",
+    "x2": "x180"
+   }
+  }
+ },
+ "tray__spopfj": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "tray__thkphg": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "tray__wbwmcs": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "tray__xzcnjq": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {
+    "z2": "z180"
+   }
+  }
+ },
+ "tray__zcmnji": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "tray__zsddtq": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "y2",
+    "z2",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "tube_of_lotion__ixfuxm": {
+  "base": {
+   "first": [
+    "z2",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "umbrella__hdfkbc": {
+  "base": {
+   "first": [
+    "xinf",
+    "y2",
+    "z2",
+    "x4",
+    "x2",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "x4": "x90"
+   }
+  }
+ },
+ "umbrella__zxnjwz": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "vase__aegxpb": {
+  "base": {
+   "first": [
+    "z4",
+    "z5",
+    "z6",
+    "zinf",
+    "z2",
+    "z3"
+   ],
+   "pin": {
+    "zinf": "z163"
+   }
+  }
+ },
+ "vase__atgnsc": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "zinf": "z251"
+   }
+  }
+ },
+ "vase__gopbrh": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "vase__rusmlm": {
+  "base": {
+   "first": [
+    "z4",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "vase__stqkvx": {
+  "base": {
+   "first": [
+    "z6",
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5"
+   ],
+   "pin": {
+    "zinf": "z53"
+   }
+  }
+ },
+ "vase__wltgjn": {
+  "base": {
+   "first": [
+    "z2",
+    "x2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "vidalia_onion__buyxll": {
+  "base": {
+   "first": [
+    "x5",
+    "x6",
+    "xinf",
+    "x2",
+    "x4",
+    "y4",
+    "x3",
+    "y5",
+    "z5",
+    "y6"
+   ],
+   "pin": {
+    "xinf": "x251"
+   }
+  }
+ },
+ "vidalia_onion__dejqhf": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "y4",
+    "z4",
+    "x3",
+    "y3",
+    "z3"
+   ],
+   "pin": {}
+  }
+ },
+ "vidalia_onion__ldeuli": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "y4",
+    "z4",
+    "x3",
+    "y3",
+    "z3"
+   ],
+   "pin": {
+    "xinf": "x197"
+   }
+  }
+ },
+ "video_game__apjpos": {
+  "base": {
+   "first": [
+    "y2",
+    "z2",
+    "x2"
+   ],
+   "pin": {}
+  }
+ },
+ "video_game__ceaxsd": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "video_game__ckugyi": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "video_game__coiafo": {
+  "base": {
+   "first": [
+    "y2",
+    "z2",
+    "x2",
+    "z4",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "video_game__lfdpse": {
+  "base": {
+   "first": [
+    "y2",
+    "z2",
+    "x2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "video_game__ppnzqm": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "video_game__pujfzk": {
+  "base": {
+   "first": [
+    "y2",
+    "z2",
+    "x2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "video_game__qsyyql": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z4"
+   ],
+   "pin": {}
+  }
+ },
+ "video_game__quzjuo": {
+  "base": {
+   "first": [
+    "y2",
+    "z2",
+    "x2",
+    "z4",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "video_game__rzaxlj": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2",
+    "z4"
+   ],
+   "pin": {}
+  }
+ },
+ "video_game__veodkq": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "video_game__yyvkel": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "wall_clock__fnwzqj": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "wall_clock__fqvgny": {
+  "base": {
+   "first": [
+    "xinf",
+    "x2",
+    "y2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {}
+  }
+ },
+ "wall_clock__jerval": {
+  "base": {
+   "first": [
+    "y2",
+    "xinf",
+    "x2",
+    "z2",
+    "x4",
+    "x3",
+    "x5",
+    "x6"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "wall_clock__xevvel": {
+  "base": {
+   "first": [
+    "x4",
+    "x3",
+    "x6",
+    "y2",
+    "z2",
+    "x5",
+    "xinf",
+    "x2"
+   ],
+   "pin": {
+    "x6": "x60",
+    "x2": "x180"
+   }
+  }
+ },
+ "wall_clock__zpctvp": {
+  "base": {
+   "first": [
+    "xinf",
+    "y2",
+    "z2",
+    "x2",
+    "x4",
+    "x3",
+    "x6",
+    "x5"
+   ],
+   "pin": {
+    "x6": "x60",
+    "x4": "x90"
+   }
+  }
+ },
+ "wall_mounted_tv__dxyfxf": {
+  "base": {
+   "first": [
+    "x2"
+   ],
+   "pin": {}
+  }
+ },
+ "wall_mounted_tv__ggfznh": {
+  "base": {
+   "first": [
+    "x2"
+   ],
+   "pin": {}
+  }
+ },
+ "wall_mounted_tv__sodbbr": {
+  "base": {
+   "first": [
+    "x2"
+   ],
+   "pin": {}
+  }
+ },
+ "wall_mounted_tv__ylvjhb": {
+  "base": {
+   "first": [
+    "x2"
+   ],
+   "pin": {}
+  }
+ },
+ "wall_nail__wlnail": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "water_bottle__lzdzkk": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "water_glass__cdteyb": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "water_glass__edfzlt": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "water_glass__elwfms": {
+  "base": {
+   "first": [
+    "zinf",
+    "x2",
+    "y2",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "whiteboard__bqqmtc": {
+  "base": {
+   "first": [
+    "x2",
+    "z2",
+    "y2"
+   ],
+   "pin": {}
+  }
+ },
+ "whiteboard__gvkgsi": {
+  "base": {
+   "first": [
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "x2": "x180"
+   }
+  }
+ },
+ "wicker_basket__dgkhyn": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "wicker_basket__drxfmr": {
+  "base": {
+   "first": [
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6",
+    "zinf"
+   ],
+   "pin": {}
+  }
+ },
+ "wicker_basket__jqfftz": {
+  "base": {
+   "first": [
+    "z4",
+    "x2",
+    "y2",
+    "z2"
+   ],
+   "pin": {
+    "z4": "z90"
+   }
+  }
+ },
+ "wicker_basket__tsjvyu": {
+  "base": {
+   "first": [
+    "z2",
+    "zinf",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {
+    "z4": "z90"
+   }
+  }
+ },
+ "wicker_basket__unasxd": {
+  "base": {
+   "first": [
+    "z2"
+   ],
+   "pin": {}
+  }
+ },
+ "wine_bottle__inkqch": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "wineglass__aakcyj": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "wineglass__akusda": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "wineglass__bovcqx": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "wineglass__euzudc": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "wineglass__exasdr": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "wineglass__ezsdil": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "wineglass__hxccge": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "wineglass__kxovsj": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "wineglass__oadvet": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "wineglass__ovoceo": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "wineglass__vxmzmq": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ },
+ "wineglass__yfzibn": {
+  "base": {
+   "first": [
+    "zinf",
+    "z2",
+    "z4",
+    "z3",
+    "z5",
+    "z6"
+   ],
+   "pin": {}
+  }
+ }
+}

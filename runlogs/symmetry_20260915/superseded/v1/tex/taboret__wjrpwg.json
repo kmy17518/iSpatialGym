@@ -1,0 +1,1 @@
+{"key": "taboret__wjrpwg", "category": "taboret", "model": "wjrpwg", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z3": {"mad": 0.01111707670358086, "p95": 0.043137254901960784, "p99": 0.12549019607843137, "mad_union": 0.03353516665672772, "iou": 0.9664713300200282, "worst": "z120"}}, "render_s": 0.119}

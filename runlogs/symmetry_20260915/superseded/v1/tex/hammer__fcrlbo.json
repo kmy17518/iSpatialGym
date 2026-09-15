@@ -1,0 +1,1 @@
+{"key": "hammer__fcrlbo", "category": "hammer", "model": "fcrlbo", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.007090851261115996, "p95": 0.047058823529411764, "p99": 0.15294117647058825, "mad_union": 0.12520183336562668, "iou": 0.8350945336151254, "worst": "x180"}}, "render_s": 0.111}

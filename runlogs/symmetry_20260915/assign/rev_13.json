@@ -1,0 +1,993 @@
+{
+ "batch_id": "rev_13",
+ "contract": "runlogs/symmetry_20260915/review_contract.md",
+ "output": "runlogs/symmetry_20260915/review/rev_13.json",
+ "n_models": 24,
+ "n_candidates": 34,
+ "models": [
+  {
+   "key": "half_lime__wdadtn",
+   "category": "half_lime",
+   "model": "wdadtn",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/half_lime__wdadtn.jpg",
+   "bbox_m": [
+    0.05939,
+    0.0601,
+    0.03843
+   ],
+   "n_faces": 5216,
+   "uses": [
+    "inter_object_relation_satisfaction-inside/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "z2"
+    ]
+   },
+   "candidates": {
+    "z2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.54 %, p95 1.47 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "z180",
+     "survey_texture": "borderline (MAD 3.8, p95 11.8, p99 18 /255 on the blurred, fully covered pixels; largest difference blob 11 mm (3.4x a 6 x 6 mm patch, 4.0 % of the -z view, mean 23/255); union-mask MAD 16.4, silhouette IoU 0.948)",
+     "sheet_row": "z2  (z180)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": [
+    "rev_05"
+   ]
+  },
+  {
+   "key": "hamburger_bun__fqxumh",
+   "category": "hamburger_bun",
+   "model": "fqxumh",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/hamburger_bun__fqxumh.jpg",
+   "bbox_m": [
+    0.08664,
+    0.08494,
+    0.02639
+   ],
+   "n_faces": 1920,
+   "uses": [
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "z4",
+     "z5",
+     "z6"
+    ]
+   },
+   "candidates": {
+    "z4": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.56 %, p95 1.29 %, frac2 0.3 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "z90",
+     "survey_texture": "borderline (MAD 2.7, p95 10.7, p99 18 /255 on the blurred, fully covered pixels; largest difference blob 9 mm (2.2x a 6 x 6 mm patch, 1.4 % of the -z view, mean 22/255); union-mask MAD 10.8, silhouette IoU 0.963)",
+     "sheet_row": "z4  (z90)"
+    },
+    "z5": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.48 %, p95 1.19 %, frac2 0.2 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "z72",
+     "survey_texture": "borderline (MAD 2.7, p95 10.4, p99 20 /255 on the blurred, fully covered pixels; largest difference blob 11 mm (3.1x a 6 x 6 mm patch, 2.0 % of the -z view, mean 20/255); union-mask MAD 9.4, silhouette IoU 0.970)",
+     "sheet_row": "z5  (z72)"
+    },
+    "z6": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.44 %, p95 1.12 %, frac2 0.2 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "z60",
+     "survey_texture": "borderline (MAD 2.7, p95 10.1, p99 20 /255 on the blurred, fully covered pixels; largest difference blob 11 mm (3.2x a 6 x 6 mm patch, 2.0 % of the -z view, mean 23/255); union-mask MAD 8.5, silhouette IoU 0.975)",
+     "sheet_row": "z6  (z60)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": [
+    "rev_05"
+   ]
+  },
+  {
+   "key": "hamper__xhdtjn",
+   "category": "hamper",
+   "model": "xhdtjn",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/hamper__xhdtjn.jpg",
+   "bbox_m": [
+    0.43635,
+    0.43635,
+    0.34588
+   ],
+   "n_faces": 664,
+   "uses": [
+    "camera_relocalization-obstructed/obstacles"
+   ],
+   "survey": {
+    "symmetry": [
+     "z4",
+     "z5",
+     "z6"
+    ],
+    "symmetry_near": [
+     "zinf"
+    ]
+   },
+   "candidates": {
+    "zinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.14 %, p95 0.24 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z53",
+     "survey_texture": "borderline (MAD 0.9, p95 2.5, p99 4 /255 on the blurred, fully covered pixels; largest difference blob 3 mm (0.3x a 6 x 6 mm patch, 0.0 % of the +z view, mean 1/255); union-mask MAD 1.9, silhouette IoU 0.996)",
+     "sheet_row": "zinf  (z101)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": []
+  },
+  {
+   "key": "jar_of_curry_powder__ozhftu",
+   "category": "jar_of_curry_powder",
+   "model": "ozhftu",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/jar_of_curry_powder__ozhftu.jpg",
+   "bbox_m": [
+    0.06,
+    0.0599,
+    0.07195
+   ],
+   "n_faces": 5102,
+   "uses": [
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "z4",
+     "z5",
+     "z6"
+    ]
+   },
+   "candidates": {
+    "z4": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.24 %, p95 0.40 %, frac2 2.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z90",
+     "survey_texture": "borderline (MAD 0.8, p95 2.7, p99 4 /255 on the blurred, fully covered pixels; largest difference blob 12 mm (3.8x a 6 x 6 mm patch, 3.3 % of the -z view, mean 10/255); silhouette difference 5 mm (0.8x a 6 x 6 mm patch, -x view); union-mask MAD 7.3, silhouette IoU 0.982)",
+     "sheet_row": "z4  (z90)"
+    },
+    "z5": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.24 %, p95 0.40 %, frac2 2.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z72",
+     "survey_texture": "borderline (MAD 0.8, p95 2.7, p99 5 /255 on the blurred, fully covered pixels; largest difference blob 10 mm (2.8x a 6 x 6 mm patch, 2.4 % of the -z view, mean 10/255); silhouette difference 5 mm (0.6x a 6 x 6 mm patch, -x view); union-mask MAD 7.3, silhouette IoU 0.982)",
+     "sheet_row": "z5  (z72)"
+    },
+    "z6": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.24 %, p95 0.40 %, frac2 1.9 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z60",
+     "survey_texture": "borderline (MAD 0.8, p95 2.8, p99 4 /255 on the blurred, fully covered pixels; largest difference blob 8 mm (1.7x a 6 x 6 mm patch, 1.5 % of the -z view, mean 10/255); silhouette difference 5 mm (0.7x a 6 x 6 mm patch, -x view); union-mask MAD 7.3, silhouette IoU 0.982)",
+     "sheet_row": "z6  (z60)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": [
+    "rev_05"
+   ]
+  },
+  {
+   "key": "lemon__asdada",
+   "category": "lemon",
+   "model": "asdada",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/lemon__asdada.jpg",
+   "bbox_m": [
+    0.09543,
+    0.06757,
+    0.06758
+   ],
+   "n_faces": 2078,
+   "uses": [
+    "object_scaling/target",
+    "disembedding/distractors",
+    "inter_object_relation_satisfaction-inside/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "x6"
+    ]
+   },
+   "candidates": {
+    "x6": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.23 %, p95 0.47 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x60",
+     "survey_texture": "borderline (MAD 2.2, p95 4.7, p99 6 /255 on the blurred, fully covered pixels; largest difference blob 11 mm (3.5x a 6 x 6 mm patch, 3.1 % of the +x view, mean 13/255); union-mask MAD 5.5, silhouette IoU 0.984)",
+     "sheet_row": "x6  (x60)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": [
+    "rev_05"
+   ]
+  },
+  {
+   "key": "lemon__kvgfdl",
+   "category": "lemon",
+   "model": "kvgfdl",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/lemon__kvgfdl.jpg",
+   "bbox_m": [
+    0.08675,
+    0.06127,
+    0.06125
+   ],
+   "n_faces": 2078,
+   "uses": [
+    "object_scaling/target",
+    "inter_object_relation_satisfaction-inside/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "x5",
+     "x6"
+    ]
+   },
+   "candidates": {
+    "x5": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.26 %, p95 0.54 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "x72",
+     "survey_texture": "borderline (MAD 2.3, p95 5.0, p99 6 /255 on the blurred, fully covered pixels; largest difference blob 9 mm (2.1x a 6 x 6 mm patch, 2.2 % of the +x view, mean 15/255); union-mask MAD 6.0, silhouette IoU 0.982)",
+     "sheet_row": "x5  (x72)"
+    },
+    "x6": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.26 %, p95 0.54 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "x60",
+     "survey_texture": "borderline (MAD 2.2, p95 4.7, p99 6 /255 on the blurred, fully covered pixels; largest difference blob 8 mm (1.8x a 6 x 6 mm patch, 2.0 % of the +x view, mean 14/255); union-mask MAD 6.1, silhouette IoU 0.981)",
+     "sheet_row": "x6  (x60)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": [
+    "rev_05"
+   ]
+  },
+  {
+   "key": "marker__vjjsul",
+   "category": "marker",
+   "model": "vjjsul",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/marker__vjjsul.jpg",
+   "bbox_m": [
+    0.15355,
+    0.01719,
+    0.01413
+   ],
+   "n_faces": 1408,
+   "uses": [
+    "inter_object_relation_satisfaction-nextto/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "x4",
+     "x3",
+     "x5"
+    ]
+   },
+   "candidates": {
+    "x4": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.67 %, p95 1.32 %, frac2 0.6 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x90",
+     "survey_texture": "borderline (MAD 0.7, p95 3.5, p99 8 /255 on the blurred, fully covered pixels; largest difference blob 7 mm (1.3x a 6 x 6 mm patch, 4.4 % of the -x view, mean 14/255); union-mask MAD 40.4, silhouette IoU 0.816)",
+     "sheet_row": "x4  (x90)"
+    },
+    "x3": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.77 %, p95 1.49 %, frac2 0.2 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x120",
+     "survey_texture": "borderline (MAD 0.8, p95 4.0, p99 8 /255 on the blurred, fully covered pixels; largest difference blob 7 mm (1.5x a 6 x 6 mm patch, 5.4 % of the -x view, mean 17/255); union-mask MAD 46.7, silhouette IoU 0.791)",
+     "sheet_row": "x3  (x120)"
+    },
+    "x5": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.60 %, p95 1.35 %, frac2 0.9 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x72",
+     "survey_texture": "borderline (MAD 0.6, p95 3.3, p99 7 /255 on the blurred, fully covered pixels; largest difference blob 7 mm (1.2x a 6 x 6 mm patch, 3.9 % of the -x view, mean 12/255); silhouette difference 5 mm (0.7x a 6 x 6 mm patch, +x view); union-mask MAD 34.1, silhouette IoU 0.843)",
+     "sheet_row": "x5  (x72)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": [
+    "rev_06"
+   ]
+  },
+  {
+   "key": "marker__vrjwkg",
+   "category": "marker",
+   "model": "vrjwkg",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/marker__vrjwkg.jpg",
+   "bbox_m": [
+    0.15357,
+    0.01722,
+    0.01407
+   ],
+   "n_faces": 1408,
+   "uses": [
+    "inter_object_relation_satisfaction-nextto/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "x3"
+    ]
+   },
+   "candidates": {
+    "x3": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.80 %, p95 1.67 %, frac2 0.6 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x120",
+     "survey_texture": "borderline (MAD 0.6, p95 3.1, p99 7 /255 on the blurred, fully covered pixels; largest difference blob 6 mm (1.0x a 6 x 6 mm patch, 3.5 % of the -x view, mean 10/255); union-mask MAD 50.4, silhouette IoU 0.781)",
+     "sheet_row": "x3  (x120)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": [
+    "rev_06"
+   ]
+  },
+  {
+   "key": "notebook__gqkaqu",
+   "category": "notebook",
+   "model": "gqkaqu",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/notebook__gqkaqu.jpg",
+   "bbox_m": [
+    0.16319,
+    0.1104,
+    0.008
+   ],
+   "n_faces": 4660,
+   "uses": [
+    "disembedding/distractors",
+    "alignment-axial/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "x2"
+    ]
+   },
+   "candidates": {
+    "x2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.11 %, p95 0.19 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x180",
+     "survey_texture": "borderline (MAD 0.7, p95 5.1, p99 14 /255 on the blurred, fully covered pixels; largest difference blob 4 mm (0.3x a 6 x 6 mm patch, 0.1 % of the -x view, mean 16/255); union-mask MAD 6.5, silhouette IoU 0.975)",
+     "sheet_row": "x2  (x180)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": [
+    "rev_07"
+   ]
+  },
+  {
+   "key": "notebook__zkmmnf",
+   "category": "notebook",
+   "model": "zkmmnf",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/notebook__zkmmnf.jpg",
+   "bbox_m": [
+    0.12719,
+    0.08722,
+    0.0066
+   ],
+   "n_faces": 9364,
+   "uses": [
+    "disembedding/target",
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "x2",
+     "y2"
+    ],
+    "symmetry_near": [
+     "z2"
+    ]
+   },
+   "candidates": {
+    "z2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.15 %, p95 0.31 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "z180",
+     "survey_texture": "borderline (MAD 0.6, p95 3.7, p99 14 /255 on the blurred, fully covered pixels; largest difference blob 3 mm (0.3x a 6 x 6 mm patch, 0.2 % of the +y view, mean 13/255); union-mask MAD 5.2, silhouette IoU 0.979)",
+     "sheet_row": "z2  (z180)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": []
+  },
+  {
+   "key": "orange__ucstpm",
+   "category": "orange",
+   "model": "ucstpm",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/orange__ucstpm.jpg",
+   "bbox_m": [
+    0.0831,
+    0.08534,
+    0.08497
+   ],
+   "n_faces": 532,
+   "uses": [
+    "object_scaling/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "z6"
+    ]
+   },
+   "candidates": {
+    "z6": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.42 %, p95 1.00 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "z60",
+     "survey_texture": "borderline (MAD 1.7, p95 3.6, p99 5 /255 on the blurred, fully covered pixels; largest difference blob 10 mm (2.5x a 6 x 6 mm patch, 1.7 % of the +z view, mean 12/255); union-mask MAD 7.0, silhouette IoU 0.975)",
+     "sheet_row": "z6  (z60)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": [
+    "rev_07"
+   ]
+  },
+  {
+   "key": "ottoman__qsnawv",
+   "category": "ottoman",
+   "model": "qsnawv",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/ottoman__qsnawv.jpg",
+   "bbox_m": [
+    0.45237,
+    0.45299,
+    0.43769
+   ],
+   "n_faces": 16575,
+   "uses": [
+    "camera_relocalization-obstructed/obstacles"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "z4"
+    ]
+   },
+   "candidates": {
+    "z4": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.18 %, p95 0.33 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "z90",
+     "survey_texture": "borderline (MAD 0.3, p95 0.7, p99 1 /255 on the blurred, fully covered pixels; largest difference blob 3 mm (0.2x a 6 x 6 mm patch, 0.0 % of the -z view, mean 5/255); silhouette difference 5 mm (0.6x a 6 x 6 mm patch, -z view); union-mask MAD 2.1, silhouette IoU 0.992)",
+     "sheet_row": "z4  (z90)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": []
+  },
+  {
+   "key": "ottoman__xcmniq",
+   "category": "ottoman",
+   "model": "xcmniq",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/ottoman__xcmniq.jpg",
+   "bbox_m": [
+    0.4626,
+    0.66433,
+    0.42056
+   ],
+   "n_faces": 4773,
+   "uses": [
+    "camera_relocalization-obstructed/obstacles"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "z2"
+    ]
+   },
+   "candidates": {
+    "z2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.13 %, p95 0.27 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "z180",
+     "survey_texture": "borderline (MAD 1.6, p95 3.9, p99 5 /255 on the blurred, fully covered pixels; no difference blob >= 3 x 3 mm; silhouette difference 6 mm (0.6x a 6 x 6 mm patch, -z view); union-mask MAD 2.9, silhouette IoU 0.996)",
+     "sheet_row": "z2  (z180)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": []
+  },
+  {
+   "key": "pack_of_cigarettes__qabdgg",
+   "category": "pack_of_cigarettes",
+   "model": "qabdgg",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/pack_of_cigarettes__qabdgg.jpg",
+   "bbox_m": [
+    0.12522,
+    0.05544,
+    0.07998
+   ],
+   "n_faces": 12,
+   "uses": [
+    "disembedding/target",
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "z2"
+    ]
+   },
+   "candidates": {
+    "z2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.10 %, p95 0.20 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z180",
+     "survey_texture": "borderline (MAD 0.8, p95 1.9, p99 9 /255 on the blurred, fully covered pixels; largest difference blob 11 mm (3.2x a 6 x 6 mm patch, 1.1 % of the +x view, mean 15/255); union-mask MAD 1.1, silhouette IoU 1.000)",
+     "sheet_row": "z2  (z180)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": []
+  },
+  {
+   "key": "pack_of_cigarettes__wjfbhw",
+   "category": "pack_of_cigarettes",
+   "model": "wjfbhw",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/pack_of_cigarettes__wjfbhw.jpg",
+   "bbox_m": [
+    0.12617,
+    0.05762,
+    0.07998
+   ],
+   "n_faces": 12,
+   "uses": [
+    "object_scaling/target",
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "z2"
+    ]
+   },
+   "candidates": {
+    "z2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.10 %, p95 0.20 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z180",
+     "survey_texture": "borderline (MAD 1.7, p95 4.9, p99 7 /255 on the blurred, fully covered pixels; largest difference blob 8 mm (1.8x a 6 x 6 mm patch, 0.6 % of the +x view, mean 12/255); union-mask MAD 2.2, silhouette IoU 1.000)",
+     "sheet_row": "z2  (z180)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": []
+  },
+  {
+   "key": "pack_of_kielbasa__fwqdoy",
+   "category": "pack_of_kielbasa",
+   "model": "fwqdoy",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/pack_of_kielbasa__fwqdoy.jpg",
+   "bbox_m": [
+    0.25979,
+    0.06392,
+    0.05987
+   ],
+   "n_faces": 336,
+   "uses": [
+    "inter_object_relation_satisfaction-ontop_small_scale/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "x2"
+    ]
+   },
+   "candidates": {
+    "x2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.06 %, p95 0.12 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "x180",
+     "survey_texture": "borderline (MAD 0.2, p95 0.5, p99 1 /255 on the blurred, fully covered pixels; largest difference blob 12 mm (3.9x a 6 x 6 mm patch, 1.4 % of the +x view, mean 17/255); union-mask MAD 0.6, silhouette IoU 1.000)",
+     "sheet_row": "x2  (x180)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": []
+  },
+  {
+   "key": "pen__enfumt",
+   "category": "pen",
+   "model": "enfumt",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/pen__enfumt.jpg",
+   "bbox_m": [
+    0.17455,
+    0.01021,
+    0.0158
+   ],
+   "n_faces": 1188,
+   "uses": [
+    "inter_object_relation_satisfaction-ontop_large_scale/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "x2"
+    ]
+   },
+   "candidates": {
+    "x2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.78 %, p95 1.90 %, frac2 2.1 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x180",
+     "survey_texture": "borderline (MAD 0.4, p95 2.0, p99 3 /255 on the blurred, fully covered pixels; no difference blob >= 3 x 3 mm; union-mask MAD 46.3, silhouette IoU 0.710)",
+     "sheet_row": "x2  (x180)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": [
+    "rev_07"
+   ]
+  },
+  {
+   "key": "pen__gzrbrx",
+   "category": "pen",
+   "model": "gzrbrx",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/pen__gzrbrx.jpg",
+   "bbox_m": [
+    0.15826,
+    0.01141,
+    0.01101
+   ],
+   "n_faces": 5258,
+   "uses": [
+    "disembedding/distractors",
+    "inter_object_relation_satisfaction-ontop_large_scale/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "xinf"
+    ]
+   },
+   "candidates": {
+    "xinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.40 %, p95 1.20 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "x163",
+     "survey_texture": "borderline (MAD 0.6, p95 2.6, p99 7 /255 on the blurred, fully covered pixels; largest difference blob 7 mm (1.3x a 6 x 6 mm patch, 5.3 % of the -x view, mean 11/255); union-mask MAD 33.7, silhouette IoU 0.834)",
+     "sheet_row": "xinf  (x163)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": []
+  },
+  {
+   "key": "pen__hiyeki",
+   "category": "pen",
+   "model": "hiyeki",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/pen__hiyeki.jpg",
+   "bbox_m": [
+    0.14182,
+    0.01148,
+    0.01136
+   ],
+   "n_faces": 5258,
+   "uses": [
+    "inter_object_relation_satisfaction-ontop_large_scale/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "x4",
+     "x3",
+     "x5"
+    ],
+    "symmetry_near": [
+     "xinf"
+    ]
+   },
+   "candidates": {
+    "xinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.53 %, p95 1.16 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x163",
+     "survey_texture": "borderline (MAD 0.9, p95 4.1, p99 13 /255 on the blurred, fully covered pixels; largest difference blob 3 mm (0.3x a 6 x 6 mm patch, 1.4 % of the -x view, mean 12/255); union-mask MAD 28.7, silhouette IoU 0.841)",
+     "sheet_row": "xinf  (x251)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": []
+  },
+  {
+   "key": "pencil__heqkmr",
+   "category": "pencil",
+   "model": "heqkmr",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/pencil__heqkmr.jpg",
+   "bbox_m": [
+    0.12389,
+    0.00598,
+    0.00394
+   ],
+   "n_faces": 11760,
+   "uses": [
+    "inter_object_relation_satisfaction-nextto/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "x6"
+    ],
+    "symmetry_near": [
+     "y2",
+     "xinf"
+    ]
+   },
+   "candidates": {
+    "y2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.45 %, p95 1.11 %, frac2 0.7 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "y180",
+     "survey_texture": "borderline (MAD 3.7, p95 18.4, p99 55 /255 on the blurred, fully covered pixels; largest difference blob 2 mm (0.1x a 6 x 6 mm patch, 2.1 % of the +x view, mean 63/255); union-mask MAD 68.7, silhouette IoU 0.708)",
+     "sheet_row": "y2  (y180)"
+    },
+    "xinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.43 %, p95 1.10 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x163",
+     "survey_texture": "preserved (MAD 1.5, p95 5.2, p99 10 /255 on the blurred, fully covered pixels; no difference blob >= 3 x 3 mm; union-mask MAD 64.1, silhouette IoU 0.719)",
+     "sheet_row": "xinf  (x163)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": []
+  },
+  {
+   "key": "pencil__hmawzy",
+   "category": "pencil",
+   "model": "hmawzy",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/pencil__hmawzy.jpg",
+   "bbox_m": [
+    0.12389,
+    0.00619,
+    0.004
+   ],
+   "n_faces": 11760,
+   "uses": [
+    "inter_object_relation_satisfaction-nextto/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "x5",
+     "x6"
+    ],
+    "symmetry_near": [
+     "y2",
+     "xinf"
+    ]
+   },
+   "candidates": {
+    "y2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.51 %, p95 1.24 %, frac2 0.9 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "y180",
+     "survey_texture": "preserved (MAD 1.6, p95 4.8, p99 20 /255 on the blurred, fully covered pixels; no difference blob >= 3 x 3 mm; union-mask MAD 64.1, silhouette IoU 0.681)",
+     "sheet_row": "y2  (y180)"
+    },
+    "xinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.49 %, p95 1.23 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x163",
+     "survey_texture": "preserved (MAD 1.1, p95 3.9, p99 8 /255 on the blurred, fully covered pixels; no difference blob >= 3 x 3 mm; union-mask MAD 45.6, silhouette IoU 0.771)",
+     "sheet_row": "xinf  (x101)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": []
+  },
+  {
+   "key": "pencil__lruiot",
+   "category": "pencil",
+   "model": "lruiot",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/pencil__lruiot.jpg",
+   "bbox_m": [
+    0.12389,
+    0.00555,
+    0.00393
+   ],
+   "n_faces": 11760,
+   "uses": [
+    "inter_object_relation_satisfaction-nextto/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "x5",
+     "x6"
+    ],
+    "symmetry_near": [
+     "y2",
+     "xinf"
+    ]
+   },
+   "candidates": {
+    "y2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.35 %, p95 0.83 %, frac2 0.7 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "y180",
+     "survey_texture": "borderline (MAD 3.0, p95 23.7, p99 38 /255 on the blurred, fully covered pixels; no difference blob >= 3 x 3 mm; union-mask MAD 47.3, silhouette IoU 0.768)",
+     "sheet_row": "y2  (y180)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": [
+    "rev_08"
+   ]
+  },
+  {
+   "key": "pencil__lykqoh",
+   "category": "pencil",
+   "model": "lykqoh",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/pencil__lykqoh.jpg",
+   "bbox_m": [
+    0.12389,
+    0.00556,
+    0.00391
+   ],
+   "n_faces": 11760,
+   "uses": [
+    "inter_object_relation_satisfaction-nextto/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "x4",
+     "x5",
+     "x6"
+    ],
+    "symmetry_near": [
+     "y2",
+     "xinf"
+    ]
+   },
+   "candidates": {
+    "y2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.35 %, p95 0.84 %, frac2 0.7 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "y180",
+     "survey_texture": "preserved (MAD 2.7, p95 19.0, p99 33 /255 on the blurred, fully covered pixels; largest difference blob 2 mm (0.1x a 6 x 6 mm patch, 2.0 % of the -x view, mean 62/255); union-mask MAD 50.5, silhouette IoU 0.766)",
+     "sheet_row": "y2  (y180)"
+    },
+    "xinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.33 %, p95 0.84 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x163",
+     "survey_texture": "preserved (MAD 1.1, p95 5.4, p99 9 /255 on the blurred, fully covered pixels; no difference blob >= 3 x 3 mm; union-mask MAD 35.7, silhouette IoU 0.830)",
+     "sheet_row": "xinf  (x251)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": []
+  },
+  {
+   "key": "pencil__mvmxfo",
+   "category": "pencil",
+   "model": "mvmxfo",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/pencil__mvmxfo.jpg",
+   "bbox_m": [
+    0.12389,
+    0.00601,
+    0.00392
+   ],
+   "n_faces": 11760,
+   "uses": [
+    "inter_object_relation_satisfaction-nextto/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "xinf"
+    ]
+   },
+   "candidates": {
+    "xinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.44 %, p95 1.12 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x163",
+     "survey_texture": "preserved (MAD 1.5, p95 5.3, p99 13 /255 on the blurred, fully covered pixels; no difference blob >= 3 x 3 mm; union-mask MAD 68.4, silhouette IoU 0.716)",
+     "sheet_row": "xinf  (x197)"
+    }
+   },
+   "symmetric_180": [],
+   "supplement_of": []
+  }
+ ]
+}

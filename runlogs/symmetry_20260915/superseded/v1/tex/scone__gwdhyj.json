@@ -1,0 +1,1 @@
+{"key": "scone__gwdhyj", "category": "scone", "model": "gwdhyj", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.0015082598090142881, "p95": 0.00261437908496732, "p99": 0.02483660130718954, "mad_union": 0.09651087151859841, "iou": 0.8797888078355354, "worst": "z180"}}, "render_s": 0.109}

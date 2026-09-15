@@ -1,0 +1,1 @@
+{"key": "parsnip__jidpjl", "category": "parsnip", "model": "jidpjl", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"y6": {"mad": 0.022126407817024636, "p95": 0.06535947712418301, "p99": 0.15163398692810456, "mad_union": 0.20494286212407756, "iou": 0.7488027058138048, "worst": "y60"}}, "render_s": 0.308}

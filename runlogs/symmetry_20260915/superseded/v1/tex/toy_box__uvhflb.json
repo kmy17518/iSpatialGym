@@ -1,0 +1,1 @@
+{"key": "toy_box__uvhflb", "category": "toy_box", "model": "uvhflb", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.0044662998519990425, "p95": 0.022222222222222223, "p99": 0.03529411764705882, "mad_union": 0.00604724513750534, "iou": 0.9960704158450046, "worst": "z180"}}, "render_s": 0.115}

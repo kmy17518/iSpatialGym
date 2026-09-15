@@ -1,0 +1,1 @@
+{"key": "hanger__anobre", "category": "hanger", "model": "anobre", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.02236024844720497, "p95": 0.0819607843137254, "p99": 0.11050980392156866, "mad_union": 0.07402564042687342, "iou": 0.8396188963874553, "worst": "x180"}}, "render_s": 0.117}

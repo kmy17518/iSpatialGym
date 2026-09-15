@@ -1,0 +1,1 @@
+{"key": "briefcase__lwbctq", "category": "briefcase", "model": "lwbctq", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.002095889041364906, "p95": 0.00392156862745098, "p99": 0.05359477124183006, "mad_union": 0.11835257406407197, "iou": 0.8642550639043972, "worst": "x180"}}, "render_s": 0.142}

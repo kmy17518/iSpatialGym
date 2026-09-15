@@ -1,0 +1,1 @@
+{"key": "lid__snklci", "category": "lid", "model": "snklci", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.0009343777780500521, "p95": 0.00392156862745098, "p99": 0.01568627450980392, "mad_union": 0.0010471847313710133, "iou": 0.9997786932688707, "worst": "z180"}}, "render_s": 0.13}

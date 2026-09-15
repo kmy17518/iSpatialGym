@@ -1,0 +1,1 @@
+{"key": "trash_can__eahqyq", "category": "trash_can", "model": "eahqyq", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 2, "base": {"z2": {"mad": 0.0049312319930831785, "p95": 0.013071895424836602, "p99": 0.07450980392156863, "mad_union": 0.008386390988768066, "iou": 0.9937296828722098, "worst": "z180"}}, "render_s": 0.177}

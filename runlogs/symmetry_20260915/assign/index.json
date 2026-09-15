@@ -1,7 +1,6 @@
 {
- "n_entries": 319,
- "n_batches": 11,
- "batch_size": 29,
+ "n_entries": 413,
+ "n_batches": 15,
  "verdicts": [
   "preserved",
   "broken",
@@ -267,6 +266,101 @@
     "wall_clock",
     "whiteboard",
     "wicker_basket"
+   ]
+  },
+  {
+   "batch_id": "rev_11",
+   "assignment": "runlogs/symmetry_20260915/assign/rev_11.json",
+   "output": "runlogs/symmetry_20260915/review/rev_11.json",
+   "n_models": 24,
+   "n_candidates": 36,
+   "n_symmetric_180": 0,
+   "categories": [
+    "asparagus",
+    "beeswax_candle",
+    "bottle_of_beer",
+    "bottle_of_catsup",
+    "bottle_of_coconut_water",
+    "bottle_of_essential_oil",
+    "bottle_of_ginger",
+    "bottle_of_ground_cloves",
+    "bottle_of_ground_nutmeg",
+    "bottle_of_paprika",
+    "bottle_of_pop",
+    "bottle_of_sage",
+    "bottle_of_salsa",
+    "bottle_of_seasoning",
+    "bottle_of_tea_leaves",
+    "bottle_of_water"
+   ]
+  },
+  {
+   "batch_id": "rev_12",
+   "assignment": "runlogs/symmetry_20260915/assign/rev_12.json",
+   "output": "runlogs/symmetry_20260915/review/rev_12.json",
+   "n_models": 24,
+   "n_candidates": 38,
+   "n_symmetric_180": 1,
+   "categories": [
+    "can_of_baking_mix",
+    "can_of_corn",
+    "cap",
+    "carrot",
+    "chopstick",
+    "cinnamon_stick",
+    "colored_pencil",
+    "cookie_cutter",
+    "cutting_board",
+    "decorative_sign",
+    "dip_candle",
+    "half_lime"
+   ]
+  },
+  {
+   "batch_id": "rev_13",
+   "assignment": "runlogs/symmetry_20260915/assign/rev_13.json",
+   "output": "runlogs/symmetry_20260915/review/rev_13.json",
+   "n_models": 24,
+   "n_candidates": 34,
+   "n_symmetric_180": 0,
+   "categories": [
+    "half_lime",
+    "hamburger_bun",
+    "hamper",
+    "jar_of_curry_powder",
+    "lemon",
+    "marker",
+    "notebook",
+    "orange",
+    "ottoman",
+    "pack_of_cigarettes",
+    "pack_of_kielbasa",
+    "pen",
+    "pencil"
+   ]
+  },
+  {
+   "batch_id": "rev_14",
+   "assignment": "runlogs/symmetry_20260915/assign/rev_14.json",
+   "output": "runlogs/symmetry_20260915/review/rev_14.json",
+   "n_models": 22,
+   "n_candidates": 28,
+   "n_symmetric_180": 5,
+   "categories": [
+    "pencil",
+    "pepper_shaker",
+    "plate",
+    "rolling_pin",
+    "salt_shaker",
+    "shelf",
+    "spray_can",
+    "taboret",
+    "teacup",
+    "towel_rack",
+    "toy_dice",
+    "trash_can",
+    "vidalia_onion",
+    "wall_mounted_tv"
    ]
   }
  ]

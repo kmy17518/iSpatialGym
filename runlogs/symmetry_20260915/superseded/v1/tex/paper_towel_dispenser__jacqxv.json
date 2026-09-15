@@ -1,0 +1,1 @@
+{"key": "paper_towel_dispenser__jacqxv", "category": "paper_towel_dispenser", "model": "jacqxv", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.11675107307106145, "p95": 0.17647058823529413, "p99": 0.17647058823529413, "mad_union": 0.17514110222098178, "iou": 0.8951066800798787, "worst": "z180"}}, "render_s": 0.115}

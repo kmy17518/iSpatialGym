@@ -246,7 +246,7 @@ class Renderer:
 
     Rendered at ``size * ss`` and box-downsampled to ``size`` (cheap anti-aliasing of the silhouettes)."""
 
-    def __init__(self, size: int = 192, ss: int = 2, yfov_deg: float = 38.0, bg=(255, 255, 255)):
+    def __init__(self, size: int = 384, ss: int = 2, yfov_deg: float = 38.0, bg=(255, 255, 255)):
         import pyrender
 
         self.pyrender = pyrender
@@ -255,6 +255,16 @@ class Renderer:
         self.bg = np.array(bg, dtype=np.float64) / 255.0
         self.r = pyrender.OffscreenRenderer(size * ss, size * ss)
         self.dirs = camera_directions()
+        self.dist = 0.0
+
+    @property
+    def view_names(self) -> List[str]:
+        return [n for n, _ in self.dirs]
+
+    @property
+    def m_per_px(self) -> float:
+        """Metres per output pixel at the object centre (the render scale the blob test converts millimetres with)."""
+        return 2.0 * self.dist * math.tan(self.yfov / 2) / self.size
 
     def set_size(self, size: int):
         """Change the output resolution (elongated objects are rendered larger so that their thin side has pixels)."""
@@ -266,7 +276,7 @@ class Renderer:
     @staticmethod
     def size_factor(bbox_extents) -> int:
         """1 or 2: a body whose longest extent is >= 4.5x its middle extent (pencil, chopstick, rod) is rendered at
-        twice the base resolution (384 px, still 2x supersampled); at 192 px a 19 cm pencil is 4 px thick."""
+        twice the base resolution (768 px, still 2x supersampled); at 384 px a 19 cm pencil is 8 px thick."""
         e = sorted(float(v) for v in bbox_extents)
         elong = e[2] / max(e[1], 1e-6)
         return 2 if elong >= 4.5 else 1
@@ -317,60 +327,278 @@ class Renderer:
             color, depth = self.r.render(scene, flags=pyrender.RenderFlags.FLAT)
             rgb = color[..., :3].astype(np.float64)
             cov = (depth > 0).astype(np.float64)
+            dep = depth.astype(np.float64)
             if self.ss > 1:
                 s = self.ss
                 n = self.size
                 rgb = rgb.reshape(n, s, n, s, 3).mean(axis=(1, 3))
-                cov = cov.reshape(n, s, n, s).mean(axis=(1, 3))
-            out.append((np.clip(rgb, 0, 255).astype(np.uint8), cov))
+                cnt = cov.reshape(n, s, n, s).sum(axis=(1, 3))
+                dep = dep.reshape(n, s, n, s).sum(axis=(1, 3)) / np.maximum(cnt, 1)
+                cov = cnt / (s * s)
+            out.append((np.clip(rgb, 0, 255).astype(np.uint8), cov, dep))
         return out
 
 
-def image_diff(a: Sequence[Tuple[np.ndarray, np.ndarray]], b: Sequence[Tuple[np.ndarray, np.ndarray]]) -> Dict[str, float]:
-    """Compare two render sets (same cameras). ``mad`` / ``p95`` / ``p99`` = mean, 95th and 99th percentile of the
-    per-pixel channel-mean |diff| (fractions of 255) over the pixels fully covered by the object in both renders
-    (partially covered silhouette pixels mix the background colour in and depend on the sub-pixel position of the
-    edge, so they are excluded; for an exact geometric symmetry the two silhouettes coincide anyway); ``mad_union`` =
-    the same mean over the union of the (any-coverage) object masks - the raw union-mask criterion, which also counts
-    silhouette mismatches; ``iou`` = mask IoU (coverage >= 1/2)."""
-    diffs, udiffs, inter, union = [], [], 0, 0
-    for (ia, ca), (ib, cb) in zip(a, b):
+#: optional global contrast normalisation (per channel, the object's 2nd-98th percentile range over the fully covered
+#: pixels of both renders stretched to 0-255, gain <= 255 / min_range). Off by default (``NORM_MIN_RANGE = None``):
+#: tested with a gain cap of 4 and 2 it turned reviewer-preserved dark plain objects (a dark-grey 12-gon beaker with a
+#: baked shading gradient, a mottled apple, a wooden bat, a jar of speckled seeds) into "broken" because it amplifies
+#: smooth shading and stochastic texture exactly like a print. Low-contrast prints are caught by the structural blob
+#: test below instead.
+NORM_MIN_RANGE = None
+#: perceptual blur before differencing (Gaussian sigma in millimetres at the render scale): a person at 0.5-1.5 m does
+#: not resolve pixel-scale speckle, wood grain or mottle, only features of a few millimetres (1.5 mm smeared the 1 cm
+#: letters of a low-contrast wrapping print below the blob threshold; 1.0 mm keeps them)
+BLUR_MM = 1.0
+BLUR_PX_RANGE = (0.6, 4.0)
+#: local-feature (blob) test on D = 3x3 median of the channel-max |diff| of the blurred renders: a pixel is "hot" when
+#: D > BLOB_T (a high-contrast feature: logo, glyph, label edge) or when the local standard deviation of D over a
+#: BLOB_STD_MM window exceeds BLOB_STD_T (a low-contrast but structured feature: dark-on-dark text, a faint print -
+#: a smooth baked-shading gradient has D of the same size but no local structure). Connected hot blobs are measured
+#: in pixels; BLOB_MM is the feature size a blob must reach to break the symmetry (a person at 1 m sees a 6 x 6 mm
+#: print), a blob of a quarter of that area (3 x 3 mm) already costs "preserved".
+BLOB_T = 25.0 / 255.0
+BLOB_STD_T = 6.0 / 255.0
+BLOB_STD_MM = 5.0
+BLOB_MM = 6.0
+BLOB_MIN_PX = 9
+#: morphological opening of the hot mask (structuring-element diameter in millimetres) before the blobs are measured:
+#: removes structures thinner than ~2 mm - the baked shading edges between the facets of a low-poly body of revolution,
+#: rim corners, grain streaks - while print strokes, logos and labels (>= 2-3 mm) survive. High-contrast pixels
+#: (D > BLOB_T_STRONG: a black line drawing on a light face, a digit) are exempt from it up to a 1 mm opening, because
+#: a thin high-contrast stroke is what a person reads first (the fish outline and the "6" of a letter block).
+BLOB_OPEN_MM = 2.5
+BLOB_T_STRONG = 60.0 / 255.0
+BLOB_OPEN_STRONG_MM = 1.0
+#: silhouette test: the XOR of the two coverage masks (a part of the object that is present in one render and absent
+#: in the other - a pencil tip swapped with the flat end, a pump nozzle, a wick, a swing-top bail) opened with a disc
+#: of SIL_OPEN_STRONG_MM (a shape difference at least that thick) resp. SIL_OPEN_WEAK_MM; the largest remaining blob
+#: is compared with n6 like the texture blob (strong >= n6 -> broken, weak >= n6 -> borderline). Sub-pixel silhouette
+#: shifts of an exact symmetry and the corner slivers of low-poly bodies are thinner than 3 mm and vanish (a 2 mm weak
+#: opening still kept the 2.5 mm crescent of a slightly lopsided bar of soap). For thin bodies the openings shrink to
+#: SIL_THIN_FRAC x the thinnest bbox extent (a pencil is 6-8 mm thick: its swapped tip is a wedge thinner than 4 mm).
+SIL_OPEN_STRONG_MM = 4.0
+SIL_OPEN_WEAK_MM = 3.0
+SIL_THIN_FRAC = 0.4
+SIL_OPEN_MIN_MM = 1.0
+
+
+def normalise_pair(ia: np.ndarray, ib: np.ndarray, mask: np.ndarray, min_range: float = NORM_MIN_RANGE) -> Tuple[np.ndarray, np.ndarray, float]:
+    """Contrast-normalise two renders with one common per-channel linear stretch (object 2nd-98th percentiles ->
+    0-255, gain <= 255 / min_range) so that a dark bottle is judged like a bright one. Returns floats in 0-255 and the
+    largest channel gain."""
+    if not mask.any():
+        return ia.astype(np.float64), ib.astype(np.float64), 1.0
+    pix = np.concatenate([ia[mask], ib[mask]]).astype(np.float64)
+    lo = np.percentile(pix, 2, axis=0)
+    hi = np.percentile(pix, 98, axis=0)
+    gain = 255.0 / np.maximum(hi - lo, min_range)
+    na = np.clip((ia.astype(np.float64) - lo) * gain, 0, 255)
+    nb = np.clip((ib.astype(np.float64) - lo) * gain, 0, 255)
+    return na, nb, float(gain.max())
+
+
+def _blur(img: np.ndarray, sigma_px: float) -> np.ndarray:
+    from scipy import ndimage
+
+    if sigma_px <= 0:
+        return img.astype(np.float64)
+    return ndimage.gaussian_filter(img.astype(np.float64), sigma=(sigma_px, sigma_px, 0), mode="nearest")
+
+
+#: optional depth matching: pixels whose depth differs between the two renders by more than this fraction of the bbox
+#: diagonal would be left out of the texture comparison (a polygon corner of a low-poly body, a lump). Off by default
+#: (``None``): after a symmetry rotation the pixel legitimately shows another part of the object - a thin painting
+#: flipped by ``y2`` presents its white back at a depth that differs by its thickness, and the mask hid the picture
+#: (v2 trial: ``painting/fwuole`` y2 came out preserved). Polygon-corner artefacts are handled by the blur, the
+#: opening and the graded blob rule instead (they land in ``borderline``, i.e. the review).
+DEPTH_TOL_FRAC = None
+
+
+def image_diff(a: Sequence[Tuple[np.ndarray, ...]], b: Sequence[Tuple[np.ndarray, ...]],
+               m_per_px: Optional[float] = None, view_names: Optional[Sequence[str]] = None, diag: Optional[float] = None,
+               blur_mm: float = BLUR_MM, min_range: Optional[float] = NORM_MIN_RANGE, blob_t: float = BLOB_T,
+               std_t: float = BLOB_STD_T, std_mm: float = BLOB_STD_MM, open_mm: float = BLOB_OPEN_MM,
+               depth_tol_frac: Optional[float] = DEPTH_TOL_FRAC, sil_strong_mm: float = SIL_OPEN_STRONG_MM,
+               sil_weak_mm: float = SIL_OPEN_WEAK_MM, thin_mm: Optional[float] = None) -> Dict[str, float]:
+    """Compare two render sets (same cameras; ``(rgb, coverage[, depth])`` per view): perceptual blur (``blur_mm``),
+    optional contrast normalisation per view (``normalise_pair``, off when ``min_range`` is None), then the statistics
+    below over the pixels fully covered by the object in both renders (optionally only those whose depth agrees within
+    ``depth_tol_frac`` x ``diag``; off by default, see ``DEPTH_TOL_FRAC``).
+
+    ``mad`` / ``p95`` / ``p99`` = mean, 95th and 99th percentile of the per-pixel channel-mean |diff| of the blurred
+    renders (fractions of 255) over those pixels (partially covered silhouette pixels mix the background colour in and
+    depend on the sub-pixel position of the edge, so they are excluded; for an exact geometric symmetry the two
+    silhouettes coincide anyway); ``mad_raw`` = the same mean of the un-blurred renders; ``mad_union`` = raw mean over
+    the union of the (coverage >= 1/2) masks - the union-mask criterion, which also counts silhouette mismatches;
+    ``iou`` = mask IoU; ``depth_frac`` = share of the fully covered pixels excluded for a depth mismatch; ``gain`` = the
+    largest normalisation gain applied (1 when off). Local-feature test on D = 3x3 median of the channel-max |diff|:
+    hot pixels are D > ``blob_t`` or local-std(D, ``std_mm`` window) > ``std_t``, thinned by an opening of
+    ``open_mm``; ``blob_px`` = largest connected hot blob (pixels), ``blob_frac`` = its share of that view's object
+    pixels, ``blob_view`` = the camera it was seen from, ``blob_kind`` = ``abs`` / ``struct`` / ``both`` (which test
+    lit its pixels), ``blob_d`` = mean D over the blob (/255 fraction), ``blob_mm`` = its side length in millimetres
+    (``m_per_px`` = render scale), ``n6`` = the pixel area of a ``BLOB_MM`` x ``BLOB_MM`` feature. Silhouette test: the
+    XOR of the coverage masks opened with ``sil_strong_mm`` / ``sil_weak_mm`` discs (shrunk for thin bodies, ``thin_mm``
+    = thinnest bbox extent), largest blob ``sil_px`` / ``sil_px_weak``, ``sil_view``, ``sil_mm``."""
+    from scipy import ndimage
+
+    diffs, rdiffs, udiffs, inter, union, n_full, n_depth = [], [], [], 0, 0, 0, 0
+    gain_max = 1.0
+    blob = {"blob_px": 0, "blob_frac": 0.0, "blob_view": "", "blob_kind": "", "blob_d": 0.0}
+    sil = {"sil_px": 0, "sil_px_weak": 0, "sil_view": ""}
+    n6 = max(BLOB_MIN_PX, int(round((BLOB_MM / 1000.0 / m_per_px) ** 2))) if m_per_px else BLOB_MIN_PX
+    sigma_px = min(BLUR_PX_RANGE[1], max(BLUR_PX_RANGE[0], blur_mm / 1000.0 / m_per_px)) if (m_per_px and blur_mm > 0) else 0.0
+    win = int(min(25, max(3, round(std_mm / 1000.0 / m_per_px)))) if m_per_px else 5
+
+    def disc(diam_mm: float):
+        px = int(min(25, max(0, round(diam_mm / 1000.0 / m_per_px)))) if (m_per_px and diam_mm > 0) else 0
+        if px < 2:
+            return None
+        yy, xx = np.mgrid[-px // 2: px // 2 + 1, -px // 2: px // 2 + 1]
+        return (xx * xx + yy * yy) <= (px / 2.0) ** 2
+
+    def largest(mask) -> int:
+        if not mask.any():
+            return 0
+        lab, n = ndimage.label(mask)
+        return int(ndimage.sum(mask, lab, index=np.arange(1, n + 1)).max())
+
+    if thin_mm:  # thin bodies: a shape difference cannot be thicker than the body
+        sil_strong_mm = max(SIL_OPEN_MIN_MM, min(sil_strong_mm, SIL_THIN_FRAC * thin_mm))
+        sil_weak_mm = max(SIL_OPEN_MIN_MM, min(sil_weak_mm, SIL_THIN_FRAC * thin_mm))
+    open_se, sil_strong_se, sil_weak_se, open_strong_se = disc(open_mm), disc(sil_strong_mm), disc(sil_weak_mm), disc(BLOB_OPEN_STRONG_MM)
+    for vi, (ra, rb) in enumerate(zip(a, b)):
+        ia, ca = ra[0], ra[1]
+        ib, cb = rb[0], rb[1]
         ma, mb = ca >= 0.5, cb >= 0.5
         u = ma | mb
         if not u.any():
             continue
-        d = np.abs(ia.astype(np.float64) - ib.astype(np.float64)).mean(axis=2) / 255.0
         full = (ca >= 1.0) & (cb >= 1.0)
-        if full.any():
-            diffs.append(d[full])
-        udiffs.append(d[u])
+        raw = np.abs(ia.astype(np.float64) - ib.astype(np.float64)).mean(axis=2) / 255.0
+        udiffs.append(raw[u])
         inter += int((ma & mb).sum())
         union += int(u.sum())
+        xor = ma ^ mb
+        if xor.any():
+            strong = largest(ndimage.binary_opening(xor, structure=sil_strong_se)) if sil_strong_se is not None else largest(xor)
+            weak = largest(ndimage.binary_opening(xor, structure=sil_weak_se)) if sil_weak_se is not None else largest(xor)
+            if strong > sil["sil_px"] or (strong == sil["sil_px"] and weak > sil["sil_px_weak"]):
+                sil = {"sil_px": strong, "sil_px_weak": weak, "sil_view": view_names[vi] if view_names else str(vi)}
+        if not full.any():
+            continue
+        n_full += int(full.sum())
+        if depth_tol_frac and len(ra) > 2 and len(rb) > 2 and diag:
+            same_depth = np.abs(ra[2] - rb[2]) <= depth_tol_frac * diag
+            n_depth += int((full & ~same_depth).sum())
+            full = full & same_depth
+            if not full.any():
+                continue
+        # blur inside the object only: paint the background with the object's mean colour first so that the silhouette
+        # does not bleed white into the object's border pixels
+        fill = ia[full].mean(axis=0)
+        ba, bb = ia.astype(np.float64).copy(), ib.astype(np.float64).copy()
+        ba[~ma], bb[~mb] = fill, fill
+        ba, bb = _blur(ba, sigma_px), _blur(bb, sigma_px)
+        if min_range:
+            ba, bb, g = normalise_pair(ba, bb, full, min_range)
+            gain_max = max(gain_max, g)
+        dn = np.abs(ba - bb)
+        core = ndimage.binary_erosion(full, iterations=max(1, int(round(sigma_px)))) if full.sum() > 64 else full
+        if not core.any():
+            core = full
+        diffs.append(dn.mean(axis=2)[core] / 255.0)
+        rdiffs.append(raw[full])
+        D = ndimage.median_filter(dn.max(axis=2) / 255.0, size=3)
+        hot_abs = (D > blob_t) & core
+        # structure: local standard deviation of D (window ~ std_mm); D outside the core is replaced by its core mean so
+        # that the silhouette itself is not an edge, and the structural mask is kept off the outermost window/2 pixels
+        Dm = np.where(core, D, float(D[core].mean()))
+        m1 = ndimage.uniform_filter(Dm, size=win, mode="nearest")
+        m2 = ndimage.uniform_filter(Dm * Dm, size=win, mode="nearest")
+        lstd = np.sqrt(np.maximum(m2 - m1 * m1, 0.0))
+        inner = ndimage.binary_erosion(core, iterations=max(1, win // 2)) if core.sum() > 4 * win * win else core
+        hot_struct = (lstd > std_t) & inner
+        hot = hot_abs | hot_struct
+        if open_se is not None and hot.any():
+            hot = ndimage.binary_opening(hot, structure=open_se)
+        hot_strong = (D > BLOB_T_STRONG) & core
+        if hot_strong.any():
+            if open_strong_se is not None:
+                hot_strong = ndimage.binary_opening(hot_strong, structure=open_strong_se)
+            hot = hot | hot_strong
+        if hot.any():
+            lab, n = ndimage.label(hot)
+            sizes = ndimage.sum(hot, lab, index=np.arange(1, n + 1))
+            k = int(np.argmax(sizes))
+            if sizes[k] > blob["blob_px"]:
+                part = lab == (k + 1)
+                na_, ns_ = int((part & hot_abs).sum()), int((part & hot_struct).sum())
+                blob = {"blob_px": int(sizes[k]), "blob_frac": float(sizes[k] / max(int(full.sum()), 1)),
+                        "blob_view": view_names[vi] if view_names else str(vi),
+                        "blob_kind": "both" if (na_ and ns_) else ("abs" if na_ else "struct"), "blob_d": float(D[part].mean())}
+    mm = (m_per_px or 0.0) * 1000.0
     if not udiffs:
-        return {"mad": 1.0, "p95": 1.0, "p99": 1.0, "mad_union": 1.0, "iou": 0.0}
+        return {"mad": 1.0, "p95": 1.0, "p99": 1.0, "mad_raw": 1.0, "mad_union": 1.0, "iou": 0.0, "depth_frac": 0.0, "gain": 1.0,
+                "blob_px": 0, "blob_frac": 0.0, "blob_view": "", "blob_kind": "", "blob_d": 0.0, "blob_mm": 0.0, "n6": n6,
+                "sil_px": 0, "sil_px_weak": 0, "sil_view": "", "sil_mm": 0.0}
     du = np.concatenate(udiffs)
     d = np.concatenate(diffs) if diffs else du
+    dr = np.concatenate(rdiffs) if rdiffs else du
     return {"mad": float(d.mean()), "p95": float(np.percentile(d, 95)), "p99": float(np.percentile(d, 99)),
-            "mad_union": float(du.mean()), "iou": inter / max(union, 1)}
+            "mad_raw": float(dr.mean()), "mad_union": float(du.mean()), "iou": inter / max(union, 1),
+            "depth_frac": n_depth / max(n_full, 1), "gain": gain_max,
+            **blob, "blob_mm": float(math.sqrt(blob["blob_px"]) * mm), "n6": n6,
+            **sil, "sil_mm": float(math.sqrt(sil["sil_px"]) * mm)}
 
 
-#: texture thresholds (fractions of 255) on the fully-covered-pixel comparison. ``p99`` guards against small features
-#: (die pips, letters, clock numerals, small logos) that cover 1-5 % of the object's pixels and so barely move the
-#: mean / p95: >= 1 % of the pixels differing by more than 60/255 is a visible feature, never borderline. The
-#: borderline band is closed by ``p95`` as well because a muted label on a bottle or a wrapper logo moves the mean by
-#: only 7-12/255 while >= 5 % of the pixels differ by > 25/255 (tuned on a medicine bottle, a chocolate bar, a numeral
-#: clock face, a magazine cover, a licence plate: broken; a tennis-ball seam, a pencil tip, a low-contrast letter
-#: block: borderline; plain bowls / plates / caps / boxes / beakers: preserved).
-TEX_PRESERVED = {"mad": 3.0 / 255.0, "p95": 20.0 / 255.0, "p99": 60.0 / 255.0}
-TEX_BORDERLINE = {"mad": 12.0 / 255.0, "p95": 25.0 / 255.0, "p99": 60.0 / 255.0}
+#: texture thresholds (fractions of 255) on the blurred, fully-covered, depth-matched pixel comparison (v2). The
+#: percentile rules are those of v1 (``p99`` guards against small features that cover 1-5 % of the pixels; the
+#: borderline band is closed by ``p95`` because a muted label moves the mean by only 7-12/255 while >= 5 % of the
+#: pixels differ by > 25/255). The blob test adds what the percentiles miss: a connected patch of difference of
+#: >= 4 x (6 x 6 mm) (``n6`` pixels at the render scale), or of >= 6 x 6 mm with a mean difference of >= 30/255,
+#: breaks the symmetry outright (a logo, a glyph, a wrapping print, a label edge); a smaller / fainter patch of
+#: >= 3 x 3 mm costs "preserved" (borderline -> review: facet shading of a low-poly body, a pale print, a seam).
+TEX_PRESERVED = {"mad": 3.0 / 255.0, "p95": 20.0 / 255.0, "p99": 60.0 / 255.0, "blob_n6_frac": 0.25, "sil_weak_n6_frac": 1.0}
+TEX_BORDERLINE = {"mad": 12.0 / 255.0, "p95": 25.0 / 255.0, "p99": 60.0 / 255.0, "blob_n6_frac": 4.0,
+                  "blob_n6_frac_strong": 1.0, "blob_d_strong": 30.0 / 255.0, "sil_n6_frac": 1.0}
 TEX_BORDERLINE_MAD = TEX_BORDERLINE["mad"]
+#: the v1 thresholds (192 px, no blur, no blob test) - kept to reproduce the contact-sheet row order the first review
+#: batches (rev_00..10) were issued with
+TEX_PRESERVED_V1 = {"mad": 3.0 / 255.0, "p95": 20.0 / 255.0, "p99": 60.0 / 255.0}
+TEX_BORDERLINE_V1 = {"mad": 12.0 / 255.0, "p95": 25.0 / 255.0, "p99": 60.0 / 255.0}
 
 
 def classify_tex(score: Dict[str, float], preserved=TEX_PRESERVED, borderline=TEX_BORDERLINE) -> str:
-    """``preserved`` / ``borderline`` / ``broken`` for the worst rotation score of a tag."""
+    """``preserved`` / ``borderline`` / ``broken`` for the worst rotation score of a tag (v2: with the blob test; a
+    v1 score without blob fields is classified on the percentiles alone)."""
     p99 = score.get("p99", score["p95"])
-    if score["mad"] < preserved["mad"] and score["p95"] < preserved["p95"] and p99 < preserved["p99"]:
+    n6 = max(score.get("n6", BLOB_MIN_PX), 1)
+    blob_rel = score.get("blob_px", 0) / n6
+    blob_d = score.get("blob_d", 0.0)
+    sil_rel, sil_weak_rel = score.get("sil_px", 0) / n6, score.get("sil_px_weak", 0) / n6
+    if (score["mad"] < preserved["mad"] and score["p95"] < preserved["p95"] and p99 < preserved["p99"]
+            and blob_rel < preserved.get("blob_n6_frac", 1e9) and sil_weak_rel < preserved.get("sil_weak_n6_frac", 1e9)):
         return "preserved"
-    if score["mad"] <= borderline["mad"] and score["p95"] <= borderline["p95"] and p99 <= borderline["p99"]:
+    strong = blob_rel >= borderline.get("blob_n6_frac_strong", 1e9) and blob_d >= borderline.get("blob_d_strong", 1e9)
+    if (score["mad"] <= borderline["mad"] and score["p95"] <= borderline["p95"] and p99 <= borderline["p99"]
+            and blob_rel < borderline.get("blob_n6_frac", 1e9) and not strong and sil_rel < borderline.get("sil_n6_frac", 1e9)):
         return "borderline"
     return "broken"
+
+
+def classify_tex_v1(score: Dict[str, float]) -> str:
+    """The first survey's texture class (before the contrast normalisation and the blob test)."""
+    p99 = score.get("p99", score["p95"])
+    if score["mad"] < TEX_PRESERVED_V1["mad"] and score["p95"] < TEX_PRESERVED_V1["p95"] and p99 < TEX_PRESERVED_V1["p99"]:
+        return "preserved"
+    if score["mad"] <= TEX_BORDERLINE_V1["mad"] and score["p95"] <= TEX_BORDERLINE_V1["p95"] and p99 <= TEX_BORDERLINE_V1["p99"]:
+        return "borderline"
+    return "broken"
+
+
+def tex_severity(score: Dict[str, float]) -> Tuple[float, float]:
+    """Ordering key for the worst rotation of a tag: the larger of the texture blob and the silhouette blob relative
+    to n6 first, then the MAD."""
+    n6 = max(score.get("n6", BLOB_MIN_PX), 1)
+    return (max(score.get("blob_px", 0), score.get("sil_px", 0)) / n6, score["mad"])

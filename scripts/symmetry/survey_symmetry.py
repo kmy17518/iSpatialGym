@@ -20,12 +20,17 @@ Stages (all idempotent, ``--force`` recomputes; ``OUT`` defaults to ``runlogs/sy
         -> OUT/geom/<category>__<model>.json : symmetric Chamfer scores of every candidate rotation (20k-point
            area-weighted surface sample vs a 400k dense sample, about the bbox centre and the centroid), for the
            canonical model and for the scaled variant
-    python scripts/symmetry/survey_symmetry.py texture  [--shard K/N] [--limit N] [--only ...]
-        -> OUT/tex/<key>.json : flat-shaded render comparison (6 cameras, 192 px) of the model vs the model rotated
-           by every geometrically exact / near rotation; OUT/renders/<key>.jpg contact sheets (<= 100 KB) for review
+    python scripts/symmetry/survey_symmetry.py texture  [--shard K/N] [--limit N] [--only ...] [--layout-file ...] [--tags-file ...]
+        -> OUT/tex/<key>.json : flat-shaded render comparison (6 cameras, 384 px, 768 px for elongated bodies) of the
+           model vs the model rotated by every geometrically exact / near rotation: blurred percentile statistics and
+           the local-feature (blob) test of symcore.image_diff; OUT/renders/<key>.jpg contact sheets (<= 100 KB) for
+           review (--layout-file keeps the row order / displayed rotations of issued review batches)
     python scripts/symmetry/survey_symmetry.py report
         -> OUT/symmetry.json, OUT/symmetry.csv, OUT/report.md (per-tag counts, sanity table, mental-rotation targets
            with a symmetry, symmetric_180 disagreements, review list, failures)
+    python scripts/symmetry/survey_symmetry.py diff [--previous OUT/superseded/v1/symmetry.json]
+        -> OUT/report_diff.md : texture-class flips per tag, final-verdict changes, newly borderline models and the
+           agreement with the reviewer verdicts in OUT/review/
 
 Tags: ``x2 y2 z2`` half turns, ``x4 y4 z4`` quarter turns, ``x3 y3 z3 x5 y5 z5 x6 y6 z6`` 3-/5-/6-fold, ``xinf yinf zinf``
 bodies of revolution, ``full`` spheres, reduced to generators (``symcore.reduce_tags``); ``none`` = surveyed and
@@ -175,10 +180,14 @@ def candidate_tags(tag_scores: Dict[str, dict]) -> List[str]:
     return [t for t in S.TAG_ORDER if t in tag_scores and tag_scores[t]["mean"] <= S.GEOM_NEAR["mean"] and not tag_scores[t].get("coarse")]
 
 
-def texture_variant(renderer, meshes, g: dict, tags: List[str]) -> Tuple[Dict[str, dict], list, Dict[str, list]]:
-    """Texture scores of ``tags`` for one variant (base / scaled): {tag: {mad, p95, iou, worst}}, the base renders and
-    the worst-rotation renders per tag (for the contact sheet)."""
+def texture_variant(renderer, meshes, g: dict, tags: List[str],
+                    pins: Optional[Dict[str, str]] = None) -> Tuple[Dict[str, dict], list, Dict[str, list]]:
+    """Texture scores of ``tags`` for one variant (base / scaled): {tag: {mad, p95, p99, blob_*, ..., worst, shown}},
+    the base renders and the renders shown on the contact sheet per tag: the worst rotation of the tag
+    (``symcore.tex_severity``: largest blob, then MAD) unless ``pins`` names the rotation a running review batch was
+    issued with (``shown`` records which one it is)."""
     cands = S.candidate_rotations()
+    pins = pins or {}
     renderer.set_size(renderer.base_size * renderer.size_factor(g.get("bbox", [1, 1, 1])))
     renderer.prepare(meshes, np.asarray(g["bbox_centre"]), float(g["diag"]))
     base = renderer.render(None)
@@ -186,31 +195,42 @@ def texture_variant(renderer, meshes, g: dict, tags: List[str]) -> Tuple[Dict[st
     scores, imgs = {}, {}
     for tag in tags:
         c = centres[g["tags"][tag].get("centre", "bbox")]
-        worst = None
+        worst, worst_imgs, pinned_imgs = None, None, None
         for rname, R in cands[tag]:
             rend = renderer.render(R, centre=c)
-            s = S.image_diff(base, rend)
-            if worst is None or s["mad"] > worst["mad"]:
-                worst = dict(s, worst=rname)
-                imgs[tag] = rend
-            if worst["mad"] > 2 * S.TEX_BORDERLINE_MAD:
+            s = S.image_diff(base, rend, m_per_px=renderer.m_per_px, view_names=renderer.view_names, diag=float(g["diag"]),
+                             thin_mm=float(min(g.get("bbox", [1, 1, 1]))) * 1000.0)
+            if worst is None or S.tex_severity(s) > S.tex_severity(worst):
+                worst, worst_imgs = dict(s, worst=rname), rend
+            if pins.get(tag) == rname:
+                pinned_imgs = rend
+            if worst["mad"] > 2 * S.TEX_BORDERLINE_MAD and worst["blob_px"] >= 2 * worst["n6"] and pins.get(tag) is None:
                 break  # clearly broken: the remaining angles cannot rescue the tag
+        if pinned_imgs is None and pins.get(tag):  # the pinned angle was not reached (early exit) - render it
+            R = dict(cands[tag]).get(pins[tag])
+            if R is not None:
+                pinned_imgs = renderer.render(R, centre=c)
+        worst["shown"] = pins[tag] if pinned_imgs is not None else worst["worst"]
         scores[tag] = worst
+        imgs[tag] = pinned_imgs if pinned_imgs is not None else worst_imgs
     return scores, base, imgs
 
 
-def sheet_rows(g: dict, tex: Dict[str, dict], first: List[str] = ()) -> List[str]:
-    """Tags shown on the contact sheet: ``first`` (tags a review asks for), then the reduced exact + near sets, every
-    texture-borderline tag, then the other rendered tags, <= SHEET_MAX_ROWS."""
+def sheet_rows(g: dict, tex: Dict[str, dict], first: List[str] = (), classify=None) -> List[str]:
+    """Tags shown on the contact sheet: ``first`` (the rows a review batch was issued with / asks for, all of them),
+    then the reduced exact + near sets, every texture-borderline tag (``classify``, default the current
+    ``symcore.classify_tex``), then the other rendered tags, up to SHEET_MAX_ROWS (or the length of ``first``)."""
+    classify = classify or S.classify_tex
     ex, nr = S.classify_geom(g["tags"])
-    show = list(first) + [t for t in S.reduce_tags(ex) if t not in first] + [t for t in S.reduce_tags(nr) if t not in ex and t not in first]
+    show = [t for t in first if t in tex]
+    show += [t for t in S.reduce_tags(ex) if t not in show] + [t for t in S.reduce_tags(nr) if t not in ex and t not in show]
     for t in tex:
-        if t not in show and S.classify_tex(tex[t]) == "borderline":
+        if t not in show and classify(tex[t]) == "borderline":
             show.append(t)
     for t in tex:  # everything else that was rendered, until the cap
         if t not in show:
             show.append(t)
-    return [t for t in show if t in tex][:SHEET_MAX_ROWS]
+    return [t for t in show if t in tex][:max(SHEET_MAX_ROWS, len([t for t in first if t in tex]))]
 
 
 def write_sheet(path: str, title: str, base_imgs, rows: List[tuple]):
@@ -235,8 +255,8 @@ def write_sheet(path: str, title: str, base_imgs, rows: List[tuple]):
         y0 = hdr + ri * tile
         for li, line in enumerate(lines[:5]):
             dr.text((4, y0 + 4 + 13 * li), line[:38], fill=(0, 0, 0) if li == 0 else (70, 70, 70), font=font(11 if li == 0 else 10))
-        for vi, (rgb, _) in enumerate(imgs):
-            im = Image.fromarray(rgb).resize((tile, tile), Image.BOX)
+        for vi, view in enumerate(imgs):
+            im = Image.fromarray(view[0]).resize((tile, tile), Image.BOX)
             out.paste(im, (label_w + vi * tile, y0))
         dr.line([(0, y0), (W, y0)], fill=(200, 200, 200), width=1)
     for q in (82, 70, 58, 45):
@@ -246,15 +266,17 @@ def write_sheet(path: str, title: str, base_imgs, rows: List[tuple]):
 
 
 def texture_one(entry: dict, geom_rec: dict, renderer, out_dir: str, renders_dir: str, force: bool = False,
-                extra_tags: Optional[Dict[str, List[str]]] = None) -> str:
+                extra_tags: Optional[Dict[str, List[str]]] = None, pins: Optional[Dict[str, Dict[str, str]]] = None) -> str:
     """Texture scores + contact sheet of one model. ``extra_tags`` = {"base" | "scaled": [tags]} a review round asks
-    for: rendered even when they are no geometric candidate, shown first on the sheet, and the sheet is written even
-    for a model without a geometric candidate."""
+    for (or the row order a running batch was issued with): rendered even when they are no geometric candidate, shown
+    first on the sheet in that order, and the sheet is written even for a model without a geometric candidate.
+    ``pins`` = {"base" | "scaled": {tag: rotation name}} keeps the displayed rotation of a row a running batch judges."""
     key = entry["key"]
     path = os.path.join(out_dir, key + ".json")
     if os.path.exists(path) and not force:
         return "skip"
     extra_tags = extra_tags or {}
+    pins = pins or {}
     variants = [(v, geom_rec[v]) for v in ("base", "scaled") if geom_rec.get(v)]
     todo = [(v, g, [t for t in S.TAG_ORDER if t in set(candidate_tags(g["tags"])) | set(extra_tags.get(v, []))]) for v, g in variants]
     todo = [(v, g, tags) for v, g, tags in todo if tags]
@@ -282,7 +304,7 @@ def texture_one(entry: dict, geom_rec: dict, renderer, out_dir: str, renders_dir
         rec["n_textured"] = sum(1 for m in meshes if m.visual.kind == "texture")
         for v, g, tags in todo:
             ms = meshes if v == "base" else scaled(meshes, entry["scale"])
-            scores, base_imgs, imgs = texture_variant(renderer, ms, g, tags)
+            scores, base_imgs, imgs = texture_variant(renderer, ms, g, tags, pins=pins.get(v))
             rec[v] = scores
             sheet = os.path.join(renders_dir, key + ("" if v == "base" else "__scaled") + ".jpg")
             forced = [t for t in extra_tags.get(v, []) if t in scores]
@@ -291,13 +313,17 @@ def texture_one(entry: dict, geom_rec: dict, renderer, out_dir: str, renders_dir
                     os.remove(sheet)
                 continue
             rows = []
-            for t in sheet_rows(g, scores, first=forced):
+            shown_rows = sheet_rows(g, scores, first=forced)
+            rec.setdefault("sheet_rows", {})[v] = shown_rows
+            for t in shown_rows:
                 gs, ts = g["tags"][t], scores[t]
-                lines = [f"{t}  ({ts['worst']}) {S.classify_tex(ts)}",
-                         f"geom mean {gs['mean'] * 100:.2f}% p95 {gs['p95'] * 100:.2f}%",
-                         f"     frac2 {gs['frac2'] * 100:.1f}% about {gs['centre']}",
-                         f"tex MAD {ts['mad'] * 255:.1f} p95 {ts['p95'] * 255:.1f} p99 {ts['p99'] * 255:.0f} /255",
-                         f"     union MAD {ts['mad_union'] * 255:.1f} mask IoU {ts['iou']:.3f}"]
+                blob = (f"blob {ts['blob_mm']:.0f}mm {ts['blob_view']} ({ts['blob_px']}px/{ts['n6']})" if ts.get("blob_px") else "blob -")
+                lines = [f"{t}  ({ts.get('shown', ts['worst'])}) {S.classify_tex(ts)}",
+                         f"geom mean {gs['mean'] * 100:.2f}% p95 {gs['p95'] * 100:.2f}% frac2 {gs['frac2'] * 100:.1f}%",
+                         f"tex MAD {ts['mad'] * 255:.1f} p95 {ts['p95'] * 255:.1f} p99 {ts['p99'] * 255:.0f} gain {ts.get('gain', 1):.1f}",
+                         f"     {blob}",
+                         f"     union MAD {ts['mad_union'] * 255:.1f} IoU {ts['iou']:.3f}" +
+                         (f" scores {ts['worst']}" if ts.get("shown", ts["worst"]) != ts["worst"] else "")]
                 rows.append((lines, imgs[t]))
             ex, nr = S.classify_geom(g["tags"])
             bb = g.get("bbox", [0, 0, 0])
@@ -320,9 +346,17 @@ def stage_texture(args):
         k, n = (int(v) for v in args.shard.split("/"))
         models = [m for i, m in enumerate(models) if i % n == k]
     extra: Dict[str, Dict[str, List[str]]] = {}
+    pins: Dict[str, Dict[str, Dict[str, str]]] = {}
     if args.tags_file:  # {"<key>": {"base": [tags], "scaled": [tags]}} - render these, sheet them first
         extra = json.load(open(args.tags_file))
         models = [m for m in models if m["key"] in extra]
+    if args.layout_file:  # {"<key>": {"base": {"first": [tags], "pin": {tag: rotation}}, "scaled": {...}}} - keep a batch's sheet layout
+        for key, lay in json.load(open(args.layout_file)).items():
+            for v, d in lay.items():
+                if d.get("first"):
+                    extra.setdefault(key, {})[v] = list(dict.fromkeys(list(d["first"]) + extra.get(key, {}).get(v, [])))
+                if d.get("pin"):
+                    pins.setdefault(key, {})[v] = dict(d["pin"])
     geom_dir, out_dir, renders_dir = os.path.join(args.out, "geom"), os.path.join(args.out, "tex"), os.path.join(args.out, "renders")
     os.makedirs(out_dir, exist_ok=True)
     os.makedirs(renders_dir, exist_ok=True)
@@ -338,7 +372,7 @@ def stage_texture(args):
         if "error" in g:
             counts["geomerror"] += 1
             continue
-        status = texture_one(m, g, renderer, out_dir, renders_dir, args.force or bool(extra), extra.get(m["key"]))
+        status = texture_one(m, g, renderer, out_dir, renders_dir, args.force or bool(args.tags_file), extra.get(m["key"]), pins.get(m["key"]))
         counts[status] += 1
         if status == "error":
             print(f"FAILED {m['key']}", flush=True)
@@ -350,11 +384,15 @@ def stage_texture(args):
 
 # ----------------------------------------------------------------------------------------------- report
 
-def classify_model(g: dict, tex: Optional[Dict[str, dict]]) -> dict:
-    """Final verdict of one variant: geometry classes x texture classes -> symmetry / symmetry_near (reduced tags)."""
+def classify_model(g: dict, tex: Optional[Dict[str, dict]], prev_symmetry: Optional[List[str]] = None) -> dict:
+    """Final verdict of one variant: geometry classes x texture classes -> symmetry / symmetry_near (reduced tags).
+    ``prev_symmetry`` (the superseded pass's final tags): a tag the current criterion calls preserved that the previous
+    pass did not is a *relaxation* and goes to ``symmetry_near`` (review) instead of ``symmetry`` - a re-tuned criterion
+    may only tighten the equivalences on its own."""
     ex, nr = S.classify_geom(g["tags"])
     tex = tex or {}
-    preserved, sym_raw, near_raw, tex_missing = [], [], [], []
+    preserved, sym_raw, near_raw, tex_missing, relaxed = [], [], [], [], []
+    prev_ok = set(S.expand_tags([t for t in (prev_symmetry or []) if t != "none"])) if prev_symmetry is not None else None
     for t in ex + nr:
         if t not in tex:
             tex_missing.append(t)
@@ -364,7 +402,11 @@ def classify_model(g: dict, tex: Optional[Dict[str, dict]]) -> dict:
         if cls == "preserved":
             preserved.append(t)
         if t in ex and cls == "preserved":
-            sym_raw.append(t)
+            if prev_ok is not None and t not in prev_ok:
+                relaxed.append(t)
+                near_raw.append(t)
+            else:
+                sym_raw.append(t)
         elif cls in ("preserved", "borderline", "unknown"):
             near_raw.append(t)
     sym = S.reduce_tags(sym_raw)
@@ -377,11 +419,17 @@ def classify_model(g: dict, tex: Optional[Dict[str, dict]]) -> dict:
             continue
         scores[t] = {"geom": {k: round(s[k], 5) for k in ("mean", "p95", "frac2")}, "centre": s["centre"], "worst": s["worst"]}
         if t in tex:
-            scores[t]["tex"] = {k: round(tex[t][k], 5) for k in ("mad", "p95", "p99", "mad_union", "iou") if k in tex[t]}
+            scores[t]["tex"] = {k: (round(tex[t][k], 5) if isinstance(tex[t][k], float) else tex[t][k])
+                                for k in ("mad", "p95", "p99", "mad_raw", "mad_union", "iou", "depth_frac", "gain", "blob_px", "blob_frac", "blob_view",
+                                          "blob_kind", "blob_d", "blob_mm", "n6", "sil_px", "sil_px_weak", "sil_view", "sil_mm")
+                                if k in tex[t]}
             scores[t]["tex"]["worst"] = tex[t]["worst"]
+            if tex[t].get("shown", tex[t]["worst"]) != tex[t]["worst"]:
+                scores[t]["tex"]["shown"] = tex[t]["shown"]
             scores[t]["tex_class"] = S.classify_tex(tex[t])
     return {"geom_exact": S.reduce_tags(ex), "geom_near": [t for t in S.reduce_tags(nr) if t not in ex], "texture_preserved": S.reduce_tags(preserved),
             "symmetry": sym or ["none"], "symmetry_near": near, "geom_exact_raw": ex, "geom_near_raw": nr, "texture_missing": tex_missing,
+            "relaxed_awaiting_review": relaxed,
             "scores": scores, "floor": {k: round(v, 5) for k, v in g["floor"].items()}, "diag": round(g["diag"], 5), "bbox": g.get("bbox")}
 
 
@@ -433,6 +481,8 @@ def alignment_half_turns(icl: List[dict], out: Dict[str, dict]) -> List[dict]:
 def stage_report(args):
     models = load_models(args, full=True)
     icl = list(csv.DictReader(open(args.icl)))
+    prev_path = os.path.join(args.out, "superseded", "v1", "symmetry.json")
+    prev = json.load(open(prev_path)) if os.path.exists(prev_path) else {}
     out = collections.OrderedDict()
     failures, tex_failures = [], []
     for m in models:
@@ -449,12 +499,14 @@ def stage_report(args):
         if "error" in tex:
             tex_failures.append((m["key"], tex["error"]))
         rec = {"category": m["category"], "model": m["model"], "uses": m["uses"]}
-        rec.update(classify_model(g["base"], tex.get("base")))
+        p = prev.get(m["key"])
+        rec.update(classify_model(g["base"], tex.get("base"), p["symmetry"] if p else None))
         rec["scale"] = m.get("scale")
         if g.get("scaled"):
-            sc = classify_model(g["scaled"], tex.get("scaled"))
+            sc = classify_model(g["scaled"], tex.get("scaled"), (p.get("symmetry_scaled") or ["none"]) if p else None)
             rec["symmetry_scaled"], rec["symmetry_near_scaled"] = sc["symmetry"], sc["symmetry_near"]
-            rec["scaled"] = {k: sc[k] for k in ("geom_exact", "geom_near", "texture_preserved", "scores", "bbox", "geom_exact_raw", "geom_near_raw")}
+            rec["scaled"] = {k: sc[k] for k in ("geom_exact", "geom_near", "texture_preserved", "scores", "bbox", "geom_exact_raw", "geom_near_raw",
+                                               "relaxed_awaiting_review")}
         else:
             rec["symmetry_scaled"], rec["symmetry_near_scaled"] = None, None
         rec["n_faces"], rec["n_meshes"] = g.get("n_faces"), g.get("n_meshes")
@@ -560,6 +612,113 @@ def stage_report(args):
     print(f"... report written to {os.path.join(args.out, 'report.md')}; symmetry.json / symmetry.csv: {n} models")
 
 
+# ----------------------------------------------------------------------------------------------- diff
+
+def stage_diff(args):
+    """Compare the current ``symmetry.json`` with a previous one (``--previous``, default ``superseded/v1/symmetry.json``):
+    texture-class flips per tag, final-verdict changes, models that gained a borderline tag, and the agreement of the
+    current texture classes with the reviewer verdicts in ``review/*.json``. Writes ``report_diff.md``."""
+    import glob as _glob
+
+    prev_path = args.previous or os.path.join(args.out, "superseded", "v1", "symmetry.json")
+    prev = json.load(open(prev_path))
+    cur = json.load(open(os.path.join(args.out, "symmetry.json")))
+    flips = collections.Counter()  # (tag, old class, new class)
+    flip_rows = []
+    sym_lost = collections.Counter()
+    sym_gained = collections.Counter()
+    changed = []
+    newly_border, newly_none_to_border = [], []
+    for key, r in cur.items():
+        p = prev.get(key)
+        if p is None:
+            continue
+        for variant in ("base", "scaled"):
+            ps = p["scores"] if variant == "base" else (p.get("scaled") or {}).get("scores", {})
+            cs = r["scores"] if variant == "base" else (r.get("scaled") or {}).get("scores", {})
+            for t, s in cs.items():
+                old, new = (ps.get(t) or {}).get("tex_class"), s.get("tex_class")
+                if old and new and old != new:
+                    flips[(t, old, new)] += 1
+                    if old == "preserved":
+                        flip_rows.append((key + ("" if variant == "base" else "__scaled"), t, old, new, s.get("tex", {})))
+        if r["symmetry"] != p["symmetry"] or r["symmetry_near"] != p["symmetry_near"]:
+            changed.append((key, p["symmetry"], p["symmetry_near"], r["symmetry"], r["symmetry_near"]))
+            for t in set(S.expand_tags(p["symmetry"])) - set(S.expand_tags(r["symmetry"])):
+                if t in p["symmetry"]:
+                    sym_lost[t] += 1
+            for t in set(r["symmetry"]) - set(S.expand_tags(p["symmetry"])):
+                if t != "none":
+                    sym_gained[t] += 1
+        new_near = [t for t in r["symmetry_near"] if t not in p["symmetry_near"]]
+        if new_near:
+            newly_border.append((key, new_near))
+            if p["symmetry"] == ["none"] and not p["symmetry_near"]:
+                newly_none_to_border.append((key, new_near))
+    # agreement with the reviewer verdicts (their tags are judged on the current texture class)
+    agree = collections.Counter()
+    disagree_rows = []
+    for f in sorted(_glob.glob(os.path.join(args.out, "review", "*.json"))):
+        bid = os.path.splitext(os.path.basename(f))[0]
+        try:
+            d = json.load(open(f))
+        except Exception:  # noqa: BLE001
+            continue
+        for key, tags in d.items():
+            base_key = key[: -len("__scaled")] if key.endswith("__scaled") else key
+            r = cur.get(base_key)
+            if r is None or not isinstance(tags, dict):
+                continue
+            scores = r["scores"] if not key.endswith("__scaled") else (r.get("scaled") or {}).get("scores", {})
+            for t, v in tags.items():
+                verdict = (v or {}).get("verdict") if isinstance(v, dict) else None
+                cls = (scores.get(t) or {}).get("tex_class")
+                if verdict not in ("preserved", "broken") or cls is None:
+                    agree["n/a (unsure or not scored)"] += 1
+                    continue
+                if cls == "borderline":
+                    agree[f"reviewer {verdict} / survey borderline"] += 1
+                elif cls == verdict:
+                    agree[f"agree ({verdict})"] += 1
+                else:
+                    agree[f"DISAGREE reviewer {verdict} / survey {cls}"] += 1
+                    disagree_rows.append((bid, key, t, verdict, cls, (v or {}).get("note", "")[:90]))
+    L = [f"# Survey re-run diff: {os.path.relpath(prev_path, REPO)} -> current\n",
+         "## Texture-class flips per (model, tag) with a texture score in both runs\n",
+         "| tag | preserved -> broken | preserved -> borderline | borderline -> broken | borderline -> preserved | broken -> borderline | broken -> preserved |\n|---|---|---|---|---|---|---|"]
+    for t in S.TAG_ORDER:
+        row = [flips[(t, "preserved", "broken")], flips[(t, "preserved", "borderline")], flips[(t, "borderline", "broken")],
+               flips[(t, "borderline", "preserved")], flips[(t, "broken", "borderline")], flips[(t, "broken", "preserved")]]
+        if any(row):
+            L.append(f"| `{t}` | " + " | ".join(str(v) for v in row) + " |")
+    tot = collections.Counter()
+    for (t, o, n), c in flips.items():
+        tot[(o, n)] += c
+    L.append("\nTotals: " + ", ".join(f"{o} -> {n}: {c}" for (o, n), c in sorted(tot.items())) + "\n")
+    L.append(f"## Final verdicts\n\n{len(changed)} models changed `symmetry` / `symmetry_near`. Tags removed from `symmetry`: "
+             + (", ".join(f"`{t}` {c}" for t, c in sym_lost.most_common()) or "none") + ". Tags added to `symmetry`: "
+             + (", ".join(f"`{t}` {c}" for t, c in sym_gained.most_common()) or "none") + ".\n")
+    L.append(f"{len(newly_border)} models gained a `symmetry_near` tag ({len(newly_none_to_border)} of them were `none` without a near entry before).\n")
+    L.append("| key | before `symmetry` / `symmetry_near` | now `symmetry` / `symmetry_near` |\n|---|---|---|")
+    for key, s0, n0, s1, n1 in changed:
+        L.append(f"| `{key}` | `{' '.join(s0)}` / `{' '.join(n0) or '-'}` | `{' '.join(s1)}` / `{' '.join(n1) or '-'}` |")
+    L.append(f"\n## (model, tag) that were texture-preserved and are not any more ({len(flip_rows)})\n")
+    L.append("| key | tag | now | MAD | p95 | p99 | blob (x 6x6 mm) | blob mean /255 | view |\n|---|---|---|---|---|---|---|---|---|")
+    for key, t, old, new, tex in flip_rows:
+        L.append(f"| `{key}` | `{t}` | {new} | {tex.get('mad', 0) * 255:.1f} | {tex.get('p95', 0) * 255:.1f} | {tex.get('p99', 0) * 255:.0f} | "
+                 f"{tex.get('blob_px', 0) / max(tex.get('n6', 1), 1):.1f} | {tex.get('blob_d', 0) * 255:.0f} | {tex.get('blob_view', '')} |")
+    L.append("\n## Agreement with the reviewer verdicts (review/*.json, judged on the current texture class)\n")
+    for k, c in sorted(agree.items()):
+        L.append(f"- {k}: {c}")
+    L.append("\n| batch | key | tag | reviewer | survey | note |\n|---|---|---|---|---|---|")
+    for bid, key, t, verdict, cls, note in disagree_rows:
+        L.append(f"| {bid} | `{key}` | `{t}` | {verdict} | {cls} | {note} |")
+    with open(os.path.join(args.out, "report_diff.md"), "w") as f:
+        f.write("\n".join(L) + "\n")
+    print("\n".join(L[:60]))
+    print(f"... written to {os.path.join(args.out, 'report_diff.md')}")
+
+
 # ----------------------------------------------------------------------------------------------- main
 
 def load_models(args, full: bool = False) -> List[dict]:
@@ -575,7 +734,8 @@ def load_models(args, full: bool = False) -> List[dict]:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("stage", choices=["models", "geom", "texture", "report"])
+    ap.add_argument("stage", choices=["models", "geom", "texture", "report", "diff"])
+    ap.add_argument("--previous", default=None, help="diff stage: the previous symmetry.json (default superseded/v1/symmetry.json)")
     ap.add_argument("--icl", default=DEFAULT_ICL)
     ap.add_argument("--out", default=DEFAULT_OUT)
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 4) - 4))
@@ -586,9 +746,12 @@ def main():
     ap.add_argument("--tags-file", default=None,
                     help="texture stage: json {key: {base: [tags], scaled: [tags]}} of extra rotations to render and to put first on the "
                          "sheet (review round); only these models are (re-)rendered")
-    ap.add_argument("--size", type=int, default=192)
+    ap.add_argument("--layout-file", default=None,
+                    help="texture stage: json {key: {base|scaled: {first: [tags], pin: {tag: rotation}}}} - keep the sheet row order and "
+                         "displayed rotations a running review batch was issued with (prepare_review.py --layout writes it)")
+    ap.add_argument("--size", type=int, default=384)
     args = ap.parse_args()
-    {"models": stage_models, "geom": stage_geom, "texture": stage_texture, "report": stage_report}[args.stage](args)
+    {"models": stage_models, "geom": stage_geom, "texture": stage_texture, "report": stage_report, "diff": stage_diff}[args.stage](args)
 
 
 if __name__ == "__main__":
