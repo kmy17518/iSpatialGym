@@ -46,7 +46,10 @@ import torch as th
 
 log = logging.getLogger("ispatialgym.sampling.reach_volume")
 
-TRANSLATES = [0.0, 0.25, 0.5, 0.75, 1.0]
+#: JoyLo translate 1.0 (the "downward" keyframe itself) self-collides in cuRobo's sphere model with *every* arm posture
+#: (measured 2026-09-15: untucked / tucked / ready all collide at 1.0, untucked is free up to 0.95), so the deepest grid
+#: trunk is 0.95. Tilts are additive on torso_joint3 (negative = forward / down).
+TRANSLATES = [0.0, 0.25, 0.5, 0.75, 0.95]
 TILTS = [0.0, -0.3, -0.6, -0.9]
 LATTICE = 0.05
 X_RANGE = (0.25, 0.90)
@@ -65,8 +68,17 @@ CLASSES: Dict[str, Dict] = {
 ARMS = ("right", "left")
 
 
+#: committed copy of the merged volume (what the samplers read on every machine; env var overrides)
+REPO_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "runlogs", "reach_volume_20260915")
+
+
 def default_dir() -> str:
-    return os.environ.get("ISPATIALGYM_REACH_VOLUME", os.path.expanduser("~/.cache/ispatialgym/reach_volume"))
+    env = os.environ.get("ISPATIALGYM_REACH_VOLUME")
+    if env:
+        return env
+    if os.path.exists(os.path.join(REPO_DIR, "reach_volume.npz")):
+        return REPO_DIR
+    return os.path.expanduser("~/.cache/ispatialgym/reach_volume")
 
 
 def _arange(lo: float, hi: float, step: float) -> np.ndarray:
