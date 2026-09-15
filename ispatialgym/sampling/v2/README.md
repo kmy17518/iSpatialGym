@@ -140,6 +140,22 @@ it also calls `tabletop.edge_candidates` (per-edge retry when Phase 1c rejects a
   the stance the program is at (tracked through `Navigate.path.to` / `Transition.transition.to`) with the object a preceding
   `Grasp` picked up attached (the grasp record's `eef_in_object` puts it into the hand).
 
+## Running (D4)
+
+```
+OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.sample_isg --alias <alias> [--customs ispatialgym/assets/task_specs/isg_customs.json]
+    [--scene S] [--templates N] [--instances-per-template N] [--seed 0] [--out <root>] [--max-attempts 30] [--no-write-back]
+OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.multiply_isg --template <root>/<alias>/<template_id> --instances N [--path-buckets 3:10,5:10,10:5]
+```
+
+`sample_isg` copies the customs list to `<root>/task_custom_lists.json`, writes `<root>/<alias>/activity_definitions/<activity>/problem<N>.bddl`,
+`<root>/<alias>/<template_id>/{template.json, template-partial_rooms.json, template_meta.json, instances/<iid>-tro_state.json,
+<iid>.oracle.json, <iid>.summary.json}` and `<root>/summary.json`, and prints one `SAMPLING_REPORT {...}` line. Blacklists and
+constraints learned go back into the source customs file (§1) unless `--no-write-back`; the `<root>` copy always carries them.
+On the shared smoke pods (`scripts/runpod/remote_run.py`) pass explicit paths (`--out $SMOKE_OUT/run1`, `--customs ...`); the
+reach band of a (support, object) pair is computed in-process on a cache miss (~10 min per pair on an L40S, then cached under
+`~/.cache/ispatialgym/reach_bands`). `ISG_PROGRAM_CHECK=stub` limits the program check to the structural test (development only).
+
 ## Status (D2 / D4, 2026-09-15) and gaps
 
 Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,

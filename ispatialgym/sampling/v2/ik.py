@@ -104,6 +104,26 @@ class IKChecker:
     def __init__(self, kit, cache_scope: Optional[Dict[str, Any]] = None):
         self.kit = kit
         self.cache_scope = dict(cache_scope or {})  # scene / rooms / placed objects: part of every cache key
+        #: (arm, rounded pose) -> 28-D solution of a successful exact solve; cuRobo's remaining seeds are random, so a
+        #: marginal pose can pass once and fail when re-solved (the program check re-solves every recorded pose): the
+        #: sampler's own solution is used as the seed configuration then. Cleared per attempt (``core``).
+        self.solutions: Dict[Tuple[str, Tuple[float, ...]], th.Tensor] = {}
+
+    @staticmethod
+    def _pose_key(pose: Pose) -> Tuple[float, ...]:
+        p, q = G.t(pose[0]), G.t(pose[1])
+        return tuple(round(float(v), 3) for v in p.tolist()) + tuple(round(float(v), 3) for v in q.tolist())
+
+    def _seeded(self, q0: th.Tensor, pose: Pose, arm: str) -> th.Tensor:
+        """``q0`` with the working arm set to a remembered solution of ``pose`` (the other joints stay ``q0``'s: the
+        base virtual joints must belong to the current robot root)."""
+        q_rec = self.solutions.get((arm, self._pose_key(pose)))
+        if q_rec is None:
+            return q0
+        q = q0.clone()
+        idx = self.kit.robot.arm_control_idx[arm]
+        q[idx] = q_rec[idx]
+        return q
 
     # -- configurations -----------------------------------------------------------------------------------------
     def q_locked(self, stance: Stance, arms: str = "untucked", right_arm: Optional[th.Tensor] = None, left_arm: Optional[th.Tensor] = None) -> th.Tensor:
@@ -154,6 +174,8 @@ class IKChecker:
         if len(poses) == 0:
             return IKResult(True, None, "no poses", 0)
         q0 = self.q_locked(stance) if q_seed is None else q_seed
+        if q_seed is None:
+            q0 = self._seeded(q0, poses[-1], arm)
         key = None
         if cache:
             key = cache_key("exact_ik_v2", {**self.cache_scope, "base": list(stance.base_pose2d), "trunk": [stance.translate, stance.tilt], "arm": arm,
@@ -162,9 +184,14 @@ class IKChecker:
                                             "seeds": EXACT_SEEDS, "seed_arms": q0[self.kit.robot.arm_control_idx[arm]]})
             hit = cache_get(key)
             if hit is not None:
-                return IKResult(bool(hit["ok"]), None if hit.get("q") is None else th.tensor(hit["q"]), "cache", len(poses))
+                q_hit = None if hit.get("q") is None else th.tensor(hit["q"])
+                if q_hit is not None:
+                    self.solutions[(arm, self._pose_key(poses[-1]))] = q_hit.clone()
+                return IKResult(bool(hit["ok"]), q_hit, "cache", len(poses))
         q = self.kit.reachable(list(poses), q0, arm=arm, ignore_for_last=list(ignore_for_last))
         res = IKResult(q is not None, q, "" if q is not None else "exact IK failed", len(poses))
+        if q is not None:
+            self.solutions[(arm, self._pose_key(poses[-1]))] = q.clone()
         if key is not None:
             cache_put(key, {"ok": res.ok, "q": None if q is None else q.tolist()})
         return res

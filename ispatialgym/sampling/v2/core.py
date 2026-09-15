@@ -357,8 +357,8 @@ class SamplerV2(TaskSampler):
 
     def check_stances_with_objects(self, draft: Draft):
         """§4.6 step 5: whole-body collision check of every recorded stance (init, manipulation, placement, ...) with the
-        objects placed (the Phase-2 scan ran without them); ``Reject("stance_collision_with_objects")``. Runs right after
-        ``apply_draft`` (objects at their draft poses, robot at init)."""
+        objects placed (the Phase-2 scan ran without them); ``Reject("stance_collision_with_objects")``. Runs after the
+        settle (objects at their settled = recorded poses, robot at init)."""
         stances = [s for s in self.sidecar.stances.values() if s.name != "goal"]
         if not stances:
             return
@@ -509,15 +509,17 @@ class SamplerV2(TaskSampler):
                     if n_reset:
                         self.rejection_log.counts["scene_reset"] = self.rejection_log.counts.get("scene_reset", 0) + n_reset
                     self.park_robot()
+                    self.ikc.solutions.clear()
                     phase = "sample"
                     draft = self.sample(rng)
                     t_sample = time.time() - t0
                     phase = "apply"
                     self.apply_draft(draft)
-                    self.check_stances_with_objects(draft)
                     t_apply = time.time() - t0 - t_sample
                     phase = "settle_validate"
                     self.settle_and_validate(draft)
+                    # §4.6 step 5 with the objects at their settled (= recorded) poses
+                    self.check_stances_with_objects(draft)
                     t_settle = time.time() - t0 - t_sample - t_apply
                     phase = "goal_check"
                     self.check_goal_feasible(draft)
