@@ -30,10 +30,11 @@ committed HEAD instead. Spend ≈ $100 for the day (3 auto‑recharges of ~$24 t
 
 ## Results
 
-See `summary.md` (regenerated at the end of the run). Headlines at 12:35 PDT (7 sampling jobs and ~30 demo jobs still
-running): 222 / 200+ jobs done, **298 instances** for 149 picks; demos: object scaling 29 / 29 success, mental rotation
-31 / 31 success, camera relocalization 10 success / 17 QA‑failed (v1 base planner: `plan_failed` 16, `collision` 1;
-the binary goal is reached in several of the failed runs).
+See `summary.md`. Final (12:53 PDT, fleet terminated): 196 / 200 sampling jobs done (4 still running at the TTL),
+**151 of 200 picks with instances, 302 instances**; 103 `run_isg` demos: object scaling 35 / 35 success, mental
+rotation 37 / 37 success, camera relocalization 12 success / 19 QA‑failed (v1 base planner: `plan_failed` 17,
+`collision` 2; the binary goal is reached in several of the failed runs — see `demos.csv`). Spend for the day $93
+(4 auto‑recharges).
 
 ### Where the v1 rules lose picks (the reasons the v2 rules exist)
 

@@ -1,13 +1,13 @@
 # Representative run (G0) - results index
 
-Source: `runlogs/runpod/samp` (collected pods + live pulls). 196 jobs done of 200, 302 instances, 99 demo runs.
+Source: `runlogs/runpod/samp` (collected pods + live pulls). 196 jobs done of 200, 302 instances, 103 demo runs.
 
 | subtask | jobs | done | with >= 1 instance | instances | demos ok | demos QA-failed (binary goal may still hold) | demo error | top rejections |
 |---|---|---|---|---|---|---|---|---|
 | alignment-axial | 10 | 10 | 9 | 18 | 0 | 0 | 0 | scene_reset 195, goal_infeasible 56, grasp_unreachable 12 |
 | alignment-world_horizontal | 10 | 10 | 10 | 20 | 0 | 0 | 0 | scene_reset 50, grasp_unreachable 28, too_few_visible 3 |
 | alignment-world_vertical | 10 | 10 | 10 | 20 | 0 | 0 | 0 | scene_reset 35, grasp_unreachable 20, too_few_visible 3 |
-| camera_relocalization-obstructed | 17 | 16 | 16 | 32 | 12 | 16 | 0 | scene_reset 69, obstacle 7 |
+| camera_relocalization-obstructed | 17 | 16 | 16 | 32 | 12 | 17 | 0 | scene_reset 69, obstacle 7 |
 | camera_relocalization-standard | 1 | 1 | 1 | 2 | 0 | 2 | 0 | scene_reset 3 |
 | configuration_matching-articulation_close_large_scale | 6 | 6 | 1 | 2 | 0 | 0 | 0 | scene_reset 3, ERROR Reject("[unreachable] no stance in front of bottom 2, ERROR Reject("[unreachable] no stance in front of fridge 1, ERROR Reject("[unreachable] no stance in front of oven_a 1 |
 | configuration_matching-articulation_close_small_scale | 5 | 5 | 2 | 4 | 0 | 0 | 0 | scene_reset 10, grasp_unreachable 2, ERROR Reject('[articulation] artic_blender_cwkvib_0/j_li 1, ERROR Reject('[no_support] breakfast_table_rhjoby_0: [un 1 |
@@ -23,9 +23,9 @@ Source: `runlogs/runpod/samp` (collected pods + live pulls). 196 jobs done of 20
 | inter_object_relation_satisfaction-touching | 4 | 4 | 3 | 6 | 0 | 0 | 0 | scene_reset 10, partner_placement 1, target_placement 1, ERROR ISGProblemError("Instance 'first-aid_kit.n.01_1' d 1 |
 | inter_object_relation_satisfaction-under_large_scale | 5 | 5 | 1 | 2 | 0 | 0 | 0 | scene_reset 122, target_placement 60, ERROR Reject('[no_support] desk_xhjsub_0: [no_stance] st 2, ERROR Reject('[no_support] desk_aduafr_0: [no_stance] st 1 |
 | inter_object_relation_satisfaction-under_small_scale | 4 | 4 | 4 | 8 | 0 | 0 | 0 | scene_reset 18, goal_infeasible 2 |
-| mental_rotation | 30 | 29 | 29 | 58 | 35 | 0 | 0 | scene_reset 435, init_false 77, goal_self_occlusion 6, grasp_failed 4 |
-| object_scaling | 30 | 30 | 30 | 60 | 34 | 0 | 0 | scene_reset 441, init_false 87 |
-| **total** | 200 | 196 | 151 | 302 | 81 | 18 | 0 | |
+| mental_rotation | 30 | 29 | 29 | 58 | 37 | 0 | 0 | scene_reset 435, init_false 77, goal_self_occlusion 6, grasp_failed 4 |
+| object_scaling | 30 | 30 | 30 | 60 | 35 | 0 | 0 | scene_reset 441, init_false 87 |
+| **total** | 200 | 196 | 151 | 302 | 84 | 19 | 0 | |
 
 ## Picks without an instance
 
