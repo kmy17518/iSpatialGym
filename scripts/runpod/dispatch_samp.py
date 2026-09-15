@@ -34,6 +34,7 @@ cd /root/ispatialgym
 export OMNIGIBSON_HEADLESS=1 OMNI_KIT_ACCEPT_EULA=YES ISPATIALGYM_LOG_LEVEL=INFO
 mkdir -p /root/samp/queue /root/samp/running /root/samp/finished
 touch /root/samp/done.txt
+echo $$ > /root/samp/runner.pid
 while true; do
   next=$(ls /root/samp/queue/*.job 2>/dev/null | sort | head -1)
   if [ -z "$next" ]; then
@@ -45,8 +46,6 @@ while true; do
   IFS=$'\t' read -r jid spec problem extra < "$jf"
   out=/root/samp/$jid; mkdir -p "$out"
   echo "$jid" > /root/samp/current.txt
-  # the spec / code may have been updated after the bootstrap: refresh the checkout the dispatcher pointed at
-  [ -f /root/samp/ref.txt ] && git fetch -q --depth 1 origin "$(cat /root/samp/ref.txt)" 2>/dev/null && git checkout -q FETCH_HEAD 2>/dev/null
   t0=$(date +%s)
   timeout 5400 python -m ispatialgym.sampling.sample_instances --spec "$spec" --problem "$problem" --out "$out" --overwrite $extra > "$out/run.log" 2>&1
   rc=$?
@@ -69,6 +68,36 @@ touch /root/JOB_DONE
 '''
 
 
+SYNC_DIRS = ["ispatialgym/sampling", "ispatialgym/oracle", "ispatialgym/activity", "ispatialgym/eval", "ispatialgym/tasks",
+             "ispatialgym/assets/task_specs", "ispatialgym/assets/icl/roles", "ispatialgym/assets/iddl", "scripts"]
+
+
+EXPORT_DIR = "/tmp/isg_dispatch_export"
+
+
+def export_head() -> str:
+    """Export the committed HEAD (not the working tree: other agents' uncommitted edits must not reach the fleet)."""
+    if os.path.exists(EXPORT_DIR):
+        subprocess.run(["rm", "-rf", EXPORT_DIR], check=True)
+    os.makedirs(EXPORT_DIR)
+    tar = subprocess.Popen(["git", "-C", rp.REPO, "archive", "HEAD"] + SYNC_DIRS, stdout=subprocess.PIPE)
+    subprocess.run(["tar", "-x", "-C", EXPORT_DIR], stdin=tar.stdout, check=True)
+    tar.wait()
+    return EXPORT_DIR
+
+
+def sync_tree(ep) -> None:
+    """rsync the exported HEAD (code + specs) to /root/ispatialgym on the pod (no git: the repo is private)."""
+    ip, port = ep
+    root = export_head() if not os.path.exists(os.path.join(EXPORT_DIR, ".exported")) else EXPORT_DIR
+    open(os.path.join(EXPORT_DIR, ".exported"), "w").close()
+    ssh_cmd = " ".join(shlex.quote(x) for x in rp.ssh_base(ip, port)[:-1])
+    for d in SYNC_DIRS:
+        src = os.path.join(root, d) + "/"
+        subprocess.run(["rsync", "-az", "--delete", "--exclude", "__pycache__", "--exclude", "*.pyc", "-e", ssh_cmd, src,
+                        f"root@{ip}:/root/ispatialgym/{d}/"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--manifest")
@@ -79,6 +108,8 @@ def main():
     ap.add_argument("--wave", type=int, default=1, help="dispatch wave (queue order prefix)")
     ap.add_argument("--close", action="store_true", help="close the queues: runners exit when empty -> JOB_DONE -> collect.py")
     ap.add_argument("--subtasks", nargs="*", default=None, help="only jobs of these subtasks")
+    ap.add_argument("--reset-queue", action="store_true", help="drop queued (not yet started) jobs before adding")
+    ap.add_argument("--sync-only", action="store_true", help="only rsync the working tree to the pods")
     ap.add_argument("--exclude-subtasks", nargs="*", default=None)
     args = ap.parse_args()
     api = rp.Api(rp.load_env()["RUNPOD_API_KEY"])
@@ -110,6 +141,8 @@ def main():
             jobs = [j for j in jobs if j.get("subtask") in args.subtasks]
         if args.exclude_subtasks:
             jobs = [j for j in jobs if j.get("subtask") not in args.exclude_subtasks]
+    if os.path.exists(EXPORT_DIR):
+        subprocess.run(["rm", "-rf", EXPORT_DIR], check=True)
     ready = []
     for pid in pods:
         ep = rp.pod_ssh(api, pid)
@@ -126,6 +159,11 @@ def main():
             print(f"{pid} {fleet['pods'][pid]['name']}: bootstrap not done, skipped")
     if not ready:
         sys.exit("no bootstrapped pod")
+    if args.sync_only:
+        for pid, ep in ready:
+            sync_tree(ep)
+            print(f"{pid}: synced")
+        return
     if args.close:
         for pid, ep in ready:
             rp.ssh_run(*ep, "touch /root/samp/CLOSE", timeout=60)
@@ -136,7 +174,7 @@ def main():
     for i, job in enumerate(sorted(jobs, key=lambda j: -float(j.get("weight", 1.0)))):
         per_pod[ready[i % len(ready)][0]].append(job)
     for pid, ep in ready:
-        script = ["mkdir -p /root/samp/queue"]
+        script = ["mkdir -p /root/samp/queue"] + (["rm -f /root/samp/queue/*.job"] if args.reset_queue else [])
         for k, j in enumerate(per_pod[pid]):
             extra = " ".join(shlex.quote(a) for a in j.get("args", []))
             if j.get("n_instances") is not None:
@@ -150,10 +188,10 @@ def main():
         script.append(f"printf '%s' {shlex.quote(args.ref)} > /root/samp/ref.txt")
         rp.ssh_run(*ep, "bash -s", timeout=120, stdin_text="\n".join(script) + "\n")
         rp.ssh_run(*ep, "cat > /root/samp/run_jobs.sh && chmod +x /root/samp/run_jobs.sh", timeout=60, stdin_text=RUNNER)
-        pull = f"cd /root/ispatialgym && git fetch -q --depth 1 origin {shlex.quote(args.ref)} && git checkout -q FETCH_HEAD && git log --oneline -1"
-        r = rp.ssh_run(*ep, pull, capture=True, timeout=180)
-        running = rp.ssh_run(*ep, "pgrep -f run_jobs.sh > /dev/null && echo RUNNING", capture=True, timeout=45)
-        print(f"{pid} {fleet['pods'][pid]['name']}: +{len(per_pod[pid])} jobs; repo at {(r.stdout or '').strip()}; runner {'already running' if 'RUNNING' in (running.stdout or '') else 'started'}")
+        # the pods cannot pull the private repo after the bootstrap (token shredded): sync the working tree over rsync
+        sync_tree(ep)
+        running = rp.ssh_run(*ep, "test -f /root/samp/runner.pid && kill -0 $(cat /root/samp/runner.pid) 2>/dev/null && echo RUNNING", capture=True, timeout=45)
+        print(f"{pid} {fleet['pods'][pid]['name']}: +{len(per_pod[pid])} jobs; runner {'already running' if 'RUNNING' in (running.stdout or '') else 'started'}")
         if "RUNNING" not in (running.stdout or ""):
             remote = "cd /root && rm -f /root/JOB_DONE /root/samp/CLOSE && setsid nohup /root/samp/run_jobs.sh > /root/samp/runner.log 2>&1 < /dev/null & disown"
             try:
