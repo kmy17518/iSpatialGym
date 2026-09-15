@@ -1,0 +1,11 @@
+[
+ {
+  "id": "demo__object_scaling-jar_of_spaghetti_sauce__representative__target-zahyds",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && for tro in /root/samp/object_scaling-jar_of_spaghetti_sauce__representative__target-zahyds/*/*/instances/*-tro_state.json; do OMNIGIBSON_HEADLESS=1 timeout 1500 python -m ispatialgym.oracle.run_isg --instance \"$tro\" --out \"$OUT\" --video --video-size 540; echo \"DEMO_EXIT $? $tro\"; done",
+  "weight": 1.0,
+  "subtask": "object_scaling",
+  "slot": "representative",
+  "alias": "object_scaling-jar_of_spaghetti_sauce",
+  "source_job": "object_scaling-jar_of_spaghetti_sauce__representative__target-zahyds"
+ }
+]

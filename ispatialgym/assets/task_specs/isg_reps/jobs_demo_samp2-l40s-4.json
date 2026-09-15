@@ -1,0 +1,20 @@
+[
+ {
+  "id": "demo__object_scaling-hard_candy__representative__target-qptjgv",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && for tro in /root/samp/object_scaling-hard_candy__representative__target-qptjgv/*/*/instances/*-tro_state.json; do OMNIGIBSON_HEADLESS=1 timeout 1500 python -m ispatialgym.oracle.run_isg --instance \"$tro\" --out \"$OUT\" --video --video-size 540; echo \"DEMO_EXIT $? $tro\"; done",
+  "weight": 1.0,
+  "subtask": "object_scaling",
+  "slot": "representative",
+  "alias": "object_scaling-hard_candy",
+  "source_job": "object_scaling-hard_candy__representative__target-qptjgv"
+ },
+ {
+  "id": "demo__object_scaling-potato__representative__target-lqjear",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && for tro in /root/samp/object_scaling-potato__representative__target-lqjear/*/*/instances/*-tro_state.json; do OMNIGIBSON_HEADLESS=1 timeout 1500 python -m ispatialgym.oracle.run_isg --instance \"$tro\" --out \"$OUT\" --video --video-size 540; echo \"DEMO_EXIT $? $tro\"; done",
+  "weight": 1.0,
+  "subtask": "object_scaling",
+  "slot": "representative",
+  "alias": "object_scaling-potato",
+  "source_job": "object_scaling-potato__representative__target-lqjear"
+ }
+]

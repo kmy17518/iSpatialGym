@@ -1,11 +1,29 @@
 [
  {
-  "id": "demo__camera_relocalization-obstructed-carton_1__representative__obstacles-cdmmwy",
-  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && for tro in /root/samp/camera_relocalization-obstructed-carton_1__representative__obstacles-cdmmwy/*/*/instances/*-tro_state.json; do OMNIGIBSON_HEADLESS=1 timeout 1500 python -m ispatialgym.oracle.run_isg --instance \"$tro\" --out \"$OUT\" --video --video-size 540; echo \"DEMO_EXIT $? $tro\"; done",
+  "id": "demo__mental_rotation-sandal__representative__target-uhzfis",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && for tro in /root/samp/mental_rotation-sandal__representative__target-uhzfis/*/*/instances/*-tro_state.json; do OMNIGIBSON_HEADLESS=1 timeout 1500 python -m ispatialgym.oracle.run_isg --instance \"$tro\" --out \"$OUT\" --video --video-size 540; echo \"DEMO_EXIT $? $tro\"; done",
   "weight": 1.0,
-  "subtask": "camera_relocalization-obstructed",
+  "subtask": "mental_rotation",
   "slot": "representative",
-  "alias": "camera_relocalization-obstructed-carton_1",
-  "source_job": "camera_relocalization-obstructed-carton_1__representative__obstacles-cdmmwy"
+  "alias": "mental_rotation-sandal",
+  "source_job": "mental_rotation-sandal__representative__target-uhzfis"
+ },
+ {
+  "id": "demo__mental_rotation-ginger_root__representative__target-wqcasl",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && for tro in /root/samp/mental_rotation-ginger_root__representative__target-wqcasl/*/*/instances/*-tro_state.json; do OMNIGIBSON_HEADLESS=1 timeout 1500 python -m ispatialgym.oracle.run_isg --instance \"$tro\" --out \"$OUT\" --video --video-size 540; echo \"DEMO_EXIT $? $tro\"; done",
+  "weight": 1.0,
+  "subtask": "mental_rotation",
+  "slot": "representative",
+  "alias": "mental_rotation-ginger_root",
+  "source_job": "mental_rotation-ginger_root__representative__target-wqcasl"
+ },
+ {
+  "id": "demo__object_scaling-canned_food__representative__target-ycbspm",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && for tro in /root/samp/object_scaling-canned_food__representative__target-ycbspm/*/*/instances/*-tro_state.json; do OMNIGIBSON_HEADLESS=1 timeout 1500 python -m ispatialgym.oracle.run_isg --instance \"$tro\" --out \"$OUT\" --video --video-size 540; echo \"DEMO_EXIT $? $tro\"; done",
+  "weight": 1.0,
+  "subtask": "object_scaling",
+  "slot": "representative",
+  "alias": "object_scaling-canned_food",
+  "source_job": "object_scaling-canned_food__representative__target-ycbspm"
  }
 ]
