@@ -53,6 +53,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import torch as th
 
+from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling import knowledge as K
 from ispatialgym.sampling import scene_variants as SV
@@ -79,7 +80,7 @@ STRUCTURAL_SUBSTRINGS = ("walls", "floors", "ceilings", "roof", "baseboard", "wi
 MIN_EUCLIDEAN_M = 0.3
 #: search budgets (not rule numbers): free points drawn per attempt, goal candidates rendered, obstacle cells tried
 N_FREE_POINTS = 60
-N_GOAL_TRIES = 12
+N_GOAL_TRIES = 20
 N_YAW_TRIES = 3
 OBSTACLE_MAX_CELLS = 8
 #: obstacle displacement tolerances at the goal settle (§6.2 "displacement is checked at the goal settle")
@@ -410,14 +411,15 @@ class CameraRelocalizationV2(SamplerV2):
         base0, q0 = init
         cam0 = self.kit.camera_pose(q0)
         axis0 = self.world.camera_model.optical_axis(cam0)
-        # goal candidates: analytic filters (bucket upper bound on the Euclidean distance, heading), collision later
+        # goal candidates: analytic filters (bucket upper bound on the Euclidean distance, heading), collision later;
+        # candidates whose Euclidean distance lies inside the bucket are tried first (a path is never shorter than it)
         cands = []
         for xy in pts:
             e = math.hypot(float(xy[0]) - base0[0], float(xy[1]) - base0[1])
             if e < MIN_EUCLIDEAN_M or e > hi:
                 continue
             for _ in range(N_YAW_TRIES):
-                yaw1 = base0[2] + float(rng.uniform(-max_h, max_h))
+                yaw1 = C.wrap_angle(base0[2] + float(rng.uniform(-max_h, max_h)))
                 tr1 = float(rng.uniform(float(tr_lo), tr_hi))
                 ti1 = float(rng.uniform(float(ti_lo), float(ti_hi)))
                 base1 = (float(xy[0]), float(xy[1]), yaw1)
@@ -433,7 +435,8 @@ class CameraRelocalizationV2(SamplerV2):
                 cands.append((e, heading, base1, tr1, ti1, q1, cam1, arms))
         if not cands:
             raise Reject("goal_sampling", f"no goal candidate passes the analytic filters (bucket ({lo}, {hi}] m, heading <= {math.degrees(max_h):.0f} deg)")
-        order = rng.permutation(len(cands))
+        order = list(rng.permutation(len(cands)))
+        order.sort(key=lambda i: 0 if cands[int(i)][0] > lo else 1)  # Euclidean distance already inside the bucket first (stable: random within)
         chosen = None
         n_rendered = 0
         fails: Dict[str, int] = {}
@@ -584,6 +587,19 @@ class CameraRelocalizationV2(SamplerV2):
 
     def refine_targets_from_goal(self, draft: Draft):
         pass
+
+    def check_stances_with_objects(self, draft: Draft):
+        """§4.6 step 5 for this task: init and goal configurations re-checked with the objects placed in their *recorded*
+        posture (JoyLo reset arms, or untucked where ``goal.arms`` says so) — the core's generic check locks the arms
+        untucked, which is not the posture of these stances (§3.3). TEMP until the core honours ``Stance.q``."""
+        self.kit.sync_world()
+        margin = float(self.g("collision_margin_m"))
+        q0 = self.kit.q_at_base_pose(self.q_reset_rel, *draft.base_pose2d)
+        tr1, ti1 = draft.extras["goal_trunk"]
+        q1 = self.config(draft.extras["goal_base_pose2d"], tr1, ti1, arms=RESET_ARMS if draft.extras["goal_arms"] == "same" else "untucked")
+        free = self.kit.collision_free(th.stack([q0, q1]), margin=margin).tolist()
+        if not all(free):
+            raise Reject("stance_collision_with_objects", f"{'init' if not free[0] else 'goal'} configuration collides with the objects placed")
 
     # ------------------------------------------------------------------ obstacles (§6.2)
 
