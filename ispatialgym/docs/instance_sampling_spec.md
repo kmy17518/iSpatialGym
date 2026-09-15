@@ -474,8 +474,17 @@ limit (same edge and lateral as the init stance):
      at tray depth = camera-frame depth × tan 49.6°, confirmed by one segmentation render), ≥ 4 cm from the source
      tray, footprint on the top.
    - *Blocks*: one block per region cell drawn at random with ≥ 3 cm gaps between footprints, distinct up faces,
-     **no block's up face is the opposite of its goal face** (section 6.5), yaw jitter as before; reach = the cube grasp
-     set of 6.5, confirmed per block with the exact IK for pick **and** place.
+     **no block's up face is the opposite of its goal face** (section 6.5), and the **visible-face rule** (kept from
+     v1 §5.4): every pattern used in the goal is visible in the init image — a block whose goal face is its up face
+     shows it on top; a block that flips gets the coarse yaw (multiple of 90°, before the jitter) that turns its goal
+     face toward the robot, so the goal face is a robot-facing side face. Each goal face must be ≥ 50 % visible from
+     the init stance (ray test on a 3 × 3 grid of face points against the other blocks and the scene; the front row
+     hides the lower part of a back-row block's front face at the camera's elevation) — otherwise redraw the cells.
+     The two rules do not compete: the flip rule fixes *which* face (up or an adjacent face) is the goal face, the
+     visible-face rule fixes the *yaw* about the vertical; for 2 × 2 the four distinct up faces plus four
+     robot-facing side faces always suffice, and a pattern that is on no up face is adjacent to at least three of the
+     up faces (only its opposite is not), so a block that can show it always exists. Yaw jitter as before on top of
+     the coarse yaw; reach = the cube grasp set of 6.5, confirmed per block with the exact IK for pick **and** place.
    - *Axial alignment*: yaw = aligned yaw ± U(20°, 70°) with random sign, footprint on the top, at least one end of
      the long axis inside the band and its top-down push pose confirmed with the exact IK; the stop edge for the other
      arm (6.10) reachable.
@@ -937,6 +946,13 @@ whole-body check; every right-hand push pose IK-feasible; `roles.target.scale` m
 conditions satisfiable (diagnostic `scale_hint` as in 5.5). Goal: position unchanged, orientation = long axis
 parallel to the support's front edge, front toward the robot; tolerance 0.10 rad; equivalences per model. Screening
 uses the left-arm reach volume (push classes at the top height + object thickness) before the exact IK.
+
+**Reference edge visible** (kept from v1 §5.7): the support's front edge is the alignment reference, so a sufficient
+run of it must be in the init image — of 9 points sampled uniformly along the front edge over the lateral window
+[λ − 0.30, λ + 0.30] m around the target, ≥ 3 are inside the frame (5 % margin) and unoccluded (ray from the camera
+to the point, the target itself may not hide them: the points in front of the target are the ones that count), from
+the init stance (Phase 1) and from the manipulation stance (Phase 2). Rejection reason `edge_not_visible`; the
+template retries with the next lateral position (4.4) before the next edge.
 
 ### 6.11 IORS — ontop / under / inside / nextto / touching (small-scale)
 
