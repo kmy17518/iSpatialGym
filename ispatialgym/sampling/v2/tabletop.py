@@ -1233,10 +1233,10 @@ def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose
 
 @contextmanager
 def posed_in_hand(s, arm: str, obj, eef_in_object: Pose):
-    """Put ``obj`` where it sits in the (parked) robot's ``arm`` per the grasp transform ``T_obj→eef`` for the duration of
-    the block, so that ``kit.backend.attach_object`` (which reads the *current* object-in-eef offset) attaches it as
-    carried; the object's pose is restored afterwards. Wrap ``s.record_path`` / ``s.record_transition`` / place IK checks
-    with a carried object in it."""
+    """Put ``obj`` where it sits in the robot's ``arm`` per the grasp transform ``T_obj→eef`` for the duration of the
+    block, so that ``kit.backend.attach_object`` (which reads the *current* object-in-eef offset) attaches it as carried;
+    the object's pose is restored and the collision world re-synced afterwards. Wrap ``s.record_path`` /
+    ``s.record_transition`` / place IK checks with a carried object in it."""
     p0, q0 = obj.get_position_orientation()
     p0, q0 = p0.clone(), q0.clone()
     eef = s.kit.eef_pose(s.kit.q_current(), arm)
@@ -1248,6 +1248,25 @@ def posed_in_hand(s, arm: str, obj, eef_in_object: Pose):
     finally:
         obj.set_position_orientation(p0, q0)
         obj.keep_still()
+        s.kit.sync_world()
+
+
+def facade_v1_spec(s):
+    """v1 facade only (``GroundedProblem.from_v1_spec``): the v1 ``ProblemSpec`` the entry was built from (its
+    ``distractors`` pools, role options), read from the default v1 customs list; None outside the facade."""
+    name = (s.gp.entry.get("_v1") or {}).get("name")
+    if not name:
+        return None
+    from ispatialgym.sampling.spec import load_task_spec
+    from ispatialgym.sampling.v2 import problem as P
+
+    cands = [p for p in ([s.gp.customs_path] if s.gp.customs_path else []) + list(P._CUSTOMS_CANDIDATES) if p and p.endswith("task_custom_lists.json") and os.path.exists(p)]
+    for path in cands:
+        try:
+            return load_task_spec(path, check_ready=False)[name]
+        except Exception:  # noqa: BLE001 - another list, or the entry is not a v1 one
+            continue
+    return None
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -1283,5 +1302,5 @@ __all__ = [
     "image_border_lateral", "r_img", "in_frame", "all_in_frame",
     "edge_frames", "edge_candidates", "phase1_edge_and_standoff", "phase1b_init_trunk", "trunk_sweep_free", "phase1c_lateral", "tilt_scan",
     "phase2_manipulation_stance", "phase3_target", "place_partner", "place_distractors", "whole_body_check_at", "brace_second_arm", "posed_in_hand",
-    "placement_stance",
+    "placement_stance", "facade_v1_spec",
 ]

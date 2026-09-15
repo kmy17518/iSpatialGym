@@ -1,0 +1,445 @@
+"""Alignment — axial (spec §6.10; init per §4.2–4.6 with the axial bullets).
+
+Roles: ``target`` (pushed object with a reviewed frame record: ``frame_front`` / ``frame_long``; ``roles.target.scale``
+may be configured), scene ``support``, ``floor``.
+
+Template: hull / COM / extents, the generic-pinch reach band (push poses at the object's height), Phases 1a / 1b
+(H_max = the object's height) / 1c (row ``axial``: w_diag = ½√(long² + short²)) with the **reference edge visible**
+rule (≥ 3 of 9 points of the front edge over [λ − 0.30, λ + 0.30] in frame and unoccluded) from the init stance —
+the template retries the next lateral position, then the next edge — and Phase 2 filtered by the same rule from the
+manipulation stance.
+
+Instance: yaw = aligned yaw ± U(20°, 70°) (random sign), the object at the focus (footprint on the top), at least one
+end of the long axis inside the band with its top-down push pose confirmed by the exact IK; push contact at that end
+(closed right gripper beside the end, pushing tangentially), arc waypoints at δ/2 and the goal about the COM (§3.9);
+the **stop edge** braced by the closed left gripper: the target's edge that protrudes most along the pushed end's
+direction of motion at the goal orientation (pre-contact + contact IK with the push arm locked, combined whole-body
+check); every right-hand push pose IK-feasible. After settling a vertical hinge through the COM (parent = support,
+anchor 1 mm below the top) is installed and recorded as a TRO constraint (drift ≤ 1 mm / 0.005 rad over 60 steps).
+Goal: position unchanged, orientation = long axis parallel to the front edge, front toward the robot (tolerance
+0.10 rad, equivalences from the customs entry). Sidecar: ``init`` / ``manipulation`` stances (arms right + left),
+the transition, ``contacts.push`` (pre, init, mid, goal, direction, distance) and ``contacts.brace`` (``stop_edge``).
+"""
+
+from __future__ import annotations
+
+import logging
+import math
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import torch as th
+
+from ispatialgym.robot import conventions as C
+from ispatialgym.sampling import generation_defaults as GD
+from ispatialgym.sampling.constraints import Hinge, create_hinge, remove_hinge
+from ispatialgym.sampling.sim_utils import Reject
+from ispatialgym.sampling.tasks.base import Draft
+from ispatialgym.sampling.tro_writer import pose_target
+from ispatialgym.sampling.v2 import tabletop as TT
+from ispatialgym.sampling.v2.core import SamplerV2, register
+from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, Stance
+
+import omnigibson as og  # noqa: E402
+
+log = logging.getLogger("ispatialgym.sampling.v2")
+
+SUBTASK = "alignment-axial"
+AXES = {"+x": (1.0, 0.0, 0.0), "-x": (-1.0, 0.0, 0.0), "+y": (0.0, 1.0, 0.0), "-y": (0.0, -1.0, 0.0), "+z": (0.0, 0.0, 1.0), "-z": (0.0, 0.0, -1.0)}
+#: closed fingers: half thickness of the blade the pushes / stops act with (eef origin this far off the touched face)
+FINGER_HALF_THICKNESS = 0.012
+STOP_CLEARANCE = 0.005  # §5.5 style: the stop face 5 mm outside the goal hull
+END_INSET = 0.03  # the pushed end lies this far inside the object's long-axis extremity
+BAND_TOLERANCE = 0.5  # an end is "inside the band" within this fraction of the lattice of a band cell
+
+
+def _axis(name: str) -> th.Tensor:
+    name = str(name)
+    name = name if name[0] in "+-" else "+" + name
+    return th.tensor(AXES[name], dtype=th.float32)
+
+
+@register(SUBTASK)
+class AlignmentAxial(SamplerV2):
+    def __init__(self, ctx):
+        super().__init__(ctx)
+        if self.gp.bddl is None:
+            self.definition_id = 0  # v1 writer: alignment-0 (table_surface)
+        self.defaults = GD.defaults_for(SUBTASK)
+        self.top = None
+        self.hull: Optional[th.Tensor] = None
+        self.com_local = th.zeros(3)
+        self.edge_frame: Optional[EdgeFrame] = None
+        self.init_stance: Optional[Stance] = None
+        self.manip_candidates: List[Stance] = []
+        self.band_spec: Optional[TT.BandSpec] = None
+        self.bands = None
+        self.hinge: Optional[Hinge] = None
+        self.front_axis = th.tensor([1.0, 0.0, 0.0])
+        self.long_axis = th.tensor([0.0, 1.0, 0.0])
+
+    def g(self, key: str):
+        return self.gen(key, self.defaults.get(key))
+
+    # ------------------------------------------------------------------ roles
+
+    def bind_scene_roles(self):
+        self.bind_floor_v2()
+        req = self.choice.bindings.get("support")
+        names = [n for n in (req if isinstance(req, list) else []) if isinstance(n, str)]
+        if not names:
+            raise Reject("spec", f"{self.gp.alias}: scenes.{self.scene}.bindings.support must list scene object names")
+        self.bind_scene_object("support", self.world.obj(names[0]))
+
+    @property
+    def tname(self) -> str:
+        return self.bindings.one("target").name
+
+    # ------------------------------------------------------------------ frame record (icl frame axes / v1 generation)
+
+    def _frame_axes(self):
+        """``(front, long)`` object-frame axes: the customs ``roles.target.frame`` (D1: ``{"<cat>/<model>": {"front": "+x",
+        "long": "y"}}``), else the v1 ``generation.front_axis`` / ``long_axis`` (per model dict or a value)."""
+        mc = self.choice.models["target"]
+        key = f"{mc.category}/{mc.model}"
+        r = self.gp.roles["target"]
+        frames = getattr(r, "frame", None) or (self.gp.entry.get("roles", {}).get("target", {}).get("frame") or {})
+        rec = frames.get(key) if isinstance(frames, dict) else None
+        front = long = None
+        if isinstance(rec, dict):
+            front, long = rec.get("front", rec.get("frame_front")), rec.get("long", rec.get("frame_long"))
+
+        def per_model(v, default):
+            if isinstance(v, dict):
+                return v.get(key, v.get(mc.category, v.get("default", default)))
+            return v if v is not None else default
+
+        front = front or per_model(self.gen("front_axis"), None)
+        long = long or per_model(self.gen("long_axis"), None)
+        if front is None or long is None:
+            raise Reject("missing_frame", f"{key}: no frame record (front / long axes) in the customs entry")
+        return _axis(front), _axis(long)
+
+    # ------------------------------------------------------------------ template
+
+    def sample_template(self):
+        target = self.obj("target")
+        self.hull = self.world.local_hull(target)
+        self.com_local = _com_local(target)
+        self.front_axis, self.long_axis = self._frame_axes()
+        ext = self.hull.max(dim=0).values - self.hull.min(dim=0).values
+        li = int(th.argmax(self.long_axis.abs()))
+        long_len = float(ext[li])
+        short_len = float(ext[[i for i in range(2) if i != li][0]]) if li < 2 else float(min(ext[0], ext[1]))
+        ez = float(ext[2])
+        support = self.obj("support")
+        self.top = self.support_top(support)
+        if int(self.top.free.sum()) < 50:
+            raise Reject("support_small", f"{support.name}: too little free top")
+        mc = self.choice.models["target"]
+        self.band_spec = TT.BandSpec(object=f"{mc.category}/{mc.model}", grasp_key=None, grasps=None, hull=self.hull, rest_quat=C.IDENTITY_QUAT.clone(),
+                                     scale=list(mc.scale) if mc.scale else None, generic_pinch=True, height=ez)
+        w_diag = 0.5 * math.hypot(long_len, short_len)
+        margins = {"kind": "axial", "w_diag": w_diag, "safety": 0.02, "H_max": ez}
+        self.extents = {"long": long_len, "short": short_len, "height": ez, "w_diag": w_diag}
+        ev = self.g("edge_visibility") or {}
+        rng = np.random.default_rng(self.ctx.base_seed)
+        errors = []
+        for edge, st in TT.edge_candidates(self, self.top, rng):
+            try:
+                self.bands = None
+                bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
+                init0 = TT.phase1b_init_trunk(self, st, ez, bands=bands, top=self.top)
+                init = None
+                for _ in range(4):  # §6.10: retry the next lateral position before the next edge
+                    cand = TT.phase1c_lateral(self, init0, margins, rng, top=self.top, bands=bands)
+                    cand.name = "init"
+                    n_vis = self._edge_visible_points(cand, self.camera_pose_at(cand), 0.0, None)
+                    if n_vis >= int(ev.get("min_visible", 3)):
+                        init = cand
+                        break
+                    log.info("%s: edge %s lateral %.2f: reference edge %d/%d points visible from init", self.gp.alias, edge.name, cand.lateral, n_vis, int(ev.get("points", 9)))
+                if init is None:
+                    raise Reject("edge_not_visible", "the front edge is not visible from the init stance at 4 lateral draws")
+                cands = TT.phase2_manipulation_stance(self, init, w_diag, target_height=ez, bands=bands, top=self.top, focus_z=self.top.z + 0.5 * ez)
+                cands = [c for c in cands if self._edge_visible_points(c, self.camera_pose_at(c), c.local(c.focus[:2])[1], None) >= int(ev.get("min_visible", 3))]
+                if not cands:
+                    raise Reject("edge_not_visible", "no Phase-2 survivor sees the front edge")
+                self.edge_frame, self.init_stance, self.manip_candidates = edge, init, cands
+                break
+            except Reject as e:
+                errors.append(f"edge {edge.name}: {e}")
+                log.info("%s: %s", self.gp.alias, errors[-1][:300])
+        if self.init_stance is None:
+            raise Reject("no_stance", "; ".join(errors)[:1500])
+        self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
+                                    "n_manipulation_candidates": len(self.manip_candidates), "extents": self.extents, "band": getattr(self.bands, "path", None),
+                                    "front_axis": self.front_axis.tolist(), "long_axis": self.long_axis.tolist()})
+
+    def _edge_visible_points(self, stance: Stance, cam, target_lat: float, target_pose: Optional[TT.Pose]) -> int:
+        """§6.10 reference edge: of 9 points along the front edge over [λ − 0.30, λ + 0.30], how many are in frame (5 %) and
+        unoccluded (the ray from the camera reaches the point; the support itself may be hit within 1 cm of it)."""
+        ev = self.g("edge_visibility") or {}
+        n, win, margin = int(ev.get("points", 9)), float(ev.get("window_m", 0.30)), float(ev.get("in_frame_margin", 0.05))
+        pts = th.stack([th.tensor([*stance.world(0.0, target_lat + l).tolist(), float(self.top.z)]) for l in np.linspace(-win, win, n)])
+        inside = self.world.camera_model.inside(cam, pts, margin)
+        if int(inside.sum()) == 0:
+            return 0
+        cam_p = TT._t(cam[0])
+        sel = pts[inside]
+        starts = cam_p.unsqueeze(0).expand(len(sel), 3)
+        ends = sel + (sel - cam_p) / th.linalg.norm(sel - cam_p, dim=1, keepdim=True) * 0.01
+        hits = self.world.raycast(starts, ends)
+        support_prims = {l.prim_path for l in self.obj("support").links.values()}
+        n_vis = 0
+        for h, p in zip(hits, sel):
+            if not h["hit"]:
+                n_vis += 1
+            elif h["rigidBody"] in support_prims and float(th.linalg.norm(TT._t(h["position"]) - p)) < 0.02:
+                n_vis += 1
+        return n_vis
+
+    # ------------------------------------------------------------------ geometry
+
+    def _aligned_yaw(self, stance: Stance) -> float:
+        """Long axis parallel to the front edge, front toward the robot: the object's front axis maps onto −inward."""
+        target_dir = -stance.inward
+        f = self.front_axis[:2]
+        return C.wrap_angle(math.atan2(float(target_dir[1]), float(target_dir[0])) - math.atan2(float(f[1]), float(f[0])))
+
+    def _com_world(self, pose: TT.Pose) -> th.Tensor:
+        return TT._t(pose[0]) + C.quat_rotate(TT._t(pose[1]), self.com_local)
+
+    def _push_height(self) -> float:
+        return float(self.top.z) + max(0.6 * self.extents["height"], 0.03) + C.FINGERTIP_LENGTH
+
+    # ------------------------------------------------------------------ instance
+
+    def sample_instance(self, rng: np.random.Generator) -> Draft:
+        init = self.init_stance
+        errors = []
+        for k in rng.permutation(len(self.manip_candidates))[:6]:
+            cand = self.manip_candidates[int(k)]
+            manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
+            manip.focus, manip.arms = cand.focus, ["right", "left"]
+            self.sidecar.reset_instance()
+            self.sidecar.add_stance(init)
+            for o in self.world.spawned.values():
+                self.world.park(o, list(self.world.spawned).index(o.name))
+            self.kit.sync_world()
+            try:
+                return self._sample_with(rng, init, manip, int(k))
+            except Reject as e:
+                errors.append(f"candidate {int(k)}: {e}")
+                log.info("%s: %s", self.gp.alias, errors[-1][:300])
+        raise Reject("target_placement", "; ".join(errors[-3:])[:1500])
+
+    def _sample_with(self, rng, init: Stance, manip: Stance, k: int) -> Draft:
+        d = Draft()
+        tname = self.tname
+        target, support = self.obj("target"), self.obj("support")
+        self.record_transition(init, manip)
+        yaw_goal = self._aligned_yaw(manip)
+        cam_init = self.camera_pose_at(init)
+        ev = self.g("edge_visibility") or {}
+        bands = self.bands
+        z_push = self._push_height()
+        half_len = 0.5 * self.extents["long"] - END_INSET
+        chosen = None
+        fails = {"support": 0, "frame": 0, "band": 0, "edge": 0}
+        for _ in range(12):
+            yaw0, delta = TT.axial_init_yaw(rng, yaw_goal, self.g("deviation_range_deg"))
+            r, a = float(rng.uniform(0.0, TT.FOCUS_RADIUS)), float(rng.uniform(0.0, 2 * math.pi))
+            xy = manip.focus[:2] + th.tensor([r * math.cos(a), r * math.sin(a)])
+            pose = TT.object_pose_on(self, self.hull, C.IDENTITY_QUAT, xy, yaw0, self.top.z)
+            if not self.top.polygon_supported(self.world.footprint(self.hull, pose), margin=TT.SUPPORT_MARGIN):
+                fails["support"] += 1
+                continue
+            if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull, pose), TT.IN_FRAME_MARGIN):
+                fails["frame"] += 1
+                continue
+            com = self._com_world(pose)
+            long_w = C.quat_rotate(pose[1], self.long_axis)
+            ends = [com + long_w * s * half_len for s in (1.0, -1.0)]
+            cells = TT.band_cells_world(bands, manip)
+            in_band = []
+            for e in ends:
+                dist = float(th.linalg.norm(cells - e[:2], dim=1).min()) if len(cells) else float("inf")
+                in_band.append(dist <= BAND_TOLERANCE * float(bands.meta.get("lattice", 0.08)))
+            if not any(in_band):
+                fails["band"] += 1
+                continue
+            chosen = (pose, yaw0, delta, com, ends, in_band)
+            break
+        if chosen is None:
+            raise Reject("target_placement", f"no (yaw, position) with an end inside the band ({fails})")
+        pose, yaw0, delta, com, ends, in_band = chosen
+        # target in the world for the checks below
+        target.set_position_orientation(*pose)
+        target.keep_still()
+        self.kit.sync_world()
+        # reference edge visible with the target placed (from init and from the manipulation stance)
+        lat_t = manip.local(pose[0])[1]
+        for st, cam in ((init, cam_init), (manip, self.camera_pose_at(manip))):
+            n_vis = self._edge_visible_points(st, cam, lat_t, pose)
+            if n_vis < int(ev.get("min_visible", 3)):
+                raise Reject("edge_not_visible", f"{st.name}: {n_vis} of {ev.get('points', 9)} front-edge points visible with the target placed")
+        # push contact at an end inside the band: the closed right gripper beside the end, pushing tangentially toward the goal yaw
+        d_goal = C.wrap_angle(yaw_goal - yaw0)  # signed rotation to the goal
+        spin = 1.0 if d_goal > 0 else -1.0
+        push = None
+        for e, ok in zip(ends, in_band):
+            if not ok:
+                continue
+            r_vec = e - com
+            r_xy = th.tensor([float(r_vec[0]), float(r_vec[1]), 0.0])
+            d = spin * th.cross(th.tensor([0.0, 0.0, 1.0]), r_xy, dim=0)  # direction of motion of the end under the spin
+            d = d / th.linalg.norm(d)
+            side_pt = self._extreme_point(pose, -d, near=e)  # the face the end moves away from
+            side_pt = th.tensor([float(side_pt[0]), float(side_pt[1]), z_push])
+            quat = C.eef_quat(th.tensor([0.0, 0.0, -1.0]), d)  # top-down, the closed fingers' broad face along the push
+            p_init = (side_pt - d * FINGER_HALF_THICKNESS, quat)
+            arc = C.arc_waypoints(p_init, th.tensor([float(com[0]), float(com[1]), z_push]), th.tensor([0.0, 0.0, 1.0]), d_goal, n=2)
+            p_mid, p_goal = arc[0], arc[1]
+            p_pre = C.pre_pose(p_init)
+            res = self.ikc.waypoints_ok([p_pre, p_init, p_mid, p_goal], manip, "right", ignore_all=[support, target])
+            if res.ok:
+                dist = abs(d_goal) * float(th.linalg.norm(r_xy))
+                push = (p_pre, p_init, p_mid, p_goal, d, dist, e)
+                break
+        if push is None:
+            raise Reject("grasp_unreachable", "neither long-axis end inside the band has an IK-feasible top-down push arc")
+        p_pre, p_init, p_mid, p_goal, d_push, dist, end = push
+        # stop edge: the goal hull's extreme point along the pushed end's direction of motion at the goal orientation
+        q_goal = C.quat_from_yaw(yaw_goal)
+        goal_pose = (com - C.quat_rotate(q_goal, self.com_local), q_goal)
+        r_goal = C.quat_rotate(q_goal, C.quat_rotate(C.qinv(pose[1]), end - TT._t(pose[0]))) + goal_pose[0] - com
+        d_stop = spin * th.cross(th.tensor([0.0, 0.0, 1.0]), th.tensor([float(r_goal[0]), float(r_goal[1]), 0.0]), dim=0)
+        d_stop = d_stop / th.linalg.norm(d_stop)
+        stop_pt = self._extreme_point(goal_pose, d_stop)
+        stop_pt = th.tensor([float(stop_pt[0]), float(stop_pt[1]), z_push]) + d_stop * STOP_CLEARANCE
+        quat_b = C.eef_quat(th.tensor([0.0, 0.0, -1.0]), d_stop)
+        brace = (stop_pt + d_stop * FINGER_HALF_THICKNESS, quat_b)
+        brace_pre = C.pre_pose(brace)
+        res = TT.brace_second_arm(self, manip, "right", [p_pre, p_init, p_mid, p_goal], "left", [brace_pre, brace], ignore_work_last=[support, target],
+                                  ignore_brace_last=[support])
+        if not res.ok:
+            raise Reject("contact_unreachable", f"stop-edge brace with the push arm locked: {res.reason}")
+        cam_manip = self.camera_pose_at(manip)
+        for nm, p in (("push init", p_init), ("push goal", p_goal), ("brace", brace)):
+            if not self.ikc.eef_in_frame(p, cam_manip):
+                raise Reject("gripper_not_in_frame", f"{nm} eef pose outside the manipulation image (5 %)")
+        TT.whole_body_check_at(self, [init, manip], {tname: pose}, require=True, reason="stance_collision")
+        # record
+        self.sidecar.add_stance(manip)
+        self.sidecar.add_contact(ContactRecord("push", "right", p_pre, p_init, p_mid, p_goal, d_push, dist, object=tname))
+        self.sidecar.add_contact(ContactRecord("brace", "left", brace_pre, brace, direction=-d_stop, brace_kind="stop_edge", object=tname))
+        manip.contacts = ["push", "brace"]
+        d.object_poses[tname] = pose
+        d.robot_q = self.stance_q(init)
+        d.base_pose2d = tuple(init.base_pose2d)
+        mc = self.choice.models["target"]
+        equiv = self.gp.orientation_equivalences("target", mc.category, mc.model) or self.gen("orientation_equivalences", []) or []
+        d.pose_targets[tname] = pose_target(orientation=q_goal, orientation_metric="full", orientation_tolerance=self.tol("orientation", 0.10), equivalences=equiv)
+        d.goal_poses[tname] = goal_pose
+        d.summary.update({"yaw_goal": yaw_goal, "yaw_init": yaw0, "deviation_deg": math.degrees(delta), "push_end": end.tolist(), "push_distance_m": dist,
+                          "manipulation_candidate": k, "spin": spin})
+        self.sidecar.describe(tname, mc.category.replace("_", " "), f"the {mc.category.replace('_', ' ')} on the table")
+        self.sidecar.language["goal_numbers"]["rotate_deg"] = math.degrees(d_goal)
+        return d
+
+    def _extreme_point(self, pose: TT.Pose, direction: th.Tensor, near: Optional[th.Tensor] = None) -> th.Tensor:
+        """Hull point (world) with the largest projection on ``direction`` (xy); with ``near`` only points within 4 cm of
+        that end along the long axis are considered (the face at the pushed end)."""
+        pts = C.transform_points(pose, self.hull)
+        dxy = th.tensor([float(direction[0]), float(direction[1])])
+        dxy = dxy / th.linalg.norm(dxy)
+        if near is not None:
+            long_w = C.quat_rotate(TT._t(pose[1]), self.long_axis)[:2]
+            along = (pts[:, :2] - TT._t(near)[:2]) @ long_w
+            sel = along.abs() <= 0.04
+            if int(sel.sum()) >= 3:
+                pts = pts[sel]
+        proj = pts[:, :2] @ dxy
+        i = int(th.argmax(proj))
+        return pts[i]
+
+    # ------------------------------------------------------------------ goal / hinge (§6.10)
+
+    def goal(self, draft: Draft):
+        manip = self.sidecar.stance("manipulation")
+        self.sidecar.set_goal(manip.base_pose2d, manip.translate, manip.tilt, arms="same")
+
+    def _clear_hinge(self):
+        remove_hinge(self.hinge)
+        self.hinge = None
+
+    def after_settle(self, draft: Draft):
+        """Install the hinge at the settled COM (anchor 1 mm below the top), require drift <= 1 mm / 0.005 rad over 60
+        steps, record the TRO constraint and the goal pose (rotation about the COM to the aligned yaw)."""
+        target, support = self.obj("target"), self.obj("support")
+        tname = self.tname
+        self._clear_hinge()
+        sink = float(self.g("hinge_sink_m"))
+        p, q = target.get_position_orientation()
+        target.set_position_orientation(p - th.tensor([0.0, 0.0, sink]), q)
+        target.keep_still()
+        anchor = self._com_world((target.get_position_orientation()[0].float(), q.float()))
+        self.hinge = create_hinge(target, anchor, th.tensor([0.0, 0.0, 1.0]), parent_link=support.root_link)
+        target.keep_still()
+        og.sim.step_physics()
+        drift = self.g("hinge_drift_max") or {}
+        p0, q0 = target.get_position_orientation()
+        self.world.step_physics(int(drift.get("steps", 60)), still=[self.robot])
+        p1, q1 = target.get_position_orientation()
+        if float(th.linalg.norm(p1 - p0)) > float(drift.get("position_m", 0.001)) or C.quat_angle(q1, q0) > float(drift.get("orientation_rad", 0.005)):
+            raise Reject("hinge_drift", f"target drifted {float(th.linalg.norm(p1 - p0)) * 1000:.1f} mm / {C.quat_angle(q1, q0):.4f} rad with the hinge")
+        draft.extras["constraints"] = [self.hinge.to_tro(tname, self.bindings.one("support").name)]
+        draft.object_poses[tname] = (p1.clone(), q1.clone())
+        yaw_goal = draft.summary["yaw_goal"]
+        q_goal = C.quat_from_yaw(yaw_goal)
+        com = self._com_world((p1.float(), q1.float()))
+        draft.goal_poses[tname] = (com - C.quat_rotate(q_goal, self.com_local), q_goal)
+
+    def refine_targets_from_goal(self, draft: Draft):
+        pass  # orientation-only target: the goal orientation is exact by construction
+
+    def on_reject(self, err: Reject):
+        self._clear_hinge()
+        super().on_reject(err)
+
+    def write_instance(self, draft: Draft, index: int, seed: int) -> str:
+        path = super().write_instance(draft, index, seed)
+        self._clear_hinge()
+        return path
+
+    def record_constraints(self, draft: Draft) -> List[Dict[str, Any]]:
+        push = self.sidecar.contacts.get("push")
+        manip = self.sidecar.stance("manipulation")
+        if push is None:
+            return []
+        mc = self.choice.models["target"]
+        return [{"scope": {"target": f"{mc.category}/{mc.model}", "support_height": round(float(self.top.z - self.world.floor_z), 2)}, "type": "contacts",
+                 "trunk": [manip.translate, round(manip.tilt, 2)], "push": {"end": "long_axis", "distance_m": round(float(push.distance_m), 3)},
+                 "brace": "stop_edge", "hard": False}]
+
+
+def _com_local(obj) -> th.Tensor:
+    """Centre of mass in the root frame (mass-weighted link COMs from PhysX; the AABB centre when unavailable)."""
+    try:
+        total, acc = 0.0, th.zeros(3)
+        rp, rq = obj.get_position_orientation()
+        for link in obj.links.values():
+            m = float(link.mass)
+            if m <= 0:
+                continue
+            lp, lq = link.get_position_orientation()
+            acc += m * (lp.float() + C.quat_rotate(lq.float(), TT._t(link.center_of_mass)))
+            total += m
+        if total > 0:
+            return C.quat_rotate(C.qinv(rq.float()), acc / total - rp.float())
+    except Exception:  # noqa: BLE001
+        pass
+    lo, hi = obj.aabb
+    rp, rq = obj.get_position_orientation()
+    return C.quat_rotate(C.qinv(rq.float()), (lo + hi) / 2 - rp.float())
