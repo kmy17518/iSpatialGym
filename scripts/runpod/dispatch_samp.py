@@ -47,7 +47,12 @@ while true; do
   out=/root/samp/$jid; mkdir -p "$out"
   echo "$jid" > /root/samp/current.txt
   t0=$(date +%s)
-  timeout 5400 python -m ispatialgym.sampling.sample_instances --spec "$spec" --problem "$problem" --out "$out" --overwrite $extra > "$out/run.log" 2>&1
+  if [ "$spec" = "CMD" ]; then
+    # generic job: <problem> is a shell command run from the repo root with $out as OUT
+    OUT="$out" bash -c "$problem $extra" > "$out/run.log" 2>&1
+  else
+    timeout 5400 python -m ispatialgym.sampling.sample_instances --spec "$spec" --problem "$problem" --out "$out" --overwrite $extra > "$out/run.log" 2>&1
+  fi
   rc=$?
   t1=$(date +%s)
   nw=$(python - "$out" <<'EOF'
@@ -110,6 +115,7 @@ def main():
     ap.add_argument("--subtasks", nargs="*", default=None, help="only jobs of these subtasks")
     ap.add_argument("--reset-queue", action="store_true", help="drop queued (not yet started) jobs before adding")
     ap.add_argument("--sync-only", action="store_true", help="only rsync the working tree to the pods")
+    ap.add_argument("--restart-runner", action="store_true", help="on idle pods (no current job) restart the runner with the current RUNNER script")
     ap.add_argument("--exclude-subtasks", nargs="*", default=None)
     args = ap.parse_args()
     api = rp.Api(rp.load_env()["RUNPOD_API_KEY"])
@@ -159,6 +165,21 @@ def main():
             print(f"{pid} {fleet['pods'][pid]['name']}: bootstrap not done, skipped")
     if not ready:
         sys.exit("no bootstrapped pod")
+    if args.restart_runner:
+        for pid, ep in ready:
+            r = rp.ssh_run(*ep, "test -f /root/samp/current.txt && echo BUSY", capture=True, timeout=45)
+            if "BUSY" in (r.stdout or ""):
+                print(f"{pid} {fleet['pods'][pid]['name']}: busy, not restarted")
+                continue
+            rp.ssh_run(*ep, "test -f /root/samp/runner.pid && kill $(cat /root/samp/runner.pid) 2>/dev/null; sleep 1; cat > /root/samp/run_jobs.sh && chmod +x /root/samp/run_jobs.sh",
+                       timeout=60, stdin_text=RUNNER)
+            remote = "cd /root && rm -f /root/JOB_DONE /root/samp/CLOSE && setsid nohup /root/samp/run_jobs.sh > /root/samp/runner.log 2>&1 < /dev/null & disown"
+            try:
+                subprocess.run(rp.ssh_base(*ep) + [remote], text=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+            except subprocess.TimeoutExpired:
+                pass
+            print(f"{pid} {fleet['pods'][pid]['name']}: runner restarted")
+        return
     if args.sync_only:
         for pid, ep in ready:
             sync_tree(ep)
@@ -183,7 +204,10 @@ def main():
                 extra += f" --max-templates {int(j['max_templates'])}"
             if j.get("scene"):
                 extra += f" --scene {j['scene']}"
-            line = "\t".join([j["id"], j["spec"], j["problem"], extra.strip()])
+            if j.get("cmd"):
+                line = "\t".join([j["id"], "CMD", j["cmd"], ""])
+            else:
+                line = "\t".join([j["id"], j["spec"], j["problem"], extra.strip()])
             script.append(f"printf '%s\\n' {shlex.quote(line)} > /root/samp/queue/w{args.wave:02d}_{k:03d}_{j['id'][:40]}.job")
         script.append(f"printf '%s' {shlex.quote(args.ref)} > /root/samp/ref.txt")
         rp.ssh_run(*ep, "bash -s", timeout=120, stdin_text="\n".join(script) + "\n")
