@@ -360,7 +360,9 @@ def test_legacy_activity_name_loads_renamed_templates():
     assert problem_path("world_alignment", 0) == problem_path("alignment", 0)
     assert problem_path("alignment", 0).endswith(os.path.join("alignment", "problem0.bddl"))
     assert activity_dir("world_alignment").endswith(os.sep + "alignment")
-    assert list_problem_ids("world_alignment") == list_problem_ids("alignment") == [0, 1, 2]
+    ids = list_problem_ids("alignment")
+    assert list_problem_ids("world_alignment") == ids
+    assert ids[:3] == [0, 1, 2] and ids == list(range(len(ids)))  # the v1 templates stay 0-2; ground_isg appends contiguous ids
     problem = load_problem("world_alignment", 0)
     assert problem.activity == "alignment" and problem.name == "alignment-0" and problem.canonical_name == "alignment-0"
     assert problem.alias == "table_surface"

@@ -339,6 +339,9 @@ def test_representative_test_hook_is_skipped_without_the_sampler(grounded, monke
     gp = _entries(grounded, "mental_rotation")[0]
     fake = types.ModuleType("ispatialgym.sampling.v2.core")  # a v2 core without the entry point yet
     monkeypatch.setitem(sys.modules, "ispatialgym.sampling.v2.core", fake)
+    import ispatialgym.sampling.v2 as v2_pkg  # `from ispatialgym.sampling.v2 import core` reads the package attribute once imported
+
+    monkeypatch.setattr(v2_pkg, "core", fake, raising=False)
     GI._SKIP_LOGGED.clear()
     with caplog.at_level("INFO", logger="ispatialgym.ground_isg"):
         assert GI.run_representative_test(gp, grounded.customs, "house_single_floor") is None

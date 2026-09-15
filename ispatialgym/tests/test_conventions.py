@@ -38,8 +38,14 @@ GEN = th.Generator().manual_seed(1234)
 
 
 def test_module_is_pure():
-    assert "omnigibson" not in sys.modules, "the conventions module (or this test) must not import OmniGibson"
-    assert not any(m.startswith("curobo") for m in sys.modules)
+    # in a fresh interpreter (other test modules of the suite legitimately import OmniGibson / cuRobo)
+    import subprocess
+
+    code = ("import sys, ispatialgym.robot.conventions; "
+            "assert 'omnigibson' not in sys.modules, 'conventions imports OmniGibson'; "
+            "assert not any(m.startswith('curobo') for m in sys.modules), 'conventions imports cuRobo'")
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300)
+    assert r.returncode == 0, r.stderr[-2000:]
 
 
 def test_public_names_of_the_table_exist():
@@ -529,7 +535,7 @@ def test_torso_chain_matches_the_urdf_when_available():
         base = [float(v) for v in joints[f"{arm}_arm_base_joint"].find("origin").get("xyz").split()]
         j1 = [float(v) for v in joints[f"{arm}_arm_joint1"].find("origin").get("xyz").split()]
         assert [a + b for a, b in zip(base, j1)] == pytest.approx(list(C._SHOULDER_IN_TORSO4[arm]), abs=1e-9)
-    assert "omnigibson" not in sys.modules
+    # purity of this test's imports is checked in a fresh interpreter by test_module_is_pure
 
 
 # ------------------------------------------------------------------------------------------------------------------
