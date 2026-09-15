@@ -781,8 +781,11 @@ def brace_candidates(joint_info: Dict[str, Any], handle_data: Dict[str, Any], ob
     """Brace contacts on the base link (never the moving link): ``opposite_face`` (base-link face whose outward normal is
     closest to the push direction v, contact at the face centroid shifted 1/4 of the face width toward the brace arm's
     side, approach -v) and ``top_press`` (downward press on the exposed top of the base link nearest the brace arm's
-    side). Contacts must stay >= 2 cm outside the moving link's swept AABB over the joint values. Returns
-    [(kind, [pre, contact])] in preference order, eef poses in the world."""
+    side). Contacts must stay >= 2 cm outside the moving link's swept AABB over the joint values; the swept AABB of a
+    lid that flips all the way back covers the whole body, so the check is made for the longest prefix of ``q_values``
+    (the waypoints the brace protects, in order) that leaves a candidate. Returns [(kind, [pre, contact], q_prefix)]
+    in preference order, eef poses in the world; ``q_prefix`` = the number of leading joint values the contact is
+    valid for (the sampler requires its direction's waypoints to lie within that prefix)."""
     import omnigibson.utils.transform_utils as T
 
     bl = handle_data.get("base_link", {})
@@ -800,20 +803,17 @@ def brace_candidates(joint_info: Dict[str, Any], handle_data: Dict[str, Any], ob
     # moving link swept AABB (object frame) over the joint values, from the annotated link bbox at the closed configuration
     lmin, lmax = th.tensor(joint_info.get("link_bbox_min", bmin.tolist())), th.tensor(joint_info.get("link_bbox_max", bmax.tolist()))
     corners = th.stack([th.tensor([x, y, z]) for x in (lmin[0], lmax[0]) for y in (lmin[1], lmax[1]) for z in (lmin[2], lmax[2])])
-    swept = [corners]
     axis = th.tensor(joint_info.get("axis_dir_obj", [0.0, 1.0, 0.0]), dtype=th.float32)
     axis = axis / th.linalg.norm(axis)
     lower = float(joint_info.get("closed_q", joint_info.get("lower", 0.0)))
+    per_q = [corners]
     for qv in q_values:
         if joint_info.get("type", "RevoluteJoint") == "RevoluteJoint":
             rot = G.quat_about_axis(axis, qv - lower)
             hinge = th.tensor(joint_info.get("hinge_point_obj", [0.0, 0.0, 0.0]), dtype=th.float32)
-            swept.append(hinge + G.rotate(rot, corners - hinge))
+            per_q.append(hinge + th.stack([G.rotate(rot, c - hinge) for c in corners]))
         else:
-            swept.append(corners + axis * (qv - lower))
-    swept = th.cat(swept)
-    smin, smax = swept.min(dim=0).values - 0.02, swept.max(dim=0).values + 0.02
-    out = []
+            per_q.append(corners + axis * (qv - lower))
     faces = [(th.tensor([1.0, 0, 0]), 0, bmax[0]), (th.tensor([-1.0, 0, 0]), 0, bmin[0]), (th.tensor([0, 1.0, 0]), 1, bmax[1]), (th.tensor([0, -1.0, 0]), 1, bmin[1])]
     # opposite_face: outward normal closest to v (the face the handle motion points toward)
     n, ax, coord = max(faces, key=lambda f: float(th.dot(f[0], v)))
@@ -823,13 +823,20 @@ def brace_candidates(joint_info: Dict[str, Any], handle_data: Dict[str, Any], ob
     p[ax] = coord
     side_dir = th.tensor([-float(v[1]), float(v[0]), 0.0]) * brace_side  # brace arm's side along the face
     p = p + side_dir * (float(bmax[other] - bmin[other]) / 4)
-    inside_swept = bool((p >= smin).all() and (p <= smax).all())
-    if not inside_swept:
-        out.append(("opposite_face", p, -n))
-    # top_press: exposed top of the base link nearest the brace arm's side, outside the swept AABB
     top = th.tensor([float(centre[0]), float(centre[1]), float(bmax[2])]) + side_dir * (float(bmax[other] - bmin[other]) / 3)
-    if not bool((top >= smin).all() and (top <= smax).all()):
-        out.append(("top_press", top, th.tensor([0.0, 0.0, -1.0])))
+    out = []
+    q_prefix = 0
+    for k in range(len(q_values), 0, -1):  # longest prefix of the joint values whose swept AABB leaves a candidate
+        swept = th.cat(per_q[:k + 1])
+        smin, smax = swept.min(dim=0).values - 0.02, swept.max(dim=0).values + 0.02
+        cands = []
+        if not bool((p >= smin).all() and (p <= smax).all()):
+            cands.append(("opposite_face", p, -n))
+        if not bool((top >= smin).all() and (top <= smax).all()):
+            cands.append(("top_press", top, th.tensor([0.0, 0.0, -1.0])))
+        if cands:
+            out, q_prefix = cands, k
+            break
     poses = []
     for kind, p_obj, a_obj in out:
         c_w = G.compose(obj_pose, (p_obj, G.IDENTITY_QUAT))[0]
@@ -844,7 +851,7 @@ def brace_candidates(joint_info: Dict[str, Any], handle_data: Dict[str, Any], ob
         x = th.cross(y, z, dim=0)
         quat = T.mat2quat(th.stack([x, y, z], dim=1))
         eef = c_w - z * 0.012
-        poses.append((kind, [(eef - z * PRE_GRASP, quat), (eef, quat)]))
+        poses.append((kind, [(eef - z * PRE_GRASP, quat), (eef, quat)], q_prefix))
     return poses
 
 
@@ -1210,8 +1217,9 @@ def main(argv=None):
                         handle_ok.setdefault(c, []).append(k)
                 surv = [c for c in combos if c in handle_ok]
                 braces = {c: brace_candidates(jinfo, hdata, obj_poses[c], q_values, brace_side, G) for c in surv}
-                bflat = [(c, kind) for c in surv for kind, _ in braces[c]]
-                bposes = [pose for c in surv for _, pair in braces[c] for pose in pair]
+                bflat = [(c, kind) for c in surv for kind, _, _ in braces[c]]
+                bposes = [pose for c in surv for _, pair, _ in braces[c] for pose in pair]
+                brace_prefix = {c: (braces[c][0][2] if braces[c] else 0) for c in surv}
                 ok_b = bc.ik_screen(bposes, q, brace_arm)
                 brace_ok: Dict[Tuple[int, float], List[str]] = {}
                 for n, (c, kind) in enumerate(bflat):
@@ -1231,16 +1239,17 @@ def main(argv=None):
                         if best is None or len(handle_ok[c]) > len(handle_ok[best]):
                             best = c
                     if best is not None:
-                        feasible_cells.append((i, best[1], sorted(handle_ok[best]), brace_ok[best]))
+                        feasible_cells.append((i, best[1], sorted(handle_ok[best]), brace_ok[best], brace_prefix[best]))
                 entry["n_after_prune"] = int(near.sum())
                 entry["n_reachable"] = len(feasible_cells)
                 entry["n_handle_only_pairs"] = n_handle_only
-                entry["n_all_q"] = sum(1 for _, _, ks, _ in feasible_cells if len(ks) == len(q_values))
-                entry["feasible"] = [{"cell": base_cells[i].tolist(), "yaw_offset": yaw, "q_indices": ks, "q_feasible": [q_values[k] for k in ks], "brace_kinds": kinds}
-                                     for i, yaw, ks, kinds in feasible_cells]
+                entry["n_all_q"] = sum(1 for _, _, ks, _, _ in feasible_cells if len(ks) == len(q_values))
+                entry["feasible"] = [{"cell": base_cells[i].tolist(), "yaw_offset": yaw, "q_indices": ks, "q_feasible": [q_values[k] for k in ks], "brace_kinds": kinds,
+                                      "brace_q_prefix": kp}
+                                     for i, yaw, ks, kinds, kp in feasible_cells]
                 entry["time_s"] = round(time.time() - t0, 2)
                 per_trunk.append(entry)
-                cells_out[(tr, ti)] = base_cells[[i for i, _, _, _ in feasible_cells]].numpy() if feasible_cells else np.zeros((0, 2))
+                cells_out[(tr, ti)] = base_cells[[i for i, _, _, _, _ in feasible_cells]].numpy() if feasible_cells else np.zeros((0, 2))
                 log.info("brace trunk (%.2f, %+.1f): %d/%d cells feasible (%d with every joint value; %d (cell, yaw) handle-only), %.1fs", tr, ti,
                          len(feasible_cells), len(base_cells), entry["n_all_q"], n_handle_only, entry["time_s"])
             bc.scope.__exit__(None, None, None)
