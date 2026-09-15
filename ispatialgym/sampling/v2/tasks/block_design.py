@@ -391,23 +391,21 @@ class BlockDesign(SamplerV2):
     def _goal_face_visibility(self, cam, poses: Dict[int, TT.Pose], goal_face: Dict[int, str]) -> Dict[int, float]:
         """Fraction of a 3 x 3 grid of points on each block's goal face whose ray from the camera reaches the point (first
         hit = the block itself within 5 mm of the point) — blocks and the scene at their init poses."""
-        names = self.names()
         out = {}
         cam_p = TT._t(cam[0])
         for bi, pose in poses.items():
             pts = TT.face_points(pose, goal_face[bi], self.edge)
-            dirs = (pts - cam_p) / th.linalg.norm(pts - cam_p, dim=1, keepdim=True)
-            starts = cam_p.unsqueeze(0) + dirs * 0.25  # the camera sits inside the robot's head: start the rays outside it
-            ends = pts + dirs * 0.01
+            normal = TT.face_normal_world(goal_face[bi], pose[1])
+            to_cam = cam_p.unsqueeze(0) - pts
+            dist = th.linalg.norm(to_cam, dim=1, keepdim=True)
+            dirs = to_cam / dist
+            facing = (dirs @ normal) > 0.05  # the face must look at the camera
+            # reverse rays: from just outside the face toward the camera, stopped 0.25 m short of it (the camera sits inside
+            # the robot's head); any hit = another block or the scene occludes the point
+            starts = pts + normal * 0.002
+            ends = cam_p.unsqueeze(0) - dirs * 0.25
             hits = self.world.raycast(starts, ends)
-            prims = {l.prim_path for l in self.objects[names[bi]].links.values()}
-            n_vis = 0
-            for h, p in zip(hits, pts):
-                if not h["hit"]:
-                    n_vis += 1
-                    continue
-                if h["rigidBody"] in prims and float(th.linalg.norm(TT._t(h["position"]) - p)) < 0.006:
-                    n_vis += 1
+            n_vis = sum(1 for h, f in zip(hits, facing.tolist()) if f and not h["hit"])
             out[bi] = n_vis / len(pts)
         return out
 
