@@ -246,7 +246,8 @@ class IORSSmall(SamplerV2):
                     if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull[role], pose)):
                         raise Reject("not_in_frame", f"{role} not in the init image (5 %)")
                 grasp.place_on = pname
-                grasp.carry_height = max(float(self.gen("carry_height_min_m", 0.12)), TT.height_of(self.hull["partner"], self.rest["partner"]) + 0.03)
+                # carry height: the target (bottom at the table at init) clears the partner's top by 3 cm on the way
+                grasp.carry_height = max(float(self.gen("carry_clearance_m", 0.03)), TT.height_of(self.hull["partner"], self.rest["partner"]) + float(self.gen("carry_clearance_m", 0.03)))
                 self.sidecar.add_stance(manip)
                 self.sidecar.add_grasp(grasp)
                 d.object_poses[tname] = t_pose
@@ -340,6 +341,16 @@ class IORSSmall(SamplerV2):
         goal = self.goal_pose(draft.object_poses[tname], (p.clone(), q.clone()))
         draft.goal_poses[tname] = goal
         self._set_target_goal(draft, tname, goal)
+        # the recorded grasp poses follow the settled target pose (what the oracle re-derives from the loaded instance)
+        grasp = self.sidecar.grasp_of(tname)
+        if grasp is not None and grasp.eef_in_object is not None:
+            grasp.grasp = IK.grasp_pose(draft.object_poses[tname], grasp.eef_in_object)
+            grasp.pre_grasp = IK.pre_pose(grasp.grasp)
+            manip = self.sidecar.stance("manipulation")
+            res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, ignore_for_last=self.support_objects(),
+                                 scale_key=self.choice.models["target"].scale, cache=False)
+            if not res.ok:
+                raise Reject("grasp_unreachable", "pre-grasp / grasp at the settled target pose fail the exact IK")
 
     def refine_targets_from_goal(self, draft: Draft):
         tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
@@ -396,6 +407,13 @@ class IORSSmall(SamplerV2):
                                               f"pre-place ignoring support+partner {_ok(r_pre_obj_ign)}, place {_ok(r_place_obj)}, place ignoring every object "
                                               f"{_ok(r_place_obj_free)}; goal lateral {lat:+.2f} m, trunk ({manip.translate}, {manip.tilt:.2f}), stand-off {manip.stand_off})")
         grasp.pre_place, grasp.place = pre_place, place
+        # the lift (oracle ``Lift``): grasp pose raised by carry_height with the object attached, support ignored (the
+        # object leaves it); the pre-place is where the carry ends, so the lift end must be IK-feasible too
+        lift_end = (G.t(grasp.grasp[0]) + th.tensor([0.0, 0.0, float(grasp.carry_height)]), G.t(grasp.grasp[1]))
+        with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
+            r_lift = self.ikc.exact([lift_end], manip, grasp.arm, ignore_for_last=self.support_objects(), cache=False)
+        if not r_lift.ok:
+            raise Reject("lift_unreachable", f"lift end pose ({grasp.carry_height:.2f} m above the grasp) fails the exact IK with the object attached")
         cam = self.camera_pose_at(manip)
         if not self.ikc.eef_in_frame(grasp.grasp, cam):
             raise Reject("gripper_not_in_frame", "grasp eef pose outside the manipulation image (5 %)")
