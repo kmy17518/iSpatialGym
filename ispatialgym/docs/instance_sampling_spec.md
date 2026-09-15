@@ -191,7 +191,9 @@ footprint as `blocked_footprints` in the same structure.
   screen. Grippers open (0.05). Exceptions: camera relocalization (JoyLo reset pose: trunk 0.5, arms zero) and the
   held-object tasks (trunk and left arm at the JoyLo reset pose, right arm from the fixed hold, section 6.3).
 - Trunk = JoyLo (translate t ∈ [0, 1] on the keyframe curve, tilt k on `torso_joint3`). Grid for caches: translate
-  {0, 0.25, 0.5, 0.75, 1.0} × tilt {0, −0.3, −0.6, −0.9} (+ −1.2 when the support height h < 0.6 m). Camera and
+  {0, 0.25, 0.5, 0.75, 0.95} × tilt {0, −0.3, −0.6, −0.9} (+ −1.2 when the support height h < 0.6 m). Translate 1.0
+  self-collides in cuRobo for every arm posture (measured 2026-09-15, reach-volume run), so 0.95 is the deepest grid
+  trunk everywhere (Phase 2 scans, Prompt 0/1 scans, camera-relocalization goal range clamp). Camera and
   hand offsets as functions of t (`x_c(t)`, `z_c(t)`, camera pitch, hand height below the camera) come from FK once
   per robot and are cached; the constants quoted in section 4 are their design values `[pilot]`.
 - Base frame: x ahead, lateral + = robot's left, z above the floor. Face frame for large-scale tasks: n = outward
@@ -364,7 +366,7 @@ border at the source-tray depth) and R_img (surface distance from the target to 
 ### 4.5 Phase 2 — manipulation stance
 
 Grasps are executed from this stance without re-posing the arms, so each candidate trunk uses its own band. Scan
-stand-off {0.35, 0.45, 0.55} × translate {0, 0.25, 0.5, 0.75, 1.0} × tilt continuous from 0 to the `torso_joint3`
+stand-off {0.35, 0.45, 0.55} × translate {0, 0.25, 0.5, 0.75, 0.95} × tilt continuous from 0 to the `torso_joint3`
 limit (same edge and lateral as the init stance):
 
 1. Whole-body collision check without objects; drop colliding candidates (this also prunes trunks whose bands are
@@ -471,7 +473,7 @@ base yaw faces P, tilt 0 throughout.
 
 1b. Minimum distance with the whole target in view. Target extent = AABB corners of the target in its init state
 (articulation: joints at q_init, an open door counts; alignment: the hull at the init tilt δ). Scan d from d_min in
-5 cm steps to d_max; at each d, for t ∈ {0, 0.25, 0.5, 0.75, 1.0}: (1) base centre on free floor (un-eroded map) and
+5 cm steps to d_max; at each d, for t ∈ {0, 0.25, 0.5, 0.75, 0.95}: (1) base centre on free floor (un-eroded map) and
 inside the task room; (2) all target corners in frame (5 %) at camera FK (b(d), t, 0); (3) whole-body collision-free
 (1 cm) with untucked arms and open grippers, world synced with the target in its init state; (4) base + torso links
 + head collision-free at every t ∈ {0, …, 1.0}, tilt 0, arms excluded. d* = the first d with a feasible t; t* = the
@@ -480,7 +482,7 @@ then forward while it still fits. No feasible d → redraw β (≤ 6), then reje
 `init_stance = {face_normal, bearing_deg, distance: d*, translate: t*, tilt: 0, base_pose2d}`.
 
 **Phase 2 — manipulation stance** (contact set, arm rule and focus per task). Base square to the face (yaw = −n).
-Scan d ∈ {0.35, 0.40, …, 0.90} × λ ∈ Λ_task (5 cm) × translate {0, 0.25, 0.5, 0.75, 1.0} × tilt continuous from 0 to
+Scan d ∈ {0.35, 0.40, …, 0.90} × λ ∈ Λ_task (5 cm) × translate {0, 0.25, 0.5, 0.75, 0.95} × tilt continuous from 0 to
 the `torso_joint3` limit (band = the grid trunk with the same translate and the nearest tilt):
 
 1. Base on free floor, in room; collision-free (1 cm) against the scene with the target in its init state. Single-arm
