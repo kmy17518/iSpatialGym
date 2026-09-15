@@ -1,5 +1,9 @@
 # iSpatialGym instance sampling: requirements and design (v1)
 
+> **Superseded (2026-09-15)** by `instance_sampling_spec.md` (v2 rule set for the `ground_isg` / `sample_isg` /
+> `multiply_isg` rebuild). This file is kept for the measured facts and the implementation history of sampler 1.x;
+> where the two disagree, v2 wins.
+
 Status: specification for `ispatialgym/sampling` (sampler v1), 2026-09-11. Companion to
 `task_bddl_formats.md` (what an instance evaluates) and `task_definition_and_evaluation.md`
 (artifacts, deterministic loading). Version history of the sampler itself is in

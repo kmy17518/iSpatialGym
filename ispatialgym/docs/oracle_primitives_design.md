@@ -1,6 +1,7 @@
 # iSpatialGym oracle primitives for R1Pro: design and implementation notes
 
-Status: first implementation validated in simulation, 2026-09-04. Code: `ispatialgym/oracle/`.
+Status: first implementation validated in simulation, 2026-09-04; section 6 rewritten 2026-09-15 for the v2 sampling
+rebuild (recorded plans from the oracle sidecar, no fallbacks). Code: `ispatialgym/oracle/`.
 
 This document explains how the scripted (oracle) demonstration policies for the seven
 iSpatialGym tasks are organised, why the primitive set is arranged hierarchically rather
@@ -186,22 +187,75 @@ exceed the arm's reach, hence the tilted (30/45 deg) grasp candidates. This is w
 exists and why instance generators should validate reachability with `Skills.reachable` /
 `stance_for` when sampling object and goal poses.
 
-## 6. Task oracles
+## 6. Task oracles (v2, 2026-09-15)
 
-| Task | Script |
+The oracles are the second half of the sampling rules in `instance_sampling_spec.md`: every pose, stance, contact
+and waypoint they use was IK- and collision-checked at sampling time and is read from the instance's **oracle
+sidecar** (`<instance_id>.oracle.json`, spec §7). An oracle never searches for a grasp, a stance or a path; if a
+recorded plan fails in execution that is a QA failure to be fixed in the sampler, not something to fall back from.
+Motions look like JoyLo teleoperation: base velocities with simultaneous translation and rotation, trunk along the
+keyframe curve, arms planned with the trunk locked.
+
+### 6.1 Shared building blocks (changes to Layer 1)
+
+| Skill | v2 behaviour |
 | --- | --- |
-| Camera Relocalization | `tasks.CameraRelocalizationOracle`: `solve_viewpoint` (grid + refinement over trunk translate/tilt for a planar base pose) -> `go_to_stance` -> `set_torso(tilt)` -> corrective `navigate_to` on the residual. |
-| Object Scaling | `tasks.ObjectScalingOracle`: target position on the camera->object ray (from a distance or an apparent-size ratio) -> straight-line eef translation, fallbacks arm+torso / planned. |
-| Mental Rotation | `tasks.MentalRotationOracle`: rotation to the target orientation in <= 60 deg chunks, `rotate_eef(pivot="object")`, same fallbacks. |
-| Disembedding | `approach(target)` -> `grasp(top)` -> `place_object_at(tray pose)` (or `approach` the tray first). |
-| Configuration Matching / block design | per slot: `approach` (if needed) -> `grasp(top)` -> `place_object_at(slot pose)`. |
-| Configuration Matching / articulated opening | `brace` (left) where useful -> `grasp(handle)` -> `move_eef_cartesian(waypoints on the joint's arc/line from the privileged joint axis)` -> release. |
-| Configuration Matching / attachment | `grasp(child)` -> `move_eef(above attach site)` -> `move_eef_cartesian(insert)` -> release; left hand `brace`s the parent. |
-| World Alignment | wall: `brace` left gripper on the frame edge -> `push` along an arc about the pivot (waypoints via `rotate_eef` math) with feedback on the object's measured angle; desk: planar arc. |
-| IORS | ontop/under/inside: `grasp` -> `place_object_at(goal)`; touching/nextto: `push` or `grasp` + `place_object_at`. |
+| `navigate_to` | follows the **recorded path** (spec §3.7): un-eroded shortest path validated with whole-body checks at the navigation posture when both stances lie in one locally un-eroded region, otherwise eroded-map global path + collision-checked local connections; the traversability map carries the scene variant's `freed_footprints` (chairs) and `blocked_footprints` (obstacle). Erosion for planning uses the footprint of the posture actually held (untucked arms, carried object). |
+| `set_torso` | no `ready_arms` fallback. Trunk changes happen at the recorded **transition stand-off** (spec §3.8): drive back to `s_T`, move the trunk, drive in. Arms are lifted to untucked only where the sidecar says so (camera relocalization goal with self-collision). |
+| `grasp` | uses the recorded `(grasp_key, grasp_name, yaw)` → pre-grasp and grasp eef poses; approach = straight 10 cm along the grasp axis; assisted grasp must attach (hard QA failure otherwise, except for push / brace oracles). Lift keeps the object orientation. |
+| `place` / `place_object_at` | recorded pre-place / place eef poses; straight descent; release; retreat 10 cm along −a; then "move contacting grippers away a little". |
+| `push` | closed gripper at the recorded contact, along the recorded direction / arc waypoints (δ/2, goal), distance from the sidecar. |
+| `brace` | closed gripper at the recorded brace contact (kind, point, direction), placed **before** the working arm moves, held until the working arm retreats. |
+| `base_follow` (new) | articulation: with the handle grasped and the arm locked, track the recorded base poses `b_k` (`base_follow`) while the joint moves; `follow_mode: arm` uses `move_eef_cartesian` along `h(q_k)` instead; base mode may fall to arm mode per waypoint only where the sampler recorded both. |
+| `reorient_in_hand` (new) | in-hand yaw / flip / SLERP with the object attached, through the recorded waypoints (`rotate_eef` with pivot = object). |
+| checkpoints | after every successfully executed oracle action the state is snapshotted (JoyLo-style checkpoint) so the episode can roll back and retry the action once before it is declared a failure. |
 
-The last five need per-asset information (handle/attach points, tray poses) that the TRO
-schema will provide; the skills they need exist.
+### 6.2 Sequences per subtask
+
+Every sequence ends with: task success check → `max(50, 20 % of the action steps)` no-op steps → pose-settled check
+→ goal image captured → if the binary goal holds and the measured errors are within tolerance, the goal poses of the
+TRO are overridden with the settled values.
+
+| Subtask | Sequence |
+| --- | --- |
+| camera relocalization — standard | `navigate_to` the goal base (recorded path, bucket length) → `set_torso` to the goal (translate, tilt); if the goal trunk self-collides with the reset arms, lift the arms to untucked first (recorded `goal_arms`). |
+| camera relocalization — obstructed | as standard on the map with the obstacle blocked; the obstacle appears in the head camera along the path. |
+| object scaling | move the held object along the camera centre ray to the recorded depth (arm only; 3 recorded waypoints), object orientation unchanged. |
+| mental rotation | rotate the held object to the goal orientation about its own centre (arm only; SLERP waypoints), position unchanged. |
+| disembedding | init → manipulation stance (transition) → `grasp` at the recorded pose → lift to the carry height (orientation kept) → drive sideways along the edge to the **placement stance** (recorded path) → `place` at the destination centre (orientation kept) → retreat. |
+| block design | init → manipulation stance → for each block in the recorded order (anchor first): `grasp` (recorded cube grasp: pinch ∥ flip axis, pick tilt) → lift → `reorient_in_hand` (smallest yaw to the table axes, then one 90° flip about the pinch axis to the place tilt) → `place` at its slot with a small safety margin (anchor: its init position) → push it left against the placed row with the right hand while the closed left gripper braces the row-left blocks (recorded brace) → push it up while the left gripper braces the column-top blocks (where recorded) → retreat both grippers. |
+| articulation — large-scale open / close | init → manipulation stance (transition) → `grasp` the handle at h(q_init) (both directions) → move the joint: `base_follow` along the recorded `b_k` (vertical-axis doors, drawers) or `move_eef_cartesian` along `h(q_k)` (horizontal-axis flaps), up to `passive_from` or q_goal → release → retreat. |
+| articulation — small-scale open / close | init → manipulation stance → `brace` the base link (recorded kind) with the brace arm → `grasp` the handle with the handle arm → move the arm along `h(q_k)` to the goal (or `passive_from`) → release → retreat both. |
+| attachment | init → manipulation stance → `grasp` the target → lift → `reorient_in_hand` toward the attach orientation while moving to the pre-attach pose (10 cm back along the female insertion axis) → `brace` the partner on its face opposite to the insertion direction with the other gripper (closed) → insert along the axis until `attached` → release → retreat both. |
+| alignment — world vertical / horizontal | init → manipulation stance → close both grippers → `brace` at the recorded stop (`below_high` / `above_low` / `side_high`) → `push` at E_low along the arc (δ/2, goal) with the arm only until the level / upright orientation → retreat both. |
+| alignment — axial | init → manipulation stance → close both grippers → left gripper `brace` at the recorded stop edge → right gripper `push` at the long-axis end along the arc to the aligned yaw → retreat both. |
+| IORS ontop / under (large-scale) | init A → manipulation B (transition) → `grasp` → lift (orientation kept) → `navigate_to` placement C with the object attached (recorded path, retreat transition before lowering the trunk toward the floor band for under) → `place` at the goal cell → retreat. |
+| IORS ontop / under / inside / nextto (small-scale) | init → manipulation stance → `grasp` → lift (orientation kept) → `place` at the recorded goal pose (centre of the partner; nearest satisfying position for nextto; inside: drop into the fillable volume) → retreat. |
+| IORS touching | as nextto to the recorded nextto position, then `brace` the partner's far side with the left gripper and `push` the target toward the partner with the right gripper until `touching` → retreat both. |
+
+### 6.3 Language annotations
+
+Each oracle action yields (1) a fine-grained annotation over the involved objects' `display_name`s, disambiguated by
+the per-object descriptors recorded at sampling time ("the cereal box on the left"), and (2) the same with the
+concrete numbers of the action ("push the towel rack up 3 cm at its left end"). Each demo carries (a) the task family
+name, (b) the family-level description shared by all instances, (c) the template-level description with the involved
+categories, and (d) the instance-level description with the goal numbers (a replacement for the goal image).
+
+### 6.4 Real-time QA (hard failures, `run_isg`)
+
+Binary success not reached, measured error above tolerance, robot or object motion after the final no-op window,
+collision (whole body vs scene / objects other than the intended contacts), ghost hand (assisted-grasp artefact),
+prolonged pause (except the final stop), gripper out of the head camera's FOV during a manipulation action, failed
+grasp for grasp actions (not checked for push / brace actions). A hard failure ends the episode; the checkpoint of the
+last successful action allows one retry of the failed action.
+
+### 6.5 `run_isg` modes and recording
+
+One script loads an instance (TRO + sidecar + scene variant), then either (i) feeds actions from a policy, (ii)
+replays actions from a LeRobot episode, or (iii) runs the oracle; the same loader and evaluator serve all three.
+Recording modes: demos → hdf5 replayable by the BEHAVIOR tooling **and** the LeRobot v3 ingredients (observations,
+actions, annotations) written by the same wrapper (no second replay pass; see
+`OmniGibson/omnigibson/envs/lerobot_data_wrapper.py`); QA-only → the rollout observation video of `replay_data.py`.
 
 ## 7. Running it
 

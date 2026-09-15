@@ -1,7 +1,8 @@
 # iSpatialGym task definition and evaluation decisions
 
 Status: agreed cross-task design, updated 2026-09-06 (evaluator implemented;
-see "Implementation status")
+see "Implementation status"); "Instance artifacts" and "Task spec (customs
+list)" updated 2026-09-15 for the v2 sampling rebuild (`instance_sampling_spec.md`).
 
 This document records the shared design for the seven iSpatialGym tasks. Detailed
 task semantics, tolerances, observations, action spaces, and oracle policies will
@@ -24,17 +25,24 @@ See `task_bddl_formats.md` for the proposed concrete BDDL templates.
 
 Each benchmark instance consists of:
 
-1. A BDDL problem/template describing symbolic objects, initial relations, and
-   logical goals.
+1. A BDDL problem describing symbolic objects, initial relations, and logical
+   goals — grounded by `ground_isg` from the subtask's **iddl** (role-level
+   definition, `ispatialgym/assets/iddl/`) and the **icl** (candidate list,
+   `ispatialgym/assets/icl/`); one problem per category combination, named by
+   its alias.
 2. A versioned TRO record containing the materialized scene state and numeric
    evaluation targets.
 3. A task spec entry (iSpatialGym's version of the BEHAVIOR task-custom list)
-   describing how instances of that problem are generated: model pools, scenes,
-   and layouts.
+   describing how instances of that problem are generated: per-scene model
+   whitelists / blacklists, fixed bindings, generation parameters and the
+   constraints learned from earlier instances.
+4. An **oracle sidecar** (`<instance_id>.oracle.json`) with everything the
+   scripted demonstration policy needs (stances, grasps, contacts, waypoints,
+   paths); the evaluator never reads it and the public release may omit it.
 
 BDDL describes **what** must hold. The TRO stores concrete values required to
 instantiate and evaluate that statement. The task spec describes how those
-values are produced.
+values are produced. The sidecar describes how the oracle reaches them.
 
 Task specs are generation-time input only. Runtime loading must not resample a
 model or layout from them: the exact selected scene, models, and poses must
@@ -56,73 +64,38 @@ challenge scripts, which iSpatialGym cannot reuse (definition `0` hard-coded,
 one scene, no `inroom`).
 
 iSpatialGym therefore keeps one file (`task_custom_lists.json` in its own
-metadata directory, never BEHAVIOR's) with a different entry structure:
+metadata directory, never BEHAVIOR's) with a different entry structure
+(schema and example in `instance_sampling_spec.md` §2.3):
 
-- **Key by `<activity>-<definition_id>`** (`disembedding-0`), the knowledge
-  base's `Task.name`. Aliases are stored inside for validation but are not keys,
-  because several problems can share one alias. Variants with different object
-  sets are different BDDL problems anyway, so they get separate entries.
-  Template and TRO filenames already encode the definition id.
-- **`models`**: the BEHAVIOR whitelist/blacklist shape, scene-independent, for
-  spawned objects. It is handed to `BDDLSampler` unchanged.
-- **`scenes`**: one sub-entry per scene the problem may be generated in,
-  holding only scene-dependent data: `fixed_objects` binds each scene-fixed BDDL
-  instance (table, cabinet, wall) to an explicit list of allowed scene object
-  names, and optional `extra_rooms` adds rooms the camera must see. Room types
-  are not used; `load_room_instances` is derived from the bound objects'
-  `in_rooms` plus `extra_rooms`. This explicit binding is the replacement for
-  `inroom`.
-- **`generation`**: everything scene-independent about layouts, expressed
-  relative to anchors so it applies in every scene: instance counts, robot pose
-  sampling relative to an anchor object, the initial layout (explicit templates
-  with jitter, or a constrained sampler; Disembedding clutter is relative to the
-  source tray, block scatter relative to the table), the goal specification
-  (block pattern library using the same slot/relation schema as TRO `groups`,
-  destination regions, articulation joint target ranges), and the occlusion
-  profile for Disembedding.
-
-```json
-{
-  "disembedding-0": {
-    "alias": null,
-    "models": {
-      "whitelist": {
-        "mug.n.04": {"mug": {"MODEL_ID": null}},
-        "tray.n.01": {"tray": {"MODEL_ID": null}}
-      },
-      "blacklist": {}
-    },
-    "scenes": {
-      "SCENE_MODEL": {
-        "fixed_objects": {"table.n.02_1": ["SCENE_OBJECT_NAME"]},
-        "extra_rooms": []
-      }
-    },
-    "generation": {
-      "instances_per_scene": 20,
-      "robot_pose": {"anchor": "table.n.02_1", "distance_range": [0.6, 0.9]},
-      "initial_layout": {
-        "frame": "tray.n.01_1",
-        "templates": [{"id": "TEMPLATE_ID", "slots": {"mug.n.04_1": {"position": [], "orientation": []}}}],
-        "jitter": {"position": 0.01, "yaw": 0.2}
-      },
-      "occlusion": {"buckets": {"occluded": 0.5, "unoccluded": 0.5}, "ratio_range": [0.2, 0.7], "min_visible_pixels": 400},
-      "goal": {"destination_region": {"frame": "tray.n.01_2", "xy_extent": [0.08, 0.10]}}
-    }
-  }
-}
-```
+- **Key by alias** (`inter_object_relation_satisfaction-nextto-spatula-soup_ladle-breakfast_table`):
+  one entry per grounded BDDL problem. The definition id is recorded inside
+  (`definition_id`, from `activity_definitions/<activity>/problems.json`).
+- **`roles`**: the iddl roles with their grounded category, grasp pipeline,
+  representative model and options; fixed roles are flagged.
+- **`scenes`**: one block per candidate scene (all seven unless the subtask
+  bounds the scene): task rooms, `fixed` bindings of the fixed roles to scene
+  object names (or `{"category": [...]}` / `{"room": ...}`), and the **per-scene
+  `whitelist` / `blacklist`** of models per role and category. Whitelists start
+  as the full icl pool; a model that fails its representative test moves to the
+  blacklist with the rejection reason. Scene-dependent objects (supports, walls,
+  scene articulated objects, big partners) are listed per scene.
+- **`generation`**: scene-independent parameters — template and instance
+  counts, tolerances, and the camera-relocalization `path_buckets`
+  (`[{"max_m": 3, "n": 10}, ...]`, half-open geodesic ranges, overridable on the
+  `multiply_isg` command line).
+- **`constraints`**: typed, scoped records appended by every successful
+  sampling run (`stance`, `grasp_set`, `joint_set`, `placement`, `scale`,
+  `band_ref`, `contacts`, `blacklist`) with `hard` and `source` fields. Soft
+  records are priors that narrow the draws of later runs; hard records reject.
+  This is how "robot placed x from the edge of the table" and every other
+  initialization rule that a successful instance confirmed is expressed for
+  reuse, next to the BEHAVIOR predicate sampling the samplers still use.
 
 Generation runs per scene: bind fixed objects, spawn models from the whitelist,
-apply the initial layout relative to its anchor, settle, validate (`:init`
-true, goal false, occlusion bucket met, objects reachable), derive rooms, and
-write the TRO with `object_bindings`, `load_room_instances`, the layout
-template id, and the spec file hash (`task_spec_sha256`).
-
-Each BDDL variant places its generation data as follows: block design puts the
-goal pattern library and scatter rule in `generation`; the articulation
-problems bind the cabinet in `fixed_objects` and put the joint target range in
-`generation`; the world-vertical problem binds the wall in `fixed_objects`.
+run the initialization rules of `instance_sampling_spec.md`, settle, validate
+(`:init` true, goal false, goal feasible, every recorded oracle pose IK- and
+collision-feasible), derive rooms, and write the TRO with `object_bindings`,
+`load_room_instances`, the spec file hash (`task_spec_sha256`) and the sidecar.
 
 ## Room-independent BDDL
 
@@ -613,9 +586,9 @@ These are cross-task decisions only; each task still needs a dedicated review.
   relative or internal configuration together with `open`/`(not (open ...))` or
   `attached` as the semantic guard; absolute placement (`target_slots`) is
   measured only.
-- World Alignment, previously called Rod and Frame, has three variants. Table
-  surface: the object starts and stays `ontop` the table while reaching its
-  target orientation. World vertical: an object (e.g. a painting) hangs on a wall
+- Alignment (activity `alignment`, previously World Alignment / Rod and Frame)
+  has three variants. Axial (previously table surface): the object starts and
+  stays `ontop` the table while reaching its target orientation. World vertical: an object (e.g. a painting) hangs on a wall
   through a revolute joint at its center of mass and must be rotated to the
   straight orientation; the hinge is restored from a TRO constraint record rather
   than expressed with `attached`, because BEHAVIOR attachment aligns meta links
@@ -628,7 +601,15 @@ These are cross-task decisions only; each task still needs a dedicated review.
 - Inter-object Relation Satisfaction, previously called Relation Satisfaction,
   gates success on the intended spatial-relation predicate and release; the
   exact pictured poses are measured only. `open` remains excluded from this
-  task because articulation now belongs to Configuration Matching.
+  task because articulation now belongs to Configuration Matching. It has
+  seven subtasks (ontop / under × small-scale / large-scale, inside, nextto,
+  touching); the small-scale `under` puts the manipulated target on the
+  partner, so its goal is `(under ?partner ?target)`; `inside` does not
+  evaluate the target's orientation.
+- Configuration Matching's articulation variant is split into large-scale
+  (scene objects, opened primarily by base / trunk motion) and small-scale
+  (spawned objects on a support, handle arm + brace arm), each in an open and a
+  close direction.
 
 The concrete BDDL for each variant is in `task_bddl_formats.md`.
 
@@ -654,8 +635,8 @@ Remaining gaps (instance restoration and generation):
   construction.
 - Grasp, attachment-link, hinge-constraint and controller-target restoration
   (recreated after every reset).
-- Instance generation that accepts a definition id and reads the per-problem
-  task spec (`models`, `scenes.fixed_objects`, `generation`).
+- The v2 generation pipeline (`ground_isg` / `sample_isg` / `multiply_isg`)
+  and the oracle sidecar (`instance_sampling_spec.md`).
 - Controlled initial-occlusion generation, recording, and reload validation.
 - Initial-condition revalidation after restoration is available
   (`compiled_task.check_initial_conditions`) but not enforced by the loader.

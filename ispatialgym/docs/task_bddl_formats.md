@@ -1,12 +1,17 @@
 # BDDL formats for iSpatialGym
 
-Status: implemented for evaluation, updated 2026-09-06
+Status: implemented for evaluation (2026-09-06); updated 2026-09-15 for the v2 sampling rebuild (21 subtasks, grounded
+BDDL per category combination, `alignment` activity, oracle sidecar). See `instance_sampling_spec.md` for the rules that
+produce instances and `ispatialgym/assets/iddl/README.md` for the role-level problem definitions the BDDL is grounded
+from.
 
 This document specifies the BDDL problem files for the seven public iSpatialGym
-tasks and the task-specific TRO metadata each one needs. Tasks with variants
-(Configuration Matching, World Alignment, Inter-object Relation Satisfaction)
-use several problem files inside one activity directory, distinguished by an
-`(:alias ...)` section.
+tasks and the task-specific TRO metadata each one needs. Every task family has
+one activity directory; the 21 subtasks are distinguished by an `(:alias ...)`
+whose name also carries the grounded object categories (section "Files, problem
+names, and aliases"). The shipped files under
+`ispatialgym/assets/bddl/activity_definitions/` are structural templates with
+representative synsets; `ground_isg` writes the concrete problems.
 
 The problem files live in `ispatialgym/assets/bddl/activity_definitions/` and
 are parsed, expanded and compiled by `ispatialgym.activity`; the evaluator is
@@ -59,12 +64,18 @@ activity_definitions/<activity>/problem1.bddl
 
 - Problem `N` is named `<activity>-N`. BEHAVIOR's knowledge base already
   enumerates every `problemN.bddl` in a directory (`get_instance_count`), and
-  `BehaviorTask(activity_definition_id=N)` loads it.
-- A problem may declare `(:alias <variant>)` directly after `:domain`. The
-  alias is the variant label: the parser records it as `task_variant`, the TRO's
-  `task_variant` must equal it, and results are reported per alias. Several
-  problems may share one alias (both articulation directions). Single-variant
-  activities omit `:alias`, and their `task_variant` is `null`.
+  `BehaviorTask(activity_definition_id=N)` loads it. `ground_isg` allocates `N`
+  per alias, contiguously, and records the mapping in
+  `activity_definitions/<activity>/problems.json` (alias ↔ id).
+- Every problem declares `(:alias <name>)` directly after `:domain`. The alias
+  names the **subtask and the grounded categories**:
+  `<family>-<subtask>-<category slots>` (table below), e.g.
+  `inter_object_relation_satisfaction-nextto-spatula-soup_ladle-breakfast_table`.
+  The parser records it as `task_variant`, the TRO's `task_variant` must equal
+  it, and results are reported per alias. Group slots list `<category>_<count>`
+  tokens (`bottle_of_beer_3_bottle_of_sake_1`); the block design uses the custom
+  block token `block_4`. One alias = one BDDL = one category combination;
+  templates of that alias differ only by models.
 - A problem may end with a `(:measure ...)` section (after `:goal`) listing
   `pose_reached` / `layout_reached` atoms that are **measured but never gate
   success**:
@@ -87,10 +98,10 @@ activity_definitions/<activity>/problem1.bddl
   group symbols would otherwise be undefined at scope resolution.
 - BEHAVIOR's `sample_b1k_tasks.py` hard-codes `activity_definition_id=0` and
   keys `task_custom_lists.json` (scene, room types, model pools) by activity
-  name. iSpatialGym instance generation must take the definition id and read
-  its own task spec file keyed by `<activity>-N` (see "Task spec (customs
-  list)" in `task_definition_and_evaluation.md`), because variants in one
-  activity use disjoint object pools and may need different scenes.
+  name. iSpatialGym generation reads its own customs list keyed by **alias**
+  (see "Task spec (customs list)" in `task_definition_and_evaluation.md`),
+  because subtasks in one activity use disjoint object pools and may need
+  different scenes.
 
 ### Domain
 
@@ -134,10 +145,15 @@ declared instance keeps the normal form:
 Roles such as "target" and "distractor" are conveyed by which instances appear
 in which predicates (and by groups), not by aliases such as `target_1`.
 
-Block design uses `toy_dice.n.01` (patterned cubes, 20 BEHAVIOR models) as the
-interchangeable design blocks; the earlier proposal of an iSpatialGym-only
-`configuration_block.n.01` category is dropped because every declared synset
-must exist in the BEHAVIOR knowledge base.
+Block design uses `toy_dice.n.01` for the custom Kohs block (`toy_dice/isgblk`
+in the `ispatialgym-assets` dataset); every declared synset must exist in the
+BEHAVIOR knowledge base, so the custom asset is registered under an existing
+category and the alias carries the token `block_4` instead.
+
+Group names are derived from the iddl group role: `targets` → `targets_group.n.01_1`
+(blocks), `distractors` → `distractors_group.n.01_1`, the attachment assembly
+`target partner - assembly` → `assembly_group.n.01_1`, `obstacles` →
+`obstacles_group.n.01_1`.
 
 ### Groups
 
@@ -151,7 +167,7 @@ must exist in the BEHAVIOR knowledge base.
 - The typed-list shape is the same as `:objects` (`members - name`), so the
   same tokenizer loop parses it into `{group_name: [members]}`. This is why the
   members-first order is recommended over `group - members`.
-- Group names follow the instance-name shape (`blocks_group.n.01_1`) so they can
+- Group names follow the instance-name shape (`targets_group.n.01_1`) so they can
   appear wherever an instance can, but they are not synsets: nothing is loaded
   for them, ontology checks skip them, and they must not be declared in
   `:objects`.
@@ -426,22 +442,35 @@ Used by `pose_reached(g)` and `layout_reached(g)`:
 - Reported errors: `pose_reached` -> max member position / orientation error;
   `layout_reached` -> max relation position / orientation error.
 
-## Public task, problem, and alias mapping
+## Public task, subtask and alias mapping
 
-| Public task | Activity | Problem | `:alias` |
+| Family (activity dir) | Subtask | Alias template | Fixed roles in the alias |
 | --- | --- | --- | --- |
-| Camera Relocalization | `camera_relocalization` | `problem0` | none |
-| Object Scaling | `object_scaling` | `problem0` | none |
-| Mental Rotation | `mental_rotation` | `problem0` | none |
-| Disembedding | `disembedding` | `problem0` | none |
-| Configuration Matching | `configuration_matching` | `problem0` | `block_design` |
-| Configuration Matching | `configuration_matching` | `problem1` | `articulation` (closed to open) |
-| Configuration Matching | `configuration_matching` | `problem2` | `articulation` (open to closed) |
-| Configuration Matching | `configuration_matching` | `problem3` | `attachment` |
-| World Alignment | `world_alignment` | `problem0` | `table_surface` |
-| World Alignment | `world_alignment` | `problem1` | `world_vertical` |
-| World Alignment | `world_alignment` | `problem2` | `world_horizontal` |
-| Inter-object Relation Satisfaction | `inter_object_relation_satisfaction` | `problem0` to `problem4` | `ontop`, `under`, `inside`, `nextto`, `touching` |
+| `camera_relocalization` | standard | `camera_relocalization-standard` | – |
+| `camera_relocalization` | obstructed | `camera_relocalization-obstructed-{obstacles}` | obstacle category (one for now) |
+| `object_scaling` | – | `object_scaling-{target}` | – |
+| `mental_rotation` | – | `mental_rotation-{target}` | – |
+| `disembedding` | – | `disembedding-{target}-{distractors}-{support}` | support category |
+| `configuration_matching` | block design | `configuration_matching-block_design-block_4-{support}` | support |
+| `configuration_matching` | articulation open, large-scale | `configuration_matching-articulation_open_large_scale-{target}` | target = scene articulated object category |
+| `configuration_matching` | articulation close, large-scale | `configuration_matching-articulation_close_large_scale-{target}` | idem |
+| `configuration_matching` | articulation open, small-scale | `configuration_matching-articulation_open_small_scale-{target}-{support}` | support (table or floor) |
+| `configuration_matching` | articulation close, small-scale | `configuration_matching-articulation_close_small_scale-{target}-{support}` | idem |
+| `configuration_matching` | attachment | `configuration_matching-attachment-{target}-{partner}-{support}` | support |
+| `alignment` | world vertical | `alignment-world_vertical-{target}-{support}` | support = wall |
+| `alignment` | world horizontal | `alignment-world_horizontal-{target}-{support}` | support = wall |
+| `alignment` | axial | `alignment-axial-{target}-{support}` | support = table |
+| `inter_object_relation_satisfaction` | ontop, large-scale | `inter_object_relation_satisfaction-ontop_large_scale-{target}-{partner}-{support}` | partner = scene object; support = table or floor |
+| `inter_object_relation_satisfaction` | ontop, small-scale | `inter_object_relation_satisfaction-ontop_small_scale-{target}-{partner}-{support}` | support |
+| `inter_object_relation_satisfaction` | under, large-scale | `inter_object_relation_satisfaction-under_large_scale-{target}-{partner}-{support}` | partner = scene object; support = table, floor or the partner |
+| `inter_object_relation_satisfaction` | under, small-scale | `inter_object_relation_satisfaction-under_small_scale-{target}-{partner}-{support}` | support |
+| `inter_object_relation_satisfaction` | inside / nextto / touching | `inter_object_relation_satisfaction-{inside,nextto,touching}-{target}-{partner}-{support}` | support |
+
+Definition ids `N` are per alias (`problems.json`); the examples below keep the
+representative synsets of the structural templates. The former names
+`world_alignment` (activity), `table_surface` (alias) and `iors` are retired:
+the activity directory is `alignment`, the table variant is `axial`, and the IORS
+activity keeps its full name.
 
 ## 1. Camera Relocalization
 
@@ -496,6 +525,49 @@ Additional TRO specification:
 - The full initial R1Pro configuration in `robot_state` matters here: the same
   camera pose depends on torso joints, not only on `robot_poses`.
 - The initial state must not already satisfy `pose_reached`.
+- The geodesic path-length bucket of the instance ((0, 3], (3, 5], (5, 10] m) is
+  a generation parameter (`generation.path_buckets`) recorded in the oracle
+  sidecar, not part of the BDDL or the alias.
+
+### 1b. Obstructed (`camera_relocalization-obstructed-{obstacles}`)
+
+One obstacle object (group `obstacles_group.n.01_1`, one member for now) stands
+on the floor on the eroded shortest path from the init to the goal so that the
+shortest path changes; it is never touched.
+
+```lisp
+(define (problem camera_relocalization-1)
+    (:domain ispatialgym)
+
+    (:alias camera_relocalization-obstructed-trash_can_1)
+
+    (:objects
+        trash_can.n.01_1 - trash_can.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:groups
+        trash_can.n.01_1 - obstacles_group.n.01_1
+    )
+
+    (:init
+        (ontop obstacles_group.n.01_1 floor.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (pose_reached ?agent.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+)
+```
+
+The TRO is that of the standard problem; the obstacle's footprint is recorded
+as `scene_variant.blocked_footprints` (the counterpart of the chair variant's
+`freed_footprints`) so that evaluation and the oracle's navigation map block it.
 
 ## 2. Object Scaling
 
@@ -737,7 +809,7 @@ One activity, four problem files, three aliases.
 (define (problem configuration_matching-0)
     (:domain ispatialgym)
 
-    (:alias block_design)
+    (:alias configuration_matching-block_design-block_4-table)
 
     (:objects
         toy_dice.n.01_1 toy_dice.n.01_2 toy_dice.n.01_3 toy_dice.n.01_4 - toy_dice.n.01
@@ -747,26 +819,26 @@ One activity, four problem files, three aliases.
     )
 
     (:groups
-        toy_dice.n.01_1 toy_dice.n.01_2 toy_dice.n.01_3 toy_dice.n.01_4 - blocks_group.n.01_1
+        toy_dice.n.01_1 toy_dice.n.01_2 toy_dice.n.01_3 toy_dice.n.01_4 - targets_group.n.01_1
     )
 
     (:init
-        (ontop blocks_group.n.01_1 table.n.02_1)
+        (ontop targets_group.n.01_1 table.n.02_1)
         (ontop agent.n.01_1 floor.n.01_1)
     )
 
     (:goal
         (and
-            (ontop ?blocks_group.n.01_1 ?table.n.02_1)
-            (layout_reached ?blocks_group.n.01_1)
-            (not (grasped ?agent.n.01_1 ?blocks_group.n.01_1))
-            (pose_settled ?blocks_group.n.01_1)
+            (ontop ?targets_group.n.01_1 ?table.n.02_1)
+            (layout_reached ?targets_group.n.01_1)
+            (not (grasped ?agent.n.01_1 ?targets_group.n.01_1))
+            (pose_settled ?targets_group.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
     (:measure
-        (pose_reached ?blocks_group.n.01_1)
+        (pose_reached ?targets_group.n.01_1)
     )
 )
 ```
@@ -776,7 +848,7 @@ Additional TRO specification:
 ```json
 {
   "groups": {
-    "blocks_group.n.01_1": {
+    "targets_group.n.01_1": {
       "members": [
         "toy_dice.n.01_1",
         "toy_dice.n.01_2",
@@ -811,27 +883,36 @@ Additional TRO specification:
   is one block's pose in another block's frame). A correctly built design that
   is displaced on the table therefore still succeeds; `target_slots` record the
   pictured absolute placement and, through `(:measure (pose_reached
-  ?blocks_group.n.01_1))`, their max member position / orientation error is
+  ?targets_group.n.01_1))`, their max member position / orientation error is
   reported as the block-design pose error without gating success.
 - `orientation_equivalences` matters here: an unmarked cube has 24 equivalent
   orientations, and patterned blocks usually keep some. Leaving it empty makes
-  the orientation check exact.
-- `(ontop ?blocks_group.n.01_1 ?table.n.02_1)` restricts the template to a
+  the orientation check exact (the Kohs block has six distinct faces).
+- The goal orientation of every block is the table-aligned orientation with the
+  pattern's face up that is reached by the **smallest rotation** from its init
+  orientation (yaw-align, then one flip about a horizontal table axis); the
+  anchor is the block that is top-left in the init image and keeps its position
+  (`instance_sampling_spec.md` §6.5).
+- `(ontop ?targets_group.n.01_1 ?table.n.02_1)` restricts the template to a
   single layer. For stacked designs, drop it and let the layout relations carry
   the block-on-block structure.
 
-### 5b. Articulation (`problem1` and `problem2`, alias `articulation`)
+### 5b. Articulation (four subtasks: open / close × large-scale / small-scale)
 
-`problem1` opens a closed object; `problem2` closes an open one. Only the
-`open` literals differ. A target that is already partially open at the start
-uses the `open` literal in both `:init` and `:goal` and relies on
-`layout_reached` for the change.
+Large-scale: the target is a **scene** articulated object (cabinet, fridge,
+oven, dishwasher, drawer, door) bound per scene; nothing is spawned. Small-scale:
+the target is a spawned articulated object (toolbox, carton, hinged jar) that
+stands on a support (a table, or the floor for objects taller than 0.6 m); its
+BDDL adds `(ontop target support)` to `:init` and `:goal` and measures the root
+pose (`(:measure (pose_reached ?target))`). Only the `open` literals differ
+between the open and close directions. Exactly one joint of the object is the
+task joint; every other non-fixed joint is listed at its init value.
 
 ```lisp
 (define (problem configuration_matching-1)
     (:domain ispatialgym)
 
-    (:alias articulation)
+    (:alias configuration_matching-articulation_open_large_scale-cabinet)
 
     (:objects
         cabinet.n.01_1 - cabinet.n.01
@@ -860,7 +941,7 @@ uses the `open` literal in both `:init` and `:goal` and relies on
 (define (problem configuration_matching-2)
     (:domain ispatialgym)
 
-    (:alias articulation)
+    (:alias configuration_matching-articulation_close_large_scale-cabinet)
 
     (:objects
         cabinet.n.01_1 - cabinet.n.01
@@ -939,7 +1020,7 @@ Additional TRO specification (both problems):
 (define (problem configuration_matching-3)
     (:domain ispatialgym)
 
-    (:alias attachment)
+    (:alias configuration_matching-attachment-digital_camera-camera_tripod-table)
 
     (:objects
         digital_camera.n.01_1 - digital_camera.n.01
@@ -950,11 +1031,11 @@ Additional TRO specification (both problems):
     )
 
     (:groups
-        digital_camera.n.01_1 camera_tripod.n.01_1 - attachment_group.n.01_1
+        digital_camera.n.01_1 camera_tripod.n.01_1 - assembly_group.n.01_1
     )
 
     (:init
-        (ontop attachment_group.n.01_1 table.n.02_1)
+        (ontop assembly_group.n.01_1 table.n.02_1)
         (not (attached digital_camera.n.01_1 camera_tripod.n.01_1))
         (ontop agent.n.01_1 floor.n.01_1)
     )
@@ -963,15 +1044,15 @@ Additional TRO specification (both problems):
         (and
             (attached ?digital_camera.n.01_1 ?camera_tripod.n.01_1)
             (ontop ?camera_tripod.n.01_1 ?table.n.02_1)
-            (layout_reached ?attachment_group.n.01_1)
-            (not (grasped ?agent.n.01_1 ?attachment_group.n.01_1))
-            (pose_settled ?attachment_group.n.01_1)
+            (layout_reached ?assembly_group.n.01_1)
+            (not (grasped ?agent.n.01_1 ?assembly_group.n.01_1))
+            (pose_settled ?assembly_group.n.01_1)
             (pose_settled ?agent.n.01_1)
         )
     )
 
     (:measure
-        (pose_reached ?attachment_group.n.01_1)
+        (pose_reached ?assembly_group.n.01_1)
     )
 )
 ```
@@ -981,7 +1062,7 @@ Additional TRO specification:
 ```json
 {
   "groups": {
-    "attachment_group.n.01_1": {
+    "assembly_group.n.01_1": {
       "members": ["digital_camera.n.01_1", "camera_tripod.n.01_1"],
       "assignment": {
         "mode": "fixed",
@@ -1026,17 +1107,17 @@ Additional TRO specification:
 - An assembly with more parts lists every directed `attached` edge, one
   attachment target per edge, and all parts in the group.
 
-## 6. World Alignment
+## 6. Alignment (activity directory `alignment`, formerly `world_alignment`)
 
-One activity, three problem files.
+One activity, three subtasks.
 
-### 6a. Table surface (`problem0`, alias `table_surface`)
+### 6a. Axial (`alignment-axial-{target}-{support}`, formerly `table_surface`)
 
 ```lisp
-(define (problem world_alignment-0)
+(define (problem alignment-0)
     (:domain ispatialgym)
 
-    (:alias table_surface)
+    (:alias alignment-axial-fishing_rod-table)
 
     (:objects
         fishing_rod.n.01_1 - fishing_rod.n.01
@@ -1092,16 +1173,16 @@ Additional TRO specification:
   `orientation_equivalences` (e.g. the 180-degree flip of a plain rod) if the
   model is symmetric.
 
-### 6b. World vertical (`problem1`, alias `world_vertical`)
+### 6b. World vertical (`alignment-world_vertical-{target}-{support}`)
 
 A painting hangs on a wall through a revolute joint whose axis passes through
 the painting's center of mass; the goal is the straight (world-vertical) pose.
 
 ```lisp
-(define (problem world_alignment-1)
+(define (problem alignment-1)
     (:domain ispatialgym)
 
-    (:alias world_vertical)
+    (:alias alignment-world_vertical-painting-wall)
 
     (:objects
         painting.n.01_1 - painting.n.01
@@ -1174,7 +1255,7 @@ Additional TRO specification:
 - The painting has one degree of freedom, so the full world-frame target
   effectively evaluates the in-plane angle; no axis-only predicate is needed.
 
-### 6c. World horizontal (`problem2`, alias `world_horizontal`)
+### 6c. World horizontal (`alignment-world_horizontal-{target}-{support}`)
 
 The same wall hinge as 6b, but the object is an elongated wall item with one
 clear horizontal direction (a towel bar, a hook rail, a shelf, a wide sign or
@@ -1183,10 +1264,10 @@ long axis / reference edge horizontal). The BDDL structure is identical to 6b
 with the representative synset changed.
 
 ```lisp
-(define (problem world_alignment-2)
+(define (problem alignment-2)
     (:domain ispatialgym)
 
-    (:alias world_horizontal)
+    (:alias alignment-world_horizontal-towel_rack-wall)
 
     (:objects
         towel_rack.n.01_1 - towel_rack.n.01
@@ -1260,14 +1341,18 @@ Additional TRO specification:
 
 ## 7. Inter-object Relation Satisfaction
 
-One activity, one problem file per relation, alias equal to the relation name.
-BDDL cannot parameterize a predicate name, so each relation is its own problem.
+One activity, seven subtasks: `ontop_large_scale`, `ontop_small_scale`,
+`under_large_scale`, `under_small_scale`, `inside`, `nextto`, `touching`. BDDL
+cannot parameterize a predicate name, so each relation is its own problem; the
+large-scale variants bind the partner to a fixed scene object (bed, sofa, desk,
+breakfast table, countertop) and the target's init support is a table, the floor,
+or (under only) the partner itself.
 
 ```lisp
 (define (problem inter_object_relation_satisfaction-3)
     (:domain ispatialgym)
 
-    (:alias nextto)
+    (:alias inter_object_relation_satisfaction-nextto-apple-bowl-table)
 
     (:objects
         apple.n.01_1 - apple.n.01
@@ -1301,15 +1386,23 @@ BDDL cannot parameterize a predicate name, so each relation is its own problem.
 )
 ```
 
-| Problem | `:alias` | Goal relation |
+| Subtask | Goal relation | Init support literals |
 | --- | --- | --- |
-| `problem0` | `ontop` | `(ontop ?apple.n.01_1 ?bowl.n.01_1)` |
-| `problem1` | `under` | `(under ?apple.n.01_1 ?bowl.n.01_1)` |
-| `problem2` | `inside` | `(inside ?apple.n.01_1 ?bowl.n.01_1)` |
-| `problem3` | `nextto` | `(nextto ?apple.n.01_1 ?bowl.n.01_1)` |
-| `problem4` | `touching` | `(touching ?apple.n.01_1 ?bowl.n.01_1)` |
+| `ontop_large_scale` | `(ontop ?target ?partner)` | `(ontop target support)`, `(not (ontop target partner))`; partner fixed |
+| `ontop_small_scale` | `(ontop ?target ?partner)` | both `ontop support` |
+| `under_large_scale` | `(under ?target ?partner)` | `(ontop target support)`, `(not (under target partner))`; partner fixed; support may be the partner |
+| `under_small_scale` | **`(under ?partner ?target)`** | both `ontop support`, `(not (under partner target))` |
+| `inside` | `(inside ?target ?partner)` | both `ontop support`, `(not (inside target partner))` |
+| `nextto` | `(nextto ?target ?partner)` | both `ontop support`, `(not (nextto target partner))` |
+| `touching` | `(touching ?target ?partner)` | both `ontop support`, `(not (touching target partner))` |
 
-Additional TRO specification (all five):
+The argument order of the two `under` subtasks differs on purpose: in the
+small-scale version the manipulated target (glass, teacup, fries, bottle) is set
+down on the partner (coaster, saucer, platter, tray), so the *partner* ends under
+the target. Fixed scene partners have no `pose_settled` atom (kinematic prims
+report no velocity) and no `pose_reached` measurement.
+
+Additional TRO specification (all seven; the partner entry only for spawned partners):
 
 ```json
 {
@@ -1342,7 +1435,10 @@ Additional TRO specification (all five):
   The two `:measure` atoms and their pose targets record the exact pictured
   configuration; their errors are reported (the maximum over both objects is
   the instance's position / orientation error) without gating success. The
-  loader checks that `task_variant` equals the relation in the goal.
+  loader checks that `task_variant` names the relation in the goal.
+- `inside` sets `orientation_metric: null` on the target's pose target (the
+  target's goal orientation is whatever settles in the container; this admits
+  flowers stood in vases).
 - The apple/bowl pair is representative. Each problem must use synsets that can
   physically realize its relation, and initial support literals may differ
   (an `under` reference may need a raised object).
@@ -1361,7 +1457,8 @@ evaluator, never BDDL:
   relations, joint targets, and the member-to-slot assignment.
 - Disembedding occlusion profile, bucket, and measurements.
 - Allowed robot actuator groups, time limits, split metadata, seeds, and
-  oracle-only information.
+  oracle-only information (stances, contacts, grasps, waypoints, paths: the
+  oracle sidecar `<instance_id>.oracle.json`, `instance_sampling_spec.md` §7).
 - The `require_pose_settled` evaluation flag.
 
 ## Implementation status
@@ -1405,7 +1502,8 @@ Not yet implemented (instance restoration / generation):
    every reset), and `robot_state.controller_targets`; `load_tro_instance`
    logs a warning when these records are present.
 3. Recomputing and validating Disembedding's `initial_occlusion` after settling.
-4. Instance generation that accepts a definition id and reads the per-problem
-   task spec (`models`, `scenes.fixed_objects`, `generation`).
+4. The v2 generation pipeline (`ground_isg` / `sample_isg` / `multiply_isg`,
+   `instance_sampling_spec.md`) with the 21 subtasks, grounded BDDL per alias,
+   `problems.json`, the `alignment` activity rename and the oracle sidecar.
 5. `initial_occlusion`, `goal_observation` and hash fields are carried through
    but not checked beyond their presence.

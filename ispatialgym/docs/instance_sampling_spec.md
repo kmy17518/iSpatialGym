@@ -1,0 +1,964 @@
+# iSpatialGym instance sampling and initialization rules (v2)
+
+Status: authoritative rule set for the sampling rebuild (`ground_isg` → `sample_isg` → `multiply_isg`), 2026-09-15.
+Supersedes `instance_sampling_spec_v1.md` (sampler 1.x; kept for measured facts). Companions: `task_bddl_formats.md`
+(what an instance evaluates), `task_definition_and_evaluation.md` (artefacts, customs list, deterministic loading),
+`oracle_primitives_design.md` (the demo oracles the rules must stay consistent with), `ispatialgym/assets/iddl/README.md`
+(iddl grammar), `TODO.md` (who is doing what).
+
+Numbers marked `[pilot]` are the design values; the pilot (TODO E1/E2) verifies or replaces them.
+
+## 0. Pipeline and principles
+
+```
+Behavior-1K:  sample_b1k   : bddl + task customs list ─sample→   1 template
+              multiply_b1k : 1 template               ─multiply→ N instances
+
+iSpatialGym:  ground_isg   : iddl + icl               ─ground→   bddl per category combination + task customs list
+                                                                 (+ template & instance 0 of the representative models)
+              sample_isg   : bddl + task customs list ─sample→   N templates (model combinations), each with instance 0
+              multiply_isg : 1 template               ─multiply→ N instances
+              run_isg      : instances                ─oracle→   demos (hdf5 + LeRobot v3), QA, evaluation
+```
+
+- **iddl** (`ispatialgym/assets/iddl/`): one file per subtask, BDDL over roles, no synsets (see its README).
+- **icl** (`ispatialgym/assets/icl/`): candidate categories and models per role, how roles correlate (partner for
+  this target, distractor pools for this target, female for this male), which combinations are *test* combinations,
+  supports and wall regions per scene, per-model frame axes / scale / grasp keys.
+- **task customs list** (`task_custom_lists.json`, section 2.3): per alias, per-scene whitelists and blacklists of
+  models, fixed bindings, generation parameters and the *constraints* every successful sampling run adds.
+
+Principles, in the order they are traded off:
+
+1. **Correctness of the saved instance**: `:init` true, binary goal false, robot and every object settled and
+   whole-body collision-free at init and at the goal, goal physically feasible without the robot, every TRO target
+   consistent with the BDDL.
+2. **NO FALLBACKS.** A check that fails rejects the attempt (or the template); the only alternatives are the
+   enumerated candidate sets written in this document (edges, stand-offs, trunks, feasible grasp sets, brace kinds,
+   partner candidates). Nothing silently substitutes another arm pose, another grasp pipeline, another support or
+   another relation. `view_arm_fallbacks`, the `ready` arm fallback, `init_depth_fallbacks`, the bed-top init
+   fallback and the base-yaw fallback of v1 are gone.
+3. **Geometry first, one verification.** Placements come from support geometry, the camera model and cached
+   reachability sets (reach volume, reach bands); random draws choose among pre-filtered candidates; each draw is
+   confirmed once with the exact IK.
+4. **Sampling must guarantee oracle yield.** Every gripper pose the scripted policy will need (grasp, pre-grasp,
+   place, push and brace contacts, articulation waypoints, in-hand reorientations, base-follow poses) is IK- and
+   collision-checked during sampling and recorded for the oracle (section 7). Whatever the oracle does, the sampler
+   has checked.
+5. **Identical robot configuration across instances** except where a rule samples it (base pose, trunk when the
+   rule says "continuous", the grasp draw).
+6. **Every instance makes sampling cheaper**: constraints learned from successful instances are written back into
+   the customs list (section 9) and read as priors by later runs.
+
+## 1. Artefacts and layout
+
+```text
+<out_root>/
+  task_custom_lists.json                          the customs list used (copied; ground_isg / sample_isg append to the source)
+  <alias>/                                        e.g. inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table
+    activity_definitions/<activity>/problem<N>.bddl  the grounded BDDL (one per alias; N from problems.json)
+    <template_id>/                                e.g. house_single_floor__target-apple-omzprq__partner-plate-kkjiko
+      template.json / template-partial_rooms.json
+      template_meta.json                          bindings, rooms, cached geometry, spec hash, timings, stances
+      instances/
+        <instance_id>-tro_state.json              TRO (BEHAVIOR object states + robot_poses + ispatialgym block)
+        <instance_id>.oracle.json                 oracle sidecar (section 7): stances, contacts, grasps, waypoints, plans
+        <instance_id>.summary.json                what was sampled / measured (debug)
+```
+
+- `template_id = <scene>__<role>-<category>-<model>[__...]` for the spawned roles; fixed roles are recorded in
+  `template_meta.json` and in the alias.
+- `instance_id = <alias>__<template_id>__<NNNN>`.
+- The TRO keeps BEHAVIOR's layout and the `isg-tro-v1` block exactly as in `task_bddl_formats.md`. Everything the
+  oracle needs but the evaluator does not is in the **oracle sidecar**, a sibling file that carries the TRO's sha256;
+  the public release may omit it.
+- The activity directories are `camera_relocalization`, `object_scaling`, `mental_rotation`, `disembedding`,
+  `configuration_matching`, `alignment`, `inter_object_relation_satisfaction`. Definition ids are allocated per alias
+  in `activity_definitions/<activity>/problems.json` (alias ↔ id, contiguous), because the BEHAVIOR knowledge base
+  enumerates `problemN.bddl`.
+
+## 2. Inputs
+
+### 2.1 iddl
+
+See `ispatialgym/assets/iddl/README.md`. Roles: `target`, `targets` (group), `partner`, `source`, `destination`,
+`distractors` (group with `same_category` / `other_category` pools), `obstacles` (group, obstructed camera
+relocalization only), `support`, implicit `floor` and `agent`.
+
+### 2.2 icl (candidate list)
+
+`ispatialgym/assets/icl/` — categories, never synsets:
+
+| sheet | one row per | key columns |
+|---|---|---|
+| `roles.csv` | (subtask, role, category, model) | `representative` (the one model of the category tested by `ground_isg`), `test` (test-instance models), `scenes_natural` (where the category may be drawn), `grasp_key` / `grasp_pipeline`, `scale`, frame axes (`front_axis`, `up_axis`, `level_axis`, `long_axis`, `symmetric_180`), `display_name`, `status` (`candidate` / `whitelisted` / `blacklisted` + reason), `notes` |
+| `pairs.csv` | (subtask, role_a, category_a[/model_a], role_b, category_b[/models_b], relation) | how roles correlate: target→partner, target→distractor pool (same/other category, look-alike groups), male→female (attachment type), target→support class, obstacle→scene |
+| `combos.csv` | explicit combination | `test=1` combinations that `ground_isg` must test (representative models), scenes |
+| `supports.csv` | (scene, object name) | category, room, top height, footprint, per-edge free-floor run, chairs removed, `status` per subtask; the 31 supports of the union plus the 78 wall regions and the large partners |
+| `grasps.csv` | (grasp key, grasp name) | `width` (pinch width), `finger_q`, `pad_clearance = (0.10 − width)/2`, verdict |
+
+Everything that used to be a "viable" list (supports, walls, articulated objects) is a *candidate* here until
+`ground_isg` re-derives it.
+
+### 2.3 Task customs list
+
+One entry per alias. Scene-independent model pools are the icl's job; the customs list holds what a scene changes
+and what sampling learned.
+
+```json
+{
+  "inter_object_relation_satisfaction-nextto-spatula-soup_ladle-breakfast_table": {
+    "iddl": "inter_object_relation_satisfaction/nextto.iddl",
+    "definition_id": 3,
+    "roles": {
+      "target":  {"category": "spatula",    "grasps": "tabletop", "representative": "hkvsep"},
+      "partner": {"category": "soup_ladle", "representative": "cfzneb"},
+      "support": {"category": "breakfast_table", "fixed": true},
+      "floor":   {"fixed": true}
+    },
+    "scenes": {
+      "house_single_floor": {
+        "rooms": ["dining_room_0"],
+        "fixed": {"support": ["breakfast_table_rhjoby_0"], "floor": {"room": "dining_room_0"}},
+        "whitelist": {"target": {"spatula": ["hkvsep", "ktkigm", "ymvrct"]}, "partner": {"soup_ladle": ["cfzneb", "hgvzdm"]}},
+        "blacklist": {"target": {"spatula": {"pdqgzq": "ground_isg 2026-09-20: grasp_unreachable at every focus cell"}}}
+      },
+      "restaurant_diner": {"...": "one block per candidate scene; unbounded scenes list all seven"}
+    },
+    "generation": {
+      "templates_max": 20, "instances_per_template": 5,
+      "tolerances": {"position": 0.03, "orientation": 0.20},
+      "path_buckets": null
+    },
+    "constraints": [
+      {"scope": {"scene": "house_single_floor", "support": "breakfast_table_rhjoby_0"},
+       "type": "stance", "edges": ["e2"], "stand_off": [0.45, 0.55], "lateral": [-0.30, 0.60],
+       "trunk": {"translate": [0.5, 0.75], "tilt": [-0.6, -0.3]}, "hard": false,
+       "source": {"instance": "...__0003", "sampler": "2.0.0"}},
+      {"scope": {"target": "spatula/hkvsep", "support_height": 0.80},
+       "type": "grasp_set", "trunk": [0.5, -0.3], "cell": [0.62, -0.18], "feasible": [[3, "grasp_1"], [4, "grasp_1"], [3, "grasp_4"]],
+       "hard": false, "source": {"instance": "...__0003"}}
+    ]
+  }
+}
+```
+
+- `whitelist` / `blacklist` are **per scene**; a scene block exists for every candidate scene (`house_single_floor`,
+  `house_double_floor_upper`, `house_double_floor_lower`, `Rs_int`, `hotel_suite_large`, `restaurant_diner`,
+  `office_cubicles_right`) unless the iddl/icl bounds the scene (camera relocalization: `house_single_floor` /
+  `living_room_0` only for now). Whitelists start as the full icl candidate pool per category except models removed
+  by a failed representative test (they move to the blacklist with the reason); scene-dependent objects (supports,
+  walls, scene articulated objects, big partners) are listed per scene.
+- `generation.path_buckets` (camera relocalization only): `[{"max_m": 3, "n": 10}, {"max_m": 5, "n": 10},
+  {"max_m": 10, "n": 5}]`; buckets are half-open ranges of the geodesic path length `(0, 3]`, `(3, 5]`, `(5, 10]`;
+  `multiply_isg --path-buckets 3:10,5:10,10:5` overrides; the bucket is recorded in the sidecar and used in the
+  instance-level language.
+- **Constraints** are typed, scoped records that *narrow* a sampling distribution (priors), never replace a check.
+  Types: `stance` (edges, stand-off, lateral, trunk ranges), `grasp_set` (feasible `(yaw, grasp)` per trunk and
+  cell), `joint_set` (stable set S, `passive_from`), `placement` (a BDDL-like literal with numeric ranges:
+  `(ontop target support :depth [0.10, 0.40] :lateral [-0.30, 0.30])`), `scale`, `band_ref` (reach-band cache key),
+  `contacts` (verified push / brace contacts per model), `blacklist` (with reason). Every record has `scope`
+  (any of `scene`, `support`, `partner`, `target`, `model`, `support_height`, `trunk`), `hard` (a hard record is a
+  rejection rule, e.g. a blacklist; soft records are priors) and `source` (instance id, sampler version, date).
+  `sample_isg` reads them before drawing; `sample_isg` and `multiply_isg` append what each successful instance
+  confirmed.
+
+## 3. Shared rules (every task)
+
+### 3.1 Scenes and scene variants
+
+Candidates: the seven 2026-challenge scenes above. Task rooms = the rooms of the bound fixed objects (+ `rooms`);
+`load_room_instances` adds the neighbours (segmentation footprint within 0.6 m) as in v1. Table tasks sample in the
+stable scene minus the chairs within 1.0 m of the support (`scene_variants`, `freed_footprints` recorded and applied
+by evaluation and by the oracle's navigation map). The obstructed camera-relocalization variant records the obstacle
+footprint as `blocked_footprints` in the same structure.
+
+### 3.2 Support and placement
+
+- An object placed on a surface has its **whole footprint** (AABB projected after the sampled yaw) inside the support
+  polygon (top face of the collision geometry, not the AABB) shrunk by 2 cm (0.5 cm on a tray floor).
+- Rest orientation = canonical up, or the grasp library's rest quaternion for models that lie on a side, times the
+  sampled yaw; z = support top + bottom offset + 3 mm.
+- Footprints keep ≥ 3 cm clearance (target–partner) unless a rule states otherwise; nothing is placed inside the
+  robot's or another object's AABB.
+
+### 3.3 Robot
+
+- R1Pro, JoyLo controller config (`r1pro_model.joylo_robot_config`), grasping mode assisted, head camera
+  `robot_r1:zed_link:Camera:0`, 1080 × 1080, hfov = vfov = 99.2°.
+- **Untucked is the only arm posture** (`untucked_default_joint_pos`, hands 0.64 m ahead of the base at 1.20 m at
+  translate 0.5) — at init, for the idle arm at every manipulation stance and as the locked posture in every IK
+  screen. Grippers open (0.05). Exceptions: camera relocalization (JoyLo reset pose: trunk 0.5, arms zero) and the
+  held-object tasks (trunk and left arm at the JoyLo reset pose, right arm from the fixed hold, section 6.3).
+- Trunk = JoyLo (translate t ∈ [0, 1] on the keyframe curve, tilt k on `torso_joint3`). Grid for caches: translate
+  {0, 0.25, 0.5, 0.75, 1.0} × tilt {0, −0.3, −0.6, −0.9} (+ −1.2 when the support height h < 0.6 m). Camera and
+  hand offsets as functions of t (`x_c(t)`, `z_c(t)`, camera pitch, hand height below the camera) come from FK once
+  per robot and are cached; the constants quoted in section 4 are their design values `[pilot]`.
+- Base frame: x ahead, lateral + = robot's left, z above the floor. Face frame for large-scale tasks: n = outward
+  unit normal of the manipulation face, P = reference point, d = distance of the base centre from the face plane
+  along n, λ = lateral offset from P along the face tangent (+ = robot's left when facing the face).
+- Whole-body collision freedom: cuRobo spheres against every collision mesh of the loaded rooms, 1 cm margin for
+  non-floor links (2 cm where a rule says so).
+
+### 3.4 Camera model and visibility
+
+Pinhole model of the head camera (fx = fy = 459 px, cx = cy = 540). "In frame (p %)" = every AABB corner (or hull
+point where the rule says hull) of the object projects inside the image with a margin of p % of the image size.
+Optical axis "within θ of a point" = angle between the optical axis and the ray to the point. Renders are used only
+where a measurement needs them (visible-object counts, occlusion ratio, held-object self-occlusion, one confirmation
+render of the disembedding destination width).
+
+### 3.5 Checks common to every task
+
+At init **and** at the goal configuration: whole body collision-free, robot and all objects settled; objects on a
+surface fully supported (3.2); when a gripper pose near the goal is known, its IK feasibility is checked (section 3.6);
+then the validation steps of v1 §3.6, unchanged: settle (90 physics steps + 10), BEHAVIOR `validate_task` checks
+(scene unchanged 5 cm / 0.05 rad, velocities ~0, `:init` true, stability over 1 + 10 steps), binary goal **false** at
+init, goal feasibility by teleport + settle (120 steps) **with the robot parked** (tucked, room centre) and every
+binary goal atom true, drift ≤ tolerance, TRO written and validated against the BDDL. Every attempt and every
+template starts from the stable scene (`reset_scene_objects`, robot parked).
+
+### 3.6 IK conventions
+
+- Screening: 12-seed batched IK per pose; exact confirmation: 32-seed IK. Locked joints = the untucked init
+  configuration at the stance's trunk; the idle arm is untucked and collision-checked.
+- Pre-grasp / pre-contact = the pose moved 0.10 m back along −a (a = approach = eef +z). Handle grasps: eef origin =
+  contact − 0.012·a. Push / brace contacts: pad centre on the contact point, eef origin = point − `CONTACT_CENTER_Z`·a.
+- "Support ignored for the grasp pose only": the support (table, tray floor, wall, mattress) is removed from the
+  collision world for the final grasp / contact pose and for nothing else; the target object is ignored for the
+  final contact pose unless the rule says otherwise; every other object (partner, distractors, scene) stays.
+- Every arm the oracle will use (right, left, both) has its cuRobo embodiment; the arm rule of the task decides.
+
+### 3.7 Navigation feasibility (init stance → manipulation stance → placement stance)
+
+Stances lie 0.35–1.1 m from a face, inside BEHAVIOR's eroded band, so the eroded navigation map cannot be used
+end to end:
+
+1. If the goal stance lies in the same connected region of the **locally un-eroded** map (the room's erosion mask
+   minus the strip in front of the support / face) as the start stance, compute the shortest path on the un-eroded
+   map and validate the whole path with whole-body collision checks at the **navigation posture** (untucked arms,
+   carried object attached, trunk as recorded) at 0.1 m strides.
+2. Otherwise plan on the eroded map between the nearest eroded-free cells of the two stances and connect each stance
+   to the global path with a straight local segment, collision-checked the same way.
+
+The path (waypoints, posture, length) is recorded; the oracle drives exactly this path. Path length limits: Prompt 0
+step 6 (≤ 3 m), IORS large-scale B → C (≤ `max_partner_geodesic` + 1 m), camera relocalization buckets.
+
+### 3.8 Stance transitions (swept trunk motion)
+
+Wherever two consecutive recorded stances differ in trunk (init → manipulation, B → C, manipulation → placement),
+the trunk change is executed at a **transition stand-off** `s_T`: find the smallest `s_T ∈ {s, s + 0.1, …, s + 0.5}`
+(along −n from the arriving stance, `s` its stand-off) at which the swept trunk motion (5 samples between the two
+trunk values, arms untucked, carried object attached) is whole-body collision-free; record
+`transition = {stand_off: s_T, order: drive-back → trunk → drive-in}`; reject the candidate when none exists. This
+replaces the oracle's "torso first or drive first" guess and its `ready_arms` fallback.
+
+### 3.9 Waypoints and gripper visibility
+
+- Motions the oracle executes as paths are checked at intermediate waypoints, not only at the endpoints: SLERP of
+  in-hand rotations and the straight camera-ray motion of the held-object tasks (3 waypoints), push arcs of the
+  alignment tasks (δ/2 and the goal), articulation trajectories (q_k), block flips (pick tilt → place tilt). Screening
+  IK per waypoint, exact IK at the endpoints. `waypoint_policy` in the sidecar records which waypoints were checked.
+- Every recorded contact / grasp pose is FK-projected into the init‑image or manipulation‑image frame; the eef at the
+  final pose must be in frame (5 %) for the camera of the stance the oracle uses there (hard QA rule "gripper in FOV").
+
+### 3.10 Caches
+
+- **eef reach volume** (robot-only, section 5.1): once per arm; `ISPATIALGYM_REACH_VOLUME`.
+- **Reach bands** (per support + object, section 4.1): two factors cached separately — the object-independent factor
+  (trunk collision check, lattice, shoulder-distance prune; key = support name + top height + trunk grid + posture)
+  and the object factor (grasp mask; key = model + grasp set + rest orientation + objects placed before it).
+- **Feasible grasp sets F** per (trunk, cell) found in Phase 3 are stored in the band cache; a cell with empty F is
+  removed from the band.
+- Stance survivors of Prompt 0 steps 1–3 per (scene, target, init state).
+- `ISPATIALGYM_SAMPLING_CACHE` for the exact-IK results of v1 stays.
+
+### 3.11 What is recorded for the oracle
+
+Section 7 lists the sidecar schema. Rule: anything the oracle would otherwise have to search for — stances, trunk
+values, grasp `(yaw, grasp_key, grasp_name)`, pre-/grasp/place eef poses, push and brace contacts with directions,
+handle waypoints `h(q_k)`, `follow_mode`, transitions, paths, block order and per-block grasp/flip data, path bucket,
+per-object image-space descriptors for the language annotations — is written at sampling time.
+
+## 4. Tabletop initialization
+
+Applies to every task whose objects rest on a fixed support: disembedding, block design, attachment, axial
+alignment, IORS ontop / under / inside / nextto / touching (small-scale), and — with the substitutions of section 5.4
+— small-scale articulation. One procedure replaces the per-task stance and view code of v1. Arms always untucked,
+grippers open; trunk JoyLo (t, k). Chairs within 1.0 m of the support are removed (3.1). Coordinates in the base frame;
+h = top height, s = stand-off.
+
+### 4.1 Reach-band script
+
+```
+python -m ispatialgym.sampling.reach_bands --scene S --support T --target CATEGORY/MODEL [--grasp-key K]
+```
+
+For one (scene support, grasped object) it computes, in base coordinates at one concrete stance (edge midpoint,
+s = 0.45), for every trunk of the grid (3.3):
+
+1. Whole-body collision check of the trunk with untucked arms, no objects; skip colliding trunks.
+2. Lattice (8 cm) over the near strip at the object's grasp height; drop cells farther from the right shoulder than
+   arm reach + largest grasp offset (geometric, no IK).
+3. Library-grasp mask on the remaining cells: object posed at 8 yaws × every library grasp, pre-grasp 10 cm back
+   along the grasp approach; 12-seed batched IK; locked joints = the untucked init pose at that trunk; support ignored
+   for the grasp pose only. `(yaw, grasp)` pairs are evaluated in rounds — best-ranked grasps and robot-facing yaws
+   first — with early exit per cell (one feasible pair marks the cell). Objects without library grasps (blocks; axial
+   push poses) use the generic top-down pinch (2 wrist yaws × 2 approach pitches at the cell) as their grasp set.
+4. Output per trunk: reachable cells (x ahead, lateral); plus the union extent [λ_min, λ_max] over all trunks.
+
+Cache key: 3.10 (two factors). Not the base pose; the stand-off is not a dimension (a different stand-off only
+changes which cells fall on the top). Expected cost: 5–20 s per surviving trunk, 1–4 min cold per (support, object).
+`sample_isg` calls the function on a cache miss.
+
+### 4.2 Phase 1a — edge and stand-off
+
+Any edge of the top polygon (raycast raster), no preference; yaw = inward normal; s = 0.45 m from the top edge, plus
+the AABB overhang beyond it when ≥ 5 cm.
+
+### 4.3 Phase 1b — init trunk height (tilt 0)
+
+At tilt 0 the camera pitch is constant (≈ 22.6° down `[pilot]`), the camera is x_c ≈ 0.22 m ahead of the base
+`[pilot]`, its height z_c(t) decreases monotonically with t, and the untucked hands are 0.19 m below the camera
+`[pilot]` (all four from the FK tables of 3.3). Workspace = band union ∩ top of this edge; d_ws, d_near = depth from
+the edge of its centre / near edge; H_max = tallest object to be placed; φ_m = image-border angle including the
+visibility margin.
+
+```
+Δ_aim = (s + d_ws − x_c)                          # 45° elevation onto the workspace centre
+Δ_min = H_max + 0.10 + 0.19                       # hands ≥ 10 cm above the tallest object
+Δ_max = (s + d_near − x_c) · tan(22.6° + φ_m)     # workspace near edge inside the frame
+Δ     = clamp(Δ_aim, Δ_min, Δ_max);  t* = z_c⁻¹(h + Δ), clamped to [0, 1]
+```
+
+Record `init_stance = {stand_off, translate: t*, tilt: 0}`. From this camera compute b (lateral offset of the image
+border at the source-tray depth) and R_img (surface distance from the target to the image border on a given side).
+
+### 4.4 Phase 1c — lateral position
+
+1. Margins. w_x = half the larger horizontal bbox side of object x (random yaw); [λ_min, λ_max] = band union extent
+   (λ_min ≤ 0 right end, λ_max left end); W_p = the partner's top-down AABB extent along the edge (canonical
+   orientation); D_p = maximum edge-to-edge gap target–partner (the partner's side is random, so both margins carry
+   it); safety 0.02.
+
+   D_p = min(W_p + 0.03, R_img) for ontop, under, inside, touching and nextto; nextto additionally rejects the pair
+   when D_p < g_NT + 0.03, with g_NT = mean(dims_target + dims_partner)/6 (element-wise sum of the two AABB extents,
+   then the mean — OmniGibson's `NextTo` threshold).
+
+   | task | m_R (robot's right) | m_L (robot's left) |
+   |---|---|---|
+   | ontop, under, inside, nextto, touching | \|λ_min\| + w_t + D_p + 2·w_p + 0.02 | max(0, λ_max) + w_t + D_p + 2·w_p + 0.02 |
+   | attachment | \|λ_min\| + max(w_target, w_partner) + 0.02 | max(0, λ_max) + max(w_target, w_partner) + 0.02 |
+   | axial alignment | \|λ_min\| + w_diag + 0.02, w_diag = ½√(long² + short²) | max(0, λ_max) + w_diag + 0.02 |
+   | block design | \|λ_min\| + 0.0125 + 0.026 + 0.02 | max(0, λ_max) + 0.0125 + 0.02 |
+   | disembedding | b + 0.437 + 0.02 | b + 0.437 + 0.02 |
+
+   (block design: half edge + one pitch to the robot's right of the anchor; disembedding: 0.437 = the two fixed trays'
+   half lengths along the edge + gap, recompute if the trays change.)
+2. Lateral position uniform over [−L/2 + m_R, L/2 − m_L] (L = edge length); skip the edge if m_R + m_L > L. Valid
+   when (1) the base centre is on free floor; (2) the resulting configuration — base (x, y, yaw), trunk (t*, 0),
+   untucked arms, grippers open — is whole-body collision-free (it is the instance's **init pose**); if not, move t
+   within [Δ_min, Δ_max] (recompute b, R_img and the margins) or redraw the lateral position; (3) base + torso links
+   + head are collision-free (cuRobo, 1 cm) at translates 0, 0.25, …, 1.0, tilt 0, arms excluded.
+
+### 4.5 Phase 2 — manipulation stance
+
+Grasps are executed from this stance without re-posing the arms, so each candidate trunk uses its own band. Scan
+stand-off {0.35, 0.45, 0.55} × translate {0, 0.25, 0.5, 0.75, 1.0} × tilt continuous from 0 to the `torso_joint3`
+limit (same edge and lateral as the init stance):
+
+1. Whole-body collision check without objects; drop colliding candidates (this also prunes trunks whose bands are
+   never requested).
+2. Band = the grid trunk with the same translate and the nearest tilt; focus candidates = its cells inside the top
+   eroded by the target's half-extent + 0.02 (band shifted with the stand-off).
+3. Keep candidates where the optical axis is within 8° of the focus (if none, within 20°) and the target AABB is in
+   frame (5 %). Disembedding: the whole source tray (centred on the focus, long axis along the edge) in frame (5 %).
+   Block design: the focus is the centre of a region of band cells with ≥ n_blocks + 2 cells at spacing edge·√2 +
+   0.03, the 2 × 2 goal grid (pitch = edge + 1 mm) still on the top, region in frame (8 %).
+4. Draw uniformly among the survivors in the best angle class (never always the smallest angle: the target would land
+   on the same cell every instance); sample tilt continuously within the surviving band. Record
+   `manipulation_stance = {stand_off, translate, tilt, focus, base_pose2d}`.
+5. Transition check init → manipulation (3.8); on failure take the next survivor.
+
+### 4.6 Phase 3 — sample objects
+
+1. **Target init pose.** Screen the 8 fixed yaws (45° steps) × library grasps at the focus cell with the 12-seed IK
+   from the manipulation stance → feasible set F; store F in the band cache under (trunk, cell) (empty F removes the
+   cell). Draw (yaw, grasp) uniformly from F, add a uniform jitter of ±22.5° to the yaw, place the target within 5 cm
+   of the focus with its footprint on the top (2 cm margin). Derive the eef poses from the drawn grasp at the actual
+   object pose — grasp = object pose ∘ T_obj→eef, pre-grasp 10 cm back along the approach — and confirm both with the
+   exact IK from the manipulation stance (idle arm untucked and locked; support ignored for the grasp pose only). On
+   failure draw the next element of F without replacement; reject the attempt when F is exhausted. Record
+   `(yaw, grasp_key, grasp_name)` and both eef poses.
+   - *Disembedding*: source tray at the focus, aligned with the edge; target inside it (yaw as above, footprint on
+     the tray floor, 0.5 cm margin). Destination tray on the left or right (random), aligned with the edge and the
+     source tray (same depth), at the lateral position where exactly 4 cm of it is inside the **init** image (border
+     at tray depth = camera-frame depth × tan 49.6°, confirmed by one segmentation render), ≥ 4 cm from the source
+     tray, footprint on the top.
+   - *Blocks*: one block per region cell drawn at random with ≥ 3 cm gaps between footprints, distinct up faces,
+     **no block's up face is the opposite of its goal face** (section 6.5), yaw jitter as before; reach = the cube grasp
+     set of 6.5, confirmed per block with the exact IK for pick **and** place.
+   - *Axial alignment*: yaw = aligned yaw ± U(20°, 70°) with random sign, footprint on the top, at least one end of
+     the long axis inside the band and its top-down push pose confirmed with the exact IK; the stop edge for the other
+     arm (6.10) reachable.
+2. **Partner** on a random side of the target with edge-to-edge gap g: ontop / under / inside g ∈ [0.03, D_p];
+   nextto g ∈ [g_NT + 0.03, D_p]; touching g ∈ [0.03, D_p] **on the robot's left** (the right hand pushes toward it,
+   the left hand braces its far side, section 6.11); attachment: partner on a cell of the attach-reach band (every
+   attachment pose reachable ignoring collision with the target), gap ≥ 0.04, centre distance ≥ 0.08. Footprints on
+   the top, ≥ 3 cm apart.
+3. **Distractors** (disembedding) on the source tray, each ≥ x from the target along the drawn grasp's pinch axis,
+   x = (open width 0.10 − pinch width of the drawn grasp)/2 + 0.01 (`Grasp.pad_clearance` + margin), so the grasp
+   stays possible with the distractors placed; they may occlude the target up to **30 %** of its visible area
+   (segmentation render, distractors visible vs hidden); no other occlusion bucket exists.
+4. Every sampled object fully in frame (5 %) in the init image except the disembedding destination tray.
+5. Whole-body collision check at the init pose and at the manipulation stance with the objects placed; on failure
+   take the next Phase-2 survivor before rejecting the attempt.
+6. **Brace / second-arm poses** where the oracle uses them (block design row-left / column-top brace, attachment
+   partner brace, axial stop edge, touching partner brace): pre-contact + contact IK with the other arm, the working
+   arm locked at its solution, combined whole-body check (section 6 per task).
+7. Then the existing pipeline (3.5): settle, BEHAVIOR validation, `:init` true, binary goal false, goal feasibility by
+   teleport + settle, TRO + sidecar with `init_stance`, `manipulation_stance`, transitions, grasps, contacts.
+
+### 4.7 Disembedding placement stance
+
+The carried target is placed at the destination centre from a **placement stance**: the manipulation stance shifted
+along the edge so that the destination centre is at the focus (same stand-off, translate, tilt). Record
+`placement_stance`; check: base on free floor and whole-body collision-free with the trays and distractors; the
+place pose (goal target pose ∘ T_obj→eef of the drawn grasp) and its pre-place (10 cm up along −a) pass the exact IK
+from the placement stance (tray and support ignored for the place pose only); the lateral drive between the two
+stances is a straight segment validated per 3.7 with the object attached at the **carry height** (lift ≥ tallest
+distractor + tray rim + 3 cm above the source floor). The drawn `(yaw, grasp)` must pass both the pick and the place
+check (draw the next element of F otherwise).
+
+## 5. Large-scale initialization (shared robot init for scene targets)
+
+Applies to every task whose target is a fixed scene object or is hinged to a fixed support: articulation
+(large-scale, open / close) — the scene articulated object is the target; world vertical / horizontal — the target
+hung on the wall support. Arms untucked, grippers open; trunk JoyLo (t, k). Face frame as in 3.3. Untucked hands sit
+0.64 m ahead of the base at 1.20 m, so a single-arm stance closer than ≈ 0.7 m to a face fails the whole-body check;
+rely on the check, not on a bound.
+
+### 5.1 eef reach volume (robot-only cache)
+
+```
+python -m ispatialgym.sampling.eef_reach_volume compute --arm right|left|both [--all | --translates … --tilts …] --out DIR
+python -m ispatialgym.sampling.eef_reach_volume merge --out DIR
+```
+
+Object- and scene-independent: large-scale contacts are handle bars / knobs and push or brace contacts whose eef
+orientations are fixed by geometry, so one cache serves every scene and scale. For every trunk of the grid and each
+arm: (1) whole-body self-collision check with untucked arms (floor plane only); (2) 5 cm lattice of eef positions in
+the base frame, x ∈ [0.25, 0.90], λ ∈ [−0.70, 0.70], z per class group, pruned to positions within arm length + 0.05
+of that arm's shoulder; (3) orientation classes (a = approach = eef +z, c = closing axis = eef y): `fwd_pinch_v`
+(a +x, c +z) and `fwd_pinch_h` (a +x, c +y) for handles / knobs (z ∈ [0.20, 1.70]); `push_up` (a +z), `push_down`
+(a −z), `push_left` (a +y), `push_right` (a −y), all c = +x, pads parallel to the wall (z ∈ [0.90, 1.90]); pre-pose =
+pose − 0.10·a; a cell is feasible when pose and pre-pose pass the 12-seed IK with the untucked init at that trunk as
+locked joints, floor as the only obstacle; (4) output per (arm, trunk, class): boolean mask;
+`reachable(arm, trunk, class, p_base)` = nearest-cell lookup.
+
+Lookup of a world eef pose (p, R) at a candidate base (b, ψ): p_base = R_z(−ψ)(p − b); class = the one whose (a, c)
+lie within 20° of R_z(−ψ)·(a_world, c_world) with **c compared up to sign** (the closing axis is undirected); push
+classes: nearest of the four; no class → infeasible for screening. Cache key: robot model + arm + posture + trunk
+grid + lattice + classes + IK settings. Cost: 1–3 min per (trunk, arm) → 20–60 min cold per arm, once per robot
+(sharded per (arm, trunk) across pods).
+
+### 5.2 Prompt 0 — stance skeleton
+
+**Phase 1 — init pose.**
+
+1a. Approach ray: bearing β ~ U(−β_max, β_max) (per task) about n through P; base positions b(d) = P_xy + R_z(β)·n_xy·d,
+base yaw faces P, tilt 0 throughout.
+
+1b. Minimum distance with the whole target in view. Target extent = AABB corners of the target in its init state
+(articulation: joints at q_init, an open door counts; alignment: the hull at the init tilt δ). Scan d from d_min in
+5 cm steps to d_max; at each d, for t ∈ {0, 0.25, 0.5, 0.75, 1.0}: (1) base centre on free floor (un-eroded map) and
+inside the task room; (2) all target corners in frame (5 %) at camera FK (b(d), t, 0); (3) whole-body collision-free
+(1 cm) with untucked arms and open grippers, world synced with the target in its init state; (4) base + torso links
++ head collision-free at every t ∈ {0, …, 1.0}, tilt 0, arms excluded. d* = the first d with a feasible t; t* = the
+feasible t whose optical axis is closest to the target centre (tie → smaller t): step back until the object fits,
+then forward while it still fits. No feasible d → redraw β (≤ 6), then reject `no_stance`. Record
+`init_stance = {face_normal, bearing_deg, distance: d*, translate: t*, tilt: 0, base_pose2d}`.
+
+**Phase 2 — manipulation stance** (contact set, arm rule and focus per task). Base square to the face (yaw = −n).
+Scan d ∈ {0.35, 0.40, …, 0.90} × λ ∈ Λ_task (5 cm) × translate {0, 0.25, 0.5, 0.75, 1.0} × tilt continuous from 0 to
+the `torso_joint3` limit (band = the grid trunk with the same translate and the nearest tilt):
+
+1. Base on free floor, in room; collision-free (1 cm) against the scene with the target in its init state. Single-arm
+   tasks: the idle arm untucked is included; two-arm tasks: arms excluded (IK-checked in step 5).
+2. Every required contact of the task's contact set (pose + pre-pose, per arm) feasible in the reach volume at this
+   base and trunk.
+3. Visibility: the task's manipulation focus in frame (5 %) and the optical axis within 8° of it (if none, 20°). The
+   whole target need not be in frame.
+4. Draw uniformly among the survivors in the best angle class; sample tilt continuously within the surviving band.
+   Record `manipulation_stance = {stand_off: d, lateral: λ, translate, tilt, focus, base_pose2d, arms, contacts}`.
+5. Exact IK from the drawn stance for the whole contact set (locked trunk; idle arm untucked and locked; the
+   contacted object ignored for the final contact pose only unless the task says otherwise; world re-synced per
+   waypoint wherever the target moves). Failure → next survivor; exhausted → reject.
+6. Path init → manipulation stance per 3.7, length ≤ 3 m; transition per 3.8.
+
+Cache per (scene, target, init state): survivors of steps 1–3 that do not depend on continuous per-instance draws;
+key = scene + target name + init state (joint value quantised 0.01, or none) + trunk grid + lattice + arm rule. Per
+instance: the draw, step 5, step 6. Variety comes from β, the step-4 draw and the continuous tilt.
+
+### 5.3 Prompt 1 — articulation, large-scale (open / close)
+
+Target bound to a scene articulated object (`fixed.target` names or categories within the task rooms: cabinets,
+fridges, ovens, dishwashers, drawers, doors); one joint per object (`roles.target.joint`, `roles.target.handle_key`).
+Handle annotation `artic/handles/<key>.json` → joint, contact, pinch_axis, approach_dir (target frame, closed
+configuration), kind (bar / knob / edge / fallback), outward_normal, axis_dir_obj, hinge_point_obj — **scaled by the
+scene instance's per-axis scale** before use (scene instances are non-uniformly scaled; the pinch width must stay
+within 15–80 mm after scaling). Single arm; the object holds itself, no brace arm. Uses Prompt 0 with:
+
+- **Joint states.** Stable set S: 7 fractions of `open_fraction_range` ([0.5, 0.95]) + the upper limit, each held 120
+  physics steps, kept when it stays within ½ tolerance (revolute 0.10 rad, prismatic 0.02 m). S empty → reject the
+  template. Objects whose partial opening never holds settle to the same angle every time: that angle is recorded
+  per object and is the only open target (open) or the only open init (close). Open: q_init = lower limit on every
+  joint, q_goal ~ U(S). Close: chosen joint q_init ~ U(S) (must satisfy OmniGibson `Open`), others closed, q_goal =
+  lower limit.
+- **Handle trajectory h(q)**: contact / pinch / approach of the closed configuration moved with the link — revolute:
+  rotation about (hinge_point_obj, axis_dir_obj) by q − q_lower; prismatic: translation along axis_dir_obj. Eef pose
+  at q: approach along approach_dir(q), closing along pinch_axis(q), origin = contact(q) − 0.012·approach, pre-grasp
+  0.10 m back.
+- **Waypoints** q_k = q_init + k·(q_goal − q_init), k ∈ {0.25, 0.5, 0.75, 1.0}. Required handle poses
+  (`generation.require_goal_handle: auto`): q_init plus every q_k up to and including the first k from which the link
+  reaches q_goal passively (set q_k, 120 steps, within tolerance of q_goal; probed once per template, per q_init for
+  close); if no k passes, all waypoints including q_goal are required. `true` / `false` force q_goal in / out. Summary:
+  `handle_reach = {q: reachable}` for the four waypoints and `passive_from` = the first passing k.
+- **Arm rule**: the arm on the handle's side of the face centre P — handle > 0.10 m to the robot's left of P (facing
+  the face) → left arm, > 0.10 m right → right arm, else right; `generation.arm` overrides. Requires the left-arm
+  cuRobo embodiment.
+- **Phase 1**: β_max = 20°, d_min = 0.5 m, d_max = 2.5 m; the whole target at q_init in frame (5 %; an open door counts).
+- **Phase 2** (d scan extended to {0.35, …, 1.10}: an open door protrudes): λ measured from the handle contact's
+  projection onto the face; right arm Λ = [−0.10, 0.60] (base to the left of the handle), left arm Λ = [−0.60, 0.10].
+  Contact set screened by the volume: h(q_init) grasp + pre-grasp; class `fwd_pinch_v` if |pinch_axis(q_init)·ẑ| > 0.7
+  else `fwd_pinch_h` (knob: either). Focus = contact(q_init); visibility: contact(q_init) and the moving face patch
+  (contact ± 0.10 m along the pinch axis) in frame (5 %), optical axis within 8° (else 20°). Step 5 exact IK:
+  [pre-grasp, grasp] at q_init, then the grasp pose at each required q_k with the world re-synced at q_k (target
+  ignored for the grasp poses only). Cache per (scene, target name, joint, q_init) (close: one entry per element of S).
+- **Base-follow feasibility (primary opening mode).** The handle is grasped in both directions. With the arm locked at
+  its q_init IK solution q*, the eef pose relative to the base is fixed, so base-follow means
+  b_k = h(q_k) ∘ T_eef→base(q*). `follow_mode` per joint type: **base** for vertical-axis revolute joints and
+  horizontal prismatic joints (h(q) changes only in x, y, yaw — the holonomic base matches it exactly), **arm** for
+  horizontal-axis revolute joints (pitch and height change; base + trunk cannot match). Base mode checks, per
+  required q_k: b_k on free floor (un-eroded), whole-body collision-free with the target at q_k (the grasped link
+  ignored for the gripper only), base path b_0 → b_k collision-checked per 3.7; and, as the oracle's secondary mode,
+  arm-only IK at each waypoint from the manipulation stance. Arm mode = the step-5 waypoint IK. Record
+  `follow_mode`, `base_follow = {q_k: base_pose2d}`.
+- **Phase 3**: nothing is spawned. Joints at q_init, `settle_free = []`, the moving link held at q_init during
+  settling; after settling the joint may not have drifted > ½ tolerance; `articulation_targets` = every non-fixed joint
+  at its init value except the chosen one at q_goal, tolerance per type; then the pipeline (`:init` true, binary goal
+  false, goal feasibility: set q_goal, settle 120 steps, all joints within tolerance, robot parked). Sidecar:
+  `init_stance`, `manipulation_stance` (arm, handle class, focus), `handle_waypoints` = h(q) for the four waypoints
+  (contact, approach, pinch, world frame), `handle_reach`, `passive_from`, `follow_mode`, `base_follow`.
+
+Kept from v1: stable-angle probe, tolerances, `Open` semantics, whole target in frame at init, pre-grasp 10 cm / eef
+offset 1.2 cm. Replaced: `scene_distances` × lateral list and the drive-forward {0, 0.15, 0.3} (subsumed by the d
+scan), `view_translates` (Phase 1b), tucked reach arms, right-arm-only.
+
+### 5.4 Prompt 2 — articulation, small-scale (open / close)
+
+Tabletop Phases 1–2 for stance and view (support = the fixed `support`, or the floor for objects taller than 0.6 m);
+everything object-related follows this section, which wins over section 4 where they differ — small-scale
+articulation is not a pick-and-place (some objects have no grasp, only an edge pinch). Roles: `target` (spawned
+articulated object; `roles.target.joint`, `handle_key`), fixed `support`. Handle annotation, joint states, S (probed
+on a band cell of the top), h(q), waypoints and the auto required-waypoint rule as in 5.3.
+
+- **Target yaw is not free**: the facing direction f (target frame: the moving face's outward normal; for lids the
+  direction from the hinge line to the target centre, so the lid swings away from the robot) points at the robot:
+  yaw = face_yaw(edge) + U(−0.1, 0.1).
+- **Arms.** Handle arm = the arm on the handle's side of the target centre (> 0.05 m; else right); brace arm = the
+  other. The brace only keeps the body in place: it acts on the side opposite to the pushing direction.
+- **Push axis and brace contact.** v = unit horizontal component of the handle's motion at q_init toward the first
+  required waypoint (dh/dq · sign(q_goal − q_init)); if the horizontal component is < 30 % of the motion (a lid lifted
+  straight up), v = the horizontal direction from the hinge line to the handle contact. Brace candidates on the base
+  link (never the moving link), first reachable wins (`brace.kind` recorded): (1) `opposite_face`: the base-link face
+  whose outward normal is closest to v, contact at the face centroid shifted ¼ of the face width toward the brace
+  arm's side, a = −v (into the face), c = +y_base; (2) `top_press`: downward press on the exposed top of the base link
+  (raycast from above with the moving link hidden at q_init; exposed cell nearest the brace arm's side), a = −ẑ,
+  c = +y_base — table friction holds the body when the opposite face is unreachable (drawer pushed closed). For both:
+  contact ≥ 2 cm outside the moving link's swept AABB over the required waypoints; pad centre on the face, eef origin
+  = point − `CONTACT_CENTER_Z`·a, pre-contact = eef − 0.10·a; one pose (the base link does not move).
+- **Reach-band script**: `reach_bands --scene S --support T --target toolbox/redmtl --handle-key toolbox__redmtl
+  --joint j_lid --joint-values <lower>,<S>,<waypoints> --brace` — grasp set = the handle [pre-grasp, grasp] at each
+  listed q, target posed at the cell with yaw ∈ {face_yaw − 0.1, face_yaw, face_yaw + 0.1} (3 yaws, no library
+  grasps), screened with the handle arm (brace arm untucked); the brace candidates [pre, contact] screened with the
+  brace arm (handle arm untucked). Output per (trunk, cell): the set of joint values whose handle poses are feasible
+  plus the feasible brace kinds; a cell is in the band for a task direction when the required waypoints ⊆
+  feasible(cell) and ≥ 1 brace kind is feasible. Cache key as in 4.1 with handle key + joint values + brace in place
+  of the grasp set.
+- **Phase 1b**: H_max = target height at q_init (an open lid counts). Margins: m_R = |λ_min| + w_a + 0.02,
+  m_L = max(0, λ_max) + w_a + 0.02, w_a = half the larger horizontal bbox side at q_init. In-frame margin for the
+  target stays `view_margin` = 0.03 on the exact hull (the toolbox is 0.6 m wide).
+- **Phase 2**: stand-off {0.35, 0.45, 0.55}; band cells filtered for the task direction; visibility: the whole target
+  at q_init (hull, `view_margin`), the handle contact and the brace point in frame; optical axis within 8° (else 20°)
+  of the target centre.
+- **Phase 3**: place the target at the focus cell (± 5 cm), yaw as above, footprint on the top (2 cm), joint at
+  q_init. Exact 32-seed IK from the manipulation stance, in order: brace arm (handle arm untucked and locked;
+  pre-contact against the full world, contact with the target ignored; first feasible candidate), then the handle
+  arm with the brace arm locked at its solution ([pre-grasp, grasp] at q_init, support and target ignored for the
+  grasp pose only; grasp poses at the required waypoints with the target re-posed for each world sync), then a
+  whole-body collision check of the combined configuration against the scene (target excluded: both hands touch it).
+  Settle with the joint held at q_init; drift ≤ ½ tolerance; `pose_targets[target]` measured (0.03 / 0.20) and
+  `articulation_targets`; pipeline. Sidecar: `init_stance`, `manipulation_stance` (handle arm, brace = {kind, face,
+  point, direction}), `handle_waypoints`, `handle_reach`, `passive_from`, `follow_mode: arm`.
+
+Removed from v1: `lateral_center` −0.15, `lateral_half` 0.15, `depth_range` (band), `view_prefer_translate` 0,
+`approach_forward`, `stand_offs` [0.45, 0.55].
+
+### 5.5 Alignment — world vertical and world horizontal
+
+Roles: `target` (hung), fixed `support` (the wall: `fixed.support` = allowed wall object names,
+`fixed.support_regions` = the surveyed wall segments). Prompt 0 with the wall as the face (n = wall normal, P = hinge
+point on the wall at hang height). Arc lattice, single right-arm push into the wall and `view_translates` of v1 are
+replaced by the Phase 1 ray + Phase 2 lattice and the tangential push + brace below.
+
+Kept (target side): wall spots from `fixed.support_regions` (0.25 m seeding) or the 24-ray search; flat patch 5 × 5
+rays within 1 cm over (w + 0.10) × (h + 0.10) (horizontal: swept extents over the max deviation, `swept_patch`);
+front clearance 0.35 m; in-room test 0.8 m in front; one wall per template (most spots); frame from `front_axis` /
+`up_axis` / `level_axis` (dict form), `symmetric_180`; hang pose (up axis along world z, front axis along n, centre at
+height 1.45 m, thickness/2 + 0.01 off the wall); hinge at the COM with axis n, parent = the support's wall link (TRO
+`constraints`); init in-plane angle δ = sign · U(15°, 45°); goal = level pose (rotation 0), orientation tolerance
+0.08, equivalences (`symmetric_180` half turn + explicit); `settle_free = []`; hinge drift ≤ 0.03 rad after settling;
+≥ `min_visible_objects` (5) objects with ≥ 200 px, structure included, in the init render; whole tilted target in frame
+at init (5 %).
+
+**Scale** (configured, not searched): `roles.target.scale` in the customs list ([sx, sy, sz] per model, or the dict
+form keyed by `<category>/<model>`, `<category>`, `default`; uniform recommended). Hull, COM, dimensions, swept
+extents and wall spots are computed from the spawned (scaled) target; the reach cache is robot-only, pushing needs no
+grasp re-validation. When the template fails with `push_unreachable` / `no_stance`, a diagnostic pass over uniform
+s ∈ {0.9, 0.8, …, 0.5} on the same spots puts the first feasible s into the rejection message and
+`template_meta.scale_hint`; it is never applied automatically — it is copied into the customs list by hand (or by the
+icl review, TODO B6).
+
+**Contacts**: push arm + brace arm. ℓ_δ = the target's level axis (side = up × front) rotated by δ in the wall plane;
+C = COM. E_low / E_high = mean of the hull points within 3 cm of the two extremes along ℓ_δ (E_low the lower one), both
+on the mid-thickness plane (thickness/2 + 0.01 off the wall). Reviewed contact candidates per model
+(`contacts/<category>__<model>.json`, TODO B6) override the geometric E_low / brace points where present.
+
+- Push arm at E_low: a = t(E_low) = unit tangent of the circle about C through E_low, signed so the low end rises
+  (t·ẑ > 0); c = n; pad centre at E_low, eef origin = E_low − `CONTACT_CENTER_Z`·a; pre-contact = eef − 0.10·a; goal
+  contact = the same material point at the level pose, a recomputed there; arc waypoint at δ/2 (3.9). Class = nearest
+  push class of t. Push arm = the arm on E_low's side.
+- Brace arm (a stop that arrests the rotation at the level pose; placed before the push, does not move; the other
+  arm). Candidates in order, first reachable wins (`brace.kind`): (1) `below_high`: under the high end at its level
+  position — B = mean of the level-pose hull points on E_high's side within 3 cm of the lowest z; a = +ẑ, c = n;
+  fingertip face 5 mm below B; (2) `above_low`: over the low end at its level position — B = mean of the level-pose
+  hull points on E_low's side within 3 cm of the highest z; a = −ẑ, c = n; fingertip face 5 mm above B; (3)
+  `side_high`: against the outer edge of the high end at its level position — B = mean of the level-pose hull points
+  on E_high's side within 3 cm of the outermost lateral coordinate, upper half; a = horizontal direction from B toward
+  C, c = n; fingertip face 5 mm outside B; admitted only when the target's height ≥ half its width (frames). For every
+  candidate: pre-contact = eef − 0.10·a; at init the brace hand must be ≥ 2 cm clear of the tilted hull (exact IK
+  checks the brace with the target not ignored); class = nearest push class of a.
+
+**Phase 1**: β_max = 35°, d_min = 0.5 m, d_max = 1.5 m; the spot is drawn per instance weighted by its number of
+Phase-2 survivors.
+
+**Phase 2**: Λ = [−0.40, 0.40] about C; arms excluded from the stance collision check (two-arm task). Contact set:
+push arm {pre-contact, init contact, δ/2 contact, goal contact}; brace arm ≥ 1 candidate {pre-contact, contact}.
+Focus = C; visibility: C, E_low and the chosen B in frame (5 %), optical axis within 8° (else 20°) of C. Step 5, exact
+IK in order: brace arm (other arm untucked and locked; target not ignored; first candidate whose pre-contact and
+contact pass), then push arm with the brace arm locked at its solution (target ignored for the push contact poses
+only), then one whole-body collision check of the combined configuration (both arms placed, tilted target in the
+world). Record `manipulation_stance` with `push_arm`, `brace_arm`, `contacts = {push: {pre, init, mid, goal,
+direction}, brace: {kind, point, direction}}`, `deviation_deg`, `scale`. Cache per (scene, spot): step-1 survivors
+(δ-, target- and scale-independent because arms are excluded); steps 2–3 are per-instance lookups. Template filter: a
+spot is kept when ≥ 1 candidate passes steps 1–3 for δ = +30° and for δ = −30° at the configured scale; none left →
+reject `no_stance` (with `scale_hint`).
+
+**Phase 3**: hang the target at δ with the hinge, `settle_free = []`; pipeline (hinge drift, visible-object count,
+`:init` true, goal false, goal feasibility by teleport to the level pose + settle). Sidecar: `init_stance`,
+`manipulation_stance`, `push_contacts`, `constraints`, `scale`.
+
+### 5.6 IORS large-scale — three stances (ontop, under)
+
+Partner = a large fixed scene object (ontop: bed, sofa, desk, breakfast_table, countertop; under: bed, sofa, desk,
+breakfast_table — filtered per target height class by the under-clearance rule below). Roles: `target` (spawned,
+library grasps), fixed `partner`, fixed `support` (the init surface), `floor`. Three recorded stances: **A** init pose
+and **B** manipulation stance at the init surface, **C** placement stance at the partner.
+
+**Init surface** — an explicit choice of `ground_isg` (it is in the alias), never a runtime fallback: (a) a support
+object whose near AABB side lies within `max_partner_geodesic` (3.0 m, eroded map) of the partner's near AABB side;
+(b) **the partner's own top** (under only: "take it from the bed and put it under the bed"; for ontop the goal would
+hold at init); (c) **the floor** beside the partner (`support = floor`). Per template one candidate of the grounded
+class is drawn uniformly; if A–C cannot be built on it, the remaining candidates *of the same class* are tried in
+random order; none → reject the template.
+
+**Stance A** — tabletop Phase 1 at the support, target the only object on it, plus partner visible: ≥ 4 of the
+partner's 8 AABB corners in frame (0 margin) and its AABB centre in frame. If the lateral draw fails this, redraw the
+lateral position (≤ 6), then the next edge, then the next candidate surface. Record `init_stance`.
+
+**Stance B** — tabletop Phase 2 at the support, same edge as A; band from the reach-band script for (support,
+target). Record `manipulation_stance`. A → B per 3.7 / 3.8.
+
+**Floor init** (support = floor): anchor = the target's floor cell c_t, drawn uniformly among floor raster cells
+(2 cm) that are free floor on the un-eroded map, ≥ 2 cm outside every object's AABB, outside the partner's footprint
+(the goal must be false at init) and within geodesic 3 m of the partner's near AABB side. Band: reach-band script with
+h = floor z (`--support floor --target C/M --grasp-key K`; the grid adds tilt −1.2; no edge, so the band is the near
+strip on the floor in base coordinates). Stance B: base facing c_t at distance ∈ {0.35, 0.45, 0.55} (bearing uniform),
+trunk from the floor band (c_t must be a band cell), whole-body collision-free (idle arm untucked), target in frame
+(5 %), optical axis within 8° (else 20°) of c_t. Stance A: base on the eroded free map at 0.6–1.5 m from c_t, facing
+it (bearing uniform), tilt 0, t* from Phase 1b with h = floor z, s = 0 and d_ws = the distance to c_t; the target at
+c_t and the partner (≥ 4 / 8 corners) in frame; collision-free; path A → B exists.
+
+**Stance C** — placement stance (per relation; base square to the partner edge, stand-off {0.35, 0.45, 0.55}, lateral
+uniform along the edge minus margins, trunk from the band, uniform draw among survivors in the best angle class):
+
+- ontop: placement top = the partner's largest horizontal face raster (mattress / seat; not the AABB top —
+  headboards), stand-off measured from the AABB where the top raster is inset (bed frames). Band from the reach-band
+  script for (partner-as-support, target). Edge = the partner edge nearest the target's init pose; focus / **goal
+  cell** = the band cell inside the top eroded by the target's half-extent + 0.05 that is nearest to the init pose
+  (constant safety margin for every partner candidate); the target AABB at the goal cell in frame (5 %), optical axis
+  within 8° (else 20°).
+- under: placement top = the floor strip under the partner: floor raster (2 cm) cells inside the partner's footprint
+  shrunk by the target's half-extent + 0.05, where an upward ray from the cell hits the partner ≥ target height + 0.03
+  above the floor (this is exactly OmniGibson's `Under` test: the ray from the target's AABB-centre column), within
+  0.45 m of the partner's near AABB edge. Band from the reach-band script with h = floor z (`--support floor --under
+  <partner>`; tilt −1.2 added; the partner's frame is an obstacle, the floor ignored for the grasp pose only). Base
+  square to the partner's near AABB edge nearest the init pose; visibility: the near edge's two bottom AABB corners in
+  frame (5 %) and the optical axis within 20° of the goal cell (the cell itself is hidden). **Goal cell** = the band
+  cell nearest the init pose.
+
+Record `placement_stance = {stand_off, lateral, translate, tilt, focus / goal_cell, base_pose2d, grasp}`. B → C path
+per 3.7 (≤ `max_partner_geodesic` + 1 m) with the object attached; transition per 3.8 (with the partner as init
+surface the retreat `s_T` before lowering the trunk toward the floor band is what makes C reachable).
+
+**Coupling B ↔ C — one grasp for pick and place.** The target is carried without re-grasping, so the (yaw, grasp)
+drawn at B must also be feasible at C: F_init = the Phase 3 feasible set at B's focus cell (or c_t); F_goal = the
+library grasps screened at the goal cell for the target's goal yaw (= its init world yaw) with the 12-seed IK from C
+(cached under (trunk, cell)); draw (yaw, grasp) uniformly from F_init ∩ F_goal (empty → next C survivor, then next B
+survivor, then reject). Exact IK at B (pre-grasp + grasp, the init surface ignored for the grasp pose only) and at C
+(pre-place + place at the goal pose; ontop: the partner's top ignored for the place pose only; under: only the floor
+ignored). Record `(yaw, grasp_key, grasp_name)` in both stances.
+
+**Objects.** Target at B's focus cell (± 5 cm, footprint on the init surface with 2 cm margin; floor init: at c_t)
+with the drawn yaw; no small partner. Goal pose: ontop → target root at the goal cell, init orientation, z = partner
+face + bottom offset + 1 cm, feasibility by drop + settle, `OnTop(target, partner)` true; under → target at the goal
+cell, init orientation, z = floor + bottom offset + 3 mm, `Under(target, partner)` true. Partner unchanged during the
+goal settle (≤ 5 mm). Whole-body collision checks: at A and B with the target at init; at C with the target at its
+goal pose. Pose targets measured for the target (0.03 / 0.20); pipeline. Sidecar: `init_stance`,
+`manipulation_stance`, `placement_stance`, `goal_cell`, `init_surface` (support name, `partner` or `floor`),
+`path_length_m` (A → B, B → C), transitions.
+
+Kept from v1: partner candidate categories, the ≥ 4 / 8 corners rule, `max_partner_geodesic`, the under-clearance rule,
+partner unchanged ≤ 5 mm at the goal, tolerances, init surface = largest horizontal face. Replaced: `stand_offs`
+[0.45, 0.35, 0.55, 0.65] + `try_all_edges` → any edge / stand-off scan; the "nearest floor point under the bed" goal →
+a reachable band cell from a recorded placement stance; the name-sorted candidate order → uniform draw within the
+grounded init-surface class.
+
+## 6. Per-task rules
+
+Init = the sampled configuration, goal = what the TRO targets describe. Everything the oracle needs is recorded.
+
+### 6.1 Camera relocalization — standard
+
+- Agent init: base = random free cell of the **eroded** traversability map (task room `living_room_0` of
+  `house_single_floor` for now) + yaw ~ U(−π, π); trunk and arms = JoyLo reset joint pos (trunk 0.5, arms zero,
+  grippers open).
+- Agent goal: base = free cell of the eroded map with a path from init (`get_shortest_path`, eroded map) and geodesic
+  length inside the instance's **path bucket** (`generation.path_buckets`, half-open ranges (0, 3], (3, 5], (5, 10] m);
+  arms stay as at init unless the selected (translate, tilt) makes the arms self-collide → untucked (the oracle lifts
+  the arms before adjusting the torso; recorded as `goal_arms`); trunk (translate, tilt) from the widely used JoyLo
+  range (`goal_translate_range` [0, 1.25], `goal_tilt_range` [−0.5, 0.5] `[pilot]`); the camera forward-axis angle
+  between init and goal ≤ 60°; goal render: ≥ 3 non-structural objects each ≥ 200 px, ≥ 30 % of them visible from the
+  init; both configurations whole-body collision-free (2 cm).
+- TRO: `pose_targets[agent]` = goal camera sensor pose (5 cm / 0.10 rad); sidecar: goal base pose, trunk, arms, path
+  (3.7), bucket.
+
+### 6.2 Camera relocalization — obstructed
+
+As 6.1 plus one obstacle (group `obstacles`, size 1 for now; category natural in the scene per the icl): placed on
+the eroded shortest path so that the shortest path on the map **with the obstacle's footprint blocked** differs
+(`blocked_footprints` recorded like `freed_footprints`, applied by evaluation and the oracle); the **new** path must
+stay inside the bucket; the obstacle must be inside the head camera's frame (5 %) at some pose along the new path,
+evaluated with the JoyLo reset trunk used at init (the oracle navigates first, then adjusts the torso). The obstacle
+is never touched; it is `ontop floor` in `:init` and its displacement is checked at the goal settle.
+
+### 6.3 Object scaling and mental rotation (held object)
+
+- Agent init: base = random free cell (eroded map) + yaw ~ U(−π, π); trunk + left arm = JoyLo reset joint pos; right
+  arm = the **fixed hold** solved once per robot: pad centre on the head camera's optical axis at depth 0.50 m, trunk
+  (0.5, 0), closing axis rolled 15° from vertical `[pilot]` (no depth or trunk fallbacks: the hold is a constant
+  written into the customs list as a `hold` constraint). Grasp = a library grasp (floating pipeline) realised as in v1
+  §5.2 (finger advance 1 mm/step, 4 mm press), pose written to `grasps[0].object_pose_in_eef_frame`; both init and
+  goal need ≥ 40 % of the object visible (self-occlusion render) and the whole object in frame.
+- Goal (object scaling): depth d1 on a 5 cm grid over [0.35, 0.85] m with |d1 − d0| ≥ 0.10 m, same orientation; target
+  frame = camera sensor, `position_metric = depth`, tolerance 20 % of |Δd| with a 2 cm floor (section 8).
+- Goal (mental rotation): rotation about a sampled axis by U(30°, 120°), position unchanged; world orientation target,
+  tolerance 0.15 rad, equivalences per model.
+- Feasibility: the goal arm configuration is solved with the **right-arm embodiment only** (the oracle moves the arm,
+  not the torso); the motion between init and goal (straight line along the camera ray / SLERP about the object) is
+  checked at 3 intermediate waypoints (3.9); whole-body collision-free with the object attached at every checked pose.
+- Sidecar: hold constant, grasp, goal arm configuration, waypoints.
+
+### 6.4 Disembedding
+
+Init per section 4 (+ 4.7). Goal: target at the **centre of the destination tray** with its init orientation
+(measured, 0.03 / 0.20); no distractor on the destination tray; feasibility by teleport + settle. Sidecar:
+`init_stance`, `manipulation_stance`, `placement_stance`, transitions, carry height, grasp with both eef poses, place
+eef pose, occlusion ratio, per-object image-space descriptors.
+
+### 6.5 Configuration matching — block design (goal and cube grasp rule)
+
+- Goal pattern from `generation.patterns` (or `--variant`); the top-left block in the init image is the anchor: its
+  position stays, its goal orientation is the table-aligned orientation with the pattern's top face up reached by the
+  **smallest rotation** from its init orientation — yaw-align (|ψ| ≤ 45°) then one flip about a horizontal table axis
+  a that brings the goal face up (adjacent face; the init up-face is never the opposite of the goal face, enforced in
+  Phase 3); no extra quarter turns. The other blocks are placed relative to the anchor (row first, then column;
+  pitch = edge + 1 mm toward the robot's right and toward the robot) with the same smallest-rotation rule per block.
+  `layout_reached` gates, `pose_reached` is measured; `assignment.cost = layout`.
+- **Cube grasp rule** (the same grasp serves pick and place). The cube grasp set = pinch across one of the 3 face
+  pairs × approach along one of the 4 perpendicular faces × tilt about the pinch axis ∈ {0, ±30°, ±45°, ±60°} (pads
+  stay flat only for tilts about the pinch axis). The in-hand transform is rigid, so `d_pick = R_a(∓90°)·d_place`
+  for a block that flips: pinch axis ∥ a; place approach tilted +θ about a toward the free side of the grid, pick
+  approach tilted θ − 90° (θ = 45° gives two symmetric 45° grasps; 30/60 are the alternatives); exactly one tilt sign
+  has a downward pick approach. Blocks without a flip use the top-down pinch with the yaw. Sampling screens (pick,
+  place) pairs with the 12-seed IK from the manipulation stance with the already-placed blocks (in placement order) in
+  the collision world, confirms with the 32-seed IK, and records per block: face pair, tilt pair, ψ, a, sign, place
+  order, pick / place eef poses.
+- **Brace points**: after each placement the oracle pushes the block left (row) and up (column) with the right hand
+  while the closed left gripper braces the already-placed blocks (row-left / column-top): the left-arm brace poses at
+  the goal grid (pre-contact + contact) are IK-checked from the manipulation stance and recorded.
+- Tolerances: position 0.4 × edge (≈ 1 cm), orientation 0.15 rad (section 8).
+
+### 6.6 Configuration matching — articulation (large-scale, open / close)
+
+Section 5.3. The object may have several viable joints; exactly one is chosen (customs list). Open: goal joint angle
+= q_goal ∈ S (or the object's settle angle when partial openings never hold — recorded per object); close: init
+angle ∈ S, goal = closed limit. Pose unchanged (scene object).
+
+### 6.7 Configuration matching — articulation (small-scale, open / close)
+
+Section 5.4. Root pose measured only (0.03 / 0.20); joint goals as 6.6.
+
+### 6.8 Configuration matching — attachment
+
+Init per section 4 with: partner (female) upright on a cell of the attach-reach band, target (male) at the focus with
+the attachment pipeline's library grasps. Goal: partner unchanged; target attached at
+`T_partner ∘ T_F(partner) ∘ inv(T_M(target))` (meta-link alignment, verified with `AttachedTo.set_value(True)`; the
+pair's collisions filtered as in v1). Checks recorded: pre-attach pose 10 cm back along the **female meta-link's
+insertion axis** (not the grasp approach), the attach pose with the target ignored, the in-hand reorientation from the
+grasp pose to the attach pose at 3 SLERP waypoints, and the **partner brace**: the other gripper closed on the
+partner's face opposite to the insertion direction (pre-contact + contact IK with the target arm locked at the attach
+solution; combined whole-body check). Group target: fixed assignment, relation partner → target, tolerances 0.01 /
+0.15, symmetry equivalences as in v1.
+
+### 6.9 Alignment — world vertical / world horizontal
+
+Section 5.5. Goal: position as at init (hinge), orientation = aligned (upright / level), tolerance 0.08 rad.
+
+### 6.10 Alignment — axial
+
+Tabletop sections 4.2–4.6 with the axial rules: target yaw = aligned yaw ± U(20°, 70°); a vertical hinge through the
+COM (TRO constraint, parent = support) installed after settling; push contact = the long-axis end inside the band,
+generic top-down push pose, arc waypoints at δ/2 and the goal (3.9); **stop edge** for the other arm = the target's
+edge (left or right, depending on the spin direction to the goal) that protrudes most along that direction at the
+goal orientation, braced with the closed left gripper: pre-contact + contact IK at the manipulation stance, combined
+whole-body check; every right-hand push pose IK-feasible; `roles.target.scale` may be configured to make the reach
+conditions satisfiable (diagnostic `scale_hint` as in 5.5). Goal: position unchanged, orientation = long axis
+parallel to the support's front edge, front toward the robot; tolerance 0.10 rad; equivalences per model. Screening
+uses the left-arm reach volume (push classes at the top height + object thickness) before the exact IK.
+
+### 6.11 IORS — ontop / under / inside / nextto / touching (small-scale)
+
+Init per section 4. Goal: partner unchanged; target orientation as at init (inside: not evaluated,
+`orientation_metric: null`); position: ontop / under(small) → target centred on the partner (under(small): the
+partner ends under the target, BDDL `(under ?partner ?target)`); inside → centred on the partner's fillable-volume
+floor (drop + settle; standing orientation allowed for stem-grasped objects); nextto / touching → the position
+closest to the init pose that satisfies the predicate (nextto: AABB gap < g_NT along the lateral axis, adjacency rays;
+touching: translated toward the partner until rigid contact, partner moved ≤ 5 mm). The place pose (goal pose ∘
+T_obj→eef of the drawn grasp) and its pre-place are IK-checked from the manipulation stance. **Touching**: the partner
+is on the robot's left; the oracle places the target at the nextto position and pushes it toward the partner with the
+right hand while the closed left gripper braces the partner's far (left) side: the push contact on the target's right
+face, its direction and distance, and the brace pre-contact + contact (left arm) are IK-checked and recorded.
+
+### 6.12 IORS — ontop / under (large-scale)
+
+Section 5.6. Goal: partner unchanged; target orientation as at init; position = the goal cell (nearest band cell to
+the init pose inside the eroded placement face, margin = half-extent + 0.05), verified `OnTop` / `Under`.
+
+## 7. Oracle sidecar (`<iid>.oracle.json`)
+
+```json
+{
+  "schema": "isg-oracle-v1", "instance_id": "...", "tro_sha256": "...",
+  "task_family": "inter_object_relation_satisfaction", "alias": "...", "path_bucket_m": null,
+  "stances": {
+    "init":         {"base_pose2d": [x, y, yaw], "translate": 0.5, "tilt": 0.0, "arms": "untucked", "stand_off": 0.45, "edge": "e2"},
+    "manipulation": {"base_pose2d": [...], "translate": 0.75, "tilt": -0.42, "stand_off": 0.35, "focus": [x, y, z], "arms": ["right"]},
+    "placement":    {"...": "IORS large-scale / disembedding only"}
+  },
+  "transitions": [{"from": "init", "to": "manipulation", "stand_off": 0.55, "order": ["drive-back", "trunk", "drive-in"]}],
+  "paths": [{"from": "init", "to": "manipulation", "mode": "local|global", "waypoints": [[x, y, yaw], ...], "length_m": 0.4, "posture": "untucked", "carried": null}],
+  "grasps": [{"object": "spatula.n.01_1", "arm": "right", "grasp_key": "spatula__hkvsep__t", "grasp_name": "grasp_1", "yaw": 1.23,
+              "pre_grasp": {"position": [], "orientation": []}, "grasp": {"...": ""}, "pre_place": {"...": ""}, "place": {"...": ""}, "carry_height": 0.12}],
+  "contacts": {"push": {"arm": "right", "pre": {}, "init": {}, "mid": {}, "goal": {}, "direction": [], "distance_m": 0.06},
+               "brace": {"arm": "left", "kind": "below_high", "pre": {}, "contact": {}, "direction": []}},
+  "articulation": {"joint": "j_link_0", "q_init": 0.0, "q_goal": 1.2, "waypoints": {"0.25": {"contact": [], "approach": [], "pinch": []}},
+                   "handle_reach": {"0.25": true}, "passive_from": 0.75, "follow_mode": "base", "base_follow": {"0.25": [x, y, yaw]}},
+  "blocks": [{"instance": "toy_dice.n.01_2", "order": 0, "face_pair": "x", "tilt_pick_deg": -45, "tilt_place_deg": 45, "yaw_deg": 12.0, "flip_axis": [0, 1, 0], "flip_sign": 1, "pick": {}, "place": {}, "brace_row": {}, "brace_col": {}}],
+  "goal": {"base_pose2d": [...], "translate": 0.8, "tilt": -0.25, "arms": "same|untucked"},
+  "language": {"objects": {"spatula.n.01_1": {"display_name": "spatula", "descriptor": "the spatula on the left"}}, "goal_numbers": {"move_left_cm": 6.0}},
+  "waypoint_policy": "checked"
+}
+```
+
+Only the blocks a task uses are present. `run_isg --mode oracle` requires the sidecar; the evaluator never reads it.
+
+## 8. Error tolerances
+
+Gating tolerances follow the perceptual quantity a subtask tests; measured-only tasks report absolute and
+size-normalised errors.
+
+| subtask | gating target | tolerance |
+|---|---|---|
+| camera relocalization | camera pose | 0.05 m / 0.10 rad (fixed) |
+| object scaling | depth | max(0.02 m, 0.20·\|Δd\|) |
+| mental rotation | orientation | 0.15 rad (+ equivalences) |
+| block design | layout relations | position 0.4·edge (≈ 0.010 m), orientation 0.15 rad |
+| articulation | joint | max(0.05 rad, 0.10·\|q_goal − q_init\|) revolute; max(0.01 m, 0.10·\|Δq\|) prismatic |
+| attachment | layout relation | 0.01 m / 0.15 rad |
+| alignment vertical / horizontal | orientation | 0.08 rad |
+| alignment axial | orientation | 0.10 rad |
+| disembedding, IORS | measured only | 0.03 m / 0.20 rad; override threshold for "goal := settled pose" = max(0.01 m, 0.25 × smallest horizontal extent) / 0.20 rad |
+
+## 9. `ground_isg`, `sample_isg`, `multiply_isg`
+
+**`ground_isg`** (iddl + icl → BDDL + customs list). For each iddl file and each category combination admitted by the
+icl (`pairs.csv`; only the `combos.csv` rows when `--test-only`): write the BDDL (alias, synsets from the KB, groups),
+the customs entry (per-scene whitelists = full icl pools, fixed bindings, options, generation defaults), then test the
+combination with **one representative model per category** (`roles.csv`) on every candidate scene / support / partner:
+run the full initialization once (template + instance 0). Success → the template and instance 0 are kept, the
+constraints learned are appended; failure → the representative model is moved to that scene's blacklist with the
+rejection reason, and the combination is retried with the next representative (icl order) once; a combination with
+no successful representative anywhere is written with an empty whitelist and flagged. The alias is never a simple
+cartesian product of category lists: only correlated pairs from `pairs.csv` are grounded.
+
+**`sample_isg`** (BDDL + customs → N templates). N = min(#valid model combinations, `templates_max`), minus one when
+`ground_isg` already produced the representative template (its pair is removed from the pool). Model draw: iterate
+over all whitelisted models before reusing one; unique models within a template (blocks excepted, `same_model`);
+disembedding distractors from the pools of the target's category minus look-alikes. Each template: full
+initialization → instance 0; failure → the model(s) responsible move to the blacklist (reason recorded); every
+success appends constraints (stance, grasp_set, joint_set, placement, contacts) with `source`.
+
+**`multiply_isg`** (template → N instances). N minus the instance 0 that exists; per instance the per-instance parts
+of the rules (draws, exact IK, transitions, paths) with the constraints as priors; camera relocalization fills the
+path buckets; every success appends constraints; rejections are counted per reason (`summary.rejections`).
+
+## 10. `[pilot]` numbers
+
+x_c(t), z_c(t), camera pitch at tilt 0, hand height below the camera (FK tables); band extents with untucked idle arms
+per support height; brace reach of the second arm (blocks, attachment, axial, touching, alignment); base-follow
+corridors; the held-object hold (depth 0.50, roll 15°); `goal_translate_range` / `goal_tilt_range` of camera
+relocalization; the 45° cube-grasp tilts vs 30/60; `max_partner_geodesic`; the 0.437 disembedding margin.
+
+## 11. Changes from v1 (summary)
+
+Replaced: canonical front-edge stance, `view_prefer_translate`, `view_translates`, `view_arm_fallbacks`, tucked reach
+arms (`REACH_ARMS`), `approach_forward` / drive-forward, `scene_distances` × lateral list, arc lattice (4 radii × 7
+bearings), right-arm-only, disembedding base-yaw fallback and occluded / unoccluded buckets, "nearest floor point under
+the bed", bed-top init fallback, `stand_offs` lists, `init_depth_fallbacks` / `hold_trunks`, per-template BDDL
+generation, `<activity>-<def_id>` spec keys.
+
+Kept: scene variants (chairs), support polygon and rest orientations, settle / validation / goal-feasibility pipeline,
+IK seeds, grasp library access, hinge constraints, attachment meta-link alignment and collision filter, stable-angle
+probe, `Open` semantics, occlusion measurement (as a ≤ 30 % check), visible-object counts, TRO schema `isg-tro-v1`.
