@@ -1,0 +1,193 @@
+{
+  "translates": [
+    0.0,
+    0.25,
+    0.5,
+    0.75,
+    0.95
+  ],
+  "tilts": [
+    0.0,
+    -0.3,
+    -0.6,
+    -0.9
+  ],
+  "lattice": 0.05,
+  "x_range": [
+    0.25,
+    0.9
+  ],
+  "lat_range": [
+    -0.7,
+    0.7
+  ],
+  "pre_pose": 0.1,
+  "reach_margin": 0.05,
+  "classes": {
+    "fwd_pinch_v": {
+      "a": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "c": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "z": [
+        0.2,
+        1.7
+      ],
+      "group": "pinch"
+    },
+    "fwd_pinch_h": {
+      "a": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "c": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "z": [
+        0.2,
+        1.7
+      ],
+      "group": "pinch"
+    },
+    "push_up": {
+      "a": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "c": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "z": [
+        0.9,
+        1.9
+      ],
+      "group": "push"
+    },
+    "push_down": {
+      "a": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "c": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "z": [
+        0.9,
+        1.9
+      ],
+      "group": "push"
+    },
+    "push_left": {
+      "a": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "c": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "z": [
+        0.9,
+        1.9
+      ],
+      "group": "push"
+    },
+    "push_right": {
+      "a": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "c": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "z": [
+        0.9,
+        1.9
+      ],
+      "group": "push"
+    }
+  },
+  "posture": "untucked",
+  "seeds": 12,
+  "shards": [
+    "left__t0.00_k+0.0.npz",
+    "left__t0.00_k-0.3.npz",
+    "left__t0.00_k-0.6.npz",
+    "left__t0.00_k-0.9.npz",
+    "left__t0.25_k+0.0.npz",
+    "left__t0.25_k-0.3.npz",
+    "left__t0.25_k-0.6.npz",
+    "left__t0.25_k-0.9.npz",
+    "left__t0.50_k+0.0.npz",
+    "left__t0.50_k-0.3.npz",
+    "left__t0.50_k-0.6.npz",
+    "left__t0.50_k-0.9.npz",
+    "left__t0.75_k+0.0.npz",
+    "left__t0.75_k-0.3.npz",
+    "left__t0.75_k-0.6.npz",
+    "left__t0.75_k-0.9.npz",
+    "left__t0.95_k+0.0.npz",
+    "left__t0.95_k-0.3.npz",
+    "left__t0.95_k-0.6.npz",
+    "left__t0.95_k-0.9.npz",
+    "left__t1.00_k+0.0.npz",
+    "left__t1.00_k-0.3.npz",
+    "left__t1.00_k-0.6.npz",
+    "left__t1.00_k-0.9.npz",
+    "right__t0.00_k+0.0.npz",
+    "right__t0.00_k-0.3.npz",
+    "right__t0.00_k-0.6.npz",
+    "right__t0.00_k-0.9.npz",
+    "right__t0.25_k+0.0.npz",
+    "right__t0.25_k-0.3.npz",
+    "right__t0.25_k-0.6.npz",
+    "right__t0.25_k-0.9.npz",
+    "right__t0.50_k+0.0.npz",
+    "right__t0.50_k-0.3.npz",
+    "right__t0.50_k-0.6.npz",
+    "right__t0.50_k-0.9.npz",
+    "right__t0.75_k+0.0.npz",
+    "right__t0.75_k-0.3.npz",
+    "right__t0.75_k-0.6.npz",
+    "right__t0.75_k-0.9.npz",
+    "right__t0.95_k+0.0.npz",
+    "right__t0.95_k-0.3.npz",
+    "right__t0.95_k-0.6.npz",
+    "right__t0.95_k-0.9.npz",
+    "right__t1.00_k+0.0.npz",
+    "right__t1.00_k-0.3.npz",
+    "right__t1.00_k-0.6.npz",
+    "right__t1.00_k-0.9.npz"
+  ],
+  "collided_trunks": [
+    "left__t1.00_k+0.0",
+    "left__t1.00_k-0.3",
+    "left__t1.00_k-0.6",
+    "left__t1.00_k-0.9",
+    "right__t1.00_k+0.0",
+    "right__t1.00_k-0.3",
+    "right__t1.00_k-0.6",
+    "right__t1.00_k-0.9"
+  ],
+  "sha256": "13cc2be7e9ef1ae3"
+}
