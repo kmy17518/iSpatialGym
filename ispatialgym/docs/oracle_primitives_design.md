@@ -453,8 +453,9 @@ actions, annotations) written by the same wrapper (no second replay pass; see
 `OmniGibson/omnigibson/envs/lerobot_data_wrapper.py`); QA-only → the rollout observation video of `replay_data.py`.
 Goal images (instance conditioning) are captured by `run_isg` with the robot and every task object stationary at the
 goal configuration, after ≥ 3 renders (10, as the playback wrapper does), with the physics-synced sensor pose stored
-as `goal_observation.camera_pose_world`, the evaluation camera profile (`isg-v1`), and the same segmentation /
-render guards as sampling (spec §3.4): no prim is hidden for a goal image once the viewer-camera path (B10) is in.
+as `goal_observation.camera_pose_world`, the evaluation camera profile (`isg-v1`), and nothing hidden: goal images
+are rgb and never needed the sampler's segmentation crash guard (spec §3.4, B10 — the guard is a renderer flag for
+the sampler's `seg_instance` renders, no prim is hidden anywhere).
 
 ## 7. Running it
 

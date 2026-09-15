@@ -70,9 +70,9 @@ def adjacent_rooms(scene_model: str, rooms: Sequence[str], reach_m: float = 0.6)
     k = 2 * int(round(reach_m / seg.map_resolution)) + 1
     dilated = th.nn.functional.max_pool2d(mask.float()[None, None], k, stride=1, padding=k // 2)[0, 0] > 0.5
     touched = th.unique(seg.room_ins_map[dilated]).tolist()
-    # ``ISG_ADJACENT_EXCLUDE`` (comma separated name substrings) drops rooms from the neighbour list. Default none: rgb
-    # rendering with the garden loaded is fine; only the sampler's seg_instance renders crash with it (and with the
-    # kitchen) in view, which is why the sampler loads the task rooms only.
+    # ``ISG_ADJACENT_EXCLUDE`` (comma separated name substrings) drops rooms from the neighbour list. Default none: the
+    # garden and the kitchen of house_single_floor used to crash the sampler's seg_instance renders, which was the
+    # light-shape bug guarded in ``SimWorld._set_measurement_render_settings`` and not a property of those rooms.
     exclude = tuple(s for s in os.environ.get("ISG_ADJACENT_EXCLUDE", "").split(",") if s)
     names = sorted(seg.room_ins_id_to_ins_name[int(i)] for i in touched if int(i) in seg.room_ins_id_to_ins_name and int(i) not in ids and int(i) != 0)
     return [n for n in names if not any(s in n for s in exclude)]
@@ -97,14 +97,13 @@ class SimWorld:
         #: ``rooms``: where the task takes place (stances, spawned objects, parking). ``adjacent``: their neighbours
         #: (shared wall / doorway), so that walls, doors and furniture seen through doorways and windows exist at
         #: evaluation time (no sky through missing walls). ``eval_rooms`` (rooms + adjacent) is what templates record as
-        #: ``load_room_instances``. Whether the *sampler* itself loads the neighbours is ``load_adjacent``
-        #: (``ISG_LOAD_ADJACENT``, default off): the sampler renders ``seg_instance`` for its measurements and Isaac Sim
-        #: 5.1's synthetic-data graph segfaults on house_single_floor as soon as the kitchen / garden are in view (and
-        #: when their prims are hidden); with only the task rooms loaded it has been stable for hours. The sampler's
-        #: measurements do not depend on the neighbours (their objects never occlude a tabletop target).
+        #: ``load_room_instances`` and, with ``load_adjacent`` (``ISG_LOAD_ADJACENT``, default on), also what the sampler
+        #: itself loads, so that sampling, evaluation and the oracle share one collision and visual world (a stance
+        #: validated here cannot collide with a neighbour's furniture in the demo). v1 loaded the task rooms only because
+        #: the measurement renders segfaulted with the neighbours in view; see ``_set_measurement_render_settings``.
         self.rooms = list(rooms) if rooms else None
         if load_adjacent is None:
-            load_adjacent = os.environ.get("ISG_LOAD_ADJACENT", "0") == "1"
+            load_adjacent = os.environ.get("ISG_LOAD_ADJACENT", "1") == "1"
         self.adjacent = adjacent_rooms(scene_model, self.rooms) if self.rooms else []
         self.eval_rooms = (self.rooms + [r for r in self.adjacent if r not in self.rooms]) if self.rooms else None
         self.loaded_rooms = self.eval_rooms if load_adjacent else self.rooms
@@ -136,6 +135,7 @@ class SimWorld:
         }
         t0 = time.time()
         self.env = og.Environment(configs=cfg)
+        self._set_measurement_render_settings()
         self.scene = self.env.scene
         self.robot = self.env.robots[0]
         self.cam_key = [k for k in self.robot.sensors if k.endswith(M.HEAD_CAMERA_SENSOR_SUFFIX)][0]
@@ -156,12 +156,11 @@ class SimWorld:
             log.info("traversability map patched for the scene variant: %d cells freed", n_freed)
         self.robot_park_xy = self.park_robot(floor_z=self.floor_z)
         self.scene.update_initial_file()
-        # Isaac Sim 5.1's synthetic-data graph (seg_instance) segfaults deterministically on the third frame when a
-        # light fixture (``room_light``; later also seen with ``downlight`` in the living room) and glass (sliding doors /
-        # windows) are both in the head camera's view (bisected object by object on house_single_floor). Renders here
-        # only feed measurements, so every light-like fixture is hidden while sampling and shown again around template
-        # saving (see save_template). ``ISG_HIDE_CATEGORY_SUBSTRINGS`` (comma separated) overrides the rule.
-        subs = tuple(s for s in os.environ.get("ISG_HIDE_CATEGORY_SUBSTRINGS", "light,lamp,chandelier").split(",") if s)
+        # ``ISG_HIDE_CATEGORY_SUBSTRINGS`` (comma separated category substrings, default none): emergency override that
+        # hides scene objects while sampling and shows them again around template saving (see save_template). v1 hid
+        # ``light,lamp,chandelier`` against the segmentation crash; ``_set_measurement_render_settings`` removes its
+        # cause, so nothing is hidden any more and every measurement sees the scene as evaluation renders it.
+        subs = tuple(s for s in os.environ.get("ISG_HIDE_CATEGORY_SUBSTRINGS", "").split(",") if s)
         self.render_hidden = [o for o in self.scene.objects if any(s in o.category for s in subs)]
         for o in self.render_hidden:
             o.visible = False
@@ -382,11 +381,41 @@ class SimWorld:
 
     # ------------------------------------------------------------------ renders
 
+    #: RTX flag that draws the *shapes* of light sources (the UsdLux prims inside light-fixture models) as visible
+    #: emitters. OmniGibson switches it on at launch (``Simulator._set_renderer_settings``). Isaac Sim 5.1's
+    #: instance-segmentation reduction (``omni.replicator.core.InstanceSegmentationReduction``, the C++ node behind
+    #: ``seg_instance``, ``seg_instance_fast`` and ``seg_semantic``) cannot map the instance ids of those shapes: with a
+    #: light shape in view (directly or through glass) other pixels come out ``unlabelled`` (up to a third of the
+    #: image on house_single_floor) and with enough of them the node indexes out of bounds and segfaults the process.
+    #: Bisected 2026-09-15 on house_single_floor with the neighbours loaded, 8 living-room views (sliding door + garden,
+    #: kitchen, dining room, corridor, high window) x 4 renders: flag off + nothing hidden = no crash and zero
+    #: unlabelled pixels; the v1 guard (light fixtures hidden, flag on) still crashed on the kitchen view, as did the
+    #: viewer-camera path of BEHAVIOR-1K #2312 and translucency off. Only the emitter shape disappears from rgb; the
+    #: fixture meshes stay visible and the illumination is unchanged.
+    LIGHT_SHAPES_SETTING = "/rtx/raytracing/showLights"
+
+    def _set_measurement_render_settings(self):
+        """Make every rendered frame safe for the head camera's ``seg_instance`` annotator, which runs the synthetic-data
+        graph on *every* frame (rgb reads, rendering simulator steps), not only inside :meth:`seg_instance`; a guard
+        that only wraps the measurement renders would leave those frames exposed. Nothing is hidden: see
+        ``LIGHT_SHAPES_SETTING``."""
+        import carb
+
+        settings = carb.settings.get_settings()
+        if settings.get(self.LIGHT_SHAPES_SETTING) != 0:
+            settings.set_int(self.LIGHT_SHAPES_SETTING, 0)
+            log.info("renderer: %s=0 (light shapes not drawn; seg_instance crash guard)", self.LIGHT_SHAPES_SETTING)
+
     def render(self, n: int = 3):
         for _ in range(n):
             og.sim.render()
 
     def seg_instance(self, n_renders: int = 3) -> Tuple[th.Tensor, Dict[int, str]]:
+        """Instance segmentation of the head camera after ``n_renders`` frames: ``(label map (H, W) int64,
+        {id: object name | 'background' | 'unlabelled' | 'groundPlane' | particle system})``. The label map lags the
+        physics pose by one frame (measured 2026-09-15: after a teleport the first rendered frame still shows the
+        previous view, the second is current; the very first read of a process is all background), hence the default
+        of three renders. Callers compare the mapping values (object names), never the ids."""
         self.render(n_renders)
         obs, info = self.robot.get_obs()
         seg = obs[self.cam_key]["seg_instance"]

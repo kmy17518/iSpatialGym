@@ -230,7 +230,12 @@ One entry per alias. Scene-independent model pools are the icl's job; the custom
 ### 3.1 Scenes and scene variants
 
 Candidates: the seven 2026-challenge scenes above. Task rooms = the rooms of the bound fixed objects (+ `rooms`);
-`load_room_instances` adds the neighbours (segmentation footprint within 0.6 m) as in v1. Table tasks sample in the
+`load_room_instances` adds the neighbours (segmentation footprint within 0.6 m) as in v1. **The sampler loads the
+same room set** (task rooms + neighbours, `SimWorld.load_adjacent` default on, `ISG_LOAD_ADJACENT=0` opts out), so
+sampling, evaluation and the oracle share one collision and visual world: a stance or path validated in sampling
+cannot meet furniture in the demo that did not exist while sampling, and segmentation renders see the neighbours'
+objects through doorways and glass instead of sky. v1 loaded the task rooms only because of the renderer crash
+described in 3.4; that guard no longer depends on the room set. Table tasks sample in the
 stable scene minus the chairs within 1.0 m of the support (`scene_variants`, `freed_footprints` recorded and applied
 by evaluation and by the oracle's navigation map). The obstructed camera-relocalization variant records the obstacle
 footprint as `blocked_footprints` in the same structure.
@@ -281,6 +286,27 @@ point where the rule says hull) of the object projects inside the image with a m
 Optical axis "within θ of a point" = angle between the optical axis and the ray to the point. Renders are used only
 where a measurement needs them (visible-object counts, occlusion ratio, held-object self-occlusion, one confirmation
 render of the disembedding destination width).
+
+**Measurement renders (`seg_instance`) hide nothing.** v1 hid every `light` / `lamp` / `chandelier` object for the
+whole run and loaded the task rooms only, because Isaac Sim 5.1 segfaulted on `seg_instance` renders with a light
+fixture and glass in the head camera's view (and, with the neighbours loaded, on views of the kitchen or the garden of
+`house_single_floor`). The trigger is the RTX flag `/rtx/raytracing/showLights` (OmniGibson turns it on at launch): it
+draws the shapes of the light sources inside the fixture models, and the instance-segmentation reduction node
+(`omni.replicator.core.InstanceSegmentationReduction`, the C++ node behind `seg_instance` and `seg_semantic`) cannot map
+their instance ids — pixels around them come out `unlabelled` (a third of the image in some living-room views) and with
+enough of them in view the node indexes out of bounds. `SimWorld` sets the flag to 0 for the sampler process
+(`_set_measurement_render_settings`); nothing is hidden during physics, rgb observations, measurement renders or
+`scene.save`, light fixtures and glass stay visible and are labelled normally, and the measured views are what
+evaluation renders (only the glowing emitter shape is absent from the sampler's own rgb; illumination is unchanged).
+Measured 2026-09-15 on `house_single_floor` with the neighbours loaded: 8 living-room views (sliding door + garden,
+kitchen, dining room, corridor, high window) × 4–6 renders crash-free with zero unlabelled pixels; the v1 guard still
+crashed on the kitchen view, the viewer-camera workaround of BEHAVIOR-1K #2312 (robot-camera render products lacking
+the instance-mapping table) does not cover this crash, and translucency off does not either. Consequences for the
+rules: light fixtures are labelled objects now, so the structural-category exclusion (`downlight`, `room_light`; 6.1)
+is what keeps them out of visibility counts; objects of the neighbours seen through glass count as visible where a
+rule counts non-structural objects. `ISG_HIDE_CATEGORY_SUBSTRINGS` (default empty) remains as an emergency override.
+A label map lags the physics pose by one rendered frame (the first frame after a teleport shows the previous view),
+hence three renders per measurement.
 
 ### 3.5 Checks common to every task
 

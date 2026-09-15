@@ -4,6 +4,16 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
 
 ## 1.5.0 (unreleased) - one arm pose per task, scene variants without chairs, goal check without the robot
 
+- **Neighbouring rooms loaded while sampling, nothing hidden for renders** (B10). `SimWorld.load_adjacent` defaults
+  to on (`ISG_LOAD_ADJACENT=0` opts out), so the sampler, evaluation and the oracle load the same room set (collision
+  and visual world parity). The v1 `seg_instance` crash (light fixture + glass in view; kitchen / garden with the
+  neighbours loaded) was bisected to the RTX flag `/rtx/raytracing/showLights` that OmniGibson enables at launch: the
+  light-source shapes it draws get instance ids the replicator's `InstanceSegmentationReduction` node cannot map
+  (`unlabelled` regions, then an out-of-bounds index). `SimWorld._set_measurement_render_settings` sets the flag to 0;
+  the light-fixture hiding (`ISG_HIDE_CATEGORY_SUBSTRINGS`, default now empty) is an emergency override only, and
+  label maps no longer contain `unlabelled` regions in the affected views. Measured on house_single_floor with the
+  neighbours loaded: 8 living-room views x 4-6 renders crash-free; the v1 guard still crashed on the kitchen view,
+  the viewer-camera workaround of BEHAVIOR-1K #2312 and translucency off did not help. Spec 3.1 / 3.4.
 - **World horizontal (`world_alignment-2`, alias `world_horizontal`)**: new problem (BDDL template
   `world_alignment/problem2.bddl`, `bddl_writer`, `WorldHorizontalSampler` in `tasks/world_alignment.py`, spec entry,
   docs spec §5.9 / `task_bddl_formats.md` §6c). Same wall hinge, arc and pushing rules as world vertical; the target
