@@ -73,8 +73,13 @@ touch /root/JOB_DONE
 '''
 
 
-SYNC_DIRS = ["ispatialgym/sampling", "ispatialgym/oracle", "ispatialgym/activity", "ispatialgym/eval", "ispatialgym/tasks",
-             "ispatialgym/assets/task_specs", "ispatialgym/assets/icl/roles", "ispatialgym/assets/iddl", "scripts"]
+#: the whole python package (every sub-package a pod may import: sampling, oracle, robot, activity, eval, tasks, ...) plus
+#: the assets the samplers read and the scripts; the 700 MB website checkout and __pycache__ are excluded in the rsync
+SYNC_DIRS = ["ispatialgym", "scripts"]
+SYNC_EXCLUDES = ["__pycache__", "*.pyc", "behavior-vision-suite.github.io", "data_collection", ".pytest_cache"]
+#: committed runlogs the samplers read at run time (reach volume / bands, symmetry, scene inventory); synced when present
+SYNC_RUNLOGS = ["runlogs/reach_volume_20260915", "runlogs/reach_bands_20260915", "runlogs/scene_inventory_20260915", "runlogs/symmetry_20260915",
+                "runlogs/held_visibility_20260915"]
 
 
 EXPORT_DIR = "/tmp/isg_dispatch_export"
@@ -88,7 +93,9 @@ def export_head() -> str:
     if os.path.exists(EXPORT_DIR):
         subprocess.run(["rm", "-rf", EXPORT_DIR], check=True)
     os.makedirs(EXPORT_DIR)
-    tar = subprocess.Popen(["git", "-C", rp.REPO, "archive", CODE_REF] + SYNC_DIRS, stdout=subprocess.PIPE)
+    tracked = subprocess.run(["git", "-C", rp.REPO, "ls-tree", "-d", "--name-only", CODE_REF] + SYNC_RUNLOGS, capture_output=True, text=True)
+    dirs = SYNC_DIRS + [d for d in tracked.stdout.split() if d]
+    tar = subprocess.Popen(["git", "-C", rp.REPO, "archive", CODE_REF] + dirs, stdout=subprocess.PIPE)
     subprocess.run(["tar", "-x", "-C", EXPORT_DIR], stdin=tar.stdout, check=True)
     tar.wait()
     return EXPORT_DIR
@@ -100,10 +107,12 @@ def sync_tree(ep) -> None:
     root = export_head() if not os.path.exists(os.path.join(EXPORT_DIR, ".exported")) else EXPORT_DIR
     open(os.path.join(EXPORT_DIR, ".exported"), "w").close()
     ssh_cmd = " ".join(shlex.quote(x) for x in rp.ssh_base(ip, port)[:-1])
-    for d in SYNC_DIRS:
+    excludes = [x for e in SYNC_EXCLUDES for x in ("--exclude", e)]
+    for d in SYNC_DIRS + [d for d in SYNC_RUNLOGS if os.path.isdir(os.path.join(root, d))]:
         src = os.path.join(root, d) + "/"
-        subprocess.run(["rsync", "-az", "--delete", "--exclude", "__pycache__", "--exclude", "*.pyc", "-e", ssh_cmd, src,
-                        f"root@{ip}:/root/ispatialgym/{d}/"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600)
+        # no --delete for the package root: the pods keep their local caches / outputs under the repo untouched
+        subprocess.run(["rsync", "-az"] + excludes + ["-e", ssh_cmd, src, f"root@{ip}:/root/ispatialgym/{d}/"],
+                       check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=900)
 
 
 def main():
