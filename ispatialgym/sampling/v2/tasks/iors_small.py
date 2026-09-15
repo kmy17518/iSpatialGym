@@ -222,7 +222,7 @@ class IORSSmall(SamplerV2):
         top = self.top
         t_fp = self.world.footprint(self.hull["target"], t_pose)
         st = manip
-        D_p = self.lateral_margins()["D_p_max"]
+        D_p = min(self.lateral_margins()["D_p_max"], 0.25)  # TEMP cap until tabletop.py supplies R_img (§4.4)
         if self.relation == "nextto":
             g_lo = float(self.pair["g_NT"]) + 0.03
             if D_p < g_lo:
@@ -332,8 +332,8 @@ class IORSSmall(SamplerV2):
         with_obj = self.obj("target")
         from ispatialgym.sampling.v2.navigation import attached
 
-        with attached(self.kit, "right", with_obj):
-            res = self.ikc.exact([pre_place, place], manip, "right", ignore_for_last=ignore, scale_key=self.choice.models["target"].scale)
+        with attached(self.kit, "right", with_obj, eef_in_object=grasp.eef_in_object):
+            res = self.ikc.exact([pre_place, place], manip, "right", ignore_for_last=ignore, scale_key=self.choice.models["target"].scale, cache=False)
         if not res.ok:
             raise Reject("place_unreachable", f"pre-place / place fail the exact IK from the manipulation stance: {res.reason}")
         grasp.pre_place, grasp.place = pre_place, place
@@ -501,10 +501,11 @@ class _TabletopTemp:
 
     @staticmethod
     def phase1c_lateral(s: IORSSmall, init: Stance, margins: Dict[str, float], rng=None) -> Stance:
-        """§4.4 (TEMP: lateral uniform within ±(L/2 − m) with m = w_t + D_p + 2·w_p + 0.02, base on free floor and
-        whole-body collision-free; redraw up to 20 times)."""
+        """§4.4 (TEMP: lateral uniform within ±(L/2 − m) with m = |λ| + w_t + D_p + 2·w_p + 0.02, |λ| = 0.10 and
+        D_p = min(W_p + 0.03, 0.25) standing in for the band extent / R_img the tabletop module derives; base on free
+        floor and whole-body collision-free; redraw up to 20 times)."""
         L = init.edge.length
-        m = margins["w_t"] + margins["D_p_max"] + 2 * margins["w_p"] + margins["safety"] + 0.25
+        m = 0.10 + margins["w_t"] + min(margins["D_p_max"], 0.25) + 2 * margins["w_p"] + margins["safety"]
         half = L / 2 - m
         if half < 0:
             raise Reject("edge_too_short", f"m_R + m_L = {2 * m:.2f} > L = {L:.2f}")

@@ -521,6 +521,7 @@ class SamplerV2(TaskSampler):
                     break
                 except Reject as e:
                     self.rejection_log.add(e.reason, str(e), phase=phase, index=index, attempt=attempt, seed=seed, **_plain_details(e.details))
+                    log.debug("rejection traceback", exc_info=True)
                     self.rejections[e.reason] = self.rejections.get(e.reason, 0) + 1
                     log.info("%s: instance %d attempt %d rejected in %s: %s", self.gp.alias, index, attempt, phase, e)
                     self.on_reject(e)
@@ -545,7 +546,8 @@ class SamplerV2(TaskSampler):
 
 
 def _plain_details(d: Dict[str, Any]) -> Dict[str, Any]:
-    return {k: (v if isinstance(v, (str, int, float, bool)) or v is None else str(v)) for k, v in (d or {}).items()}
+    reserved = {"phase", "index", "attempt", "seed", "message"}
+    return {(f"detail_{k}" if k in reserved else k): (v if isinstance(v, (str, int, float, bool)) or v is None else str(v)) for k, v in (d or {}).items()}
 
 
 def _sha_text(text: str) -> str:

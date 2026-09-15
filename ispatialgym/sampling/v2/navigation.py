@@ -268,19 +268,55 @@ def path_collision_free(kit: "RobotKit", poses: Sequence[Tuple[float, float, flo
 
 
 class attached:
-    """Context manager: the carried object attached to the planner for the checks inside (§3.7 / §3.8 / §3.5)."""
+    """Context manager: the carried object attached to the planner for the checks inside (§3.7 / §3.8 / §3.5).
 
-    def __init__(self, kit: "RobotKit", arm: Optional[str], obj: Any):
-        self.kit, self.arm, self.obj = kit, arm, obj
+    ``R1ProCuRobo.attach_object`` fits the object's collision meshes in the eef frame from the *current* relative pose
+    of object and eef. While sampling the object rests on its support and the hands are untucked, so the recorded grasp
+    transform ``eef_in_object`` (T_obj→eef of the drawn grasp) is applied first: the object is moved (gravity off) to
+    ``eef_pose ∘ inv(T_obj→eef)``, attached, and put back exactly where it was. Without ``eef_in_object`` the current
+    relative pose is used (the object is already in the hand)."""
+
+    def __init__(self, kit: "RobotKit", arm: Optional[str], obj: Any, eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None):
+        self.kit, self.arm, self.obj, self.eef_in_object = kit, arm, obj, eef_in_object
+        self._saved = None
 
     def __enter__(self):
-        if self.obj is not None and self.arm is not None:
-            self.kit.backend.attach_object(self.arm, self.obj)
+        if self.obj is None or self.arm is None:
+            return self
+        if self.eef_in_object is not None:
+            import omnigibson as og
+
+            from ispatialgym.sampling import geometry as G
+
+            p, q = self.obj.get_position_orientation()
+            self._saved = (p.clone(), q.clone(), bool(getattr(self.obj, "_gravity_enabled", True)))
+            eef = self.kit.robot.eef_links[self.arm].get_position_orientation()
+            obj_pose = G.compose((eef[0].float(), eef[1].float()), G.invert((G.t(self.eef_in_object[0]), G.t(self.eef_in_object[1]))))
+            self.obj.disable_gravity()
+            self.obj.set_position_orientation(obj_pose[0], obj_pose[1])
+            self.obj.keep_still()
+            og.sim.step_physics()
+            self.kit.robot.keep_still()
+            self.obj.keep_still()
+        self.kit.backend.attach_object(self.arm, self.obj)
         return self
 
     def __exit__(self, *exc):
-        if self.obj is not None and self.arm is not None:
-            self.kit.backend.detach_object(self.arm)
+        if self.obj is None or self.arm is None:
+            return False
+        self.kit.backend.detach_object(self.arm)
+        if self._saved is not None:
+            import omnigibson as og
+
+            p, q, grav = self._saved
+            self.obj.set_position_orientation(p, q)
+            if grav:
+                self.obj.enable_gravity()
+            self.obj.keep_still()
+            og.sim.step_physics()
+            self.kit.robot.keep_still()
+            self.obj.keep_still()
+            self._saved = None
         return False
 
 
@@ -394,7 +430,7 @@ def park_pose(kit: "RobotKit", rooms: Sequence[str], keep_away: Sequence[Any] = 
                 in_room |= seg.room_ins_map[cells[:, 0], cells[:, 1]] == i
             if bool(in_room.any()):
                 cells = cells[in_room]
-    pts = th.stack([trav.map_to_world(c) for c in cells]) if len(cells) else th.zeros(0, 2)
+    pts = trav.map_to_world(cells.float()) if len(cells) else th.zeros(0, 2)
     ok = th.ones(len(pts), dtype=th.bool)
     for obj in keep_away:
         try:

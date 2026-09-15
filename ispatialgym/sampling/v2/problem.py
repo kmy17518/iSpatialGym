@@ -298,7 +298,8 @@ class GroundedProblem:
                 cat = next(iter(r.models))
                 roles[role_name] = {"category": cat, "sampleable": True, "representative": r.models[cat][0]}
                 if r.grasps.get("key"):
-                    roles[role_name]["require"] = {"grasps": r.grasps["key"].rsplit("__", 1)[-1] if r.grasps["key"].count("__") >= 2 else "tabletop"}
+                    suffix = r.grasps["key"].rsplit("__", 1)[-1] if r.grasps["key"].count("__") >= 2 else "f"
+                    roles[role_name]["require"] = {"grasps": {"t": "tabletop", "i": "insert", "fl": "insert", "a": "attachment", "h": "floating"}.get(suffix, "floating")}
                     roles[role_name]["grasp_keys"] = {f"{cat}/{m}": (r.grasps["key"] if len(r.models[cat]) == 1 else r.grasps.get("keys", {}).get(m))
                                                       for m in r.models[cat]}
                 if r.options.get("scale") is not None:

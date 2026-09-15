@@ -210,12 +210,15 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
     ``Reject("program_check_failed", action=<name>)`` (``sim_utils.Reject``) on the first failing target."""
     from ispatialgym.sampling.sim_utils import Reject
 
+    import os
+
     subtask = subtask or getattr(sampler, "subtask", alias)
     sd = sidecar.to_dict()
     problems = check_blocks(subtask, sd)
     if problems:
         raise Reject("program_check_failed", "; ".join(problems), action="blocks")
-    expand = _expand()
+    # ``ISG_PROGRAM_CHECK=stub`` (development switch while F6 is a draft): structural check only, recorded as such
+    expand = None if os.environ.get("ISG_PROGRAM_CHECK", "").lower() == "stub" else _expand()
     if expand is None:
         return {"mode": "stub", "problems": [], "blocks": list(subtask_blocks(subtask))}
     try:
@@ -328,9 +331,13 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     arm = arms[0]
     stance: Stance = sidecar.stance(stance_name)
     carried_obj = sampler.objects.get(carried) if carried else None
+    g = sidecar.grasp_of(carried) if carried else None
+    eef_in_object = g.eef_in_object if g is not None else None
+    if carried_obj is not None and g is not None and g.arm:
+        arm = g.arm
     ignore_last, ignore_all = _ignore_for(action, sampler, carried)
     n = 0
-    with attached(sampler.kit, arm if carried_obj is not None else None, carried_obj):
+    with attached(sampler.kit, arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
         for key, poses in iter_pose_targets(targets):
             if len(poses) == 1:
                 res = sampler.ikc.exact(poses, stance, arm, ignore_for_last=ignore_last + ignore_all, cache=False)

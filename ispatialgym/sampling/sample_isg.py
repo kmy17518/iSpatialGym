@@ -121,7 +121,7 @@ class WorldPool:
             variant = {"path": vpath, "removed_objects": removed, "freed_footprints": SV.freed_footprints(stable, removed)}
             log.info("scene variant for %s: %d objects removed (%s)", scene, len(removed), removed)
         self.world = SimWorld(scene, rooms, scene_variant=variant)
-        self.kit = RobotKit(self.world, prebuild=("right_arm", "left_arm"))
+        self.kit = RobotKit(self.world, prebuild=("right_arm",))  # the left-arm planner is built on first use (brace tasks)
         self.key = key
         return self.world, self.kit
 
