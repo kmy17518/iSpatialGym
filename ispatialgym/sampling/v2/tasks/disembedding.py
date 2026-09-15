@@ -108,7 +108,10 @@ class TrayFloor:
         s.world.step_physics(20, still=[s.robot])
         try:
             rp, rq = tray.get_position_orientation()
-            lo, hi = tray.aabb
+            rp, rq = rp.float(), rq.float()
+            # raster over the hull's bounds at the settled pose (``tray.aabb`` can lag a physics-side teleport)
+            world_hull = C.transform_points((rp, rq), hull)
+            lo, hi = world_hull.min(dim=0).values, world_hull.max(dim=0).values
             xs = th.arange(float(lo[0]) + res / 2, float(hi[0]), res)
             ys = th.arange(float(lo[1]) + res / 2, float(hi[1]), res)
             gx, gy = th.meshgrid(xs, ys, indexing="ij")
@@ -116,11 +119,13 @@ class TrayFloor:
             ends = starts.clone()
             ends[:, 2] = float(lo[2]) - 0.02
             hits = s.world.raycast(starts, ends)
-            prims = {l.prim_path for l in tray.links.values()}
-            zs = th.tensor([float(h["position"][2]) if (h["hit"] and h["rigidBody"] in prims) else float("nan") for h in hits])
+            prims = tuple({l.prim_path for l in tray.links.values()} | {tray.prim_path})
+            zs = th.tensor([float(h["position"][2]) if (h["hit"] and str(h["rigidBody"]).startswith(prims)) else float("nan") for h in hits])
             valid = zs[~th.isnan(zs)]
             if len(valid) == 0:
-                raise Reject("support", f"{tray.name}: no raycast hits on the tray")
+                bodies = sorted({str(h["rigidBody"]) for h in hits if h["hit"]})[:6]
+                raise Reject("support", f"{tray.name}: no raycast hits on the tray ({sum(1 for h in hits if h['hit'])}/{len(hits)} rays hit {bodies}; tray at "
+                                        f"{[round(float(v), 3) for v in rp.tolist()]}, hull z {float(lo[2]):.3f}..{float(hi[2]):.3f}, top z {float(top.z):.3f})")
             floor_z = float(th.quantile(valid, 0.10))
             keep = (~th.isnan(zs)) & ((zs - floor_z).abs() < 0.004)
             world_xy = starts[keep][:, :2]
