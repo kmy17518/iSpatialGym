@@ -1,7 +1,12 @@
 """Inter-object relation satisfaction (``inter_object_relation_satisfaction-0..4``).
 
 Roles: ``target`` (the object that moves), ``partner`` (stays), fixed ``table`` (init support of both for the
-small/small case) or fixed ``partner`` (big scene object, ``under`` small-under-big case), ``floor``.
+small/small case) or fixed ``partner`` (big scene object: ``ontop`` / ``under`` large-scale), ``floor``.
+
+``under`` has two geometries (spec 6.11 / 6.12, ``docs/task_bddl_formats.md`` "under"): with a fixed big partner the
+target ends on the floor under it, BDDL ``(under ?target ?partner)``; with a spawned (small) partner the target is set
+down centred on the partner so that the *partner* ends under the target -- the same place pose as the small-scale
+``ontop`` goal -- and the BDDL argument order is ``(under ?partner ?target)``.
 """
 
 from __future__ import annotations
@@ -25,6 +30,10 @@ from omnigibson.object_states import Touching  # noqa: E402
 
 log = logging.getLogger("ispatialgym.sampling")
 
+#: scene categories a fixed ``partner`` may bind to by default (``fixed.partner`` may name objects or pass
+#: ``{"category": [...]}`` instead); the same set as the B4 partner inventory (``scene_inventory.PARTNER_CATEGORIES``)
+BIG_PARTNER_CATEGORIES = ("bed", "couch", "sofa", "breakfast_table", "desk", "countertop")
+
 
 class IORSSampler(TaskSampler):
     def __init__(self, ctx):
@@ -45,15 +54,16 @@ class IORSSampler(TaskSampler):
     def bind_fixed_roles(self):
         self.bind_floor()
         if self.big_partner:
-            cands = self.fixed_candidates("partner", ("bed", "couch", "sofa", "breakfast_table", "desk"))
+            cands = self.fixed_candidates("partner", BIG_PARTNER_CATEGORIES)
             if not cands:
                 raise Reject("spec", "no partner candidates")
             self.bind_scene_object("partner", cands[0])
         # the target's init support is chosen in prepare_bindings (needs geometry)
         self._table_candidates = self.fixed_candidates("table", TABLE_CATEGORIES)
-        if self.big_partner:
-            # last resort for cramped rooms: the big partner's own top (bed, couch) is the init support -- "take the toy
-            # from the bed and put it under the bed"
+        if self.big_partner and self.relation != "ontop":
+            # last resort for cramped rooms (under only): the big partner's own top (bed, couch) is the init support --
+            # "take the toy from the bed and put it under the bed". For ontop the partner's top as the init support
+            # would make the goal true at init (every attempt rejected with goal_satisfied_at_init).
             partner = self.obj("partner")
             if partner not in self._table_candidates:
                 self._table_candidates.append(partner)
@@ -337,7 +347,11 @@ class IORSSampler(TaskSampler):
         t_quat = t_pose[1]
         t_hull_w = self.world.hull_at(self.hull["target"], (th.zeros(3), t_quat))  # target hull about its origin
         p_obj = self.obj("partner")
-        if rel == "ontop":
+        if rel == "ontop" or (rel == "under" and not self.big_partner):
+            # target centred over the partner, resting on its top (+1 cm drop), orientation as at init. For the
+            # small-scale ``under`` this puts the partner under the target: OmniGibson Under(partner, target) shoots the
+            # ray up from the partner's top at its AABB-centre column and must hit the target -- BDDL
+            # (under ?partner ?target), see bddl_writer.
             lo, hi = p_obj.aabb
             z = float(hi[2]) - float(t_hull_w[:, 2].min()) + 0.01
             xy = p_obj.aabb_center[:2]
@@ -356,7 +370,7 @@ class IORSSampler(TaskSampler):
             xy = st.world(p_depth, lat)
             z = float(t_pose[0][2])
             return th.tensor([float(xy[0]), float(xy[1]), z]), t_quat
-        if rel == "under":
+        if rel == "under":  # large-scale: on the floor under the fixed big partner, (under ?target ?partner)
             return self._under_goal(t_pose, p_obj)
         raise ValueError(rel)
 

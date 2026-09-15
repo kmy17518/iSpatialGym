@@ -290,9 +290,19 @@ def build_problem_text(activity: str, definition_id: int, b: Bindings) -> str:
         if b.has("partner_support"):
             init.append(f"(ontop {p} {b.one('partner_support').name})")
         init.append(on_floor)
-        goal = [f"({rel} {_q(t)} {_q(p)})", f"(not (grasped {_q(agent)} {_q(t)}))", f"(not (grasped {_q(agent)} {_q(p)}))", f"(pose_settled {_q(t)})"]
+        spawned_partner = b.one("partner").dataset is not None  # scene objects are bound without a dataset
+        # The manipulated target is the first argument, except for ``under`` with a spawned (small) partner: the target
+        # is set down centred on the partner (coaster, saucer, tray), so the *partner* ends under the target --
+        # ``(under ?partner ?target)`` (docs/task_bddl_formats.md "under", iddl under_small_scale). OmniGibson
+        # Under(a, b) = the ray shot up from a's top at its AABB-centre column hits b. The fixed big partner (bed, desk)
+        # keeps ``(under ?target ?partner)``: the target ends on the floor under it.
+        if rel == "under" and spawned_partner:
+            relation = f"({rel} {_q(p)} {_q(t)})"
+        else:
+            relation = f"({rel} {_q(t)} {_q(p)})"
+        goal = [relation, f"(not (grasped {_q(agent)} {_q(t)}))", f"(not (grasped {_q(agent)} {_q(p)}))", f"(pose_settled {_q(t)})"]
         # fixed scene partners (bed, couch) are kinematic: PoseSettled cannot read their velocities, and they never move
-        if b.one("partner").dataset is not None:
+        if spawned_partner:
             goal.append(f"(pose_settled {_q(p)})")
         goal.append(f"(pose_settled {_q(agent)})")
         return render_problem(activity, definition_id, rel, b.all(), {}, init, goal,
