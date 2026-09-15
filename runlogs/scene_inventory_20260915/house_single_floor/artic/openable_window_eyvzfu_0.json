@@ -1,0 +1,176 @@
+{
+ "scene": "house_single_floor",
+ "name": "openable_window_eyvzfu_0",
+ "category": "openable_window",
+ "model": "eyvzfu",
+ "key": "openable_window__eyvzfu",
+ "scale": [
+  0.9999,
+  1.0,
+  1.0
+ ],
+ "rooms": [
+  "bathroom_0",
+  "garden_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   23.94302749633789,
+   9.734901428222656,
+   1.3303442001342773
+  ],
+  "orientation": [
+   -0.00012826161400880665,
+   0.0001280958385905251,
+   0.7064679861068726,
+   0.7077449560165405
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   22.04014015197754,
+   9.641904830932617,
+   -0.02687990665435791
+  ],
+  "max": [
+   24.919008255004883,
+   9.878700256347656,
+   2.6888012886047363
+  ],
+  "extent": [
+   2.8788681030273438,
+   0.23679542541503906,
+   2.7156810760498047
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_movingpart": 1.3482811027643038e-06
+ },
+ "openable_joint_ids": [],
+ "canonical_annotation": true,
+ "joints": [
+  {
+   "joint": "j_movingpart",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "movingpart",
+   "outward_normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "face_s": -0.4344,
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.02891,
+    1.15534,
+    -0.00901
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.3561562299728394,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.0235,
+    0.4344,
+    -1.3078
+   ],
+   "link_bbox_max": [
+    0.1227,
+    1.8825,
+    1.2919
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.0496,
+     0.4374,
+     1.2566
+    ],
+    "pinch_axis": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0061,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "contact_world": [
+     23.5057,
+     9.7857,
+     2.5869
+    ],
+    "height_world": 2.587,
+    "pinch_axis_world": [
+     1.0,
+     -0.0018,
+     0.0
+    ],
+    "approach_dir_world": [
+     -0.0,
+     -0.0004,
+     -1.0
+    ],
+    "pull_dir_world": [
+     1.0,
+     -0.0018,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "ungraspable",
+   "outward_normal_world": [
+    1.0,
+    -0.0018,
+    0.0
+   ],
+   "face_centre_world": [
+    23.5087,
+    9.7853,
+    1.3224
+   ],
+   "front_free_m": 3.0,
+   "front_free_eroded_m": 3.0,
+   "room_in_front": "garden_0",
+   "prior_review": {
+    "chosen": "none",
+    "pinch": "none",
+    "motion": "slide",
+    "graspable": "False",
+    "handle_desc": "No handle; bare sliding leaf frame, leading stile ~15 cm deep (too thick to pinch), top edge inside the head track.",
+    "result": "collision",
+    "setting": "scene:house_single_floor"
+   }
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0921,
+   -0.976,
+   -1.3572
+  ],
+  "bbox_max": [
+   0.1436,
+   1.9028,
+   1.3585
+  ],
+  "n_pieces": 8
+ },
+ "strip": "artic/strips/openable_window_eyvzfu_0.png"
+}

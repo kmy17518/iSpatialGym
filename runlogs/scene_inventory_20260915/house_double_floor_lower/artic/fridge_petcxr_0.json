@@ -1,0 +1,770 @@
+{
+ "scene": "house_double_floor_lower",
+ "name": "fridge_petcxr_0",
+ "category": "fridge",
+ "model": "petcxr",
+ "key": "fridge__petcxr",
+ "scale": [
+  1.0,
+  1.0,
+  1.0
+ ],
+ "rooms": [
+  "kitchen_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   5.201407432556152,
+   -0.568766713142395,
+   0.9560022354125977
+  ],
+  "orientation": [
+   -2.1973621187498793e-05,
+   1.069070208359335e-06,
+   0.7071031928062439,
+   0.7071103453636169
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   4.6639885902404785,
+   -0.9978212714195251,
+   -0.0025180578231811523
+  ],
+  "max": [
+   5.711788654327393,
+   -0.04690377414226532,
+   2.0400891304016113
+  ],
+  "extent": [
+   1.047800064086914,
+   0.9509174823760986,
+   2.042607307434082
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_left_door": 8.215584301751733e-08,
+  "j_right_door": 6.239608296709775e-08
+ },
+ "openable_joint_ids": [
+  [
+   1,
+   "j_left_door"
+  ],
+  [
+   2,
+   "j_right_door"
+  ]
+ ],
+ "canonical_annotation": false,
+ "joints": [
+  {
+   "joint": "j_left_door",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "left_door",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.4497,
+   "axis_dir_obj": [
+    0.0,
+    -0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    -31.78065,
+    -0.49692,
+    269806160.70024
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 2.356192111968994,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.2358,
+    -0.5007,
+    -0.9011
+   ],
+   "link_bbox_max": [
+    0.5219,
+    -0.0642,
+    1.0833
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.4888,
+      -0.0987,
+      0.6241
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0315,
+     "length": 0.1717,
+     "depth": 0.0511,
+     "face_s": 0.4497,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.0123,
+      -0.9999,
+      0.0
+     ],
+     "contact_world": [
+      5.3001,
+      -0.0799,
+      1.5801
+     ],
+     "height_world": 1.58,
+     "pinch_axis_world": [
+      1.0,
+      -0.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      -0.0,
+      -1.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      0.9999,
+      0.0123,
+      0.0
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      0.5067,
+      -0.0987,
+      0.4738
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0315,
+     "length": 0.1914,
+     "depth": 0.069,
+     "face_s": 0.4497,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.0123,
+      -0.9999,
+      0.0
+     ],
+     "contact_world": [
+      5.3001,
+      -0.0621,
+      1.4298
+     ],
+     "height_world": 1.43,
+     "pinch_axis_world": [
+      1.0,
+      -0.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      -0.0,
+      -1.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      0.9999,
+      0.0123,
+      0.0
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      0.5099,
+      -0.0987,
+      0.2811
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0315,
+     "length": 0.1987,
+     "depth": 0.0722,
+     "face_s": 0.4497,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.0123,
+      -0.9999,
+      0.0
+     ],
+     "contact_world": [
+      5.3001,
+      -0.0589,
+      1.2371
+     ],
+     "height_world": 1.237,
+     "pinch_axis_world": [
+      1.0,
+      -0.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      -0.0,
+      -1.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      0.9999,
+      0.0123,
+      0.0
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      0.5099,
+      -0.0987,
+      0.0879
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0315,
+     "length": 0.1912,
+     "depth": 0.0722,
+     "face_s": 0.4497,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.0123,
+      -0.9999,
+      0.0
+     ],
+     "contact_world": [
+      5.3001,
+      -0.0589,
+      1.0439
+     ],
+     "height_world": 1.044,
+     "pinch_axis_world": [
+      1.0,
+      -0.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      -0.0,
+      -1.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      0.9999,
+      0.0123,
+      0.0
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      0.4994,
+      -0.0987,
+      -0.0869
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0315,
+     "length": 0.2435,
+     "depth": 0.0618,
+     "face_s": 0.4497,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.0123,
+      -0.9999,
+      0.0
+     ],
+     "contact_world": [
+      5.3001,
+      -0.0694,
+      0.8691
+     ],
+     "height_world": 0.869,
+     "pinch_axis_world": [
+      1.0,
+      -0.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      -0.0,
+      -1.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      0.9999,
+      0.0123,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.4651,
+     -0.0989,
+     0.249
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     -1.0,
+     -0.0067,
+     -0.0
+    ],
+    "width": 0.2861,
+    "exposed": true,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     0.0123,
+     -0.9999,
+     0.0
+    ],
+    "contact_world": [
+     5.3003,
+     -0.1037,
+     1.205
+    ],
+    "height_world": 1.205,
+    "pinch_axis_world": [
+     0.0,
+     1.0,
+     -0.0
+    ],
+    "approach_dir_world": [
+     0.0067,
+     -1.0,
+     0.0
+    ],
+    "pull_dir_world": [
+     0.9999,
+     0.0123,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    0.0,
+    1.0,
+    -0.0
+   ],
+   "face_centre_world": [
+    5.4839,
+    -0.1191,
+    1.0471
+   ],
+   "front_free_m": 3.0,
+   "front_free_eroded_m": 3.0,
+   "room_in_front": "kitchen_0",
+   "prior_review": null
+  },
+  {
+   "joint": "j_right_door",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "right_door",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.4501,
+   "axis_dir_obj": [
+    0.0,
+    -0.0,
+    1.0
+   ],
+   "hinge_point_obj": [
+    -31.77687,
+    0.52377,
+    -269798209.8582
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 2.3561956882476807,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.3299,
+    -0.0554,
+    -0.9011
+   ],
+   "link_bbox_max": [
+    0.5219,
+    0.5228,
+    1.0841
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.4888,
+      -0.017,
+      0.6241
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0315,
+     "length": 0.1717,
+     "depth": 0.0507,
+     "face_s": 0.4501,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.0168,
+      0.9999,
+      0.0
+     ],
+     "contact_world": [
+      5.2184,
+      -0.0799,
+      1.5801
+     ],
+     "height_world": 1.58,
+     "pinch_axis_world": [
+      1.0,
+      -0.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      -0.0,
+      -1.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      -0.9999,
+      0.0168,
+      -0.0
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      0.5067,
+      -0.017,
+      0.4738
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0315,
+     "length": 0.1914,
+     "depth": 0.0685,
+     "face_s": 0.4501,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.0167,
+      0.9999,
+      0.0
+     ],
+     "contact_world": [
+      5.2184,
+      -0.0621,
+      1.4298
+     ],
+     "height_world": 1.43,
+     "pinch_axis_world": [
+      1.0,
+      -0.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      -0.0,
+      -1.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      -0.9999,
+      0.0167,
+      -0.0
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      0.5099,
+      -0.017,
+      0.2811
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0315,
+     "length": 0.1987,
+     "depth": 0.0717,
+     "face_s": 0.4501,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.0167,
+      0.9999,
+      0.0
+     ],
+     "contact_world": [
+      5.2184,
+      -0.0589,
+      1.2371
+     ],
+     "height_world": 1.237,
+     "pinch_axis_world": [
+      1.0,
+      -0.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      -0.0,
+      -1.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      -0.9999,
+      0.0167,
+      -0.0
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      0.5099,
+      -0.017,
+      0.0879
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0315,
+     "length": 0.1912,
+     "depth": 0.0717,
+     "face_s": 0.4501,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.0167,
+      0.9999,
+      0.0
+     ],
+     "contact_world": [
+      5.2184,
+      -0.0589,
+      1.0439
+     ],
+     "height_world": 1.044,
+     "pinch_axis_world": [
+      1.0,
+      -0.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      -0.0,
+      -1.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      -0.9999,
+      0.0167,
+      -0.0
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      0.4994,
+      -0.017,
+      -0.0869
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0315,
+     "length": 0.2435,
+     "depth": 0.0613,
+     "face_s": 0.4501,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.0168,
+      0.9999,
+      0.0
+     ],
+     "contact_world": [
+      5.2184,
+      -0.0694,
+      0.8691
+     ],
+     "height_world": 0.869,
+     "pinch_axis_world": [
+      1.0,
+      -0.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      -0.0,
+      -1.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      -0.9999,
+      0.0168,
+      -0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.4768,
+     -0.0176,
+     0.1962
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     -1.0,
+     0.009,
+     -0.0
+    ],
+    "width": 0.192,
+    "exposed": true,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     0.0168,
+     0.9999,
+     0.0
+    ],
+    "contact_world": [
+     5.219,
+     -0.092,
+     1.1522
+    ],
+    "height_world": 1.152,
+    "pinch_axis_world": [
+     0.0,
+     1.0,
+     -0.0
+    ],
+    "approach_dir_world": [
+     -0.009,
+     -1.0,
+     0.0
+    ],
+    "pull_dir_world": [
+     -0.9999,
+     0.0168,
+     -0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    0.0,
+    1.0,
+    -0.0
+   ],
+   "face_centre_world": [
+    4.9677,
+    -0.1187,
+    1.0475
+   ],
+   "front_free_m": 0.95,
+   "front_free_eroded_m": 0.45,
+   "room_in_front": "kitchen_0",
+   "prior_review": null
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.4291,
+   -0.5104,
+   -0.9585
+  ],
+  "bbox_max": [
+   0.4497,
+   0.5374,
+   1.0824
+  ],
+  "n_pieces": 34
+ },
+ "strip": "artic/strips/fridge_petcxr_0.png"
+}

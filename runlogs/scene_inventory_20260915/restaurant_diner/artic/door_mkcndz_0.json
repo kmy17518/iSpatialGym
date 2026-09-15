@@ -1,0 +1,167 @@
+{
+ "scene": "restaurant_diner",
+ "name": "door_mkcndz_0",
+ "category": "door",
+ "model": "mkcndz",
+ "key": "door__mkcndz",
+ "scale": [
+  1.0002,
+  0.9999,
+  1.0
+ ],
+ "rooms": [
+  "kitchen_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   -5.421124458312988,
+   -3.603832483291626,
+   1.1973668336868286
+  ],
+  "orientation": [
+   -2.1042323439246502e-08,
+   1.7291858966927975e-05,
+   -0.0012447574408724904,
+   0.9999992251396179
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   -5.5647053718566895,
+   -4.073181629180908,
+   0.021929502487182617
+  ],
+  "max": [
+   -5.300863742828369,
+   -3.114659309387207,
+   2.0461230278015137
+  ],
+  "extent": [
+   0.2638416290283203,
+   0.9585223197937012,
+   2.024193525314331
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_leaf": -7.295556192861771e-19
+ },
+ "openable_joint_ids": [],
+ "canonical_annotation": false,
+ "joints": [
+  {
+   "joint": "j_leaf",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "leaf",
+   "outward_normal": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "face_s": 0.0452,
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    -0.01208,
+    0.38975,
+    -128.82994
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5707969665527344,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.0452,
+    -0.4044,
+    -1.1644
+   ],
+   "link_bbox_max": [
+    0.0058,
+    0.4203,
+    0.7794
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     -0.0367,
+     -0.3694,
+     -0.2823
+    ],
+    "pinch_axis": [
+     -1.0,
+     -0.0,
+     -0.0
+    ],
+    "approach_dir": [
+     0.02,
+     0.9998,
+     -0.0
+    ],
+    "width": 0.051,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     -0.9995,
+     0.0324,
+     0.0
+    ],
+    "contact_world": [
+     -5.4588,
+     -3.9731,
+     0.9151
+    ],
+    "height_world": 0.915,
+    "pinch_axis_world": [
+     -1.0,
+     0.0025,
+     0.0
+    ],
+    "approach_dir_world": [
+     0.0225,
+     0.9997,
+     -0.0
+    ],
+    "pull_dir_world": [
+     -0.9994,
+     0.0349,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "ungraspable",
+   "outward_normal_world": [
+    -1.0,
+    0.0025,
+    0.0
+   ],
+   "face_centre_world": [
+    -5.4663,
+    -3.5958,
+    1.0049
+   ],
+   "front_free_m": 1.75,
+   "front_free_eroded_m": 1.45,
+   "room_in_front": "kitchen_0",
+   "prior_review": null
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.1447,
+   -0.4696,
+   -1.1754
+  ],
+  "bbox_max": [
+   0.1213,
+   0.4894,
+   0.8488
+  ],
+  "n_pieces": 3
+ },
+ "strip": "artic/strips/door_mkcndz_0.png"
+}

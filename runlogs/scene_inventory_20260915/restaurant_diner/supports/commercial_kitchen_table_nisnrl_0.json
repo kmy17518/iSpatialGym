@@ -1,0 +1,268 @@
+{
+ "scene": "restaurant_diner",
+ "name": "commercial_kitchen_table_nisnrl_0",
+ "category": "commercial_kitchen_table",
+ "model": "nisnrl",
+ "scale": [
+  1.0,
+  1.0,
+  1.0
+ ],
+ "rooms": [
+  "kitchen_0"
+ ],
+ "aabb_world": {
+  "min": [
+   -10.05908489227295,
+   0.5370407104492188,
+   0.003701150417327881
+  ],
+  "max": [
+   -8.931082725524902,
+   1.2464226484298706,
+   0.956852912902832
+  ],
+  "extent": [
+   1.1280021667480469,
+   0.7093819379806519,
+   0.9531517624855042
+  ]
+ },
+ "top": {
+  "z": 0.8742,
+  "yaw": -1.5686,
+  "resolution": 0.02,
+  "n_cells": 1904,
+  "n_free_cells": 1904,
+  "area_m2": 0.762,
+  "local_bounds_uv": [
+   -1.229,
+   -0.567,
+   -10.048,
+   -8.946
+  ],
+  "hull_xy": [
+   [
+    -10.048999786376953,
+    0.546999990940094
+   ],
+   [
+    -8.949000358581543,
+    0.546999990940094
+   ],
+   [
+    -8.949000358581543,
+    1.2070000171661377
+   ],
+   [
+    -10.048999786376953,
+    1.2070000171661377
+   ]
+  ],
+  "occupants": []
+ },
+ "chairs_within_1m": [],
+ "edges": [
+  {
+   "name": "+u",
+   "mid": [
+    -9.4983,
+    0.5458
+   ],
+   "inward": [
+    -0.0022,
+    1.0
+   ],
+   "tangent": [
+    -1.0,
+    -0.0022
+   ],
+   "length_m": 1.101,
+   "overhang_m": 0.0,
+   "room_in_front": "kitchen_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.15,
+     "free_lateral_range_m": [
+      -0.55,
+      0.55
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.15,
+     "free_lateral_range_m": [
+      -0.55,
+      0.55
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.15,
+     "free_lateral_range_m": [
+      -0.55,
+      0.55
+     ]
+    }
+   }
+  },
+  {
+   "name": "-u",
+   "mid": [
+    -9.4998,
+    1.2083
+   ],
+   "inward": [
+    0.0022,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    0.0022
+   ],
+   "length_m": 1.101,
+   "overhang_m": 0.0,
+   "room_in_front": null,
+   "blocked_in_front": {
+    "object": "walls_opceer_0",
+    "category": "walls",
+    "distance_m": 0.188
+   },
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.15,
+     "free_lateral_range_m": [
+      -0.55,
+      0.55
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.15,
+     "free_lateral_range_m": [
+      -0.55,
+      0.55
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.15,
+     "free_lateral_range_m": [
+      -0.55,
+      0.55
+     ]
+    }
+   }
+  },
+  {
+   "name": "+v",
+   "mid": [
+    -8.9484,
+    0.8783
+   ],
+   "inward": [
+    -1.0,
+    -0.0022
+   ],
+   "tangent": [
+    0.0022,
+    -1.0
+   ],
+   "length_m": 0.662,
+   "overhang_m": 0.0,
+   "room_in_front": "kitchen_0",
+   "blocked_in_front": {
+    "object": "fridge_jtqazu_0",
+    "category": "fridge",
+    "distance_m": 0.618
+   },
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.7,
+     "free_lateral_range_m": [
+      -0.33,
+      0.32
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.7,
+     "free_lateral_range_m": [
+      -0.33,
+      0.32
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.7,
+     "free_lateral_range_m": [
+      -0.33,
+      0.32
+     ]
+    }
+   }
+  },
+  {
+   "name": "-v",
+   "mid": [
+    -10.0498,
+    0.8758
+   ],
+   "inward": [
+    1.0,
+    0.0022
+   ],
+   "tangent": [
+    -0.0022,
+    1.0
+   ],
+   "length_m": 0.662,
+   "overhang_m": 0.0,
+   "room_in_front": "kitchen_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 0.071,
+     "free_fraction_chairs_removed": 0.071,
+     "longest_free_run_m": 0.05,
+     "free_lateral_range_m": [
+      -0.33,
+      -0.33
+     ]
+    },
+    "0.45": {
+     "free_fraction": 0.071,
+     "free_fraction_chairs_removed": 0.071,
+     "longest_free_run_m": 0.05,
+     "free_lateral_range_m": [
+      -0.33,
+      -0.33
+     ]
+    },
+    "0.55": {
+     "free_fraction": 0.071,
+     "free_fraction_chairs_removed": 0.071,
+     "longest_free_run_m": 0.05,
+     "free_lateral_range_m": [
+      -0.33,
+      -0.33
+     ]
+    }
+   }
+  }
+ ],
+ "in_union": false
+}

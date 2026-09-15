@@ -1,0 +1,268 @@
+{
+ "scene": "house_single_floor",
+ "name": "shelf_amyper_10",
+ "category": "shelf",
+ "model": "amyper",
+ "scale": [
+  1.0001,
+  1.0,
+  1.0
+ ],
+ "rooms": [
+  "corridor_0"
+ ],
+ "aabb_world": {
+  "min": [
+   19.771808624267578,
+   6.594910621643066,
+   1.982182264328003
+  ],
+  "max": [
+   20.12213897705078,
+   8.338444709777832,
+   2.042182207107544
+  ],
+  "extent": [
+   0.3503303527832031,
+   1.7435340881347656,
+   0.059999942779541016
+  ]
+ },
+ "top": {
+  "z": 2.0422,
+  "yaw": 3.139,
+  "resolution": 0.02,
+  "n_cells": 1479,
+  "n_free_cells": 1479,
+  "area_m2": 0.592,
+  "local_bounds_uv": [
+   -20.085,
+   -19.761,
+   -8.376,
+   -6.655
+  ],
+  "hull_xy": [
+   [
+    19.781999588012695,
+    6.605000019073486
+   ],
+   [
+    20.101999282836914,
+    6.605000019073486
+   ],
+   [
+    20.101999282836914,
+    8.324999809265137
+   ],
+   [
+    19.781999588012695,
+    8.324999809265137
+   ]
+  ],
+  "occupants": [
+   "walls_rdcvhx_0"
+  ]
+ },
+ "chairs_within_1m": [],
+ "edges": [
+  {
+   "name": "+u",
+   "mid": [
+    19.7796,
+    7.4653
+   ],
+   "inward": [
+    1.0,
+    -0.0025
+   ],
+   "tangent": [
+    0.0025,
+    1.0
+   ],
+   "length_m": 1.721,
+   "overhang_m": 0.0,
+   "room_in_front": "corridor_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.75,
+     "free_lateral_range_m": [
+      -0.86,
+      0.84
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.75,
+     "free_lateral_range_m": [
+      -0.86,
+      0.84
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.75,
+     "free_lateral_range_m": [
+      -0.86,
+      0.84
+     ]
+    }
+   }
+  },
+  {
+   "name": "-u",
+   "mid": [
+    20.104,
+    7.4645
+   ],
+   "inward": [
+    -1.0,
+    0.0025
+   ],
+   "tangent": [
+    -0.0025,
+    -1.0
+   ],
+   "length_m": 1.721,
+   "overhang_m": 0.0,
+   "room_in_front": "childs_room_2",
+   "blocked_in_front": {
+    "object": "walls_rdcvhx_0",
+    "category": "walls",
+    "distance_m": 0.014
+   },
+   "runs": {
+    "0.35": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    },
+    "0.45": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    },
+    "0.55": {
+     "free_fraction": 0.914,
+     "free_fraction_chairs_removed": 0.914,
+     "longest_free_run_m": 1.6,
+     "free_lateral_range_m": [
+      -0.71,
+      0.84
+     ]
+    }
+   }
+  },
+  {
+   "name": "+v",
+   "mid": [
+    19.9396,
+    6.6045
+   ],
+   "inward": [
+    0.0025,
+    1.0
+   ],
+   "tangent": [
+    -1.0,
+    0.0025
+   ],
+   "length_m": 0.324,
+   "overhang_m": 0.0,
+   "room_in_front": "corridor_0",
+   "blocked_in_front": {
+    "object": "walls_knhryu_0",
+    "category": "walls",
+    "distance_m": 0.016
+   },
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.35,
+     "free_lateral_range_m": [
+      -0.16,
+      0.14
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.35,
+     "free_lateral_range_m": [
+      -0.16,
+      0.14
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.35,
+     "free_lateral_range_m": [
+      -0.16,
+      0.14
+     ]
+    }
+   }
+  },
+  {
+   "name": "-v",
+   "mid": [
+    19.944,
+    8.3253
+   ],
+   "inward": [
+    -0.0025,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    -0.0025
+   ],
+   "length_m": 0.324,
+   "overhang_m": 0.0,
+   "room_in_front": "corridor_0",
+   "blocked_in_front": {
+    "object": "walls_htpoqj_0",
+    "category": "walls",
+    "distance_m": 0.02
+   },
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.35,
+     "free_lateral_range_m": [
+      -0.16,
+      0.14
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.35,
+     "free_lateral_range_m": [
+      -0.16,
+      0.14
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.35,
+     "free_lateral_range_m": [
+      -0.16,
+      0.14
+     ]
+    }
+   }
+  }
+ ],
+ "in_union": false
+}

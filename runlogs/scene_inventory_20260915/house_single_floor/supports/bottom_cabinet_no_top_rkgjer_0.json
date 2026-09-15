@@ -1,0 +1,57 @@
+{
+ "scene": "house_single_floor",
+ "name": "bottom_cabinet_no_top_rkgjer_0",
+ "category": "bottom_cabinet_no_top",
+ "model": "rkgjer",
+ "scale": [
+  1.0,
+  1.0,
+  0.9999
+ ],
+ "rooms": [
+  "kitchen_0"
+ ],
+ "aabb_world": {
+  "min": [
+   4.455385208129883,
+   -2.3058974742889404,
+   0.12020045518875122
+  ],
+  "max": [
+   7.518184185028076,
+   -1.6102981567382812,
+   0.8514003753662109
+  ],
+  "extent": [
+   3.0627989768981934,
+   0.6955993175506592,
+   0.7311999201774597
+  ]
+ },
+ "top": {
+  "z": 0.8514,
+  "yaw": 0.0,
+  "resolution": 0.02,
+  "n_cells": 0,
+  "n_free_cells": 0,
+  "area_m2": 0.0,
+  "local_bounds_uv": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "hull_xy": [],
+  "occupants": [
+   "countertop_kelker_0",
+   "countertop_kelzer_0",
+   "drop_in_sink_awvzkn_0",
+   "walls_fglkmr_0",
+   "walls_udqkcs_0",
+   "water_glass_bbpraa_0"
+  ]
+ },
+ "chairs_within_1m": [],
+ "edges": [],
+ "in_union": false
+}

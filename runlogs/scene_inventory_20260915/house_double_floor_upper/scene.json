@@ -1,0 +1,294 @@
+{
+ "scene": "house_double_floor_upper",
+ "load_s": 50.8,
+ "artic": {
+  "bottom_cabinet_jhymlr_0": {
+   "category": "bottom_cabinet",
+   "model": "jhymlr",
+   "n_joints": 6,
+   "status": [
+    "handle",
+    "handle",
+    "handle",
+    "handle",
+    "handle",
+    "handle"
+   ],
+   "s": 17.0
+  },
+  "bottom_cabinet_nddvba_0": {
+   "category": "bottom_cabinet",
+   "model": "nddvba",
+   "n_joints": 4,
+   "status": [
+    "handle",
+    "handle",
+    "handle",
+    "handle"
+   ],
+   "s": 8.7
+  },
+  "door_dlncrt_0": {
+   "category": "door",
+   "model": "dlncrt",
+   "n_joints": 1,
+   "status": [
+    "handle"
+   ],
+   "s": 7.1
+  },
+  "door_pevmgl_0": {
+   "category": "door",
+   "model": "pevmgl",
+   "n_joints": 1,
+   "status": [
+    "handle"
+   ],
+   "s": 7.0
+  },
+  "bottom_cabinet_no_top_ncgmqr_0": {
+   "category": "bottom_cabinet_no_top",
+   "model": "ncgmqr",
+   "n_joints": 3,
+   "status": [
+    "handle",
+    "handle",
+    "handle"
+   ],
+   "s": 7.8
+  },
+  "door_pxhbim_0": {
+   "category": "door",
+   "model": "pxhbim",
+   "n_joints": 1,
+   "status": [
+    "handle"
+   ],
+   "s": 7.3
+  },
+  "door_pxhbim_1": {
+   "category": "door",
+   "model": "pxhbim",
+   "n_joints": 1,
+   "status": [
+    "handle"
+   ],
+   "s": 7.2
+  },
+  "door_pxhbim_2": {
+   "category": "door",
+   "model": "pxhbim",
+   "n_joints": 1,
+   "status": [
+    "handle"
+   ],
+   "s": 7.2
+  },
+  "door_pxhbim_3": {
+   "category": "door",
+   "model": "pxhbim",
+   "n_joints": 1,
+   "status": [
+    "handle"
+   ],
+   "s": 7.2
+  },
+  "toilet_udiezm_0": {
+   "category": "toilet",
+   "model": "udiezm",
+   "n_joints": 1,
+   "status": [
+    "edge"
+   ],
+   "s": 7.1
+  }
+ },
+ "supports": {
+  "bottom_cabinet_jhymlr_0": {
+   "category": "bottom_cabinet",
+   "top_z": 0.8815,
+   "n_free_cells": 1113,
+   "best_edge_free_run_m": 1.2,
+   "in_union": true,
+   "s": 0.3
+  },
+  "bottom_cabinet_nddvba_0": {
+   "category": "bottom_cabinet",
+   "top_z": 0.722,
+   "n_free_cells": 779,
+   "best_edge_free_run_m": 0.8,
+   "in_union": true,
+   "s": 0.2
+  },
+  "bottom_cabinet_no_top_ncgmqr_0": {
+   "category": "bottom_cabinet_no_top",
+   "top_z": 0.6718,
+   "n_free_cells": 2,
+   "best_edge_free_run_m": 0.05,
+   "in_union": false,
+   "s": 0.1
+  },
+  "coffee_table_osroux_0": {
+   "category": "coffee_table",
+   "top_z": 0.3558,
+   "n_free_cells": 2920,
+   "best_edge_free_run_m": 1.45,
+   "in_union": false,
+   "s": 0.2
+  },
+  "desk_aduafr_0": {
+   "category": "desk",
+   "top_z": 0.7734,
+   "n_free_cells": 2100,
+   "best_edge_free_run_m": 1.5,
+   "in_union": true,
+   "s": 0.2
+  },
+  "desk_iotfzl_0": {
+   "category": "desk",
+   "top_z": 0.7351,
+   "n_free_cells": 1791,
+   "best_edge_free_run_m": 1.4,
+   "in_union": true,
+   "s": 0.2
+  },
+  "desk_uqcmzf_0": {
+   "category": "desk",
+   "top_z": 0.7168,
+   "n_free_cells": 4382,
+   "best_edge_free_run_m": 1.6,
+   "in_union": false,
+   "s": 0.5
+  },
+  "nightstand_aykehx_0": {
+   "category": "nightstand",
+   "top_z": 0.3089,
+   "n_free_cells": 773,
+   "best_edge_free_run_m": 0.65,
+   "in_union": false,
+   "s": 0.1
+  },
+  "nightstand_roxnbe_0": {
+   "category": "nightstand",
+   "top_z": 0.7,
+   "n_free_cells": 1028,
+   "best_edge_free_run_m": 0.8,
+   "in_union": false,
+   "s": 0.1
+  },
+  "nightstand_roxnbe_1": {
+   "category": "nightstand",
+   "top_z": 0.7,
+   "n_free_cells": 1053,
+   "best_edge_free_run_m": 0.8,
+   "in_union": false,
+   "s": 0.1
+  },
+  "nightstand_uzxrlg_0": {
+   "category": "nightstand",
+   "top_z": 0.347,
+   "n_free_cells": 838,
+   "best_edge_free_run_m": 0.8,
+   "in_union": false,
+   "s": 0.1
+  },
+  "ottoman_qsnawv_0": {
+   "category": "ottoman",
+   "top_z": 0.4346,
+   "n_free_cells": 469,
+   "best_edge_free_run_m": 0.45,
+   "in_union": false,
+   "s": 0.1
+  },
+  "serving_cart_vvtcby_0": {
+   "category": "serving_cart",
+   "top_z": 0.5829,
+   "n_free_cells": 393,
+   "best_edge_free_run_m": 0.5,
+   "in_union": false,
+   "s": 0.1
+  },
+  "shelf_sapyzl_0": {
+   "category": "shelf",
+   "top_z": 1.4964,
+   "n_free_cells": 540,
+   "best_edge_free_run_m": 1.55,
+   "in_union": false,
+   "s": 0.1
+  },
+  "shelf_sapyzl_1": {
+   "category": "shelf",
+   "top_z": 0.9729,
+   "n_free_cells": 550,
+   "best_edge_free_run_m": 1.55,
+   "in_union": false,
+   "s": 0.1
+  }
+ },
+ "partners": {
+  "bed_klcjcy_0": {
+   "category": "bed",
+   "top_z": 0.448,
+   "face_cells": 5982,
+   "under_frac_ge_0.15": 0.0,
+   "under_frac_ge_0.25": 0.0,
+   "n_supports_within_3m": 1,
+   "s": 1.3
+  },
+  "bed_siuxgz_0": {
+   "category": "bed",
+   "top_z": 0.472,
+   "face_cells": 9132,
+   "under_frac_ge_0.15": 0.0,
+   "under_frac_ge_0.25": 0.0,
+   "n_supports_within_3m": 4,
+   "s": 1.3
+  },
+  "bed_tjfzsb_0": {
+   "category": "bed",
+   "top_z": 0.4728,
+   "face_cells": 6799,
+   "under_frac_ge_0.15": 0.094,
+   "under_frac_ge_0.25": 0.0,
+   "n_supports_within_3m": 5,
+   "s": 1.0
+  },
+  "desk_aduafr_0": {
+   "category": "desk",
+   "top_z": 0.7734,
+   "face_cells": 2100,
+   "under_frac_ge_0.15": 0.382,
+   "under_frac_ge_0.25": 0.382,
+   "n_supports_within_3m": 3,
+   "s": 0.4
+  },
+  "desk_iotfzl_0": {
+   "category": "desk",
+   "top_z": 0.7351,
+   "face_cells": 1791,
+   "under_frac_ge_0.15": 0.955,
+   "under_frac_ge_0.25": 0.947,
+   "n_supports_within_3m": 1,
+   "s": 0.3
+  },
+  "desk_uqcmzf_0": {
+   "category": "desk",
+   "top_z": 0.7168,
+   "face_cells": 4382,
+   "under_frac_ge_0.15": 0.496,
+   "under_frac_ge_0.25": 0.496,
+   "n_supports_within_3m": 1,
+   "s": 1.1
+  },
+  "sofa_ukfaaz_0": {
+   "category": "sofa",
+   "top_z": 0.461,
+   "face_cells": 7451,
+   "under_frac_ge_0.15": 0.004,
+   "under_frac_ge_0.25": 0.001,
+   "n_supports_within_3m": 2,
+   "s": 2.2
+  }
+ },
+ "total_s": 93.6
+}

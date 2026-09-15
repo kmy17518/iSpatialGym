@@ -1,0 +1,232 @@
+{
+ "scene": "house_double_floor_lower",
+ "name": "dishwasher_ynrhuk_0",
+ "category": "dishwasher",
+ "model": "ynrhuk",
+ "key": "dishwasher__ynrhuk",
+ "scale": [
+  1.1037,
+  1.1392,
+  1.0696
+ ],
+ "rooms": [
+  "kitchen_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   8.157533645629883,
+   1.0955928564071655,
+   0.4197513163089752
+  ],
+  "orientation": [
+   5.820766091346741e-11,
+   3.524291969370097e-11,
+   1.0,
+   1.94646418094635e-07
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   7.75266695022583,
+   0.7950007915496826,
+   0.01051265001296997
+  ],
+  "max": [
+   8.384821891784668,
+   1.3950412273406982,
+   0.8294392824172974
+  ],
+  "extent": [
+   0.6321549415588379,
+   0.6000404357910156,
+   0.8189266324043274
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_link_0": 0.0,
+  "j_link_1": 4.7753524225202515e-12,
+  "j_link_2": 1.7033677067956887e-05
+ },
+ "openable_joint_ids": [
+  [
+   4,
+   "j_link_2"
+  ]
+ ],
+ "canonical_annotation": true,
+ "joints": [
+  {
+   "joint": "j_link_2",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "link_2",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.3448,
+   "axis_dir_obj": [
+    0.0,
+    1.0,
+    -0.0
+   ],
+   "hinge_point_obj": [
+    -31.84196,
+    -269673459.1052,
+    -0.25902
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5707963705062866,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.2647,
+    -0.2987,
+    -0.2944
+   ],
+   "link_bbox_max": [
+    0.4049,
+    0.3006,
+    0.3992
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.3929,
+      0.0443,
+      0.3531
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0243,
+     "length": 0.4082,
+     "depth": 0.0601,
+     "face_s": 0.3448,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.019,
+      -0.0,
+      -0.9998
+     ],
+     "contact_world": [
+      7.7646,
+      1.0513,
+      0.7729
+     ],
+     "height_world": 0.773,
+     "pinch_axis_world": [
+      -0.0,
+      -0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      1.0,
+      -0.0,
+      -0.0
+     ],
+     "pull_dir_world": [
+      -0.019,
+      0.0,
+      -0.9998
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     0.3699,
+     -0.0593,
+     0.3552
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     -1.0,
+     -0.0,
+     -0.0097
+    ],
+    "width": 0.005,
+    "exposed": true,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     0.0191,
+     -0.0,
+     -0.9998
+    ],
+    "contact_world": [
+     7.7876,
+     1.1549,
+     0.775
+    ],
+    "height_world": 0.775,
+    "pinch_axis_world": [
+     -1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     1.0,
+     -0.0,
+     -0.0097
+    ],
+    "pull_dir_world": [
+     -0.0191,
+     0.0,
+     -0.9998
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "face_centre_world": [
+    7.8127,
+    1.0946,
+    0.4722
+   ],
+   "front_free_m": 2.65,
+   "front_free_eroded_m": 2.35,
+   "room_in_front": "kitchen_0",
+   "prior_review": {
+    "chosen": "A",
+    "pinch": "horizontal_bar",
+    "motion": "swing",
+    "graspable": "True",
+    "handle_desc": "Black horizontal bar handle near the door top, 23 mm thick, 54 mm proud; A at its centre. Bottom hinge, folds down toward viewer.",
+    "result": "grasped_not_opened",
+    "setting": "scene:house_single_floor"
+   }
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.2273,
+   -0.2994,
+   -0.4092
+  ],
+  "bbox_max": [
+   0.3035,
+   0.2983,
+   0.4097
+  ],
+  "n_pieces": 8
+ },
+ "strip": "artic/strips/dishwasher_ynrhuk_0.png"
+}

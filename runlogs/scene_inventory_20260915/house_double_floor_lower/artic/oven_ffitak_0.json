@@ -1,0 +1,543 @@
+{
+ "scene": "house_double_floor_lower",
+ "name": "oven_ffitak_0",
+ "category": "oven",
+ "model": "ffitak",
+ "key": "oven__ffitak",
+ "scale": [
+  1.2165,
+  0.9933,
+  0.9864
+ ],
+ "rooms": [
+  "kitchen_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   6.911428928375244,
+   -0.6495887041091919,
+   0.5409926772117615
+  ],
+  "orientation": [
+   4.470348358154297e-08,
+   1.6996635210375644e-08,
+   0.7071069478988647,
+   0.7071065902709961
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   6.6158447265625,
+   -0.9272952675819397,
+   0.25253090262413025
+  ],
+  "max": [
+   7.203945636749268,
+   -0.3251950740814209,
+   0.8391311168670654
+  ],
+  "extent": [
+   0.5881009101867676,
+   0.6021001935005188,
+   0.5866001844406128
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_door": -5.7341062236968e-13,
+  "j_rack1": 1.6187890256436156e-21,
+  "j_rack2": 1.7643489100271914e-11
+ },
+ "openable_joint_ids": [],
+ "canonical_annotation": true,
+ "joints": [
+  {
+   "joint": "j_door",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "door",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.2983,
+   "axis_dir_obj": [
+    0.0,
+    1.0,
+    -0.0
+   ],
+   "hinge_point_obj": [
+    0.28985,
+    -8.94627,
+    -0.27319
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5707964897155762,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.2393,
+    -0.2925,
+    -0.2885
+   ],
+   "link_bbox_max": [
+    0.3192,
+    0.2956,
+    0.1739
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.3088,
+      0.2536,
+      0.1426
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0088,
+     "length": 0.0242,
+     "depth": 0.0209,
+     "face_s": 0.2983,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.999,
+      -0.0,
+      -0.0455
+     ],
+     "contact_world": [
+      6.6578,
+      -0.3408,
+      0.6836
+     ],
+     "height_world": 0.684,
+     "pinch_axis_world": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "approach_dir_world": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "pull_dir_world": [
+      -0.0,
+      0.999,
+      -0.0455
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      0.3088,
+      0.0058,
+      0.1426
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0242,
+     "length": 0.4877,
+     "depth": 0.0209,
+     "face_s": 0.2983,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.999,
+      -0.0,
+      -0.0455
+     ],
+     "contact_world": [
+      6.9056,
+      -0.3408,
+      0.6836
+     ],
+     "height_world": 0.684,
+     "pinch_axis_world": [
+      -0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "pull_dir_world": [
+      -0.0,
+      0.999,
+      -0.0455
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      0.3088,
+      -0.2419,
+      0.1426
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0088,
+     "length": 0.0242,
+     "depth": 0.0209,
+     "face_s": 0.2983,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.999,
+      -0.0,
+      -0.0455
+     ],
+     "contact_world": [
+      7.1533,
+      -0.3408,
+      0.6836
+     ],
+     "height_world": 0.684,
+     "pinch_axis_world": [
+      1.0,
+      0.0,
+      -0.0
+     ],
+     "approach_dir_world": [
+      0.0,
+      -1.0,
+      -0.0
+     ],
+     "pull_dir_world": [
+      -0.0,
+      0.999,
+      -0.0455
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     0.2811,
+     0.0165,
+     0.137
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0.049,
+     -0.0,
+     -0.9988
+    ],
+    "width": 0.0742,
+    "exposed": false,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     0.9998,
+     0.0,
+     0.0213
+    ],
+    "contact_world": [
+     6.8949,
+     -0.3685,
+     0.678
+    ],
+    "height_world": 0.678,
+    "pinch_axis_world": [
+     -0.0,
+     1.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     -0.0,
+     0.049,
+     -0.9988
+    ],
+    "pull_dir_world": [
+     -0.0,
+     0.9998,
+     0.0213
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    -0.0,
+    1.0,
+    0.0
+   ],
+   "face_centre_world": [
+    6.9099,
+    -0.3513,
+    0.4837
+   ],
+   "front_free_m": 3.0,
+   "front_free_eroded_m": 3.0,
+   "room_in_front": "kitchen_0",
+   "prior_review": {
+    "chosen": "B",
+    "pinch": "horizontal_bar",
+    "motion": "swing",
+    "graspable": "True",
+    "handle_desc": "Horizontal bar handle across the top of the drop-down door (bottom hinge); B is the bar's middle, A/C its end caps. Shallow 17 mm standoff.",
+    "result": "unreachable",
+    "setting": "scene:house_single_floor"
+   }
+  },
+  {
+   "joint": "j_rack1",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "rack1",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.2082,
+   "axis_dir_obj": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.07336,
+    0.00197,
+    -0.08238
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.18564637005329132,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.0635,
+    -0.2028,
+    -0.0878
+   ],
+   "link_bbox_max": [
+    0.2082,
+    0.2071,
+    -0.0751
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.2027,
+     0.0021,
+     -0.1101
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.011,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "contact_world": [
+     6.9093,
+     -0.4469,
+     0.4309
+    ],
+    "height_world": 0.431,
+    "pinch_axis_world": [
+     -0.0,
+     1.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     -0.0,
+     0.0,
+     -1.0
+    ],
+    "pull_dir_world": [
+     -0.0,
+     1.0,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "ungraspable",
+   "outward_normal_world": [
+    -0.0,
+    1.0,
+    0.0
+   ],
+   "face_centre_world": [
+    6.9093,
+    -0.4414,
+    0.4595
+   ],
+   "front_free_m": 3.0,
+   "front_free_eroded_m": 3.0,
+   "room_in_front": "kitchen_0",
+   "prior_review": {
+    "chosen": "F",
+    "pinch": "horizontal_bar",
+    "motion": "pull",
+    "graspable": "True",
+    "handle_desc": "Front wire rail of the wire rack (~9 mm); pinch it from the front. Only reachable after the door is opened.",
+    "result": "unreachable",
+    "setting": "scene:house_single_floor"
+   }
+  },
+  {
+   "joint": "j_rack2",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "rack2",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.2082,
+   "axis_dir_obj": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.07336,
+    0.00197,
+    -0.19213
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.18564637005329132,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.0635,
+    -0.2028,
+    -0.1975
+   ],
+   "link_bbox_max": [
+    0.2082,
+    0.2071,
+    -0.1848
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.2027,
+     0.0021,
+     -0.2198
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.011,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "contact_world": [
+     6.9093,
+     -0.4469,
+     0.3212
+    ],
+    "height_world": 0.321,
+    "pinch_axis_world": [
+     -0.0,
+     1.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     -0.0,
+     0.0,
+     -1.0
+    ],
+    "pull_dir_world": [
+     -0.0,
+     1.0,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "ungraspable",
+   "outward_normal_world": [
+    -0.0,
+    1.0,
+    0.0
+   ],
+   "face_centre_world": [
+    6.9093,
+    -0.4414,
+    0.3498
+   ],
+   "front_free_m": 3.0,
+   "front_free_eroded_m": 3.0,
+   "room_in_front": "kitchen_0",
+   "prior_review": {
+    "chosen": "F",
+    "pinch": "horizontal_bar",
+    "motion": "pull",
+    "graspable": "True",
+    "handle_desc": "Front wire rail of the lower wire rack (~9 mm); pinch it from the front. Only reachable after the door is opened.",
+    "result": "unreachable",
+    "setting": "scene:house_single_floor"
+   }
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.2777,
+   -0.2925,
+   -0.2885
+  ],
+  "bbox_max": [
+   0.3244,
+   0.2956,
+   0.2981
+  ],
+  "n_pieces": 10
+ },
+ "strip": "artic/strips/oven_ffitak_0.png"
+}

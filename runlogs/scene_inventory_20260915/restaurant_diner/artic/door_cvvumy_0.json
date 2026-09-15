@@ -1,0 +1,285 @@
+{
+ "scene": "restaurant_diner",
+ "name": "door_cvvumy_0",
+ "category": "door",
+ "model": "cvvumy",
+ "key": "door__cvvumy",
+ "scale": [
+  1.0002,
+  1.0,
+  1.0
+ ],
+ "rooms": [
+  "bathroom_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   -3.0463669300079346,
+   4.8337578773498535,
+   1.3565196990966797
+  ],
+  "orientation": [
+   2.433427198411664e-06,
+   2.4555085929023335e-06,
+   -0.7039059996604919,
+   0.7102931141853333
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   -3.9512336254119873,
+   4.748814105987549,
+   -0.0009986162185668945
+  ],
+  "max": [
+   -2.141451835632324,
+   4.919754981994629,
+   2.1326024532318115
+  ],
+  "extent": [
+   1.809781789779663,
+   0.17094087600708008,
+   2.133601188659668
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_left_leaf": -8.112701812114823e-20,
+  "j_right_leaf": 9.47304601671146e-16
+ },
+ "openable_joint_ids": [],
+ "canonical_annotation": true,
+ "joints": [
+  {
+   "joint": "j_left_leaf",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "left_leaf",
+   "outward_normal": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "face_s": 0.053,
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "hinge_point_obj": [
+    48.20428,
+    -0.8602,
+    404750927.07488
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5523947477340698,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.053,
+    -0.8573,
+    -1.3483
+   ],
+   "link_bbox_max": [
+    0.0206,
+    0.0094,
+    0.7282
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     -0.0178,
+     -0.5845,
+     0.1843
+    ],
+    "pinch_axis": [
+     -1.0,
+     -0.0,
+     -0.0
+    ],
+    "approach_dir": [
+     1.0,
+     -0.009,
+     -0.0
+    ],
+    "width": 0.0736,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     -0.0057,
+     -1.0,
+     0.0
+    ],
+    "contact_world": [
+     -3.631,
+     4.8463,
+     1.5408
+    ],
+    "height_world": 1.541,
+    "pinch_axis_world": [
+     -0.009,
+     1.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     0.0,
+     -1.0,
+     -0.0
+    ],
+    "pull_dir_world": [
+     -1.0,
+     -0.0033,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "ungraspable",
+   "outward_normal_world": [
+    -0.009,
+    1.0,
+    0.0
+   ],
+   "face_centre_world": [
+    -3.4708,
+    4.8829,
+    1.0465
+   ],
+   "front_free_m": 3.0,
+   "front_free_eroded_m": 3.0,
+   "room_in_front": "bathroom_0",
+   "prior_review": {
+    "chosen": "none",
+    "pinch": "none",
+    "motion": "swing",
+    "graspable": "False",
+    "handle_desc": "No protruding handle; only flush/recessed vertical pull plate near the meeting edge at ~1 m height. Meeting edge not exposed. Hinge on outer (-y) edge.",
+    "result": "infeasible_2_reviews",
+    "setting": "scene:restaurant_diner"
+   }
+  },
+  {
+   "joint": "j_right_leaf",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "right_leaf",
+   "outward_normal": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "face_s": 0.0432,
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    -16.12099,
+    0.87519,
+    134911383.21032
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5891975164413452,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.0432,
+    0.0138,
+    -1.3483
+   ],
+   "link_bbox_max": [
+    0.0266,
+    0.8801,
+    0.7282
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     -0.0111,
+     0.1704,
+     0.0433
+    ],
+    "pinch_axis": [
+     -1.0,
+     -0.0,
+     -0.0
+    ],
+    "approach_dir": [
+     -0.9996,
+     0.0266,
+     -0.0
+    ],
+    "width": 0.0698,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     -0.0437,
+     -0.999,
+     -0.0
+    ],
+    "contact_world": [
+     -2.8761,
+     4.8464,
+     1.3998
+    ],
+    "height_world": 1.4,
+    "pinch_axis_world": [
+     -0.009,
+     1.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     0.0176,
+     0.9998,
+     0.0
+    ],
+    "pull_dir_world": [
+     -0.9994,
+     0.0347,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "ungraspable",
+   "outward_normal_world": [
+    -0.009,
+    1.0,
+    0.0
+   ],
+   "face_centre_world": [
+    -2.5998,
+    4.881,
+    1.0465
+   ],
+   "front_free_m": 3.0,
+   "front_free_eroded_m": 3.0,
+   "room_in_front": "bathroom_0",
+   "prior_review": {
+    "chosen": "none",
+    "pinch": "none",
+    "motion": "swing",
+    "graspable": "False",
+    "handle_desc": "No protruding handle; only flush/recessed vertical pull plate near the meeting edge at ~1 m height. Meeting edge not exposed. Hinge on outer (+y) edge.",
+    "result": "infeasible_2_reviews",
+    "setting": "scene:restaurant_diner"
+   }
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0779,
+   -0.9042,
+   -1.3575
+  ],
+  "bbox_max": [
+   0.0768,
+   0.9043,
+   0.7761
+  ],
+  "n_pieces": 3
+ },
+ "strip": "artic/strips/door_cvvumy_0.png"
+}

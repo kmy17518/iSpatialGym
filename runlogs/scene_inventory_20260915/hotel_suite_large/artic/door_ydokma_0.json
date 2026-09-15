@@ -1,0 +1,217 @@
+{
+ "scene": "hotel_suite_large",
+ "name": "door_ydokma_0",
+ "category": "door",
+ "model": "ydokma",
+ "key": "door__ydokma",
+ "scale": [
+  1.0001,
+  1.0,
+  1.0
+ ],
+ "rooms": [
+  "bathroom_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   -1.1394668817520142,
+   4.956404209136963,
+   1.069981336593628
+  ],
+  "orientation": [
+   0.7152050137519836,
+   -0.6989138126373291,
+   0.001016272115521133,
+   0.0004968168213963509
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   -1.6201015710830688,
+   4.920825004577637,
+   -0.0037305355072021484
+  ],
+  "max": [
+   -0.010470747947692871,
+   4.9874796867370605,
+   2.0758442878723145
+  ],
+  "extent": [
+   1.609630823135376,
+   0.06665468215942383,
+   2.0795748233795166
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_leaf": 1.4806361832597759e-05
+ },
+ "openable_joint_ids": [],
+ "canonical_annotation": false,
+ "joints": [
+  {
+   "joint": "j_leaf",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "leaf",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.0284,
+   "axis_dir_obj": [
+    0.0017300000181421638,
+    0.004279999993741512,
+    0.9999899864196777
+   ],
+   "hinge_point_obj": [
+    0.04545,
+    -1.0495,
+    14.62078
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.4577605724334717,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.0236,
+    -1.121,
+    -0.9678
+   ],
+   "link_bbox_max": [
+    0.043,
+    -0.2764,
+    1.053
+   ],
+   "handles": [
+    {
+     "kind": "knob",
+     "contact": [
+      0.0357,
+      -0.3415,
+      0.2104
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0464,
+     "length": 0.0466,
+     "depth": 0.0146,
+     "face_s": 0.0284,
+     "n_pieces": 1,
+     "pull_dir": [
+      -0.9998,
+      0.0197,
+      0.0016
+     ],
+     "contact_world": [
+      -0.7971,
+      4.9281,
+      0.8599
+     ],
+     "height_world": 0.86,
+     "pinch_axis_world": [
+      -0.0008,
+      0.0021,
+      1.0
+     ],
+     "approach_dir_world": [
+      -0.023,
+      0.9997,
+      -0.0021
+     ],
+     "pull_dir_world": [
+      -0.0427,
+      0.9991,
+      -0.0038
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.0089,
+     -0.3198,
+     0.3762
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0.0255,
+     -0.9997,
+     0.0042
+    ],
+    "width": 0.0666,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     -0.9999,
+     -0.0151,
+     0.0018
+    ],
+    "contact_world": [
+     -0.8193,
+     4.9541,
+     0.694
+    ],
+    "height_world": 0.694,
+    "pinch_axis_world": [
+     0.023,
+     -0.9997,
+     0.0021
+    ],
+    "approach_dir_world": [
+     1.0,
+     -0.0025,
+     -0.0034
+    ],
+    "pull_dir_world": [
+     -0.0079,
+     1.0,
+     -0.0039
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    0.023,
+    -0.9997,
+    0.0021
+   ],
+   "face_centre_world": [
+    -0.4403,
+    4.944,
+    1.0279
+   ],
+   "front_free_m": 3.0,
+   "front_free_eroded_m": 3.0,
+   "room_in_front": "bathroom_0",
+   "prior_review": null
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0206,
+   -1.1296,
+   -1.0062
+  ],
+  "bbox_max": [
+   0.0395,
+   0.4814,
+   1.0739
+  ],
+  "n_pieces": 4
+ },
+ "strip": "artic/strips/door_ydokma_0.png"
+}

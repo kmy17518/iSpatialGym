@@ -1,0 +1,241 @@
+{
+ "scene": "Rs_int",
+ "name": "top_cabinet_fqhdne_0",
+ "category": "top_cabinet",
+ "model": "fqhdne",
+ "key": "top_cabinet__fqhdne",
+ "scale": [
+  1.8757,
+  2.117,
+  1.8406
+ ],
+ "rooms": [
+  "kitchen_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   -1.862776279449463,
+   2.4946959018707275,
+   1.994042992591858
+  ],
+  "orientation": [
+   0.000383323582354933,
+   -0.003569526830688119,
+   0.024976514279842377,
+   0.9996815919876099
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   -2.0279910564422607,
+   1.9118133783340454,
+   1.620886206626892
+  ],
+  "max": [
+   -1.568065881729126,
+   3.1081275939941406,
+   2.3681623935699463
+  ],
+  "extent": [
+   0.45992517471313477,
+   1.1963142156600952,
+   0.7472761869430542
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_link_0": 2.299083146084513e-09
+ },
+ "openable_joint_ids": [
+  [
+   1,
+   "j_link_0"
+  ]
+ ],
+ "canonical_annotation": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "link_0",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.2844,
+   "axis_dir_obj": [
+    -0.007160000037401915,
+    -0.000590000010561198,
+    -0.999970018863678
+   ],
+   "hinge_point_obj": [
+    0.23221,
+    -0.14502,
+    0.112
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5833714008331299,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.2176,
+    -0.1576,
+    -0.3697
+   ],
+   "link_bbox_max": [
+    0.3213,
+    0.5988,
+    0.3679
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.3093,
+      0.5497,
+      -0.2035
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0241,
+     "length": 0.1438,
+     "depth": 0.0369,
+     "face_s": 0.2844,
+     "n_pieces": 2,
+     "pull_dir": [
+      0.9935,
+      -0.1134,
+      -0.007
+     ],
+     "contact_world": [
+      -1.5799,
+      3.0593,
+      1.7931
+     ],
+     "height_world": 1.793,
+     "pinch_axis_world": [
+      0.0499,
+      -0.9988,
+      -0.0006
+     ],
+     "approach_dir_world": [
+      -0.9987,
+      -0.0499,
+      -0.0072
+     ],
+     "pull_dir_world": [
+      0.9979,
+      -0.0636,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [
+    {
+     "kind": "flush_handle",
+     "center": [
+      0.294,
+      0.5529,
+      -0.1277
+     ],
+     "depth": 0.01,
+     "note": "protrudes < 12 mm; fingertips cannot get behind it"
+    }
+   ],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.2642,
+     0.5602,
+     0.0215
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     -0.1035,
+     -0.9946,
+     0.0013
+    ],
+    "width": 0.1037,
+    "exposed": true,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     0.9989,
+     -0.0462,
+     -0.0071
+    ],
+    "contact_world": [
+     -1.627,
+     3.0674,
+     2.0178
+    ],
+    "height_world": 2.018,
+    "pinch_axis_world": [
+     0.9987,
+     0.0499,
+     0.0072
+    ],
+    "approach_dir_world": [
+     -0.0537,
+     -0.9985,
+     -0.0
+    ],
+    "pull_dir_world": [
+     1.0,
+     0.0037,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    0.9987,
+    0.0499,
+    0.0072
+   ],
+   "face_centre_world": [
+    -1.5897,
+    2.7292,
+    1.9953
+   ],
+   "front_free_m": 1.25,
+   "front_free_eroded_m": 2.55,
+   "room_in_front": "kitchen_0",
+   "prior_review": {
+    "chosen": "A",
+    "pinch": "vertical_bar",
+    "motion": "swing",
+    "graspable": "True",
+    "handle_desc": "Short vertical bar handle (~78 mm) on the door's free right edge, lower-middle height; hinge on left (-y) edge",
+    "result": "model_error",
+    "setting": "scene:Rs_int"
+   }
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.1896,
+   -0.594,
+   -0.3725
+  ],
+  "bbox_max": [
+   0.2599,
+   0.6193,
+   0.3757
+  ],
+  "n_pieces": 8
+ },
+ "strip": "artic/strips/top_cabinet_fqhdne_0.png"
+}

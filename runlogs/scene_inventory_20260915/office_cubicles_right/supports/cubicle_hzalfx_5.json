@@ -1,0 +1,285 @@
+{
+ "scene": "office_cubicles_right",
+ "name": "cubicle_hzalfx_5",
+ "category": "cubicle",
+ "model": "hzalfx",
+ "scale": [
+  1.0,
+  1.0,
+  1.0
+ ],
+ "rooms": [
+  "shared_office_0"
+ ],
+ "aabb_world": {
+  "min": [
+   10.396592140197754,
+   -0.7554911375045776,
+   -0.005540907382965088
+  ],
+  "max": [
+   11.85732650756836,
+   0.6992871165275574,
+   1.2217464447021484
+  ],
+  "extent": [
+   1.4607343673706055,
+   1.4547781944274902,
+   1.2272872924804688
+  ]
+ },
+ "top": {
+  "z": 0.7756,
+  "yaw": 0.0,
+  "resolution": 0.02,
+  "n_cells": 3163,
+  "n_free_cells": 3163,
+  "area_m2": 1.265,
+  "local_bounds_uv": [
+   10.427,
+   11.787,
+   -0.685,
+   0.635
+  ],
+  "hull_xy": [
+   [
+    10.427000045776367,
+    -0.6660000085830688
+   ],
+   [
+    11.72700023651123,
+    -0.6859999895095825
+   ],
+   [
+    11.746999740600586,
+    -0.6660000085830688
+   ],
+   [
+    11.786999702453613,
+    -0.6060000061988831
+   ],
+   [
+    11.786999702453613,
+    -0.4860000014305115
+   ],
+   [
+    11.767000198364258,
+    0.5540000200271606
+   ],
+   [
+    11.647000312805176,
+    0.5740000009536743
+   ],
+   [
+    11.506999969482422,
+    0.593999981880188
+   ],
+   [
+    11.206999778747559,
+    0.6340000033378601
+   ],
+   [
+    11.166999816894531,
+    0.6340000033378601
+   ],
+   [
+    10.427000045776367,
+    -0.10599999874830246
+   ]
+  ],
+  "occupants": [
+   "cubicle_deceti_0",
+   "cubicle_hzalfx_4",
+   "swivel_chair_ryznxk_0"
+  ]
+ },
+ "chairs_within_1m": [
+  "swivel_chair_ryznxk_0",
+  "swivel_chair_ryznxk_1",
+  "swivel_chair_ryznxk_6"
+ ],
+ "edges": [
+  {
+   "name": "+u",
+   "mid": [
+    11.7866,
+    -0.0255
+   ],
+   "inward": [
+    -1.0,
+    -0.0
+   ],
+   "tangent": [
+    0.0,
+    -1.0
+   ],
+   "length_m": 1.32,
+   "overhang_m": 0.071,
+   "room_in_front": "corridor_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.35,
+     "free_lateral_range_m": [
+      -0.66,
+      0.64
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.35,
+     "free_lateral_range_m": [
+      -0.66,
+      0.64
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.35,
+     "free_lateral_range_m": [
+      -0.66,
+      0.64
+     ]
+    }
+   }
+  },
+  {
+   "name": "-u",
+   "mid": [
+    10.4266,
+    -0.0255
+   ],
+   "inward": [
+    1.0,
+    0.0
+   ],
+   "tangent": [
+    -0.0,
+    1.0
+   ],
+   "length_m": 1.32,
+   "overhang_m": 0.0,
+   "room_in_front": "shared_office_0",
+   "blocked_in_front": {
+    "object": "cubicle_hzalfx_4",
+    "category": "cubicle",
+    "distance_m": 0.022
+   },
+   "runs": {
+    "0.35": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    },
+    "0.45": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    },
+    "0.55": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.444,
+     "longest_free_run_m": 0.6,
+     "free_lateral_range_m": [
+      -0.01,
+      0.54
+     ]
+    }
+   }
+  },
+  {
+   "name": "+v",
+   "mid": [
+    11.1066,
+    0.6345
+   ],
+   "inward": [
+    0.0,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    0.0
+   ],
+   "length_m": 1.36,
+   "overhang_m": 0.065,
+   "room_in_front": "shared_office_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.4,
+     "free_lateral_range_m": [
+      -0.68,
+      0.67
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.4,
+     "free_lateral_range_m": [
+      -0.68,
+      0.67
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.4,
+     "free_lateral_range_m": [
+      -0.68,
+      0.67
+     ]
+    }
+   }
+  },
+  {
+   "name": "-v",
+   "mid": [
+    11.1066,
+    -0.6855
+   ],
+   "inward": [
+    -0.0,
+    1.0
+   ],
+   "tangent": [
+    -1.0,
+    -0.0
+   ],
+   "length_m": 1.36,
+   "overhang_m": 0.07,
+   "room_in_front": "shared_office_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    },
+    "0.45": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    },
+    "0.55": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    }
+   }
+  }
+ ],
+ "in_union": false
+}

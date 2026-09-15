@@ -1,0 +1,1585 @@
+{
+ "scene": "house_single_floor",
+ "name": "bottom_cabinet_xqmipa_0",
+ "category": "bottom_cabinet",
+ "model": "xqmipa",
+ "key": "bottom_cabinet__xqmipa",
+ "scale": [
+  0.548,
+  0.5592,
+  0.9078
+ ],
+ "rooms": [
+  "bathroom_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   20.993335723876953,
+   11.313687324523926,
+   0.40321028232574463
+  ],
+  "orientation": [
+   0.0,
+   0.0,
+   0.0,
+   1.0
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   20.83761978149414,
+   10.655587196350098,
+   -0.0012385845184326172
+  ],
+  "max": [
+   21.217220306396484,
+   11.971787452697754,
+   0.7361614108085632
+  ],
+  "extent": [
+   0.37960052490234375,
+   1.3162002563476562,
+   0.7373999953269958
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_bottom_left_drawer": 3.0141975720932024e-11,
+  "j_bottom_right_drawer": 1.8436986312653225e-11,
+  "j_left_left_leaf": -2.157591626200133e-22,
+  "j_left_right_leaf": 2.1973511898920606e-09,
+  "j_middle_left_drawer": 6.057271654744123e-13,
+  "j_middle_right_drawer": 0.0,
+  "j_right_left_leaf": -3.6414907381962386e-22,
+  "j_right_right_leaf": 2.1973955988130456e-09,
+  "j_top_left_drawer": 2.956091046859427e-13,
+  "j_top_right_drawer": 4.225415861387055e-13
+ },
+ "openable_joint_ids": [],
+ "canonical_annotation": false,
+ "joints": [
+  {
+   "joint": "j_bottom_left_drawer",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "bottom_left_drawer",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.2031,
+   "axis_dir_obj": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.04776,
+    -0.10777,
+    -0.21845
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.6105554699897766,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.1458,
+    -0.2098,
+    -0.2968
+   ],
+   "link_bbox_max": [
+    0.2176,
+    -0.0051,
+    -0.0172
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.2103,
+      -0.1046,
+      -0.0659
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0094,
+     "length": 0.0531,
+     "depth": 0.0145,
+     "face_s": 0.2031,
+     "n_pieces": 3,
+     "pull_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "contact_world": [
+      21.2036,
+      11.2091,
+      0.3373
+     ],
+     "height_world": 0.337,
+     "pinch_axis_world": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      1.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.1979,
+     -0.1074,
+     -0.0522
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0104,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "contact_world": [
+     21.1912,
+     11.2063,
+     0.351
+    ],
+    "height_world": 0.351,
+    "pinch_axis_world": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "pull_dir_world": [
+     1.0,
+     0.0,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_centre_world": [
+    21.1964,
+    11.2062,
+    0.2462
+   ],
+   "front_free_m": 3.0,
+   "front_free_eroded_m": 0.4,
+   "room_in_front": "bathroom_0",
+   "prior_review": null
+  },
+  {
+   "joint": "j_bottom_right_drawer",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "bottom_right_drawer",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.2031,
+   "axis_dir_obj": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.04776,
+    0.10707,
+    -0.21845
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.6097966432571411,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.1458,
+    0.0051,
+    -0.2968
+   ],
+   "link_bbox_max": [
+    0.2176,
+    0.2098,
+    -0.0172
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.2103,
+      0.1102,
+      -0.0659
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0094,
+     "length": 0.0531,
+     "depth": 0.0145,
+     "face_s": 0.2031,
+     "n_pieces": 3,
+     "pull_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "contact_world": [
+      21.2036,
+      11.4239,
+      0.3373
+     ],
+     "height_world": 0.337,
+     "pinch_axis_world": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      1.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.1979,
+     0.1074,
+     -0.0522
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0104,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "contact_world": [
+     21.1912,
+     11.4211,
+     0.351
+    ],
+    "height_world": 0.351,
+    "pinch_axis_world": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "pull_dir_world": [
+     1.0,
+     0.0,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_centre_world": [
+    21.1964,
+    11.4211,
+    0.2462
+   ],
+   "front_free_m": 3.0,
+   "front_free_eroded_m": 0.4,
+   "room_in_front": "bathroom_0",
+   "prior_review": null
+  },
+  {
+   "joint": "j_left_left_leaf",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "left_left_leaf",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.2091,
+   "axis_dir_obj": [
+    0.0,
+    -0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    0.20838,
+    -0.63094,
+    -514.67568
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5707969665527344,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.1836,
+    -0.6316,
+    -0.293
+   ],
+   "link_bbox_max": [
+    0.2235,
+    -0.428,
+    0.2882
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.2163,
+      -0.4805,
+      0.2406
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0094,
+     "length": 0.0531,
+     "depth": 0.0144,
+     "face_s": 0.2091,
+     "n_pieces": 3,
+     "pull_dir": [
+      0.9986,
+      -0.0526,
+      0.0
+     ],
+     "contact_world": [
+      21.2096,
+      10.8332,
+      0.6438
+     ],
+     "height_world": 0.644,
+     "pinch_axis_world": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      0.9986,
+      -0.0526,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.2051,
+     -0.4646,
+     0.0453
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0.0477,
+     -0.9989,
+     -0.0
+    ],
+    "width": 0.0399,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     0.9998,
+     0.0197,
+     0.0
+    ],
+    "contact_world": [
+     21.1984,
+     10.8491,
+     0.4485
+    ],
+    "height_world": 0.449,
+    "pinch_axis_world": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     0.0477,
+     -0.9989,
+     0.0
+    ],
+    "pull_dir_world": [
+     0.9998,
+     0.0197,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_centre_world": [
+    21.2024,
+    10.7839,
+    0.4008
+   ],
+   "front_free_m": 1.85,
+   "front_free_eroded_m": 0.85,
+   "room_in_front": "bathroom_0",
+   "prior_review": null
+  },
+  {
+   "joint": "j_left_right_leaf",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "left_right_leaf",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.2091,
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "hinge_point_obj": [
+    0.2082,
+    -0.22245,
+    -0.00085
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5707966089248657,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.1829,
+    -0.4254,
+    -0.293
+   ],
+   "link_bbox_max": [
+    0.2236,
+    -0.2225,
+    0.2878
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.2163,
+      -0.3747,
+      0.2406
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0094,
+     "length": 0.0531,
+     "depth": 0.0145,
+     "face_s": 0.2091,
+     "n_pieces": 3,
+     "pull_dir": [
+      0.9986,
+      0.0531,
+      -0.0
+     ],
+     "contact_world": [
+      21.2096,
+      10.939,
+      0.6438
+     ],
+     "height_world": 0.644,
+     "pinch_axis_world": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      0.9986,
+      0.0531,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.205,
+     -0.3892,
+     0.047
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0.0487,
+     0.9988,
+     -0.0
+    ],
+    "width": 0.0407,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     0.9998,
+     -0.0192,
+     0.0
+    ],
+    "contact_world": [
+     21.1983,
+     10.9245,
+     0.4502
+    ],
+    "height_world": 0.45,
+    "pinch_axis_world": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     0.0487,
+     0.9988,
+     0.0
+    ],
+    "pull_dir_world": [
+     0.9998,
+     -0.0192,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_centre_world": [
+    21.2024,
+    10.9897,
+    0.4006
+   ],
+   "front_free_m": 3.0,
+   "front_free_eroded_m": 1.05,
+   "room_in_front": "bathroom_0",
+   "prior_review": null
+  },
+  {
+   "joint": "j_middle_left_drawer",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "middle_left_drawer",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.2032,
+   "axis_dir_obj": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.02979,
+    -0.10788,
+    0.03569
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.6114159822463989,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.1448,
+    -0.2113,
+    -0.0147
+   ],
+   "link_bbox_max": [
+    0.2177,
+    -0.0046,
+    0.1411
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.2104,
+      -0.107,
+      0.0826
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0094,
+     "length": 0.0531,
+     "depth": 0.0145,
+     "face_s": 0.2032,
+     "n_pieces": 3,
+     "pull_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "contact_world": [
+      21.2037,
+      11.2067,
+      0.4858
+     ],
+     "height_world": 0.486,
+     "pinch_axis_world": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      1.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.1984,
+     -0.108,
+     0.1061
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0096,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "contact_world": [
+     21.1917,
+     11.2057,
+     0.5093
+    ],
+    "height_world": 0.509,
+    "pinch_axis_world": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "pull_dir_world": [
+     1.0,
+     0.0,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_centre_world": [
+    21.1965,
+    11.2057,
+    0.4664
+   ],
+   "front_free_m": 3.0,
+   "front_free_eroded_m": 0.4,
+   "room_in_front": "bathroom_0",
+   "prior_review": null
+  },
+  {
+   "joint": "j_middle_right_drawer",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "middle_right_drawer",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.2032,
+   "axis_dir_obj": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.02979,
+    0.10801,
+    0.03569
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.6120043992996216,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.1448,
+    0.0046,
+    -0.0147
+   ],
+   "link_bbox_max": [
+    0.2177,
+    0.2113,
+    0.1411
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.2104,
+      0.1089,
+      0.0826
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0094,
+     "length": 0.0531,
+     "depth": 0.0145,
+     "face_s": 0.2032,
+     "n_pieces": 3,
+     "pull_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "contact_world": [
+      21.2037,
+      11.4226,
+      0.4858
+     ],
+     "height_world": 0.486,
+     "pinch_axis_world": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      1.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.1984,
+     0.108,
+     0.1061
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0096,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "contact_world": [
+     21.1917,
+     11.4217,
+     0.5093
+    ],
+    "height_world": 0.509,
+    "pinch_axis_world": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "pull_dir_world": [
+     1.0,
+     0.0,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_centre_world": [
+    21.1965,
+    11.4216,
+    0.4664
+   ],
+   "front_free_m": 3.0,
+   "front_free_eroded_m": 0.4,
+   "room_in_front": "bathroom_0",
+   "prior_review": null
+  },
+  {
+   "joint": "j_right_left_leaf",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "right_left_leaf",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.2088,
+   "axis_dir_obj": [
+    0.0,
+    -0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    8.24983,
+    0.22277,
+    -67459470.12182
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5707976818084717,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.1833,
+    0.2221,
+    -0.2932
+   ],
+   "link_bbox_max": [
+    0.2232,
+    0.4257,
+    0.288
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.216,
+      0.3733,
+      0.2404
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0094,
+     "length": 0.0531,
+     "depth": 0.0144,
+     "face_s": 0.2088,
+     "n_pieces": 3,
+     "pull_dir": [
+      0.0187,
+      0.9998,
+      0.0
+     ],
+     "contact_world": [
+      21.2093,
+      11.687,
+      0.6436
+     ],
+     "height_world": 0.644,
+     "pinch_axis_world": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      0.0187,
+      0.9998,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.2183,
+     0.2243,
+     0.0264
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0.9999,
+     -0.0126,
+     -0.0
+    ],
+    "width": 0.0399,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     0.0002,
+     1.0,
+     0.0
+    ],
+    "contact_world": [
+     21.2116,
+     11.538,
+     0.4296
+    ],
+    "height_world": 0.43,
+    "pinch_axis_world": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     0.9999,
+     -0.0126,
+     0.0
+    ],
+    "pull_dir_world": [
+     0.0002,
+     1.0,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_centre_world": [
+    21.2021,
+    11.6376,
+    0.4006
+   ],
+   "front_free_m": 0.65,
+   "front_free_eroded_m": 0.35,
+   "room_in_front": "bathroom_0",
+   "prior_review": null
+  },
+  {
+   "joint": "j_right_right_leaf",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "right_right_leaf",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.2094,
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "hinge_point_obj": [
+    0.2085,
+    0.63095,
+    -0.00065
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5707966089248657,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.1832,
+    0.428,
+    -0.2928
+   ],
+   "link_bbox_max": [
+    0.2239,
+    0.631,
+    0.288
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.2166,
+      0.4787,
+      0.2408
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0094,
+     "length": 0.0531,
+     "depth": 0.0145,
+     "face_s": 0.2094,
+     "n_pieces": 3,
+     "pull_dir": [
+      0.9986,
+      0.0531,
+      -0.0
+     ],
+     "contact_world": [
+      21.2099,
+      11.7924,
+      0.644
+     ],
+     "height_world": 0.644,
+     "pinch_axis_world": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      0.9986,
+      0.0531,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.2054,
+     0.4642,
+     0.0453
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0.0487,
+     0.9988,
+     -0.0
+    ],
+    "width": 0.0407,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     0.9998,
+     -0.0186,
+     0.0
+    ],
+    "contact_world": [
+     21.1987,
+     11.7779,
+     0.4485
+    ],
+    "height_world": 0.449,
+    "pinch_axis_world": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     0.0487,
+     0.9988,
+     0.0
+    ],
+    "pull_dir_world": [
+     0.9998,
+     -0.0186,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_centre_world": [
+    21.2027,
+    11.8432,
+    0.4008
+   ],
+   "front_free_m": 0.65,
+   "front_free_eroded_m": 0.0,
+   "room_in_front": "bathroom_0",
+   "prior_review": null
+  },
+  {
+   "joint": "j_top_left_drawer",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "top_left_drawer",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.2029,
+   "axis_dir_obj": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.02952,
+    -0.1072,
+    0.19362
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.6118828058242798,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.1451,
+    -0.2106,
+    0.1433
+   ],
+   "link_bbox_max": [
+    0.2174,
+    -0.0039,
+    0.299
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.2102,
+      -0.1063,
+      0.2406
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0094,
+     "length": 0.0531,
+     "depth": 0.0145,
+     "face_s": 0.2029,
+     "n_pieces": 3,
+     "pull_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "contact_world": [
+      21.2035,
+      11.2074,
+      0.6438
+     ],
+     "height_world": 0.644,
+     "pinch_axis_world": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      1.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.1981,
+     -0.1072,
+     0.264
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0096,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "contact_world": [
+     21.1914,
+     11.2065,
+     0.6672
+    ],
+    "height_world": 0.667,
+    "pinch_axis_world": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "pull_dir_world": [
+     1.0,
+     0.0,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_centre_world": [
+    21.1962,
+    11.2064,
+    0.6244
+   ],
+   "front_free_m": 3.0,
+   "front_free_eroded_m": 0.4,
+   "room_in_front": "bathroom_0",
+   "prior_review": null
+  },
+  {
+   "joint": "j_top_right_drawer",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "top_right_drawer",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.2029,
+   "axis_dir_obj": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.02952,
+    0.10732,
+    0.19362
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.6119848489761353,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.1451,
+    0.0039,
+    0.1433
+   ],
+   "link_bbox_max": [
+    0.2174,
+    0.2106,
+    0.299
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.2102,
+      0.1082,
+      0.2406
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0094,
+     "length": 0.0531,
+     "depth": 0.0145,
+     "face_s": 0.2029,
+     "n_pieces": 3,
+     "pull_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "contact_world": [
+      21.2035,
+      11.4219,
+      0.6438
+     ],
+     "height_world": 0.644,
+     "pinch_axis_world": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      1.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.1981,
+     0.1072,
+     0.264
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0096,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "contact_world": [
+     21.1914,
+     11.4209,
+     0.6672
+    ],
+    "height_world": 0.667,
+    "pinch_axis_world": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "pull_dir_world": [
+     1.0,
+     0.0,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_centre_world": [
+    21.1962,
+    11.4209,
+    0.6244
+   ],
+   "front_free_m": 3.0,
+   "front_free_eroded_m": 0.4,
+   "room_in_front": "bathroom_0",
+   "prior_review": null
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.1557,
+   -0.6581,
+   -0.4044
+  ],
+  "bbox_max": [
+   0.2201,
+   0.6581,
+   0.333
+  ],
+  "n_pieces": 20
+ },
+ "strip": "artic/strips/bottom_cabinet_xqmipa_0.png"
+}

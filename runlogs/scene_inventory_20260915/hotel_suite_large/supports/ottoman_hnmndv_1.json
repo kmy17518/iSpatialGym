@@ -1,0 +1,279 @@
+{
+ "scene": "hotel_suite_large",
+ "name": "ottoman_hnmndv_1",
+ "category": "ottoman",
+ "model": "hnmndv",
+ "scale": [
+  1.0001,
+  1.0,
+  0.9999
+ ],
+ "rooms": [
+  "bedroom_0"
+ ],
+ "aabb_world": {
+  "min": [
+   -0.0902460366487503,
+   -1.0274910926818848,
+   -0.0061667561531066895
+  ],
+  "max": [
+   0.37728047370910645,
+   0.46260738372802734,
+   0.4801826775074005
+  ],
+  "extent": [
+   0.46752649545669556,
+   1.490098476409912,
+   0.4863494336605072
+  ]
+ },
+ "top": {
+  "z": 0.4731,
+  "yaw": 0.0,
+  "resolution": 0.02,
+  "n_cells": 1518,
+  "n_free_cells": 1518,
+  "area_m2": 0.607,
+  "local_bounds_uv": [
+   -0.06,
+   0.34,
+   -0.997,
+   0.443
+  ],
+  "hull_xy": [
+   [
+    -0.05999999865889549,
+    -0.9779999852180481
+   ],
+   [
+    -0.03999999910593033,
+    -0.9980000257492065
+   ],
+   [
+    0.30000001192092896,
+    -0.9980000257492065
+   ],
+   [
+    0.3199999928474426,
+    -0.9779999852180481
+   ],
+   [
+    0.3400000035762787,
+    -0.9179999828338623
+   ],
+   [
+    0.3400000035762787,
+    0.38199999928474426
+   ],
+   [
+    0.30000001192092896,
+    0.421999990940094
+   ],
+   [
+    0.2800000011920929,
+    0.44200000166893005
+   ],
+   [
+    -0.019999999552965164,
+    0.44200000166893005
+   ],
+   [
+    -0.03999999910593033,
+    0.421999990940094
+   ],
+   [
+    -0.05999999865889549,
+    0.4020000100135803
+   ]
+  ],
+  "occupants": []
+ },
+ "chairs_within_1m": [],
+ "edges": [
+  {
+   "name": "+u",
+   "mid": [
+    0.3398,
+    -0.2775
+   ],
+   "inward": [
+    -1.0,
+    -0.0
+   ],
+   "tangent": [
+    0.0,
+    -1.0
+   ],
+   "length_m": 1.44,
+   "overhang_m": 0.0,
+   "room_in_front": "bedroom_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.45,
+     "free_lateral_range_m": [
+      -0.72,
+      0.68
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.45,
+     "free_lateral_range_m": [
+      -0.72,
+      0.68
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.45,
+     "free_lateral_range_m": [
+      -0.72,
+      0.68
+     ]
+    }
+   }
+  },
+  {
+   "name": "-u",
+   "mid": [
+    -0.0602,
+    -0.2775
+   ],
+   "inward": [
+    1.0,
+    0.0
+   ],
+   "tangent": [
+    -0.0,
+    1.0
+   ],
+   "length_m": 1.44,
+   "overhang_m": 0.0,
+   "room_in_front": "bedroom_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    },
+    "0.45": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    },
+    "0.55": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    }
+   }
+  },
+  {
+   "name": "+v",
+   "mid": [
+    0.1398,
+    0.4425
+   ],
+   "inward": [
+    0.0,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    0.0
+   ],
+   "length_m": 0.4,
+   "overhang_m": 0.0,
+   "room_in_front": "bedroom_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.45,
+     "free_lateral_range_m": [
+      -0.2,
+      0.2
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.45,
+     "free_lateral_range_m": [
+      -0.2,
+      0.2
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.45,
+     "free_lateral_range_m": [
+      -0.2,
+      0.2
+     ]
+    }
+   }
+  },
+  {
+   "name": "-v",
+   "mid": [
+    0.1398,
+    -0.9975
+   ],
+   "inward": [
+    -0.0,
+    1.0
+   ],
+   "tangent": [
+    -1.0,
+    -0.0
+   ],
+   "length_m": 0.4,
+   "overhang_m": 0.0,
+   "room_in_front": "bedroom_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.45,
+     "free_lateral_range_m": [
+      -0.2,
+      0.2
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.45,
+     "free_lateral_range_m": [
+      -0.2,
+      0.2
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.45,
+     "free_lateral_range_m": [
+      -0.2,
+      0.2
+     ]
+    }
+   }
+  }
+ ],
+ "in_union": false
+}

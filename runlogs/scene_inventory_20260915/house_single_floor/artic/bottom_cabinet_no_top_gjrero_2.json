@@ -1,0 +1,525 @@
+{
+ "scene": "house_single_floor",
+ "name": "bottom_cabinet_no_top_gjrero_2",
+ "category": "bottom_cabinet_no_top",
+ "model": "gjrero",
+ "key": "bottom_cabinet_no_top__gjrero",
+ "scale": [
+  0.9998,
+  1.3945,
+  1.2035
+ ],
+ "rooms": [
+  "utility_room_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   24.57786750793457,
+   -0.335743248462677,
+   0.4670557975769043
+  ],
+  "orientation": [
+   -7.450579886381092e-08,
+   -1.280568540096283e-09,
+   1.0,
+   -4.325992790654709e-07
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   24.183679580688477,
+   -0.8353974223136902,
+   -0.0035530030727386475
+  ],
+  "max": [
+   24.847412109375,
+   0.1625068187713623,
+   0.8826817274093628
+  ],
+  "extent": [
+   0.6637325286865234,
+   0.9979042410850525,
+   0.8862347602844238
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_link_0": 1.144177308454175e-09,
+  "j_link_1": 3.103040827762138e-14
+ },
+ "openable_joint_ids": [
+  [
+   1,
+   "j_link_0"
+  ],
+  [
+   2,
+   "j_link_1"
+  ]
+ ],
+ "canonical_annotation": false,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "link_0",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.3546,
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "hinge_point_obj": [
+    0.34185,
+    0.46209,
+    -514.64169
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5707964897155762,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.3291,
+    0.0011,
+    -0.341
+   ],
+   "link_bbox_max": [
+    0.3942,
+    0.4792,
+    0.4101
+   ],
+   "handles": [
+    {
+     "kind": "knob",
+     "contact": [
+      0.3822,
+      0.0461,
+      0.0756
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0227,
+     "length": 0.0453,
+     "depth": 0.0396,
+     "face_s": 0.3546,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9953,
+      0.0965,
+      -0.0
+     ],
+     "contact_world": [
+      24.1957,
+      -0.3818,
+      0.5427
+     ],
+     "height_world": 0.543,
+     "pinch_axis_world": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      -0.9953,
+      -0.0965,
+      -0.0
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      0.3822,
+      0.0466,
+      0.253
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0228,
+     "length": 0.2459,
+     "depth": 0.0396,
+     "face_s": 0.3546,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9953,
+      0.0967,
+      -0.0
+     ],
+     "contact_world": [
+      24.1957,
+      -0.3823,
+      0.7201
+     ],
+     "height_world": 0.72,
+     "pinch_axis_world": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      -0.9953,
+      -0.0967,
+      -0.0
+     ]
+    },
+    {
+     "kind": "knob",
+     "contact": [
+      0.3648,
+      0.0469,
+      0.3187
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0212,
+     "length": 0.0366,
+     "depth": 0.0203,
+     "face_s": 0.3546,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9985,
+      0.0552,
+      -0.0
+     ],
+     "contact_world": [
+      24.2131,
+      -0.3826,
+      0.7858
+     ],
+     "height_world": 0.786,
+     "pinch_axis_world": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      -0.9985,
+      -0.0552,
+      -0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.3408,
+     0.0375,
+     0.0346
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     -0.0889,
+     0.996,
+     -0.0
+    ],
+    "width": 0.0651,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     1.0,
+     -0.0025,
+     0.0
+    ],
+    "contact_world": [
+     24.2371,
+     -0.3732,
+     0.5017
+    ],
+    "height_world": 0.502,
+    "pinch_axis_world": [
+     -1.0,
+     -0.0,
+     -0.0
+    ],
+    "approach_dir_world": [
+     0.0889,
+     -0.996,
+     0.0
+    ],
+    "pull_dir_world": [
+     -1.0,
+     0.0025,
+     -0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "face_centre_world": [
+    24.2233,
+    -0.5759,
+    0.5016
+   ],
+   "front_free_m": 2.0,
+   "front_free_eroded_m": 1.7,
+   "room_in_front": "utility_room_0",
+   "prior_review": null
+  },
+  {
+   "joint": "j_link_1",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "link_1",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.3546,
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    0.34197,
+    -0.47299,
+    -514.63196
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.570804476737976,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.3291,
+    -0.4777,
+    -0.341
+   ],
+   "link_bbox_max": [
+    0.3942,
+    0.0003,
+    0.4101
+   ],
+   "handles": [
+    {
+     "kind": "knob",
+     "contact": [
+      0.3822,
+      -0.0448,
+      0.0677
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0226,
+     "length": 0.0393,
+     "depth": 0.0395,
+     "face_s": 0.3546,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9956,
+      -0.0935,
+      0.0
+     ],
+     "contact_world": [
+      24.1957,
+      -0.2909,
+      0.5348
+     ],
+     "height_world": 0.535,
+     "pinch_axis_world": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      -0.9956,
+      0.0935,
+      -0.0
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      0.3822,
+      -0.0438,
+      0.2825
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0228,
+     "length": 0.2519,
+     "depth": 0.0395,
+     "face_s": 0.3546,
+     "n_pieces": 2,
+     "pull_dir": [
+      0.9956,
+      -0.0933,
+      0.0
+     ],
+     "contact_world": [
+      24.1957,
+      -0.2919,
+      0.7496
+     ],
+     "height_world": 0.75,
+     "pinch_axis_world": [
+      -0.0,
+      1.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      -0.9956,
+      0.0933,
+      -0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.3414,
+     -0.0362,
+     0.0346
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     -0.0837,
+     -0.9965,
+     -0.0
+    ],
+    "width": 0.0651,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     1.0,
+     0.0013,
+     0.0
+    ],
+    "contact_world": [
+     24.2365,
+     -0.2995,
+     0.5017
+    ],
+    "height_world": 0.502,
+    "pinch_axis_world": [
+     -1.0,
+     -0.0,
+     -0.0
+    ],
+    "approach_dir_world": [
+     0.0837,
+     0.9965,
+     0.0
+    ],
+    "pull_dir_world": [
+     -1.0,
+     -0.0013,
+     -0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "face_centre_world": [
+    24.2233,
+    -0.097,
+    0.5016
+   ],
+   "front_free_m": 2.0,
+   "front_free_eroded_m": 1.6,
+   "room_in_front": "utility_room_0",
+   "prior_review": null
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.2695,
+   -0.4983,
+   -0.4706
+  ],
+  "bbox_max": [
+   0.3365,
+   0.4997,
+   0.4156
+  ],
+  "n_pieces": 32
+ },
+ "strip": "artic/strips/bottom_cabinet_no_top_gjrero_2.png"
+}

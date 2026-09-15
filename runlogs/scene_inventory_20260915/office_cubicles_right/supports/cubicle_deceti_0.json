@@ -1,0 +1,261 @@
+{
+ "scene": "office_cubicles_right",
+ "name": "cubicle_deceti_0",
+ "category": "cubicle",
+ "model": "deceti",
+ "scale": [
+  1.0,
+  1.0,
+  1.0
+ ],
+ "rooms": [
+  "shared_office_0"
+ ],
+ "aabb_world": {
+  "min": [
+   10.396596908569336,
+   -2.192572832107544,
+   -0.005480527877807617
+  ],
+  "max": [
+   11.857330322265625,
+   -0.7377912402153015,
+   1.2217423915863037
+  ],
+  "extent": [
+   1.460733413696289,
+   1.4547815322875977,
+   1.2272229194641113
+  ]
+ },
+ "top": {
+  "z": 0.7756,
+  "yaw": 0.0,
+  "resolution": 0.02,
+  "n_cells": 3127,
+  "n_free_cells": 3127,
+  "area_m2": 1.251,
+  "local_bounds_uv": [
+   10.427,
+   11.787,
+   -2.123,
+   -0.823
+  ],
+  "hull_xy": [
+   [
+    10.427000045776367,
+    -1.3830000162124634
+   ],
+   [
+    11.187000274658203,
+    -2.122999906539917
+   ],
+   [
+    11.786999702453613,
+    -2.122999906539917
+   ],
+   [
+    11.786999702453613,
+    -0.8230000138282776
+   ],
+   [
+    10.427000045776367,
+    -0.8230000138282776
+   ]
+  ],
+  "occupants": [
+   "cubicle_deceti_1",
+   "cubicle_hzalfx_5",
+   "swivel_chair_ryznxk_6"
+  ]
+ },
+ "chairs_within_1m": [
+  "swivel_chair_ryznxk_0",
+  "swivel_chair_ryznxk_6",
+  "swivel_chair_ryznxk_7"
+ ],
+ "edges": [
+  {
+   "name": "+u",
+   "mid": [
+    11.7866,
+    -1.4726
+   ],
+   "inward": [
+    -1.0,
+    -0.0
+   ],
+   "tangent": [
+    0.0,
+    -1.0
+   ],
+   "length_m": 1.3,
+   "overhang_m": 0.071,
+   "room_in_front": "corridor_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.35,
+     "free_lateral_range_m": [
+      -0.65,
+      0.65
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.35,
+     "free_lateral_range_m": [
+      -0.65,
+      0.65
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.35,
+     "free_lateral_range_m": [
+      -0.65,
+      0.65
+     ]
+    }
+   }
+  },
+  {
+   "name": "-u",
+   "mid": [
+    10.4266,
+    -1.4726
+   ],
+   "inward": [
+    1.0,
+    0.0
+   ],
+   "tangent": [
+    -0.0,
+    1.0
+   ],
+   "length_m": 1.3,
+   "overhang_m": 0.0,
+   "room_in_front": "shared_office_0",
+   "blocked_in_front": {
+    "object": "cubicle_deceti_1",
+    "category": "cubicle",
+    "distance_m": 0.022
+   },
+   "runs": {
+    "0.35": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    },
+    "0.45": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    },
+    "0.55": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.444,
+     "longest_free_run_m": 0.6,
+     "free_lateral_range_m": [
+      -0.55,
+      -0.0
+     ]
+    }
+   }
+  },
+  {
+   "name": "+v",
+   "mid": [
+    11.1066,
+    -0.8226
+   ],
+   "inward": [
+    0.0,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    0.0
+   ],
+   "length_m": 1.36,
+   "overhang_m": 0.085,
+   "room_in_front": "shared_office_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    },
+    "0.45": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    },
+    "0.55": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    }
+   }
+  },
+  {
+   "name": "-v",
+   "mid": [
+    11.1066,
+    -2.1226
+   ],
+   "inward": [
+    -0.0,
+    1.0
+   ],
+   "tangent": [
+    -1.0,
+    -0.0
+   ],
+   "length_m": 1.36,
+   "overhang_m": 0.07,
+   "room_in_front": "shared_office_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.4,
+     "free_lateral_range_m": [
+      -0.68,
+      0.67
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.4,
+     "free_lateral_range_m": [
+      -0.68,
+      0.67
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.4,
+     "free_lateral_range_m": [
+      -0.68,
+      0.67
+     ]
+    }
+   }
+  }
+ ],
+ "in_union": false
+}

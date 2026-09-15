@@ -1,0 +1,1002 @@
+{
+ "scene": "Rs_int",
+ "name": "bottom_cabinet_jhymlr_0",
+ "category": "bottom_cabinet",
+ "model": "jhymlr",
+ "key": "bottom_cabinet__jhymlr",
+ "scale": [
+  2.3135,
+  2.4063,
+  2.0004
+ ],
+ "rooms": [
+  "living_room_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   1.6596179008483887,
+   -1.4950332641601562,
+   0.3776909112930298
+  ],
+  "orientation": [
+   -5.477902595885098e-05,
+   -6.1989330788492225e-06,
+   1.0,
+   -9.103025035983592e-07
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   1.2802174091339111,
+   -2.3184564113616943,
+   0.0042223334312438965
+  ],
+  "max": [
+   1.8484673500061035,
+   -0.6716662645339966,
+   0.7543675899505615
+  ],
+  "extent": [
+   0.5682499408721924,
+   1.6467901468276978,
+   0.7501452565193176
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_link_0": 2.872411926091445e-07,
+  "j_link_1": 2.872411926091445e-07,
+  "j_link_2": 2.872411926091445e-07,
+  "j_link_3": 2.872411926091445e-07,
+  "j_link_4": 2.872411926091445e-07,
+  "j_link_5": 2.8724116418743506e-07
+ },
+ "openable_joint_ids": [
+  [
+   0,
+   "j_link_0"
+  ],
+  [
+   2,
+   "j_link_1"
+  ],
+  [
+   4,
+   "j_link_2"
+  ],
+  [
+   6,
+   "j_link_3"
+  ],
+  [
+   8,
+   "j_link_4"
+  ],
+  [
+   10,
+   "j_link_5"
+  ]
+ ],
+ "canonical_annotation": false,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "link_0",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.3534,
+   "axis_dir_obj": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.14959,
+    0.40609,
+    -0.25081
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.20061302185058594,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.1628,
+    0.0012,
+    -0.3275
+   ],
+   "link_bbox_max": [
+    0.3794,
+    0.811,
+    -0.0659
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.3674,
+      0.4061,
+      -0.0682
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0047,
+     "length": 0.2098,
+     "depth": 0.026,
+     "face_s": 0.3534,
+     "n_pieces": 1,
+     "pull_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "contact_world": [
+      1.2922,
+      -1.9011,
+      0.3094
+     ],
+     "height_world": 0.309,
+     "pinch_axis_world": [
+      0.0001,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      1.0,
+      0.0,
+      0.0001
+     ],
+     "pull_dir_world": [
+      -1.0,
+      -0.0,
+      -0.0001
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.3317,
+     0.4061,
+     -0.1009
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0434,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "contact_world": [
+     1.3279,
+     -1.9011,
+     0.2767
+    ],
+    "height_world": 0.277,
+    "pinch_axis_world": [
+     -1.0,
+     -0.0,
+     -0.0001
+    ],
+    "approach_dir_world": [
+     0.0001,
+     0.0,
+     -1.0
+    ],
+    "pull_dir_world": [
+     -1.0,
+     -0.0,
+     -0.0001
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    -1.0,
+    -0.0,
+    -0.0001
+   ],
+   "face_centre_world": [
+    1.3062,
+    -1.9011,
+    0.1809
+   ],
+   "front_free_m": 2.3,
+   "front_free_eroded_m": 1.0,
+   "room_in_front": "living_room_0",
+   "prior_review": null
+  },
+  {
+   "joint": "j_link_1",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "link_1",
+   "outward_normal": [
+    1.0,
+    -0.0,
+    0.0
+   ],
+   "face_s": 0.3534,
+   "axis_dir_obj": [
+    1.0,
+    -0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.14971,
+    0.40609,
+    0.0119
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.20061302185058594,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.1628,
+    0.0012,
+    -0.0649
+   ],
+   "link_bbox_max": [
+    0.3794,
+    0.811,
+    0.1976
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.3674,
+      0.4061,
+      0.1953
+     ],
+     "pinch_axis": [
+      0.0,
+      -0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      0.0,
+      -0.0
+     ],
+     "width": 0.0047,
+     "length": 0.2098,
+     "depth": 0.026,
+     "face_s": 0.3534,
+     "n_pieces": 1,
+     "pull_dir": [
+      1.0,
+      -0.0,
+      0.0
+     ],
+     "contact_world": [
+      1.2922,
+      -1.9011,
+      0.5729
+     ],
+     "height_world": 0.573,
+     "pinch_axis_world": [
+      0.0001,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      1.0,
+      0.0,
+      0.0001
+     ],
+     "pull_dir_world": [
+      -1.0,
+      -0.0,
+      -0.0001
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.3317,
+     0.4061,
+     0.1626
+    ],
+    "pinch_axis": [
+     1.0,
+     -0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0434,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     1.0,
+     -0.0,
+     0.0
+    ],
+    "contact_world": [
+     1.3279,
+     -1.9011,
+     0.5402
+    ],
+    "height_world": 0.54,
+    "pinch_axis_world": [
+     -1.0,
+     -0.0,
+     -0.0001
+    ],
+    "approach_dir_world": [
+     0.0001,
+     0.0,
+     -1.0
+    ],
+    "pull_dir_world": [
+     -1.0,
+     -0.0,
+     -0.0001
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    -1.0,
+    -0.0,
+    -0.0001
+   ],
+   "face_centre_world": [
+    1.3062,
+    -1.9011,
+    0.444
+   ],
+   "front_free_m": 2.3,
+   "front_free_eroded_m": 1.0,
+   "room_in_front": "living_room_0",
+   "prior_review": null
+  },
+  {
+   "joint": "j_link_2",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "link_2",
+   "outward_normal": [
+    1.0,
+    -0.0,
+    0.0
+   ],
+   "face_s": 0.3533,
+   "axis_dir_obj": [
+    1.0,
+    -0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.14136,
+    0.40609,
+    0.24679
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.20061302185058594,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.1629,
+    0.0012,
+    0.1985
+   ],
+   "link_bbox_max": [
+    0.3794,
+    0.811,
+    0.3664
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.3674,
+      0.4061,
+      0.3641
+     ],
+     "pinch_axis": [
+      0.0,
+      -0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      0.0,
+      -0.0
+     ],
+     "width": 0.0047,
+     "length": 0.2098,
+     "depth": 0.026,
+     "face_s": 0.3533,
+     "n_pieces": 1,
+     "pull_dir": [
+      1.0,
+      -0.0,
+      0.0
+     ],
+     "contact_world": [
+      1.2922,
+      -1.9011,
+      0.7417
+     ],
+     "height_world": 0.742,
+     "pinch_axis_world": [
+      0.0001,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      1.0,
+      0.0,
+      0.0001
+     ],
+     "pull_dir_world": [
+      -1.0,
+      -0.0,
+      -0.0001
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.3317,
+     0.4061,
+     0.3314
+    ],
+    "pinch_axis": [
+     1.0,
+     -0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0434,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     1.0,
+     -0.0,
+     0.0
+    ],
+    "contact_world": [
+     1.3279,
+     -1.9011,
+     0.709
+    ],
+    "height_world": 0.709,
+    "pinch_axis_world": [
+     -1.0,
+     -0.0,
+     -0.0001
+    ],
+    "approach_dir_world": [
+     0.0001,
+     0.0,
+     -1.0
+    ],
+    "pull_dir_world": [
+     -1.0,
+     -0.0,
+     -0.0001
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    -1.0,
+    -0.0,
+    -0.0001
+   ],
+   "face_centre_world": [
+    1.3063,
+    -1.9011,
+    0.6601
+   ],
+   "front_free_m": 2.3,
+   "front_free_eroded_m": 1.0,
+   "room_in_front": "living_room_0",
+   "prior_review": null
+  },
+  {
+   "joint": "j_link_3",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "link_3",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.3534,
+   "axis_dir_obj": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.14959,
+    -0.40602,
+    -0.25082
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.20061302185058594,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.1628,
+    -0.811,
+    -0.3275
+   ],
+   "link_bbox_max": [
+    0.3794,
+    -0.0011,
+    -0.0659
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.3674,
+      -0.406,
+      -0.0682
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0047,
+     "length": 0.2098,
+     "depth": 0.026,
+     "face_s": 0.3534,
+     "n_pieces": 1,
+     "pull_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "contact_world": [
+      1.2922,
+      -1.089,
+      0.3095
+     ],
+     "height_world": 0.309,
+     "pinch_axis_world": [
+      0.0001,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      1.0,
+      0.0,
+      0.0001
+     ],
+     "pull_dir_world": [
+      -1.0,
+      -0.0,
+      -0.0001
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.3317,
+     -0.406,
+     -0.1009
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0434,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "contact_world": [
+     1.3279,
+     -1.089,
+     0.2768
+    ],
+    "height_world": 0.277,
+    "pinch_axis_world": [
+     -1.0,
+     -0.0,
+     -0.0001
+    ],
+    "approach_dir_world": [
+     0.0001,
+     0.0,
+     -1.0
+    ],
+    "pull_dir_world": [
+     -1.0,
+     -0.0,
+     -0.0001
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    -1.0,
+    -0.0,
+    -0.0001
+   ],
+   "face_centre_world": [
+    1.3062,
+    -1.089,
+    0.181
+   ],
+   "front_free_m": 1.4,
+   "front_free_eroded_m": 1.1,
+   "room_in_front": "living_room_0",
+   "prior_review": null
+  },
+  {
+   "joint": "j_link_4",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "link_4",
+   "outward_normal": [
+    1.0,
+    -0.0,
+    0.0
+   ],
+   "face_s": 0.3534,
+   "axis_dir_obj": [
+    1.0,
+    -0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.14971,
+    -0.40603,
+    0.01189
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.20061302185058594,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.1628,
+    -0.811,
+    -0.0649
+   ],
+   "link_bbox_max": [
+    0.3794,
+    -0.0011,
+    0.1976
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.3674,
+      -0.406,
+      0.1953
+     ],
+     "pinch_axis": [
+      0.0,
+      -0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      0.0,
+      -0.0
+     ],
+     "width": 0.0047,
+     "length": 0.2098,
+     "depth": 0.026,
+     "face_s": 0.3534,
+     "n_pieces": 1,
+     "pull_dir": [
+      1.0,
+      -0.0,
+      0.0
+     ],
+     "contact_world": [
+      1.2922,
+      -1.089,
+      0.573
+     ],
+     "height_world": 0.573,
+     "pinch_axis_world": [
+      0.0001,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      1.0,
+      0.0,
+      0.0001
+     ],
+     "pull_dir_world": [
+      -1.0,
+      -0.0,
+      -0.0001
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.3317,
+     -0.406,
+     0.1626
+    ],
+    "pinch_axis": [
+     1.0,
+     -0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0434,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     1.0,
+     -0.0,
+     0.0
+    ],
+    "contact_world": [
+     1.3279,
+     -1.089,
+     0.5403
+    ],
+    "height_world": 0.54,
+    "pinch_axis_world": [
+     -1.0,
+     -0.0,
+     -0.0001
+    ],
+    "approach_dir_world": [
+     0.0001,
+     0.0,
+     -1.0
+    ],
+    "pull_dir_world": [
+     -1.0,
+     -0.0,
+     -0.0001
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    -1.0,
+    -0.0,
+    -0.0001
+   ],
+   "face_centre_world": [
+    1.3062,
+    -1.089,
+    0.444
+   ],
+   "front_free_m": 1.4,
+   "front_free_eroded_m": 1.1,
+   "room_in_front": "living_room_0",
+   "prior_review": null
+  },
+  {
+   "joint": "j_link_5",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "link_5",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.3533,
+   "axis_dir_obj": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.14136,
+    -0.40603,
+    0.24678
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.20061302185058594,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.1629,
+    -0.811,
+    0.1985
+   ],
+   "link_bbox_max": [
+    0.3794,
+    -0.0011,
+    0.3664
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.3674,
+      -0.406,
+      0.364
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0047,
+     "length": 0.2098,
+     "depth": 0.026,
+     "face_s": 0.3533,
+     "n_pieces": 1,
+     "pull_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "contact_world": [
+      1.2922,
+      -1.089,
+      0.7417
+     ],
+     "height_world": 0.742,
+     "pinch_axis_world": [
+      0.0001,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      1.0,
+      0.0,
+      0.0001
+     ],
+     "pull_dir_world": [
+      -1.0,
+      -0.0,
+      -0.0001
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.3317,
+     -0.406,
+     0.3314
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0434,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "contact_world": [
+     1.3279,
+     -1.089,
+     0.7091
+    ],
+    "height_world": 0.709,
+    "pinch_axis_world": [
+     -1.0,
+     -0.0,
+     -0.0001
+    ],
+    "approach_dir_world": [
+     0.0001,
+     0.0,
+     -1.0
+    ],
+    "pull_dir_world": [
+     -1.0,
+     -0.0,
+     -0.0001
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    -1.0,
+    -0.0,
+    -0.0001
+   ],
+   "face_centre_world": [
+    1.3063,
+    -1.089,
+    0.6601
+   ],
+   "front_free_m": 1.4,
+   "front_free_eroded_m": 1.1,
+   "room_in_front": "living_room_0",
+   "prior_review": null
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.1889,
+   -0.8234,
+   -0.3735
+  ],
+  "bbox_max": [
+   0.3534,
+   0.8234,
+   0.3767
+  ],
+  "n_pieces": 9
+ },
+ "strip": "artic/strips/bottom_cabinet_jhymlr_0.png"
+}

@@ -1,0 +1,54 @@
+{
+ "scene": "office_cubicles_right",
+ "name": "bottom_cabinet_immwzb_1",
+ "category": "bottom_cabinet",
+ "model": "immwzb",
+ "scale": [
+  1.3301,
+  0.9117,
+  1.3046
+ ],
+ "rooms": [
+  "shared_office_0"
+ ],
+ "aabb_world": {
+  "min": [
+   8.987759590148926,
+   -0.699209988117218,
+   0.0026369690895080566
+  ],
+  "max": [
+   9.38122844696045,
+   -0.09632598608732224,
+   0.7109996676445007
+  ],
+  "extent": [
+   0.39346885681152344,
+   0.6028839945793152,
+   0.7083626985549927
+  ]
+ },
+ "top": {
+  "z": 0.711,
+  "yaw": 1.5708,
+  "resolution": 0.02,
+  "n_cells": 0,
+  "n_free_cells": 0,
+  "area_m2": 0.0,
+  "local_bounds_uv": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "hull_xy": [],
+  "occupants": [
+   "cubicle_hzalfx_4"
+  ]
+ },
+ "chairs_within_1m": [
+  "swivel_chair_ryznxk_1"
+ ],
+ "edges": [],
+ "in_union": false
+}

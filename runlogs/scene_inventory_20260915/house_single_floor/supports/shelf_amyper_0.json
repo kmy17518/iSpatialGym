@@ -1,0 +1,52 @@
+{
+ "scene": "house_single_floor",
+ "name": "shelf_amyper_0",
+ "category": "shelf",
+ "model": "amyper",
+ "scale": [
+  1.0001,
+  1.0,
+  1.0
+ ],
+ "rooms": [
+  "corridor_0"
+ ],
+ "aabb_world": {
+  "min": [
+   19.786283493041992,
+   12.290661811828613,
+   2.392035722732544
+  ],
+  "max": [
+   20.136613845825195,
+   14.034195899963379,
+   2.452035665512085
+  ],
+  "extent": [
+   0.3503303527832031,
+   1.7435340881347656,
+   0.059999942779541016
+  ]
+ },
+ "top": {
+  "z": 2.452,
+  "yaw": 3.139,
+  "resolution": 0.02,
+  "n_cells": 0,
+  "n_free_cells": 0,
+  "area_m2": 0.0,
+  "local_bounds_uv": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "hull_xy": [],
+  "occupants": [
+   "ceilings_apkslx_0"
+  ]
+ },
+ "chairs_within_1m": [],
+ "edges": [],
+ "in_union": false
+}

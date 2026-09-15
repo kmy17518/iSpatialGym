@@ -1,0 +1,217 @@
+{
+ "scene": "office_cubicles_right",
+ "name": "door_lztyfn_0",
+ "category": "door",
+ "model": "lztyfn",
+ "key": "door__lztyfn",
+ "scale": [
+  0.9997,
+  1.0,
+  1.0
+ ],
+ "rooms": [
+  "bathroom_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   14.031078338623047,
+   8.14438247680664,
+   1.1921825408935547
+  ],
+  "orientation": [
+   -5.960465188081798e-08,
+   -1.160545421428124e-14,
+   1.0,
+   -1.9470718370939721e-07
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   13.95466136932373,
+   7.644680976867676,
+   -0.00833117961883545
+  ],
+  "max": [
+   14.111950874328613,
+   8.649115562438965,
+   2.0733261108398438
+  ],
+  "extent": [
+   0.1572895050048828,
+   1.004434585571289,
+   2.0816574096679688
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_door": -5.737695505915028e-21
+ },
+ "openable_joint_ids": [],
+ "canonical_annotation": false,
+ "joints": [
+  {
+   "joint": "j_door",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "door",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.0301,
+   "axis_dir_obj": [
+    0.0,
+    -0.0,
+    1.0
+   ],
+   "hinge_point_obj": [
+    16.08285,
+    -0.40084,
+    134919053.85743
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.7391692399978638,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.0473,
+    -0.4085,
+    -1.1773
+   ],
+   "link_bbox_max": [
+    0.0764,
+    0.3949,
+    0.7797
+   ],
+   "handles": [
+    {
+     "kind": "knob",
+     "contact": [
+      0.0644,
+      0.3107,
+      -0.331
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0563,
+     "length": 0.1329,
+     "depth": 0.0463,
+     "face_s": 0.0301,
+     "n_pieces": 3,
+     "pull_dir": [
+      -0.0444,
+      -0.999,
+      0.0
+     ],
+     "contact_world": [
+      13.9667,
+      7.8337,
+      0.8612
+     ],
+     "height_world": 0.861,
+     "pinch_axis_world": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "pull_dir_world": [
+      0.0444,
+      0.999,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     -0.0107,
+     0.3199,
+     -0.331
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0.9997,
+     -0.0245,
+     -0.0
+    ],
+    "width": 0.1237,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     -0.0447,
+     -0.999,
+     0.0
+    ],
+    "contact_world": [
+     14.0418,
+     7.8245,
+     0.8612
+    ],
+    "height_world": 0.861,
+    "pinch_axis_world": [
+     -1.0,
+     -0.0,
+     -0.0
+    ],
+    "approach_dir_world": [
+     -0.9997,
+     0.0245,
+     -0.0
+    ],
+    "pull_dir_world": [
+     0.0447,
+     0.999,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "face_centre_world": [
+    14.001,
+    8.1512,
+    0.9934
+   ],
+   "front_free_m": 2.1,
+   "front_free_eroded_m": 1.8,
+   "room_in_front": "corridor_0",
+   "prior_review": null
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0809,
+   -0.5047,
+   -1.2005
+  ],
+  "bbox_max": [
+   0.0647,
+   0.4997,
+   0.8811
+  ],
+  "n_pieces": 4
+ },
+ "strip": "artic/strips/door_lztyfn_0.png"
+}

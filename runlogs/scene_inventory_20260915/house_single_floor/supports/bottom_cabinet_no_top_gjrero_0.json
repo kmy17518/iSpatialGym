@@ -1,0 +1,52 @@
+{
+ "scene": "house_single_floor",
+ "name": "bottom_cabinet_no_top_gjrero_0",
+ "category": "bottom_cabinet_no_top",
+ "model": "gjrero",
+ "scale": [
+  0.9998,
+  1.3945,
+  1.2035
+ ],
+ "rooms": [
+  "utility_room_0"
+ ],
+ "aabb_world": {
+  "min": [
+   24.183679580688477,
+   1.178321361541748,
+   -0.0035530030727386475
+  ],
+  "max": [
+   24.847412109375,
+   2.1762256622314453,
+   0.8826817274093628
+  ],
+  "extent": [
+   0.6637325286865234,
+   0.9979043006896973,
+   0.8862347602844238
+  ]
+ },
+ "top": {
+  "z": 0.8827,
+  "yaw": -3.1416,
+  "resolution": 0.02,
+  "n_cells": 0,
+  "n_free_cells": 0,
+  "area_m2": 0.0,
+  "local_bounds_uv": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "hull_xy": [],
+  "occupants": [
+   "countertop_ikwqer_0"
+  ]
+ },
+ "chairs_within_1m": [],
+ "edges": [],
+ "in_union": false
+}

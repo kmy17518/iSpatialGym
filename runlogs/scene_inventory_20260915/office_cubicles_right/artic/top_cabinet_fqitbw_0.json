@@ -1,0 +1,180 @@
+{
+ "scene": "office_cubicles_right",
+ "name": "top_cabinet_fqitbw_0",
+ "category": "top_cabinet",
+ "model": "fqitbw",
+ "key": "top_cabinet__fqitbw",
+ "scale": [
+  1.7096,
+  6.1928,
+  6.9626
+ ],
+ "rooms": [
+  "copy_room_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   9.993484497070312,
+   -8.870285034179688,
+   2.4396815299987793
+  ],
+  "orientation": [
+   -5.816263728775084e-05,
+   -5.5128170060925186e-05,
+   -0.7071061730384827,
+   0.7071073651313782
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   8.235773086547852,
+   -9.06483268737793,
+   1.9026038646697998
+  ],
+  "max": [
+   11.760047912597656,
+   -8.75680160522461,
+   3.000063419342041
+  ],
+  "extent": [
+   3.5242748260498047,
+   0.3080310821533203,
+   1.0974595546722412
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_link_1": -1.3923620231194795e-16
+ },
+ "openable_joint_ids": [
+  [
+   1,
+   "j_link_1"
+  ]
+ ],
+ "canonical_annotation": true,
+ "joints": [
+  {
+   "joint": "j_link_1",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "link_1",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.1736,
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    0.15911,
+    0.0,
+    0.54361
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 2.094395160675049,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.1549,
+    -1.7336,
+    -0.5187
+   ],
+   "link_bbox_max": [
+    0.1945,
+    1.7419,
+    0.5475
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     0.1642,
+     -0.3434,
+     -0.4834
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     -0.0294,
+     -0.0,
+     0.9996
+    ],
+    "width": 0.0105,
+    "exposed": false,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     1.0,
+     0.0,
+     0.005
+    ],
+    "contact_world": [
+     9.6501,
+     -9.0346,
+     1.9563
+    ],
+    "height_world": 1.956,
+    "pinch_axis_world": [
+     0.0,
+     -1.0,
+     0.0002
+    ],
+    "approach_dir_world": [
+     0.0,
+     0.0296,
+     0.9996
+    ],
+    "pull_dir_world": [
+     0.0,
+     -1.0,
+     0.0052
+    ]
+   },
+   "sub_links": [],
+   "status": "ungraspable",
+   "outward_normal_world": [
+    0.0,
+    -1.0,
+    0.0002
+   ],
+   "face_centre_world": [
+    9.9976,
+    -9.0439,
+    2.4541
+   ],
+   "front_free_m": 2.05,
+   "front_free_eroded_m": 1.75,
+   "room_in_front": "copy_room_0",
+   "prior_review": {
+    "chosen": "A",
+    "pinch": "knob",
+    "motion": "swing",
+    "graspable": "True",
+    "handle_desc": "Small knob/latch at bottom-right corner of glass-paned flap; ~12 mm protrusion, marginal; flap hinged at top, bottom edge swings up",
+    "result": "unreachable",
+    "setting": "scene:office_cubicles_right"
+   }
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.1134,
+   -1.7577,
+   -0.5371
+  ],
+  "bbox_max": [
+   0.1606,
+   1.7666,
+   0.5604
+  ],
+  "n_pieces": 9
+ },
+ "strip": "artic/strips/top_cabinet_fqitbw_0.png"
+}

@@ -1,0 +1,413 @@
+{
+ "scene": "house_single_floor",
+ "name": "washer_ynwamu_0",
+ "category": "washer",
+ "model": "ynwamu",
+ "key": "washer__ynwamu",
+ "scale": [
+  1.0,
+  1.0,
+  1.0001
+ ],
+ "rooms": [
+  "utility_room_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   21.996633529663086,
+   0.3348013460636139,
+   0.46791115403175354
+  ],
+  "orientation": [
+   -8.663396329211537e-06,
+   -1.3546319678425789e-05,
+   -0.0012447922490537167,
+   0.9999992251396179
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   21.66657066345215,
+   0.04035201668739319,
+   0.0026832222938537598
+  ],
+  "max": [
+   22.308982849121094,
+   0.6283208131790161,
+   0.8979812860488892
+  ],
+  "extent": [
+   0.6424121856689453,
+   0.5879688262939453,
+   0.8952980637550354
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_door": -1.124443216816502e-19
+ },
+ "openable_joint_ids": [],
+ "canonical_annotation": false,
+ "joints": [
+  {
+   "joint": "j_door",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "door",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.1856,
+   "axis_dir_obj": [
+    0.0,
+    -0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    0.30049,
+    -0.2511,
+    0.00834
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 2.007129192352295,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.0515,
+    -0.2228,
+    -0.1998
+   ],
+   "link_bbox_max": [
+    0.3121,
+    0.2229,
+    0.2462
+   ],
+   "handles": [
+    {
+     "kind": "knob",
+     "contact": [
+      0.2883,
+      0.0191,
+      -0.1723
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.064,
+     "length": 0.1488,
+     "depth": 0.1147,
+     "face_s": 0.1856,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.999,
+      0.0451,
+      0.0
+     ],
+     "contact_world": [
+      22.285,
+      0.3532,
+      0.2956
+     ],
+     "height_world": 0.296,
+     "pinch_axis_world": [
+      0.0,
+      -0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      -1.0,
+      0.0025,
+      -0.0
+     ],
+     "pull_dir_world": [
+      0.9991,
+      0.0426,
+      0.0
+     ]
+    },
+    {
+     "kind": "knob",
+     "contact": [
+      0.2804,
+      0.1969,
+      0.0007
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0676,
+     "length": 0.1492,
+     "depth": 0.1068,
+     "face_s": 0.1856,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.999,
+      0.0448,
+      0.0
+     ],
+     "contact_world": [
+      22.2775,
+      0.531,
+      0.4686
+     ],
+     "height_world": 0.469,
+     "pinch_axis_world": [
+      -0.0025,
+      -1.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      -1.0,
+      0.0025,
+      -0.0
+     ],
+     "pull_dir_world": [
+      0.9991,
+      0.0423,
+      0.0
+     ]
+    },
+    {
+     "kind": "knob",
+     "contact": [
+      0.2822,
+      -0.1888,
+      -0.0434
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0834,
+     "length": 0.1397,
+     "depth": 0.1086,
+     "face_s": 0.1856,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9595,
+      0.2817,
+      0.0
+     ],
+     "contact_world": [
+      22.2784,
+      0.1453,
+      0.4245
+     ],
+     "height_world": 0.425,
+     "pinch_axis_world": [
+      -0.0025,
+      -1.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      -1.0,
+      0.0025,
+      -0.0
+     ],
+     "pull_dir_world": [
+      0.9602,
+      0.2793,
+      0.0
+     ]
+    },
+    {
+     "kind": "knob",
+     "contact": [
+      0.3001,
+      0.1232,
+      -0.0067
+     ],
+     "pinch_axis": [
+      0.0,
+      -1.0,
+      0.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.04,
+     "length": 0.0642,
+     "depth": 0.1265,
+     "face_s": 0.1856,
+     "n_pieces": 1,
+     "pull_dir": [
+      1.0,
+      0.001,
+      0.0
+     ],
+     "contact_world": [
+      22.297,
+      0.4573,
+      0.4612
+     ],
+     "height_world": 0.461,
+     "pinch_axis_world": [
+      -0.0025,
+      -1.0,
+      0.0
+     ],
+     "approach_dir_world": [
+      -1.0,
+      0.0025,
+      -0.0
+     ],
+     "pull_dir_world": [
+      1.0,
+      -0.0015,
+      0.0
+     ]
+    },
+    {
+     "kind": "knob",
+     "contact": [
+      0.2883,
+      0.063,
+      0.2081
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0846,
+     "length": 0.1411,
+     "depth": 0.1147,
+     "face_s": 0.1856,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9992,
+      0.0388,
+      0.0
+     ],
+     "contact_world": [
+      22.2851,
+      0.3971,
+      0.676
+     ],
+     "height_world": 0.676,
+     "pinch_axis_world": [
+      0.0,
+      -0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      -1.0,
+      0.0025,
+      -0.0
+     ],
+     "pull_dir_world": [
+      0.9993,
+      0.0363,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.1657,
+     0.1473,
+     0.0033
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0.4273,
+     -0.9041,
+     -0.0
+    ],
+    "width": 0.2606,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     0.9473,
+     0.3205,
+     0.0
+    ],
+    "contact_world": [
+     22.1627,
+     0.4817,
+     0.4712
+    ],
+    "height_world": 0.471,
+    "pinch_axis_world": [
+     1.0,
+     -0.0025,
+     0.0
+    ],
+    "approach_dir_world": [
+     0.425,
+     -0.9052,
+     0.0
+    ],
+    "pull_dir_world": [
+     0.9481,
+     0.3181,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    1.0,
+    -0.0025,
+    0.0
+   ],
+   "face_centre_world": [
+    22.1822,
+    0.3344,
+    0.4911
+   ],
+   "front_free_m": 2.0,
+   "front_free_eroded_m": 1.7,
+   "room_in_front": "utility_room_0",
+   "prior_review": null
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.3293,
+   -0.2938,
+   -0.4652
+  ],
+  "bbox_max": [
+   0.3005,
+   0.2933,
+   0.4301
+  ],
+  "n_pieces": 18
+ },
+ "strip": "artic/strips/washer_ynwamu_0.png"
+}

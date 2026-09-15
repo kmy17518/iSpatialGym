@@ -1,0 +1,260 @@
+{
+ "scene": "restaurant_diner",
+ "name": "commercial_kitchen_table_vxvtec_0",
+ "category": "commercial_kitchen_table",
+ "model": "vxvtec",
+ "scale": [
+  0.9999,
+  1.0,
+  1.0001
+ ],
+ "rooms": [
+  "kitchen_0"
+ ],
+ "aabb_world": {
+  "min": [
+   -9.686949729919434,
+   -4.982623100280762,
+   0.0037012100219726562
+  ],
+  "max": [
+   -8.882148742675781,
+   -2.1770236492156982,
+   0.8705013990402222
+  ],
+  "extent": [
+   0.8048009872436523,
+   2.8055994510650635,
+   0.8668001890182495
+  ]
+ },
+ "top": {
+  "z": 0.8705,
+  "yaw": 0.0,
+  "resolution": 0.02,
+  "n_cells": 5600,
+  "n_free_cells": 5600,
+  "area_m2": 2.24,
+  "local_bounds_uv": [
+   -9.677,
+   -8.897,
+   -4.973,
+   -2.193
+  ],
+  "hull_xy": [
+   [
+    -9.677000045776367,
+    -4.9730000495910645
+   ],
+   [
+    -8.897000312805176,
+    -4.9730000495910645
+   ],
+   [
+    -8.897000312805176,
+    -2.193000078201294
+   ],
+   [
+    -9.677000045776367,
+    -2.193000078201294
+   ]
+  ],
+  "occupants": []
+ },
+ "chairs_within_1m": [],
+ "edges": [
+  {
+   "name": "+u",
+   "mid": [
+    -8.8969,
+    -3.5826
+   ],
+   "inward": [
+    -1.0,
+    -0.0
+   ],
+   "tangent": [
+    0.0,
+    -1.0
+   ],
+   "length_m": 2.78,
+   "overhang_m": 0.0,
+   "room_in_front": "kitchen_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 2.8,
+     "free_lateral_range_m": [
+      -1.39,
+      1.36
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 2.8,
+     "free_lateral_range_m": [
+      -1.39,
+      1.36
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 2.8,
+     "free_lateral_range_m": [
+      -1.39,
+      1.36
+     ]
+    }
+   }
+  },
+  {
+   "name": "-u",
+   "mid": [
+    -9.6769,
+    -3.5826
+   ],
+   "inward": [
+    1.0,
+    0.0
+   ],
+   "tangent": [
+    -0.0,
+    1.0
+   ],
+   "length_m": 2.78,
+   "overhang_m": 0.0,
+   "room_in_front": "kitchen_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 2.8,
+     "free_lateral_range_m": [
+      -1.39,
+      1.36
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 2.8,
+     "free_lateral_range_m": [
+      -1.39,
+      1.36
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 2.8,
+     "free_lateral_range_m": [
+      -1.39,
+      1.36
+     ]
+    }
+   }
+  },
+  {
+   "name": "+v",
+   "mid": [
+    -9.2869,
+    -2.1926
+   ],
+   "inward": [
+    0.0,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    0.0
+   ],
+   "length_m": 0.78,
+   "overhang_m": 0.0,
+   "room_in_front": "kitchen_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.8,
+     "free_lateral_range_m": [
+      -0.39,
+      0.36
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.8,
+     "free_lateral_range_m": [
+      -0.39,
+      0.36
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.8,
+     "free_lateral_range_m": [
+      -0.39,
+      0.36
+     ]
+    }
+   }
+  },
+  {
+   "name": "-v",
+   "mid": [
+    -9.2869,
+    -4.9726
+   ],
+   "inward": [
+    -0.0,
+    1.0
+   ],
+   "tangent": [
+    -1.0,
+    -0.0
+   ],
+   "length_m": 0.78,
+   "overhang_m": 0.0,
+   "room_in_front": "kitchen_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.8,
+     "free_lateral_range_m": [
+      -0.39,
+      0.36
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.8,
+     "free_lateral_range_m": [
+      -0.39,
+      0.36
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.8,
+     "free_lateral_range_m": [
+      -0.39,
+      0.36
+     ]
+    }
+   }
+  }
+ ],
+ "in_union": false
+}

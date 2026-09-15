@@ -1,0 +1,167 @@
+{
+ "scene": "house_double_floor_lower",
+ "name": "toilet_udiezm_0",
+ "category": "toilet",
+ "model": "udiezm",
+ "key": "toilet__udiezm",
+ "scale": [
+  1.0,
+  1.0,
+  1.0
+ ],
+ "rooms": [
+  "bathroom_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   -4.072304725646973,
+   -0.5223057270050049,
+   0.33443355560302734
+  ],
+  "orientation": [
+   0.0,
+   0.0,
+   0.0,
+   1.0
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   -4.328001022338867,
+   -0.7091559171676636,
+   0.11876396834850311
+  ],
+  "max": [
+   -3.7821693420410156,
+   -0.3354811668395996,
+   0.9393932819366455
+  ],
+  "extent": [
+   0.5458316802978516,
+   0.37367475032806396,
+   0.8206292986869812
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_flap": -4.133054304616274e-13
+ },
+ "openable_joint_ids": [],
+ "canonical_annotation": false,
+ "joints": [
+  {
+   "joint": "j_flap",
+   "type": "RevoluteJoint",
+   "kind": "flap",
+   "child_link": "flap",
+   "outward_normal": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "face_s": 0.2495,
+   "axis_dir_obj": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    15.91002,
+    134899865.27817,
+    0.14741
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.7016957998275757,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.2495,
+    -0.182,
+    0.1242
+   ],
+   "link_bbox_max": [
+    -0.1433,
+    0.1819,
+    0.605
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_lid",
+    "contact": [
+     -0.2143,
+     0.0,
+     0.5938
+    ],
+    "pinch_axis": [
+     -1.0,
+     -0.0,
+     -0.0
+    ],
+    "approach_dir": [
+     0.9999,
+     -0.0,
+     -0.0135
+    ],
+    "width": 0.0045,
+    "exposed": true,
+    "note": "pinch the lid/flap across its thickness at the free edge",
+    "pull_dir": [
+     0.0277,
+     -0.0,
+     0.9996
+    ],
+    "contact_world": [
+     -4.2866,
+     -0.5223,
+     0.9282
+    ],
+    "height_world": 0.928,
+    "pinch_axis_world": [
+     -1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     0.9999,
+     0.0,
+     -0.0135
+    ],
+    "pull_dir_world": [
+     0.0277,
+     0.0,
+     0.9996
+    ]
+   },
+   "sub_links": [],
+   "status": "edge",
+   "outward_normal_world": [
+    -1.0,
+    0.0,
+    0.0
+   ],
+   "face_centre_world": [
+    -4.3218,
+    -0.5224,
+    0.699
+   ],
+   "front_free_m": 0.6,
+   "front_free_eroded_m": 3.0,
+   "room_in_front": "garden_0",
+   "prior_review": null
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.2557,
+   -0.1869,
+   -0.2157
+  ],
+  "bbox_max": [
+   0.2901,
+   0.1868,
+   0.1628
+  ],
+  "n_pieces": 32
+ },
+ "strip": "artic/strips/toilet_udiezm_0.png"
+}

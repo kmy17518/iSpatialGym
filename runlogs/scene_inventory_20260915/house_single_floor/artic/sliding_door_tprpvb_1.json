@@ -1,0 +1,176 @@
+{
+ "scene": "house_single_floor",
+ "name": "sliding_door_tprpvb_1",
+ "category": "sliding_door",
+ "model": "tprpvb",
+ "key": "sliding_door__tprpvb",
+ "scale": [
+  1.0007,
+  1.0632,
+  1.0
+ ],
+ "rooms": [
+  "corridor_0",
+  "childs_room_1"
+ ],
+ "root_pose_world": {
+  "position": [
+   20.203441619873047,
+   14.243247985839844,
+   2.310049057006836
+  ],
+  "orientation": [
+   0.0,
+   0.0,
+   0.0,
+   1.0
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   20.180028915405273,
+   13.350186347961426,
+   0.01094508171081543
+  ],
+  "max": [
+   20.2269287109375,
+   15.136285781860352,
+   2.355245351791382
+  ],
+  "extent": [
+   0.04689979553222656,
+   1.7860994338989258,
+   2.3443002700805664
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_movingpart": 0.0
+ },
+ "openable_joint_ids": [],
+ "canonical_annotation": true,
+ "joints": [
+  {
+   "joint": "j_movingpart",
+   "type": "PrismaticJoint",
+   "kind": "drawer",
+   "child_link": "movingpart",
+   "outward_normal": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "face_s": 0.0515,
+   "axis_dir_obj": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "hinge_point_obj": [
+    -0.0,
+    0.42224,
+    -1.14755
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 0.8177558779716492,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.0234,
+    -0.0515,
+    -2.2991
+   ],
+   "link_bbox_max": [
+    0.0235,
+    0.893,
+    0.0039
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_drawer_top",
+    "contact": [
+     0.0,
+     -0.0515,
+     -0.0311
+    ],
+    "pinch_axis": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "approach_dir": [
+     0,
+     0,
+     -1.0
+    ],
+    "width": 0.0,
+    "exposed": false,
+    "note": "pinch the drawer front across its thickness from above",
+    "pull_dir": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "contact_world": [
+     20.2034,
+     14.1917,
+     2.2789
+    ],
+    "height_world": 2.279,
+    "pinch_axis_world": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     0.0,
+     0.0,
+     -1.0
+    ],
+    "pull_dir_world": [
+     0.0,
+     -1.0,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "ungraspable",
+   "outward_normal_world": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "face_centre_world": [
+    20.2035,
+    14.1917,
+    1.1624
+   ],
+   "front_free_m": 3.0,
+   "front_free_eroded_m": 0.0,
+   "room_in_front": "childs_room_1",
+   "prior_review": {
+    "chosen": "none",
+    "pinch": "edge",
+    "motion": "slide",
+    "graspable": "True",
+    "handle_desc": "No handle; pinch the panel's leading vertical edge (y-min side, toward the empty rail half) across its 47 mm thickness at about 1.1 m.",
+    "result": "unreachable",
+    "setting": "scene:house_single_floor"
+   }
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0109,
+   -0.8931,
+   -0.0452
+  ],
+  "bbox_max": [
+   0.0109,
+   0.893,
+   0.0452
+  ],
+  "n_pieces": 1
+ },
+ "strip": "artic/strips/sliding_door_tprpvb_1.png"
+}

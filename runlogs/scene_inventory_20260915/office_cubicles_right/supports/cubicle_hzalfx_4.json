@@ -1,0 +1,290 @@
+{
+ "scene": "office_cubicles_right",
+ "name": "cubicle_hzalfx_4",
+ "category": "cubicle",
+ "model": "hzalfx",
+ "scale": [
+  1.0,
+  1.0,
+  1.0
+ ],
+ "rooms": [
+  "shared_office_0"
+ ],
+ "aabb_world": {
+  "min": [
+   8.955108642578125,
+   -0.7554911375045776,
+   -0.005541324615478516
+  ],
+  "max": [
+   10.41584300994873,
+   0.6992871165275574,
+   1.2217459678649902
+  ],
+  "extent": [
+   1.4607343673706055,
+   1.4547781944274902,
+   1.2272872924804688
+  ]
+ },
+ "top": {
+  "z": 0.7756,
+  "yaw": 0.0,
+  "resolution": 0.02,
+  "n_cells": 3192,
+  "n_free_cells": 3192,
+  "area_m2": 1.277,
+  "local_bounds_uv": [
+   8.965,
+   10.345,
+   -0.685,
+   0.635
+  ],
+  "hull_xy": [
+   [
+    8.96500015258789,
+    -0.6660000085830688
+   ],
+   [
+    10.28499984741211,
+    -0.6859999895095825
+   ],
+   [
+    10.305000305175781,
+    -0.6660000085830688
+   ],
+   [
+    10.345000267028809,
+    -0.6060000061988831
+   ],
+   [
+    10.345000267028809,
+    -0.4860000014305115
+   ],
+   [
+    10.324999809265137,
+    0.5540000200271606
+   ],
+   [
+    10.204999923706055,
+    0.5740000009536743
+   ],
+   [
+    10.0649995803833,
+    0.593999981880188
+   ],
+   [
+    9.765000343322754,
+    0.6340000033378601
+   ],
+   [
+    9.725000381469727,
+    0.6340000033378601
+   ],
+   [
+    8.96500015258789,
+    -0.10599999874830246
+   ]
+  ],
+  "occupants": [
+   "cubicle_deceti_1",
+   "swivel_chair_ryznxk_1"
+  ]
+ },
+ "chairs_within_1m": [
+  "swivel_chair_ryznxk_0",
+  "swivel_chair_ryznxk_1",
+  "swivel_chair_ryznxk_7"
+ ],
+ "edges": [
+  {
+   "name": "+u",
+   "mid": [
+    10.3451,
+    -0.0255
+   ],
+   "inward": [
+    -1.0,
+    -0.0
+   ],
+   "tangent": [
+    0.0,
+    -1.0
+   ],
+   "length_m": 1.32,
+   "overhang_m": 0.071,
+   "room_in_front": "shared_office_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 0.185,
+     "free_fraction_chairs_removed": 0.556,
+     "longest_free_run_m": 0.75,
+     "free_lateral_range_m": [
+      -0.66,
+      0.04
+     ]
+    },
+    "0.45": {
+     "free_fraction": 0.111,
+     "free_fraction_chairs_removed": 0.556,
+     "longest_free_run_m": 0.75,
+     "free_lateral_range_m": [
+      -0.66,
+      0.04
+     ]
+    },
+    "0.55": {
+     "free_fraction": 0.037,
+     "free_fraction_chairs_removed": 0.519,
+     "longest_free_run_m": 0.65,
+     "free_lateral_range_m": [
+      -0.66,
+      0.04
+     ]
+    }
+   }
+  },
+  {
+   "name": "-u",
+   "mid": [
+    8.9651,
+    -0.0255
+   ],
+   "inward": [
+    1.0,
+    0.0
+   ],
+   "tangent": [
+    -0.0,
+    1.0
+   ],
+   "length_m": 1.32,
+   "overhang_m": 0.0,
+   "room_in_front": "shared_office_0",
+   "blocked_in_front": {
+    "object": "walls_gxjccg_0",
+    "category": "walls",
+    "distance_m": 0.717
+   },
+   "runs": {
+    "0.35": {
+     "free_fraction": 0.593,
+     "free_fraction_chairs_removed": 0.593,
+     "longest_free_run_m": 0.8,
+     "free_lateral_range_m": [
+      -0.66,
+      0.09
+     ]
+    },
+    "0.45": {
+     "free_fraction": 0.593,
+     "free_fraction_chairs_removed": 0.593,
+     "longest_free_run_m": 0.8,
+     "free_lateral_range_m": [
+      -0.66,
+      0.09
+     ]
+    },
+    "0.55": {
+     "free_fraction": 0.593,
+     "free_fraction_chairs_removed": 0.593,
+     "longest_free_run_m": 0.8,
+     "free_lateral_range_m": [
+      -0.66,
+      0.09
+     ]
+    }
+   }
+  },
+  {
+   "name": "+v",
+   "mid": [
+    9.6551,
+    0.6345
+   ],
+   "inward": [
+    0.0,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    0.0
+   ],
+   "length_m": 1.38,
+   "overhang_m": 0.065,
+   "room_in_front": "shared_office_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.4,
+     "free_lateral_range_m": [
+      -0.69,
+      0.66
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.4,
+     "free_lateral_range_m": [
+      -0.69,
+      0.66
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.4,
+     "free_lateral_range_m": [
+      -0.69,
+      0.66
+     ]
+    }
+   }
+  },
+  {
+   "name": "-v",
+   "mid": [
+    9.6551,
+    -0.6855
+   ],
+   "inward": [
+    -0.0,
+    1.0
+   ],
+   "tangent": [
+    -1.0,
+    -0.0
+   ],
+   "length_m": 1.38,
+   "overhang_m": 0.07,
+   "room_in_front": "shared_office_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    },
+    "0.45": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    },
+    "0.55": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    }
+   }
+  }
+ ],
+ "in_union": false
+}

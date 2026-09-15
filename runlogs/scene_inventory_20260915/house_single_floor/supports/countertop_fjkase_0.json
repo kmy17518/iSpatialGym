@@ -1,0 +1,274 @@
+{
+ "scene": "house_single_floor",
+ "name": "countertop_fjkase_0",
+ "category": "countertop",
+ "model": "fjkase",
+ "scale": [
+  1.0001,
+  1.0,
+  1.0
+ ],
+ "rooms": [
+  "utility_room_0"
+ ],
+ "aabb_world": {
+  "min": [
+   21.5999755859375,
+   -0.750180721282959,
+   0.8778429627418518
+  ],
+  "max": [
+   22.256683349609375,
+   1.70058274269104,
+   0.9157429337501526
+  ],
+  "extent": [
+   0.656707763671875,
+   2.450763463973999,
+   0.03789997100830078
+  ]
+ },
+ "top": {
+  "z": 0.9157,
+  "yaw": 3.139,
+  "resolution": 0.02,
+  "n_cells": 4026,
+  "n_free_cells": 4026,
+  "area_m2": 1.61,
+  "local_bounds_uv": [
+   -22.252,
+   -21.606,
+   -1.736,
+   0.685
+  ],
+  "hull_xy": [
+   [
+    21.610000610351562,
+    -0.7400000095367432
+   ],
+   [
+    22.25,
+    -0.7400000095367432
+   ],
+   [
+    22.25,
+    1.6799999475479126
+   ],
+   [
+    21.610000610351562,
+    1.6799999475479126
+   ]
+  ],
+  "occupants": [
+   "wardrobe_pyuwgc_0"
+  ]
+ },
+ "chairs_within_1m": [],
+ "edges": [
+  {
+   "name": "+u",
+   "mid": [
+    21.6069,
+    0.4706
+   ],
+   "inward": [
+    1.0,
+    -0.0025
+   ],
+   "tangent": [
+    0.0025,
+    1.0
+   ],
+   "length_m": 2.422,
+   "overhang_m": 0.0,
+   "room_in_front": "corridor_0",
+   "blocked_in_front": {
+    "object": "walls_evgaml_0",
+    "category": "walls",
+    "distance_m": 0.0
+   },
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 2.45,
+     "free_lateral_range_m": [
+      -1.21,
+      1.19
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 2.45,
+     "free_lateral_range_m": [
+      -1.21,
+      1.19
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 2.45,
+     "free_lateral_range_m": [
+      -1.21,
+      1.19
+     ]
+    }
+   }
+  },
+  {
+   "name": "-u",
+   "mid": [
+    22.253,
+    0.469
+   ],
+   "inward": [
+    -1.0,
+    0.0025
+   ],
+   "tangent": [
+    -0.0025,
+    -1.0
+   ],
+   "length_m": 2.422,
+   "overhang_m": 0.0,
+   "room_in_front": "utility_room_0",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 2.45,
+     "free_lateral_range_m": [
+      -1.21,
+      1.19
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 2.45,
+     "free_lateral_range_m": [
+      -1.21,
+      1.19
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 2.45,
+     "free_lateral_range_m": [
+      -1.21,
+      1.19
+     ]
+    }
+   }
+  },
+  {
+   "name": "+v",
+   "mid": [
+    21.9269,
+    -0.741
+   ],
+   "inward": [
+    0.0025,
+    1.0
+   ],
+   "tangent": [
+    -1.0,
+    0.0025
+   ],
+   "length_m": 0.646,
+   "overhang_m": 0.0,
+   "room_in_front": "utility_room_0",
+   "blocked_in_front": {
+    "object": "wardrobe_pyuwgc_0",
+    "category": "wardrobe",
+    "distance_m": 0.008
+   },
+   "runs": {
+    "0.35": {
+     "free_fraction": 0.077,
+     "free_fraction_chairs_removed": 0.077,
+     "longest_free_run_m": 0.05,
+     "free_lateral_range_m": [
+      -0.32,
+      -0.32
+     ]
+    },
+    "0.45": {
+     "free_fraction": 0.077,
+     "free_fraction_chairs_removed": 0.077,
+     "longest_free_run_m": 0.05,
+     "free_lateral_range_m": [
+      -0.32,
+      -0.32
+     ]
+    },
+    "0.55": {
+     "free_fraction": 0.077,
+     "free_fraction_chairs_removed": 0.077,
+     "longest_free_run_m": 0.05,
+     "free_lateral_range_m": [
+      -0.32,
+      -0.32
+     ]
+    }
+   }
+  },
+  {
+   "name": "-v",
+   "mid": [
+    21.9331,
+    1.6806
+   ],
+   "inward": [
+    -0.0025,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    -0.0025
+   ],
+   "length_m": 0.646,
+   "overhang_m": 0.0,
+   "room_in_front": "corridor_0",
+   "blocked_in_front": {
+    "object": "wardrobe_pyuwgc_0",
+    "category": "wardrobe",
+    "distance_m": 0.019
+   },
+   "runs": {
+    "0.35": {
+     "free_fraction": 0.077,
+     "free_fraction_chairs_removed": 0.077,
+     "longest_free_run_m": 0.05,
+     "free_lateral_range_m": [
+      0.28,
+      0.28
+     ]
+    },
+    "0.45": {
+     "free_fraction": 0.077,
+     "free_fraction_chairs_removed": 0.077,
+     "longest_free_run_m": 0.05,
+     "free_lateral_range_m": [
+      0.28,
+      0.28
+     ]
+    },
+    "0.55": {
+     "free_fraction": 0.077,
+     "free_fraction_chairs_removed": 0.077,
+     "longest_free_run_m": 0.05,
+     "free_lateral_range_m": [
+      0.28,
+      0.28
+     ]
+    }
+   }
+  }
+ ],
+ "in_union": true
+}

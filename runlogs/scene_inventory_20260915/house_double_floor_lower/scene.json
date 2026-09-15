@@ -1,0 +1,245 @@
+{
+ "scene": "house_double_floor_lower",
+ "load_s": 72.0,
+ "artic": {
+  "bottom_cabinet_qacthv_0": {
+   "category": "bottom_cabinet",
+   "model": "qacthv",
+   "n_joints": 3,
+   "status": [
+    "ungraspable",
+    "ungraspable",
+    "ungraspable"
+   ],
+   "s": 17.9
+  },
+  "dishwasher_ynrhuk_0": {
+   "category": "dishwasher",
+   "model": "ynrhuk",
+   "n_joints": 1,
+   "status": [
+    "handle"
+   ],
+   "s": 7.9
+  },
+  "fridge_petcxr_0": {
+   "category": "fridge",
+   "model": "petcxr",
+   "n_joints": 2,
+   "status": [
+    "handle",
+    "handle"
+   ],
+   "s": 8.3
+  },
+  "microwave_hjjxmi_0": {
+   "category": "microwave",
+   "model": "hjjxmi",
+   "n_joints": 1,
+   "status": [
+    "handle"
+   ],
+   "s": 7.7
+  },
+  "oven_ffitak_0": {
+   "category": "oven",
+   "model": "ffitak",
+   "n_joints": 3,
+   "status": [
+    "handle",
+    "ungraspable",
+    "ungraspable"
+   ],
+   "s": 8.3
+  },
+  "toilet_udiezm_0": {
+   "category": "toilet",
+   "model": "udiezm",
+   "n_joints": 1,
+   "status": [
+    "edge"
+   ],
+   "s": 7.9
+  },
+  "bottom_cabinet_rhdbzv_0": {
+   "category": "bottom_cabinet",
+   "model": "rhdbzv",
+   "n_joints": 2,
+   "status": [
+    "handle",
+    "handle"
+   ],
+   "s": 8.1
+  },
+  "door_bexenl_0": {
+   "category": "door",
+   "model": "bexenl",
+   "n_joints": 1,
+   "status": [
+    "handle"
+   ],
+   "s": 7.9
+  },
+  "door_bexenl_1": {
+   "category": "door",
+   "model": "bexenl",
+   "n_joints": 1,
+   "status": [
+    "handle"
+   ],
+   "s": 7.6
+  },
+  "door_vudhlc_0": {
+   "category": "door",
+   "model": "vudhlc",
+   "n_joints": 1,
+   "status": [
+    "handle"
+   ],
+   "s": 7.7
+  },
+  "door_vudhlc_1": {
+   "category": "door",
+   "model": "vudhlc",
+   "n_joints": 1,
+   "status": [
+    "handle"
+   ],
+   "s": 7.7
+  },
+  "door_vudhlc_2": {
+   "category": "door",
+   "model": "vudhlc",
+   "n_joints": 1,
+   "status": [
+    "handle"
+   ],
+   "s": 7.7
+  },
+  "door_vudhlc_3": {
+   "category": "door",
+   "model": "vudhlc",
+   "n_joints": 1,
+   "status": [
+    "handle"
+   ],
+   "s": 7.7
+  },
+  "top_cabinet_tynnnw_0": {
+   "category": "top_cabinet",
+   "model": "tynnnw",
+   "n_joints": 2,
+   "status": [
+    "handle",
+    "handle"
+   ],
+   "s": 7.8
+  },
+  "top_cabinet_tynnnw_1": {
+   "category": "top_cabinet",
+   "model": "tynnnw",
+   "n_joints": 2,
+   "status": [
+    "handle",
+    "handle"
+   ],
+   "s": 7.9
+  },
+  "washer_ziomqg_0": {
+   "category": "washer",
+   "model": "ziomqg",
+   "n_joints": 1,
+   "status": [
+    "handle"
+   ],
+   "s": 7.7
+  }
+ },
+ "supports": {
+  "bar_byvbuc_0": {
+   "category": "bar",
+   "top_z": 0.8874,
+   "n_free_cells": 1686,
+   "best_edge_free_run_m": 2.1,
+   "in_union": false,
+   "s": 0.5
+  },
+  "bar_egwapq_0": {
+   "category": "bar",
+   "top_z": 0.8874,
+   "n_free_cells": 2756,
+   "best_edge_free_run_m": 2.45,
+   "in_union": false,
+   "s": 0.4
+  },
+  "bottom_cabinet_qacthv_0": {
+   "category": "bottom_cabinet",
+   "top_z": 0.8062,
+   "n_free_cells": 725,
+   "best_edge_free_run_m": 1.15,
+   "in_union": false,
+   "s": 0.1
+  },
+  "bottom_cabinet_rhdbzv_0": {
+   "category": "bottom_cabinet",
+   "top_z": 0.4133,
+   "n_free_cells": 2223,
+   "best_edge_free_run_m": 2.35,
+   "in_union": false,
+   "s": 0.7
+  },
+  "breakfast_table_xftrki_0": {
+   "category": "breakfast_table",
+   "top_z": 0.6789,
+   "n_free_cells": 3450,
+   "best_edge_free_run_m": 1.5,
+   "in_union": false,
+   "s": 0.3
+  },
+  "coffee_table_koagbh_0": {
+   "category": "coffee_table",
+   "top_z": 0.423,
+   "n_free_cells": 3403,
+   "best_edge_free_run_m": 1.65,
+   "in_union": false,
+   "s": 0.4
+  },
+  "countertop_tpuwys_0": {
+   "category": "countertop",
+   "top_z": 1.383,
+   "n_free_cells": 1653,
+   "best_edge_free_run_m": 1.75,
+   "in_union": false,
+   "s": 0.1
+  },
+  "shelf_vanltx_0": {
+   "category": "shelf",
+   "top_z": 1.3047,
+   "n_free_cells": 1080,
+   "best_edge_free_run_m": 1.2,
+   "in_union": false,
+   "s": 0.1
+  }
+ },
+ "partners": {
+  "countertop_tpuwys_0": {
+   "category": "countertop",
+   "top_z": 1.383,
+   "face_cells": 1653,
+   "under_frac_ge_0.15": 0.0,
+   "under_frac_ge_0.25": 0.0,
+   "n_supports_within_3m": 2,
+   "s": 2.8
+  },
+  "sofa_frlxgz_0": {
+   "category": "sofa",
+   "top_z": 0.4593,
+   "face_cells": 6775,
+   "under_frac_ge_0.15": 0.017,
+   "under_frac_ge_0.25": 0.015,
+   "n_supports_within_3m": 1,
+   "s": 2.8
+  }
+ },
+ "total_s": 144.0
+}

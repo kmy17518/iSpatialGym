@@ -1,0 +1,327 @@
+{
+ "scene": "house_double_floor_lower",
+ "name": "door_vudhlc_3",
+ "category": "door",
+ "model": "vudhlc",
+ "key": "door__vudhlc",
+ "scale": [
+  0.9998,
+  1.0,
+  1.0
+ ],
+ "rooms": [
+  "living_room_0",
+  "garden_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   4.699669361114502,
+   7.66694450378418,
+   1.1734071969985962
+  ],
+  "orientation": [
+   0.0004577827930916101,
+   -2.0090228645130992e-05,
+   0.7107704281806946,
+   0.7034239172935486
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   3.809067726135254,
+   7.563385486602783,
+   -0.0061991214752197266
+  ],
+  "max": [
+   5.409999847412109,
+   7.724496841430664,
+   2.3346168994903564
+  ],
+  "extent": [
+   1.6009321212768555,
+   0.16111135482788086,
+   2.340816020965576
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_leaf": 7.524035936512519e-07
+ },
+ "openable_joint_ids": [],
+ "canonical_annotation": false,
+ "joints": [
+  {
+   "joint": "j_leaf",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "leaf",
+   "outward_normal": [
+    -1.0,
+    -0.0,
+    -0.0
+   ],
+   "face_s": 0.0336,
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    -32.29589,
+    0.83782,
+    271567163.64944
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.7451969385147095,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.1038,
+    -0.1691,
+    -1.1647
+   ],
+   "link_bbox_max": [
+    0.0574,
+    0.8843,
+    1.1276
+   ],
+   "handles": [
+    {
+     "kind": "knob",
+     "contact": [
+      -0.0862,
+      0.0464,
+      0.0964
+     ],
+     "pinch_axis": [
+      0.0,
+      1.0,
+      0.0
+     ],
+     "approach_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "width": 0.0197,
+     "length": 0.0277,
+     "depth": 0.0646,
+     "face_s": 0.0336,
+     "n_pieces": 1,
+     "pull_dir": [
+      -0.0246,
+      -0.9997,
+      -0.0
+     ],
+     "contact_world": [
+      4.6542,
+      7.5802,
+      1.2698
+     ],
+     "height_world": 1.27,
+     "pinch_axis_world": [
+      -0.9999,
+      -0.0104,
+      0.0006
+     ],
+     "approach_dir_world": [
+      -0.0104,
+      0.9999,
+      0.0007
+     ],
+     "pull_dir_world": [
+      0.9999,
+      -0.0142,
+      -0.0006
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      -0.0918,
+      -0.0619,
+      0.0963
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "width": 0.0297,
+     "length": 0.1563,
+     "depth": 0.0703,
+     "face_s": 0.0336,
+     "n_pieces": 2,
+     "pull_dir": [
+      -0.0279,
+      -0.9996,
+      -0.0
+     ],
+     "contact_world": [
+      4.7626,
+      7.5757,
+      1.2696
+     ],
+     "height_world": 1.27,
+     "pinch_axis_world": [
+      -0.0006,
+      0.0007,
+      -1.0
+     ],
+     "approach_dir_world": [
+      -0.0104,
+      0.9999,
+      0.0007
+     ],
+     "pull_dir_world": [
+      0.9998,
+      -0.0175,
+      -0.0006
+     ]
+    },
+    {
+     "kind": "bar",
+     "contact": [
+      -0.0434,
+      -0.1012,
+      0.0398
+     ],
+     "pinch_axis": [
+      0.0,
+      1.0,
+      0.0
+     ],
+     "approach_dir": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "width": 0.0445,
+     "length": 0.2237,
+     "depth": 0.0196,
+     "face_s": 0.0336,
+     "n_pieces": 1,
+     "pull_dir": [
+      -0.0291,
+      -0.9996,
+      -0.0
+     ],
+     "contact_world": [
+      4.8013,
+      7.6246,
+      1.2131
+     ],
+     "height_world": 1.213,
+     "pinch_axis_world": [
+      -0.9999,
+      -0.0104,
+      0.0006
+     ],
+     "approach_dir_world": [
+      -0.0104,
+      0.9999,
+      0.0007
+     ],
+     "pull_dir_world": [
+      0.9998,
+      -0.0187,
+      -0.0006
+     ]
+    }
+   ],
+   "flush_handles": [
+    {
+     "kind": "flush_handle",
+     "center": [
+      -0.0432,
+      -0.0649,
+      -1.1209
+     ],
+     "depth": 0.0101,
+     "note": "protrudes < 12 mm; fingertips cannot get behind it"
+    }
+   ],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.0194,
+     -0.0201,
+     0.0964
+    ],
+    "pinch_axis": [
+     -1.0,
+     -0.0,
+     -0.0
+    ],
+    "approach_dir": [
+     -0.9999,
+     0.0149,
+     -0.0
+    ],
+    "width": 0.1612,
+    "exposed": true,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     -0.0265,
+     -0.9996,
+     -0.0
+    ],
+    "contact_world": [
+     4.7196,
+     7.6865,
+     1.2698
+    ],
+    "height_world": 1.27,
+    "pinch_axis_world": [
+     0.0104,
+     -0.9999,
+     -0.0007
+    ],
+    "approach_dir_world": [
+     -0.0045,
+     -1.0,
+     -0.0007
+    ],
+    "pull_dir_world": [
+     0.9998,
+     -0.0161,
+     -0.0006
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    0.0104,
+    -0.9999,
+    -0.0007
+   ],
+   "face_centre_world": [
+    4.3424,
+    7.6296,
+    1.1551
+   ],
+   "front_free_m": 3.0,
+   "front_free_eroded_m": 3.0,
+   "room_in_front": "living_room_0",
+   "prior_review": null
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0335,
+   -0.7113,
+   -1.1802
+  ],
+  "bbox_max": [
+   0.0329,
+   0.8915,
+   1.1616
+  ],
+  "n_pieces": 6
+ },
+ "strip": "artic/strips/door_vudhlc_3.png"
+}

@@ -271,7 +271,17 @@ class Inventory:
         self.render = render
         self.markers = None
         if render:
-            for o in self.world.render_hidden:  # hidden by SimWorld against the seg_instance crash; rgb-only here
+            # Isaac Sim 5.1's synthetic-data graph (the robot camera's seg_instance annotator) segfaults with light
+            # fixtures and glass in view (see SimWorld). This module only needs rgb from the viewer camera, so the robot
+            # is parked far outside the scene (its camera sees only sky) and the light fixtures are shown again for the
+            # review renders. Detaching the annotator instead (remove_modality) left the physics view invalid.
+            from ispatialgym.sampling import geometry as G
+
+            robot = self.world.robot
+            robot.set_position_orientation(th.tensor([60.0, 60.0, 5.0]), G.IDENTITY_QUAT)
+            robot.disable_gravity()
+            robot.keep_still()
+            for o in self.world.render_hidden:
                 o.visible = True
         self.summary: Dict[str, Any] = {"scene": scene_model, "load_s": round(self.load_s, 1), "artic": {}, "supports": {}, "partners": {}}
         self._prim_to_obj = {l.prim_path: o for o in self.scene.objects for l in o.links.values()}
@@ -727,6 +737,10 @@ class Inventory:
         n0 = _unit(n0)
         side = np.cross(n0, [0, 0, 1.0])
         d = 1.2 * float(np.linalg.norm(ext)) + 0.4
+        # stay inside the room: the camera may not go further out than the free floor in front of the face allows
+        front = [j.get("front_free_m") for j in joints if j.get("front_free_m") is not None]
+        if front:
+            d = max(0.9, min(d, max(front) + 0.25))
         names = list(obj.joints.keys())
         q = obj.get_joint_positions().clone()
         for j in joints:
@@ -751,7 +765,7 @@ class Inventory:
         views = []
         self._place_markers(items)
         p_over = os.path.join(rdir, f"{obj.name}__overview.png")
-        self._grab(c + n0 * d * 0.85 + side * d * 0.35 + np.array([0, 0, d * 0.25]), c, p_over)
+        self._grab(c + n0 * d * 0.9 + side * d * 0.2 + np.array([0, 0, d * 0.25]), c, p_over)
         views.append(("overview (closed)", p_over))
         for ji, j in enumerate(joints):
             jitems = [("ABCD"[k], world(h["contact"])) for k, h in enumerate(j.get("handles", [])[:4])]
@@ -779,7 +793,7 @@ class Inventory:
         obj.keep_still()
         og.sim.step()
         p_open = os.path.join(rdir, f"{obj.name}__open.png")
-        self._grab(c + n0 * d * 0.85 + side * d * 0.35 + np.array([0, 0, d * 0.25]), c, p_open)
+        self._grab(c + n0 * d * 0.9 + side * d * 0.2 + np.array([0, 0, d * 0.25]), c, p_open)
         views.append(("opened 60 % (markers at closed positions)", p_open))
         obj.set_joint_positions(q)
         obj.keep_still()

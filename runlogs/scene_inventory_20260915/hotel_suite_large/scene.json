@@ -1,0 +1,176 @@
+{
+ "scene": "hotel_suite_large",
+ "load_s": 32.0,
+ "artic": {
+  "toilet_aapttl_0": {
+   "category": "toilet",
+   "model": "aapttl",
+   "n_joints": 1,
+   "status": [
+    "ungraspable"
+   ],
+   "s": 14.2
+  },
+  "door_uptpdr_0": {
+   "category": "door",
+   "model": "uptpdr",
+   "n_joints": 1,
+   "status": [
+    "ungraspable"
+   ],
+   "s": 6.6
+  },
+  "door_ydokma_0": {
+   "category": "door",
+   "model": "ydokma",
+   "n_joints": 1,
+   "status": [
+    "handle"
+   ],
+   "s": 6.8
+  }
+ },
+ "supports": {
+  "desk_ohjotf_0": {
+   "category": "desk",
+   "top_z": 0.6793,
+   "n_free_cells": 2403,
+   "best_edge_free_run_m": 1.65,
+   "in_union": true,
+   "s": 0.4
+  },
+  "nightstand_maeowc_0": {
+   "category": "nightstand",
+   "top_z": 0.4472,
+   "n_free_cells": 769,
+   "best_edge_free_run_m": 0.65,
+   "in_union": false,
+   "s": 0.1
+  },
+  "nightstand_maeowc_1": {
+   "category": "nightstand",
+   "top_z": 0.4473,
+   "n_free_cells": 806,
+   "best_edge_free_run_m": 0.65,
+   "in_union": false,
+   "s": 0.1
+  },
+  "nightstand_maeowc_2": {
+   "category": "nightstand",
+   "top_z": 0.4472,
+   "n_free_cells": 769,
+   "best_edge_free_run_m": 0.65,
+   "in_union": false,
+   "s": 0.1
+  },
+  "ottoman_hnmndv_0": {
+   "category": "ottoman",
+   "top_z": 0.4731,
+   "n_free_cells": 1518,
+   "best_edge_free_run_m": 1.45,
+   "in_union": false,
+   "s": 0.2
+  },
+  "ottoman_hnmndv_1": {
+   "category": "ottoman",
+   "top_z": 0.4731,
+   "n_free_cells": 1518,
+   "best_edge_free_run_m": 1.45,
+   "in_union": false,
+   "s": 0.1
+  },
+  "shelf_aqtmhm_0": {
+   "category": "shelf",
+   "top_z": 0.9068,
+   "n_free_cells": 778,
+   "best_edge_free_run_m": 2.25,
+   "in_union": false,
+   "s": 0.2
+  },
+  "shelf_cbidyu_0": {
+   "category": "shelf",
+   "top_z": 0.2747,
+   "n_free_cells": 114,
+   "best_edge_free_run_m": 2.0,
+   "in_union": false,
+   "s": 0.3
+  },
+  "shelf_nbmidu_0": {
+   "category": "shelf",
+   "top_z": 1.2788,
+   "n_free_cells": 1333,
+   "best_edge_free_run_m": 1.5,
+   "in_union": false,
+   "s": 0.1
+  },
+  "shelf_rglkkf_0": {
+   "category": "shelf",
+   "top_z": 0.6616,
+   "n_free_cells": 2064,
+   "best_edge_free_run_m": 1.7,
+   "in_union": true,
+   "s": 0.2
+  },
+  "shelf_xogqqm_0": {
+   "category": "shelf",
+   "top_z": 1.4626,
+   "n_free_cells": 624,
+   "best_edge_free_run_m": 0.85,
+   "in_union": false,
+   "s": 0.1
+  },
+  "shelf_xogqqm_1": {
+   "category": "shelf",
+   "top_z": 1.0823,
+   "n_free_cells": 84,
+   "best_edge_free_run_m": 0.85,
+   "in_union": false,
+   "s": 0.1
+  },
+  "shelf_xogqqm_2": {
+   "category": "shelf",
+   "top_z": 0.641,
+   "n_free_cells": 624,
+   "best_edge_free_run_m": 0.85,
+   "in_union": false,
+   "s": 0.1
+  },
+  "shelf_xogqqm_3": {
+   "category": "shelf",
+   "top_z": 0.2175,
+   "n_free_cells": 624,
+   "best_edge_free_run_m": 0.85,
+   "in_union": false,
+   "s": 0.1
+  },
+  "stand_dbskvf_0": {
+   "category": "stand",
+   "top_z": 0.4112,
+   "n_free_cells": 5842,
+   "best_edge_free_run_m": 5.7,
+   "in_union": false,
+   "s": 1.0
+  }
+ },
+ "partners": {
+  "bed_kddswt_0": {
+   "category": "bed",
+   "top_z": 0.5083,
+   "face_cells": 7836,
+   "under_frac_ge_0.15": 0.0,
+   "under_frac_ge_0.25": 0.0,
+   "n_supports_within_3m": 1,
+   "s": 1.3
+  },
+  "bed_kddswt_1": {
+   "category": "bed",
+   "top_z": 0.5083,
+   "face_cells": 7836,
+   "under_frac_ge_0.15": 0.0,
+   "under_frac_ge_0.25": 0.0,
+   "n_supports_within_3m": 5,
+   "s": 1.0
+  }
+ },
+ "total_s": 33.1
+}

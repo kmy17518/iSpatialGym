@@ -1,0 +1,226 @@
+{
+ "scene": "house_double_floor_lower",
+ "name": "door_bexenl_0",
+ "category": "door",
+ "model": "bexenl",
+ "key": "door__bexenl",
+ "scale": [
+  0.9998,
+  1.0,
+  1.0
+ ],
+ "rooms": [
+  "garage_0",
+  "corridor_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   -3.886465072631836,
+   2.3801634311676025,
+   1.1881227493286133
+  ],
+  "orientation": [
+   6.518217787743197e-07,
+   3.0848721507936716e-05,
+   0.7104470729827881,
+   -0.703750729560852
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   -4.356766223907471,
+   2.2838568687438965,
+   -0.004246950149536133
+  ],
+  "max": [
+   -3.4157168865203857,
+   2.4272947311401367,
+   2.050917148590088
+  ],
+  "extent": [
+   0.941049337387085,
+   0.14343786239624023,
+   2.055164098739624
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_leaf": -7.938509724326402e-19
+ },
+ "openable_joint_ids": [],
+ "canonical_annotation": true,
+ "joints": [
+  {
+   "joint": "j_leaf",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "leaf",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.0717,
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    0.06562,
+    -0.41442,
+    -0.18214
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.569969654083252,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    -0.0281,
+    -0.4227,
+    -1.1803
+   ],
+   "link_bbox_max": [
+    0.0942,
+    0.4226,
+    0.8164
+   ],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      0.083,
+      0.2813,
+      -0.092
+     ],
+     "pinch_axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "approach_dir": [
+      -1.0,
+      -0.0,
+      -0.0
+     ],
+     "width": 0.0362,
+     "length": 0.1461,
+     "depth": 0.0225,
+     "face_s": 0.0717,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.9997,
+      -0.025,
+      0.0
+     ],
+     "contact_world": [
+      -3.606,
+      2.2945,
+      1.0961
+     ],
+     "height_world": 1.096,
+     "pinch_axis_world": [
+      0.0,
+      -0.0,
+      -1.0
+     ],
+     "approach_dir_world": [
+      0.0095,
+      1.0,
+      -0.0
+     ],
+     "pull_dir_world": [
+      -0.0345,
+      -0.9994,
+      0.0
+     ]
+    }
+   ],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.0338,
+     0.3871,
+     -0.1807
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0.0784,
+     -0.9969,
+     -0.0
+    ],
+    "width": 0.1223,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     0.9992,
+     0.0397,
+     0.0
+    ],
+    "contact_world": [
+     -3.4997,
+     2.3427,
+     1.0074
+    ],
+    "height_world": 1.007,
+    "pinch_axis_world": [
+     -0.0095,
+     -1.0,
+     0.0
+    ],
+    "approach_dir_world": [
+     -0.9976,
+     -0.069,
+     -0.0
+    ],
+    "pull_dir_world": [
+     0.0302,
+     -0.9995,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "handle",
+   "outward_normal_world": [
+    -0.0095,
+    -1.0,
+    0.0
+   ],
+   "face_centre_world": [
+    -3.8872,
+    2.3085,
+    1.0062
+   ],
+   "front_free_m": 1.45,
+   "front_free_eroded_m": 1.15,
+   "room_in_front": "corridor_0",
+   "prior_review": {
+    "chosen": "A",
+    "pinch": "lever",
+    "motion": "swing",
+    "graspable": "True",
+    "handle_desc": "Horizontal lever at mid-height near free (+y) edge; A on lever arm, standoff ~22 mm (shallow). Hinge -y side, swings toward viewer.",
+    "result": "opened",
+    "setting": "scene:house_double_floor_lower"
+   }
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.0516,
+   -0.4708,
+   -1.1924
+  ],
+  "bbox_max": [
+   0.0535,
+   0.4712,
+   0.8628
+  ],
+  "n_pieces": 3
+ },
+ "strip": "artic/strips/door_bexenl_0.png"
+}

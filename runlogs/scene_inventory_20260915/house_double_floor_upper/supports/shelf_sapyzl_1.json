@@ -1,0 +1,263 @@
+{
+ "scene": "house_double_floor_upper",
+ "name": "shelf_sapyzl_1",
+ "category": "shelf",
+ "model": "sapyzl",
+ "scale": [
+  1.0002,
+  1.0,
+  1.0006
+ ],
+ "rooms": [
+  "bedroom_1"
+ ],
+ "aabb_world": {
+  "min": [
+   2.455521821975708,
+   1.696331262588501,
+   0.9176979660987854
+  ],
+  "max": [
+   2.6133227348327637,
+   3.210831880569458,
+   0.9729202389717102
+  ],
+  "extent": [
+   0.15780091285705566,
+   1.514500617980957,
+   0.055222272872924805
+  ]
+ },
+ "top": {
+  "z": 0.9729,
+  "yaw": 3.1416,
+  "resolution": 0.02,
+  "n_cells": 550,
+  "n_free_cells": 550,
+  "area_m2": 0.22,
+  "local_bounds_uv": [
+   -2.606,
+   -2.466,
+   -3.206,
+   -1.706
+  ],
+  "hull_xy": [
+   [
+    2.4660000801086426,
+    1.7059999704360962
+   ],
+   [
+    2.6059999465942383,
+    1.7059999704360962
+   ],
+   [
+    2.6059999465942383,
+    3.2060000896453857
+   ],
+   [
+    2.4660000801086426,
+    3.2060000896453857
+   ]
+  ],
+  "occupants": [
+   "picture_aqahkx_0",
+   "picture_ttwhjj_0",
+   "picture_vezfau_0"
+  ]
+ },
+ "chairs_within_1m": [],
+ "edges": [
+  {
+   "name": "+u",
+   "mid": [
+    2.4655,
+    2.4563
+   ],
+   "inward": [
+    1.0,
+    -0.0
+   ],
+   "tangent": [
+    0.0,
+    1.0
+   ],
+   "length_m": 1.5,
+   "overhang_m": 0.0,
+   "room_in_front": "bathroom_0",
+   "blocked_in_front": {
+    "object": "picture_ttwhjj_0",
+    "category": "picture",
+    "distance_m": 0.0
+   },
+   "runs": {
+    "0.35": {
+     "free_fraction": 0.129,
+     "free_fraction_chairs_removed": 0.129,
+     "longest_free_run_m": 0.2,
+     "free_lateral_range_m": [
+      0.15,
+      0.3
+     ]
+    },
+    "0.45": {
+     "free_fraction": 0.129,
+     "free_fraction_chairs_removed": 0.129,
+     "longest_free_run_m": 0.2,
+     "free_lateral_range_m": [
+      0.15,
+      0.3
+     ]
+    },
+    "0.55": {
+     "free_fraction": 0.129,
+     "free_fraction_chairs_removed": 0.129,
+     "longest_free_run_m": 0.2,
+     "free_lateral_range_m": [
+      0.15,
+      0.3
+     ]
+    }
+   }
+  },
+  {
+   "name": "-u",
+   "mid": [
+    2.6055,
+    2.4563
+   ],
+   "inward": [
+    -1.0,
+    0.0
+   ],
+   "tangent": [
+    -0.0,
+    -1.0
+   ],
+   "length_m": 1.5,
+   "overhang_m": 0.0,
+   "room_in_front": "bedroom_1",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.55,
+     "free_lateral_range_m": [
+      -0.75,
+      0.75
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.55,
+     "free_lateral_range_m": [
+      -0.75,
+      0.75
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 1.55,
+     "free_lateral_range_m": [
+      -0.75,
+      0.75
+     ]
+    }
+   }
+  },
+  {
+   "name": "+v",
+   "mid": [
+    2.5355,
+    1.7063
+   ],
+   "inward": [
+    0.0,
+    1.0
+   ],
+   "tangent": [
+    -1.0,
+    0.0
+   ],
+   "length_m": 0.14,
+   "overhang_m": 0.0,
+   "room_in_front": "bedroom_1",
+   "blocked_in_front": null,
+   "runs": {
+    "0.35": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.15,
+     "free_lateral_range_m": [
+      -0.07,
+      0.03
+     ]
+    },
+    "0.45": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.15,
+     "free_lateral_range_m": [
+      -0.07,
+      0.03
+     ]
+    },
+    "0.55": {
+     "free_fraction": 1.0,
+     "free_fraction_chairs_removed": 1.0,
+     "longest_free_run_m": 0.15,
+     "free_lateral_range_m": [
+      -0.07,
+      0.03
+     ]
+    }
+   }
+  },
+  {
+   "name": "-v",
+   "mid": [
+    2.5355,
+    3.2063
+   ],
+   "inward": [
+    -0.0,
+    -1.0
+   ],
+   "tangent": [
+    1.0,
+    -0.0
+   ],
+   "length_m": 0.14,
+   "overhang_m": 0.0,
+   "room_in_front": "bedroom_1",
+   "blocked_in_front": {
+    "object": "walls_boflea_0",
+    "category": "walls",
+    "distance_m": 0.891
+   },
+   "runs": {
+    "0.35": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    },
+    "0.45": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    },
+    "0.55": {
+     "free_fraction": 0.0,
+     "free_fraction_chairs_removed": 0.0,
+     "longest_free_run_m": 0.0,
+     "free_lateral_range_m": null
+    }
+   }
+  }
+ ],
+ "in_union": false
+}

@@ -113,7 +113,14 @@ def main():
                 lines.append(f"| {name} | {r['category']}/{r['model']} | {r.get('scale')} | {','.join(r.get('rooms') or [])} | {j['joint']} | {j.get('kind', '-')} | {j.get('status')} | "
                              f"{best or '-'} | {fmt(j.get('front_free_m'))} ({fmt(j.get('front_free_eroded_m'))}) | {'yes' if r.get('canonical_annotation') else 'NO'} | "
                              f"{(pr.get('chosen') or '-') + ('/' + pr.get('result', '') if pr else '')} | {r.get('strip') or '-'} |")
-        lines.append("")
+        # review workload: distinct (category, model, scale) groups among the objects without a canonical annotation
+        groups: Dict[tuple, List[str]] = {}
+        for name, a in sc["artic"].items():
+            if a["review_needed"]:
+                groups.setdefault((a["category"], a["model"], tuple(round(x, 2) for x in (a.get("scale") or []))), []).append(name)
+        sc["review_groups"] = [{"category": k[0], "model": k[1], "scale": list(k[2]), "objects": v} for k, v in sorted(groups.items())]
+        lines += [f"Review needed (no canonical handle annotation, graspable joint): {sum(1 for a in sc['artic'].values() if a['review_needed'])} objects in "
+                  f"{len(groups)} distinct (model, scale) groups: " + "; ".join(f"{k[0]}/{k[1]} x{len(v)} scale {list(k[2])}" for k, v in sorted(groups.items())), ""]
         summary["scenes"][scene] = sc
     with open(os.path.join(args.root, "summary.json"), "w") as f:
         json.dump(summary, f, indent=1)

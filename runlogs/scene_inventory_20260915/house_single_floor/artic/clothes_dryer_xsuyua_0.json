@@ -1,0 +1,180 @@
+{
+ "scene": "house_single_floor",
+ "name": "clothes_dryer_xsuyua_0",
+ "category": "clothes_dryer",
+ "model": "xsuyua",
+ "key": "clothes_dryer__xsuyua",
+ "scale": [
+  1.1082,
+  0.9749,
+  1.0521
+ ],
+ "rooms": [
+  "utility_room_0"
+ ],
+ "root_pose_world": {
+  "position": [
+   21.990785598754883,
+   0.9457172155380249,
+   0.49232757091522217
+  ],
+  "orientation": [
+   -1.2264534943184913e-09,
+   -4.6647616613881837e-07,
+   -0.0012448730412870646,
+   0.9999992251396179
+  ]
+ },
+ "aabb_world": {
+  "min": [
+   21.6622314453125,
+   0.6427704691886902,
+   -0.0022293925285339355
+  ],
+  "max": [
+   22.31464195251465,
+   1.242990255355835,
+   0.902851939201355
+  ],
+  "extent": [
+   0.6524105072021484,
+   0.6002197861671448,
+   0.9050813317298889
+  ]
+ },
+ "joint_positions_in_scene": {
+  "j_link_0": -1.6773461832599458e-20
+ },
+ "openable_joint_ids": [
+  [
+   1,
+   "j_link_0"
+  ]
+ ],
+ "canonical_annotation": true,
+ "joints": [
+  {
+   "joint": "j_link_0",
+   "type": "RevoluteJoint",
+   "kind": "door",
+   "child_link": "link_0",
+   "outward_normal": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "face_s": 0.3211,
+   "axis_dir_obj": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "hinge_point_obj": [
+    0.2729,
+    -0.21679,
+    514.65652
+   ],
+   "open_sign": 1,
+   "lower": 0.0,
+   "upper": 1.5707964897155762,
+   "closed_q": 0.0,
+   "link_bbox_min": [
+    0.1902,
+    -0.2155,
+    -0.2515
+   ],
+   "link_bbox_max": [
+    0.3212,
+    0.2201,
+    0.2182
+   ],
+   "handles": [],
+   "flush_handles": [],
+   "fallback": {
+    "kind": "edge_door",
+    "contact": [
+     0.2926,
+     0.1791,
+     -0.0305
+    ],
+    "pinch_axis": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "approach_dir": [
+     0.0783,
+     -0.9969,
+     -0.0
+    ],
+    "width": 0.131,
+    "exposed": false,
+    "note": "pinch the door leaf across its thickness at the free edge",
+    "pull_dir": [
+     0.9988,
+     -0.0497,
+     0.0
+    ],
+    "contact_world": [
+     22.2838,
+     1.1241,
+     0.4618
+    ],
+    "height_world": 0.462,
+    "pinch_axis_world": [
+     1.0,
+     -0.0025,
+     0.0
+    ],
+    "approach_dir_world": [
+     0.0758,
+     -0.9971,
+     0.0
+    ],
+    "pull_dir_world": [
+     0.9987,
+     -0.0522,
+     0.0
+    ]
+   },
+   "sub_links": [],
+   "status": "ungraspable",
+   "outward_normal_world": [
+    1.0,
+    -0.0025,
+    0.0
+   ],
+   "face_centre_world": [
+    22.3119,
+    0.9472,
+    0.4757
+   ],
+   "front_free_m": 1.85,
+   "front_free_eroded_m": 1.55,
+   "room_in_front": "utility_room_0",
+   "prior_review": {
+    "chosen": "none",
+    "pinch": "none",
+    "motion": "swing",
+    "graspable": "False",
+    "handle_desc": "No handle; bowl-shaped porthole door 118 mm thick, black bezel nearly flush with the cabinet front, wide (~8 cm) rim, nothing to get fingertips behind",
+    "result": "infeasible_2_reviews",
+    "setting": "scene:house_single_floor"
+   }
+  }
+ ],
+ "base_link": {
+  "bbox_min": [
+   -0.3278,
+   -0.3022,
+   -0.4946
+  ],
+  "bbox_max": [
+   0.3239,
+   0.2965,
+   0.4105
+  ],
+  "n_pieces": 32
+ },
+ "strip": "artic/strips/clothes_dryer_xsuyua_0.png"
+}
