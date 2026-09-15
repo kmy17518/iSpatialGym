@@ -40,6 +40,10 @@ Each benchmark instance consists of:
 4. An **oracle sidecar** (`<instance_id>.oracle.json`) with everything the
    scripted demonstration policy needs (stances, grasps, contacts, waypoints,
    paths); the evaluator never reads it and the public release may omit it.
+   It carries facts only: the action sequence is the oracle's per-subtask
+   program (`oracle_primitives_design.md` §3.7), and the only writer of
+   evaluation targets on the demo side is the `run_isg` executor's epilogue
+   (goal-pose override after the settled check, oracle doc §3.8).
 
 BDDL describes **what** must hold. The TRO stores concrete values required to
 instantiate and evaluate that statement. The task spec describes how those
@@ -107,8 +111,9 @@ metadata directory, never BEHAVIOR's) with a different entry structure
 
 Generation runs per scene: bind the scene roles, spawn models from the whitelist,
 run the initialization rules of `instance_sampling_spec.md`, settle, validate
-(`:init` true, goal false, goal feasible, every recorded oracle pose IK- and
-collision-feasible), derive rooms, and write the TRO with `object_bindings`,
+(`:init` true, goal false, goal feasible, every pose of the expanded oracle
+program IK- and collision-feasible — the program check of
+`instance_sampling_spec.md` §3.5), derive rooms, and write the TRO with `object_bindings`,
 `load_room_instances`, the spec file hash (`task_spec_sha256`) and the sidecar.
 
 ## Room-independent BDDL

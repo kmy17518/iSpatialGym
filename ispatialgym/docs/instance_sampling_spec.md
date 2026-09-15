@@ -45,7 +45,10 @@ Principles, in the order they are traded off:
 4. **Sampling must guarantee oracle yield.** Every gripper pose the scripted policy will need (grasp, pre-grasp,
    place, push and brace contacts, articulation waypoints, in-hand reorientations, base-follow poses) is IK- and
    collision-checked during sampling and recorded for the oracle (section 7). Whatever the oracle does, the sampler
-   has checked.
+   has checked — by construction, not by two code bases agreeing: the oracle's program for the instance
+   (`expand(alias, sidecar)`, `oracle_primitives_design.md` §3.7) is expanded from the completed draft sidecar at
+   the end of sampling and every pose and waypoint of every action is checked once more (the program check, 3.5),
+   and sampler and oracle derive those poses from one conventions module (oracle doc §3.5).
 5. **Identical robot configuration across instances** except where a rule samples it (base pose, trunk when the
    rule says "continuous", the grasp draw).
 6. **Every instance makes sampling cheaper**: constraints learned from successful instances are written back into
@@ -289,6 +292,15 @@ init, goal feasibility by teleport + settle (120 steps) **with the robot parked*
 binary goal atom true, drift ≤ tolerance, TRO written and validated against the BDDL. Every attempt and every
 template starts from the stable scene (`reset_scene_objects`, robot parked).
 
+**Program check** (new in v2, TODO D2 / F6): once the draft sidecar is complete, the sampler expands the oracle's
+program for the alias (`expand(alias, sidecar)`, `oracle_primitives_design.md` §3.7) and IK- and collision-checks
+every pose and waypoint that every action's `targets()` returns — in the recorded posture, trunk and stance, with the
+carried object attached where the action carries one (screening IK at waypoints, exact IK at end poses, 3.6). This is
+the check principle 4 refers to. A pose that fails here is a bug in the rule that recorded it; the attempt is
+rejected (`program_check_failed`, reported per action name), never patched. `validate_instances.py` (D5) runs the same
+expansion on written instances. Trajectories *between* key poses are not checked here: the oracle plans them at run
+time (oracle doc §3.9).
+
 Details kept from v1 that the checks depend on:
 
 - **Predicate cache**: OmniGibson caches kinematic predicates (`ontop`, `inside`, `touching`, `nextto`) per object
@@ -371,6 +383,11 @@ Section 7 lists the sidecar schema. Rule: anything the oracle would otherwise ha
 values, grasp `(yaw, grasp_key, grasp_name)`, pre-/grasp/place eef poses, push and brace contacts with directions,
 handle waypoints `h(q_k)`, `follow_mode`, transitions, paths, block order and per-block grasp/flip data, path bucket,
 per-object image-space descriptors for the language annotations — is written at sampling time.
+
+Two things are deliberately **not** recorded (decision 2026-09-15, oracle doc §3.7 / §3.9): the action *sequence*
+— it is the oracle's per-subtask program (oracle doc §6.2), which both `run_isg` and the program check of 3.5 expand
+from these facts — and the joint-space trajectories between key poses, which the oracle plans at run time
+(`plan_failed` is its own QA category).
 
 ### 3.12 Look-alikes, exact duplicates and texture variants
 
@@ -1185,6 +1202,14 @@ coffee tables do not; `under_clearance`), and the target's footprint fits betwee
 ```
 
 Only the blocks a task uses are present. `run_isg --mode oracle` requires the sidecar; the evaluator never reads it.
+
+The sidecar carries **facts, not an action list** (decision 2026-09-15): the sequence is the oracle's program for the
+alias (`oracle_primitives_design.md` §3.7, one function per row of its §6.2), expanded from these blocks by `run_isg`
+and by the sampler's program check (3.5). One schema therefore serves every subtask, and a new subtask adds a program,
+not a schema version. Each block is consumed by a named action of the oracle doc §3.6 (`paths` → `Navigate`,
+`transitions` → `Transition`, `grasps` → `Grasp` / `Lift` / `Place`, `contacts.push` → `Push`, `contacts.brace` →
+`Brace`, `articulation` → `BaseFollow`, `blocks` → the block-design program, `goal` → `SetTorso`, `language` → every
+action's annotation).
 
 ## 8. Error tolerances
 

@@ -1,13 +1,17 @@
 # iSpatialGym oracle primitives for R1Pro: design and implementation notes
 
 Status: first implementation validated in simulation, 2026-09-04; section 6 rewritten 2026-09-15 for the v2 sampling
-rebuild (recorded plans from the oracle sidecar, no fallbacks). Code: `ispatialgym/oracle/`.
+rebuild (recorded plans from the oracle sidecar, no fallbacks); section 3 rewritten 2026-09-15 06:50 for the v2
+**structure** (conventions shared with the sampler, decision-free motions, actions as the unit of checkpoint /
+annotation / QA, pure per-subtask programs, one executor; owner decision). Code: `ispatialgym/oracle/` holds the v1
+classes until TODO F2/F5/F6 land; section 3.2 lists the fate of every v1 skill.
 
 This document explains how the scripted (oracle) demonstration policies for the seven
-iSpatialGym tasks are organised, why the primitive set is arranged hierarchically rather
-than as a flat per-task list, how joint groups are restricted when planning with cuRobo,
-how base / torso motions are made to look like JoyLo teleoperation, and what was learned
-while getting it to run.
+iSpatialGym tasks are organised, why the primitive set is arranged in layers rather
+than as a flat per-task list, which unit carries checkpoints, annotations and QA in v2 (the
+action, section 3), how joint groups are restricted when planning with cuRobo, how base /
+torso motions are made to look like JoyLo teleoperation, and what was learned while getting
+it to run.
 
 ## 1. Facts that constrain the design
 
@@ -27,17 +31,57 @@ nothing else touches robot state during execution. Privileged information is use
 physics disabled and the like are therefore instance-setup utilities (e.g. restoring the initial
 grasp for Object Scaling / Mental Rotation from a TRO), not primitives.
 
-## 3. Hierarchy instead of a flat per-task list
+In v2 the deciding / doing split is structural, not just a rule: the deciding happened in the
+sampler and arrives in the sidecar; Layer 1 (motions) contains no deciding at all, and the only
+run-time decision left is the trajopt between recorded key poses (3.9).
 
-The brainstormed table has ~15 primitives, several of which are the same motion with a
-different frame (`move_eef global/local`, `translate_eef_along_axis`, `rotate_eef`, `push`,
-`release(xyz, xyzw)` ...). Three layers remove the duplication and isolate everything
-cuRobo-specific in one place:
+## 3. Structure (v2, 2026-09-15): conventions, motions, actions, programs, executor
+
+v1 organised the oracle as backend / skills / task oracles: the skills decided *and* did (stance search, grasp
+candidates, fallback cascades) and every task was a hand-written class with its own retry loop. v2 moves every
+decision into the sampler and the sidecar (spec principle 4, §3.11), which changes the unit the code is organised
+around: the oracle executes a recorded plan, and the per-action concerns of section 6 (checkpoint, one retry, two
+annotations, hard-failure QA) attach to the **action** — not to the task and not to the motion. The v2 layering:
 
 ```
-Layer 2  task oracles   tasks/camera_relocalization.py, tasks/held_object.py (object scaling, mental
-                        rotation); disembedding, configuration matching, world alignment and IORS are
-                        short compositions of the skills below (section 6)
+Layer 0   backend        r1pro_model, curobo_planner.R1ProCuRobo, action.ActionState, trunk.TrunkState,
+                         base_tracker — unchanged from v1
+          conventions    the geometry both the sampler and the oracle derive poses from (3.5); imported by
+                         ispatialgym.sampling and ispatialgym.oracle alike
+Layer 1   motions        decision-free executors of one recorded target each (3.2): track_path, trunk_to,
+                         arm_to, arm_along, gripper, base_follow, hold, settle
+Layer 2   actions        the unit of checkpoint / annotation / QA (3.6): Navigate, Transition, SetTorso, Grasp,
+                         Lift, Reorient, Place, Push, Brace, BaseFollow, Retreat — targets() from a sidecar block
+                         via the conventions; execute() yields 23-D actions via Layer 1; postcondition(); annotate()
+Layer 3   programs       one pure function per row of 6.2: expand(alias, sidecar) -> list[Action] (3.7); no simulator
+Executor  run_isg        one loop for the oracle / replay / policy modes (3.8): load -> expand -> per action:
+                         checkpoint -> execute under the QA monitors -> postcondition -> one retry -> annotate;
+                         then the epilogue (success, no-op window, settled, goal image, TRO goal override) -> record
+```
+
+Rules that keep the layers apart:
+
+* **Layer 1 makes no decisions.** A motion receives one fully specified target (a path, a trunk pair, an eef pose
+  or joint vector, a waypoint list, a gripper command) and either reaches it or raises. No candidate sets, no
+  alternative embodiments, no re-stancing. Everything of that kind in v1's `Skills` (3.2, column "v2") moves to
+  the sampler or is deleted.
+* **Layer 2 is the only layer the executor sees.** Checkpoints, annotations and QA exemptions (push / brace need no
+  grasp check) are per action; a motion is never checkpointed or annotated on its own.
+* **Layer 3 is pure.** `expand` reads the sidecar and returns actions with their targets resolved; it never touches
+  the simulator, so it is unit-tested against sample sidecars without Isaac Sim, and the sampler calls it (3.7).
+* **Sampler and oracle share the conventions, not copies of them.** The sampler checks the *outputs* of the
+  conventions functions; the oracle tracks the *same outputs* (3.5). v1 had `Skills.q_with_base_pose` and
+  `RobotKit.q_at_base_pose`, `Skills.grasp_candidates` and `RobotKit.grasp_candidates_at`, and
+  `camera_offset_in_zed` defined in a task oracle and imported by the sampler; none of that survives.
+* **Correction is not a fallback.** Closing the loop on the tracking error of a recorded target (re-tracking the
+  residual base error after a path, re-solving the arm goal from the settled state, the corrective navigation of
+  the camera-relocalization oracle) is control and stays. Choosing a different target, embodiment, grasp or
+  stance because the recorded one failed is a fallback and is gone (spec principle 2).
+
+For reference, the v1 layering as implemented in `ispatialgym/oracle/` today (runnable until F2 lands):
+
+```
+Layer 2  task oracles   tasks/camera_relocalization.py, tasks/held_object.py (object scaling, mental rotation)
 Layer 1  motor skills   skills.Skills: navigate_to, set_torso, ready_arms, move_eef(s), move_joints,
                         move_eef_cartesian, rotate_eef, set_gripper, grasp, place, place_object_at,
                         push, brace, stance_for / approach
@@ -52,22 +96,29 @@ Pose arguments are `FramedPose(pos, quat_xyzw, frame)` with `frame` in `world`, 
 (robot `base_link`), `eef:<arm>`, `obj:<name>`, or a plain world `(pos, quat)`. This replaces
 the `mode=global/local` flags.
 
-### 3.2 Layer 1 skills (all yield 23-D actions)
+### 3.2 Layer 1: the v1 skills and their v2 fate
 
-| Skill | Joints that move | How | Replaces (brainstorm) |
+All v1 skills yield 23-D actions; the "How" column is the v1 implementation (kept as the record of what works in
+simulation), the "v2" column says what becomes of each one. The v2 motions are `track_path(waypoints, posture)`,
+`trunk_to(translate, tilt)`, `arm_to(arm | arms, pose | q)`, `arm_along(arm, waypoints, speed)`, `gripper(arm,
+close)`, `base_follow(b_k, arm)`, `hold(steps)`, `settle()`; nothing else is public in Layer 1.
+
+| Skill | Joints that move | How (v1) | v2 |
 | --- | --- | --- | --- |
-| `navigate_to(pose2d)` | base x, y, yaw | cuRobo `base` embodiment plans a smooth collision-free `(x, y, yaw)(t)` for the *whole body* at its current arm/torso configuration (fallback: traversability-map A* / straight line, always whole-body collision-checked). `base_tracker` turns it into base-frame velocities: feed-forward + pose feedback, clipped to joystick limits, acceleration-limited, exponentially smoothed. Translation and rotation happen simultaneously - no translate-rotate-translate. | `navigate` |
-| `set_torso(translate, tilt, delta)` | torso 1-3 (+3) | JoyLo keyframe curve (`trunk.py`), scalars rate-limited exactly like holding the JoyLo controls. Swept motion is whole-body collision-checked; if hanging arms would hit the base it first calls `ready_arms`. | `raise_torso`, `tilt_torso` |
-| `ready_arms()` | arms | Planned motion to `ARM_READY_Q` (hands in front, elbows bent; found by IK with max joint-limit margin), with lift-first and Cartesian fallbacks. What a JoyLo operator does before working. | - |
-| `move_eef(arm, pose, torso=False)` / `move_eefs({arm: pose})` / `move_joints(q)` | 7 (14) arm joints, +4 torso if `torso` | cuRobo IK + trajopt, self/scene collision, grasped object attached; interpolated at 1/30 s, streamed, hold-to-converge. | `move_eef`, bimanual |
-| `move_eef_cartesian(arm, pose / delta / waypoints, torso=False)` | arm (+torso) | Dense straight-line / arc waypoints -> damped-least-squares differential IK (finite-difference Jacobians from batched cuRobo FK, saturated-joint handling) -> collision validated -> streamed at a configurable eef speed. Guarantees the path shape trajopt does not. | `translate_eef_along_axis`, `push`, articulation follow |
-| `rotate_eef(arm, delta_rot, pivot=eef/object/point)` | arm (+torso) | Special case of the above with SLERP about a pivot; `pivot="object"` keeps the held object centred (Mental Rotation). | `rotate_eef` |
-| `set_gripper / open_gripper / close_gripper` | fingers | Streams +1/-1 until fingers stop or assisted grasping engages. | `grasp`, `close_eef`, `release` |
-| `grasp(arm, obj, approach=top/front)` | composite | `grasp_candidates` (vertical + 30/45 deg tilted approaches x wrist yaws, fingertips kept above the object bottom) -> first IK-feasible grasp + pre-grasp -> planned pre-grasp -> straight approach -> close -> attach to planner -> lift. | `grasp` |
-| `place(arm, eef_pose)` / `place_object_at(arm, object_pose)` | composite | Reachability check (repositions via `stance_for` if needed) -> planned pose above -> straight descent (planned fallback) -> release -> retreat. `drop_height` avoids pushing the object into the support. | `release(xyz, xyzw)` |
-| `push(arm, contact, direction, distance)` | composite | Closed gripper, planned standoff, straight motion through the contact. | `push`, world-alignment nudges |
-| `brace(arm, pose)` | other arm | Closed gripper + planned move: support hand for World Alignment / articulation / attachment. | bimanual support |
-| `stance_for(target)` / `approach(target)` | base + trunk | Chooses base pose (facing the target, target on the arm's side) and JoyLo trunk level from candidates that are whole-body collision-free *and* have IK-feasible grasp + pre-grasp, then executes trunk/drive in a collision-safe order. Mirrors how operators position the robot before reaching. | (new; needed, see 5.2) |
+| `navigate_to(pose2d)` | base x, y, yaw | cuRobo `base` embodiment plans a smooth collision-free `(x, y, yaw)(t)` for the *whole body* at its current arm/torso configuration (fallback: traversability-map A* / straight line, always whole-body collision-checked). `base_tracker` turns it into base-frame velocities: feed-forward + pose feedback, clipped to joystick limits, acceleration-limited, exponentially smoothed. Translation and rotation happen simultaneously - no translate-rotate-translate. | → `track_path`: the tracker follows the **recorded** path (spec §3.7); the cuRobo base plan and the trav-map / straight-line cascade (`plan_base`) are deleted. Used by `Navigate` and `Transition`. |
+| `set_torso(translate, tilt, delta)` | torso 1-3 (+3) | JoyLo keyframe curve (`trunk.py`), scalars rate-limited exactly like holding the JoyLo controls. Swept motion is whole-body collision-checked; if hanging arms would hit the base it first calls `ready_arms`. | → `trunk_to`: keyframe curve and rates stay; the swept check and the `ready_arms` fallback go (the sampler swept the motion at the recorded stand-off, spec §3.8). Used by `Transition` and `SetTorso`. |
+| `ready_arms()` | arms | Planned motion to `ARM_READY_Q` (hands in front, elbows bent; found by IK with max joint-limit margin), with lift-first and Cartesian fallbacks. What a JoyLo operator does before working. | **deleted.** Arms are untucked at init (spec §3.6); where the sidecar says `goal.arms: untucked` the lift is `arm_to` with the recorded joint vector. |
+| `move_eef(arm, pose, torso=False)` / `move_eefs({arm: pose})` / `move_joints(q)` | 7 (14) arm joints, +4 torso if `torso` | cuRobo IK + trajopt, self/scene collision, grasped object attached; interpolated at 1/30 s, streamed, hold-to-converge. | → `arm_to`: trajopt with the trunk locked — the one planner left at run time (3.9). `torso=True` is removed. |
+| `move_eef_cartesian(arm, pose / delta / waypoints, torso=False)` | arm (+torso) | Dense straight-line / arc waypoints -> damped-least-squares differential IK (finite-difference Jacobians from batched cuRobo FK, saturated-joint handling) -> collision validated -> streamed at a configurable eef speed. Guarantees the path shape trajopt does not. | → `arm_along`: differential IK through a **given** waypoint list; the `pose` / `delta_pos` forms become conventions functions that produce the list (3.5). `torso=True` is removed. Used by every contact motion. |
+| `rotate_eef(arm, delta_rot, pivot=eef/object/point)` | arm (+torso) | Special case of the above with SLERP about a pivot; `pivot="object"` keeps the held object centred (Mental Rotation). | → conventions `orbit_waypoints` / `slerp_waypoints` fed to `arm_along`. Used by `Reorient`. |
+| `set_gripper / open_gripper / close_gripper` | fingers | Streams +1/-1 until fingers stop or assisted grasping engages. | → `gripper(arm, close)`, unchanged. |
+| `grasp(arm, obj, approach=top/front)` | composite | `grasp_candidates` (vertical + 30/45 deg tilted approaches x wrist yaws, fingertips kept above the object bottom) -> first IK-feasible grasp + pre-grasp -> planned pre-grasp -> straight approach -> close -> attach to planner -> lift. | → `Grasp` action (3.6): pre-grasp and grasp from the sidecar `grasps[]` entry via `grasp_pose` / `pre_pose`; `grasp_candidates` / `grasp_pose_for` are deleted; the lift is its own `Lift` action. |
+| `place(arm, eef_pose)` / `place_object_at(arm, object_pose)` | composite | Reachability check (repositions via `stance_for` if needed) -> planned pose above -> straight descent (planned fallback) -> release -> retreat. `drop_height` avoids pushing the object into the support. | → `Place` + `Retreat` actions: recorded pre-place / place; `reposition` and the planned-descent fallback are deleted. |
+| `push(arm, contact, direction, distance)` | composite | Closed gripper, planned standoff, straight motion through the contact. | → `Push` action: recorded pre-contact, contact, arc waypoints (δ/2, goal), distance. |
+| `brace(arm, pose)` | other arm | Closed gripper + planned move: support hand for World Alignment / articulation / attachment. | → `Brace` action: recorded kind, pre-contact, contact; held until the working arm's `Retreat`. |
+| `stance_for(target)` / `approach(target)` | base + trunk | Chooses base pose (facing the target, target on the arm's side) and JoyLo trunk level from candidates that are whole-body collision-free *and* have IK-feasible grasp + pre-grasp, then executes trunk/drive in a collision-safe order. Mirrors how operators position the robot before reaching. | **deleted.** Stances are the sampler's (spec §4–6) and arrive as `stances{}`; `go_to_stance`'s "torso first or drive first" guess becomes the recorded `Transition` (spec §3.8). |
+| `plan_base`, `base_reference_collision_free`, `q_with_base_pose` | - | base path planning and its whole-body validation | `q_with_base_pose` → conventions (3.5); the rest is deleted (paths are recorded). |
+| `hold`, `settle`, `execute_joint_trajectory`, `track_base`, `_wait_converged` | - | emitters and trajectory streaming | Layer-1 internals, unchanged. |
 
 ### 3.3 Restricting the joints that move (cuRobo)
 
@@ -85,7 +136,7 @@ incrementally).
 | `base` | `base_footprint_{x,y,rz}` | `base_link` | `navigate_to` |
 | `right_arm` / `left_arm` | 7 | that eef | most manipulation |
 | `both_arms` | 14 | both eefs | `ready_arms`, bimanual |
-| `right_arm_torso` / `left_arm_torso` | 4 + 7 | eef | fallback for hard reaches (held-object oracles use it when the arm alone cannot track) |
+| `right_arm_torso` / `left_arm_torso` | 4 + 7 | eef | v1 fallback for hard reaches (the held-object oracles used it when the arm alone could not track); **not used by the v2 oracles** (spec §6.3: the arm moves, not the torso), kept for sampler queries |
 | `whole_body` | 3 + 4 + 14 | eefs, `zed_link`, `base_link`, `torso_link4` | FK / collision queries (kinematics-only, no planner needed) |
 | `base_torso` | 3 + 4 | `zed_link`, ... | viewpoint queries |
 
@@ -94,23 +145,151 @@ planned motion speed; the defaults are deliberately slow (arms 0.25 x URDF limit
 0.45 m/s) to look like teleoperation and should be tuned against human JoyLo statistics.
 
 Design decision: for demos the torso is **not** freed while reaching. JoyLo operators lower the
-trunk along the keyframe curve, then reach. `stance_for` chooses the trunk level, `set_torso`
-applies it, and the arm is planned with the torso locked. `*_arm_torso` is used only as a
-fallback when a motion is otherwise infeasible (e.g. Object Scaling toward the camera).
+trunk along the keyframe curve, then reach. The sampler chooses the trunk level (v1: `stance_for`),
+`trunk_to` applies it, and the arm is planned with the torso locked. v1 used `*_arm_torso` as a
+fallback when a motion was otherwise infeasible (e.g. Object Scaling toward the camera); v2 has no
+such fallback — the sampler solved the goal with the arm-only embodiment (spec §6.3).
 
 Unused tool frames of a multi-frame planner get a zero-weight `ToolPoseCriteria` (cuRobo then
 treats them as trivially converged); joint-space goals use `plan_cspace`.
 
 ### 3.4 Execution model
 
-* Skills are generators; `skills.run(env, gen)` steps the env. Composites `yield from`.
+* Motions and actions are generators yielding 23-D actions; composites `yield from`. The **executor** (3.8) steps
+  the env (`env.step(action, n_render_iterations=1)`); `skills.run(env, gen)` is the v1 driver and stays only for
+  the v1 classes.
 * `ActionState` holds targets (trunk q, both arm q, gripper commands); every yielded action
   fills all 23 dims, so position-controlled joints never drift. Base velocity defaults to zero.
-* Convergence checks with step budgets raise `SkillError(reason, ...)`; task oracles retry with
-  other parameters.
+* Convergence checks with step budgets raise `SkillError(reason, ...)`; `reason` is the QA category of 6.4
+  (`plan_failed`, `execution`, `collision`, `failed_grasp`, `timeout`, ...). Nothing inside a motion or an action
+  retries with other parameters (v1 did); the executor retries the whole action once from its checkpoint.
 * Collision world: all non-visual-only object collision meshes (expressed in the robot root
   frame, fixed during an episode) plus a ground slab; the grasped object is sphere-fitted,
-  attached to `attached_object_<arm>_eef_link` and removed from the world.
+  attached to `attached_object_<arm>_eef_link` and removed from the world. Sampler and oracle must load the
+  same world (spec review item 3.1: room-set parity is a sampler-side fix in `sim_utils.py`).
+
+### 3.5 Conventions shared with the sampler
+
+One module (`ispatialgym/robot/conventions.py`, TODO F5; today spread over `oracle/skills.py`,
+`oracle/tasks/camera_relocalization.py`, `oracle/poses.py`, `oracle/trunk.py` and `sampling/robot_utils.py`) holds
+every function that turns sidecar facts into poses. The sampler validates the *outputs* of these functions; the
+oracle tracks the *same outputs*; neither package may re-implement one. Every function is pure (tensors in, tensors
+out, frames as in 3.1); the simulator is read only by the caller.
+
+| Function | Used by |
+| --- | --- |
+| `grasp_pose(obj_pose, grasp_key, grasp_name, yaw)` → eef pose from the grasp-library entry | sampler Phase 3, `Grasp`, `Place` (carry transform) |
+| `pre_pose(pose, dist=0.10)` = pose moved back along −a (spec §3.6); `handle_eef(contact)` = contact − 0.012·a; `contact_eef(point, normal)` = point − `CONTACT_CENTER_Z`·a | sampler brace / push / handle IKs; `Grasp`, `Push`, `Brace`, `BaseFollow` |
+| `line_waypoints(p0, p1, n)`, `slerp_waypoints(q0, q1, n)`, `orbit_waypoints(pivot, delta, n)`, `arc_waypoints(contact, centre, δ)` (δ/2 and goal), `handle_waypoints(h, q_k)` — the waypoint policy of spec §3.9 | sampler waypoint IKs; the `arm_along` targets of `Grasp`, `Place`, `Push`, `Reorient`, `BaseFollow` (arm mode) and the held-object programs |
+| `transition_poses(stance_from, stance_to, s_T)` → drive-back pose, trunk pair, drive-in pose (spec §3.8) | sampler transition sweep; `Transition` |
+| `base_follow_poses(h, q_k, T_eef_base)` = `h(q_k) ∘ T_eef→base(q*)` (spec §5.3) | sampler base-follow feasibility; `BaseFollow` |
+| `trunk.torso_q(translate, tilt)`, `translate_to_torso_q`, `torso_q_to_translate_tilt` (JoyLo keyframes) | everywhere the trunk is set or read |
+| `camera_offset_in_zed(robot)`, `camera_pose(q)` | sampler view solve and goal image; `SetTorso`; the gripper-in-FOV monitor |
+| `q_with_base_pose(q, x, y, yaw)` (root-frame virtual base joints) | sampler stance checks; `track_path`'s collision monitor |
+| `cube_grasp(block_pose, face_pair, tilt_pick, yaw)`, `flip_waypoints(...)` (spec §6.5) | block-design sampler; `Grasp` / `Reorient` for blocks |
+| gripper constants `FINGER_OPEN`, `CONTACT_CENTER_Z`, fingertip length | sampler; `gripper`; the contact functions |
+
+### 3.6 Layer 2: actions
+
+An action is one row of the executor loop: it owns exactly one checkpoint, one annotation pair and one QA verdict.
+The contract (`ispatialgym/oracle/actions.py`, TODO F6 declares, F2 executes):
+
+```python
+class Action:
+    name: str                          # "grasp", "push", ...
+    arms: tuple[str, ...]              # arms involved (QA: gripper-in-FOV; failed-grasp exemption)
+    objects: tuple[str, ...]           # bddl instances involved (annotation; intended-contact whitelist)
+    qa_exempt: frozenset[str]          # e.g. {"failed_grasp"} for Push / Brace
+    def targets(self, sidecar, state) -> dict           # poses / waypoints / paths via the conventions (3.5); pure
+    def execute(self, motions, state) -> Iterator[th.Tensor]  # Layer-1 motions only; yields 23-D actions
+    def postcondition(self, state) -> str | None        # None = ok, else a QA category of 6.4
+    def annotate(self, sidecar) -> tuple[str, str]      # fine-grained, with numbers (6.3)
+```
+
+The vocabulary (the rows of 6.2 are compositions of these and nothing else):
+
+| Action | Sidecar block | Motions | Postcondition |
+| --- | --- | --- | --- |
+| `Navigate(path)` | `paths[i]` (waypoints, posture, carried) | `track_path` | base within tracker tolerance of the last waypoint; whole-body collision-free along the way (monitor) |
+| `Transition(t)` | `transitions[i]` + the two stances | `track_path` (drive-back) → `trunk_to` → `track_path` (drive-in) | trunk at the target pair, base at the arriving stance |
+| `SetTorso(goal)` | `goal.{translate, tilt, arms}` | (`arm_to` untucked when `goal.arms` says so) → `trunk_to` | trunk converged; camera relocalization: head-camera pose within tolerance, one corrective `track_path` on the residual allowed (correction, not fallback) |
+| `Grasp(g)` | `grasps[i]` | `gripper(open)` → `arm_to(pre_grasp)` → `arm_along(approach)` → `gripper(close)` | assisted grasp attached to the object (`failed_grasp` otherwise); backend `attach_object` |
+| `Lift(g)` | `grasps[i].carry_height` | `arm_along(vertical)` | eef at the carry height, object orientation kept |
+| `Reorient(w)` | `grasps[i]` / `blocks[i]` waypoints | `arm_along(orbit / slerp / flip waypoints)` | object orientation within tolerance of the waypoint end |
+| `Place(g)` | `grasps[i].{pre_place, place}` | `arm_to(pre_place)` → `arm_along(descent)` → `gripper(open)` → `arm_along(retreat −a)` | object released (`release_grasp_immediately`), backend `detach_object`, object settled on the support |
+| `Push(c)` | `contacts.push` | `gripper(close)` → `arm_to(pre)` → `arm_along(init → mid → goal)` | eef reached the goal contact; the pushed object moved (`no_motion` otherwise) |
+| `Brace(c)` | `contacts.brace` | `gripper(close)` → `arm_to(pre)` → `arm_along(pre → contact)` | eef at the contact; held (no further command) until the working arm's `Retreat` |
+| `BaseFollow(a)` | `articulation.{base_follow, waypoints, follow_mode, passive_from}` | `base_follow(b_k)` with the arm locked, or `arm_along(h(q_k))` in arm mode | joint at `q_goal`, or `passive_from` reached and the joint continued passively |
+| `Retreat(arm)` | the preceding action's retreat vector (−a, 0.10 m) or "away a little" after a place | `gripper(open)` if it was closed for a brace → `arm_along(retreat)` | eef clear of the object by the retreat distance |
+
+Actions read privileged state between yields (object poses, `_ag_obj_in_hand`, joint positions) to evaluate their
+postcondition and to close the loop on tracking error; they never choose between alternatives.
+
+### 3.7 Layer 3: programs and `expand`
+
+`expand(alias, sidecar) -> list[Action]` (`ispatialgym/oracle/programs.py`, TODO F6) dispatches on the alias's
+subtask to one function per row of 6.2 (`program_block_design(sidecar)`, `program_iors_touching(sidecar)`, …).
+Each returns the action list with the loops and conditionals of its row resolved from the sidecar (block order,
+`brace_col` present or not, `passive_from`, `follow_mode`, the placement stance of disembedding / IORS large-scale).
+The sidecar therefore carries **facts, not the sequence** (owner decision 2026-09-15; spec §7): one schema serves
+every subtask, the sequence lives in one readable place next to the table it must match, the loops are Python rather
+than a JSON DSL, and a new subtask adds a program, not a schema version.
+
+Two callers besides the executor:
+
+* **The sampler's program check** (spec §3.5, TODO D2): once the draft sidecar is complete, `expand` it and IK- and
+  collision-check every pose and waypoint that every action's `targets()` returns, in the recorded posture with the
+  carried object attached. This is how spec principle 4 ("whatever the oracle does, the sampler has checked") holds
+  by construction rather than by two code bases agreeing.
+* **`validate_instances.py`** (TODO D5) runs the same expansion on written instances.
+
+Tests: every program is unit-tested against one hand-written sidecar per subtask (action names, arms, object sets,
+target shapes) without a simulator; the conventions are tested against the FK numbers of section 5.
+
+### 3.8 Executor (`run_isg`)
+
+One loop serves the three modes of 6.5; only the action source differs (a program, a LeRobot episode, a policy):
+
+```
+load TRO + sidecar + scene variant (loader contract, spec §3.14); verify sidecar.tro_sha256
+actions = expand(alias, sidecar)
+for action in actions:
+    checkpoint = snapshot(simulator state, executor state)
+    for attempt in (0, 1):
+        verdict = run(action)                 # steps the env; the QA monitors of 6.4 watch every step
+        if verdict is None: verdict = action.postcondition(state)
+        if verdict is None: break
+        restore(checkpoint); log(action, verdict, attempt)
+    else: fail the episode with verdict
+    record action.annotate(sidecar)
+epilogue: binary success -> max(50, 20 % of the action steps) no-op -> pose-settled -> goal image ->
+          if success within tolerance: TRO goal poses overridden with the settled values (6.2)
+```
+
+* **Checkpoint contents.** The simulator state (scene state including the assisted-grasp bookkeeping of the robot;
+  verify that `scene.save_state` / `load_state` round-trip it, section 8) **and** the executor state: `ActionState`
+  hold targets, `TrunkState`, the backend's attached objects, the gripper commands, the tracker's reference index.
+  Restoring the sim without the executor state resumes with stale hold targets or a planner that still thinks the
+  object is attached — the reason executor state can no longer live as loose attributes on `Skills`.
+* **One retry**, then the episode fails with the action's category (6.4). The retry re-runs `targets()` from the
+  restored state, so tracking error accumulated before the checkpoint is not inherited.
+* **The epilogue belongs to the executor, not to an action.** The TRO goal override makes `run_isg --mode oracle`
+  a producer of evaluation targets; it is the only place where the demo pipeline writes into the TRO. The loader
+  and `ISpatialGymTask` never read the sidecar.
+* **Stepping is the executor's** (`env.step(action, n_render_iterations=1)`), so the recorder (6.5) and the QA
+  monitors see the same frames in all three modes.
+
+### 3.9 The one planner left at run time
+
+Between recorded key poses the arm still moves by cuRobo trajopt (`arm_to`: pre-grasp, pre-place, pre-contact,
+the untucked lift), planned at execution time from the settled state with the trunk locked. The sampler proves IK
+and collision feasibility of the key poses and waypoints, not the existence of a trajopt solution between them, so a
+trajopt failure is not a sampler bug. Decision 2026-09-15 (owner, on the agent's recommendation): trajopt stays at
+run time — recording joint-space trajectories would enlarge the sidecar, cost one trajopt per candidate pair during
+sampling, and still not start from the settled state — and `plan_failed` is its own QA category (6.4), retried
+once from the checkpoint and counted separately in the QA statistics so that a sampler-side cause (a key pose at
+the collision margin) can be told from a planner-side one. If the pilot (E1) shows a `plan_failed` rate the retry
+does not absorb, the alternative is to record `q_traj` per key-pose pair in the sidecar and make `arm_to` a tracker.
 
 ## 4. cuRobo 0.8.0 facts and workarounds found on the way
 
@@ -194,27 +373,30 @@ and waypoint they use was IK- and collision-checked at sampling time and is read
 sidecar** (`<instance_id>.oracle.json`, spec §7). An oracle never searches for a grasp, a stance or a path; if a
 recorded plan fails in execution that is a QA failure to be fixed in the sampler, not something to fall back from.
 Motions look like JoyLo teleoperation: base velocities with simultaneous translation and rotation, trunk along the
-keyframe curve, arms planned with the trunk locked.
+keyframe curve, arms planned with the trunk locked. The structure (conventions, motions, actions, programs,
+executor) is section 3; this section is the per-action and per-subtask content.
 
-### 6.1 Shared building blocks (changes to Layer 1)
+### 6.1 Actions in v2 (behaviour per action; the contract is 3.6)
 
-| Skill | v2 behaviour |
+| Action (v1 skill) | v2 behaviour |
 | --- | --- |
-| `navigate_to` | follows the **recorded path** (spec §3.7): un-eroded shortest path validated with whole-body checks at the navigation posture when both stances lie in one locally un-eroded region, otherwise eroded-map global path + collision-checked local connections; the traversability map carries the scene variant's `freed_footprints` (chairs) and `blocked_footprints` (obstacle). Erosion for planning uses the footprint of the posture actually held (untucked arms, carried object). |
-| `set_torso` | no `ready_arms` fallback. Trunk changes happen at the recorded **transition stand-off** (spec §3.8): drive back to `s_T`, move the trunk, drive in. Arms are lifted to untucked only where the sidecar says so (camera relocalization goal with self-collision). |
-| `grasp` | uses the recorded `(grasp_key, grasp_name, yaw)` → pre-grasp and grasp eef poses; approach = straight 10 cm along the grasp axis; assisted grasp must attach (hard QA failure otherwise, except for push / brace oracles). Lift keeps the object orientation. |
-| `place` / `place_object_at` | recorded pre-place / place eef poses; straight descent; release; retreat 10 cm along −a; then "move contacting grippers away a little". |
-| `push` | closed gripper at the recorded contact, along the recorded direction / arc waypoints (δ/2, goal), distance from the sidecar. |
-| `brace` | closed gripper at the recorded brace contact (kind, point, direction), placed **before** the working arm moves, held until the working arm retreats. |
-| `base_follow` (new) | articulation: with the handle grasped and the arm locked, track the recorded base poses `b_k` (`base_follow`) while the joint moves; `follow_mode: arm` uses `move_eef_cartesian` along `h(q_k)` instead; base mode may fall to arm mode per waypoint only where the sampler recorded both. |
-| `reorient_in_hand` (new) | in-hand yaw / flip / SLERP with the object attached, through the recorded waypoints (`rotate_eef` with pivot = object). |
-| checkpoints | after every successfully executed oracle action the state is snapshotted (JoyLo-style checkpoint) so the episode can roll back and retry the action once before it is declared a failure. |
+| `Navigate` (`navigate_to`) | follows the **recorded path** (spec §3.7): un-eroded shortest path validated with whole-body checks at the navigation posture when both stances lie in one locally un-eroded region, otherwise eroded-map global path + collision-checked local connections; the traversability map carries the scene variant's `freed_footprints` (chairs) and `blocked_footprints` (obstacle). Erosion for planning uses the footprint of the posture actually held (untucked arms, carried object). |
+| `Transition` / `SetTorso` (`set_torso`, `go_to_stance`) | no `ready_arms` fallback. Trunk changes happen at the recorded **transition stand-off** (spec §3.8): drive back to `s_T`, move the trunk, drive in (`Transition`). `SetTorso` is the camera-relocalization goal trunk; arms are lifted to untucked only where the sidecar says so (`goal.arms`, self-collision at the goal trunk). |
+| `Grasp` (`grasp`) | uses the recorded `(grasp_key, grasp_name, yaw)` → pre-grasp and grasp eef poses; approach = straight 10 cm along the grasp axis; assisted grasp must attach (hard QA failure otherwise, except for push / brace actions). The following `Lift` keeps the object orientation. |
+| `Place` + `Retreat` (`place` / `place_object_at`) | recorded pre-place / place eef poses; straight descent; release; retreat 10 cm along −a; then "move contacting grippers away a little". |
+| `Push` (`push`) | closed gripper at the recorded contact, along the recorded direction / arc waypoints (δ/2, goal), distance from the sidecar. |
+| `Brace` (`brace`) | closed gripper at the recorded brace contact (kind, point, direction), placed **before** the working arm moves, held until the working arm retreats. |
+| `BaseFollow` (new) | articulation: with the handle grasped and the arm locked, track the recorded base poses `b_k` (`base_follow`) while the joint moves; `follow_mode: arm` uses `arm_along` over `h(q_k)` instead; base mode may fall to arm mode per waypoint only where the sampler recorded both. |
+| `Reorient` (new) | in-hand yaw / flip / SLERP with the object attached, through the recorded waypoints (`orbit_waypoints` / `slerp_waypoints` / `flip_waypoints` of 3.5 fed to `arm_along`, pivot = object centre). |
+| checkpoints | per action, by the executor (3.8): after every successfully executed action the simulator and executor state are snapshotted so the episode can roll back and retry the action once before it is declared a failure. |
 
-### 6.2 Sequences per subtask
+### 6.2 Programs per subtask (Layer 3)
 
-Every sequence ends with: task success check → `max(50, 20 % of the action steps)` no-op steps → pose-settled check
-→ goal image captured → if the binary goal holds and the measured errors are within tolerance, the goal poses of the
-TRO are overridden with the settled values.
+Each row is one `program_<subtask>(sidecar)` function behind `expand` (3.7); the row is what the function must
+produce, with its loops and conditionals resolved from the sidecar. Every program ends with the executor's epilogue
+(3.8): task success check → `max(50, 20 % of the action steps)` no-op steps → pose-settled check → goal image
+captured → if the binary goal holds and the measured errors are within tolerance, the goal poses of the TRO are
+overridden with the settled values.
 
 | Subtask | Sequence |
 | --- | --- |
@@ -249,15 +431,23 @@ look-alikes, spec §3.12) are both visible, the descriptor carries a colour / pr
 Binary success not reached, measured error above tolerance, robot or object motion after the final no-op window,
 collision (whole body vs scene / objects other than the intended contacts), ghost hand (assisted-grasp artefact),
 prolonged pause (except the final stop), gripper out of the head camera's FOV during a manipulation action, failed
-grasp for grasp actions (not checked for push / brace actions). A hard failure ends the episode; the checkpoint of the
-last successful action allows one retry of the failed action. "Failed grasp" means the assisted grasp did not attach
-(both pads never touched the object); an asymmetric closure — one finger at 0 mm, the other at 30–50 mm — is the
-normal `one_finger` artefact of position-controlled fingers under assisted grasping and is not a failure.
+grasp for grasp actions (not checked for push / brace actions), and a trajopt failure between recorded key poses
+(`plan_failed`, 3.9). A hard failure ends the episode; the checkpoint of the last successful action allows one retry
+of the failed action (3.8). "Failed grasp" means the assisted grasp did not attach (both pads never touched the
+object); an asymmetric closure — one finger at 0 mm, the other at 30–50 mm — is the normal `one_finger` artefact of
+position-controlled fingers under assisted grasping and is not a failure.
+
+Categories, as the executor's verdict / `SkillError.reason` (F3 fixes the final list): `not_reached` (binary goal),
+`tolerance`, `not_settled`, `collision`, `ghost_hand`, `paused`, `gripper_out_of_fov`, `failed_grasp`, `no_motion`
+(push / articulation moved nothing), `plan_failed`, `execution` (a motion did not converge), `timeout`. QA
+statistics are reported per category and per action name, so a sampler-side cause and a planner-side cause of the
+same symptom stay distinguishable.
 
 ### 6.5 `run_isg` modes and recording
 
 One script loads an instance (TRO + sidecar + scene variant), then either (i) feeds actions from a policy, (ii)
-replays actions from a LeRobot episode, or (iii) runs the oracle; the same loader and evaluator serve all three.
+replays actions from a LeRobot episode, or (iii) runs the oracle (`expand` + the executor loop of 3.8); the same
+loader, executor loop and evaluator serve all three, and the recorder hangs off the executor's `env.step`.
 Recording modes: demos → hdf5 replayable by the BEHAVIOR tooling **and** the LeRobot v3 ingredients (observations,
 actions, annotations) written by the same wrapper (no second replay pass; see
 `OmniGibson/omnigibson/envs/lerobot_data_wrapper.py`); QA-only → the rollout observation video of `replay_data.py`.
@@ -267,6 +457,10 @@ as `goal_observation.camera_pose_world`, the evaluation camera profile (`isg-v1`
 render guards as sampling (spec §3.4): no prim is hidden for a goal image once the viewer-camera path (B10) is in.
 
 ## 7. Running it
+
+The snippet below is the **v1** API and still runs. The v2 entry point is `run_isg --mode oracle <instance>` (TODO
+F1), which loads the TRO + sidecar, expands the alias's program and runs it through the executor (3.8); none of the
+v2 modules (`robot/conventions.py`, `oracle/actions.py`, `oracle/programs.py`, `run_isg`) exists yet.
 
 ```bash
 conda activate ispatialgym
@@ -293,11 +487,20 @@ Logging: the `ispatialgym` logger prints to stdout (`ISPATIALGYM_LOG_LEVEL`).
 
 * Speed / smoothness tuning against human JoyLo statistics (embodiment velocity scales,
   tracker gains, trunk rates).
-* Grasp candidates for arbitrary BEHAVIOR assets (currently AABB-based), handle / attachment
-  meta-link lookup for Configuration Matching, arc-following helper for articulation and World
-  Alignment.
-* Long-range navigation in full scenes uses the traversability-map fallback; a smoother
-  waypoint-following profile (heading toward the path, blend to the goal yaw at the end) would
-  look more human.
+* The v2 cut (TODO F5 → F6 → F2): conventions out of `skills.py` / `tasks/camera_relocalization.py` /
+  `sampling/robot_utils.py` into one module; `Skills` reduced to the Layer-1 motions of 3.2; the action vocabulary
+  and the 14 programs; the three v1 oracle classes retired once `run_isg --mode oracle` reproduces their section 5.1
+  results on the same goals.
+* Checkpoint mechanism (3.8): verify that OmniGibson's `scene.save_state()` / `load_state()` round-trips the
+  assisted-grasp bookkeeping (`_ag_obj_in_hand`, AG constraints) and the position-controller targets; otherwise the
+  checkpoint has to store and re-apply them explicitly.
+* Gripper-in-FOV monitor (spec §3.9, 6.4): FK-project both eefs into the head camera every step through the
+  conventions' `camera_pose`; 5 % frame margin; only during manipulation actions.
+* `plan_failed` rate in the pilot (3.9) decides whether `arm_to` stays a planner or becomes a tracker of recorded
+  `q_traj`.
+* Superseded by the sidecar: grasp candidates for arbitrary assets (grasp library via `grasps[]`), handle /
+  attachment meta-link lookup (icl `require/handles.csv`, TRO `attachments`), arc-following helper (recorded arc
+  waypoints). Still wanted: a smoother waypoint-following profile for `track_path` (heading toward the path, blend
+  to the goal yaw at the end).
 * Planner build time (~10-15 s per embodiment) and GPU memory: build lazily, one process per
   worker.
