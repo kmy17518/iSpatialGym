@@ -421,19 +421,19 @@ class SamplerV2(TaskSampler):
     # ------------------------------------------------------------------ writing
 
     def save_template(self):
-        """v1 template writer; the grounded BDDL goes to ``<alias>/activity_definitions/<activity>/problem<N>.bddl`` (§1)."""
+        """v1 template writer; the grounded BDDL goes to ``<alias>/activity_definitions/<activity>/problem<N>.bddl`` (§1).
+        The v1 copy inside the template directory stays until D5 moves ``validate_instances.py`` to the §1 layout
+        (its loader reads ``<template>/activity_definitions``)."""
         super().save_template()
         bddl_dir = os.path.join(self.ctx2.alias_dir, "activity_definitions", self.activity)
         os.makedirs(bddl_dir, exist_ok=True)
         with open(os.path.join(bddl_dir, f"problem{self.definition_id}.bddl"), "w") as f:
             f.write(self.problem.text)
-        # the copy the v1 writer put into the template dir is redundant here
-        stray = os.path.join(self.ctx.out_dir, "activity_definitions")
-        if os.path.isdir(stray):
-            import shutil
-
-            shutil.rmtree(stray, ignore_errors=True)
         self.template_meta["activity_definition"] = os.path.relpath(os.path.join(bddl_dir, f"problem{self.definition_id}.bddl"), self.ctx.out_dir)
+        # v1 tools split ``problem`` as <activity>-<def_id>; the alias lives under ``alias``
+        self.template_meta["problem"] = f"{self.activity}-{self.definition_id}"
+        self.template_meta["alias"] = self.gp.alias
+        self.template_meta["bddl_alias"] = self.problem.alias
 
     def write_instance(self, draft: Draft, index: int, seed: int) -> str:
         iid = self.instance_id(index)

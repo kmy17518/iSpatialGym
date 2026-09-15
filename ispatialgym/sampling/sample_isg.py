@@ -290,10 +290,8 @@ def main(argv=None):
                         log.info("template %s done: %d instances in %.1fs (rejections %s)", choice.template_id, entry["n_written"], entry["time_s"], entry["rejections"])
                     pool.cleanup_template()
                     if not args.no_write_back and gp.customs_path:
-                        gp.save_customs()
-                        shutil.copy(gp.customs_path, customs_copy)
-                    elif not gp.customs_path:
-                        gp.save_customs(customs_copy)
+                        gp.save_customs()  # §1: sample_isg appends blacklists / constraints to the source customs list
+                    gp.save_customs(customs_copy)  # the copy under <out> always carries what this run learned
     except BaseException:
         traceback.print_exc()
         raise
