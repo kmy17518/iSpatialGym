@@ -135,7 +135,6 @@ class BlockDesign(SamplerV2):
         errors = []
         for edge, st in TT.edge_candidates(self, self.top, rng):
             try:
-                self.bands = None
                 bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
                 init = TT.phase1b_init_trunk(self, st, self.edge, bands=bands, top=self.top)
                 init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=bands)

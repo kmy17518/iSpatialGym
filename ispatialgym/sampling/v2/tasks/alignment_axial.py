@@ -153,7 +153,6 @@ class AlignmentAxial(SamplerV2):
         errors = []
         for edge, st in TT.edge_candidates(self, self.top, rng):
             try:
-                self.bands = None
                 bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
                 init0 = TT.phase1b_init_trunk(self, st, ez, bands=bands, top=self.top)
                 init = None

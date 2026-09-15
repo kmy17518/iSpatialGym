@@ -163,7 +163,6 @@ class Attachment(SamplerV2):
         errors = []
         for edge, st in TT.edge_candidates(self, self.top, rng):
             try:
-                self.bands = None
                 bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
                 try:
                     self.attach_bands = TT.RB.ReachBands.load(self.world.scene_model, self.top.name, attach_spec.object, attach_spec.grasp_key, placed=attach_spec.placed, scale=attach_spec.scale)

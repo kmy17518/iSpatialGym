@@ -832,13 +832,18 @@ def edge_frames(s, top, rng=None, stand_off: float = STAND_OFF) -> List[Tuple[Ed
 def edge_candidates(s, top, rng=None, stand_off: float = STAND_OFF) -> Iterator[Tuple[EdgeFrame, Stance]]:
     """§4.2 survivors in random order: the edge stance is on free floor and whole-body collision-free at trunk (0.5, 0)
     with untucked arms. Task modules that retry edges (axial ``edge_not_visible``) iterate this."""
+    skipped: Dict[str, str] = {}
+    s._tabletop_edge_log = skipped  # 1a outcomes per edge (reported with the rejections)
     for edge, st in edge_frames(s, top, rng, stand_off):
         if not s.kit.trav_free(st.base_xy):
-            log.debug("edge %s: no floor at %s", edge.name, st.base_xy.tolist())
+            skipped[edge.name] = f"no floor at {[round(float(v), 2) for v in st.base_xy.tolist()]}"
+            log.info("phase 1a: edge %s (L %.2f, overhang %.2f) skipped: %s", edge.name, edge.length, edge.overhang, skipped[edge.name])
             continue
         if not s.ikc.stance_collision_free(st):
-            log.debug("edge %s: stance collides at trunk (0.5, 0)", edge.name)
+            skipped[edge.name] = f"stance at {[round(float(v), 2) for v in st.base_xy.tolist()]} collides at trunk (0.5, 0)"
+            log.info("phase 1a: edge %s (L %.2f, overhang %.2f) skipped: %s", edge.name, edge.length, edge.overhang, skipped[edge.name])
             continue
+        log.info("phase 1a: edge %s (L %.2f, overhang %.2f) stance at %s", edge.name, edge.length, edge.overhang, [round(float(v), 2) for v in st.base_xy.tolist()])
         s._tabletop_top = top
         yield edge, st
 
@@ -849,8 +854,7 @@ def phase1_edge_and_standoff(s, top, rng=None, stand_off: float = STAND_OFF) -> 
     free floor and collision-free."""
     for edge, st in edge_candidates(s, top, rng, stand_off):
         return edge, st
-    names = [e[0] for e in top.edges()]
-    _reject("no_free_edge", f"{top.name}: no edge of {names} has a free, collision-free stance at s = {stand_off} (+ overhang)")
+    _reject("no_free_edge", f"{top.name}: no edge has a free, collision-free stance at s = {stand_off} (+ overhang): {getattr(s, '_tabletop_edge_log', {})}")
 
 
 # ----------------------------------------------------------------------------------------------------------------
