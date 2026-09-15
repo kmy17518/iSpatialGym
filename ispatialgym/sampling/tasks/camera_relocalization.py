@@ -12,8 +12,10 @@ Obstructed variant: once init, goal and the free shortest path are chosen, every
 traversability map and the path is re-planned on it: the new path must exist (the eroded map stays connected), be at
 least ``obstacle_min_detour_m`` longer than the free path and at most ``max_geodesic_m``, a corridor of
 ``obstacle_clearance_m`` must stay free on one side of the obstacle, and the obstacle must be inside the head-camera
-frame (``obstacle_view_margin``) at some waypoint of the new path (0.2 m strides, init trunk, base facing along the
-path). Init and goal are re-checked for whole-body collisions with the obstacles in the world. The TRO scene block
+frame (``obstacle_view_margin``) at some waypoint of the new path **before the path departs from the unobstructed
+shortest path** (owner decision 2026-09-15: seeing the obstacle only after the detour, e.g. at the last waypoint when
+the base turns to the goal yaw, would let a policy learn the detour without its cause; 0.2 m strides, init trunk, base
+heading along the unobstructed path). Init and goal are re-checked for whole-body collisions with the obstacles in the world. The TRO scene block
 records ``scene_variant.blocked_footprints`` (the counterpart of the chair variant's ``freed_footprints``); the
 summary / template meta record the free and blocked path lengths and the waypoint index where each obstacle is seen.
 """
@@ -314,13 +316,37 @@ class CameraRelocalizationSampler(TaskSampler):
                 yaws.append(math.atan2(float(step[1]), float(step[0])))
         return yaws
 
-    def _view_indices(self, path: th.Tensor, final_yaw: float, corners: th.Tensor, margin: float) -> List[int]:
+    @staticmethod
+    def _divergence_index(path_before: th.Tensor, path_after: th.Tensor, tol: float) -> int:
+        """Index of the last waypoint the two paths share (their common prefix, waypoints within ``tol`` of each other):
+        the robot on ``path_after`` departs from ``path_before`` right after this waypoint. 0 when they part immediately."""
+        n = min(len(path_before), len(path_after))
+        k = 0
+        while k + 1 < n and float(th.linalg.norm(path_before[k + 1] - path_after[k + 1])) <= tol:
+            k += 1
+        return k
+
+    def _view_indices(self, path: th.Tensor, final_yaw: float, corners: th.Tensor, margin: float,
+                      path_before: Optional[th.Tensor] = None) -> List[int]:
         """Waypoints of ``path`` (0.2 m strides) at which the whole box ``corners`` (8 x 3) is inside the head-camera
-        image with ``margin``, the robot in its init trunk / arm configuration and the base facing along the path."""
+        image with ``margin``, the robot in its init trunk / arm configuration and the base facing along the path.
+
+        With ``path_before`` (the shortest path the robot would take without the obstacle) only the waypoints **up to
+        the divergence point** count (owner decision 2026-09-15): the obstacle must be seen before the robot's path
+        departs from the unobstructed path, otherwise a policy could learn the detour without ever seeing its cause
+        (e.g. an obstacle that only enters the frame at the last waypoint, when the base turns to the goal yaw). The
+        heading at those waypoints is the heading of ``path_before`` (at the divergence waypoint: toward where the
+        unobstructed path would have continued)."""
         if len(path) == 0:
             return []
-        yaws = self._path_yaws(path, final_yaw)
-        qs = th.stack([self.kit.q_at_base_pose(self.q_init_rel, float(p[0]), float(p[1]), yaw) for p, yaw in zip(path, yaws)])
+        if path_before is None:
+            yaws = self._path_yaws(path, final_yaw)
+            pts = path
+        else:
+            k = self._divergence_index(path_before, path, tol=0.5 * float(self.world.scene.trav_map.map_resolution) + 1e-6)
+            yaws = self._path_yaws(path_before, final_yaw)[: k + 1]
+            pts = path[: k + 1]
+        qs = th.stack([self.kit.q_at_base_pose(self.q_init_rel, float(p[0]), float(p[1]), yaw) for p, yaw in zip(pts, yaws)])
         cams = self.kit.camera_poses_batch(qs)
         return [i for i, cam in enumerate(cams) if self.frustum_ok(cam, corners, margin)]
 
@@ -360,20 +386,27 @@ class CameraRelocalizationSampler(TaskSampler):
             return "too_long"
         return None
 
-    def _view_record(self, poses: Dict[str, G.Pose], path_b: th.Tensor, final_yaw: float, margin: float) -> Dict[str, Any]:
-        """Per obstacle the waypoints of ``path_b`` at which it is inside the head-camera frame (at least one, else Reject)."""
-        view = {}
+    def _view_record(self, poses: Dict[str, G.Pose], path_b: th.Tensor, final_yaw: float, margin: float,
+                     ref_paths: Dict[str, th.Tensor]) -> Dict[str, Any]:
+        """Per obstacle the waypoints of ``path_b`` at which it is inside the head-camera frame **before the path departs
+        from the obstacle's reference path** (the shortest path before that obstacle was placed; at least one, else
+        Reject)."""
+        view, div = {}, {}
         for name, pose in poses.items():
-            hits = self._view_indices(path_b, final_yaw, G.aabb_corners(*self._obstacle_aabb(name, pose)), margin)
+            ref = ref_paths[name]
+            hits = self._view_indices(path_b, final_yaw, G.aabb_corners(*self._obstacle_aabb(name, pose)), margin, path_before=ref)
+            div[name] = self._divergence_index(ref, path_b, tol=0.5 * float(self.world.scene.trav_map.map_resolution) + 1e-6)
             if not hits:
-                raise Reject("obstacle", f"{name} is not inside the head camera frame at any waypoint of the blocked-map path")
+                raise Reject("obstacle", f"{name} is not inside the head camera frame at any waypoint before the path departs from the "
+                                         f"unobstructed path (divergence at waypoint {div[name]} of {len(path_b)})")
             view[name] = hits
-        return {"view_waypoint_index": {n: h[0] for n, h in view.items()}, "view_waypoints": view}
+        return {"view_waypoint_index": {n: h[0] for n, h in view.items()}, "view_waypoints": view, "divergence_waypoint_index": div}
 
     def _navigation_record(self, poses: Dict[str, G.Pose], base0, base1, geo_free: float, max_g: float, P: Dict[str, float],
-                           planned: Optional[Tuple[th.Tensor, float]] = None) -> Dict[str, Any]:
+                           ref_paths: Dict[str, th.Tensor], planned: Optional[Tuple[th.Tensor, float]] = None) -> Dict[str, Any]:
         """Blocked footprints of ``poses``, the path on the blocked map (must divert by ``min_detour`` and stay within
-        ``max_g``) and the waypoints at which every obstacle is in view. ``planned`` = (path, length) already planned
+        ``max_g``) and the waypoints at which every obstacle is in view before the departure from its reference path
+        (``ref_paths[name]`` = the shortest path before ``name`` was placed). ``planned`` = (path, length) already planned
         on these footprints (one A* on the 862^2 house map costs ~4 s; it is skipped when given)."""
         fps = self._footprints(poses, P["obstacle_margin_m"])
         if planned is not None:
@@ -386,11 +419,11 @@ class CameraRelocalizationSampler(TaskSampler):
             raise Reject("obstacle", f"blocked-map path {why} (free {geo_free:.2f} m, blocked {geo_b})")
         rec = {"blocked_footprints": fps, "free_geodesic_m": float(geo_free), "blocked_geodesic_m": float(geo_b), "detour_m": float(geo_b) - float(geo_free),
                "path_blocked": [[round(float(v), 3) for v in p] for p in path_b], "n_waypoints_blocked": int(len(path_b))}
-        rec.update(self._view_record(poses, path_b, base1[2], P["obstacle_view_margin"]))
+        rec.update(self._view_record(poses, path_b, base1[2], P["obstacle_view_margin"], ref_paths))
         return rec
 
     def _try_obstacle_cell(self, name: str, xy, yaw: float, direction: th.Tensor, placed: Dict[str, G.Pose], base0, q0, base1, q1,
-                           geo_before: float, max_g: float, P: Dict[str, float]):
+                           geo_before: float, max_g: float, P: Dict[str, float], path_before: Optional[th.Tensor] = None):
         """One placement candidate for ``name``: (record, None) on success (the obstacle stands settled in the world),
         (None, failure tag) otherwise (the obstacle is parked again). Cheap geometric filters first, then the settle,
         then the single A* on the blocked map, the corridor, the view along the new path and the collision checks."""
@@ -431,7 +464,9 @@ class CameraRelocalizationSampler(TaskSampler):
         if why is None and max(corridor) < P["obstacle_clearance_m"]:
             why = "corridor"
         if why is None:
-            hits = self._view_indices(path_b, base1[2], G.aabb_corners(*self._obstacle_aabb(name, pose)), P["obstacle_view_margin"])
+            # the obstacle must be seen before the robot departs from the path it would have taken without it
+            hits = self._view_indices(path_b, base1[2], G.aabb_corners(*self._obstacle_aabb(name, pose)), P["obstacle_view_margin"],
+                                      path_before=path_before)
             if not hits:
                 why = "view"
         if why is None:
@@ -453,6 +488,7 @@ class CameraRelocalizationSampler(TaskSampler):
         names = self.obstacle_names
         poses: Dict[str, G.Pose] = {}
         placements: Dict[str, Dict[str, Any]] = {}
+        ref_paths: Dict[str, th.Tensor] = {}  # per obstacle: the shortest path before it was placed (the view rule's reference)
         cur_path, cur_geo = path_free, geo_free
         fails: Dict[str, int] = {}
         n_tried = 0
@@ -462,7 +498,7 @@ class CameraRelocalizationSampler(TaskSampler):
                 n_tried += 1
                 yaw = float(rng.uniform(-math.pi, math.pi))
                 direction = cur_path[min(idx + 1, len(cur_path) - 1)] - cur_path[max(idx - 1, 0)]
-                rec, why = self._try_obstacle_cell(name, xy, yaw, direction, poses, base0, q0, base1, q1, cur_geo, max_g, P)
+                rec, why = self._try_obstacle_cell(name, xy, yaw, direction, poses, base0, q0, base1, q1, cur_geo, max_g, P, path_before=cur_path)
                 if rec is None:
                     fails[why] = fails.get(why, 0) + 1
                     continue
@@ -472,6 +508,7 @@ class CameraRelocalizationSampler(TaskSampler):
                 raise Reject("obstacle", f"no cell of the shortest path admits {name} ({n_tried} cells tried: {fails}; free path {geo_free:.2f} m, "
                                          f"{len(cur_path)} waypoints)")
             poses[name] = placed["pose"]
+            ref_paths[name] = cur_path
             corners = G.aabb_corners(*self._obstacle_aabb(name, placed["pose"]))
             placements[name] = {"position": [round(float(v), 4) for v in placed["pose"][0]], "orientation": [round(float(v), 5) for v in placed["pose"][1]],
                                 "yaw": placed["yaw"], "corridor_m": placed["corridor_m"], "settle_drift_m": round(placed["settle_drift_m"], 4),
@@ -481,13 +518,14 @@ class CameraRelocalizationSampler(TaskSampler):
             cur_path, cur_geo = placed["path"], placed["geodesic_m"]
         # the final path (all obstacles blocked) must divert from the *free* path, stay in range and show every obstacle;
         # the last cell check planned with every obstacle blocked, so its path is the final one (no second A*)
-        rec = self._navigation_record(poses, base0, base1, geo_free, max_g, P, planned=(cur_path, cur_geo))
+        rec = self._navigation_record(poses, base0, base1, geo_free, max_g, P, ref_paths, planned=(cur_path, cur_geo))
         for name, pose in poses.items():
             d.object_poses[name] = pose
         d.settle_free = list(names)
         d.extras["blocked_footprints"] = rec.pop("blocked_footprints")
         d.extras["obstacle_planned_poses"] = {n: (p[0].clone(), p[1].clone()) for n, p in poses.items()}
         d.extras["obstacle_path"] = (cur_path, cur_geo)
+        d.extras["obstacle_ref_paths"] = ref_paths
         d.summary["geodesic_blocked_m"] = rec["blocked_geodesic_m"]
         d.summary["obstacles"] = {"placements": placements, "cells_tried": n_tried, "cell_failures": fails,
                                   "path_free": [[round(float(v), 3) for v in p] for p in path_free], **rec}
@@ -511,7 +549,8 @@ class CameraRelocalizationSampler(TaskSampler):
         fps = self._footprints(draft.object_poses, P["obstacle_margin_m"])
         same_cells = self._blocked_cells(fps) == self._blocked_cells(draft.extras["blocked_footprints"])
         rec = self._navigation_record(draft.object_poses, draft.base_pose2d, draft.extras["goal_base_pose2d"], float(draft.summary["geodesic_m"]),
-                                      float(self.gen("max_geodesic_m", 10.0)), P, planned=draft.extras["obstacle_path"] if same_cells else None)
+                                      float(self.gen("max_geodesic_m", 10.0)), P, draft.extras["obstacle_ref_paths"],
+                                      planned=draft.extras["obstacle_path"] if same_cells else None)
         rec["replanned_after_settle"] = not same_cells
         draft.extras["blocked_footprints"] = rec.pop("blocked_footprints")
         draft.summary["geodesic_blocked_m"] = rec["blocked_geodesic_m"]

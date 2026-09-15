@@ -1043,9 +1043,15 @@ Init = the sampled configuration, goal = what the TRO targets describe. Everythi
 As 6.1 plus one obstacle (group `obstacles`, size 1 for now; category natural in the scene per the icl): placed on
 the eroded shortest path so that the shortest path on the map **with the obstacle's footprint blocked** differs
 (`blocked_footprints` recorded like `freed_footprints`, applied by evaluation and the oracle); the **new** path must
-stay inside the bucket; the obstacle must be inside the head camera's frame (5 %) at some pose along the new path,
-evaluated with the JoyLo reset trunk used at init (the oracle navigates first, then adjusts the torso). The obstacle
-is never touched; it is `ontop floor` in `:init` and its displacement is checked at the goal settle.
+stay inside the bucket; the obstacle must be inside the head camera's frame (5 %) at some pose along the new path
+**before the path departs from the unobstructed shortest path** — i.e. at one of the waypoints the two paths share
+(the divergence waypoint included), with the base heading along the unobstructed path and the JoyLo reset trunk used
+at init (the oracle navigates first, then adjusts the torso). Decision 2026‑09‑15 (owner): an obstacle that enters the
+frame only after the robot has gone around it (e.g. at the last waypoint, where the base takes the goal yaw and looks
+back) is not admissible — a policy could then "know" the detour without ever having seen its cause. With several
+obstacles each one is checked against the shortest path before it was placed. The sidecar / summary record the
+divergence waypoint index next to the view waypoint index. The obstacle is never touched; it is `ontop floor` in
+`:init` and its displacement is checked at the goal settle.
 
 **Obstacle admissibility** (the selection criteria of `runlogs/obstacle_selection_20260912`, now checks): the
 category is natural on the floor of the scene (`natural_scenes`), the model stands stably in its canonical +z-up
