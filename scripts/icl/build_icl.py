@@ -77,14 +77,24 @@ CONTACTS_GLOB = os.path.join(REPO, "runlogs", "contacts_*")
 SYMMETRY_DEFAULT = os.path.join(REPO, "runlogs", "symmetry_20260915", "symmetry.json")
 sys.path.insert(0, REPO)
 
-try:  # knowledge base (synsets, bboxes, readiness); optional
+try:  # knowledge base (synsets, bboxes, readiness)
     from ispatialgym.sampling import knowledge as K  # type: ignore
-except Exception:  # pragma: no cover
+except Exception as _e:  # pragma: no cover
     K = None
+    _K_ERROR = repr(_e)
 try:
     from ispatialgym.sampling import grasp_library as GL  # type: ignore
-except Exception:  # pragma: no cover
+except Exception as _e:  # pragma: no cover
     GL = None
+    _GL_ERROR = repr(_e)
+
+if K is None or GL is None:
+    # Without the knowledge base the builder silently writes empty ``synset`` / ``bbox_*`` / ``ready`` cells (seen when
+    # run from the ``base`` env, 2026-09-15). Refuse instead of producing a plausible-looking but wrong icl.
+    if os.environ.get("ISG_ICL_ALLOW_NO_KB", "0") != "1":
+        sys.exit("build_icl.py: the BEHAVIOR knowledge base / grasp library could not be imported "
+                 f"(knowledge: {globals().get('_K_ERROR', 'ok')}; grasp_library: {globals().get('_GL_ERROR', 'ok')}). "
+                 "Run in the `ispatialgym` conda env, or set ISG_ICL_ALLOW_NO_KB=1 for a deliberately partial build.")
 
 SCENES = ["house_single_floor", "house_double_floor_upper", "house_double_floor_lower", "Rs_int", "hotel_suite_large",
           "restaurant_diner", "office_cubicles_right"]
