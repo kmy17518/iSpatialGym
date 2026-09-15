@@ -82,3 +82,44 @@ class IORSOntopSmall(SamplerV2):
 `tabletop.phase1b_init_trunk(s, ...)`, `tabletop.phase1c_lateral(s, margins)`, `tabletop.phase2_manipulation_stance(s, ...)`,
 `tabletop.phase3_target(s, ...)`; `prompt0.phase1_init_pose(s, face, beta_max, d_min, d_max)`, `prompt0.phase2_manipulation(s, face, contacts, lam_range)`),
 so a task module composes them and adds its own rules (§6).
+
+## Core API (D2 / D4, `core.py` and friends) — what a task module gets
+
+`SamplerV2(ctx: ContextV2)` extends the v1 `TaskSampler`; `ContextV2(problem: GroundedProblem, choice: TemplateChoice, world, kit,
+out_dir, base_seed, customs_sha256, variant)`. Attributes a task module uses:
+
+| attribute / method | what |
+|---|---|
+| `s.gp` (`GroundedProblem`) | the customs entry: `gp.roles[role]` (`category`, `kind`, `grasp_pipeline()`, `scale_of()`), `gp.gen(key)`, `gp.rooms(scene)`, `gp.bindings(scene)`, `gp.constraints_for(type, **scope)` (priors), `gp.tolerances()`, `gp.bddl` (ISGProblem, None for the v1 facade) |
+| `s.choice` (`TemplateChoice`) | `choice.models[role]` (`ModelChoice`: category, model, dataset, grasp_key, scale), `choice.groups[role]` (member list), `choice.bindings`, `choice.scene` |
+| `s.sidecar` (`stances.SidecarDraft`) | `add_stance(Stance)`, `add_transition`, `add_path`, `add_grasp(GraspRecord)`, `add_contact(ContactRecord)`, `set_goal(base_pose2d, translate, tilt, arms)`, `describe(instance, display_name, descriptor, **goal_numbers)`, `articulation` / `blocks` dicts; reset before every attempt |
+| `s.ikc` (`ik.IKChecker`) | `q_locked(stance)`, `stance_collision_free(stance)`, `stances_collision_free([...])`, `screen(poses, stance, arm, ignore)`, `screen_pairs(pairs, ...)`, `exact(poses, stance, arm, ignore_for_last, scale_key)`, `exact_both_arms(work, other, stance, ...)`, `waypoints_ok(list, stance, arm, policy, ...)`, `eef_in_frame(pose, cam_pose)`, `feasible_sets(cells, yaws, grasps, pose_at, stance, ...)` (F per cell) |
+| `s.record_transition(frm, to, carried, arm)` | §3.8 sweep -> `Transition` in the sidecar or `Reject("no_transition")` |
+| `s.record_path(frm, to, carried, arm, max_length_m, blocked)` | §3.7 path -> `PathRecord` or `Reject(no_path / path_collision / path_too_long)` |
+| `s.park_robot()` | §3.3 parking (free cell in the task rooms, >= 1 m from the task objects) |
+| `s.camera_pose_at(stance)`, `s.stance_q(stance)` | FK helpers |
+| v1 helpers still available | `support_top(obj)`, `frustum_ok(cam, pts)`, `hull_corners_world(hull, pose)`, `world.footprint / bottom_offset / local_hull`, `bind_scene_object`, `spawn_role`, `tol(key, default)` |
+
+Hooks (override): `bind_scene_roles()`, `sample_template()`, `sample_instance(rng) -> Draft`, `goal(draft)`, `after_goal_check(draft)`,
+`record_constraints(draft) -> [records]`, `support_objects()`, `v1_role_aliases()` (facade only). Per attempt `core.run_instances`
+runs: reset scene + park -> `sample` (= `sidecar.reset_instance()`, `sample_instance`, `goal`) -> `apply_draft` -> `settle_and_validate`
+-> `check_goal_feasible` (parked) -> `after_goal_check` -> `program_check` -> `save_template` (first instance) -> TRO + `<iid>.oracle.json`
++ `<iid>.summary.json` -> `constraints_write_back`. Every `Reject(reason)` is counted (first three examples kept in `template_meta.json`
+and the CLI `summary.json`).
+
+`ik.py` also holds the F5 adapter (`pre_pose`, `grasp_pose`, `contact_eef`, `handle_eef`, `line_waypoints`): it forwards to
+`ispatialgym.robot.conventions` when that module exists and otherwise applies the documented formulas — task modules call the adapter,
+never the formulas.
+
+### tabletop.py — signatures the reference task (`tasks/iors_small.py`) calls
+
+```python
+phase1_edge_and_standoff(s, top: SupportTop, rng, stand_off=0.45) -> (EdgeFrame, Stance)      # §4.2; Stance("init", ..., translate 0.5, tilt 0)
+phase1b_init_trunk(s, init: Stance, H_max: float) -> Stance                                     # §4.3; init_stance with t*, tilt 0
+phase1c_lateral(s, init: Stance, margins: dict, rng) -> Stance                                  # §4.4; margins = the task's row (w_t, w_p, W_p, D_p_max, safety, relation, g_NT)
+phase2_manipulation_stance(s, init: Stance, target_half_extent: float) -> list[Stance]           # §4.5; survivors of the best angle class, .focus set, tilt continuous
+phase3_target(s, manip: Stance, rng, grasps, hull, rest_quat, ignore_for_grasp) -> (obj_pose, GraspRecord)   # §4.6 step 1 (F at the focus, exact IK)
+```
+
+`iors_small.py` draws the manipulation stance uniformly among the Phase-2 survivors and checks the §4.5 step 5 transition itself.
+Until `tabletop.py` exists, `iors_small._TabletopTemp` is a TEMP stand-in with these signatures (deleted when tabletop lands).
