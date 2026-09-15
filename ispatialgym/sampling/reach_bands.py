@@ -15,16 +15,17 @@ below 0.6 m):
    (yaw, grasp) pairs are evaluated in rounds - best‑ranked grasps and robot‑facing yaws first - with early exit per
    cell (one feasible pair marks the cell). Objects without library grasps (``--generic-pinch``: blocks, push poses) use
    the generic top‑down pinch (2 wrist yaws x 2 approach pitches);
-4. output per trunk: the reachable cells (x, lateral) and, over all trunks, the union extent [lambda_min, lambda_max].
+4. output per trunk: the reachable cells (x, lateral), the (yaw, grasp) pairs that marked each cell (the seed of the
+   feasible set F of spec 4.6, stored in the ``.npz``) and, over all trunks, the union extent [lambda_min, lambda_max].
 
 Two‑factor cache (``ISPATIALGYM_REACH_BANDS``, default ``~/.cache/ispatialgym/reach_bands``): the support factor
 (collision‑free trunks, lattice, shoulder positions) is keyed by scene + support + top height + stance + trunk grid and
-shared by every object; the object factor (the mask) adds the object model, grasp set, rest orientation and the placed
-objects. Neither key contains the base pose: a different stand‑off only changes which cells fall on the top.
+shared by every object; the object factor (the mask) adds the object model, spawn scale, grasp set, rest orientation and
+the placed objects. Neither key contains the base pose: a different stand‑off only changes which cells fall on the top.
 
 Modes::
 
-    python -m ispatialgym.sampling.reach_bands --scene S --support T --object CATEGORY/MODEL [--grasp-key K]
+    python -m ispatialgym.sampling.reach_bands --scene S --support T --object CATEGORY/MODEL [--grasp-key K] [--scale sx,sy,sz]
     python -m ispatialgym.sampling.reach_bands ... --placed tray/gsxbym            # disembedding: lattice = source tray floor
     python -m ispatialgym.sampling.reach_bands ... --generic-pinch                 # blocks / pushes, no library grasps
     python -m ispatialgym.sampling.reach_bands --scene S --support floor --room R --object C/M [--under PARTNER]
@@ -32,7 +33,22 @@ Modes::
         --joint j_lid --joint-values 0.0,1.48,2.1,2.97 --brace                      # small‑scale articulation
 
 ``--rooms`` restricts the loaded rooms (default: the support's rooms); chairs within 1 m of the support are removed
-(scene variant) like the sampler does. ``--smoke`` uses a 16 cm lattice and two trunks.
+(scene variant) like the sampler does. ``--smoke`` uses a 16 cm lattice and two trunks ((0.5, 0) and (0.25, -0.3)),
+verifies the shoulder FK against the simulated robot and prints a band sanity summary; ``--trunks 0.5,0 0.95,-0.9``
+restricts the grid explicitly.
+
+Reading a band (the sampler)::
+
+    from ispatialgym.sampling.reach_bands import ReachBands
+    rb = ReachBands.load("house_single_floor", "breakfast_table_rhjoby_0", "pack_of_kielbasa/dgodnn", "pack_of_kielbasa__dgodnn__t")
+    rb.band(0.5, 0.0)                 # (N, 2) cells (x ahead, lateral) of the grid trunk (same translate, nearest tilt)
+    rb.union_extent()                 # (lambda_min, lambda_max) over every trunk
+    rb.feasible(0.5, 0.0, cell)       # [(yaw_offset, grasp_name), ...] recorded for that cell (yaw_world = base_yaw + yaw_offset)
+    rb.to_world(cells, base_pose2d)   # base-frame cells -> world xy for a concrete stance
+
+``ReachBands.load`` looks in ``ISPATIALGYM_REACH_BANDS`` (if set), then the committed ``runlogs/reach_bands_20260915/bands``,
+then ``~/.cache/ispatialgym/reach_bands``; the match is by the meta fields (scene, support, object, grasp key, spawn
+scale, placed objects, ``--under`` partner; brace: target, handle key, joint), not by the hashed file name.
 """
 
 from __future__ import annotations
@@ -65,10 +81,27 @@ TILTS_GENERIC = (0.0, 30.0)
 STRIP_MAX_DEPTH = 0.95  # m into the support from the edge; deeper cells are never reachable
 STRIP_HALF_WIDTH = 0.80
 CACHE_DEFAULT = os.path.expanduser("~/.cache/ispatialgym/reach_bands")
+#: committed bands of the representative run (what the samplers read on every machine; the env var overrides)
+REPO_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "runlogs", "reach_bands_20260915", "bands")
+SMOKE_TRUNKS = [(0.5, 0.0), (0.25, -0.3)]
+SMOKE_FK_TRUNKS = [(0.5, 0.0), (0.95, -0.9)]
 
 
 def cache_root() -> str:
+    """Where the script writes by default (``--out`` overrides)."""
     return os.environ.get("ISPATIALGYM_REACH_BANDS", CACHE_DEFAULT)
+
+
+def default_dirs() -> List[str]:
+    """Directories :meth:`ReachBands.load` searches, in order: ``ISPATIALGYM_REACH_BANDS``, the committed runlog, ``~/.cache``."""
+    env = os.environ.get("ISPATIALGYM_REACH_BANDS")
+    dirs = ([env] if env else []) + [REPO_DIR, CACHE_DEFAULT]
+    out: List[str] = []
+    for d in dirs:
+        d = os.path.abspath(os.path.expanduser(d))
+        if d not in out and os.path.isdir(d):
+            out.append(d)
+    return out
 
 
 def _key(d: Dict[str, Any]) -> str:
@@ -80,54 +113,311 @@ def trunk_grid(top_z_above_floor: float) -> List[Tuple[float, float]]:
     return [(tr, ti) for tr in TRANSLATES for ti in tilts]
 
 
+def trunk_key(translate: float, tilt: float) -> str:
+    return f"t{translate:.2f}_k{tilt:+.1f}"
+
+
+def parse_scale(s: Optional[str]) -> Optional[List[float]]:
+    if not s:
+        return None
+    vals = [float(v) for v in str(s).replace("[", "").replace("]", "").split(",")]
+    if len(vals) == 1:
+        vals = vals * 3
+    assert len(vals) == 3, f"scale needs 1 or 3 numbers, got {s!r}"
+    return [round(v, 4) for v in vals]
+
+
 # ----------------------------------------------------------------------------------------------- result container
+
+
+_INDEX_CACHE: Dict[str, Tuple[float, List[Tuple[str, Dict[str, Any]]]]] = {}
+
+
+def _index(d: str) -> List[Tuple[str, Dict[str, Any]]]:
+    """(npz path, meta) of every band file in ``d`` (re-read when the directory changed)."""
+    try:
+        mtime = os.path.getmtime(d)
+    except OSError:
+        return []
+    cached = _INDEX_CACHE.get(d)
+    if cached is not None and cached[0] == mtime:
+        return cached[1]
+    out = []
+    for fn in sorted(os.listdir(d)):
+        if not fn.endswith(".json"):
+            continue
+        npz = os.path.join(d, fn[:-5] + ".npz")
+        if not os.path.exists(npz):
+            continue
+        try:
+            with open(os.path.join(d, fn)) as f:
+                meta = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if isinstance(meta, dict) and "trunks" in meta and "scene" in meta:
+            out.append((npz, meta))
+    _INDEX_CACHE[d] = (mtime, out)
+    return out
+
+
+def _same_scale(a, b) -> bool:
+    if a is None and b is None:
+        return True
+    if a is None or b is None:
+        return False
+    return all(abs(float(x) - float(y)) < 1e-3 for x, y in zip(a, b)) and len(a) == len(b)
 
 
 @dataclass
 class ReachBands:
-    """Reachable cells per trunk in base coordinates (x ahead, lateral + = left) plus the stance they were computed at."""
+    """Reachable cells per trunk in base coordinates (x ahead, lateral + = robot's left) at the stance
+    ``meta["stance"]["base_pose2d"]`` they were computed at, plus the (yaw, grasp) pairs that marked each cell.
+
+    * ``cells[(translate, tilt)]`` -> ``(N, 2)`` float array of cell centres (lattice ``meta["lattice"]``);
+    * ``pairs[(translate, tilt)]`` -> ``(M, 3)`` int array ``[cell index, yaw index, grasp index]`` (``yaw index`` into
+      :data:`YAWS` = object yaw offset relative to the base yaw; ``grasp index`` into ``meta["grasp_names"]``, or, for the
+      generic pinch, into the ``grasp_candidates_at`` order with ``yaw index = -1``);
+    * brace mode (``meta["mode"] == "brace"``): ``meta["trunks"][i]["feasible"]`` lists ``{cell, yaw_offset, brace_kinds}``.
+    """
 
     meta: Dict[str, Any]
     cells: Dict[Tuple[float, float], np.ndarray] = field(default_factory=dict)  # (translate, tilt) -> (N, 2) reachable cells
+    pairs: Dict[Tuple[float, float], np.ndarray] = field(default_factory=dict)  # (translate, tilt) -> (M, 3) int [cell, yaw, grasp]
+    path: Optional[str] = None
 
+    # -- loading --------------------------------------------------------------------------------------------------
     @staticmethod
-    def load(path_npz: str) -> "ReachBands":
+    def from_files(path_npz: str) -> "ReachBands":
         d = np.load(path_npz, allow_pickle=False)
         with open(path_npz[:-4] + ".json") as f:
             meta = json.load(f)
-        cells = {}
+        cells, pairs = {}, {}
         for t in meta["trunks"]:
-            if t["collides"]:
+            if t.get("collides"):
                 continue
-            k = f"t{t['translate']:.2f}_k{t['tilt']:+.1f}"
-            cells[(t["translate"], t["tilt"])] = d[k]
-        return ReachBands(meta, cells)
+            k = trunk_key(t["translate"], t["tilt"])
+            key = (float(t["translate"]), float(t["tilt"]))
+            cells[key] = d[k] if k in d.files else np.zeros((0, 2))
+            pairs[key] = d[k + "__pairs"] if (k + "__pairs") in d.files else np.zeros((0, 3), dtype=np.int32)
+        return ReachBands(meta, cells, pairs, path_npz)
 
+    @staticmethod
+    def find(scene: str, support: str, object: Optional[str] = None, grasp_key: Optional[str] = None, *, placed: Sequence[str] = (),
+             under: Optional[str] = None, scale: Optional[Sequence[float]] = None, target: Optional[str] = None, joint: Optional[str] = None,
+             mode: Optional[str] = None, dirs: Optional[Sequence[str]] = None) -> List[str]:
+        """Paths (``.npz``) of the cached bands matching the given factors, best match first.
+
+        ``object`` = ``CATEGORY/MODEL`` (``None`` for object-less generic bands); ``grasp_key`` = the library key,
+        ``"generic"`` for ``--generic-pinch`` bands, ``None`` = any grasp set; ``placed`` = the ``--placed`` objects
+        (order-insensitive); ``under`` = the IORS partner of ``--support floor --under``; ``scale`` = the spawn scale
+        (``None`` = canonical); brace bands are selected with ``target`` (+ optional ``joint``)."""
+        hits = []
+        for d in (dirs if dirs is not None else default_dirs()):
+            for npz, meta in _index(d):
+                if meta.get("scene") != scene or meta.get("support") != support:
+                    continue
+                if mode is not None and meta.get("mode") != mode:
+                    continue
+                if target is not None:
+                    if meta.get("target") != target or (joint is not None and meta.get("joint") != joint):
+                        continue
+                else:
+                    if meta.get("mode") == "brace" or meta.get("object") != object:
+                        continue
+                    if grasp_key == "generic":
+                        if not meta.get("generic_pinch"):
+                            continue
+                    elif grasp_key is not None and meta.get("grasp_key") != grasp_key:
+                        continue
+                    if not _same_scale(scale, meta.get("scale")):
+                        continue
+                if sorted(placed) != sorted(p.get("category", "") + "/" + p.get("model", "") for p in meta.get("placed", [])) and sorted(placed) != sorted(meta.get("placed_specs", [])):
+                    continue
+                if (meta.get("under_partner") or None) != (under or None):
+                    continue
+                hits.append((npz, meta))
+        # finest lattice first, then most trunks, then the newest
+        hits.sort(key=lambda h: (float(h[1].get("lattice", 1.0)), -len(h[1].get("trunks", [])), -os.path.getmtime(h[0])))
+        return [h[0] for h in hits]
+
+    @staticmethod
+    def load(scene: str, support: str, object: Optional[str] = None, grasp_key: Optional[str] = None, *, placed: Sequence[str] = (),
+             under: Optional[str] = None, scale: Optional[Sequence[float]] = None, target: Optional[str] = None, joint: Optional[str] = None,
+             mode: Optional[str] = None, dirs: Optional[Sequence[str]] = None) -> "ReachBands":
+        """Load the cached band for the given factors (see :meth:`find`); ``FileNotFoundError`` on a cache miss."""
+        paths = ReachBands.find(scene, support, object, grasp_key, placed=placed, under=under, scale=scale, target=target, joint=joint, mode=mode, dirs=dirs)
+        if not paths:
+            raise FileNotFoundError(f"no reach band for scene={scene} support={support} object={object} grasp_key={grasp_key} placed={list(placed)} "
+                                    f"under={under} scale={scale} target={target} joint={joint} in {list(dirs) if dirs is not None else default_dirs()}")
+        if len(paths) > 1:
+            log.debug("%d reach bands match (%s ...); using %s", len(paths), object or target, paths[0])
+        return ReachBands.from_files(paths[0])
+
+    # -- queries --------------------------------------------------------------------------------------------------
     def trunks(self) -> List[Tuple[float, float]]:
         return sorted(self.cells)
 
-    def band(self, translate: float, tilt: float) -> np.ndarray:
-        """Cells of the grid trunk with the same translate and the nearest tilt (empty array when that trunk collides)."""
+    def nearest_trunk(self, translate: float, tilt: float) -> Optional[Tuple[float, float]]:
         cands = [k for k in self.cells if abs(k[0] - translate) < 1e-6]
         if not cands:
-            return np.zeros((0, 2))
-        k = min(cands, key=lambda k: abs(k[1] - tilt))
-        return self.cells[k]
+            return None
+        return min(cands, key=lambda k: abs(k[1] - tilt))
+
+    def band(self, translate: float, tilt: float) -> np.ndarray:
+        """Cells of the grid trunk with the same translate and the nearest tilt (empty array when that trunk collides)."""
+        k = self.nearest_trunk(translate, tilt)
+        return self.cells[k] if k is not None else np.zeros((0, 2))
 
     def union_extent(self) -> Tuple[float, float]:
         lat = np.concatenate([c[:, 1] for c in self.cells.values() if len(c)]) if self.cells else np.zeros(0)
         return (float(lat.min()), float(lat.max())) if len(lat) else (0.0, 0.0)
 
+    def cell_index(self, translate: float, tilt: float, cell) -> Optional[int]:
+        k = self.nearest_trunk(translate, tilt)
+        if k is None or not len(self.cells[k]):
+            return None
+        d = np.linalg.norm(self.cells[k] - np.asarray(cell, dtype=float)[None, :2], axis=1)
+        i = int(np.argmin(d))
+        return i if d[i] <= 0.51 * float(self.meta.get("lattice", LATTICE)) else None
+
+    def feasible(self, translate: float, tilt: float, cell) -> List[Tuple[Any, Any]]:
+        """Recorded feasible (yaw offset [rad, relative to the base yaw], grasp name) pairs of the band cell nearest to
+        ``cell`` (generic pinch: ``("generic", candidate index)``); the seed of the feasible set F of spec 4.6."""
+        k = self.nearest_trunk(translate, tilt)
+        i = self.cell_index(translate, tilt, cell)
+        if k is None or i is None:
+            return []
+        p = self.pairs.get(k)
+        if p is None or not len(p):
+            return []
+        names = self.meta.get("grasp_names") or []
+        out = []
+        for ci, yi, gi in p[p[:, 0] == i].tolist():
+            if yi < 0:
+                out.append(("generic", int(gi)))
+            else:
+                out.append((YAWS[int(yi)], names[int(gi)] if int(gi) < len(names) else int(gi)))
+        return out
+
+    def brace_feasible(self, translate: float, tilt: float) -> List[Dict[str, Any]]:
+        """Brace mode: ``[{cell, yaw_offset, brace_kinds}]`` of the trunk (same translate, nearest tilt)."""
+        k = self.nearest_trunk(translate, tilt)
+        if k is None:
+            return []
+        for t in self.meta.get("trunks", []):
+            if abs(float(t["translate"]) - k[0]) < 1e-6 and abs(float(t["tilt"]) - k[1]) < 1e-6:
+                return list(t.get("feasible", []))
+        return []
+
     def to_world(self, cells_base: np.ndarray, base_pose2d: Sequence[float]) -> np.ndarray:
         x0, y0, yaw = base_pose2d
         c, s = math.cos(yaw), math.sin(yaw)
-        return np.stack([x0 + c * cells_base[:, 0] - s * cells_base[:, 1], y0 + s * cells_base[:, 0] + c * cells_base[:, 1]], axis=1)
+        cb = np.asarray(cells_base, dtype=float).reshape(-1, 2)
+        return np.stack([x0 + c * cb[:, 0] - s * cb[:, 1], y0 + s * cb[:, 0] + c * cb[:, 1]], axis=1)
+
+    def to_base(self, xy_world: np.ndarray, base_pose2d: Sequence[float]) -> np.ndarray:
+        x0, y0, yaw = base_pose2d
+        c, s = math.cos(yaw), math.sin(yaw)
+        w = np.asarray(xy_world, dtype=float).reshape(-1, 2) - np.array([x0, y0])
+        return np.stack([c * w[:, 0] + s * w[:, 1], -s * w[:, 0] + c * w[:, 1]], axis=1)
 
 
 # ----------------------------------------------------------------------------------------------- computation
 
 
+class ObstacleScope:
+    """Collision world of one stance: the cuRobo meshes of scene objects whose AABB is farther than ``radius`` from the
+    base centre are disabled while the scope is active (the robot's reach from the base centre is < 1.3 m; 400 meshes
+    of the loaded rooms made every batched IK call ~4x slower than with the near obstacles only), and
+    :meth:`ignoring` switches the meshes of given objects (the support for the grasp pose) off and on directly instead
+    of re-syncing the whole world (``RobotKit.ignoring`` = two ``update_world`` passes per call).
+
+    Nothing here changes what the checker considers an obstacle: ``update_world`` re-enables every mesh, so the scope
+    must be re-entered after a ``kit.sync_world()``."""
+
+    #: horizontal AABB distance from the base centre beyond which an object cannot touch the robot (arm span from the
+    #: base centre < 1.3 m, plus the collision margin and the sphere radii)
+    RADIUS = 1.6
+    #: objects whose AABB bottom is this far above the floor (ceilings, room lights) are out of the robot's reach
+    Z_ABOVE = 2.1
+
+    def __init__(self, kit, world, base_xy, radius: float = RADIUS, drop_ground: bool = False):
+        """``drop_ground``: also disable the ground-like meshes (floors, carpets, lawn - large meshes that dominate the
+        collision cost); the cuRobo ground slab keeps modelling the floor. Only for tabletop bands (z_support >= 0.55 m),
+        where the arm never comes near the floor; floor bands keep them."""
+        self.kit, self.world, self.radius = kit, world, radius
+        be = kit.backend
+        names = set(be._world_mesh_names)
+        self.names_of: Dict[str, List[str]] = {}
+        for o in world.scene.objects:
+            prefix = o.prim_path + "/"
+            mine = [n for n in names if n.startswith(prefix)]
+            if mine:
+                self.names_of[o.name] = mine
+        bx, by = float(base_xy[0]), float(base_xy[1])
+        self.far: List[str] = []
+        self.kept: List[str] = []
+        ground = set(getattr(be, "_ground_mesh_names", set()))
+        for o in world.scene.objects:
+            if o is world.robot or o.name not in self.names_of:
+                continue
+            lo, hi = o.aabb
+            dx = max(float(lo[0]) - bx, 0.0, bx - float(hi[0]))
+            dy = max(float(lo[1]) - by, 0.0, by - float(hi[1]))
+            mine = self.names_of[o.name]
+            if math.hypot(dx, dy) > radius or float(lo[2]) > world.floor_z + self.Z_ABOVE or (drop_ground and all(n in ground for n in mine)):
+                self.far.extend(mine)
+            else:
+                self.kept.append(o.name)
+        self.n_near = sum(len(v) for v in self.names_of.values()) - len(self.far)
+
+    def _enable(self, names: Sequence[str], enabled: bool):
+        be = self.kit.backend
+        for n in names:
+            if n in be._world_mesh_names:
+                be._mesh_enable(n, enabled)
+
+    def __enter__(self):
+        self._enable(self.far, False)
+        log.info("collision world for the band: %d meshes of %d objects kept within %.1f m of the base (%s), %d far meshes disabled", self.n_near, len(self.kept),
+                 self.radius, ", ".join(sorted(self.kept)), len(self.far))
+        return self
+
+    def __exit__(self, *exc):
+        self._enable(self.far, True)
+
+    def ignoring(self, objs):
+        scope = self
+
+        class _Ctx:
+            def __enter__(self_inner):
+                self_inner.names = [n for o in objs for n in scope.names_of.get(getattr(o, "name", o), [])]
+                scope._enable(self_inner.names, False)
+
+            def __exit__(self_inner, *exc):
+                scope._enable(self_inner.names, True)
+
+        return _Ctx()
+
+
 class BandComputer:
+    #: (yaw, grasp) pairs per round (one batched pre-grasp + grasp IK pass over the open cells)
+    CHUNK = 8
+    #: batched IK chunk (poses per cuRobo call)
+    IK_BATCH = 128
+    #: a cell none of whose first ``MAX_ROUNDS_WITHOUT_PRE * CHUNK`` pre-grasp poses is IK-feasible is dropped (out of
+    #: reach for kinematic reasons; the exhaustive loop would spend the remaining rounds on it). Cells with a feasible
+    #: pre-grasp but no feasible grasp yet (support / table collision at the grasp) run every round. Documented
+    #: approximation of the exhaustive early-exit loop of spec 4.1 (measured 2026-09-15 on the smoke job: the 50 cells
+    #: dropped after round 1 had no pre-feasible pose in round 2 either, so the band was identical; the approximation
+    #: can lose cells at the far rim that only a lower-ranked grasp with another approach direction reaches); 0 = exhaustive.
+    MAX_ROUNDS_WITHOUT_PRE = 1
+    #: coarse-to-fine: when set and the lattice is finer, every trunk is first computed on a ``COARSE`` lattice (same
+    #: cells snapped) and the fine lattice is evaluated only within ``COARSE * 1.5`` of a reachable coarse cell (the
+    #: coarse cell and its 8 neighbours). Measured 2026-09-15 on the smoke job: 54 s vs 45 s exhaustive per trunk and one
+    #: isolated cell lost - the IK cost is per pose, not per cell, so the coarse pass does not pay for itself; off (0).
+    COARSE = 0.0
+
     def __init__(self, world, kit, arms: Sequence[str] = ("right",), lattice: float = LATTICE, seeds: int = 12):
         from ispatialgym.oracle import r1pro_model as M
         from ispatialgym.sampling import geometry as G
@@ -137,6 +427,27 @@ class BandComputer:
         self.arms = list(arms)
         self.lattice = lattice
         self.seeds = seeds
+        self.scope: Optional[ObstacleScope] = None
+
+    def ignoring(self, objs):
+        return self.scope.ignoring(objs) if self.scope is not None else self.kit.ignoring(objs)
+
+    #: batched IK solver sizes (one cuRobo solver per size, built once); the last chunk uses the smallest size that fits
+    #: so that the padded problems (cuRobo solves full batches) stay few
+    IK_SIZES = (16, 32, 64, 128)
+
+    def ik_screen(self, poses, q: th.Tensor, arm: str) -> th.Tensor:
+        """12-seed screening IK of ``poses`` from ``q`` with the arm embodiment, chunked without padding waste."""
+        n = len(poses)
+        if n == 0:
+            return th.zeros(0, dtype=th.bool)
+        out, i = [], 0
+        while i < n:
+            rem = n - i
+            bs = self.IK_BATCH if rem >= self.IK_BATCH else next(b for b in self.IK_SIZES if b >= rem)
+            out.append(self.kit.ik_batch(list(poses[i:i + bs]), q, arm=arm, batch_size=bs))
+            i += bs
+        return th.cat(out)
 
     # -- stance -------------------------------------------------------------------------------------------------
     def stance_at_edge(self, top, support, stand_off: float = STAND_OFF, edge_name: Optional[str] = None) -> Dict[str, Any]:
@@ -292,7 +603,10 @@ class BandComputer:
     def compute(self, stance: Dict[str, Any], lattice_world: th.Tensor, z_support: float, pose_fn, grasp_sets, ignore_for_grasp, arm: str = "right",
                 trunks: Optional[Sequence[Tuple[float, float]]] = None, max_grasp_offset: float = 0.0) -> Dict[str, Any]:
         """``pose_fn(world_xy, yaw) -> obj_pose`` and ``grasp_sets`` = list of grasps (with ``.pose``; rank order = library
-        order) or ``None`` for the generic pinch. Returns the per‑trunk results."""
+        order) or ``None`` for the generic pinch. Returns the per‑trunk results: ``trunks`` (entries), ``cells``
+        ((translate, tilt) -> (N, 2) reachable cells) and ``pairs`` ((translate, tilt) -> (M, 3) int
+        ``[cell index, yaw index into YAWS (-1 generic), grasp index]`` = the (yaw, grasp) pairs found feasible for a cell
+        in the round that marked it; the seed of the feasible set F)."""
         kit, G = self.kit, self.G
         base_cells, world_cells = self.lattice_on_cells(stance, lattice_world)
         trunks = list(trunks) if trunks is not None else trunk_grid(z_support - self.world.floor_z)
@@ -301,61 +615,130 @@ class BandComputer:
         results = []
         # object yaw offsets relative to the base yaw, robot-facing first (canonical +x of the object toward the robot = offset pi)
         yaw_order = sorted(YAWS, key=lambda y: abs(G.wrap_angle(y - math.pi)))
-        for tr, ti in trunks:
+        yaw_index = {y: k for k, y in enumerate(YAWS)}
+        grasp_index = {g.name: k for k, g in enumerate(grasp_sets)} if grasp_sets is not None else {}
+        coarse = self.COARSE if (self.COARSE and self.lattice < self.COARSE - 1e-6) else None
+        if coarse:
+            fine_lattice = self.lattice
+            self.lattice = coarse
+            base_c, world_c = self.lattice_on_cells(stance, lattice_world)
+            self.lattice = fine_lattice
+        common = (stance, z_support, pose_fn, grasp_sets, ignore_for_grasp, arm, max_grasp_offset, yaw_order, yaw_index, grasp_index, fwd)
+        self.scope = ObstacleScope(kit, self.world, (x0, y0), drop_ground=(z_support - self.world.floor_z) >= 0.55).__enter__()
+        try:
+            for tr, ti in trunks:
+                if not coarse:
+                    results.append(self._trunk(tr, ti, base_cells, world_cells, *common))
+                    continue
+                e_c, cells_c, _ = self._trunk(tr, ti, base_c, world_c, *common, tag="coarse ")
+                if e_c["collides"]:
+                    e_c["n_lattice"] = int(len(base_cells))
+                    results.append((e_c, cells_c, np.zeros((0, 3), dtype=np.int32)))
+                    continue
+                if len(cells_c):
+                    d = th.cdist(base_cells, th.as_tensor(cells_c, dtype=th.float32))
+                    keep = d.min(dim=1).values <= coarse * 1.5 + 1e-6
+                else:
+                    keep = th.zeros(len(base_cells), dtype=th.bool)
+                if int(keep.sum()):
+                    e, cells, pairs = self._trunk(tr, ti, base_cells[keep], world_cells[keep], *common)
+                else:
+                    e, cells, pairs = dict(e_c, n_after_prune=0, n_reachable=0, rounds=0, n_pairs=0, n_dropped_no_pre=0, n_pose_pruned=0, time_s=0.0), np.zeros((0, 2)), np.zeros((0, 3), dtype=np.int32)
+                e["coarse"] = {"lattice": coarse, "n_lattice": e_c["n_lattice"], "n_after_prune": e_c["n_after_prune"], "n_reachable": e_c["n_reachable"], "time_s": e_c["time_s"]}
+                e["n_lattice"] = int(len(base_cells))
+                e["n_refined"] = int(keep.sum())
+                e["time_s"] = round(e["time_s"] + e_c["time_s"], 2)
+                results.append((e, cells, pairs))
+        finally:
+            self.scope.__exit__(None, None, None)
+            self.scope = None
+        return {"trunks": [e for e, _, _ in results], "cells": {(e["translate"], e["tilt"]): c for e, c, _ in results},
+                "pairs": {(e["translate"], e["tilt"]): p for e, _, p in results}}
+
+    def _trunk(self, tr, ti, base_cells, world_cells, stance, z_support, pose_fn, grasp_sets, ignore_for_grasp, arm, max_grasp_offset, yaw_order, yaw_index,
+               grasp_index, fwd, tag: str = ""):
+        """One trunk of :meth:`compute` over the given cells; returns ``(entry, cells (N, 2), pairs (M, 3))``."""
+        kit = self.kit
+        x0, y0, yaw0 = stance["base_pose2d"]
+        if True:
             t0 = time.time()
             q = kit.q_at_base_pose(kit.q_config(arms="untucked", translate=tr, tilt=ti), x0, y0, yaw0)
-            entry = {"translate": tr, "tilt": ti, "collides": False, "n_lattice": int(len(base_cells)), "n_after_prune": 0, "n_reachable": 0, "rounds": 0, "time_s": 0.0}
+            entry = {"translate": tr, "tilt": ti, "collides": False, "n_lattice": int(len(base_cells)), "n_after_prune": 0, "n_reachable": 0, "rounds": 0,
+                     "n_pairs": 0, "n_dropped_no_pre": 0, "n_pose_pruned": 0, "time_s": 0.0}
             if not bool(kit.collision_free(q, margin=0.01)[0]):
                 entry["collides"] = True
                 entry["time_s"] = round(time.time() - t0, 2)
-                results.append((entry, np.zeros((0, 2))))
-                log.info("trunk (%.2f, %+.1f): collides, skipped", tr, ti)
-                continue
+                log.info("%strunk (%.2f, %+.1f): collides, skipped", tag, tr, ti)
+                return entry, np.zeros((0, 2)), np.zeros((0, 3), dtype=np.int32)
             shoulder, arm_len = self.shoulder_and_reach(q, arm)
             reach = arm_len + max_grasp_offset + PRE_GRASP + 0.05
+            entry["shoulder_world"] = [round(float(v), 4) for v in shoulder.tolist()]
+            entry["arm_len"] = round(arm_len, 4)
+            entry["reach"] = round(reach, 4)
             pts = th.cat([world_cells, th.full((len(world_cells), 1), z_support)], dim=1)
             near = th.linalg.norm(pts - shoulder, dim=1) <= reach
             todo = [i for i in range(len(base_cells)) if bool(near[i])]
             entry["n_after_prune"] = len(todo)
             ok = th.zeros(len(base_cells), dtype=th.bool)
+            pre_seen = th.zeros(len(base_cells), dtype=th.bool)  # some pre-grasp pose of the cell was IK-feasible
+            found: List[Tuple[int, int, int]] = []  # (cell, yaw index, grasp index)
+            n_pose_pruned = 0
             # rounds: (grasp rank, yaw) pairs in chunks; every round is one batched pre-grasp + grasp IK call over the open cells
             if grasp_sets is None:
                 pair_specs = [("generic", None, None)]
             else:
                 pair_specs = [(g.name, g, y) for g in grasp_sets for y in yaw_order]
-            chunk = 4 if grasp_sets is not None else 1
+            chunk = self.CHUNK if grasp_sets is not None else 1
+            pose_reach = arm_len + 0.03  # the eef origin can never be farther from the shoulder than the stretched arm
             for r0 in range(0, len(pair_specs), chunk):
                 if not todo:
                     break
                 specs = pair_specs[r0:r0 + chunk]
-                pairs, index = [], []
+                pairs, index, spec_of = [], [], []
                 for i in todo:
                     if grasp_sets is None:
                         centre = th.tensor([float(world_cells[i][0]), float(world_cells[i][1]), z_support])
-                        for pair in kit.grasp_candidates_at(centre, [yaw0, yaw0 + math.pi / 2][:N_YAWS_GENERIC], TILTS_GENERIC, fwd):
-                            pairs.append(pair)
-                            index.append(i)
+                        cands = [((-1, ci), pair) for ci, pair in enumerate(kit.grasp_candidates_at(centre, [yaw0, yaw0 + math.pi / 2][:N_YAWS_GENERIC], TILTS_GENERIC, fwd))]
                     else:
-                        for _, g, y in specs:
-                            pairs.append(self.grasp_eef_pair(pose_fn(world_cells[i], y + yaw0), g))
-                            index.append(i)
-                pres = [p[0] for p in pairs]
-                ok_pre = kit.ik_batch(pres, q, arm=arm)
-                sel = [k for k, s in enumerate(ok_pre.tolist()) if s]
-                if sel:
-                    ok_g = kit.ik_batch([pairs[k][1] for k in sel], q, arm=arm, ignore=ignore_for_grasp)
-                    for k, s in zip(sel, ok_g.tolist()):
-                        if s:
-                            ok[index[k]] = True
+                        cands = [((yaw_index[y], grasp_index[name]), self.grasp_eef_pair(pose_fn(world_cells[i], y + yaw0), g)) for name, g, y in specs]
+                    for spec, pair in cands:
+                        if float(th.linalg.norm(pair[1][0] - shoulder)) > pose_reach or float(th.linalg.norm(pair[0][0] - shoulder)) > pose_reach:
+                            n_pose_pruned += 1
+                            continue
+                        pairs.append(pair)
+                        index.append(i)
+                        spec_of.append(spec)
+                if pairs:
+                    pres = [p[0] for p in pairs]
+                    ok_pre = self.ik_screen(pres, q, arm)
+                    sel = [k for k, s in enumerate(ok_pre.tolist()) if s]
+                    for k in sel:
+                        pre_seen[index[k]] = True
+                    if sel:
+                        with self.ignoring(ignore_for_grasp):
+                            ok_g = self.ik_screen([pairs[k][1] for k in sel], q, arm)
+                        for k, s in zip(sel, ok_g.tolist()):
+                            if s:
+                                ok[index[k]] = True
+                                found.append((index[k], spec_of[k][0], spec_of[k][1]))
                 entry["rounds"] += 1
                 todo = [i for i in todo if not bool(ok[i])]
-            cells = base_cells[ok].numpy() if int(ok.sum()) else np.zeros((0, 2))
-            entry["n_reachable"] = int(ok.sum())
+                if self.MAX_ROUNDS_WITHOUT_PRE and entry["rounds"] >= self.MAX_ROUNDS_WITHOUT_PRE:
+                    n_before = len(todo)
+                    todo = [i for i in todo if bool(pre_seen[i])]
+                    entry["n_dropped_no_pre"] = entry.get("n_dropped_no_pre", 0) + (n_before - len(todo))
+            entry["n_pose_pruned"] = n_pose_pruned
+            sel_cells = [i for i in range(len(base_cells)) if bool(ok[i])]
+            remap = {i: n for n, i in enumerate(sel_cells)}
+            cells = base_cells[ok].numpy() if sel_cells else np.zeros((0, 2))
+            pairs_arr = np.array([(remap[c], yi, gi) for c, yi, gi in found], dtype=np.int32).reshape(-1, 3)
+            entry["n_reachable"] = len(sel_cells)
+            entry["n_pairs"] = int(len(pairs_arr))
             entry["time_s"] = round(time.time() - t0, 2)
-            log.info("trunk (%.2f, %+.1f): %d lattice, %d after prune, %d reachable, %d rounds, %.1fs", tr, ti, len(base_cells), entry["n_after_prune"],
-                     entry["n_reachable"], entry["rounds"], entry["time_s"])
-            results.append((entry, cells))
-        return {"trunks": [e for e, _ in results], "cells": {(e["translate"], e["tilt"]): c for e, c in results}}
+            log.info("%strunk (%.2f, %+.1f): %d lattice, %d after prune, %d reachable (%d pairs), %d rounds (%d cells dropped without pre-grasp, %d poses pruned), %.1fs",
+                     tag, tr, ti, len(base_cells), entry["n_after_prune"], entry["n_reachable"], entry["n_pairs"], entry["rounds"], entry["n_dropped_no_pre"],
+                     entry["n_pose_pruned"], entry["time_s"])
+            return entry, cells, pairs_arr
 
 
 # ----------------------------------------------------------------------------------------------- articulation (brace mode)
@@ -465,6 +848,84 @@ def brace_candidates(joint_info: Dict[str, Any], handle_data: Dict[str, Any], ob
     return poses
 
 
+# ----------------------------------------------------------------------------------------------- smoke checks
+
+
+def verify_shoulder_fk(world, kit, bc: BandComputer, trunks: Sequence[Tuple[float, float]], arm: str = "right") -> List[Dict[str, Any]]:
+    """Check the shoulder position the band computation uses (cuRobo FK of ``torso_link4`` + the measured constant offset)
+    against the simulated robot's ``<arm>_arm_link1`` (and ``torso_link4``) world poses at the same joint state.
+
+    The parked robot is put into the untucked configuration of every trunk (base untouched), one physics step, then
+    both sides are read for the *same* full joint vector (``kit.q_current()`` includes the virtual base joints of the
+    parked robot). Returns per trunk the errors in mm."""
+    import omnigibson as og
+    from ispatialgym.oracle import r1pro_model as M
+
+    robot = world.robot
+    q_saved = robot.get_joint_positions().clone()
+    idx = th.cat([robot.trunk_control_idx] + [robot.arm_control_idx[a] for a in M.ARMS] + [robot.gripper_control_idx[a] for a in M.ARMS])
+    out = []
+
+    def settle(qs):
+        robot.set_joint_positions(qs)
+        robot.set_joint_velocities(th.zeros_like(qs))
+        robot.keep_still()
+        og.sim.step_physics()
+        robot.set_joint_positions(qs)
+        robot.keep_still()
+
+    try:
+        for tr, ti in trunks:
+            q = kit.q_config(arms="untucked", translate=tr, tilt=ti)
+            qs = q_saved.clone()
+            qs[idx] = q[idx]
+            settle(qs)
+            sim_sh = robot.links[f"{arm}_arm_link1"].get_position_orientation()[0].float()
+            sim_t4 = robot.links["torso_link4"].get_position_orientation()[0].float()
+            sim_ee = robot.eef_links[arm].get_position_orientation()[0].float()
+            q_now = kit.q_current()
+            fk_sh, arm_len = bc.shoulder_and_reach(q_now, arm)
+            fk_t4 = kit.fk(["torso_link4"], q_now)["torso_link4"][0]
+            fk_ee = kit.eef_pose(q_now, arm)[0]
+            e_sh = float(th.linalg.norm(fk_sh - sim_sh)) * 1000
+            e_t4 = float(th.linalg.norm(fk_t4 - sim_t4)) * 1000
+            e_ee = float(th.linalg.norm(fk_ee - sim_ee)) * 1000
+            rec = {"translate": tr, "tilt": ti, "shoulder_err_mm": round(e_sh, 2), "torso_link4_err_mm": round(e_t4, 2), "eef_err_mm": round(e_ee, 2),
+                   "shoulder_sim": [round(float(v), 4) for v in sim_sh.tolist()], "shoulder_fk": [round(float(v), 4) for v in fk_sh.tolist()],
+                   "shoulder_above_floor_m": round(float(sim_sh[2]) - world.floor_z, 4), "arm_len_m": round(arm_len, 4)}
+            log.info("shoulder FK check trunk (%.2f, %+.1f): shoulder err %.1f mm, torso_link4 err %.1f mm, eef err %.1f mm (shoulder %.3f m above the floor)",
+                     tr, ti, e_sh, e_t4, e_ee, rec["shoulder_above_floor_m"])
+            out.append(rec)
+    finally:
+        settle(q_saved)
+    return out
+
+
+def band_sanity(stance: Dict[str, Any], result: Dict[str, Any], z_support: float) -> Dict[str, Any]:
+    """Geometric summary of a tabletop / floor result for the smoke report: extents of the reachable cells in base
+    coordinates, whether any lies behind the base (x <= 0) and the shoulder -> cell distances per trunk."""
+    per_trunk = []
+    for t in result["trunks"]:
+        cells = result["cells"][(t["translate"], t["tilt"])]
+        rec = {"translate": t["translate"], "tilt": t["tilt"], "collides": t["collides"], "n_reachable": int(len(cells))}
+        if len(cells):
+            rec.update({"x_min": round(float(cells[:, 0].min()), 3), "x_max": round(float(cells[:, 0].max()), 3), "lat_min": round(float(cells[:, 1].min()), 3),
+                        "lat_max": round(float(cells[:, 1].max()), 3), "n_behind_base": int((cells[:, 0] <= 0).sum())})
+            if t.get("shoulder_world") is not None:
+                x0, y0, yaw = stance["base_pose2d"]
+                c, s = math.cos(yaw), math.sin(yaw)
+                wx = x0 + c * cells[:, 0] - s * cells[:, 1]
+                wy = y0 + s * cells[:, 0] + c * cells[:, 1]
+                sh = np.asarray(t["shoulder_world"])
+                d = np.sqrt((wx - sh[0]) ** 2 + (wy - sh[1]) ** 2 + (z_support - sh[2]) ** 2)
+                rec.update({"shoulder_dist_min": round(float(d.min()), 3), "shoulder_dist_max": round(float(d.max()), 3)})
+        pairs = result.get("pairs", {}).get((t["translate"], t["tilt"]))
+        if pairs is not None and len(cells):
+            rec["cells_without_pair"] = int(len(cells) - len(set(pairs[:, 0].tolist())))
+        per_trunk.append(rec)
+    return {"edge_depth": stance.get("edge_depth"), "per_trunk": per_trunk}
+
+
 # ----------------------------------------------------------------------------------------------- driver
 
 
@@ -479,6 +940,22 @@ def _chairs_variant(scene: str, support_name: str, rooms: List[str], out_dir: st
         return None, []
     vpath, _ = SV.write_variant(stable_scene_path(scene), removed, out_dir)
     return {"path": vpath, "removed_objects": removed, "freed_footprints": SV.freed_footprints(stable, removed)}, removed
+
+
+def _dataset_of(category: str, model: str, preferred: Optional[str] = None) -> str:
+    """Dataset that holds ``category/model``: ``--dataset`` if given, else the first of behavior-1k-assets /
+    ispatialgym-assets (the custom block ``toy_dice/isgblk`` lives in the latter) whose object directory exists."""
+    from omnigibson.utils.asset_utils import get_dataset_path
+
+    if preferred:
+        return preferred
+    for ds in ("behavior-1k-assets", "ispatialgym-assets"):
+        try:
+            if os.path.isdir(os.path.join(get_dataset_path(ds), "objects", category, model)):
+                return ds
+        except Exception:  # noqa: BLE001 - unknown dataset name
+            continue
+    return "behavior-1k-assets"
 
 
 def _rooms_of(scene: str, name: str) -> List[str]:
@@ -511,9 +988,12 @@ def main(argv=None):
     ap.add_argument("--brace", action="store_true")
     ap.add_argument("--edge", default=None, help="edge name (+u/-u/+v/-v); default: longest collision-free edge")
     ap.add_argument("--stand-off", type=float, default=STAND_OFF)
-    ap.add_argument("--lattice", type=float, default=LATTICE)
+    ap.add_argument("--lattice", type=float, default=None, help=f"cell size (default {LATTICE} m; --smoke: 0.16 m)")
+    ap.add_argument("--scale", default=None, help="spawn scale of the grasped object, 'sx,sy,sz' (icl scale column); part of the cache key")
+    ap.add_argument("--dataset", default=None, help="dataset of the grasped object (default: auto, behavior-1k-assets or ispatialgym-assets)")
+    ap.add_argument("--trunks", nargs="*", default=None, help="restrict the trunk grid: 'translate,tilt' items, e.g. 0.5,0 0.95,-0.9")
     ap.add_argument("--out", default=None, help="directory for the .npz/.json (default: the cache dir)")
-    ap.add_argument("--smoke", action="store_true", help="16 cm lattice, two trunks")
+    ap.add_argument("--smoke", action="store_true", help="16 cm lattice, two trunks, shoulder-FK verification + band sanity summary")
     ap.add_argument("--log-level", default=os.environ.get("ISPATIALGYM_LOG_LEVEL", "INFO"))
     args = ap.parse_args(argv)
     logging.basicConfig(level=args.log_level, format="[%(levelname)s %(name)s] %(message)s", force=True)
@@ -525,10 +1005,16 @@ def main(argv=None):
 
     import omnigibson as og
 
-    lattice = 0.16 if args.smoke else args.lattice
+    lattice = args.lattice if args.lattice is not None else (0.16 if args.smoke else LATTICE)
+    scale = parse_scale(args.scale)
+    trunk_sel = [tuple(float(v) for v in t.split(",")) for t in args.trunks] if args.trunks else None
     floor_mode = args.support == "floor"
+    if floor_mode and not (args.room or args.under or args.rooms):
+        raise SystemExit("--support floor needs --room R (or --under PARTNER)")
     anchor_name = args.under if floor_mode and args.under else (None if floor_mode else args.support)
     rooms = args.rooms or ([args.room] if floor_mode and args.room else _rooms_of(args.scene, anchor_name))
+    if floor_mode and args.under and not args.room:
+        args.room = rooms[0]
     out_dir = args.out or cache_root()
     os.makedirs(out_dir, exist_ok=True)
     variant, removed = (None, [])
@@ -543,8 +1029,19 @@ def main(argv=None):
     bc = BandComputer(world, kit, arms=arms, lattice=lattice)
     meta: Dict[str, Any] = {"scene": args.scene, "rooms": rooms, "support": args.support, "removed_chairs": removed, "lattice": lattice,
                             "stand_off": args.stand_off, "arms": "untucked", "grid": {"translates": TRANSLATES, "tilts": TILTS, "low_top_tilt": LOW_TOP_TILT},
-                            "seeds": 12, "pre_grasp": PRE_GRASP, "mode": "brace" if args.brace else ("floor" if floor_mode else "tabletop")}
+                            "seeds": 12, "pre_grasp": PRE_GRASP, "yaws": YAWS, "mode": "brace" if args.brace else ("floor" if floor_mode else "tabletop"),
+                            "smoke": bool(args.smoke), "scale": scale, "placed_specs": list(args.placed),
+                            "schedule": {"chunk": BandComputer.CHUNK, "ik_batch": BandComputer.IK_BATCH, "max_rounds_without_pre": BandComputer.MAX_ROUNDS_WITHOUT_PRE, "coarse": BandComputer.COARSE,
+                                         "pose_prune": "eef and pre-grasp origin within arm_len + 0.03 of the shoulder", "obstacle_radius_m": ObstacleScope.RADIUS,
+                                         "obstacle_z_above_m": ObstacleScope.Z_ABOVE}}
+    if trunk_sel:
+        meta["trunk_selection"] = trunk_sel
     try:
+        if args.smoke:
+            t_fk = time.time()
+            meta["shoulder_fk_check"] = verify_shoulder_fk(world, kit, bc, SMOKE_FK_TRUNKS, arm="right")
+            log.info("shoulder FK check done in %.1fs", time.time() - t_fk)
+            kit.sync_world()
         # ---- support geometry and stance
         placed_objs = []
         if floor_mode:
@@ -644,7 +1141,7 @@ def main(argv=None):
                 raise SystemExit(f"no graspable handle for {args.handle_key}/{args.joint}")
             hdata["handle"] = handles[0]
             q_values = [float(v) for v in args.joint_values.split(",")]
-            obj = world.spawn(f"target_{cat}_{model}", cat, model)
+            obj = world.spawn(f"target_{cat}_{model}", cat, model, dataset=_dataset_of(cat, model, args.dataset), scale=scale)
             hull = world.local_hull(obj)
             world.park(obj, len(world.spawned) - 1)
             # facing direction: moving face outward normal (lids: from the hinge line to the centre) points at the robot
@@ -673,10 +1170,11 @@ def main(argv=None):
             meta.update({"target": args.target, "handle_key": args.handle_key, "joint": args.joint, "joint_values": q_values, "face_yaw_offset": face_off,
                          "handle_arm": handle_arm, "brace_arm": brace_arm, "handle": hdata["handle"]})
             base_cells, world_cells = bc.lattice_on_cells(stance, lattice_world)
-            trunks = trunk_grid(z_support - world.floor_z)
+            trunks = trunk_sel or (SMOKE_TRUNKS if args.smoke else trunk_grid(z_support - world.floor_z))
             per_trunk = []
             cells_out: Dict[Tuple[float, float], np.ndarray] = {}
-            for tr, ti in (trunks[:2] if args.smoke else trunks):
+            bc.scope = ObstacleScope(kit, world, (x0, y0), drop_ground=(z_support - world.floor_z) >= 0.55).__enter__()
+            for tr, ti in trunks:
                 t0 = time.time()
                 q = kit.q_at_base_pose(kit.q_config(arms="untucked", translate=tr, tilt=ti), x0, y0, yaw0)
                 entry = {"translate": tr, "tilt": ti, "collides": False, "n_lattice": int(len(base_cells)), "n_reachable": 0, "time_s": 0.0, "feasible": []}
@@ -684,95 +1182,134 @@ def main(argv=None):
                     entry["collides"] = True
                     per_trunk.append(entry)
                     cells_out[(tr, ti)] = np.zeros((0, 2))
+                    log.info("brace trunk (%.2f, %+.1f): collides, skipped", tr, ti)
                     continue
-                # 3 yaws about the facing yaw (offsets relative to the base yaw); a cell is in the band when ALL joint values'
-                # handle poses are feasible for some yaw and >= 1 brace kind is feasible for that yaw. Batched per trunk:
-                # every handle pre-grasp of every (cell, yaw, q) in one IK call, grasps of the survivors in a second
-                # (support ignored), brace [pre, contact] pairs of the survivors in a third with the brace arm.
+                # 3 yaws about the facing yaw (offsets relative to the base yaw). Per (cell, yaw) the handle [pre-grasp, grasp]
+                # is screened at every listed joint value (spec 5.4: the output is the SET of joint values whose handle poses
+                # are feasible; the sampler requires its direction's waypoints to be a subset), then the brace [pre, contact]
+                # candidates with the brace arm for the (cell, yaw) pairs with >= 1 feasible joint value. A cell is in the band
+                # when some yaw has >= 1 feasible joint value and >= 1 feasible brace kind; the yaw with the most feasible
+                # joint values (ties: the facing yaw first) is recorded. Batched per trunk: every handle pre-grasp of every
+                # (cell, yaw, q) in one IK call, the grasps of the pre-feasible ones in a second (support ignored), the brace
+                # pairs in a third.
                 shoulder, arm_len = bc.shoulder_and_reach(q, handle_arm)
                 pts = th.cat([world_cells, th.full((len(world_cells), 1), z_support)], dim=1)
                 near = th.linalg.norm(pts - shoulder, dim=1) <= arm_len + float(th.linalg.norm(th.tensor(hdata["handle"]["contact"]))) + PRE_GRASP + 0.05
-                combos = [(i, face_off + dy) for i in range(len(base_cells)) if bool(near[i]) for dy in (0.0, -0.1, 0.1)]
+                yaw_offsets = (face_off, face_off - 0.1, face_off + 0.1)
+                combos = [(i, dy) for i in range(len(base_cells)) if bool(near[i]) for dy in yaw_offsets]
                 obj_poses = {c: bc.object_pose_at(world_cells[c[0]], yaw0 + c[1], z_support, hull, G.IDENTITY_QUAT) for c in combos}
                 handle_pairs = {c: [handle_pose_at_q(jinfo, hdata["handle"], qv, obj_poses[c], G) for qv in q_values] for c in combos}
                 flat = [(c, k) for c in combos for k in range(len(q_values))]
-                ok_pre = kit.ik_batch([handle_pairs[c][k][0] for c, k in flat], q, arm=handle_arm) if flat else th.zeros(0, dtype=th.bool)
-                surv = [c for c in combos if all(bool(ok_pre[n]) for n, (cc, _) in enumerate(flat) if cc == c)]
-                flat = [(c, k) for c in surv for k in range(len(q_values))]
-                ok_g = kit.ik_batch([handle_pairs[c][k][1] for c, k in flat], q, arm=handle_arm, ignore=ignore_grasp) if flat else th.zeros(0, dtype=th.bool)
-                surv = [c for c in surv if all(bool(ok_g[n]) for n, (cc, _) in enumerate(flat) if cc == c)]
+                ok_pre = bc.ik_screen([handle_pairs[c][k][0] for c, k in flat], q, handle_arm)
+                pre_ok = [(c, k) for n, (c, k) in enumerate(flat) if bool(ok_pre[n])]
+                with bc.ignoring(ignore_grasp):
+                    ok_g = bc.ik_screen([handle_pairs[c][k][1] for c, k in pre_ok], q, handle_arm)
+                handle_ok: Dict[Tuple[int, float], List[int]] = {}
+                for n, (c, k) in enumerate(pre_ok):
+                    if bool(ok_g[n]):
+                        handle_ok.setdefault(c, []).append(k)
+                surv = [c for c in combos if c in handle_ok]
                 braces = {c: brace_candidates(jinfo, hdata, obj_poses[c], q_values, brace_side, G) for c in surv}
                 bflat = [(c, kind) for c in surv for kind, _ in braces[c]]
                 bposes = [pose for c in surv for _, pair in braces[c] for pose in pair]
-                ok_b = kit.ik_batch(bposes, q, arm=brace_arm) if bposes else th.zeros(0, dtype=th.bool)
-                feasible = {}
+                ok_b = bc.ik_screen(bposes, q, brace_arm)
+                brace_ok: Dict[Tuple[int, float], List[str]] = {}
                 for n, (c, kind) in enumerate(bflat):
                     if bool(ok_b[2 * n]) and bool(ok_b[2 * n + 1]):
-                        feasible.setdefault(c, []).append(kind)
+                        brace_ok.setdefault(c, []).append(kind)
                 feasible_cells = []
+                n_handle_only = 0
                 for i in range(len(base_cells)):
-                    for c in ((i, face_off), (i, face_off - 0.1), (i, face_off + 0.1)):
-                        if c in feasible:
-                            feasible_cells.append((i, c[1], feasible[c]))
-                            break
+                    best = None
+                    for dy in yaw_offsets:
+                        c = (i, dy)
+                        if c not in handle_ok:
+                            continue
+                        if c not in brace_ok:
+                            n_handle_only += 1
+                            continue
+                        if best is None or len(handle_ok[c]) > len(handle_ok[best]):
+                            best = c
+                    if best is not None:
+                        feasible_cells.append((i, best[1], sorted(handle_ok[best]), brace_ok[best]))
                 entry["n_after_prune"] = int(near.sum())
                 entry["n_reachable"] = len(feasible_cells)
-                entry["feasible"] = [{"cell": base_cells[i].tolist(), "yaw_offset": yaw, "brace_kinds": kinds} for i, yaw, kinds in feasible_cells]
+                entry["n_handle_only_pairs"] = n_handle_only
+                entry["n_all_q"] = sum(1 for _, _, ks, _ in feasible_cells if len(ks) == len(q_values))
+                entry["feasible"] = [{"cell": base_cells[i].tolist(), "yaw_offset": yaw, "q_indices": ks, "q_feasible": [q_values[k] for k in ks], "brace_kinds": kinds}
+                                     for i, yaw, ks, kinds in feasible_cells]
                 entry["time_s"] = round(time.time() - t0, 2)
                 per_trunk.append(entry)
-                cells_out[(tr, ti)] = base_cells[[i for i, _, _ in feasible_cells]].numpy() if feasible_cells else np.zeros((0, 2))
-                log.info("brace trunk (%.2f, %+.1f): %d/%d cells feasible, %.1fs", tr, ti, len(feasible_cells), len(base_cells), entry["time_s"])
-            result = {"trunks": per_trunk, "cells": cells_out}
+                cells_out[(tr, ti)] = base_cells[[i for i, _, _, _ in feasible_cells]].numpy() if feasible_cells else np.zeros((0, 2))
+                log.info("brace trunk (%.2f, %+.1f): %d/%d cells feasible (%d with every joint value; %d (cell, yaw) handle-only), %.1fs", tr, ti,
+                         len(feasible_cells), len(base_cells), entry["n_all_q"], n_handle_only, entry["time_s"])
+            bc.scope.__exit__(None, None, None)
+            bc.scope = None
+            result = {"trunks": per_trunk, "cells": cells_out, "pairs": {}}
             key = _key({"scene": args.scene, "support": args.support, "z": round(z_support, 2), "stance": stance["edge"], "s": args.stand_off, "target": args.target,
-                        "handle_key": args.handle_key, "joint": args.joint, "q": q_values, "brace": True, "grid": meta["grid"], "lattice": lattice, "arms": "untucked"})
+                        "scale": scale, "handle_key": args.handle_key, "joint": args.joint, "q": q_values, "brace": True, "grid": meta["grid"], "lattice": lattice, "arms": "untucked"})
             name = f"brace__{args.scene}__{args.support}__{cat}-{model}__{key}"
         else:
             grasps, rest_quat, max_off = None, G.IDENTITY_QUAT.clone(), 0.0
             hull = None
             if args.object:
                 cat, model = args.object.split("/", 1)
-                obj = world.spawn(f"target_{cat}_{model}", cat, model)
+                obj = world.spawn(f"target_{cat}_{model}", cat, model, dataset=_dataset_of(cat, model, args.dataset), scale=scale)
                 hull = world.local_hull(obj)
                 world.park(obj, len(world.spawned) - 1)
+                ext = (hull.max(dim=0).values - hull.min(dim=0).values).tolist() if hull is not None and len(hull) else None
+                meta["object_extent"] = [round(float(v), 4) for v in ext] if ext else None
                 if not args.generic_pinch:
                     key = GL.resolve_key(cat, model, args.grasp_key, ["tabletop", "insert", "floating"])
                     grasps = GL.load_grasps(key)
                     rq = GL.rest_quat_xyzw(key)
                     rest_quat = rq if rq is not None else rest_quat
                     max_off = max(float(th.linalg.norm(g.position)) for g in grasps) if grasps else 0.0
-                    meta.update({"object": args.object, "grasp_key": key, "n_grasps": len(grasps), "rest_quat_xyzw": rest_quat.tolist()})
+                    meta.update({"object": args.object, "grasp_key": key, "n_grasps": len(grasps), "grasp_names": [g.name for g in grasps],
+                                 "rest_quat_xyzw": rest_quat.tolist(), "generic_pinch": False})
                 else:
-                    meta.update({"object": args.object, "grasp_key": None, "generic_pinch": True})
-                h = float(hull[:, 2].max() - hull[:, 2].min()) if hull is not None else 0.05
+                    meta.update({"object": args.object, "grasp_key": None, "generic_pinch": True, "grasp_names": []})
+                h = float(hull[:, 2].max() - hull[:, 2].min()) if hull is not None and len(hull) else 0.05
             else:
-                meta.update({"object": None, "generic_pinch": True})
+                meta.update({"object": None, "grasp_key": None, "generic_pinch": True, "grasp_names": []})
                 h = 0.05
             if args.generic_pinch or grasps is None:
                 pose_fn = None
+                meta["generic_pinch_spec"] = {"n_yaws": N_YAWS_GENERIC, "tilts_deg": list(TILTS_GENERIC), "z_above_support": round(max(0.6 * h, 0.03), 4),
+                                             "order": "tilt-major, yaw-minor (RobotKit.grasp_candidates_at)"}
             else:
                 def pose_fn(world_xy, yaw, _hull=hull, _rq=rest_quat):
                     return bc.object_pose_at(world_xy, yaw, z_support, _hull, _rq)
             kit.sync_world()
-            trunks = trunk_grid(z_support - world.floor_z)
-            if args.smoke:
-                trunks = trunks[:2]
+            trunks = trunk_sel or (SMOKE_TRUNKS if args.smoke else trunk_grid(z_support - world.floor_z))
             result = bc.compute(stance, lattice_world, z_support if grasps is not None else (z_support + max(0.6 * h, 0.03)), pose_fn,
                                 grasps if not args.generic_pinch else None, ignore_grasp, arm="right", trunks=trunks, max_grasp_offset=max_off)
             gset = [(g.key, g.name, g.position.tolist(), g.quat.tolist()) for g in grasps] if grasps else "generic"
             key = _key({"scene": args.scene, "support": args.support, "z": round(z_support, 2), "stance": stance["edge"], "s": args.stand_off, "object": args.object,
-                        "grasps": gset, "rest": rest_quat.tolist(), "placed": args.placed, "under": args.under, "grid": meta["grid"], "lattice": lattice, "arms": "untucked", "seeds": 12})
+                        "scale": scale, "grasps": gset, "rest": rest_quat.tolist(), "placed": args.placed, "under": args.under, "grid": meta["grid"], "lattice": lattice,
+                        "arms": "untucked", "seeds": 12})
             oname = args.object.replace("/", "-") if args.object else "generic"
             name = f"{meta['mode']}__{args.scene}__{args.support}{'-under-' + args.under if args.under else ''}__{oname}__{key}"
+            if args.smoke:
+                meta["sanity"] = band_sanity(stance, result, z_support if grasps is not None else (z_support + max(0.6 * h, 0.03)))
 
         # ---- write
         lat_all = np.concatenate([c[:, 1] for c in result["cells"].values() if len(c)]) if any(len(c) for c in result["cells"].values()) else np.zeros(0)
         meta.update({"trunks": result["trunks"], "union_extent": [float(lat_all.min()), float(lat_all.max())] if len(lat_all) else None,
-                     "n_reachable_total": int(sum(len(c) for c in result["cells"].values())), "key": key, "time_s": round(time.time() - t_load, 1)})
-        arrays = {f"t{tr:.2f}_k{ti:+.1f}": c for (tr, ti), c in result["cells"].items()}
+                     "n_reachable_total": int(sum(len(c) for c in result["cells"].values())), "key": key, "time_s": round(time.time() - t_load, 1),
+                     "kit_stats": kit.stats_snapshot()})
+        arrays = {trunk_key(tr, ti): np.asarray(c, dtype=np.float32).reshape(-1, 2) for (tr, ti), c in result["cells"].items()}
+        for (tr, ti), p in result.get("pairs", {}).items():
+            arrays[trunk_key(tr, ti) + "__pairs"] = np.asarray(p, dtype=np.int32).reshape(-1, 3)
         np.savez_compressed(os.path.join(out_dir, name + ".npz"), **arrays)
         with open(os.path.join(out_dir, name + ".json"), "w") as f:
             json.dump(meta, f, indent=1, default=str)
-        print(f"REACH_BANDS {json.dumps({'file': os.path.join(out_dir, name + '.npz'), 'union_extent': meta['union_extent'], 'n_reachable_total': meta['n_reachable_total'], 'trunks': [(t['translate'], t['tilt'], t['n_reachable'], t['collides']) for t in result['trunks']]})}", flush=True)
+        summary = {"file": os.path.join(out_dir, name + ".npz"), "union_extent": meta["union_extent"], "n_reachable_total": meta["n_reachable_total"],
+                   "trunks": [(t["translate"], t["tilt"], t["n_reachable"], t["collides"], t.get("time_s")) for t in result["trunks"]], "time_s": meta["time_s"]}
+        if args.smoke:
+            summary["shoulder_fk_check"] = [(r["translate"], r["tilt"], r["shoulder_err_mm"]) for r in meta.get("shoulder_fk_check", [])]
+            summary["sanity"] = meta.get("sanity")
+        print(f"REACH_BANDS {json.dumps(summary, default=str)}", flush=True)
     except BaseException:
         import traceback
 

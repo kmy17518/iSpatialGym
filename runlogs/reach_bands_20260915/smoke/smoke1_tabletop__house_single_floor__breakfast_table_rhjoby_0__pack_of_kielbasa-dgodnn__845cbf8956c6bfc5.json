@@ -1,0 +1,239 @@
+{
+ "scene": "house_single_floor",
+ "rooms": [
+  "dining_room_0"
+ ],
+ "support": "breakfast_table_rhjoby_0",
+ "removed_chairs": [
+  "straight_chair_jgoolz_0",
+  "straight_chair_jgoolz_1",
+  "straight_chair_jgoolz_2",
+  "straight_chair_jgoolz_3",
+  "straight_chair_jgoolz_4",
+  "straight_chair_jgoolz_5"
+ ],
+ "lattice": 0.16,
+ "stand_off": 0.45,
+ "arms": "untucked",
+ "grid": {
+  "translates": [
+   0.0,
+   0.25,
+   0.5,
+   0.75,
+   0.95
+  ],
+  "tilts": [
+   0.0,
+   -0.3,
+   -0.6,
+   -0.9
+  ],
+  "low_top_tilt": -1.2
+ },
+ "seeds": 12,
+ "pre_grasp": 0.1,
+ "yaws": [
+  0.0,
+  0.7853981633974483,
+  1.5707963267948966,
+  2.356194490192345,
+  3.141592653589793,
+  3.9269908169872414,
+  4.71238898038469,
+  5.497787143782138
+ ],
+ "mode": "tabletop",
+ "smoke": true,
+ "scale": null,
+ "placed_specs": [],
+ "shoulder_fk_check": [
+  {
+   "translate": 0.5,
+   "tilt": 0.0,
+   "shoulder_err_mm": 1.36,
+   "torso_link4_err_mm": 1.36,
+   "eef_err_mm": 1.36,
+   "shoulder_sim": [
+    6.757,
+    2.0293,
+    1.2311
+   ],
+   "shoulder_fk": [
+    6.757,
+    2.0293,
+    1.2297
+   ],
+   "shoulder_above_floor_m": 1.2311,
+   "arm_len_m": 0.7929
+  },
+  {
+   "translate": 0.95,
+   "tilt": -0.9,
+   "shoulder_err_mm": 1.36,
+   "torso_link4_err_mm": 1.36,
+   "eef_err_mm": 1.36,
+   "shoulder_sim": [
+    7.02,
+    2.0293,
+    0.7943
+   ],
+   "shoulder_fk": [
+    7.02,
+    2.0293,
+    0.7929
+   ],
+   "shoulder_above_floor_m": 0.7943,
+   "arm_len_m": 0.7929
+  }
+ ],
+ "stance": {
+  "edge": "+v",
+  "edge_mid": [
+   5.839194297790527,
+   3.5011637210845947
+  ],
+  "inward": [
+   0.9999967217445374,
+   -0.002553177997469902
+  ],
+  "tangent": [
+   0.002553177997469902,
+   0.9999967217445374
+  ],
+  "length_m": 1.1602001190185547,
+  "base_pose2d": [
+   5.389195919036865,
+   3.502312660217285,
+   -0.0025531808196185024
+  ],
+  "stand_off": 0.45,
+  "overhang": 0.0,
+  "edge_depth": 0.4499998390674591
+ },
+ "top": {
+  "name": "breakfast_table_rhjoby_0",
+  "z": 0.8126291036605835,
+  "yaw": 1.568243145942688,
+  "local_bounds": [
+   2.9359607696533203,
+   4.096160888671875,
+   -8.73303508758545,
+   -5.830236434936523
+  ],
+  "n_free_cells": 8463,
+  "occupants": [],
+  "resolution": 0.02
+ },
+ "z_support": 0.8126291036605835,
+ "object_extent": [
+  0.2231,
+  0.0668,
+  0.0625
+ ],
+ "object": "pack_of_kielbasa/dgodnn",
+ "grasp_key": "pack_of_kielbasa__dgodnn__t",
+ "n_grasps": 5,
+ "grasp_names": [
+  "grasp_0",
+  "grasp_1",
+  "grasp_2",
+  "grasp_3",
+  "grasp_4"
+ ],
+ "rest_quat_xyzw": [
+  0.0,
+  0.0,
+  0.0,
+  1.0
+ ],
+ "generic_pinch": false,
+ "sanity": {
+  "edge_depth": 0.4499998390674591,
+  "per_trunk": [
+   {
+    "translate": 0.5,
+    "tilt": 0.0,
+    "collides": false,
+    "n_reachable": 9,
+    "x_min": 0.48,
+    "x_max": 0.64,
+    "lat_min": -0.64,
+    "lat_max": 0.0,
+    "n_behind_base": 0,
+    "shoulder_dist_min": 0.528,
+    "shoulder_dist_max": 0.709,
+    "cells_without_pair": 0
+   },
+   {
+    "translate": 0.25,
+    "tilt": -0.3,
+    "collides": false,
+    "n_reachable": 12,
+    "x_min": 0.48,
+    "x_max": 0.8,
+    "lat_min": -0.64,
+    "lat_max": 0.0,
+    "n_behind_base": 0,
+    "shoulder_dist_min": 0.545,
+    "shoulder_dist_max": 0.781,
+    "cells_without_pair": 0
+   }
+  ]
+ },
+ "trunks": [
+  {
+   "translate": 0.5,
+   "tilt": 0.0,
+   "collides": false,
+   "n_lattice": 72,
+   "n_after_prune": 26,
+   "n_reachable": 9,
+   "rounds": 10,
+   "n_pairs": 22,
+   "time_s": 93.1,
+   "shoulder_world": [
+    5.5455,
+    3.3312,
+    1.2298
+   ],
+   "arm_len": 0.7929,
+   "reach": 0.9561
+  },
+  {
+   "translate": 0.25,
+   "tilt": -0.3,
+   "collides": false,
+   "n_lattice": 72,
+   "n_after_prune": 28,
+   "n_reachable": 12,
+   "rounds": 10,
+   "n_pairs": 34,
+   "time_s": 62.87,
+   "shoulder_world": [
+    5.6594,
+    3.3309,
+    1.3161
+   ],
+   "arm_len": 0.7929,
+   "reach": 0.9561
+  }
+ ],
+ "union_extent": [
+  -0.6399999856948853,
+  0.0
+ ],
+ "n_reachable_total": 21,
+ "key": "845cbf8956c6bfc5",
+ "time_s": 292.4,
+ "kit_stats": {
+  "ik_calls": 0,
+  "ik_s": 0.0,
+  "ik_batch_calls": 34,
+  "ik_batch_problems": 1524,
+  "ik_batch_s": 155.35654640197754,
+  "collision_calls": 5,
+  "collision_configs": 5,
+  "collision_s": 0.023012399673461914
+ }
+}
