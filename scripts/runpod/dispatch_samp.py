@@ -80,12 +80,15 @@ SYNC_DIRS = ["ispatialgym/sampling", "ispatialgym/oracle", "ispatialgym/activity
 EXPORT_DIR = "/tmp/isg_dispatch_export"
 
 
+CODE_REF = "HEAD"
+
+
 def export_head() -> str:
-    """Export the committed HEAD (not the working tree: other agents' uncommitted edits must not reach the fleet)."""
+    """Export the committed ``CODE_REF`` (not the working tree: other agents' uncommitted edits must not reach the fleet)."""
     if os.path.exists(EXPORT_DIR):
         subprocess.run(["rm", "-rf", EXPORT_DIR], check=True)
     os.makedirs(EXPORT_DIR)
-    tar = subprocess.Popen(["git", "-C", rp.REPO, "archive", "HEAD"] + SYNC_DIRS, stdout=subprocess.PIPE)
+    tar = subprocess.Popen(["git", "-C", rp.REPO, "archive", CODE_REF] + SYNC_DIRS, stdout=subprocess.PIPE)
     subprocess.run(["tar", "-x", "-C", EXPORT_DIR], stdin=tar.stdout, check=True)
     tar.wait()
     return EXPORT_DIR
@@ -115,10 +118,13 @@ def main():
     ap.add_argument("--subtasks", nargs="*", default=None, help="only jobs of these subtasks")
     ap.add_argument("--reset-queue", action="store_true", help="drop queued (not yet started) jobs before adding")
     ap.add_argument("--sync-only", action="store_true", help="only rsync the working tree to the pods")
+    ap.add_argument("--code-ref", default="HEAD", help="git ref whose committed tree is synced to the pods")
     ap.add_argument("--rebalance", action="store_true", help="drop every queued job on the ready pods and re-dispatch the manifest jobs that are neither done nor running")
     ap.add_argument("--restart-runner", action="store_true", help="on idle pods (no current job) restart the runner with the current RUNNER script")
     ap.add_argument("--exclude-subtasks", nargs="*", default=None)
     args = ap.parse_args()
+    global CODE_REF
+    CODE_REF = args.code_ref
     api = rp.Api(rp.load_env()["RUNPOD_API_KEY"])
     fleet = rp.load_fleet()
     live = {p["id"] for p in api.myself()["pods"]}
