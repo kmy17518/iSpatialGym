@@ -40,6 +40,13 @@ RELATION_OF_SUBTASK = {
 }
 #: v1 ``bddl_writer`` definition ids of the relations (facade rendering when the alias has no grounded BDDL)
 V1_DEFINITION_ID = {"ontop": 0, "under": 1, "inside": 2, "nextto": 3, "touching": 4}
+
+
+def _tabletop():
+    """The shared tabletop phases module (``v2/tabletop.py``); kept as an accessor because ``iors_large`` imports it."""
+    return TT
+
+
 #: §6.11 touching admissibility numbers (pushability / stability; ``generation`` overrides)
 PUSH_MAX_PINCH = 0.089
 PUSH_MAX_LONG = 0.30

@@ -163,7 +163,7 @@ def run_template(problem: GroundedProblem, choice: TemplateChoice, world, kit, o
         entry["reject_reason"] = e.reason
         return entry
     except Exception as e:  # keep going with the next template
-        traceback.print_exc()
+        log.error("traceback", exc_info=True)
         entry = sampler.template_summary(0, time.time() - t0)
         entry["error"] = repr(e)
         return entry
@@ -256,7 +256,7 @@ def main(argv=None):
             try:
                 gp = load_problem_from_args(args)
             except Exception as e:
-                traceback.print_exc()
+                log.error("traceback", exc_info=True)
                 report["errors"].append({"alias": alias, "error": repr(e)})
                 continue
             scenes = [args.scene] if args.scene else gp.scene_names()
@@ -269,7 +269,7 @@ def main(argv=None):
                 try:
                     world, kit = pool.get(gp, scene)
                 except Exception as e:
-                    traceback.print_exc()
+                    log.error("traceback", exc_info=True)
                     report["errors"].append({"alias": alias, "scene": scene, "error": f"scene load failed: {e!r}"})
                     pool.world, pool.kit, pool.key = None, None, None
                     continue
@@ -293,7 +293,7 @@ def main(argv=None):
                         gp.save_customs()  # §1: sample_isg appends blacklists / constraints to the source customs list
                     gp.save_customs(customs_copy)  # the copy under <out> always carries what this run learned
     except BaseException:
-        traceback.print_exc()
+        log.error("traceback", exc_info=True)
         raise
     finally:
         report["finished"] = time.strftime("%Y-%m-%dT%H:%M:%S")

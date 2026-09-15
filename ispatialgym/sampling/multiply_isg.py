@@ -120,7 +120,7 @@ def main(argv=None):
             if os.path.abspath(copy) != os.path.abspath(gp.customs_path):
                 shutil.copy(gp.customs_path, copy)
     except BaseException:
-        traceback.print_exc()
+        log.error("traceback", exc_info=True)
         raise
     finally:
         report["finished"] = time.strftime("%Y-%m-%dT%H:%M:%S")
