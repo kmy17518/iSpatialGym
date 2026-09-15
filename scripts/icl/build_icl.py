@@ -767,6 +767,7 @@ class Builder:
         alignment targets) is only changed where the review answered the disagreement question of that (subtask,
         model) explicitly: ``preserved`` -> ``1``, ``broken`` -> ``0``; otherwise the reviewer's value stays."""
         stats = {"surveyed": 0, "scaled": 0, "not_surveyed": 0, "reviewed": 0, "symmetric_180_set": 0}
+        self.symmetry_source: Dict[str, str] = {}  # key -> "survey" | "review" (provenance for the dropped-rows file)
         if not path or not os.path.exists(path):
             return stats
         sym = json.load(open(path))
@@ -787,6 +788,7 @@ class Builder:
                 tags, near = src["symmetry_scaled"] or ["none"], src.get("symmetry_near_scaled") or []
                 stats["scaled"] += 1
             r["symmetry"], r["symmetry_near"] = ",".join(tags), ",".join(near) if near else "none"
+            self.symmetry_source[key] = "review verdict" if rv else "symmetry survey"
             stats["surveyed"] += 1
             if rv:
                 stats["reviewed"] += 1
@@ -795,6 +797,70 @@ class Builder:
                         if q.get("subtask") == r["subtask"] and q.get("value") in ("0", "1"):
                             r["symmetric_180"] = q["value"]
                             stats["symmetric_180_set"] += 1
+        return stats
+
+    # -- spec 3.13 rule 1: mental-rotation targets must be asymmetric
+    def drop_symmetric_mental_rotation(self, dropped_csv: Optional[str]) -> dict:
+        """Remove every ``mental_rotation`` / ``target`` row whose ``symmetry`` is a confirmed symmetry (``symmetry != none``;
+        empty = not surveyed and ``symmetry_near``-only rows stay until a review verdict confirms the tag - the drop then
+        applies on the next build). A dropped ``representative`` / ``test`` mark is handed to the next-ranked remaining
+        model of the category (by ``rank``, then the original row order): the first remaining model becomes the
+        representative, the test set is refilled to its previous size (a category with one remaining model keeps one);
+        the promoted row's ``note`` gets ``promoted: replaces <model> (<tags>)``, every other mark stays. A category left
+        without a model is reported, never refilled. The dropped rows go to ``dropped_csv`` (candidates.csv columns +
+        ``reason``) so the removal stays traceable."""
+        st, role = "mental_rotation", "target"
+        rows = [r for r in self.roles if r["subtask"] == st and r["role"] == role]
+        dropped = [r for r in rows if r["symmetry"] and r["symmetry"] != "none"]
+        stats = {"dropped": [], "promotions": [], "empty_categories": []}
+        by_cat: Dict[str, List[dict]] = collections.OrderedDict()
+        for r in rows:
+            by_cat.setdefault(r["category"], []).append(r)
+        dropped_ids = {id(r) for r in dropped}
+        for cat, crows in by_cat.items():
+            gone = [r for r in crows if id(r) in dropped_ids]
+            if not gone:
+                continue
+            remaining = [r for r in crows if id(r) not in dropped_ids]
+            for r in gone:
+                stats["dropped"].append((cat, r["model"], r["symmetry"], r["representative"] == "1", r["test"] == "1"))
+            if not remaining:
+                stats["empty_categories"].append(cat)
+                continue
+            order = sorted(remaining, key=lambda r: (int(r["rank"] or 9), crows.index(r)))
+            gone_reps = [r for r in gone if r["representative"] == "1"]
+            gone_tests = [r for r in gone if r["test"] == "1"]
+            if gone_reps and not any(r["representative"] == "1" for r in remaining):
+                new_rep = order[0]
+                new_rep["representative"] = "1"
+                new_rep["note"] = f"promoted: replaces {gone_reps[0]['model']} ({gone_reps[0]['symmetry']}); " + new_rep["note"]
+                stats["promotions"].append((cat, new_rep["model"], "representative", gone_reps[0]["model"], gone_reps[0]["symmetry"]))
+            n_test_before = sum(1 for r in crows if r["test"] == "1")
+            n_test = sum(1 for r in remaining if r["test"] == "1")
+            k = 0
+            for r in order:
+                if n_test >= n_test_before:
+                    break
+                if r["test"] != "1":
+                    r["test"] = "1"
+                    n_test += 1
+                    src = gone_tests[min(k, len(gone_tests) - 1)] if gone_tests else gone[0]
+                    k += 1
+                    tag = f"promoted: replaces {src['model']} ({src['symmetry']}); "
+                    if not r["note"].startswith(tag):
+                        r["note"] = tag + r["note"]
+                    stats["promotions"].append((cat, r["model"], "test", src["model"], src["symmetry"]))
+        self.roles = [r for r in self.roles if id(r) not in dropped_ids]
+        if dropped_csv:
+            os.makedirs(os.path.dirname(dropped_csv), exist_ok=True)
+            with open(dropped_csv, "w", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=ROLE_COLUMNS + ["reason"])
+                w.writeheader()
+                for r in dropped:
+                    key = f"{r['category']}__{r['model']}"
+                    w.writerow({**{c: r.get(c, "") for c in ROLE_COLUMNS},
+                                "reason": f"mental_rotation target with symmetry {r['symmetry']} ({self.symmetry_source.get(key, 'symmetry survey')}; "
+                                          f"spec 3.13 rule 1, decision 2026-09-15)"})
         return stats
 
     def build_lookalikes(self) -> List[dict]:
@@ -838,6 +904,8 @@ class Builder:
         n_sup = self.build_supports()
         self.mark_pins()
         sym_stats = self.apply_symmetry(symmetry)
+        drop_stats = self.drop_symmetric_mental_rotation(
+            os.path.join(os.path.dirname(symmetry), "dropped_mental_rotation.csv") if symmetry and os.path.exists(symmetry) else None)
         grasps = self.build_grasps()
         handles = self.build_handles()
         contacts = self.build_contacts()
@@ -876,8 +944,16 @@ class Builder:
             else:
                 print("  no review_verdicts.json next to symmetry.json -> survey values only (run scripts/symmetry/aggregate_review.py after the review round)")
             print(f"  symmetry values: {collections.Counter(r['symmetry'] for r in self.roles if r['symmetry']).most_common(12)}")
+            print(f"  mental_rotation targets dropped (symmetry != none, spec 3.13 rule 1): {len(drop_stats['dropped'])} -> "
+                  f"{os.path.relpath(os.path.join(os.path.dirname(symmetry), 'dropped_mental_rotation.csv'), REPO)}")
+            for cat, model, tags, rep, test in drop_stats["dropped"]:
+                print(f"    dropped {cat}/{model} ({tags}){' representative' if rep else ''}{' test' if test else ''}")
+            for cat, model, mark, old, tags in drop_stats["promotions"]:
+                print(f"    promoted {cat}/{model} -> {mark} (replaces {old} ({tags}))")
+            for cat in drop_stats["empty_categories"]:
+                print(f"    WARNING category {cat} has no mental_rotation target left")
         else:
-            print("symmetry: no survey file given / found -> symmetry / symmetry_near columns left empty")
+            print("symmetry: no survey file given / found -> symmetry / symmetry_near columns left empty, no mental_rotation rows dropped")
         print(f"roles/constraints_compatible.csv: {len(self.pairs)} rows ({collections.Counter(p['relation'] for p in self.pairs)})")
         print(f"roles/constraints_conflicting.csv: {len(lookalikes)} rows")
         print(f"require/grasps.csv: {len(grasps)} rows from {len(self.keys_used)} keys ({collections.Counter(g['require'] for g in grasps)})")

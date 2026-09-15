@@ -127,6 +127,8 @@ writes the scaled verdict into the rows whose `scale` matches.
   tags, texture-borderline tags, then the other rendered tags).
 - `models.json`, `geom/`, `tex/` — the model set and the per-model raw scores (re-tune thresholds in `symcore.py`, run
   `report` again: no recomputation needed).
+- `dropped_mental_rotation.csv` — written by `scripts/icl/build_icl.py`: the `mental_rotation` / `target` rows removed
+  from `roles/candidates.csv` because their `symmetry` is confirmed (spec §3.13 rule 1; candidates columns + `reason`).
 
 ## Results
 

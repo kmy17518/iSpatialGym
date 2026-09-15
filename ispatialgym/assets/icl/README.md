@@ -52,6 +52,14 @@ spawn scales, chosen joints — those are task customs list parameters (`generat
 | `ready` | 1 = no unprocessed KB complaint |
 | `note`, `source` | reviewer note (trimmed), provenance file |
 
+Mental rotation (spec §3.13 rule 1, decision 2026‑09‑15): the builder drops every `mental_rotation` / `target` row whose
+`symmetry` is a confirmed symmetry (`≠ none`; empty and `symmetry_near`‑only rows stay until a review verdict confirms the
+tag, then the drop applies on the next build) and hands a dropped `representative` / `test` mark to the next‑ranked
+remaining model of the category (`rank`, then row order; the test set is refilled to its previous size; the promoted row's
+`note` starts with `promoted: replaces <model> (<tags>)`; a category left empty is only reported). The dropped rows are
+kept in `runlogs/symmetry_20260915/dropped_mental_rotation.csv` (candidates columns + `reason`); the models stay
+candidates for every other role.
+
 Supports: the union of every scene object that was `spec`/`viable` for any task in the old sheet (31 objects in 6
 scenes) is listed for every tabletop subtask; the floor of every scene is an admissible init support for the
 large‑scale IORS subtasks. Wall regions: the 78 validated regions of the 2026‑09‑11 survey, for both wall subtasks.
