@@ -115,6 +115,7 @@ def main():
     ap.add_argument("--subtasks", nargs="*", default=None, help="only jobs of these subtasks")
     ap.add_argument("--reset-queue", action="store_true", help="drop queued (not yet started) jobs before adding")
     ap.add_argument("--sync-only", action="store_true", help="only rsync the working tree to the pods")
+    ap.add_argument("--rebalance", action="store_true", help="drop every queued job on the ready pods and re-dispatch the manifest jobs that are neither done nor running")
     ap.add_argument("--restart-runner", action="store_true", help="on idle pods (no current job) restart the runner with the current RUNNER script")
     ap.add_argument("--exclude-subtasks", nargs="*", default=None)
     args = ap.parse_args()
@@ -190,6 +191,22 @@ def main():
             rp.ssh_run(*ep, "touch /root/samp/CLOSE", timeout=60)
         print(f"queues closed on {len(ready)} pods (runner exits when its queue is empty -> JOB_DONE)")
         return
+    if args.rebalance:
+        finished, running = set(), set()
+        for pid, ep in ready:
+            r = rp.ssh_run(*ep, "cat /root/samp/done.txt 2>/dev/null; echo ---; cat /root/samp/current.txt 2>/dev/null", capture=True, timeout=45)
+            out = (r.stdout or "").split("---")
+            for line in out[0].splitlines():
+                if " rc=" in line:
+                    jid, rest = line.split(" rc=", 1)
+                    if "n_written=-1" not in rest or "rc=139" not in line:  # a segfault is retried, a real run (even 0 instances) is not
+                        finished.add(jid.strip())
+            if len(out) > 1 and out[1].strip():
+                running.add(out[1].strip())
+        before = len(jobs)
+        jobs = [j for j in jobs if j["id"] not in finished and j["id"] not in running]
+        args.reset_queue = True
+        print(f"rebalance: {before} manifest jobs, {len(finished)} finished, {len(running)} running -> {len(jobs)} re-queued")
     per_pod = {pid: [] for pid, _ in ready}
     # heaviest jobs first, round-robin; a wave number keeps later dispatches behind earlier ones in the queue order
     for i, job in enumerate(sorted(jobs, key=lambda j: -float(j.get("weight", 1.0)))):
