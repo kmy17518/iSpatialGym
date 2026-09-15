@@ -14,7 +14,8 @@
 * ``--pull REMOTE LOCAL`` rsyncs a pod path back after the run (e.g. ``--pull '$SMOKE_OUT' /tmp/my_smoke``).
 
 Pods have the datasets, the conda env and the grasp library (bootstrapped from the repo); they do NOT have the
-local ``~/.cache/ispatialgym`` caches or anything under ``/tmp``. GPU per pod: L40S 48 GB (two sampler processes
+local ``~/.cache/ispatialgym`` caches or anything under ``/tmp``. Inputs a run needs (an instance directory, a spec)
+go under ``runlogs/smoke_inputs/`` (git-ignored, synced) and are referenced by that repo-relative path. GPU per pod: L40S 48 GB (two sampler processes
 would fit, but the lock keeps it to one).
 """
 
@@ -36,7 +37,7 @@ import rp  # noqa: E402
 POOL = os.path.join(rp.REPO, "runlogs", "runpod", "smoke")
 PODS_FILE = os.path.join(POOL, "pods.txt")
 LOCKS = os.path.join(POOL, "locks")
-SYNC_DIRS = ["ispatialgym", "scripts", "runlogs/reach_volume_20260915", "runlogs/reach_bands_20260915", "runlogs/scene_inventory_20260915",
+SYNC_DIRS = ["ispatialgym", "scripts", "runlogs/smoke_inputs", "runlogs/reach_volume_20260915", "runlogs/reach_bands_20260915", "runlogs/scene_inventory_20260915",
              "runlogs/symmetry_20260915", "runlogs/held_visibility_20260915"]
 EXCLUDES = ["__pycache__", "*.pyc", "behavior-vision-suite.github.io", "data_collection", ".pytest_cache", "renders", "strips", "*.png", "*.jpg", "*.mp4"]
 
