@@ -846,8 +846,33 @@ class Selector:
         lines += ["", "## Categories used by more than one subtask", ""]
         for c in reused:
             lines.append(f"- {c}: {self.used_categories[c]} picks")
-        lines += ["", "## Filled (incomplete) candidates", "",
-                  f"{len({(r['subtask'], r['category'], r['model']) for r in self.extra})} rows in `candidates_extra.csv` (status `incomplete:*`), see the `plan` column."]
+        # slot availability per subtask (picks with a variation_geometry / variation_texture / heldout slot on the main role)
+        lines += ["", "## Slot availability per subtask (main role)", "", "| subtask | picks | var. texture | var. geometry | held-out |", "|---|---|---|---|---|"]
+        for st in SUBTASKS:
+            main = "obstacles" if "obstacles" in SUBTASKS[st]["roles"] else ("targets" if "targets" in SUBTASKS[st]["roles"] else "target")
+            pk = {r["pick"] for r in self.rows if r["subtask"] == st and r["role"] == main and r["slot"] == "representative"}
+            if not pk:
+                continue
+            cnt = {s: len({r["pick"] for r in self.rows if r["subtask"] == st and r["role"] == main and r["slot"] == s}) for s in ("variation_texture", "variation_geometry", "heldout")}
+            lines.append(f"| {st} | {len(pk)} | {cnt['variation_texture']} | {cnt['variation_geometry']} | {cnt['heldout']} |")
+        lines += ["", "## Filled (incomplete) candidates and the plan to validate them", "",
+                  f"{len({(r['subtask'], r['category'], r['model']) for r in self.extra})} rows in `candidates_extra.csv` (status `incomplete:*`, see the `plan` column). "
+                  "What is still unvalidated and how it gets validated:", "",
+                  "- **Large-scale IORS targets** (`incomplete:filled_from_*`): tabletop-grasp models of the other IORS / disembedding pools, filtered by height "
+                  "(ontop <= 0.35 m, under <= 0.20 m). Validate: the representative test of `ground_isg` (place on the partner face / under the partner, "
+                  "whole-body IK at the placement stance; spec 5.6) and the B3 reach bands with `--support floor --under <partner>`; failures go to the customs blacklist.",
+                  "- **Scene articulated targets without a canonical handle annotation** (`incomplete:handle_from_B4_heuristic`, e.g. bottom_cabinet_fancyy_0, "
+                  "bottom_cabinet_no_top_gjrero_*): the B4 geometric handle proposal is used through the `handle_file` role option; validate with the C3 review round "
+                  "on `runlogs/scene_inventory_20260915/<scene>/artic/strips/` (verdicts -> `require/handles.csv`), then the representative test.",
+                  "- **Supports** (`geometric_ok` only): admitted by top height, area, short side and a >= 0.60 m free-floor edge run at stand-off 0.45 (0.35 / 0.55 in the note); "
+                  "the sampler's stance search is the validation (rejections `no_support` / `no_stance` -> customs blacklist per (scene, support)).",
+                  "- **Alignment targets**: `(contacts target)` cannot be checked until B6 writes `require/contacts.csv`; the v1 geometric push / brace contacts are used meanwhile; "
+                  "wall regions stay the 2026-09-11 survey until B5.",
+                  "- **Short pools** (variation / held-out unavailable, see the per-subtask notes): small-scale articulation (5 categories, 8 annotated models -> annotate handles of "
+                  "more small articulated models with the B4 heuristic + review: cooler, violin_case, second laptop / toolbox / blender models), attachment (one female per male "
+                  "-> more (male, female) meta-link pairs from the KB), obstacles with 1-2 models (obstacle selection round-2 categories), block design (2 more block models), "
+                  "IORS under_small / touching (4 admissible target categories each -> grasp tests for the round-1 touching targets flagged NEEDS GRASP TEST).",
+                  "- **Held-out rule**: `ground_isg` must blacklist the held-out models in every role (reason `heldout`); the v1 bridge already removes them from the disembedding pools."]
         with open(path, "w") as f:
             f.write("\n".join(lines) + "\n")
 

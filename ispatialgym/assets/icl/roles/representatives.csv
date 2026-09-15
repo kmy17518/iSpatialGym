@@ -181,39 +181,39 @@ mental_rotation,mental_rotation,mental_rotation#11,target,heldout,carving_knife,
 mental_rotation,mental_rotation,mental_rotation#12,target,representative,crab,ohjsdr,,,,sampleable,crab__ohjsdr,,,,untested,
 mental_rotation,mental_rotation,mental_rotation#12,target,variation_geometry,crab,tjkiva,,,,sampleable,crab__tjkiva,,,,untested,
 mental_rotation,mental_rotation,mental_rotation#12,target,heldout,crab,kmeddb,,,,sampleable,crab__kmeddb,,,,untested,global held-out of the category
-mental_rotation,mental_rotation,mental_rotation#13,target,representative,pickle,ifterk,,,,sampleable,pickle__ifterk__f,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#13,target,variation_geometry,pickle,iobrqp,,,,sampleable,pickle__iobrqp__f,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#13,target,heldout,pickle,rxuimv,,,,sampleable,pickle__rxuimv__f,,,,untested,global held-out of the category
-mental_rotation,mental_rotation,mental_rotation#14,target,representative,soup_ladle,cfzneb,,,,sampleable,soup_ladle__cfzneb,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#14,target,variation_geometry,soup_ladle,hgvzdm,,,,sampleable,soup_ladle__hgvzdm,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#14,target,heldout,soup_ladle,gxsrhh,,,,sampleable,soup_ladle__gxsrhh,,,,untested,global held-out of the category
-mental_rotation,mental_rotation,mental_rotation#15,target,representative,garlic_clove,xotobt,,,,sampleable,garlic_clove__xotobt__sf,"[3.724, 3.724, 3.724]",garlic_clove__c1,garlic_clove__c1/exact:qaqrqd+xotobt+zpybkr,untested,
-mental_rotation,mental_rotation,mental_rotation#15,target,variation_geometry,garlic_clove,zpzrac,,,,sampleable,garlic_clove__zpzrac__sf,"[3.79, 3.79, 3.79]",,,untested,
-mental_rotation,mental_rotation,mental_rotation#15,target,heldout,garlic_clove,saombi,,,,sampleable,garlic_clove__saombi__sf,"[1.268, 1.0, 3.446]",,,untested,global held-out of the category
-mental_rotation,mental_rotation,mental_rotation#16,target,representative,hook,hewhtl,,,,sampleable,hook__hewhtl,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#16,target,variation_geometry,hook,yfikis,,,,sampleable,hook__yfikis,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#16,target,heldout,hook,akwlam,,,,sampleable,hook__akwlam,,,,untested,global held-out of the category
-mental_rotation,mental_rotation,mental_rotation#17,target,representative,statue,tuldri,,,,sampleable,statue__tuldri,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#17,target,variation_geometry,statue,wrtqik,,,,sampleable,statue__wrtqik,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#17,target,heldout,statue,ihagjy,,,,sampleable,statue__ihagjy,,,,untested,global held-out of the category
-mental_rotation,mental_rotation,mental_rotation#18,target,representative,tablefork,hktwlm,,,,sampleable,tablefork__hktwlm,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#18,target,variation_geometry,tablefork,flexrc,,,,sampleable,tablefork__flexrc,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#18,target,heldout,tablefork,yuihyg,,,,sampleable,tablefork__yuihyg,,,,untested,global held-out of the category
+mental_rotation,mental_rotation,mental_rotation#13,target,representative,soup_ladle,cfzneb,,,,sampleable,soup_ladle__cfzneb,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#13,target,variation_geometry,soup_ladle,hgvzdm,,,,sampleable,soup_ladle__hgvzdm,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#13,target,heldout,soup_ladle,gxsrhh,,,,sampleable,soup_ladle__gxsrhh,,,,untested,global held-out of the category
+mental_rotation,mental_rotation,mental_rotation#14,target,representative,garlic_clove,xotobt,,,,sampleable,garlic_clove__xotobt__sf,"[3.724, 3.724, 3.724]",garlic_clove__c1,garlic_clove__c1/exact:qaqrqd+xotobt+zpybkr,untested,
+mental_rotation,mental_rotation,mental_rotation#14,target,variation_geometry,garlic_clove,zpzrac,,,,sampleable,garlic_clove__zpzrac__sf,"[3.79, 3.79, 3.79]",,,untested,
+mental_rotation,mental_rotation,mental_rotation#14,target,heldout,garlic_clove,saombi,,,,sampleable,garlic_clove__saombi__sf,"[1.268, 1.0, 3.446]",,,untested,global held-out of the category
+mental_rotation,mental_rotation,mental_rotation#15,target,representative,hook,hewhtl,,,,sampleable,hook__hewhtl,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#15,target,variation_geometry,hook,yfikis,,,,sampleable,hook__yfikis,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#15,target,heldout,hook,akwlam,,,,sampleable,hook__akwlam,,,,untested,global held-out of the category
+mental_rotation,mental_rotation,mental_rotation#16,target,representative,statue,tuldri,,,,sampleable,statue__tuldri,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#16,target,variation_geometry,statue,wrtqik,,,,sampleable,statue__wrtqik,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#16,target,heldout,statue,ihagjy,,,,sampleable,statue__ihagjy,,,,untested,global held-out of the category
+mental_rotation,mental_rotation,mental_rotation#17,target,representative,tablefork,hktwlm,,,,sampleable,tablefork__hktwlm,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#17,target,variation_geometry,tablefork,flexrc,,,,sampleable,tablefork__flexrc,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#17,target,heldout,tablefork,yuihyg,,,,sampleable,tablefork__yuihyg,,,,untested,global held-out of the category
+mental_rotation,mental_rotation,mental_rotation#18,target,representative,teacup,oxfzfe,,,,sampleable,teacup__oxfzfe,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#18,target,variation_geometry,teacup,vckahe,,,,sampleable,teacup__vckahe,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#18,target,heldout,teacup,cpozxi,,,,sampleable,teacup__cpozxi,,,,untested,global held-out of the category
 mental_rotation,mental_rotation,mental_rotation#19,target,representative,toothbrush,vkrjps,,,,sampleable,toothbrush__vkrjps__f,,,,untested,
 mental_rotation,mental_rotation,mental_rotation#19,target,variation_geometry,toothbrush,qbkrzg,,,,sampleable,toothbrush__qbkrzg__f,,,,untested,
 mental_rotation,mental_rotation,mental_rotation#19,target,heldout,toothbrush,ifxlss,,,,sampleable,toothbrush__ifxlss__f,,,,untested,global held-out of the category
 mental_rotation,mental_rotation,mental_rotation#20,target,representative,briefcase,uquevd,,,,sampleable,briefcase__uquevd__f,,,,untested,
 mental_rotation,mental_rotation,mental_rotation#20,target,variation_geometry,briefcase,lwbctq,,,,sampleable,briefcase__lwbctq__f,,,,untested,
 mental_rotation,mental_rotation,mental_rotation#20,target,heldout,briefcase,psvdau,,,,sampleable,briefcase__psvdau__f,,,,untested,global held-out of the category
-mental_rotation,mental_rotation,mental_rotation#21,target,representative,tablespoon,tqqwys,,,,sampleable,tablespoon__tqqwys__f,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#21,target,variation_geometry,tablespoon,pltxjb,,,,sampleable,tablespoon__pltxjb__f,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#21,target,heldout,tablespoon,ubuhoz,,,,sampleable,tablespoon__ubuhoz__f,,,,untested,global held-out of the category
-mental_rotation,mental_rotation,mental_rotation#22,target,representative,teacup,oxfzfe,,,,sampleable,teacup__oxfzfe,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#22,target,variation_geometry,teacup,vckahe,,,,sampleable,teacup__vckahe,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#22,target,heldout,teacup,wopjex,,,,sampleable,teacup__wopjex,,,,untested,global held-out of the category
-mental_rotation,mental_rotation,mental_rotation#23,target,representative,tongs,rcpjld,,,,sampleable,tongs__rcpjld,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#23,target,variation_geometry,tongs,igsklx,,,,sampleable,tongs__igsklx,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#23,target,heldout,tongs,gbjqyn,,,,sampleable,tongs__gbjqyn,,,,untested,global held-out of the category
+mental_rotation,mental_rotation,mental_rotation#21,target,representative,cookie_cutter,jpscvj,,,,sampleable,cookie_cutter__jpscvj__f,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#21,target,variation_geometry,cookie_cutter,fvxiun,,,,sampleable,cookie_cutter__fvxiun__f,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#21,target,heldout,cookie_cutter,lqrfzo,,,,sampleable,cookie_cutter__lqrfzo__f,,,,untested,global held-out of the category
+mental_rotation,mental_rotation,mental_rotation#22,target,representative,pickle,vuspsy,,,,sampleable,pickle__vuspsy__f,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#22,target,variation_geometry,pickle,rxuimv,,,,sampleable,pickle__rxuimv__f,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#22,target,heldout,pickle,gytwes,,,,sampleable,pickle__gytwes__f,,,,untested,global held-out of the category
+mental_rotation,mental_rotation,mental_rotation#23,target,representative,tablespoon,tqqwys,,,,sampleable,tablespoon__tqqwys__f,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#23,target,variation_geometry,tablespoon,pltxjb,,,,sampleable,tablespoon__pltxjb__f,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#23,target,heldout,tablespoon,ubuhoz,,,,sampleable,tablespoon__ubuhoz__f,,,,untested,global held-out of the category
 mental_rotation,mental_rotation,mental_rotation#24,target,representative,bell_pepper,ihctxa,,,,sampleable,bell_pepper__ihctxa,,bell_pepper__c1,,untested,
 mental_rotation,mental_rotation,mental_rotation#24,target,variation_texture,bell_pepper,ggurxn,,,,sampleable,bell_pepper__ggurxn,,bell_pepper__c1,,untested,
 mental_rotation,mental_rotation,mental_rotation#24,target,variation_geometry,bell_pepper,wszvwc,,,,sampleable,bell_pepper__wszvwc,,,,untested,
@@ -226,12 +226,12 @@ mental_rotation,mental_rotation,mental_rotation#26,target,variation_texture,cell
 mental_rotation,mental_rotation,mental_rotation#26,target,heldout,cellulose_tape_dispenser,yyekns,,,,sampleable,cellulose_tape_dispenser__yyekns,,cellulose_tape_dispenser__c1,,untested,global held-out of the category
 mental_rotation,mental_rotation,mental_rotation#27,target,representative,banana,znakxm,,,,sampleable,banana__znakxm,,,,untested,
 mental_rotation,mental_rotation,mental_rotation#27,target,variation_geometry,banana,vvyyyv,,,,sampleable,banana__vvyyyv,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#28,target,representative,cookie_cutter,jpscvj,,,,sampleable,cookie_cutter__jpscvj__f,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#28,target,variation_geometry,cookie_cutter,fvxiun,,,,sampleable,cookie_cutter__fvxiun__f,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#29,target,representative,ginger_root,wqcasl,,,,sampleable,ginger_root__wqcasl__f,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#29,target,variation_geometry,ginger_root,izvukv,,,,sampleable,ginger_root__izvukv__f,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#30,target,representative,hammer,fcrlbo,,,,sampleable,hammer__fcrlbo,,,,untested,
-mental_rotation,mental_rotation,mental_rotation#30,target,variation_geometry,hammer,bbzlel,,,,sampleable,hammer__bbzlel,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#28,target,representative,ginger_root,wqcasl,,,,sampleable,ginger_root__wqcasl__f,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#28,target,variation_geometry,ginger_root,izvukv,,,,sampleable,ginger_root__izvukv__f,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#29,target,representative,hammer,fcrlbo,,,,sampleable,hammer__fcrlbo,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#29,target,variation_geometry,hammer,bbzlel,,,,sampleable,hammer__bbzlel,,,,untested,
+mental_rotation,mental_rotation,mental_rotation#30,target,representative,baby_shoe,tnbjlw,,,,sampleable,baby_shoe__tnbjlw__f,,baby_shoe__c1,,untested,
+mental_rotation,mental_rotation,mental_rotation#30,target,variation_texture,baby_shoe,jzwnri,,,,sampleable,baby_shoe__jzwnri__f,,baby_shoe__c1,,untested,
 disembedding,disembedding,disembedding#01,target,representative,box_of_shampoo,bclpiq,,,,sampleable,box_of_shampoo__bclpiq,,box_of_shampoo__c1,,untested,
 disembedding,disembedding,disembedding#01,target,variation_texture,box_of_shampoo,jccyom,,,,sampleable,box_of_shampoo__jccyom,,box_of_shampoo__c1,,untested,
 disembedding,disembedding,disembedding#01,target,variation_geometry,box_of_shampoo,nijidu,,,,sampleable,box_of_shampoo__nijidu,,,,untested,
@@ -750,9 +750,9 @@ inter_object_relation_satisfaction,inter_object_relation_satisfaction-ontop_smal
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-ontop_small_scale,inter_object_relation_satisfaction-ontop_small_scale#03,support,representative,breakfast_table,,house_single_floor,breakfast_table_rhjoby_0,,scene,,,,,geometric_ok,top_z=0.81 area=3.38 best_edge=+u run045=2.95
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-ontop_small_scale,inter_object_relation_satisfaction-ontop_small_scale#03,support,variation_geometry,countertop,,house_single_floor,countertop_ikwqer_0,,scene,,,,,geometric_ok,top_z=0.93 area=2.65 best_edge=-u run045=4.45
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-ontop_small_scale,inter_object_relation_satisfaction-ontop_small_scale#03,support,heldout,desk,,office_cubicles_right,desk_pfsjbc_0,,scene,,,,,geometric_ok,top_z=0.77 area=3.54 best_edge=+u run045=4.25
-inter_object_relation_satisfaction,inter_object_relation_satisfaction-ontop_small_scale,inter_object_relation_satisfaction-ontop_small_scale#04,target,representative,pickle,vuspsy,,,,sampleable,pickle__vuspsy,,,,untested,
-inter_object_relation_satisfaction,inter_object_relation_satisfaction-ontop_small_scale,inter_object_relation_satisfaction-ontop_small_scale#04,target,variation_geometry,pickle,gytwes,,,,sampleable,pickle__gytwes,,,,untested,
-inter_object_relation_satisfaction,inter_object_relation_satisfaction-ontop_small_scale,inter_object_relation_satisfaction-ontop_small_scale#04,target,heldout,pickle,rxuimv,,,,sampleable,pickle__rxuimv,,,,untested,global held-out of the category
+inter_object_relation_satisfaction,inter_object_relation_satisfaction-ontop_small_scale,inter_object_relation_satisfaction-ontop_small_scale#04,target,representative,pickle,iobrqp,,,,sampleable,pickle__iobrqp,,,,untested,
+inter_object_relation_satisfaction,inter_object_relation_satisfaction-ontop_small_scale,inter_object_relation_satisfaction-ontop_small_scale#04,target,variation_geometry,pickle,ifterk,,,,sampleable,pickle__ifterk,,,,untested,
+inter_object_relation_satisfaction,inter_object_relation_satisfaction-ontop_small_scale,inter_object_relation_satisfaction-ontop_small_scale#04,target,heldout,pickle,gytwes,,,,sampleable,pickle__gytwes,,,,untested,global held-out of the category
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-ontop_small_scale,inter_object_relation_satisfaction-ontop_small_scale#04,partner,representative,cutting_board,tcdrzs,,,,sampleable,,,,,untested,
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-ontop_small_scale,inter_object_relation_satisfaction-ontop_small_scale#04,partner,variation_geometry,cutting_board,nsvnai,,,,sampleable,,,,,untested,
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-ontop_small_scale,inter_object_relation_satisfaction-ontop_small_scale#04,partner,heldout,cutting_board,aibvew,,,,sampleable,,,,,untested,global held-out of the category
@@ -776,9 +776,9 @@ inter_object_relation_satisfaction,inter_object_relation_satisfaction-under_smal
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-under_small_scale,inter_object_relation_satisfaction-under_small_scale#01,support,representative,breakfast_table,,house_single_floor,breakfast_table_rhjoby_0,,scene,,,,,geometric_ok,top_z=0.81 area=3.38 best_edge=+u run045=2.95
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-under_small_scale,inter_object_relation_satisfaction-under_small_scale#01,support,variation_geometry,countertop,,house_single_floor,countertop_ikwqer_0,,scene,,,,,geometric_ok,top_z=0.93 area=2.65 best_edge=-u run045=4.45
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-under_small_scale,inter_object_relation_satisfaction-under_small_scale#01,support,heldout,desk,,office_cubicles_right,desk_pfsjbc_0,,scene,,,,,geometric_ok,top_z=0.77 area=3.54 best_edge=+u run045=4.25
-inter_object_relation_satisfaction,inter_object_relation_satisfaction-under_small_scale,inter_object_relation_satisfaction-under_small_scale#02,target,representative,teacup,cpozxi,,,,sampleable,teacup__cpozxi__t,,,,untested,
+inter_object_relation_satisfaction,inter_object_relation_satisfaction-under_small_scale,inter_object_relation_satisfaction-under_small_scale#02,target,representative,teacup,wopjex,,,,sampleable,teacup__wopjex__t,,,,untested,
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-under_small_scale,inter_object_relation_satisfaction-under_small_scale#02,target,variation_geometry,teacup,tfzfam,,,,sampleable,teacup__tfzfam__t,,,,untested,
-inter_object_relation_satisfaction,inter_object_relation_satisfaction-under_small_scale,inter_object_relation_satisfaction-under_small_scale#02,target,heldout,teacup,wopjex,,,,sampleable,teacup__wopjex__t,,,,untested,global held-out of the category
+inter_object_relation_satisfaction,inter_object_relation_satisfaction-under_small_scale,inter_object_relation_satisfaction-under_small_scale#02,target,heldout,teacup,cpozxi,,,,sampleable,teacup__cpozxi__t,,,,untested,global held-out of the category
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-under_small_scale,inter_object_relation_satisfaction-under_small_scale#02,partner,representative,saucer,mgbeah,,,,sampleable,,,,,untested,
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-under_small_scale,inter_object_relation_satisfaction-under_small_scale#02,partner,variation_geometry,saucer,vghfkh,,,,sampleable,,,,,untested,
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-under_small_scale,inter_object_relation_satisfaction-under_small_scale#02,partner,heldout,saucer,oxivmf,,,,sampleable,,,,,untested,global held-out of the category
@@ -900,9 +900,9 @@ inter_object_relation_satisfaction,inter_object_relation_satisfaction-touching,i
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-touching,inter_object_relation_satisfaction-touching#01,support,representative,breakfast_table,,house_single_floor,breakfast_table_rhjoby_0,,scene,,,,,geometric_ok,top_z=0.81 area=3.38 best_edge=+u run045=2.95
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-touching,inter_object_relation_satisfaction-touching#01,support,variation_geometry,countertop,,house_single_floor,countertop_ikwqer_0,,scene,,,,,geometric_ok,top_z=0.93 area=2.65 best_edge=-u run045=4.45
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-touching,inter_object_relation_satisfaction-touching#01,support,heldout,desk,,office_cubicles_right,desk_pfsjbc_0,,scene,,,,,geometric_ok,top_z=0.77 area=3.54 best_edge=+u run045=4.25
-inter_object_relation_satisfaction,inter_object_relation_satisfaction-touching,inter_object_relation_satisfaction-touching#02,target,representative,teacup,cpozxi,,,,sampleable,teacup__cpozxi__t,,,,untested,
-inter_object_relation_satisfaction,inter_object_relation_satisfaction-touching,inter_object_relation_satisfaction-touching#02,target,variation_geometry,teacup,oxfzfe,,,,sampleable,teacup__oxfzfe__t,,,,untested,
-inter_object_relation_satisfaction,inter_object_relation_satisfaction-touching,inter_object_relation_satisfaction-touching#02,target,heldout,teacup,wopjex,,,,sampleable,teacup__wopjex__t,,,,untested,global held-out of the category
+inter_object_relation_satisfaction,inter_object_relation_satisfaction-touching,inter_object_relation_satisfaction-touching#02,target,representative,teacup,oxfzfe,,,,sampleable,teacup__oxfzfe__t,,,,untested,
+inter_object_relation_satisfaction,inter_object_relation_satisfaction-touching,inter_object_relation_satisfaction-touching#02,target,variation_geometry,teacup,wopjex,,,,sampleable,teacup__wopjex__t,,,,untested,
+inter_object_relation_satisfaction,inter_object_relation_satisfaction-touching,inter_object_relation_satisfaction-touching#02,target,heldout,teacup,cpozxi,,,,sampleable,teacup__cpozxi__t,,,,untested,global held-out of the category
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-touching,inter_object_relation_satisfaction-touching#02,partner,representative,teapot,foaehs,,,,sampleable,,,,,untested,
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-touching,inter_object_relation_satisfaction-touching#02,partner,variation_geometry,teapot,jlalfc,,,,sampleable,,,,,untested,
 inter_object_relation_satisfaction,inter_object_relation_satisfaction-touching,inter_object_relation_satisfaction-touching#02,support,representative,breakfast_table,,house_single_floor,breakfast_table_rhjoby_0,,scene,,,,,geometric_ok,top_z=0.81 area=3.38 best_edge=+u run045=2.95
