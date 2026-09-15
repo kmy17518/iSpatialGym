@@ -839,6 +839,14 @@ class HeldObjectV2(SamplerV2):
     def refine_targets_from_goal(self, draft: Draft):
         pass
 
+    def program_check(self, draft: Draft) -> Dict[str, Any]:
+        """§3.5 with the held object attached: the program's first action (``Reorient``) already carries the target
+        (``stances.init.carried``), no ``Grasp`` precedes it, so the object is attached to the planner for the whole
+        check (the realised in-hand pose is what the simulator holds at this point). TEMP until the core's program
+        check seeds its carried-object tracker from ``stances.init.carried``."""
+        with attached(self.kit, ARM, self.obj("target")):
+            return super().program_check(draft)
+
     # ------------------------------------------------------------------ writing / constraints
 
     def write_instance(self, draft: Draft, index: int, seed: int) -> str:
