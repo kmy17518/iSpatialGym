@@ -290,3 +290,115 @@ def test_tilt_scan_runs_from_zero_to_the_joint_limit():
     fk = TT.camera_fk()
     ts = TT.tilt_scan(fk, 0.5, n=7)
     assert ts[0] == 0.0 and ts[-1] == pytest.approx(fk.tilt_limit(0.5)) and all(a > b for a, b in zip(ts[:-1], ts[1:]))
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# sidecar blocks the tabletop tasks emit, read back by the F6 sidecar / programs (schema compatibility, no simulator)
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def _pose(x, y, z, quat=None):
+    return th.tensor([x, y, z]), (C.IDENTITY_QUAT.clone() if quat is None else quat)
+
+
+def _draft(alias, family):
+    from ispatialgym.sampling.v2.stances import EdgeFrame, SidecarDraft, Stance, Transition
+
+    sd = SidecarDraft(alias, family)
+    edge = EdgeFrame("e0", th.tensor([1.0, 0.0]), th.tensor([1.0, 0.0]), 1.6)
+    init = Stance("init", (0.55, 0.0, 0.0), 0.5, 0.0, 0.45, edge)
+    manip = Stance("manipulation", (0.65, 0.0, 0.0), 0.75, -0.3, 0.35, edge, focus=th.tensor([1.0, 0.0, 0.85]), arms=["right"])
+    sd.add_stance(init)
+    sd.add_stance(manip)
+    sd.add_transition(Transition("init", "manipulation", 0.55))
+    return sd, init, manip
+
+
+def _f6(sd):
+    from ispatialgym.oracle.sidecar import Sidecar
+
+    d = sd.to_dict()
+    d["tro_sha256"] = "0" * 64
+    return Sidecar.from_dict(d)
+
+
+def test_disembedding_sidecar_blocks_expand():
+    from ispatialgym.sampling.v2.stances import GraspRecord, PathRecord
+
+    sd, init, manip = _draft("disembedding-box_of_cereal-box_of_cereal_2-breakfast_table", "disembedding")
+    place_st = manip.shifted(lateral=0.4, name="placement")
+    place_st.focus = th.tensor([1.0, 0.4, 0.85])
+    sd.add_stance(place_st)
+    down = C.eef_quat(th.tensor([0.0, 0.0, -1.0]), th.tensor([0.0, 1.0, 0.0]))
+    g = GraspRecord("box_of_cereal.n.01_1", "right", "box_of_cereal__iucshm", "grasp_0", 0.3, pre_grasp=_pose(1.0, 0.0, 1.05, down), grasp=_pose(1.0, 0.0, 0.95, down),
+                    pre_place=_pose(1.0, 0.4, 1.05, down), place=_pose(1.0, 0.4, 0.95, down), carry_height=0.15, eef_in_object=_pose(0, 0, 0.1, down), place_on="tray.n.01_2")
+    sd.add_grasp(g)
+    sd.add_path(PathRecord("manipulation", "placement", "local", [(0.65, 0.0, 0.0), (0.65, 0.4, 0.0)], 0.4, carried="box_of_cereal.n.01_1"))
+    for n, name in (("box_of_cereal.n.01_1", "box of cereal"), ("tray.n.01_1", "source tray"), ("tray.n.01_2", "destination tray")):
+        sd.describe(n, name)
+    sc = _f6(sd)
+    assert sc.problems(check_program=True) == []
+    from ispatialgym.oracle.programs import expand
+
+    names = [a.name for a in expand(sc.alias, sc)]
+    assert names == ["transition", "grasp", "lift", "navigate", "place", "retreat"]
+
+
+def test_axial_and_attachment_contact_blocks_expand():
+    from ispatialgym.sampling.v2.stances import ContactRecord, GraspRecord
+
+    # axial: push (right, arc with mid) + stop-edge brace (left) on the same target
+    sd, init, manip = _draft("alignment-axial-keyboard-breakfast_table", "alignment")
+    manip.arms = ["right", "left"]
+    q = C.eef_quat(th.tensor([0.0, 0.0, -1.0]), th.tensor([1.0, 0.0, 0.0]))
+    d = th.tensor([0.0, 1.0, 0.0])
+    sd.add_contact(ContactRecord("push", "right", _pose(1.2, -0.2, 1.0, q), _pose(1.2, -0.2, 0.9, q), _pose(1.21, -0.1, 0.9, q), _pose(1.2, 0.0, 0.9, q), d, 0.2, object="keyboard.n.01_1"))
+    sd.add_contact(ContactRecord("brace", "left", _pose(0.8, 0.4, 1.0, q), _pose(0.8, 0.4, 0.9, q), direction=-d, brace_kind="stop_edge", object="keyboard.n.01_1"))
+    sd.describe("keyboard.n.01_1", "keyboard")
+    sc = _f6(sd)
+    assert sc.problems(check_program=True) == []
+    # attachment: grasp with SLERP waypoints + pre-attach / attach + partner brace
+    sd, init, manip = _draft("configuration_matching-attachment-cap-lemonade_bottle-breakfast_table", "configuration_matching")
+    manip.arms = ["right", "left"]
+    g = GraspRecord("cap.n.01_1", "right", "cap__xxqyrt", "grasp_1", 0.0, pre_grasp=_pose(1.0, 0.0, 1.05, q), grasp=_pose(1.0, 0.0, 0.95, q), pre_place=_pose(1.0, 0.3, 1.15, q),
+                    place=_pose(1.0, 0.3, 1.05, q), carry_height=0.12, eef_in_object=_pose(0, 0, 0.05, q), place_on="lemonade_bottle.n.01_1",
+                    waypoints=[_pose(1.0, 0.1, 1.1, q), _pose(1.0, 0.2, 1.12, q), _pose(1.0, 0.3, 1.15, q)])
+    sd.add_grasp(g)
+    sd.add_contact(ContactRecord("brace", "left", _pose(1.0, 0.5, 0.95, q), _pose(1.0, 0.4, 0.95, q), direction=th.tensor([0.0, -1.0, 0.0]), brace_kind="partner_face",
+                                 object="lemonade_bottle.n.01_1"))
+    sd.describe("cap.n.01_1", "cap")
+    sd.describe("lemonade_bottle.n.01_1", "lemonade bottle")
+    assert _f6(sd).problems(check_program=True) == []
+
+
+def test_block_and_articulation_blocks_expand():
+    from ispatialgym.sampling.v2.stances import ContactRecord, pose_to_sidecar
+
+    sd, init, manip = _draft("configuration_matching-block_design-block_4-breakfast_table", "configuration_matching")
+    q = C.eef_quat(th.tensor([0.0, 0.0, -1.0]), th.tensor([1.0, 0.0, 0.0]))
+    blocks = []
+    for i in range(4):
+        rec = {"instance": f"toy_dice.n.01_{i + 1}", "order": i, "face_pair": "y", "tilt_pick_deg": -45.0 if i else 0.0, "tilt_place_deg": 45.0 if i else 0.0, "yaw_deg": 10.0,
+               "yaw_align_deg": 12.0, "flip_axis": [0.0, 1.0, 0.0] if i else None, "flip_sign": 1 if i else 0, "pick": pose_to_sidecar(_pose(1.0, 0.1 * i, 0.9, q)),
+               "place": pose_to_sidecar(_pose(1.0, 0.0, 0.9, q)), "carry_height": 0.08, "pre_pick": pose_to_sidecar(_pose(1.0, 0.1 * i, 1.0, q))}
+        if i % 2 == 1:
+            rec["push_row"] = ContactRecord("push", "right", _pose(1.0, 0.1, 0.95, q), _pose(1.0, 0.05, 0.9, q), None, _pose(1.0, 0.045, 0.9, q), th.tensor([0.0, -1.0, 0.0]), 0.005,
+                                            object=rec["instance"]).to_sidecar()
+            rec["brace_row"] = ContactRecord("brace", "left", _pose(1.0, -0.1, 0.95, q), _pose(1.0, -0.05, 0.9, q), direction=th.tensor([0.0, 1.0, 0.0]), brace_kind="row_left",
+                                             object="toy_dice.n.01_1").to_sidecar()
+        blocks.append(rec)
+        sd.describe(rec["instance"], "block")
+    sd.blocks = blocks
+    sc = _f6(sd)
+    assert sc.problems(check_program=True) == []
+    # small-scale articulation: brace + handle grasp + arm-mode follow
+    sd, init, manip = _draft("configuration_matching-articulation_open_small_scale-toolbox-breakfast_table", "configuration_matching")
+    manip.arms = ["right"]
+    wp = {"contact": [1.0, 0.0, 1.0], "approach": [0.0, 0.0, -1.0], "pinch": [1.0, 0.0, 0.0]}
+    sd.articulation = {"object": "toolbox.n.01_1", "joint": "j_lid", "joint_type": "revolute", "q_init": 0.0, "q_goal": 1.5,
+                       "waypoints": {"0.0": wp, "0.25": wp, "0.5": wp, "0.75": wp, "1": wp}, "handle_reach": {"0.25": True, "0.5": True, "0.75": False, "1": False},
+                       "passive_from": 0.5, "follow_mode": "arm"}
+    sd.add_contact(ContactRecord("brace", "left", _pose(1.0, 0.3, 1.0, q), _pose(1.0, 0.2, 0.9, q), direction=th.tensor([0.0, -1.0, 0.0]), brace_kind="opposite_face",
+                                 object="toolbox.n.01_1"))
+    sd.describe("toolbox.n.01_1", "toolbox")
+    assert _f6(sd).problems(check_program=True) == []

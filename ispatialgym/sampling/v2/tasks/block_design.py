@@ -289,12 +289,12 @@ class BlockDesign(SamplerV2):
         for bi in range(n):
             q_up = _rotation_with_up(up_of[bi])
             if up_of[bi] == goal_face[bi]:
-                yaw_c = float(rng.integers(4)) * math.pi / 2
+                yaw_c = table_yaw + float(rng.integers(4)) * math.pi / 2  # the goal face is up: any table-aligned coarse yaw
             else:
-                yaw_c = TT.facing_coarse_yaw(q_up, goal_face[bi], -manip.inward)
+                yaw_c = TT.facing_coarse_yaw(q_up, goal_face[bi], -manip.inward)  # visible-face rule: goal face toward the robot
             coarse_yaw[bi] = yaw_c
             jitter = float(rng.uniform(-math.radians(float(self.g("yaw_align_max_deg")) * 0.5), math.radians(float(self.g("yaw_align_max_deg")) * 0.5)))
-            q = C.qmul(C.quat_from_yaw(yaw_c + jitter + table_yaw), q_up)
+            q = C.qmul(C.quat_from_yaw(yaw_c + jitter), q_up)
             pos = th.tensor([float(chosen[bi][0]), float(chosen[bi][1]), self.top.z + self.world.bottom_offset(self.hull, q) + 0.002])
             poses[bi] = (pos, q)
         # footprints on the top, gaps, in frame (5 %)
@@ -464,7 +464,7 @@ class BlockDesign(SamplerV2):
             if not res.ok:
                 continue
             # place (and pre-place) with the block in hand; the world: placed blocks at their slots, this block removed (attached)
-            place_margin_pose = (place_eef[0] + right * PLACE_MARGIN + toward * PLACE_MARGIN, place_eef[1])
+            place_margin_pose = (place_eef[0] + _xy3(right) * PLACE_MARGIN + _xy3(toward) * PLACE_MARGIN, place_eef[1])
             pre_place = IK.pre_pose(place_margin_pose)
             with TT.posed_in_hand(self, "right", block, g_pick.eef_in_block):
                 with attached(self.kit, "right", block):
@@ -503,7 +503,7 @@ class BlockDesign(SamplerV2):
         n_cols = int((self.g("grid") or [2, 2])[1])
         r, c = divmod(step, n_cols)
         world_after = dict(world_poses)
-        world_after[names[bi]] = (goal_pose[bi][0] + right * PLACE_MARGIN + toward * PLACE_MARGIN, goal_pose[bi][1])
+        world_after[names[bi]] = (goal_pose[bi][0] + _xy3(right) * PLACE_MARGIN + _xy3(toward) * PLACE_MARGIN, goal_pose[bi][1])
         self._teleport(world_after)
         if c > 0:  # push left against the row, brace the row-left block's left face
             left_bi = order[step - 1]
@@ -592,6 +592,11 @@ def _rotation_with_up(face: str) -> th.Tensor:
                     if best is None or ang < best[0]:
                         best = (ang, q)
     return best[1]
+
+
+def _xy3(v) -> th.Tensor:
+    """(x, y) -> (x, y, 0) world vector."""
+    return th.tensor([float(v[0]), float(v[1]), 0.0])
 
 
 def _tilt_about_y(q0: th.Tensor, q: th.Tensor) -> float:

@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -117,7 +118,12 @@ class AlignmentAxial(SamplerV2):
         front = front or per_model(self.gen("front_axis"), None)
         long = long or per_model(self.gen("long_axis"), None)
         if front is None or long is None:
-            raise Reject("missing_frame", f"{key}: no frame record (front / long axes) in the customs entry")
+            # the reviewed frame record of the icl (``roles/candidates.csv`` frame_front / frame_long) when the customs entry
+            # does not carry it yet (§2.2 "alignment targets need a reviewed frame record")
+            f2, l2 = _icl_frame(mc.category, mc.model)
+            front, long = front or f2, long or l2
+        if front is None or long is None:
+            raise Reject("missing_frame", f"{key}: no frame record (front / long axes) in the customs entry or the icl")
         return _axis(front), _axis(long)
 
     # ------------------------------------------------------------------ template
@@ -422,6 +428,22 @@ class AlignmentAxial(SamplerV2):
         return [{"scope": {"target": f"{mc.category}/{mc.model}", "support_height": round(float(self.top.z - self.world.floor_z), 2)}, "type": "contacts",
                  "trunk": [manip.translate, round(manip.tilt, 2)], "push": {"end": "long_axis", "distance_m": round(float(push.distance_m), 3)},
                  "brace": "stop_edge", "hard": False}]
+
+
+def _icl_frame(category: str, model: str):
+    """``(frame_front, frame_long)`` of an axial target from ``icl/roles/candidates.csv`` (None, None when absent)."""
+    import csv
+
+    from ispatialgym.sampling.v2.problem import DEFAULT_ICL_ROOT
+
+    path = os.path.join(DEFAULT_ICL_ROOT, "roles", "candidates.csv")
+    if not os.path.exists(path):
+        return None, None
+    with open(path, newline="") as f:
+        for row in csv.DictReader(f):
+            if row.get("subtask") == SUBTASK and row.get("role") == "target" and row.get("category") == category and row.get("model") == model:
+                return (row.get("frame_front") or None), (row.get("frame_long") or None)
+    return None, None
 
 
 def _com_local(obj) -> th.Tensor:
