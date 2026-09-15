@@ -127,3 +127,9 @@ Supplementary batches (`rev_11` and up) were issued after the survey's texture t
 renders, a local-feature test that catches small and low-contrast prints): they contain only the (model, tag)
 candidates no earlier batch asked about; the sheets of the earlier batches kept their row order, only the labels and
 the top-row renders were refreshed.
+
+Brightness: the sheets issued to `rev_00`–`rev_10` (and the first `rev_11`–`rev_14` renders) showed every textured
+model at 40 % of its albedo brightness (a renderer material default; a white cup looked mid-grey, dark trays black).
+The sheets were re-rendered at true brightness on 2026-09-15 with the same row layout. Verdicts already given stand;
+if a model you judged looked "featureless black", its dark parts are now visible — the coordinator may re-ask.
+`review/overrides.json` holds coordinator decisions that win over reviewer verdicts (schema as above plus `"by"`).

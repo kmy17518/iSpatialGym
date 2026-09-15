@@ -346,6 +346,12 @@ class Renderer:
 #: smooth shading and stochastic texture exactly like a print. Low-contrast prints are caught by the structural blob
 #: test below instead.
 NORM_MIN_RANGE = None
+#: Units. All texture thresholds below are fractions of 255 in *albedo* units. The v1 pass and the first v2 tuning
+#: rendered every textured mesh at 40 % brightness (trimesh's SimpleMaterial default diffuse (102, 102, 102) multiplies
+#: the texture in pyrender; fixed in meshload.py on 2026-09-15): the numbers tuned then (MAD 3 / 12, p95 20 / 25,
+#: p99 60, D 25, std 6, strong 60, mean-D 30) are kept as behaviour and expressed in albedo units by x 2.5
+#: (ALBEDO_FIX). The v1 constants (classify_tex_v1) stay in the old units - they only re-read v1 records.
+ALBEDO_FIX = 2.5
 #: perceptual blur before differencing (Gaussian sigma in millimetres at the render scale): a person at 0.5-1.5 m does
 #: not resolve pixel-scale speckle, wood grain or mottle, only features of a few millimetres (1.5 mm smeared the 1 cm
 #: letters of a low-contrast wrapping print below the blob threshold; 1.0 mm keeps them)
@@ -357,8 +363,8 @@ BLUR_PX_RANGE = (0.6, 4.0)
 #: a smooth baked-shading gradient has D of the same size but no local structure). Connected hot blobs are measured
 #: in pixels; BLOB_MM is the feature size a blob must reach to break the symmetry (a person at 1 m sees a 6 x 6 mm
 #: print), a blob of a quarter of that area (3 x 3 mm) already costs "preserved".
-BLOB_T = 25.0 / 255.0
-BLOB_STD_T = 6.0 / 255.0
+BLOB_T = 25.0 * ALBEDO_FIX / 255.0
+BLOB_STD_T = 6.0 * ALBEDO_FIX / 255.0
 BLOB_STD_MM = 5.0
 BLOB_MM = 6.0
 BLOB_MIN_PX = 9
@@ -368,7 +374,7 @@ BLOB_MIN_PX = 9
 #: (D > BLOB_T_STRONG: a black line drawing on a light face, a digit) are exempt from it up to a 1 mm opening, because
 #: a thin high-contrast stroke is what a person reads first (the fish outline and the "6" of a letter block).
 BLOB_OPEN_MM = 2.5
-BLOB_T_STRONG = 60.0 / 255.0
+BLOB_T_STRONG = 60.0 * ALBEDO_FIX / 255.0
 BLOB_OPEN_STRONG_MM = 1.0
 #: silhouette test: the XOR of the two coverage masks (a part of the object that is present in one render and absent
 #: in the other - a pencil tip swapped with the flat end, a pump nozzle, a wick, a swing-top bail) opened with a disc
@@ -559,12 +565,13 @@ def image_diff(a: Sequence[Tuple[np.ndarray, ...]], b: Sequence[Tuple[np.ndarray
 #: >= 4 x (6 x 6 mm) (``n6`` pixels at the render scale), or of >= 6 x 6 mm with a mean difference of >= 30/255,
 #: breaks the symmetry outright (a logo, a glyph, a wrapping print, a label edge); a smaller / fainter patch of
 #: >= 3 x 3 mm costs "preserved" (borderline -> review: facet shading of a low-poly body, a pale print, a seam).
-TEX_PRESERVED = {"mad": 3.0 / 255.0, "p95": 20.0 / 255.0, "p99": 60.0 / 255.0, "blob_n6_frac": 0.25, "sil_weak_n6_frac": 1.0}
-TEX_BORDERLINE = {"mad": 12.0 / 255.0, "p95": 25.0 / 255.0, "p99": 60.0 / 255.0, "blob_n6_frac": 4.0,
-                  "blob_n6_frac_strong": 1.0, "blob_d_strong": 30.0 / 255.0, "sil_n6_frac": 1.0}
+TEX_PRESERVED = {"mad": 3.0 * ALBEDO_FIX / 255.0, "p95": 20.0 * ALBEDO_FIX / 255.0, "p99": 60.0 * ALBEDO_FIX / 255.0,
+                 "blob_n6_frac": 0.25, "sil_weak_n6_frac": 1.0}
+TEX_BORDERLINE = {"mad": 12.0 * ALBEDO_FIX / 255.0, "p95": 25.0 * ALBEDO_FIX / 255.0, "p99": 60.0 * ALBEDO_FIX / 255.0, "blob_n6_frac": 4.0,
+                  "blob_n6_frac_strong": 1.0, "blob_d_strong": 30.0 * ALBEDO_FIX / 255.0, "sil_n6_frac": 1.0}
 TEX_BORDERLINE_MAD = TEX_BORDERLINE["mad"]
-#: the v1 thresholds (192 px, no blur, no blob test) - kept to reproduce the contact-sheet row order the first review
-#: batches (rev_00..10) were issued with
+#: the v1 thresholds (192 px, no blur, no blob test, 40 %-brightness renders) - kept to reproduce the contact-sheet row
+#: order the first review batches (rev_00..10) were issued with
 TEX_PRESERVED_V1 = {"mad": 3.0 / 255.0, "p95": 20.0 / 255.0, "p99": 60.0 / 255.0}
 TEX_BORDERLINE_V1 = {"mad": 12.0 / 255.0, "p95": 25.0 / 255.0, "p99": 60.0 / 255.0}
 

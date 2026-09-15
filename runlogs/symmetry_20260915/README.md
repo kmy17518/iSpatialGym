@@ -66,25 +66,33 @@ perpendicular half turns (a plain cylinder → `zinf x2`), `a6` absorbs `a3` / `
 different axes are kept (a box → `x2 y2 z2`); two coprime folds about one axis (`z5 z6`) mean the mesh is a 30-gon of
 revolution whose `zinf` test failed on a detail (a ribbed cap, a seam) — the group they generate is the equivalence.
 
-**Texture** (`tex/<key>.json`, GPU, 3 processes; v2 re-run 2026-09-15 06:xx, 33 min for the 1207 models with a
+**Texture** (`tex/<key>.json`, GPU, 3 processes; final pass 2026-09-15 10:30, 40 min for the 1207 models with a
 rotation within the near mean threshold; the v1 pass took 4.3 min at 192 px). pyrender `RenderFlags.FLAT` (colour =
 albedo texture, no lighting, so shading cannot break a symmetry), white background, six fixed cameras (from ±x, ±y at
 25° elevation and 20° azimuth offset; from ±z tilted 25°, so no face is edge-on), distance 1.55 × diagonal, **384 px**
-rendered at 768 px and box-downsampled (bodies ≥ 4.5× longer than wide — pencils, rods — at 768 px). The model and
-the model rotated by every rotation of the candidate tag are rendered with the same cameras and compared on the
-pixels **fully covered by the object in both renders** (partially covered silhouette pixels mix the background in
-and move with the sub-pixel position of the edge; for an exact geometric symmetry the two silhouettes coincide anyway
-— the raw union-mask `mad_union` and the mask IoU are recorded too). Both renders are blurred with a Gaussian of
-σ = 1.0 mm at the render scale (a person at 0.5–1.5 m does not resolve pixel-scale speckle, grain or mottle), then:
+rendered at 768 px and box-downsampled (bodies ≥ 4.5× longer than wide — pencils, rods — at 768 px). *Brightness bug,
+found and fixed on 2026-09-15 (reviewer reports of "featureless black" trays and clipboards):* trimesh's
+`SimpleMaterial` default diffuse colour (102, 102, 102) multiplied every texture in pyrender, so all textured renders
+of the v1 pass and of the first v2 pass were at 40 % of their albedo brightness (a white cup rendered mid-grey, a dark
+tray black); `meshload.py` now neutralises the factor, the renders are in true albedo units and the thresholds tuned on
+the dark renders were rescaled by × 2.5 (`symcore.ALBEDO_FIX`) so the validated behaviour is kept — the brightness fix
+alone flipped 81 (model, tag) texture classes (63 preserved → broken, finer quantisation of bright textures) and 37
+models' verdicts (`superseded/v2a/` holds the dark-render outputs). The model and the model rotated by every rotation
+of the candidate tag are rendered with the same cameras and compared on the pixels **fully covered by the object in
+both renders** (partially covered silhouette pixels mix the background in and move with the sub-pixel position of the
+edge; for an exact geometric symmetry the two silhouettes coincide anyway — the raw union-mask `mad_union` and the mask
+IoU are recorded too). Both renders are blurred with a Gaussian of σ = 1.0 mm at the render scale (a person at
+0.5–1.5 m does not resolve pixel-scale speckle, grain or mottle), then:
 
 - `mad` / `p95` / `p99` of the per-pixel channel-mean |diff| (the v1 statistics, on the blurred renders);
-- the **local-feature test** (v2): D = 3 × 3 median of the channel-max |diff|; a pixel is *hot* when D > 25/255 (a
-  high-contrast feature) **or** when the local standard deviation of D over a 5 mm window exceeds 6/255 (a
-  low-contrast but *structured* feature — dark-on-dark text, a pale print; a smooth baked-shading gradient has D of
-  the same size but no local structure); the hot mask is opened with a 2.5 mm disc (facet edges of low-poly bodies,
-  rim corners and grain streaks are thinner than that, print strokes and logos are not; high-contrast pixels with
-  D > 60/255 — a black stroke on a light face — are exempt down to a 1 mm opening) and its largest connected blob is
-  measured: `blob_px`, its share of the view (`blob_frac`), the camera (`blob_view`), its mean D (`blob_d`),
+- the **local-feature test** (v2): D = 3 × 3 median of the channel-max |diff|; a pixel is *hot* when D > 62/255 (a
+  high-contrast feature; 25/255 in the dark-render units the rule was tuned in) **or** when the local standard
+  deviation of D over a 5 mm window exceeds 15/255 (6/255 dark units: a low-contrast but *structured* feature —
+  dark-on-dark text, a pale print; a smooth baked-shading gradient has D of the same size but no local structure);
+  the hot mask is opened with a 2.5 mm disc (facet edges of low-poly bodies, rim corners and grain streaks are thinner
+  than that, print strokes and logos are not; high-contrast pixels with D > 150/255 — a black stroke on a light face —
+  are exempt down to a 1 mm opening) and its largest connected blob is measured: `blob_px`, its share of the view
+  (`blob_frac`), the camera (`blob_view`), its mean D (`blob_d`),
   which test lit it (`blob_kind`), its side in mm (`blob_mm`) and `n6` = the pixel area of a 6 × 6 mm patch at the
   render scale (`m_per_px` = 2 · dist · tan(fov/2) / size);
 - the **silhouette test** (v2): the XOR of the two coverage masks — a part of the object present in one render and
@@ -114,9 +122,10 @@ hid the picture (`painting/fwuole` y2 came out preserved).
 |---|---|
 | geometry `exact` | mean ≤ 0.5 % and p95 ≤ 1.2 % and frac2 ≤ 1 % |
 | geometry `near` | mean ≤ 1.5 % and frac2 ≤ 3 % (and not exact) |
-| texture `preserved` | MAD < 3 and p95 < 20 and p99 < 60 and blob < n6 / 4 (no structured difference ≥ 3 × 3 mm) and no ≥ 3 mm-thick silhouette difference of ≥ 6 × 6 mm |
-| texture `borderline` | MAD ≤ 12 and p95 ≤ 25 and p99 ≤ 60 and blob < 4 · n6 and not (blob ≥ n6 with mean D ≥ 30) and no ≥ 4 mm-thick silhouette difference of ≥ 6 × 6 mm — and not preserved |
-| texture `broken` | otherwise: a difference blob ≥ 4 × (6 × 6 mm), or ≥ 6 × 6 mm with mean D ≥ 30/255, or a ≥ 4 mm-thick silhouette difference of ≥ 6 × 6 mm, or percentiles beyond the borderline band |
+| texture `preserved` | MAD < 7.5 and p95 < 50 and p99 < 150 (albedo /255; = 3 / 20 / 60 in the dark-render units the rule was tuned in) and blob < n6 / 4 (no structured difference ≥ 3 × 3 mm) and no ≥ 3 mm-thick silhouette difference of ≥ 6 × 6 mm |
+| texture `borderline` | MAD ≤ 30 and p95 ≤ 62 and p99 ≤ 150 (12 / 25 / 60 dark units) and blob < 4 · n6 and not (blob ≥ n6 with mean D ≥ 75, i.e. 30 dark units) and no ≥ 4 mm-thick silhouette difference of ≥ 6 × 6 mm — and not preserved |
+| texture `broken` | otherwise: a difference blob ≥ 4 × (6 × 6 mm), or ≥ 6 × 6 mm with mean D ≥ 75/255, or a ≥ 4 mm-thick silhouette difference of ≥ 6 × 6 mm, or percentiles beyond the borderline band |
+| `flat_render` | the six base views are (near-)uniform (modal colour ≥ 85 % of the object pixels or colour std ≤ 6/255) **and** a map the albedo render cannot show carries structure (reflection / emissive used-texel std > 0.03, or diffuse texels that vary while the render does not): every `symmetry` of such a model is held in `symmetry_near`, no review is issued for it, until a render with those maps exists. A uniform render of uniform maps is `plain_albedo` (a genuinely plain object; the render is faithful) |
 
 The spec's mean thresholds (0.5 % / 1.5 %) are kept; `frac2` was added because a mean over the whole surface dilutes a
 small asymmetric part — a mug handle is 6 % of the surface displaced by 20 % of the diagonal and scores a mean of
@@ -168,40 +177,44 @@ writes the scaled verdict into the rows whose `scale` matches.
   `report` again: no recomputation needed).
 - `dropped_mental_rotation.csv` — written by `scripts/icl/build_icl.py`: the `mental_rotation` / `target` rows removed
   from `roles/candidates.csv` because their `symmetry` is confirmed (spec §3.13 rule 1; candidates columns + `reason`).
-- `superseded/v1/` — the first pass (192 px, percentile statistics only): `symmetry.json`, `symmetry.csv`, `report.md`,
-  the per-model `tex/` records and the forced-row file; `report_diff.md` compares it with the current pass;
-  `assign/render_layout.json` is the v1 sheet layout the re-render preserved for the issued review batches.
+- `superseded/v1/` — the first pass (192 px, percentile statistics only, 40 %-brightness renders): `symmetry.json`,
+  `symmetry.csv`, `report.md`, the per-model `tex/` records and the forced-row file; `superseded/v2a/` — the first v2
+  pass (blob + silhouette tests, still at 40 % brightness); `report_diff.md` compares v1 with the current pass;
+  `assign/render_layout.json` is the v1 sheet layout the re-renders preserved for the issued review batches.
+- `flat_render.json` (`survey_symmetry.py flatcheck`) — per model the colour statistics of the six base renders
+  (std, modal colour and its share, luminance), the statistics of the texels the mesh actually uses in its diffuse /
+  reflection / metalness / emissive maps, the material shader ids and texture inputs, and the `flat` verdict.
 
-## Results (v2 pass, 2026-09-15 09:00; the v1 pass is under `superseded/v1/`)
+## Results (v2 pass, final 2026-09-15 10:30; the v1 pass is under `superseded/v1/`, the dark-render v2 pass under `superseded/v2a/`)
 
 1480 models surveyed, 0 loader failures (the 18 all-glass wineglasses / bottles that the world-alignment loader
-dropped are loaded here), 0 render failures. Survey alone: **261 models have a final `symmetry`, 1219 are `none`, 183
-have a `symmetry_near` entry** (v1: 377 / 1103 / 302); 965 models have at least one geometric candidate (sheet). With
-the reviewer verdicts of the first round applied (`review_verdicts.json`): 362 symmetric models, 79 still carry a
-`symmetry_near` entry (the supplementary batches, see below).
+dropped are loaded here), 0 render failures. Survey alone: **243 models have a final `symmetry`, 1237 are `none`, 190
+have a `symmetry_near` entry** (v1: 377 / 1103 / 302; 17 of the near models are `flat_render` demotions, see below);
+965 models have at least one geometric candidate (sheet). With the reviewer verdicts of the first round applied
+(`review_verdicts.json`, still the rev_00–10 aggregation): 362 symmetric models, 79 with a `symmetry_near` entry.
 
 | tag | `symmetry` (survey) | `symmetry_near` (review) | geometry exact (before texture) |
 |---|---|---|---|
-| `x2` | 23 | 28 | 278 |
-| `y2` | 23 | 26 | 267 |
-| `z2` | 86 | 34 | 364 |
-| `x4` | 15 | 8 | 31 |
-| `y4` | 2 | 2 | 17 |
-| `z4` | 33 | 18 | 82 |
+| `x2` | 17 | 33 | 278 |
+| `y2` | 15 | 18 | 267 |
+| `z2` | 72 | 56 | 364 |
+| `x4` | 9 | 9 | 31 |
+| `y4` | 2 | 3 | 17 |
+| `z4` | 29 | 19 | 82 |
 | `x3` | 1 | 3 | 1 |
 | `y3` | 0 | 0 | 2 |
 | `z3` | 1 | 4 | 5 |
-| `x5` | 14 | 10 | 22 |
+| `x5` | 19 | 10 | 22 |
 | `y5` | 1 | 1 | 1 |
-| `z5` | 13 | 15 | 55 |
-| `x6` | 15 | 11 | 24 |
-| `y6` | 1 | 3 | 1 |
-| `z6` | 19 | 20 | 64 |
-| `xinf` | 15 | 22 | 42 |
-| `yinf` | 0 | 3 | 2 |
-| `zinf` | 106 | 34 | 266 |
+| `z5` | 9 | 15 | 55 |
+| `x6` | 20 | 11 | 24 |
+| `y6` | 1 | 4 | 1 |
+| `z6` | 14 | 20 | 64 |
+| `xinf` | 8 | 16 | 42 |
+| `yinf` | 0 | 2 | 2 |
+| `zinf` | 96 | 44 | 266 |
 | `full` | 1 | 0 | 2 |
-| `none` | 1219 | – | 624 |
+| `none` | 1237 | – | 624 |
 
 (The `symmetry_near` column counts a tag once per model; 62 of the near tags on 24 models are *relaxations held for
 review*: the v2 criterion calls them preserved but the v1 pass did not — a re-tuned criterion may only tighten on its
@@ -219,26 +232,46 @@ perceptual blur, blob + silhouette tests, see *Method*) re-scored every (model, 
 
 | flip of the texture class | (model, tag) pairs |
 |---|---|
-| preserved → broken | 944 |
-| preserved → borderline | 232 |
-| borderline → broken | 861 |
-| borderline → preserved | 81 (held in `symmetry_near` as relaxations, see above) |
-| broken → borderline | 30 |
-| broken → preserved | 43 (held in `symmetry_near`) |
+| preserved → broken | 979 |
+| preserved → borderline | 230 |
+| borderline → broken | 868 |
+| borderline → preserved | 76 (held in `symmetry_near` as relaxations, see above) |
+| broken → borderline | 28 |
+| broken → preserved | 19 (held in `symmetry_near`) |
 
-338 models changed their final verdict; tags removed from `symmetry`: `z2` 43, `zinf` 29, `x2` 28, `z4` 19, `y2` 12,
-`z6` 12, `z5` 11, `x4` 7, `x6` 7, `xinf` 5, `x5` 4, `z3` 3, `y4` 2, `yinf` 1; none added. 88 models gained a
-`symmetry_near` tag (5 of them were `none` without a near entry before); the three reported false positives are
-`broken` now (blobs 43 ×, 13 × and 18 × a 6 × 6 mm patch).
+352 models changed their final verdict; tags removed from `symmetry`: `z2` 50, `zinf` 36, `x2` 31, `z4` 19, `x4` 15,
+`y2` 14, `z6` 12, `z5` 11, `x6` 7, `xinf` 5, `x5` 4, `z3` 3, `y4` 2, `yinf` 1; none added. 101 models gained a
+`symmetry_near` tag (4 of them were `none` without a near entry before); the three reported false positives are
+`broken` now (blobs 47 ×, 13 × and 18 × a 6 × 6 mm patch).
 
-**Agreement with the reviewer verdicts** (all 454 verdicts of `rev_00..10`, judged on the v2 texture class): 271 agree
-(224 broken, 47 preserved), 96 disagree — 77 where the survey is the stricter side (reviewer preserved / survey
+**Agreement with the reviewer verdicts** (all 454 verdicts of `rev_00..10`, judged on the final texture class): 287
+agree (240 broken, 47 preserved), 120 disagree — 100 where the survey is the stricter side (reviewer preserved / survey
 broken: mottled apple, wooden bat, tomato calyx, peppercorn block, wicker hampers, low-poly bottles whose facet corners
-the reviewers accepted, both-sides-alike prints the survey finds slightly misaligned) and 19 the other way (reviewer
+the reviewers accepted, both-sides-alike prints the survey finds slightly misaligned) and 20 the other way (reviewer
 broken / survey preserved: the faint engraved letter blocks, a wrapper's faint text, marker cap clips, pencil / candle
-end-to-end flips — features below what the pixel statistics separate from rendering noise), 83 land in `borderline`,
-4 are `unsure`. `rev_00` alone: 26 agree, 4 disagree (all on the strict side), 7 borderline — 87 % of the decided
-calls. The human verdict wins in the aggregation either way.
+end-to-end flips — features below what the pixel statistics separate from rendering noise), 180 land in `borderline`,
+4 are `unsure`. The human verdict wins in the aggregation either way (the reviewers judged the 40 %-brightness sheets;
+the re-rendered sheets are brighter with the same layout).
+
+### Flat renders (`flat_render.json`, `survey_symmetry.py flatcheck`)
+
+Reviewers reported `clipboard/gmxyfo` and `tray/mkdcha` as featureless black. Both have a diffuse map that the loader
+does apply (their used texels are uniform dark grey, 41/255 and 38/33/28), and both were rendered at 40 % brightness by
+the material bug above — they are dark, plain, glossy objects (VRay material: black-ish diffuse, the visible colour in
+the simulator comes from a uniform reflection map, 119 resp. 160/255), not untextured ones. Across the survey, **301 of
+1480 models render (near-)uniform** after the fix (modal colour ≥ 85 % of the object pixels or colour std ≤ 6/255;
+median luminance 0.75 — mostly white cups, plates, caps, lids): **261 are `plain_albedo`** (the texels the mesh uses are
+uniform in every map, 48 of them all-glass models drawn in a uniform tint — the render is faithful, their symmetries
+stand) and **40 are `flat_render`** — a reflection map with structure (used-texel std > 0.03; 39 models: trash cans,
+hampers, notebooks, mice, saucepots, dip candles, the clipboard, `keyboard/uwacaq` …) or, once, diffuse texels that vary
+while the render does not (`bag_of_snacks/pkwgid`, the only loader-side suspect; its varying texels are on faces the six
+cameras do not see). Every `symmetry` of a `flat_render` model is held in `symmetry_near` and no review is issued for
+it until a render with the reflection maps exists (17 models demoted: `trash_can/djgllo`, `trash_can/gilsji`,
+`lid/wtjthb`, `lid/snklci`, `bottle_of_wine/uoykwx`, `bottle_of_wine/jdqahn`, `notebook/zkmmnf`, `hardback/acaxtl`,
+`canister/xcppkc`, `dip_candle/ghctun`, `dip_candle/mxjejs`, `keyboard/uwacaq`, `clipboard/gmxyfo`, `tray/zcmnji`,
+`saucepot/tfzijn`, `saucepot/uvzmss`, `salt_shaker/fonexa`; the other 23 had no symmetry to hold); the aggregation
+holds reviewer `preserved` verdicts on them the same way. All 1480 assets use the `OmniGibsonVRayMtl` MDL (114 with an
+`OmniGlass` part); no asset lacked a bound diffuse texture, none failed to decrypt or resolve.
 
 ### Sanity table (~30 categories with an obvious answer; the survey's most common verdicts, before the review)
 
@@ -313,8 +346,9 @@ the scaled verdict into the rows that carry the matching `scale`.
 `models` < 1 s; `geom` 997 s on 24 CPU workers (≈ 0.7 s wall per model, 16 core-seconds: 400k + 20k + 20k surface
 samples, ≈ 20 coarse and ≈ 5–40 full KD-tree passes); `texture` v2 41 min on 3 GPU processes (≈ 0.3 GB each, 1207
 models, 6 × (1 + Σ rotations) renders at 768 px + the blur / median / local-std / opening filters — CPU-bound, GPU
-utilisation ≈ 15 %; the v1 pass at 192 px took 4.3 min); `report` / `diff` 2 s each. Everything is idempotent
-(`--force` recomputes); the full survey is ≈ 1 h on the local 4090 box.
+utilisation ≈ 15 %; the v1 pass at 192 px took 4.3 min); `flatcheck` 4 min on 3 GPU processes (192 px base views of
+all 1480 models + used-texel sampling); `report` / `diff` 2 s each. Everything is idempotent (`--force` recomputes);
+the full survey is ≈ 1 h on the local 4090 box.
 
 ## Review round
 
@@ -330,6 +364,11 @@ utilisation ≈ 15 %; the v1 pass at 192 px took 4.3 min); `report` / `diff` 2 s
   candidate tags no earlier batch asked about: the v2 `symmetry_near` tags (tags that moved from preserved to
   borderline, the relaxations held for review, newly borderline models) and 6 new `symmetric_180` questions; 1 scaled
   variant. 55 of the 94 entries are models no earlier batch covered, 39 add tags to already reviewed models.
+  `assign/rev_15.json` — 11 entries / 16 tags that the brightness fix moved into `symmetry_near` (pencil end-to-end
+  flips and quarter turns, a spice bottle, a cinnamon stick). `flat_render` models are left out of every batch.
+- `review/overrides.json` — coordinator decisions (`{"<key>": {"<tag>": {"verdict", "note", "by": "coordinator"}}}`),
+  applied by `aggregate_review.py` after the reviewer files (an override wins and is listed in `review_summary.md`);
+  first entry: `bottle_of_water/cyzaue` `zinf` → broken (hexagonal prism, `z6` stays).
 - `scripts/symmetry/aggregate_review.py` merges `review/*.json` into `review_verdicts.json` + `review_summary.md`
   (`preserved` → joins `symmetry`, `broken` → leaves `symmetry` and `symmetry_near`, `unsure` → stays / moves to
   `symmetry_near`; `symmetric_180` value per alignment subtask; unreviewed and partially reviewed entries; verdicts on

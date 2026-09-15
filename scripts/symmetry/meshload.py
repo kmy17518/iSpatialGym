@@ -194,6 +194,11 @@ def load_model(category: str, model: str, tmpdir: Optional[str] = None, textures
                         Vn, UVn, Fn = V, uv, tv
                     tm = trimesh.Trimesh(vertices=Vn, faces=Fn, process=False)
                     tm.visual = trimesh.visual.TextureVisuals(uv=UVn, image=img)
+                    # trimesh's SimpleMaterial defaults to a diffuse colour of (102, 102, 102): pyrender multiplies the
+                    # texture by it and every textured render comes out at 40 % brightness (a white cup rendered grey,
+                    # dark trays black). The albedo map is the colour: neutralise the factor.
+                    tm.visual.material.diffuse = np.array([255, 255, 255, 255], dtype=np.uint8)
+                    tm.metadata["texture_path"] = tex
             if tm is None:
                 tm = trimesh.Trimesh(vertices=V, faces=tv, process=False)
                 tm.visual.face_colors = GLASS_COLOR if glass else UNTEXTURED_COLOR

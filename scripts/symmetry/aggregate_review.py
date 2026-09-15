@@ -3,7 +3,9 @@
 
 Inputs (``runlogs/symmetry_20260915`` by default): ``symmetry.json`` (survey), ``assign/rev_XX.json`` (the review set:
 candidate tags, ``symmetric_180`` questions), ``review/rev_XX.json`` (reviewer output per the contract:
-``{"<key>": {"<tag>": {"verdict": preserved | broken | unsure, "note": ...}}}``; the directory may be empty or absent).
+``{"<key>": {"<tag>": {"verdict": preserved | broken | unsure, "note": ...}}}``; the directory may be empty or absent),
+``review/overrides.json`` (coordinator decisions, same schema plus ``"by"``; applied after the reviewer files, an
+override wins over a reviewer verdict, may name a tag no batch asked about, and is listed in the summary).
 
 Per review-set entry: final ``symmetry`` = survey ``symmetry`` ∪ tags reviewed ``preserved`` (reduced to generators);
 ``symmetry_near`` = survey ``symmetry_near`` minus ``preserved`` / ``broken`` tags minus what the new ``symmetry``
@@ -43,18 +45,22 @@ def tags_of(v) -> List[str]:
     return [t for t in (v or []) if t != "none"]
 
 
-def merge(survey_sym: List[str], survey_near: List[str], reviewed: Dict[str, dict]) -> Tuple[List[str], List[str]]:
+def merge(survey_sym: List[str], survey_near: List[str], reviewed: Dict[str, dict], flat_render: bool = False) -> Tuple[List[str], List[str]]:
     """Human verdicts win over the survey: ``preserved`` joins ``symmetry``; ``broken`` leaves both ``symmetry`` and
     ``symmetry_near`` (also when a re-run of the survey later called the tag preserved); ``unsure`` on a tag the
-    survey calls preserved moves it to ``symmetry_near`` (a symmetry only takes effect once it is confirmed)."""
+    survey calls preserved moves it to ``symmetry_near`` (a symmetry only takes effect once it is confirmed). For a
+    ``flat_render`` model (its look lives in a reflection map the sheets cannot show) a ``preserved`` verdict is held in
+    ``symmetry_near`` as well - nothing is confirmed until a render with those maps exists."""
     preserved = {t for t, r in reviewed.items() if r["verdict"] == "preserved"}
     broken = {t for t, r in reviewed.items() if r["verdict"] == "broken"}
     unsure = {t for t, r in reviewed.items() if r["verdict"] == "unsure"}
-    sym_raw = (set(S.expand_tags(tags_of(survey_sym))) | preserved) - broken - unsure
+    held = preserved if flat_render else set()
+    sym_raw = (set(S.expand_tags(tags_of(survey_sym))) | preserved) - broken - unsure - held
     sym = S.reduce_tags(sym_raw)
     implied = set(S.expand_tags(sym))
     near = [t for t in tags_of(survey_near) if t not in preserved and t not in broken and t not in implied]
     near += [t for t in unsure if t in set(S.expand_tags(tags_of(survey_sym))) and t not in implied and t not in near]
+    near += [t for t in held if t not in implied and t not in near]
     return sym or ["none"], S.reduce_tags(near) if near else []
 
 
@@ -82,13 +88,16 @@ def main():
             else:
                 entries[e["key"]] = e
                 batch_of[e["key"]] = d["batch_id"]
-    # ---- read the verdicts
+    # ---- read the verdicts (reviewer batches review/rev_*.json, then review/overrides.json: a coordinator override wins)
     warnings: List[str] = []
     reviewed: Dict[str, Dict[str, dict]] = collections.defaultdict(dict)
-    review_files = sorted(glob.glob(os.path.join(args.out, "review", "*.json")))
+    review_files = sorted(glob.glob(os.path.join(args.out, "review", "rev_*.json")))
+    overrides_path = os.path.join(args.out, "review", "overrides.json")
     per_batch = collections.Counter()
-    for f in review_files:
+    overrides: List[dict] = []
+    for f in review_files + ([overrides_path] if os.path.exists(overrides_path) else []):
         bid = os.path.splitext(os.path.basename(f))[0]
+        is_override = bid == "overrides"
         try:
             d = json.load(open(f))
         except Exception as ex:  # noqa: BLE001
@@ -105,16 +114,23 @@ def main():
                 warnings.append(f"{bid}: {key} is not an object of tags")
                 continue
             for tag, v in tags.items():
-                if tag not in entries[key]["candidates"]:
+                if tag not in entries[key]["candidates"] and not is_override:
                     warnings.append(f"{bid}: {key} tag {tag} was not asked - ignored")
                     continue
                 verdict = (v or {}).get("verdict") if isinstance(v, dict) else None
                 if verdict not in VERDICTS:
                     warnings.append(f"{bid}: {key}/{tag} invalid verdict {verdict!r} -> unsure")
                     verdict = "unsure"
+                note = str((v or {}).get("note", ""))[:400] if isinstance(v, dict) else ""
+                if is_override:
+                    prev = reviewed[key].get(tag)
+                    overrides.append({"key": key, "tag": tag, "verdict": verdict, "note": note, "by": (v or {}).get("by", "coordinator"),
+                                      "replaces": f"{prev['verdict']} ({prev['batch']})" if prev else "-"})
+                    reviewed[key][tag] = {"verdict": verdict, "note": note, "batch": "overrides", "by": (v or {}).get("by", "coordinator")}
+                    continue
                 if tag in reviewed[key] and reviewed[key][tag]["batch"] != bid:
                     warnings.append(f"{bid}: {key}/{tag} also reviewed in {reviewed[key][tag]['batch']} - later file wins")
-                reviewed[key][tag] = {"verdict": verdict, "note": str((v or {}).get("note", ""))[:400] if isinstance(v, dict) else "", "batch": bid}
+                reviewed[key][tag] = {"verdict": verdict, "note": note, "batch": bid}
                 per_batch[bid] += 1
     # ---- merge
     models: Dict[str, dict] = {}
@@ -144,9 +160,10 @@ def main():
         m = models.setdefault(base_key, {"category": rec["category"], "model": rec["model"], "scale": rec["scale"],
                                          "symmetry": rec["symmetry"], "symmetry_near": rec["symmetry_near"],
                                          "symmetry_scaled": rec.get("symmetry_scaled"), "symmetry_near_scaled": rec.get("symmetry_near_scaled"),
-                                         "reviewed": {}, "reviewed_scaled": {}, "symmetric_180": [], "batch": batch_of.get(base_key)})
+                                         "reviewed": {}, "reviewed_scaled": {}, "symmetric_180": [], "batch": batch_of.get(base_key),
+                                         "flat_render": bool(rec.get("flat_render"))})
         if e["variant"] == "base":
-            m["symmetry"], m["symmetry_near"] = merge(rec["symmetry"], rec["symmetry_near"], rv)
+            m["symmetry"], m["symmetry_near"] = merge(rec["symmetry"], rec["symmetry_near"], rv, bool(rec.get("flat_render")))
             m["reviewed"] = rv
             if m["symmetry"] != rec["symmetry"] or m["symmetry_near"] != rec["symmetry_near"]:
                 changed.append((key, rec["symmetry"], rec["symmetry_near"], m["symmetry"], m["symmetry_near"]))
@@ -158,7 +175,7 @@ def main():
                 if value is not None and value != (q["reviewer_value"] or "0"):
                     corrections.append((key, q["subtask"], q["tag"], q["reviewer_value"] or "(empty)", value))
         else:
-            m["symmetry_scaled"], m["symmetry_near_scaled"] = merge(rec["symmetry_scaled"], rec["symmetry_near_scaled"], rv)
+            m["symmetry_scaled"], m["symmetry_near_scaled"] = merge(rec["symmetry_scaled"], rec["symmetry_near_scaled"], rv, bool(rec.get("flat_render")))
             m["reviewed_scaled"] = rv
             m["batch_scaled"] = batch_of.get(key)
             if m["symmetry_scaled"] != rec["symmetry_scaled"] or m["symmetry_near_scaled"] != rec["symmetry_near_scaled"]:
@@ -169,6 +186,7 @@ def main():
            "verdict_counts": dict(verdict_counts), "warnings": warnings, "models": models, "unreviewed": unreviewed,
            "partially_reviewed": {k: miss for k, miss in partial},
            "verdicts_on_non_candidates": [{"key": k, "tag": t, "verdict": v, "batch": b} for k, t, v, b in stale],
+           "overrides": overrides,
            "batches": {os.path.splitext(os.path.basename(f))[0]: {"n_entries": len(json.load(open(f))["models"]),
                                                                  "n_verdicts": per_batch.get(os.path.splitext(os.path.basename(f))[0], 0),
                                                                  "reviewed": os.path.exists(os.path.join(args.out, "review", os.path.basename(f)))}
@@ -193,6 +211,12 @@ def main():
     L.append(f"\n## `symmetric_180` corrections ({len(corrections)})\n\n| key | subtask | tag | reviewer value | review value |\n|---|---|---|---|---|")
     for key, st, tag, old, new in corrections:
         L.append(f"| `{key}` | {st} | `{tag}` | {old} | {new} |")
+    L.append(f"\n## Coordinator overrides ({len(overrides)}, `review/overrides.json`, applied after the reviewer files)\n")
+    if overrides:
+        L.append("| key | tag | verdict | replaces | by | note |\n|---|---|---|---|---|---|")
+        L += [f"| `{o['key']}` | `{o['tag']}` | {o['verdict']} | {o['replaces']} | {o['by']} | {o['note'][:120]} |" for o in overrides]
+    else:
+        L.append("none")
     L.append(f"\n## Unreviewed entries ({len(unreviewed)})\n")
     L.append(", ".join(f"`{k}` ({batch_of[k]})" for k in unreviewed) or "none")
     if partial:

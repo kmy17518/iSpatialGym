@@ -478,11 +478,37 @@ def alignment_half_turns(icl: List[dict], out: Dict[str, dict]) -> List[dict]:
     return rows
 
 
+#: flat-render verdict: a near-uniform render is *unfaithful* (``flat_render``) when the asset's used texels carry
+#: structure the albedo render cannot show (a reflection / emissive map with std above this, or a diffuse map the
+#: render did not reproduce); a uniform render of uniform maps is a genuinely plain object (``plain_albedo``)
+FLAT_MAP_STD = 0.03
+
+
+def flat_verdict(fr: Optional[dict]) -> Dict[str, object]:
+    """{flat_render, plain_albedo, render_std, render_mode_frac, hidden_maps, diffuse_mismatch} from a flat_render.json
+    record. ``hidden_maps``: reflection / emissive maps whose used texels carry structure (the albedo render cannot
+    show them); ``diffuse_mismatch``: the used diffuse texels vary (modal share < 0.5) while the render is uniform - a
+    loader problem to look at (none found after the brightness fix)."""
+    if not fr or "render" not in fr:
+        return {"flat_render": False, "plain_albedo": False}
+    r = fr["render"]
+    used = fr.get("used_texels", {})
+    hidden = [k for k in ("reflection", "emissive") if used.get(k, {}).get("std", 0.0) > FLAT_MAP_STD]
+    mismatch = bool(fr.get("flat") and used.get("diffuse") and used["diffuse"]["mode_frac"] < 0.5 and r["mode_frac"] >= FLAT_MODE_FRAC)
+    if mismatch:
+        hidden.append("diffuse")
+    return {"flat_render": bool(fr.get("flat") and hidden), "plain_albedo": bool(fr.get("flat") and not hidden),
+            "render_std": round(r["std"], 4), "render_mode_frac": round(r["mode_frac"], 4), "render_lum": round(r["lum"], 3), "hidden_maps": hidden,
+            "diffuse_mismatch": mismatch, "glass_only": bool(fr.get("glass_only"))}
+
+
 def stage_report(args):
     models = load_models(args, full=True)
     icl = list(csv.DictReader(open(args.icl)))
     prev_path = os.path.join(args.out, "superseded", "v1", "symmetry.json")
     prev = json.load(open(prev_path)) if os.path.exists(prev_path) else {}
+    flat_path = os.path.join(args.out, "flat_render.json")
+    flat = json.load(open(flat_path)) if os.path.exists(flat_path) else {}
     out = collections.OrderedDict()
     failures, tex_failures = [], []
     for m in models:
@@ -511,12 +537,21 @@ def stage_report(args):
             rec["symmetry_scaled"], rec["symmetry_near_scaled"] = None, None
         rec["n_faces"], rec["n_meshes"] = g.get("n_faces"), g.get("n_meshes")
         rec["render"] = os.path.relpath(os.path.join(args.out, "renders", m["key"] + ".jpg"), REPO) if os.path.exists(os.path.join(args.out, "renders", m["key"] + ".jpg")) else None
+        rec.update(flat_verdict(flat.get(m["key"])))
+        if rec["flat_render"]:  # the texture test could not see this asset's look: nothing is confirmed until it can
+            for sk, nk in (("symmetry", "symmetry_near"), ("symmetry_scaled", "symmetry_near_scaled")):
+                tags = [t for t in (rec.get(sk) or []) if t != "none"]
+                if tags:
+                    rec[nk] = S.reduce_tags(set(rec.get(nk) or []) | set(tags))
+                    rec[sk] = ["none"]
+                    rec["flat_render_demoted"] = True
         out[m["key"]] = rec
     with open(os.path.join(args.out, "symmetry.json"), "w") as f:
         json.dump(out, f, indent=0)
     # csv
     cols = ["category", "model", "symmetry", "symmetry_near", "geom_exact", "geom_near", "texture_preserved", "scale", "symmetry_scaled",
-            "symmetry_near_scaled", "floor_mean", "best_tag", "best_geom_mean", "best_geom_frac2", "best_tex_mad", "best_tex_p95", "n_faces", "render", "uses"]
+            "symmetry_near_scaled", "flat_render", "plain_albedo", "render_std", "floor_mean", "best_tag", "best_geom_mean", "best_geom_frac2",
+            "best_tex_mad", "best_tex_p95", "n_faces", "render", "uses"]
     with open(os.path.join(args.out, "symmetry.csv"), "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(cols)
@@ -525,6 +560,7 @@ def stage_report(args):
             w.writerow([r["category"], r["model"], ",".join(r["symmetry"]), ",".join(r["symmetry_near"]), ",".join(r["geom_exact"]),
                         ",".join(r["geom_near"]), ",".join(r["texture_preserved"]), json.dumps(r["scale"]) if r["scale"] else "",
                         ",".join(r["symmetry_scaled"]) if r["symmetry_scaled"] else "", ",".join(r["symmetry_near_scaled"]) if r["symmetry_near_scaled"] else "",
+                        "1" if r["flat_render"] else "0", "1" if r["plain_albedo"] else "0", f"{r.get('render_std', 0):.4f}" if "render_std" in r else "",
                         f"{r['floor']['mean']:.5f}", best[0] if best else "", f"{best[1]['geom']['mean']:.5f}" if best else "",
                         f"{best[1]['geom']['frac2']:.4f}" if best else "", f"{best[1]['tex']['mad'] * 255:.2f}" if best and "tex" in best[1] else "",
                         f"{best[1]['tex']['p95'] * 255:.2f}" if best and "tex" in best[1] else "", r["n_faces"], r["render"] or "", ";".join(r["uses"])])
@@ -544,6 +580,18 @@ def stage_report(args):
     n_cand = sum(1 for r in out.values() if r["geom_exact"] or r["geom_near"])
     L.append(f"\nModels with a final symmetry: {n_sym}; asymmetric (`none`): {n - n_sym}; with a `symmetry_near` entry to review: {n_near}; "
              f"with at least one geometric candidate (contact sheet rendered): {n_cand}.\n")
+    if flat:
+        fr = [(k, r) for k, r in out.items() if r["flat_render"]]
+        pa = [(k, r) for k, r in out.items() if r["plain_albedo"]]
+        dem = [(k, r) for k, r in fr if r.get("flat_render_demoted")]
+        L.append(f"## Flat renders\n\n{sum(1 for v in flat.values() if v.get('flat'))} of {len(flat)} models render (near-)uniform "
+                 f"(mode share >= {FLAT_MODE_FRAC} or colour std <= {FLAT_STD * 255:.0f}/255): {len(pa)} are genuinely plain (`plain_albedo`: the texels the "
+                 f"mesh uses are uniform in every map), {len(fr)} are `flat_render` (a reflection / emissive / diffuse map with structure the albedo "
+                 f"render cannot show) - their {len(dem)} models with a symmetry were demoted to `symmetry_near`.\n")
+        L.append("| key | render std | mode share | hidden maps | `symmetry` (demoted to near) |\n|---|---|---|---|---|")
+        for k, r in fr:
+            L.append(f"| `{k}` | {r['render_std'] * 255:.1f} | {r['render_mode_frac']:.2f} | {', '.join(r['hidden_maps'])} | `{' '.join(r['symmetry_near']) or '-'}` |")
+        L.append("")
     # scaled variants
     sc = [(k, r) for k, r in out.items() if r["scale"]]
     diff = [(k, r) for k, r in sc if r["symmetry_scaled"] != r["symmetry"] or r["symmetry_near_scaled"] != r["symmetry_near"]]
@@ -610,6 +658,163 @@ def stage_report(args):
         f.write("\n".join(L) + "\n")
     print("\n".join(L[:40]))
     print(f"... report written to {os.path.join(args.out, 'report.md')}; symmetry.json / symmetry.csv: {n} models")
+
+
+# ----------------------------------------------------------------------------------------------- flat-render check
+
+FLAT_MODE_FRAC = 0.85   # share of object pixels within +-3/255 (every channel) of the modal colour
+FLAT_STD = 6.0 / 255.0  # mean per-channel std of the object pixels
+
+
+def render_stats(views) -> Dict[str, float]:
+    """Colour statistics of the object pixels of a render set: mean per-channel std, the modal colour and the share of
+    pixels within +-3/255 of it, mean luminance."""
+    pix = np.concatenate([v[0][v[1] >= 1.0] for v in views if (v[1] >= 1.0).any()]) if views else np.zeros((0, 3), np.uint8)
+    if len(pix) == 0:
+        return {"n_px": 0, "std": 0.0, "mode": [0, 0, 0], "mode_frac": 1.0, "lum": 0.0}
+    q = (pix.astype(np.int32) // 4)  # 4-level bins to find the mode robustly
+    codes = q[:, 0] * 4096 + q[:, 1] * 64 + q[:, 2]
+    vals, counts = np.unique(codes, return_counts=True)
+    mode_code = vals[int(np.argmax(counts))]
+    in_bin = codes == mode_code
+    mode = pix[in_bin].mean(axis=0)
+    near = np.all(np.abs(pix.astype(np.int32) - mode.astype(np.int32)) <= 3, axis=1)
+    return {"n_px": int(len(pix)), "std": float(pix.astype(np.float64).std(axis=0).mean() / 255.0), "mode": [int(v) for v in mode],
+            "mode_frac": float(near.mean()), "lum": float(pix.astype(np.float64).mean() / 255.0)}
+
+
+def uv_map_stats(meshes, kinds=("diffuse", "reflection", "metalness", "emissive"), n: int = 20000) -> Dict[str, dict]:
+    """Colour statistics of the texels the mesh actually uses (area-weighted surface sample -> barycentric UV -> texel)
+    for the loader's diffuse map and its sibling maps (``<model>__<link>__<kind>.png``): mean, per-channel std, share
+    of texels within +-3/255 of the modal colour. Tells whether a flat render is faithful (the used part of the diffuse
+    map is uniform) or whether another map (reflection) carries a pattern the albedo render cannot show."""
+    import trimesh
+    from PIL import Image
+
+    out: Dict[str, dict] = {}
+    for kind in kinds:
+        pix = []
+        for m in meshes:
+            tex = m.metadata.get("texture_path")
+            if not tex or m.visual.kind != "texture":
+                continue
+            path = tex if kind == "diffuse" else tex.replace("diffuse", kind)
+            if not os.path.exists(path):
+                continue
+            try:
+                img = np.asarray(Image.open(path).convert("RGB"))
+            except Exception:  # noqa: BLE001
+                continue
+            k = max(200, int(n * float(m.area) / max(sum(float(x.area) for x in meshes), 1e-12)))
+            pts, fidx = trimesh.sample.sample_surface(m, k, seed=0)
+            bary = trimesh.triangles.points_to_barycentric(m.triangles[fidx], pts)
+            uv = np.einsum("ij,ijk->ik", bary, np.asarray(m.visual.uv)[m.faces[fidx]])
+            u = np.clip((uv[:, 0] % 1.0) * (img.shape[1] - 1), 0, img.shape[1] - 1).astype(int)
+            v = np.clip((1.0 - (uv[:, 1] % 1.0)) * (img.shape[0] - 1), 0, img.shape[0] - 1).astype(int)
+            pix.append(img[v, u])
+        if pix:
+            p = np.concatenate(pix)
+            q = (p.astype(np.int32) // 4)
+            codes = q[:, 0] * 4096 + q[:, 1] * 64 + q[:, 2]
+            vals, counts = np.unique(codes, return_counts=True)
+            mode = p[codes == vals[int(np.argmax(counts))]].mean(axis=0)
+            near = np.all(np.abs(p.astype(np.int32) - mode.astype(np.int32)) <= 3, axis=1)
+            out[kind] = {"mean": [round(float(x), 1) for x in p.mean(axis=0)], "std": round(float(p.astype(np.float64).std(axis=0).mean() / 255.0), 4),
+                         "mode_frac": round(float(near.mean()), 4), "p95": round(float(np.percentile(p, 95) / 255.0), 4)}
+    return out
+
+
+def material_stats(category: str, model: str) -> Dict[str, object]:
+    """Per-asset texture-map statistics (diffuse / reflection / metalness / emissive) and the material shader ids, to
+    tell a genuinely plain asset from one whose look the flat albedo render cannot show."""
+    import tempfile
+
+    from PIL import Image
+    from pxr import Usd, UsdShade
+
+    from meshload import ASSETS, decrypt_usd
+
+    mdir = os.path.join(ASSETS, category, model, "material")
+    out: Dict[str, object] = {"maps": {}, "shaders": [], "texture_inputs": {}}
+    for fn in sorted(os.listdir(mdir)) if os.path.isdir(mdir) else []:
+        low = fn.lower()
+        kind = next((k for k in ("diffuse", "albedo", "reflection", "metalness", "emissive", "opacity") if k in low), None)
+        if kind is None or not low.endswith((".png", ".jpg", ".jpeg")):
+            continue
+        try:
+            im = Image.open(os.path.join(mdir, fn)).convert("RGB")
+            if max(im.size) > 512:
+                im = im.resize((512, 512))
+            a = np.asarray(im).astype(np.float64)
+            out["maps"].setdefault(kind, []).append({"file": fn, "mean": [round(float(v), 1) for v in a.mean(axis=(0, 1))],
+                                                     "std": round(float(a.std(axis=(0, 1)).mean()), 1), "p95": round(float(np.percentile(a, 95)), 1)})
+        except Exception as e:  # noqa: BLE001
+            out["maps"].setdefault(kind, []).append({"file": fn, "error": repr(e)[:80]})
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            stage = Usd.Stage.Open(decrypt_usd(category, model, tmp))
+            for prim in stage.Traverse():
+                if prim.IsA(UsdShade.Shader):
+                    sh = UsdShade.Shader(prim)
+                    sid = sh.GetIdAttr().Get()
+                    out["shaders"].append(f"{prim.GetPath()}:{sid or prim.GetParent().GetName()}")
+                    for i in sh.GetInputs():
+                        if str(i.GetTypeName()) == "asset" and i.Get() is not None:
+                            out["texture_inputs"][i.GetBaseName()] = os.path.basename(str(i.Get()).strip("@"))
+    except Exception as e:  # noqa: BLE001
+        out["usd_error"] = repr(e)[:120]
+    return out
+
+
+def stage_flatcheck(args):
+    """Render the six base views of every surveyed model (textured, glass parts left out as in the texture stage) and
+    record the object-pixel colour statistics plus the asset's texture-map statistics -> OUT/flat_render.json
+    ({key: {render: {...}, n_textured, n_glass, glass_only, maps: {...}, shaders, texture_inputs, flat: bool}})."""
+    from meshload import GLASS_COLOR, load_model
+    import trimesh
+
+    models = load_models(args)
+    if args.shard:
+        k, n = (int(v) for v in args.shard.split("/"))
+        models = [m for i, m in enumerate(models) if i % n == k]
+    path = os.path.join(args.out, f"flat_render{('_' + args.shard.replace('/', 'of')) if args.shard else ''}.json")
+    out = json.load(open(path)) if os.path.exists(path) and not args.force else {}
+    renderer = S.Renderer(size=args.size, ss=2)
+    t0 = time.time()
+    for i, m in enumerate(models):
+        if m["key"] in out:
+            continue
+        rec = {"category": m["category"], "model": m["model"]}
+        try:
+            gp = os.path.join(args.out, "geom", m["key"] + ".json")
+            g = json.load(open(gp))["base"]
+            meshes = load_model(m["category"], m["model"], textures=True)
+            opaque = [x for x in meshes if not x.metadata.get("glass")]
+            rec["n_glass"], rec["glass_only"] = len(meshes) - len(opaque), not opaque
+            if opaque:
+                meshes = opaque
+            else:
+                for x in meshes:
+                    x.visual = trimesh.visual.ColorVisuals(x, face_colors=GLASS_COLOR)
+            rec["n_textured"] = sum(1 for x in meshes if x.visual.kind == "texture")
+            renderer.set_size(renderer.base_size)
+            renderer.prepare(meshes, np.asarray(g["bbox_centre"]), float(g["diag"]))
+            rec["render"] = render_stats(renderer.render(None))
+            rec["used_texels"] = uv_map_stats(meshes)
+            rec.update(material_stats(m["category"], m["model"]))
+            rec["flat"] = bool(rec["render"]["mode_frac"] >= FLAT_MODE_FRAC or rec["render"]["std"] <= FLAT_STD)
+        except Exception as e:  # noqa: BLE001
+            rec["error"] = repr(e)[:300]
+        out[m["key"]] = rec
+        if (i + 1) % 100 == 0 or i + 1 == len(models):
+            with open(path, "w") as f:
+                json.dump(out, f, indent=0)
+            print(f"[{i + 1}/{len(models)}] flat so far {sum(1 for r in out.values() if r.get('flat'))} ({time.time() - t0:.0f}s)", flush=True)
+    renderer.close()
+    with open(path, "w") as f:
+        json.dump(out, f, indent=0)
+    print(f"flat-render check: {len(out)} models, {sum(1 for r in out.values() if r.get('flat'))} flat, "
+          f"{sum(1 for r in out.values() if 'error' in r)} errors -> {path}")
 
 
 # ----------------------------------------------------------------------------------------------- diff
@@ -734,7 +939,7 @@ def load_models(args, full: bool = False) -> List[dict]:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("stage", choices=["models", "geom", "texture", "report", "diff"])
+    ap.add_argument("stage", choices=["models", "geom", "texture", "report", "diff", "flatcheck"])
     ap.add_argument("--previous", default=None, help="diff stage: the previous symmetry.json (default superseded/v1/symmetry.json)")
     ap.add_argument("--icl", default=DEFAULT_ICL)
     ap.add_argument("--out", default=DEFAULT_OUT)
@@ -751,7 +956,8 @@ def main():
                          "displayed rotations a running review batch was issued with (prepare_review.py --layout writes it)")
     ap.add_argument("--size", type=int, default=384)
     args = ap.parse_args()
-    {"models": stage_models, "geom": stage_geom, "texture": stage_texture, "report": stage_report, "diff": stage_diff}[args.stage](args)
+    {"models": stage_models, "geom": stage_geom, "texture": stage_texture, "report": stage_report, "diff": stage_diff,
+     "flatcheck": stage_flatcheck}[args.stage](args)
 
 
 if __name__ == "__main__":

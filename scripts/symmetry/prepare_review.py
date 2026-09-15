@@ -110,15 +110,21 @@ def build_review_set(sym: dict, icl: List[dict], out_dir: str) -> Tuple[Dict[str
         else:
             e["candidates"][tag]["asked_because"] += "; " + reason
 
+    skipped_flat = 0
     for key, rec in sym.items():
+        if rec.get("flat_render"):  # the sheet cannot show this asset's look (reflection-map pattern): no review until a textured render exists
+            skipped_flat += 1
+            continue
         for t in rec["symmetry_near"]:
             add_tag(key, "base", t, "symmetry_near")
         if rec.get("symmetry_near_scaled"):
             for t in rec["symmetry_near_scaled"]:
                 add_tag(key + "__scaled", "scaled", t, "symmetry_near of the spawn-scaled variant")
+    if skipped_flat:
+        print(f"{skipped_flat} flat_render models left out of the review set (their symmetries wait for a render with the reflection maps)")
     n_dis_rows = 0
     for h in SV.alignment_half_turns(icl, sym):
-        if not h["disagree"]:
+        if not h["disagree"] or sym[h["key"]].get("flat_render"):
             continue
         n_dis_rows += 1
         survey = "in symmetry (exact geometry, preserved texture)" if h["has"] else ("in symmetry_near" if h["near"] else "not symmetric")

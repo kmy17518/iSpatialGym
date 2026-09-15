@@ -1,6 +1,6 @@
 {
- "n_entries": 413,
- "n_batches": 15,
+ "n_entries": 424,
+ "n_batches": 16,
  "verdicts": [
   "preserved",
   "broken",
@@ -361,6 +361,20 @@
     "trash_can",
     "vidalia_onion",
     "wall_mounted_tv"
+   ]
+  },
+  {
+   "batch_id": "rev_15",
+   "assignment": "runlogs/symmetry_20260915/assign/rev_15.json",
+   "output": "runlogs/symmetry_20260915/review/rev_15.json",
+   "n_models": 11,
+   "n_candidates": 16,
+   "n_symmetric_180": 0,
+   "categories": [
+    "bottle_of_sage",
+    "cinnamon_stick",
+    "colored_pencil",
+    "pencil"
    ]
   }
  ]
