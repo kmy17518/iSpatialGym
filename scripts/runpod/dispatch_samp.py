@@ -118,6 +118,7 @@ def main():
     ap.add_argument("--subtasks", nargs="*", default=None, help="only jobs of these subtasks")
     ap.add_argument("--reset-queue", action="store_true", help="drop queued (not yet started) jobs before adding")
     ap.add_argument("--sync-only", action="store_true", help="only rsync the working tree to the pods")
+    ap.add_argument("--no-sync", action="store_true", help="do not rsync the code to the pods (a --sync-only pass did it)")
     ap.add_argument("--code-ref", default="HEAD", help="git ref whose committed tree is synced to the pods")
     ap.add_argument("--rebalance", action="store_true", help="drop every queued job on the ready pods and re-dispatch the manifest jobs that are neither done nor running")
     ap.add_argument("--restart-runner", action="store_true", help="on idle pods (no current job) restart the runner with the current RUNNER script")
@@ -188,9 +189,12 @@ def main():
             print(f"{pid} {fleet['pods'][pid]['name']}: runner restarted")
         return
     if args.sync_only:
-        for pid, ep in ready:
-            sync_tree(ep)
-            print(f"{pid}: synced")
+        export_head()
+        open(os.path.join(EXPORT_DIR, ".exported"), "w").close()
+        import concurrent.futures as cf
+        with cf.ThreadPoolExecutor(max_workers=8) as ex:
+            list(ex.map(lambda pe: sync_tree(pe[1]), ready))
+        print(f"synced {len(ready)} pods")
         return
     if args.close:
         for pid, ep in ready:
@@ -236,7 +240,8 @@ def main():
         rp.ssh_run(*ep, "bash -s", timeout=120, stdin_text="\n".join(script) + "\n")
         rp.ssh_run(*ep, "cat > /root/samp/run_jobs.sh && chmod +x /root/samp/run_jobs.sh", timeout=60, stdin_text=RUNNER)
         # the pods cannot pull the private repo after the bootstrap (token shredded): sync the working tree over rsync
-        sync_tree(ep)
+        if not args.no_sync:
+            sync_tree(ep)
         running = rp.ssh_run(*ep, "test -f /root/samp/runner.pid && kill -0 $(cat /root/samp/runner.pid) 2>/dev/null && echo RUNNING", capture=True, timeout=45)
         print(f"{pid} {fleet['pods'][pid]['name']}: +{len(per_pod[pid])} jobs; runner {'already running' if 'RUNNING' in (running.stdout or '') else 'started'}")
         if "RUNNING" not in (running.stdout or ""):
