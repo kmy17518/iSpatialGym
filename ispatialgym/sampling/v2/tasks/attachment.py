@@ -386,8 +386,9 @@ class Attachment(SamplerV2):
         if float(th.linalg.norm(horiz)) >= 0.3:
             b_dir = horiz / th.linalg.norm(horiz)
         else:
-            t = manip.tangent
-            b_dir = th.tensor([float(t[0]), float(t[1]), 0.0])
+            # vertical insertion: hold the partner on the face toward the robot (the left gripper reaches forward)
+            f = manip.forward
+            b_dir = th.tensor([-float(f[0]), -float(f[1]), 0.0])
         pts = C.transform_points(f_pose, self.hull[self.p_role])
         proj = pts[:, :2] @ b_dir[:2]
         z_mid = float(pts[:, 2].min()) + 0.5 * float(pts[:, 2].max() - pts[:, 2].min())
