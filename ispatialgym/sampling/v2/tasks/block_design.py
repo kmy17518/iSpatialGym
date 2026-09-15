@@ -119,6 +119,9 @@ class BlockDesign(SamplerV2):
         self.hull = self.world.local_hull(blocks[0])
         ext = self.hull.max(dim=0).values - self.hull.min(dim=0).values
         self.edge = float(ext.mean())
+        # geometric centre of the block in its root frame (the asset's root origin need not be the cube centre)
+        self.c_local = 0.5 * (self.hull.max(dim=0).values + self.hull.min(dim=0).values)
+        self.template_facts["block_centre_offset_m"] = [round(float(v), 4) for v in self.c_local.tolist()]
         choice = self.choice.groups[self.role][0] if self.role in self.choice.groups else self.choice.models[self.role]
         faces_path = os.path.join(get_dataset_path(choice.dataset), "objects", choice.category, choice.model, "misc", "isg_block_faces.json")
         if os.path.exists(faces_path):
@@ -268,7 +271,7 @@ class BlockDesign(SamplerV2):
             raise Reject("layout", f"only {len(chosen)} of {n} region cells keep >= {gap} m gaps")
         # --- anchor (top-left in the init image) and slot assignment -----------------------------------------------
         z_c = self.top.z + 0.5 * self.edge
-        uv = th.stack([self.world.camera_model.project(cam_init, th.tensor([[float(c[0]), float(c[1]), z_c]]))[0][0] for c in chosen])
+        uv = th.stack([self.world.camera_model.project(cam_init, th.tensor([[float(c[0]), float(c[1]), z_c]]))[0][0] for c in chosen])  # cells = block centres
         score = (uv[:, 0] + uv[:, 1]).tolist()
         order_img = sorted(range(n), key=lambda i: score[i])  # image order (top-left first)
         anchor_i = order_img[0]
@@ -294,8 +297,7 @@ class BlockDesign(SamplerV2):
             coarse_yaw[bi] = yaw_c
             jitter = float(rng.uniform(-math.radians(float(self.g("yaw_align_max_deg")) * 0.5), math.radians(float(self.g("yaw_align_max_deg")) * 0.5)))
             q = C.qmul(C.quat_from_yaw(yaw_c + jitter), q_up)
-            pos = th.tensor([float(chosen[bi][0]), float(chosen[bi][1]), self.top.z + self.world.bottom_offset(self.hull, q) + 0.002])
-            poses[bi] = (pos, q)
+            poses[bi] = self._root_pose(chosen[bi], q, 0.002)
         # footprints on the top, gaps, in frame (5 %)
         fps = {bi: self.world.footprint(self.hull, poses[bi]) for bi in range(n)}
         for bi in range(n):
@@ -319,7 +321,7 @@ class BlockDesign(SamplerV2):
         if bad:
             raise Reject("layout", f"goal faces below {self.g('goal_face_visible_fraction')} visible: {bad}")
         # --- goal layout at the anchor ------------------------------------------------------------------------------
-        anchor = poses[anchor_i][0]
+        anchor = self._centre(poses[anchor_i])[0]
         plans: Dict[int, Dict[str, Any]] = {}
         slots: Dict[str, Dict[str, Any]] = {}
         goal_pose: Dict[int, TT.Pose] = {}
@@ -332,8 +334,7 @@ class BlockDesign(SamplerV2):
             plans[bi] = plan
             q_goal = plan["goal_quat"]
             xy = anchor[:2] + right * (c * pitch) + toward * (r * pitch)
-            z = self.top.z + self.world.bottom_offset(self.hull, q_goal) + 0.001
-            goal_pose[bi] = (th.tensor([float(xy[0]), float(xy[1]), z]), q_goal)
+            goal_pose[bi] = self._root_pose(xy, q_goal, 0.001)
             slots[f"slot_{si}"] = {"position": [float(v) for v in goal_pose[bi][0]], "orientation": [float(v) for v in q_goal]}
         # §4.6 step 5: whole-body checks at init and manipulation with the blocks placed
         TT.whole_body_check_at(self, [init, manip], objects, require=True, reason="stance_collision")
@@ -394,7 +395,7 @@ class BlockDesign(SamplerV2):
         out = {}
         cam_p = TT._t(cam[0])
         for bi, pose in poses.items():
-            pts = TT.face_points(pose, goal_face[bi], self.edge)
+            pts = TT.face_points(self._centre(pose), goal_face[bi], self.edge)
             normal = TT.face_normal_world(goal_face[bi], pose[1])
             to_cam = cam_p.unsqueeze(0) - pts
             dist = th.linalg.norm(to_cam, dim=1, keepdim=True)
@@ -440,13 +441,13 @@ class BlockDesign(SamplerV2):
         screened = []
         for pair, tilt_pick, tilt_place, yaw, sign in cands:
             try:
-                g_pick = C.cube_grasp(pick_pose, pair, tilt_pick, yaw, edge=self.edge)
+                g_pick = C.cube_grasp(self._centre(pick_pose), pair, tilt_pick, yaw, edge=self.edge)
             except ValueError:
                 continue
             if not g_pick.downward:
                 continue
             # place eef: the rigid in-hand transform carried to the goal block pose
-            place_eef = C.compose(place_pose, g_pick.eef_in_block)
+            place_eef = C.compose(self._centre(place_pose), g_pick.eef_in_block)
             if float(C.approach_axis(place_eef[1])[2]) > -0.1:
                 continue  # the place approach must point down as well
             screened.append((pair, tilt_pick, tilt_place, yaw, sign, g_pick, place_eef))
@@ -467,7 +468,7 @@ class BlockDesign(SamplerV2):
             # place (and pre-place) with the block in hand; the world: placed blocks at their slots, this block removed (attached)
             place_margin_pose = (place_eef[0] + _xy3(right) * PLACE_MARGIN + _xy3(toward) * PLACE_MARGIN, place_eef[1])
             pre_place = IK.pre_pose(place_margin_pose)
-            with TT.posed_in_hand(self, "right", block, g_pick.eef_in_block):
+            with TT.posed_in_hand(self, "right", block, C.relative(g_pick.eef, pick_pose)):
                 with attached(self.kit, "right", block):
                     res_p = self.ikc.exact([pre_place, place_margin_pose], manip, "right", ignore_for_last=[support])
                     wps_ok = True
@@ -475,7 +476,7 @@ class BlockDesign(SamplerV2):
                     if res_p.ok and (plan["flips"] or abs(plan["yaw_deg"]) > 1e-6):
                         # §3.9 in-hand reorientation waypoints (pick tilt -> place tilt) with the block attached, from the lifted grasp
                         lift = (g_pick.eef[0] + th.tensor([0.0, 0.0, self._carry_height()]), g_pick.eef[1])
-                        pivot = pick_pose[0] + th.tensor([0.0, 0.0, self._carry_height()])
+                        pivot = self._centre(pick_pose)[0] + th.tensor([0.0, 0.0, self._carry_height()])
                         if plan["flips"]:
                             wps = list(C.flip_waypoints(lift, pivot, plan["flip_axis"], plan["flip_sign"], math.radians(plan["yaw_deg"]), n_yaw=2, n_flip=3))
                         else:
@@ -517,13 +518,24 @@ class BlockDesign(SamplerV2):
     def _carry_height(self) -> float:
         return 2.0 * self.edge + 0.03
 
+    def _root_pose(self, centre_xy, q: th.Tensor, drop: float) -> TT.Pose:
+        """Root pose of a block whose geometric centre stands at ``centre_xy`` on the top with orientation ``q``."""
+        off = C.quat_rotate(q, self.c_local)
+        z = self.top.z + self.world.bottom_offset(self.hull, q) + drop
+        return th.tensor([float(centre_xy[0]) - float(off[0]), float(centre_xy[1]) - float(off[1]), z]), q
+
+    def _centre(self, root_pose: TT.Pose) -> TT.Pose:
+        """Centre pose (the cube centre, same orientation) of a block root pose — what ``cube_grasp`` / ``face_points`` take."""
+        p, q = TT._t(root_pose[0]), TT._t(root_pose[1])
+        return p + C.quat_rotate(q, self.c_local), q
+
     def _face_contact(self, pose: TT.Pose, direction_xy: th.Tensor, into: bool) -> Tuple[th.Tensor, th.Tensor]:
         """Contact point on the block face whose outward normal is ``-direction_xy`` (push: the pads press the face the
         block moves away from) or ``+direction_xy`` (brace: into the face), at 3/4 of the block height, approach tilted
         ``CONTACT_TILT_DEG`` below the horizontal along the push / brace direction."""
         dxy = th.tensor([float(direction_xy[0]), float(direction_xy[1]), 0.0])
         dxy = dxy / th.linalg.norm(dxy)
-        centre = TT._t(pose[0])
+        centre = self._centre(pose)[0]
         face_normal = -dxy if into else dxy  # outward normal of the face touched
         point = centre + face_normal * (0.5 * self.edge) + th.tensor([0.0, 0.0, 0.25 * self.edge])
         a = -face_normal * math.cos(math.radians(CONTACT_TILT_DEG)) + th.tensor([0.0, 0.0, -math.sin(math.radians(CONTACT_TILT_DEG))])
