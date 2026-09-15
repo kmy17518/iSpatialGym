@@ -121,6 +121,7 @@ def main():
     ap.add_argument("--no-sync", action="store_true", help="do not rsync the code to the pods (a --sync-only pass did it)")
     ap.add_argument("--code-ref", default="HEAD", help="git ref whose committed tree is synced to the pods")
     ap.add_argument("--rebalance", action="store_true", help="drop every queued job on the ready pods and re-dispatch the manifest jobs that are neither done nor running")
+    ap.add_argument("--force", action="store_true", help="with --restart-runner: also on busy pods (kills the current job and re-queues it)")
     ap.add_argument("--restart-runner", action="store_true", help="on idle pods (no current job) restart the runner with the current RUNNER script")
     ap.add_argument("--exclude-subtasks", nargs="*", default=None)
     args = ap.parse_args()
@@ -176,17 +177,23 @@ def main():
     if args.restart_runner:
         for pid, ep in ready:
             r = rp.ssh_run(*ep, "test -f /root/samp/current.txt && echo BUSY", capture=True, timeout=45)
-            if "BUSY" in (r.stdout or ""):
+            busy = "BUSY" in (r.stdout or "")
+            if busy and not args.force:
                 print(f"{pid} {fleet['pods'][pid]['name']}: busy, not restarted")
                 continue
-            rp.ssh_run(*ep, "test -f /root/samp/runner.pid && kill $(cat /root/samp/runner.pid) 2>/dev/null; sleep 1; cat > /root/samp/run_jobs.sh && chmod +x /root/samp/run_jobs.sh",
-                       timeout=60, stdin_text=RUNNER)
+            stop = "test -f /root/samp/runner.pid && kill $(cat /root/samp/runner.pid) 2>/dev/null; sleep 1; "
+            if busy:  # kill the current job's process tree and put its job file back into the queue (re-run from scratch)
+                stop += ("pkill -f 'ispatialgym.sampling.sample_instances' ; pkill -f 'ispatialgym.oracle.run_isg' ; sleep 3; "
+                         "for f in /root/samp/running/*.job; do [ -f \"$f\" ] && mv \"$f\" /root/samp/queue/; done; rm -f /root/samp/current.txt; ")
+            stop += ("rm -f /tmp/seen_jids; for f in $(ls /root/samp/queue/*.job 2>/dev/null | sort); do jid=$(cut -f1 \"$f\"); "
+                     "if grep -qsx \"$jid\" /tmp/seen_jids; then rm -f \"$f\"; else echo \"$jid\" >> /tmp/seen_jids; fi; done; rm -f /tmp/seen_jids; ")
+            rp.ssh_run(*ep, stop + "cat > /root/samp/run_jobs.sh && chmod +x /root/samp/run_jobs.sh", timeout=120, stdin_text=RUNNER)
             remote = "cd /root && rm -f /root/JOB_DONE /root/samp/CLOSE && setsid nohup /root/samp/run_jobs.sh > /root/samp/runner.log 2>&1 < /dev/null & disown"
             try:
                 subprocess.run(rp.ssh_base(*ep) + [remote], text=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
             except subprocess.TimeoutExpired:
                 pass
-            print(f"{pid} {fleet['pods'][pid]['name']}: runner restarted")
+            print(f"{pid} {fleet['pods'][pid]['name']}: runner restarted{' (job re-queued)' if busy else ''}")
         return
     if args.sync_only:
         export_head()
@@ -235,7 +242,8 @@ def main():
                 line = "\t".join([j["id"], "CMD", j["cmd"], ""])
             else:
                 line = "\t".join([j["id"], j["spec"], j["problem"], extra.strip()])
-            script.append(f"printf '%s\\n' {shlex.quote(line)} > /root/samp/queue/w{args.wave:02d}_{k:03d}_{j['id'][:40]}.job")
+            # deterministic file name per job id: re-dispatching the same job overwrites instead of duplicating
+            script.append(f"printf '%s\\n' {shlex.quote(line)} > /root/samp/queue/w{args.wave:02d}_{j['id'][:120]}.job")
         script.append(f"printf '%s' {shlex.quote(args.ref)} > /root/samp/ref.txt")
         rp.ssh_run(*ep, "bash -s", timeout=120, stdin_text="\n".join(script) + "\n")
         rp.ssh_run(*ep, "cat > /root/samp/run_jobs.sh && chmod +x /root/samp/run_jobs.sh", timeout=60, stdin_text=RUNNER)

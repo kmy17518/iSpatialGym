@@ -51,6 +51,9 @@ def main():
         if os.path.exists(dpath):
             for line in open(dpath):
                 if line.startswith("demo__"):
+                    m = re.search(r"rc=(-?\d+) wall=(\d+)", line)
+                    if m and int(m.group(1)) != 0 and int(m.group(2)) < 5:
+                        continue  # runner without CMD support / instant failure: re-queue
                     known.add(line.split()[0])
     per_pod = collections.defaultdict(list)
     for jid, d in done.items():
