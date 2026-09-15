@@ -5,7 +5,7 @@
     python scripts/runpod/dispatch_samp.py --status            # per pod: jobs done / running / failed
 
 ``jobs.json`` = ``[{"id": ..., "spec": "<repo-relative spec json>", "problem": "<activity>-<def_id>", "scene": ...,
-"n_instances": 2, "max_templates": 1, "args": [...]}, ...]`` (written by ``ispatialgym.sampling.ground_isg``).
+"n_instances": 2, "max_templates": 1, "args": [...]}, ...]`` (written by ``ispatialgym.sampling.v1_bridge``).
 Jobs are assigned round-robin (a job list per pod, ``/root/samp/jobs.txt``); the pod runs them sequentially with
 ``sample_instances.py`` (one process per pod, see TODO.md pitfalls), writes ``/root/samp/<job id>/`` per job and
 ``/root/samp/done.txt`` lines ``<id> rc=<rc> wall=<s> n_written=<n>``, then ``/root/JOB_DONE`` so ``collect.py

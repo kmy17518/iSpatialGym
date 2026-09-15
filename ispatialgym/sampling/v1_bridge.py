@@ -1,4 +1,4 @@
-"""ground_isg (v1-compatible bridge): iddl + icl (+ the representative selection) -> one v1 task spec per grounded alias
+"""v1_bridge (formerly ground_isg v1 bridge): iddl + icl (+ the representative selection) -> one v1 task spec per grounded alias
 + a job manifest for ``sample_instances.py``.
 
 The v2 sampler (`docs/instance_sampling_spec.md` §9) is not implemented yet; until it is, this module grounds every
@@ -19,7 +19,7 @@ per-model frame parameters of the alignment targets from the icl columns.
 
 Run::
 
-    python -m ispatialgym.sampling.ground_isg [--out ispatialgym/assets/task_specs/isg_reps] [--n-instances 2]
+    python -m ispatialgym.sampling.v1_bridge [--out ispatialgym/assets/task_specs/isg_reps] [--n-instances 2]
         [--slots representative[,variation_geometry,...]] [--subtask <id> ...]
 """
 
@@ -377,7 +377,7 @@ class Grounder:
         for p in self.problems:
             path = os.path.join(out, "specs", p["id"] + ".json")
             with open(path, "w") as f:
-                json.dump({"_comment": f"ground_isg v1-bridge: {p['alias']} ({p['pick']}, slot {p['slot']})", p["v1_key"]: p["entry"]}, f, indent=1)
+                json.dump({"_comment": f"v1_bridge: {p['alias']} ({p['pick']}, slot {p['slot']})", p["v1_key"]: p["entry"]}, f, indent=1)
             self.jobs.append({"id": p["id"], "spec": os.path.relpath(path, REPO_ROOT), "problem": p["v1_key"], "scene": p["scene"],
                               "n_instances": self.n_instances, "max_templates": 1, "weight": WEIGHT.get(p["subtask"], 3.0), "subtask": p["subtask"],
                               "slot": p["slot"], "alias": p["alias"]})

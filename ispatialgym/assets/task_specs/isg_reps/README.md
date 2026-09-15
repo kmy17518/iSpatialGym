@@ -27,7 +27,7 @@
 | object_scaling | 30 |
 
 Provenance: grounded from the representative selection at commit `2c7b2a0` (`icl/roles/representatives.csv` of that
-commit; the selection is re-run after every icl rebuild and may differ — re-run `python -m ispatialgym.sampling.ground_isg`
+commit; the selection is re-run after every icl rebuild and may differ — re-run `python -m ispatialgym.sampling.v1_bridge`
 to refresh the specs; the fleet run of 2026-09-15 used the files in this directory). `assignment_w*.json` = which pod ran
 which job (`scripts/runpod/dispatch_samp.py`), `jobs_demo_*.json` = the `run_isg` demo jobs per pod
 (`scripts/runpod/make_demo_jobs.py`). Results index: `runlogs/isg_reps_20260915/` (`scripts/isg_reps/assemble_results.py`).

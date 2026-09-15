@@ -106,7 +106,7 @@ pipeline key of the subtask), `scale`, `geometry_group` / `exact_group` (texture
 reviews), `status`, `note`. `candidates_extra.csv` = candidate rows the icl did not have (`candidates.csv` columns +
 `plan`; `status = incomplete:<reason>`), merged by `ground_isg` until a survey validates them. The report lists per
 subtask which variation / generalization axes are unavailable and why, the slot‑availability table and the plan for
-the incomplete candidates. `ispatialgym/sampling/ground_isg.py` (v1 bridge) grounds the picks into
+the incomplete candidates. `ispatialgym/sampling/v1_bridge.py` (v1 bridge, formerly ground_isg.py) grounds the picks into
 `ispatialgym/assets/task_specs/isg_reps/`.
 
 ### `constraints_compatible.csv` — which candidates go together
