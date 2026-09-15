@@ -9,8 +9,16 @@ Inputs (all committed under ``runlogs/``):
 * ``runlogs/grasp_library_20260905/results/<key>.json`` + ``cands/<key>.yaml`` + ``review/`` - the grasp library,
 * ``runlogs/grasp_library_20260905/artic/{artic_results.csv,scene_assign.json,handles/,manual_handles.json}`` -
   articulated objects and the canonical handle annotations + reviewer verdicts,
-* ``runlogs/scene_inventory_<date>/<scene>/artic/<name>.json`` - the per-instance (scaled) handle annotations of the
-  scene articulated objects (B4),
+* ``runlogs/scene_inventory_<date>/`` (``--scene-inventory``, B4) - ``summary.json`` + ``<scene>/{supports,partners,artic}/
+  <name>.json``: regenerates the scene rows of ``roles/candidates.csv`` (A5-lite) - the supports of every tabletop subtask
+  (spec 3.2: top z 0.55-1.20 m, top polygon >= 0.12 m2 and >= 0.30 m short side, >= 1 edge with a free-floor run >= 0.60 m
+  at stand-off 0.45, edges holding at all three stand-offs preferred), the large partners of the IORS large-scale
+  subtasks (spec 5.6 / 6.12: face raster; under: maximum under-clearance >= 0.30 m) with the supports within 3.0 m
+  geodesic of an admitted partner, and the scene articulated targets (one row per joint: door / drawer / flap, B4 status
+  handle / edge, pinch at 0.30-1.70 m with >= 0.60 m eroded free floor in front and a 15-80 mm width after the instance
+  scale). Admitted rows get ``status = geometric_ok``, rejected ones stay in the sheet as ``geometric_reject:<reason>``
+  without representative / test marks. The ``artic/<name>.json`` files are also the per-instance (scaled) handle
+  annotations of ``require/handles.csv``,
 * ``runlogs/contacts_<date>/<category>__<model>.json`` - push / brace contact annotations of the alignment targets
   (B6; the sheet is header-only until they exist),
 * ``runlogs/table_selection_20260911/inventory.csv`` - geometry of every work surface / big partner in the 7 scenes,
@@ -30,15 +38,18 @@ Outputs (``ispatialgym/assets/icl/``, schema in its ``README.md``):
   ``grasps.csv``, ``handles.csv``, ``contacts.csv`` (shared core columns, see ``REQUIRE_CORE``), plus ``lib/`` symlinks
   to the libraries the ``path`` column refers to.
 
-Every candidate gets ``status = untested``: the old "viable" verdicts came from the sampler this rebuild replaces, so
-they are provenance (``source_selection``), not status. The v1 test pins are kept as ``test`` / ``representative``
-marks on the candidate rows (there is no separate combinations sheet; ``ground_isg`` derives the representative
-combinations from the marks and ``constraints_compatible.csv``).
+Every sampleable / group candidate gets ``status = untested``: the old "viable" verdicts came from the sampler this
+rebuild replaces, so they are provenance (``source_selection``), not status. Scene rows regenerated from the B4
+inventory carry the geometric verdict (``geometric_ok`` / ``geometric_reject:<reason>``); rooms and wall regions stay
+``untested``. The v1 test pins are kept as ``test`` / ``representative`` marks on the candidate rows (there is no
+separate combinations sheet; ``ground_isg`` derives the representative combinations from the marks and
+``constraints_compatible.csv``); a pin whose scene row is rejected is reported and left unmarked.
 
 Run inside the ``ispatialgym`` conda env (BDDL knowledge base for synsets / bounding boxes / readiness; graceful
 degradation without it)::
 
     python scripts/icl/build_icl.py [--out ispatialgym/assets/icl] [--symmetry runlogs/symmetry_<date>/symmetry.json]
+                                    [--scene-inventory runlogs/scene_inventory_<date> | none]
 """
 
 from __future__ import annotations
@@ -48,6 +59,7 @@ import collections
 import csv
 import glob
 import json
+import math
 import os
 import re
 import sys
@@ -87,6 +99,26 @@ UNDER_LARGE_PARTNERS = ("bed", "sofa", "desk", "breakfast_table")
 SCENE_ARTIC_CATEGORIES = ("bottom_cabinet", "bottom_cabinet_no_top", "top_cabinet", "fridge", "oven", "dishwasher", "door")
 RANK = {"spec": 0, "pick 1": 1, "pick 2": 2, "alternate": 3, "candidate": 4, "viable": 4, "partner": 4, "pool": 5, "reserve": 6}
 TEST_SUPPORT = ("house_single_floor", "breakfast_table_rhjoby_0")
+LARGE_SCALE_IORS = (f"{IORS}-ontop_large_scale", f"{IORS}-under_large_scale")
+
+# -- geometric admissibility of the scene rows regenerated from the B4 scene inventory (A5-lite; spec 3.2 "support
+# admissibility", 5.6 / 6.12 large partners, the B4 README). Every threshold is a constant so the report can quote it.
+STATUS_OK = "geometric_ok"
+STATUS_REJECT = "geometric_reject"          # `geometric_reject:<reason>`, the first failing check; every failing check in `note`
+SUPPORT_TOP_Z = (0.55, 1.20)                # m -> `support_low` / `support_high`
+SUPPORT_MIN_AREA_M2 = 0.12                  # top polygon area -> `support_small`
+SUPPORT_MIN_SHORT_SIDE_M = 0.30             # minimum width of the top's convex hull -> `support_small`
+EDGE_FREE_RUN_MIN_M = 0.60                  # longest free-floor run (chairs within 1 m removed) in front of an edge -> `no_free_edge`
+STAND_OFFS = ("0.35", "0.45", "0.55")       # the B4 stand-offs; an edge is admitted at ADMIT_STAND_OFF, preferred when it holds at all three
+ADMIT_STAND_OFF = "0.45"
+PARTNER_GEODESIC_MAX_M = 3.0                # support -> admitted partner on the eroded map (spec 5.6 max_partner_geodesic) -> `no_near_partner`
+UNDER_CLEARANCE_MIN_M = 0.30                # maximum under-clearance of an under(large-scale) partner -> `under_clearance`
+HANDLE_Z = (0.30, 1.70)                     # world height of the pinch -> `handle_low` / `handle_high`
+FRONT_FREE_MIN_M = 0.60                     # eroded free floor in front of the face -> `front_blocked`
+PINCH_MM = (15.0, 80.0)                     # pinch width after the instance scale -> `pinch_narrow` / `pinch_wide`
+ARTIC_JOINT_KINDS = ("door", "drawer", "flap")
+ARTIC_GRASPABLE = ("handle", "edge")        # B4 joint status admitted (`ungraspable` rejected)
+STRUCTURAL_CATEGORIES = ("walls", "ceilings", "floors", "fixed_window")  # top "occupants" that are neighbours, not objects on the top
 
 ROLE_COLUMNS = ["subtask", "role", "kind", "category", "model", "display_name", "synset", "scene", "room", "representative", "test",
                 "rank", "source_selection", "status", "grasp_key", "scale", "bbox_x", "bbox_y", "bbox_z", "natural_scenes",
@@ -251,6 +283,42 @@ def read_wall_regions() -> List[dict]:
     return out
 
 
+def read_scene_inventory(root: str) -> Dict[str, Dict[str, Dict[str, dict]]]:
+    """``{"supports" | "partners" | "artic": {scene: {name: record}}}`` from the per-object JSON files of a B4 run
+    (``<root>/summary.json`` is the index; an object listed there without its JSON - e.g. an inventory error - is reported)."""
+    summary = json.load(open(os.path.join(root, "summary.json")))["scenes"]
+    out: Dict[str, Dict[str, Dict[str, dict]]] = {part: {} for part in ("supports", "partners", "artic")}
+    for scene, sd in summary.items():
+        for part in out:
+            recs = {}
+            for name in sd.get(part) or {}:
+                path = os.path.join(root, scene, part, f"{name}.json")
+                if os.path.exists(path):
+                    recs[name] = json.load(open(path))
+                else:
+                    print(f"WARNING scene inventory: {scene}/{part}/{name}.json missing (listed in summary.json)")
+            out[part][scene] = recs
+    return out
+
+
+def hull_min_width(hull) -> float:
+    """Minimum width of a convex polygon (rotating calipers over its edges): the short side of a rectangular top whatever
+    its yaw, the bounding-rectangle short side of an L-shaped counter."""
+    pts = [(float(p[0]), float(p[1])) for p in hull or []]
+    if len(pts) < 3:
+        return 0.0
+    best = float("inf")
+    for i, (x0, y0) in enumerate(pts):
+        x1, y1 = pts[(i + 1) % len(pts)]
+        length = math.hypot(x1 - x0, y1 - y0)
+        if length < 1e-9:
+            continue
+        nx, ny = -(y1 - y0) / length, (x1 - x0) / length
+        proj = [px * nx + py * ny for px, py in pts]
+        best = min(best, max(proj) - min(proj))
+    return best if best < float("inf") else 0.0
+
+
 def grasp_results_index() -> Dict[str, dict]:
     idx = {}
     for f in glob.glob(os.path.join(LIB, "results", "*.json")):
@@ -265,7 +333,7 @@ def grasp_results_index() -> Dict[str, dict]:
 # ----------------------------------------------------------------------------------------------- roles
 
 class Builder:
-    def __init__(self):
+    def __init__(self, scene_inventory: Optional[str] = None):
         self.blocks = read_selection_blocks()
         self.tests = read_test_instances()
         self.inventory = read_inventory()
@@ -275,6 +343,12 @@ class Builder:
         self.roles: List[dict] = []
         self.pairs: List[dict] = []
         self.keys_used: set = set()
+        # B4 scene inventory (A5-lite): when given, the scene rows (supports, large partners, scene articulated targets)
+        # are regenerated from it with the geometric filters; otherwise the hand-copied seeds below are used
+        self.scene_inventory = scene_inventory
+        self.inv = read_scene_inventory(scene_inventory) if scene_inventory else None
+        self.admitted_partners: Dict[str, set] = {st: set() for st in LARGE_SCALE_IORS}
+        self.geo: Dict[str, list] = {"supports": [], "partners": [], "artic": [], "skipped_supports": [], "pins_rejected": []}
 
     # -- generic object row
     def add_object(self, subtask: str, role: str, category: str, row: dict, kind: str = KIND_SAMPLEABLE, **extra) -> dict:
@@ -378,7 +452,11 @@ class Builder:
                                 joint=r["joint"], handle_key=hk, handle_kind=r["review_pinch"],
                                 handle_annotated="1" if os.path.exists(os.path.join(ARTIC, "handles", hk + ".json")) else "0",
                                 source="artic/artic_results.csv")
-        # large-scale: the actual articulated scene objects (hosts of the swap tests), per scene, with their instance scale
+        # large-scale: the articulated scene objects, per scene, with their instance scale - one row per (object, joint) from
+        # the B4 scene inventory (A5-lite), or the hosts of the swap tests as seeds when no inventory is given
+        if self.inv is not None:
+            self.build_scene_artic_from_inventory()
+            return
         sa = json.load(open(os.path.join(ARTIC, "scene_assign.json")))
         seen = set()
         tested = {(r["category"], r["model"]): r for r in rows if r["setting"].startswith("scene") and r.get("swap") in ("False", "")}
@@ -507,7 +585,10 @@ class Builder:
             for cat, row in self.blocks[(old, "partner")]:
                 if row.get("model"):
                     self.add_object(new, "partner", cat, row)
-        # large partners (fixed scene objects) from the inventory
+        # large partners (fixed scene objects): the B4 scene inventory (A5-lite) or the table-selection inventory as seeds
+        if self.inv is not None:
+            self.build_partners_from_inventory()
+            return
         for inv in self.inventory:
             if inv["category"] in ONTOP_LARGE_PARTNERS:
                 self._fixed_from_inventory(f"{IORS}-ontop_large_scale", "partner", inv)
@@ -521,7 +602,10 @@ class Builder:
                        note=f"inventory verdict {inv['verdict']}" + (("; " + extra["note"]) if extra.get("note") else ""))
 
     def build_supports(self):
-        """Union of every support that appears as spec / viable for any task (31 scene objects) - candidates for every tabletop subtask."""
+        """Support rows of every tabletop subtask: from the B4 scene inventory with the geometric filters (A5-lite) when one is
+        given, else the union of every support that appears as spec / viable for any task (31 scene objects, seeds)."""
+        if self.inv is not None:
+            return self.build_supports_from_inventory()
         union: Dict[Tuple[str, str], dict] = {}
         for (task, role), items in self.blocks.items():
             if role != "table":
@@ -539,12 +623,290 @@ class Builder:
                 else:
                     self.add_fixed(st, "support", scene, name, info["category"], room=info["rooms"], source="task_object_selection.csv",
                                    note=f"old sampler viable/spec for {len(info['tasks'])} task(s); not in inventory.csv")
-        # floor as an admissible init support for the large-scale IORS subtasks
-        for st in (f"{IORS}-ontop_large_scale", f"{IORS}-under_large_scale"):
+        self._add_floor_supports()
+        return len(union)
+
+    def _add_floor_supports(self):
+        """The floor of every scene as an admissible init support for the large-scale IORS subtasks (spec 5.6 (c))."""
+        for st in LARGE_SCALE_IORS:
             for scene in SCENES:
                 self.add_fixed(st, "support", scene, "floor", "floors", note="floor init: the target starts on the floor beside the partner (explicit support choice, never a fallback)",
                                source="decision 2026-09-14")
-        return len(union)
+
+    # -- scene rows from the B4 scene inventory (A5-lite) ---------------------------------------------------------------
+    @staticmethod
+    def _status(reasons: List[str]) -> str:
+        return STATUS_OK if not reasons else f"{STATUS_REJECT}:{reasons[0]}"
+
+    def _inv_source(self, scene: str, part: str, name: str) -> str:
+        return f"{os.path.basename(os.path.normpath(self.scene_inventory))}/{scene}/{part}/{name}.json"
+
+    def _surface_columns(self, rec: dict) -> dict:
+        """`top_z`, world extents / centre / yaw and the canonical bbox of a B4 support / partner record."""
+        top, aabb = rec.get("top") or {}, rec.get("aabb_world") or {}
+        lo, hi, ext = aabb.get("min"), aabb.get("max"), aabb.get("extent")
+        cols = {"top_z": f"{top['z']:.3f}" if "z" in top else "", "yaw_deg": f"{math.degrees(float(top['yaw'])):.1f}" if "yaw" in top else "",
+                "world_ext_x": f"{ext[0]:.3f}" if ext else "", "world_ext_y": f"{ext[1]:.3f}" if ext else "",
+                "pos_x": f"{(lo[0] + hi[0]) / 2:.3f}" if lo and hi else "", "pos_y": f"{(lo[1] + hi[1]) / 2:.3f}" if lo and hi else ""}
+        cols["bbox_x"], cols["bbox_y"], cols["bbox_z"] = bbox(rec.get("model", ""))
+        return cols
+
+    @staticmethod
+    def _edge_runs(edge: dict) -> List[float]:
+        return [float((edge.get("runs") or {}).get(s, {}).get("longest_free_run_m", 0.0)) for s in STAND_OFFS]
+
+    def _support_geometry(self, rec: dict) -> dict:
+        """Spec 3.2 support admissibility on one B4 support record: top height, polygon size (area + hull minimum width),
+        >= 1 edge with a free-floor run >= EDGE_FREE_RUN_MIN_M at stand-off 0.45 (chairs within 1 m removed); edges whose run
+        holds at all three stand-offs are listed first (`edges=`), the ones holding at 0.45 only under `edges_0.45_only=`."""
+        top = rec.get("top") or {}
+        z, area = float(top.get("z", 0.0)), float(top.get("area_m2", 0.0))
+        short = hull_min_width(top.get("hull_xy"))
+        if not short and top.get("local_bounds_uv"):
+            b = top["local_bounds_uv"]
+            short = min(float(b[1]) - float(b[0]), float(b[3]) - float(b[2]))
+        reasons: List[str] = []
+        cat = rec.get("category", "")
+        if "chair" in cat or cat in ("stool", "taboret", "music_stool"):
+            reasons.append("chair")
+        if z < SUPPORT_TOP_Z[0]:
+            reasons.append("support_low")
+        elif z > SUPPORT_TOP_Z[1]:
+            reasons.append("support_high")
+        if area < SUPPORT_MIN_AREA_M2 or short < SUPPORT_MIN_SHORT_SIDE_M:
+            reasons.append("support_small")
+        full, partial = [], []
+        for e in rec.get("edges") or []:
+            runs = self._edge_runs(e)
+            if runs[STAND_OFFS.index(ADMIT_STAND_OFF)] < EDGE_FREE_RUN_MIN_M:
+                continue
+            (full if all(r >= EDGE_FREE_RUN_MIN_M for r in runs) else partial).append((e["name"], runs))
+        if not full and not partial:
+            reasons.append("no_free_edge")
+        best = max((r[STAND_OFFS.index(ADMIT_STAND_OFF)] for _, r in full + partial), default=0.0)
+        fmt = lambda edges: ",".join(f"{n}({r[0]:.2f}/{r[1]:.2f}/{r[2]:.2f})" for n, r in edges)  # noqa: E731
+        note = f"B4: top z {z:.2f}, area {area:.2f} m2, short side {short:.2f} m"
+        if full:
+            note += f"; edges={fmt(full)}"
+        if partial:
+            note += f"; edges_0.45_only={fmt(partial)}"
+        if full or partial:
+            note += f"; best_run={best:.2f}"
+        if partial and not full:
+            note += "; no edge holds at all three stand-offs"
+        chairs = rec.get("chairs_within_1m") or []
+        if chairs:
+            note += f"; chairs<=1m={len(chairs)}"
+        occupants = [o for o in (top.get("occupants") or []) if o.rsplit("_", 2)[0] not in STRUCTURAL_CATEGORIES]
+        if occupants:
+            note += f"; occupants={','.join(occupants[:6])}" + ("..." if len(occupants) > 6 else "")
+        if rec.get("in_union"):
+            note += "; in the old support union"
+        return {"reasons": reasons, "note": note, "z": z, "area": area, "short": short, "edges": full, "edges_partial": partial, "best_run": best}
+
+    def build_partners_from_inventory(self):
+        """`partner` rows of the two large-scale IORS subtasks from the B4 partner inventory (spec 5.6 / 6.12): ontop = every bed
+        / sofa / desk / breakfast table / countertop with a face raster; under = every bed / sofa / desk / breakfast table whose
+        maximum under-clearance is >= UNDER_CLEARANCE_MIN_M (`under_clearance`). Rejected partners stay in the sheet."""
+        for st, cats in ((LARGE_SCALE_IORS[0], ONTOP_LARGE_PARTNERS), (LARGE_SCALE_IORS[1], UNDER_LARGE_PARTNERS)):
+            for scene in SCENES:
+                for name, rec in sorted(self.inv["partners"].get(scene, {}).items()):
+                    if rec.get("category") not in cats:
+                        continue
+                    top, uc = rec.get("top") or {}, rec.get("under_clearance") or {}
+                    reasons: List[str] = []
+                    if not top.get("n_free_cells"):
+                        reasons.append("no_face_raster")
+                    best = max((self._edge_runs(e)[STAND_OFFS.index(ADMIT_STAND_OFF)] for e in rec.get("edges") or []), default=0.0)
+                    near = [(s["support"], s["geodesic_m"]) for s in rec.get("nearby_supports") or []
+                            if s.get("geodesic_m") is not None and s["geodesic_m"] <= PARTNER_GEODESIC_MAX_M]
+                    note = (f"B4: face z {float(top.get('z', 0.0)):.2f}, {top.get('n_free_cells', 0)} face cells ({float(top.get('area_m2', 0.0)):.2f} m2)"
+                            f"; best_run_0.45={best:.2f}")
+                    ucmax = uc.get("max_clearance_m")
+                    if st == LARGE_SCALE_IORS[1]:
+                        if ucmax is None or float(ucmax) < UNDER_CLEARANCE_MIN_M:
+                            reasons.append("under_clearance")
+                        note += f"; under_clearance_max={float(ucmax):.2f}" if ucmax is not None else "; under_clearance_max=unknown"
+                        frac = (uc.get("fraction_ge") or {}).get(f"{UNDER_CLEARANCE_MIN_M:.2f}")
+                        if frac is not None:
+                            note += f" (fraction>={UNDER_CLEARANCE_MIN_M:.2f}: {frac})"
+                    note += "; supports<=3m=" + (",".join(f"{n}({d:.2f})" for n, d in near) if near else "-")
+                    if reasons:
+                        note += "; rejects=" + ",".join(reasons)
+                    if not reasons:
+                        self.admitted_partners[st].add((scene, name))
+                    self.geo["partners"].append({"subtask": st, "scene": scene, "name": name, "category": rec["category"], "status": self._status(reasons),
+                                                 "face_z": float(top.get("z", 0.0)), "under_max": ucmax, "near": near})
+                    self.add_fixed(st, "partner", scene, name, rec["category"], room=",".join(rec.get("rooms") or []), status=self._status(reasons),
+                                   note=note, source=self._inv_source(scene, "partners", name), **self._surface_columns(rec))
+
+    def build_supports_from_inventory(self) -> int:
+        """`support` rows of every tabletop subtask from the B4 support inventory with the spec 3.2 filters (`_support_geometry`);
+        supports without a top raster (0 free cells) are skipped and reported. For the two large-scale IORS subtasks a support
+        must in addition lie within PARTNER_GEODESIC_MAX_M (eroded-map geodesic, from the partner records) of an admitted partner
+        of that subtask (`no_near_partner`; the partners are named in `note` as `near_partners=`). Then the floors."""
+        near: Dict[str, Dict[Tuple[str, str], list]] = {st: collections.defaultdict(list) for st in LARGE_SCALE_IORS}
+        unknown: Dict[str, Dict[Tuple[str, str], list]] = {st: collections.defaultdict(list) for st in LARGE_SCALE_IORS}
+        for st in LARGE_SCALE_IORS:
+            for scene, pname in sorted(self.admitted_partners[st]):
+                for s in self.inv["partners"][scene][pname].get("nearby_supports") or []:
+                    if s.get("geodesic_m") is not None and s["geodesic_m"] <= PARTNER_GEODESIC_MAX_M:
+                        near[st][(scene, s["support"])].append((pname, float(s["geodesic_m"])))
+                    elif s.get("geodesic_m") is None and float(s.get("aabb_distance_m", 99)) <= PARTNER_GEODESIC_MAX_M:
+                        unknown[st][(scene, s["support"])].append((pname, float(s["aabb_distance_m"])))
+        geo: Dict[Tuple[str, str], dict] = {}
+        for st in TABLETOP_SUBTASKS:
+            for scene in SCENES:
+                for name, rec in sorted(self.inv["supports"].get(scene, {}).items()):
+                    if not (rec.get("top") or {}).get("n_free_cells"):
+                        if st == TABLETOP_SUBTASKS[0]:
+                            self.geo["skipped_supports"].append((scene, name, rec.get("category", "")))
+                        continue
+                    if (scene, name) not in geo:
+                        geo[(scene, name)] = self._support_geometry(rec)
+                        self.geo["supports"].append({"scene": scene, "name": name, "category": rec["category"], **geo[(scene, name)]})
+                    g = geo[(scene, name)]
+                    reasons, note = list(g["reasons"]), g["note"]
+                    if st in LARGE_SCALE_IORS:
+                        ps = near[st].get((scene, name), [])
+                        if ps:
+                            note += "; near_partners=" + ",".join(f"{p}({d:.2f})" for p, d in sorted(ps, key=lambda x: x[1]))
+                        else:
+                            reasons.append("no_near_partner")
+                            unk = unknown[st].get((scene, name), [])
+                            if unk:
+                                note += "; partners_aabb<=3m_geodesic_unknown=" + ",".join(f"{p}({d:.2f})" for p, d in sorted(unk, key=lambda x: x[1]))
+                    if reasons:
+                        note += "; rejects=" + ",".join(reasons)
+                    self.add_fixed(st, "support", scene, name, rec["category"], room=",".join(rec.get("rooms") or []), status=self._status(reasons),
+                                   note=note, source=self._inv_source(scene, "supports", name), **self._surface_columns(rec))
+        self._add_floor_supports()
+        return sum(1 for g in self.geo["supports"] if not g["reasons"])
+
+    def _artic_joint_geometry(self, j: dict) -> dict:
+        """Admissibility of one B4 joint: kind door / drawer / flap, status handle / edge, and a pinch (a protruding handle, else
+        the exposed edge fallback) at HANDLE_Z world height with FRONT_FREE_MIN_M eroded free floor in front of the face and a
+        width inside PINCH_MM after the instance scale. The candidate with the fewest failing checks is the row's pinch."""
+        kind, status = j.get("kind", ""), j.get("status", "")
+        reasons: List[str] = []
+        if status == "error" or not kind:
+            return {"reasons": ["error"], "kind": "", "height": None, "width_mm": None, "via_fallback": False, "front_free": j.get("front_free_eroded_m")}
+        if kind not in ARTIC_JOINT_KINDS:
+            reasons.append(f"joint_kind_{kind}")
+        if status not in ARTIC_GRASPABLE:
+            reasons.append("ungraspable")
+        ff = j.get("front_free_eroded_m")
+        cands = [(h, False) for h in j.get("handles") or []]
+        if j.get("fallback") and j["fallback"].get("exposed"):
+            cands.append((j["fallback"], True))
+        best = None
+        for h, is_fallback in cands:
+            rs: List[str] = []
+            hz, w = h.get("height_world"), h.get("width")
+            if hz is None:
+                rs.append("handle_height_unknown")
+            elif float(hz) < HANDLE_Z[0]:
+                rs.append("handle_low")
+            elif float(hz) > HANDLE_Z[1]:
+                rs.append("handle_high")
+            if ff is None:
+                rs.append("front_free_unknown")
+            elif float(ff) < FRONT_FREE_MIN_M:
+                rs.append("front_blocked")
+            if w is None:
+                rs.append("pinch_unknown")
+            elif float(w) * 1000 < PINCH_MM[0]:
+                rs.append("pinch_narrow")
+            elif float(w) * 1000 > PINCH_MM[1]:
+                rs.append("pinch_wide")
+            key = (len(rs), is_fallback)
+            if best is None or key < best[0]:
+                best = (key, h, rs, is_fallback)
+            if not rs and not is_fallback:
+                break
+        if best is None:
+            if "ungraspable" not in reasons:
+                reasons.append("ungraspable")
+            return {"reasons": reasons, "kind": "", "height": None, "width_mm": None, "via_fallback": False, "front_free": ff}
+        _, h, rs, is_fallback = best
+        return {"reasons": reasons + rs, "kind": h.get("kind", ""), "height": h.get("height_world"),
+                "width_mm": float(h["width"]) * 1000 if h.get("width") is not None else None, "via_fallback": is_fallback and bool(j.get("handles")),
+                "front_free": ff}
+
+    def build_scene_artic_from_inventory(self):
+        """`target` rows of the two large-scale articulation subtasks: one row per (scene object, joint) of the B4 artic inventory
+        with the `_artic_joint_geometry` verdict; `joint` is the joint, `handle_kind` the pinch used (bar / knob / edge_*),
+        `handle_annotated` whether the canonical model has a reviewed annotation, `instance_scale` the measured scene scale."""
+        for st in (f"{CM}-articulation_open_large_scale", f"{CM}-articulation_close_large_scale"):
+            for scene in SCENES:
+                for name, d in sorted(self.inv["artic"].get(scene, {}).items()):
+                    hk = f"{d['category']}__{d['model']}"
+                    annotated = bool(d.get("canonical_annotation")) or os.path.exists(os.path.join(ARTIC, "handles", hk + ".json"))
+                    for j in d.get("joints") or []:
+                        g = self._artic_joint_geometry(j)
+                        pinch = (f"{g['kind']} h={g['height']:.2f} w={g['width_mm']:.0f}mm" if g["kind"] and g["height"] is not None and g["width_mm"] is not None
+                                 else "no pinch candidate")
+                        ff = j.get("front_free_m")
+                        note = (f"B4 {j.get('kind', '?')} {j.get('status', '?')}: {pinch}; front_free="
+                                + (f"{float(ff):.2f}({float(g['front_free']):.2f})" if ff is not None and g["front_free"] is not None else "unknown"))
+                        if g["via_fallback"]:
+                            note += "; via the exposed edge fallback (the protruding handles fail the pinch filters)"
+                        note += "; canonical annotation " + ("exists (rescale to the instance)" if annotated else "missing (C3 review)")
+                        prior = j.get("prior_review")
+                        if isinstance(prior, dict):
+                            note += f"; prior canonical review {prior.get('chosen', '-')}/{prior.get('result', '-')}"
+                        if g["reasons"]:
+                            note += "; rejects=" + ",".join(g["reasons"])
+                        if st.endswith("open_large_scale"):
+                            self.geo["artic"].append({"scene": scene, "name": name, "category": d["category"], "joint": j.get("joint", ""), "joint_kind": j.get("kind", ""),
+                                                      "b4_status": j.get("status", ""), "status": self._status(g["reasons"]), "pinch_kind": g["kind"],
+                                                      "height": g["height"], "width_mm": g["width_mm"]})
+                        self.add_fixed(st, "target", scene, name, d["category"], room=",".join(d.get("rooms") or []), joint=j.get("joint", ""), handle_key=hk,
+                                       handle_kind=g["kind"], handle_annotated="1" if annotated else "0",
+                                       instance_scale=json.dumps(d.get("scale")) if d.get("scale") else "", status=self._status(g["reasons"]), note=note,
+                                       source=self._inv_source(scene, "artic", name), **dict(zip(("bbox_x", "bbox_y", "bbox_z"), bbox(d.get("model", "")))))
+
+    def report_scene_rows(self):
+        """Stdout report of the regenerated scene rows: counts per (subtask, role, status), the skipped supports, the admitted
+        supports per scene with their edges, the admitted partners and the admitted articulated targets (for picking
+        representatives), the geodesic gaps of the B4 partner records."""
+        print(f"scene rows from {os.path.relpath(self.scene_inventory, REPO)} (filters: top z {SUPPORT_TOP_Z}, area >= {SUPPORT_MIN_AREA_M2} m2, "
+              f"short side >= {SUPPORT_MIN_SHORT_SIDE_M} m, edge run >= {EDGE_FREE_RUN_MIN_M} m at {ADMIT_STAND_OFF}, partner geodesic <= {PARTNER_GEODESIC_MAX_M} m, "
+              f"under clearance >= {UNDER_CLEARANCE_MIN_M} m, handle z {HANDLE_Z}, front free >= {FRONT_FREE_MIN_M} m, pinch {PINCH_MM} mm)")
+        by = collections.Counter((r["subtask"], r["role"], r["status"]) for r in self.roles if r["kind"] == KIND_SCENE)
+        for (st, role, status), n in sorted(by.items()):
+            print(f"  {st:58s} {role:8s} {status:36s} {n}")
+        if self.geo["skipped_supports"]:
+            print(f"  skipped (no top raster / 0 free cells): {len(self.geo['skipped_supports'])} supports: "
+                  + ", ".join(f"{s}:{n}" for s, n, _ in self.geo["skipped_supports"]))
+        print("  admitted supports per scene (name, category, top z, edges at 0.35/0.45/0.55):")
+        for scene in SCENES:
+            rows = [g for g in self.geo["supports"] if g["scene"] == scene and not g["reasons"]]
+            print(f"    {scene}: {len(rows)}")
+            for g in rows:
+                edges = ",".join(f"{n}({r[0]:.2f}/{r[1]:.2f}/{r[2]:.2f})" for n, r in g["edges"])
+                partial = ",".join(f"{n}({r[0]:.2f}/{r[1]:.2f}/{r[2]:.2f})" for n, r in g["edges_partial"])
+                print(f"      {g['name']:34s} {g['category']:26s} z {g['z']:.2f}  {g['area']:.2f} m2 x {g['short']:.2f} m  edges={edges}"
+                      + (f"  0.45-only={partial}" if partial else ""))
+        rej = collections.Counter(g["reasons"][0] for g in self.geo["supports"] if g["reasons"])
+        print(f"  rejected supports by first reason: {dict(rej)}")
+        for st in LARGE_SCALE_IORS:
+            rows = [g for g in self.geo["partners"] if g["subtask"] == st]
+            ok = [g for g in rows if g["status"] == STATUS_OK]
+            print(f"  {st}: {len(ok)} / {len(rows)} partners admitted")
+            for g in rows:
+                near = ",".join(f"{n}({d:.2f})" for n, d in g["near"]) or "-"
+                under = f" under_max={float(g['under_max']):.2f}" if g["under_max"] is not None and st.endswith("under_large_scale") else ""
+                print(f"      {g['status']:36s} {g['scene']}:{g['name']} ({g['category']}, face z {g['face_z']:.2f}{under}) supports<=3m={near}")
+        ok = [g for g in self.geo["artic"] if g["status"] == STATUS_OK]
+        print(f"  articulated scene targets: {len(ok)} / {len(self.geo['artic'])} (object, joint) admitted; "
+              f"categories: {dict(collections.Counter(g['category'] for g in ok))}")
+        for g in ok:
+            print(f"      {g['scene']}:{g['name']} {g['joint']} {g['joint_kind']} {g['pinch_kind']} h={g['height']:.2f} w={g['width_mm']:.0f}mm")
+        rej = collections.Counter(g["status"] for g in self.geo["artic"] if g["status"] != STATUS_OK)
+        print(f"  rejected (object, joint) by status: {dict(rej)}")
+        for st, role, pin, status in self.geo["pins_rejected"]:
+            print(f"  WARNING pin rejected by the geometric filter (no representative / test mark): {st} {role} {pin} -> {status}")
 
     # -- pins (the former combos sheet): test / representative marks on the candidate rows
     def mark_pins(self):
@@ -564,9 +926,13 @@ class Builder:
                             hits = [r for r in self.roles if r["subtask"] == st and r["role"] == role and r["scene"] == scene and r["room"] == name[:-2]]
                         else:
                             hits = [r for r in self.roles if r["subtask"] == st and r["role"] == role and r["scene"] == scene and r["model"] == name]
-                        for r in hits:
+                        # a scene row rejected by the geometric filter keeps its row but never a representative / test mark
+                        admitted = [r for r in hits if not r["status"].startswith(STATUS_REJECT)]
+                        for r in admitted:
                             r["test"] = "1"
                             r["representative"] = "1"
+                        if hits and not admitted:
+                            self.geo["pins_rejected"].append((st, role, pin, hits[0]["status"]))
                     else:
                         cat, model = pin.split("/", 1)
                         hits = by_key.get((st, role, cat, model), [])
@@ -927,10 +1293,15 @@ class Builder:
         self.link_libraries(req_dir)
         # summary
         by = collections.Counter((r["subtask"], r["role"]) for r in self.roles)
-        print(f"roles/candidates.csv: {len(self.roles)} rows; supports union: {n_sup} scene objects; wall regions: {len(self.walls)}; "
-              f"representative rows: {sum(r['representative'] == '1' for r in self.roles)}, test rows: {sum(r['test'] == '1' for r in self.roles)}")
+        print(f"roles/candidates.csv: {len(self.roles)} rows; supports: {n_sup} {'admitted' if self.inv is not None else 'union'} scene objects; "
+              f"wall regions: {len(self.walls)}; representative rows: {sum(r['representative'] == '1' for r in self.roles)}, "
+              f"test rows: {sum(r['test'] == '1' for r in self.roles)}")
         for (st, role), n in sorted(by.items()):
             print(f"  {st:58s} {role:12s} {n}")
+        if self.inv is not None:
+            self.report_scene_rows()
+        else:
+            print("scene rows: no --scene-inventory -> hand-copied seeds (status untested)")
         if symmetry and os.path.exists(symmetry):
             unsurveyed = collections.Counter((r["subtask"], r["role"]) for r in self.roles
                                              if r["kind"] in (KIND_SAMPLEABLE, KIND_GROUP) and r["model"] and not r["symmetry"])
@@ -967,8 +1338,16 @@ def main():
     ap.add_argument("--out", default=os.path.join(REPO, "ispatialgym", "assets", "icl"))
     ap.add_argument("--symmetry", default=SYMMETRY_DEFAULT if os.path.exists(SYMMETRY_DEFAULT) else None,
                     help="symmetry.json of scripts/symmetry/survey_symmetry.py (default: the latest committed survey runlog if it exists)")
+    ap.add_argument("--scene-inventory", default=SCENE_INVENTORY if os.path.isdir(SCENE_INVENTORY) else None, metavar="DIR",
+                    help="B4 scene inventory (summary.json + <scene>/{supports,partners,artic}/<name>.json): regenerates the scene rows - "
+                         "supports of the tabletop subtasks, large partners and their nearby supports, scene articulated targets - with "
+                         "the geometric filters of spec 3.2 / 5.6 / 6.12 (status geometric_ok / geometric_reject:<reason>). Default: "
+                         "runlogs/scene_inventory_20260915 if it exists; 'none' keeps the hand-copied seeds (status untested)")
     args = ap.parse_args()
-    Builder().run(args.out, symmetry=args.symmetry)
+    inv = None if not args.scene_inventory or args.scene_inventory.lower() == "none" else args.scene_inventory
+    if inv and not os.path.exists(os.path.join(inv, "summary.json")):
+        ap.error(f"--scene-inventory {inv}: no summary.json there")
+    Builder(scene_inventory=inv).run(args.out, symmetry=args.symmetry)
 
 
 if __name__ == "__main__":
