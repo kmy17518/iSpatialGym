@@ -1,6 +1,6 @@
 ; IORS - ontop (large-scale). The target starts on a support (a table within 3 m of the partner, or the floor beside it -
 ; an explicit support choice made by ground_isg, never a runtime fallback) and ends on top of a large scene partner
-; (bed, sofa, desk, breakfast table, countertop; roles.csv kind scene). Three recorded stances: init A, manipulation B,
+; (bed, sofa, desk, breakfast table, countertop; roles/candidates.csv kind scene). Three recorded stances: init A, manipulation B,
 ; placement C.
 (define (iddl inter_object_relation_satisfaction-ontop_large_scale)
     (:family inter_object_relation_satisfaction)

@@ -71,7 +71,7 @@ metadata directory, never BEHAVIOR's) with a different entry structure
 - **Key by alias** (`inter_object_relation_satisfaction-nextto-spatula-soup_ladle-breakfast_table`):
   one entry per grounded BDDL problem. The definition id is recorded inside
   (`definition_id`, from `activity_definitions/<activity>/problems.json`).
-- **`roles`**: the roles of the grounded problem (from the icl `roles.csv`, the
+- **`roles`**: the roles of the grounded problem (from the icl `roles/candidates.csv`, the
   iddl declares none) with their grounded category, a `sampleable` flag
   (`true` = spawned from the whitelist per template, `false` = a scene role
   bound per scene), the iddl `require` entries (`grasps: <pipeline>`,

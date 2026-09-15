@@ -86,27 +86,29 @@ See `ispatialgym/assets/iddl/README.md`. An iddl file is the BDDL skeleton over 
 `:groups` composites, `:init`, `:goal`, `:measure`) plus a `:require` block naming the icl artefacts a role's models
 must have — `(grasps <role> floating|tabletop|insert|attachment)`, `(contacts <role>)`, `(handle <role>)` — which
 `ground_isg` applies as admissibility filters. It declares no roles, kinds, categories, counts or scales: role kinds
-and candidates are the icl's (`roles.csv`), draw parameters the customs list's (`generation`), everything about
+and candidates are the icl's (`roles/candidates.csv`), draw parameters the customs list's (`generation`), everything about
 placement and installed constraints (hinges) is in sections 3–6 here. Roles in use: `target`, `targets` (group),
 `partner`, `source`, `destination`, `distractors` (group with `same_category` / `other_category` pools), `obstacles`
 (group, obstructed camera relocalization only), `support`, implicit `floor` and `agent`.
 
 ### 2.2 icl (candidate list)
 
-`ispatialgym/assets/icl/` — categories, never synsets; schema in its `README.md`:
+`ispatialgym/assets/icl/` — categories, never synsets; schema in its `README.md`. Two folders: `roles/` matches
+concrete categories and models to the iddl roles, `require/` holds the artefacts the `:require` block points at.
 
 | sheet | one row per | key columns |
 |---|---|---|
-| `roles.csv` | (subtask, role, category, model) | `kind` — `sampleable` (one spawned instance), `group` (member candidate of a group role), `scene` (scene object / wall region / room bound per scene; supports, walls, scene articulated objects, big partners, `room` bounds); `representative` (the one model of the category tested by `ground_isg`), `test` (test-instance models), `natural_scenes` (where an obstacle category may be drawn), `grasp_key`, `scale` (grasp-tested variant), frame axes (`frame_front`, `frame_up`, `frame_level`, `frame_long`, `symmetric_180`), articulation (`joint`, `handle_key`, `handle_annotated`, `instance_scale`), wall-region / support geometry, `display_name`, `status` (`untested` until `ground_isg` writes the per-scene verdicts into the customs list), `note` |
-| `pairs.csv` | (subtask, relation, role_a, category_a[/model_a], role_b, category_b[/model_b]) | how roles correlate: target→partner (`partner_of`, attachment `attach_type`), target→distractor pool (`distractor_same_category` / `distractor_other_category`, tier) |
-| `lookalikes.csv` | (group, category, model) | models indistinguishable from the init view (section 3.12) |
-| `combos.csv` | explicit combination | `test=1` combinations that `ground_isg` must test (representative models), scenes; `*N` spells the group size of that combination |
-| `grasps.csv` | (grasp key, grasp name) | `pipeline`, `width_m` (pinch width), `finger_q1/2`, `pad_clearance_m = (0.10 − width)/2`, verdict — what `(grasps …)` requirements are checked against |
+| `roles/candidates.csv` | (subtask, role, category, model) | `kind` — `sampleable` (one spawned instance), `group` (member candidate of a group role), `scene` (scene object / wall region / room bound per scene; supports, walls, scene articulated objects, big partners, `room` bounds); `representative` (the model of the category tested first by `ground_isg`; for scene rows the test support / partner / room / wall regions), `test` (test-set models incl. the v1 pins — explicit test combinations are the `test` rows admitted by `constraints_compatible.csv`, there is no combinations sheet), `natural_scenes` (where an obstacle category may be drawn), `grasp_key`, `scale` (grasp-tested variant), frame axes (`frame_front`, `frame_up`, `frame_level`, `frame_long`, `symmetric_180`), articulation (`joint`, `handle_key`, `handle_annotated`, `instance_scale`), wall-region / support geometry, `display_name`, `status` (`untested` until `ground_isg` writes the per-scene verdicts into the customs list), `note` |
+| `roles/constraints_compatible.csv` | (subtask, relation, role_a, category_a[/model_a], role_b, category_b[/model_b]) | which candidates go together: target→partner (`partner_of`, attachment `attach_type`, `ready`), target→distractor pool (`distractor_same_category` / `distractor_other_category`, tier) |
+| `roles/constraints_conflicting.csv` | (relation, group, category, model) | which candidates must not appear together / as each other: `lookalike` groups (section 3.12; A6 adds duplicates / same-geometry) |
+| `require/grasps.csv` | (grasp key, grasp name) | shared core (`key`, `category`, `model`, `scene`, `instance`, `require = grasps:<pipeline>`, `kind`, `name`, `position`, `axis_approach`, `axis_close`, `width_m`, `verdict`, `flags`, `note`, `path`, `source`) + `quat_xyzw`, `finger_q1/2`, `pad_clearance_m = (0.10 − width)/2`, `com_perp_m`, `antipodal`, `coverage`, `tilt_deg`, `rest_quat_wxyz`, `scale`, `task`, `pipeline` — what `(grasps …)` is checked against |
+| `require/handles.csv` | (key, joint, handle candidate) | shared core (`require = handle`; `name` `<joint>#A..D` / `#F` edge fallback / `#M` reviewer pinch; `verdict` `handle` / `edge` / `edge_blocked` / `manual` / `manual_unscaled` / `skip` / `ungraspable`) + `joint`, `joint_type`, `joint_kind`, `status`, `chosen`, `exposed`, `length_m`, `depth_m`, `pull_dir`, `axis_dir`, `hinge_point`, joint limits, and for the B4 scene instances `instance_scale`, `position_world`, `height_world_m`, `front_free_m` / `front_free_eroded_m` — what `(handle …)` is checked against |
+| `require/contacts.csv` | (key, contact) | shared core (`require = contacts`; `kind` push / brace / stop_edge) + `contact_role`, `direction`, `shape_class`, `scale` — what `(contacts …)` is checked against; header-only until B6 writes `runlogs/contacts_<date>/` |
 
-Artefacts referenced by `:require` beyond the sheets: `contacts/<category>__<model>.json` (alignment push / brace
-contacts, B6) and the handle annotations (`artic/handles/<key>.json`; per-instance scaled copies with `status` in the
-B4 scene inventory). Everything that used to be a "viable" list (supports, walls, articulated objects) is a
-*candidate* here until `ground_isg` re-derives it.
+`require/lib/` holds relative symlinks to the libraries the `path` columns refer to (`grasps` → the grasp library,
+`handles` → its `artic/handles`, `scene_inventory` → the B4 inventory, `contacts` once B6 exists). Everything that
+used to be a "viable" list (supports, walls, articulated objects) is a *candidate* here until `ground_isg` re-derives
+it.
 
 ### 2.3 Task customs list
 
@@ -317,9 +319,9 @@ Three relations between models of one category, all recorded in the icl and all 
 
 | relation | definition (source) | icl | rule |
 |---|---|---|---|
-| **exact duplicate** | identical geometry *and* textures under different model ids (`runlogs/grasp_library_20260905/select/duplicates.md` + `duplicates/`, `runlogs/{world_alignment_selection_20260911,world_horizontal_selection_20260912,obstacle_selection_20260912}/duplicates.json` `exact_groups`) | `roles.csv: duplicate_of` (the group's first model) | one member is the candidate; the others are never spawned, never counted as "another model" when `sample_isg` iterates over the whitelist, never both in a test set |
-| **texture / colour variant** (same geometry) | identical geometry, different textures (`same_geometry` / `same_shape` in the same sources) | `roles.csv: geometry_group` | both are candidates (they look different); they count once for *geometry* coverage statistics, separately for model iteration; never two variants as the two test instances of a category (pair rule) |
-| **look-alike** | models that cannot be told apart from the robot's **init view** (exact duplicates + same-shape variants whose only difference is a small print, label or shade, judged on renders at the init distance where objects are 20–130 px tall; `lookalikes.csv`, 55 groups today, disembedding categories only) | `lookalikes.csv` (`group_id`) | the task-semantics notion: no instance may ask for an object that another object in the scene could be confused with |
+| **exact duplicate** | identical geometry *and* textures under different model ids (`runlogs/grasp_library_20260905/select/duplicates.md` + `duplicates/`, `runlogs/{world_alignment_selection_20260911,world_horizontal_selection_20260912,obstacle_selection_20260912}/duplicates.json` `exact_groups`) | `roles/candidates.csv: duplicate_of` (the group's first model) | one member is the candidate; the others are never spawned, never counted as "another model" when `sample_isg` iterates over the whitelist, never both in a test set |
+| **texture / colour variant** (same geometry) | identical geometry, different textures (`same_geometry` / `same_shape` in the same sources) | `roles/candidates.csv: geometry_group` | both are candidates (they look different); they count once for *geometry* coverage statistics, separately for model iteration; never two variants as the two test instances of a category (pair rule) |
+| **look-alike** | models that cannot be told apart from the robot's **init view** (exact duplicates + same-shape variants whose only difference is a small print, label or shade, judged on renders at the init distance where objects are 20–130 px tall; `roles/constraints_conflicting.csv`, 55 groups today, disembedding categories only) | `roles/constraints_conflicting.csv` (`group_id`) | the task-semantics notion: no instance may ask for an object that another object in the scene could be confused with |
 
 Rules that use them:
 
@@ -578,7 +580,7 @@ instance: the draw, step 5, step 6. Variety comes from β, the step-4 draw and t
 
 ### 5.3 Prompt 1 — articulation, large-scale (open / close)
 
-Target bound to a scene articulated object (`bindings.target` names, from the `roles.csv` scene rows of the task rooms:
+Target bound to a scene articulated object (`bindings.target` names, from the `roles/candidates.csv` scene rows of the task rooms:
 cabinets, fridges, ovens, dishwashers, drawers, doors, iddl `(handle target)` satisfied); one joint per object
 (`roles.target.joint`, `roles.target.handle_key`).
 Handle annotation `artic/handles/<key>.json` → joint, contact, pinch_axis, approach_dir (target frame, closed
@@ -1002,16 +1004,17 @@ size-normalised errors.
 ## 9. `ground_isg`, `sample_isg`, `multiply_isg`
 
 **`ground_isg`** (iddl + icl → BDDL + customs list). For each iddl file and each category combination admitted by the
-icl (`pairs.csv`; only the `combos.csv` rows when `--test-only`): write the BDDL (alias, synsets from the KB, groups),
+icl (`roles/constraints_compatible.csv`; `--test-only` / `--representative-only` restrict the candidates to the `test = 1` /
+`representative = 1` rows of `roles/candidates.csv`): write the BDDL (alias, synsets from the KB, groups),
 the customs entry (per-scene whitelists = full icl pools minus the `:require` rejects — `missing_grasps:<pipeline>` /
 `missing_contacts` / `missing_handle` in the blacklist —, bindings of the scene roles, `generation` seeded from the
 existing entry or `generation_defaults.py`, section 2.3), then test the
-combination with **one representative model per category** (`roles.csv`) on every candidate scene / support / partner:
+combination with **one representative model per category** (`roles/candidates.csv`) on every candidate scene / support / partner:
 run the full initialization once (template + instance 0). Success → the template and instance 0 are kept, the
 constraints learned are appended; failure → the representative model is moved to that scene's blacklist with the
 rejection reason, and the combination is retried with the next representative (icl order) once; a combination with
 no successful representative anywhere is written with an empty whitelist and flagged. The alias is never a simple
-cartesian product of category lists: only correlated pairs from `pairs.csv` are grounded.
+cartesian product of category lists: only correlated pairs from `roles/constraints_compatible.csv` are grounded.
 
 **`sample_isg`** (BDDL + customs → N templates). N = min(#valid model combinations, `templates_max`), minus one when
 `ground_isg` already produced the representative template (its pair is removed from the pool). Model draw: iterate

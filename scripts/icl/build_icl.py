@@ -7,14 +7,29 @@ Inputs (all committed under ``runlogs/``):
   role names), incl. distractor pools, attachment partners, alignment frames, obstacle naturalness, table / wall rows,
 * ``runlogs/grasp_library_20260905/select/test_instances.csv`` - pick keys / scores per (task, category),
 * ``runlogs/grasp_library_20260905/results/<key>.json`` + ``cands/<key>.yaml`` + ``review/`` - the grasp library,
-* ``runlogs/grasp_library_20260905/artic/{artic_results.csv,scene_assign.json,handles/}`` - articulated objects,
+* ``runlogs/grasp_library_20260905/artic/{artic_results.csv,scene_assign.json,handles/,manual_handles.json}`` -
+  articulated objects and the canonical handle annotations + reviewer verdicts,
+* ``runlogs/scene_inventory_<date>/<scene>/artic/<name>.json`` - the per-instance (scaled) handle annotations of the
+  scene articulated objects (B4),
+* ``runlogs/contacts_<date>/<category>__<model>.json`` - push / brace contact annotations of the alignment targets
+  (B6; the sheet is header-only until they exist),
 * ``runlogs/table_selection_20260911/inventory.csv`` - geometry of every work surface / big partner in the 7 scenes,
 * ``runlogs/world_alignment_selection_20260911/wall_candidates.json`` - the 78 validated wall regions,
-* ``ispatialgym/assets/task_specs/task_custom_lists.json`` - the current test pins and the look-alike groups.
+* ``ispatialgym/assets/task_specs/task_custom_lists.json`` - the v1 test pins and the look-alike groups.
 
-Outputs (``ispatialgym/assets/icl/``): ``roles.csv``, ``pairs.csv``, ``lookalikes.csv``, ``combos.csv``, ``grasps.csv``
-and ``README.md`` (schema). Every candidate gets ``status = untested``: the old "viable" verdicts came from the sampler
-this rebuild replaces, so they are provenance (``source_selection``), not status.
+Outputs (``ispatialgym/assets/icl/``, schema in its ``README.md``):
+
+* ``roles/`` - matching concrete categories and models to the iddl roles: ``candidates.csv`` (one row per candidate
+  of a (subtask, role)), ``constraints_compatible.csv`` (which candidates go together: partner_of, distractor pools),
+  ``constraints_conflicting.csv`` (which candidates must not appear together / as each other: look-alike groups);
+* ``require/`` - the artefacts the iddl ``:require`` block points at, one compact summary row per computed pose:
+  ``grasps.csv``, ``handles.csv``, ``contacts.csv`` (shared core columns, see ``REQUIRE_CORE``), plus ``lib/`` symlinks
+  to the libraries the ``path`` column refers to.
+
+Every candidate gets ``status = untested``: the old "viable" verdicts came from the sampler this rebuild replaces, so
+they are provenance (``source_selection``), not status. The v1 test pins are kept as ``test`` / ``representative``
+marks on the candidate rows (there is no separate combinations sheet; ``ground_isg`` derives the representative
+combinations from the marks and ``constraints_compatible.csv``).
 
 Run inside the ``ispatialgym`` conda env (BDDL knowledge base for synsets / bounding boxes / readiness; graceful
 degradation without it)::
@@ -41,6 +56,8 @@ ARTIC = os.path.join(LIB, "artic")
 INVENTORY = os.path.join(REPO, "runlogs", "table_selection_20260911", "inventory.csv")
 WALLS = os.path.join(REPO, "runlogs", "world_alignment_selection_20260911", "wall_candidates.json")
 SPEC = os.path.join(REPO, "ispatialgym", "assets", "task_specs", "task_custom_lists.json")
+SCENE_INVENTORY = os.path.join(REPO, "runlogs", "scene_inventory_20260915")
+CONTACTS_GLOB = os.path.join(REPO, "runlogs", "contacts_*")
 sys.path.insert(0, REPO)
 
 try:  # knowledge base (synsets, bboxes, readiness); optional
@@ -77,10 +94,54 @@ KIND_GROUP = "group"            # member candidate of a group role (size / draw 
 KIND_SCENE = "scene"            # scene object / wall region / room bound per scene
 PAIR_COLUMNS = ["subtask", "relation", "role_a", "category_a", "model_a", "role_b", "category_b", "model_b", "tier", "attach_type",
                 "ready", "note", "source"]
-COMBO_COLUMNS = ["combo_id", "subtask", "kind", "test", "scene", "assignment", "note"]
-GRASP_COLUMNS = ["key", "category", "model", "task", "pipeline", "constraint", "rest_quat_wxyz", "scale", "grasp", "finger_q1", "finger_q2",
-                 "width_m", "pad_clearance_m", "com_perp_m", "antipodal", "coverage", "tilt_deg", "verdict", "flags"]
+CONFLICT_COLUMNS = ["relation", "group_id", "category", "model", "reason", "source"]
+# require/ sheets: one row per computed pose (grasp / handle contact / push-brace contact), shared core columns first.
+# `require` is the iddl :require form the row satisfies (grasps:<pipeline> | handle | contacts); `position`,
+# `axis_approach` (a, the eef +z direction at contact) and `axis_close` (c, the eef +y / pinch axis) are in the object's
+# base_link frame; `path` is the library file (repo-relative) the summary was taken from.
+REQUIRE_CORE = ["key", "category", "model", "scene", "instance", "require", "kind", "name", "position", "axis_approach", "axis_close",
+                "width_m", "verdict", "flags", "note", "path", "source"]
+GRASP_COLUMNS = REQUIRE_CORE + ["quat_xyzw", "finger_q1", "finger_q2", "pad_clearance_m", "com_perp_m", "antipodal", "coverage", "tilt_deg",
+                                "rest_quat_wxyz", "scale", "task", "pipeline"]
+HANDLE_COLUMNS = REQUIRE_CORE + ["joint", "joint_type", "joint_kind", "status", "chosen", "exposed", "length_m", "depth_m", "pull_dir",
+                                 "axis_dir", "hinge_point", "lower", "upper", "closed_q", "instance_scale", "position_world", "height_world_m",
+                                 "front_free_m", "front_free_eroded_m", "review_graspable", "review_pinch"]
+CONTACT_COLUMNS = REQUIRE_CORE + ["contact_role", "direction", "shape_class", "scale"]
+#: grasp-library `constraint` -> iddl grasp pipeline
+GRASP_PIPELINE = {"floating": "floating", "handle_half": "floating", "tabletop": "tabletop", "tabletop_insert": "insert",
+                  "flower_stem_top": "insert", "attachment_free": "attachment"}
 GRIPPER_OPEN_M = 0.10  # two fingers at 0.05 each
+
+#: v1 test set (task_custom_lists.json pins): kept as `test` marks (and `representative` where the category had none) on
+#: the candidate rows. Scene objects are `scene:name`, `scene:room/*` = every wall region of the room, rooms `scene:room`.
+_SUP = f"{TEST_SUPPORT[0]}:{TEST_SUPPORT[1]}"
+_ROOM = "house_single_floor:living_room_0"
+_WALLS = "house_single_floor:living_room_0/*"
+PINS: Dict[str, Dict[str, List[str]]] = {
+    "camera_relocalization-standard": {"room": [_ROOM]},
+    "camera_relocalization-obstructed": {"room": [_ROOM]},
+    "object_scaling": {"target": ["bottle_of_beer/gxxbhh"], "room": [_ROOM]},
+    "mental_rotation": {"target": ["toy_figure/zuntus"], "room": [_ROOM]},
+    "disembedding": {"target": ["box_of_cereal/iucshm"], "source": ["tray/gsxbym"], "destination": ["tray/hvlfig"], "support": [_SUP]},
+    f"{CM}-block_design": {"targets": ["toy_dice/isgblk"], "support": [_SUP]},
+    f"{CM}-articulation_open_small_scale": {"target": ["toolbox/redmtl"], "support": [_SUP]},
+    f"{CM}-articulation_close_small_scale": {"target": ["toolbox/redmtl"], "support": [_SUP]},
+    f"{CM}-attachment": {"target": ["cap/xxqyrt"], "partner": ["lemonade_bottle/yprkek"], "support": [_SUP]},
+    "alignment-axial": {"target": ["keyboard/hgtbot", "keyboard/injrgc"], "support": [_SUP]},
+    "alignment-world_vertical": {"target": ["painting/dacihj", "painting/ljabhq"], "support": [_WALLS]},
+    "alignment-world_horizontal": {"target": ["towel_rack/kqrmrh", "towel_rack/crivoa"], "support": [_WALLS]},
+    f"{IORS}-ontop_small_scale": {"target": ["pack_of_kielbasa/dgodnn"], "partner": ["platter/csanbr"], "support": [_SUP]},
+    f"{IORS}-under_large_scale": {"target": ["toy_figure/cobfpg"], "partner": ["house_single_floor:bed_rrcvaq_0"],
+                                  "support": ["house_single_floor:desk_xhjsub_0"]},
+    f"{IORS}-inside": {"target": ["lemon/ovbcff"], "partner": ["bowl/belcml"], "support": [_SUP]},
+    f"{IORS}-nextto": {"target": ["spatula/hkvsep"], "partner": ["soup_ladle/cfzneb"], "support": [_SUP]},
+    f"{IORS}-touching": {"target": ["can_of_baking_mix/blrqqz", "can_of_baking_mix/orwvfx"], "partner": ["board_game/eoywpy", "board_game/gcfkqa"],
+                         "support": [_SUP]},
+}
+for _st in TABLETOP_SUBTASKS:  # the test support is the representative support of every tabletop subtask
+    _sups = PINS.setdefault(_st, {}).setdefault("support", [])
+    if _SUP not in _sups:
+        _sups.append(_SUP)
 
 DISPLAY_OVERRIDES = {
     "toy_dice": "block", "pot_plant": "potted plant", "bottom_cabinet_no_top": "cabinet", "bottom_cabinet": "cabinet",
@@ -208,7 +269,6 @@ class Builder:
         self.spec = json.load(open(SPEC))
         self.roles: List[dict] = []
         self.pairs: List[dict] = []
-        self.combos: List[dict] = []
         self.keys_used: set = set()
 
     # -- generic object row
@@ -481,111 +541,212 @@ class Builder:
                                source="decision 2026-09-14")
         return len(union)
 
-    # -- combos
-    def build_combos(self):
-        cl = self.spec
-        sup = f"support={TEST_SUPPORT[0]}:{TEST_SUPPORT[1]}"
-        def add(cid, st, kind, scene, assignment, note=""):
-            self.combos.append({"combo_id": cid, "subtask": st, "kind": kind, "test": "1" if kind == "spec" else "", "scene": scene,
-                                "assignment": assignment, "note": note})
-        add("spec_camera_standard", "camera_relocalization-standard", "spec", "house_single_floor", "room=living_room_0", "current test spec")
-        add("spec_object_scaling", "object_scaling", "spec", "house_single_floor", "target=bottle_of_beer/gxxbhh;room=living_room_0", "current test spec")
-        add("spec_mental_rotation", "mental_rotation", "spec", "house_single_floor", "target=toy_figure/zuntus;room=living_room_0", "current test spec")
-        add("spec_disembedding", "disembedding", "spec", "house_single_floor",
-            f"target=box_of_cereal/iucshm;source=tray/gsxbym;destination=tray/hvlfig;{sup}", "distractors drawn from the pools at ground time")
-        add("spec_block_design", f"{CM}-block_design", "spec", "house_single_floor", f"targets=toy_dice/isgblk*4;{sup}", "pattern test_rbbr")
-        for d in ("open", "close"):
-            add(f"spec_articulation_{d}_small", f"{CM}-articulation_{d}_small_scale", "spec", "house_single_floor", f"target=toolbox/redmtl(j_lid);{sup}")
-        add("spec_attachment", f"{CM}-attachment", "spec", "house_single_floor", f"target=cap/xxqyrt;partner=lemonade_bottle/yprkek;{sup}")
-        for m in ("hgtbot", "injrgc"):
-            add(f"spec_axial_{m}", "alignment-axial", "spec", "house_single_floor", f"target=keyboard/{m};{sup}")
-        for m in ("dacihj", "ljabhq"):
-            add(f"spec_world_vertical_{m}", "alignment-world_vertical", "spec", "house_single_floor", f"target=painting/{m};support=house_single_floor:living_room_0/*", "any validated region of the room")
-        for m in ("kqrmrh", "crivoa"):
-            add(f"spec_world_horizontal_{m}", "alignment-world_horizontal", "spec", "house_single_floor", f"target=towel_rack/{m};support=house_single_floor:living_room_0/*")
-        add("spec_iors_ontop_small", f"{IORS}-ontop_small_scale", "spec", "house_single_floor", f"target=pack_of_kielbasa/dgodnn;partner=platter/csanbr;{sup}")
-        add("spec_iors_under_large", f"{IORS}-under_large_scale", "spec", "house_single_floor",
-            "target=toy_figure/cobfpg;partner=house_single_floor:bed_rrcvaq_0;support=house_single_floor:desk_xhjsub_0", "childs_room_0 test pair")
-        add("spec_iors_inside", f"{IORS}-inside", "spec", "house_single_floor", f"target=lemon/ovbcff;partner=bowl/belcml;{sup}")
-        add("spec_iors_nextto", f"{IORS}-nextto", "spec", "house_single_floor", f"target=spatula/hkvsep;partner=soup_ladle/cfzneb;{sup}")
-        for t in ("blrqqz", "orwvfx"):
-            for p in ("eoywpy", "gcfkqa"):
-                add(f"spec_iors_touching_{t}_{p}", f"{IORS}-touching", "spec", "house_single_floor", f"target=can_of_baking_mix/{t};partner=board_game/{p};{sup}")
-        # representative combos: pick 1 of every target category with the pick-1 partner of its paired category on the test support
-        reps = collections.defaultdict(dict)  # (subtask, role) -> category -> model
+    # -- pins (the former combos sheet): test / representative marks on the candidate rows
+    def mark_pins(self):
+        """Apply the v1 test pins as ``test = 1`` marks (and ``representative = 1`` where the (subtask, role, category) had
+        none) on the candidate rows; scene pins (test support, wall regions of the test room, test partner, room bounds)
+        become representative scene rows. Missing rows are reported, never invented."""
+        by_key: Dict[Tuple[str, str, str, str], List[dict]] = collections.defaultdict(list)
         for r in self.roles:
-            if r["representative"] == "1" and r["kind"] in (KIND_SAMPLEABLE, KIND_GROUP):
-                reps[(r["subtask"], r["role"])].setdefault(r["category"], r["model"])
-        partner_of = collections.defaultdict(list)
-        for p in self.pairs:
-            if p["relation"] == "partner_of":
-                partner_of[(p["subtask"], p["category_a"], p["model_a"])].append((p["category_b"], p["model_b"], p["ready"]))
+            by_key[(r["subtask"], r["role"], r["category"], r["model"])].append(r)
+        has_rep: set = {(r["subtask"], r["role"], r["category"]) for r in self.roles if r["representative"] == "1"}
+        for st, roles in PINS.items():
+            for role, pins in roles.items():
+                for pin in pins:
+                    if ":" in pin:  # scene object / wall regions of a room / room
+                        scene, name = pin.split(":", 1)
+                        if name.endswith("/*"):
+                            hits = [r for r in self.roles if r["subtask"] == st and r["role"] == role and r["scene"] == scene and r["room"] == name[:-2]]
+                        else:
+                            hits = [r for r in self.roles if r["subtask"] == st and r["role"] == role and r["scene"] == scene and r["model"] == name]
+                        for r in hits:
+                            r["test"] = "1"
+                            r["representative"] = "1"
+                    else:
+                        cat, model = pin.split("/", 1)
+                        hits = by_key.get((st, role, cat, model), [])
+                        for r in hits:
+                            r["test"] = "1"
+                            if (st, role, cat) not in has_rep:
+                                r["representative"] = "1"
+                        if hits and (st, role, cat) not in has_rep:
+                            has_rep.add((st, role, cat))
+                    if not hits:
+                        print(f"WARNING pin without candidate row: {st} {role} {pin} (add the row to its source, e.g. A5 scene inventory)")
         # attachment: the representative male model is the best-ranked one that has a READY partner (cap/hbafeb and
-        # blackberry/tvpfvb have none)
-        by_rank = collections.defaultdict(list)
+        # blackberry/tvpfvb have none); a category without any ready partner has no representative
+        partner_ready: Dict[Tuple[str, str], bool] = collections.defaultdict(bool)
+        for pr in self.pairs:
+            if pr["subtask"] == f"{CM}-attachment" and pr["relation"] == "partner_of" and pr["ready"] != "0":
+                partner_ready[(pr["category_a"], pr["model_a"])] = True
+        by_cat: Dict[str, List[dict]] = collections.defaultdict(list)
         for r in self.roles:
             if r["subtask"] == f"{CM}-attachment" and r["role"] == "target":
-                by_rank[r["category"]].append((int(r["rank"] or 9), r["model"]))
-        for cat, lst in by_rank.items():
-            for _, model in sorted(lst):
-                if any(rd != "0" for _, _, rd in partner_of.get((f"{CM}-attachment", cat, model), [])):
-                    reps[(f"{CM}-attachment", "target")][cat] = model
-                    break
-            else:
-                reps[(f"{CM}-attachment", "target")].pop(cat, None)  # no ready partner in the category: no representative test
-        for (st, role), cats in sorted(reps.items()):
-            if role != "target":
-                continue
-            for cat, model in sorted(cats.items()):
-                parts = [f"target={cat}/{model}"]
-                partners = partner_of.get((st, cat, model)) or partner_of.get((st, cat, ""))
-                if partners:
-                    pcat, pmodel, prd = partners[0]
-                    if prd == "0" and len(partners) > 1:
-                        pcat, pmodel, prd = next(((c, m, rd) for c, m, rd in partners if rd != "0"), partners[0])
-                    if not pmodel:
-                        pmodel = reps.get((st, "partner"), {}).get(pcat, "")
-                    if st.endswith("large_scale"):
-                        parts.append(f"partner={pcat}")
-                    else:
-                        parts.append(f"partner={pcat}/{pmodel}" if pmodel else f"partner={pcat}")
-                if st in TABLETOP_SUBTASKS:
-                    parts.append(sup)
-                elif st in WALL_SUBTASKS:
-                    parts.append("support=house_single_floor:living_room_0/*")
-                elif st.startswith("camera_relocalization") or st in ("object_scaling", "mental_rotation"):
-                    parts.append("room=living_room_0")
-                add(f"rep_{st}_{cat}", st, "representative", "house_single_floor", ";".join(parts), "ground_isg representative-model test")
+                by_cat[r["category"]].append(r)
+        for cat, rows in by_cat.items():
+            rows.sort(key=lambda r: int(r["rank"] or 9))
+            ready_rows = [r for r in rows if partner_ready[(cat, r["model"])]]
+            for r in rows:
+                if r["representative"] == "1" and not partner_ready[(cat, r["model"])]:
+                    r["representative"] = ""
+                    r["note"] = "not the representative: no READY attachment partner; " + r["note"]
+            if ready_rows and not any(r["representative"] == "1" for r in ready_rows):
+                ready_rows[0]["representative"] = "1"
 
-    # -- grasps
+    # -- require/ sheets
+    @staticmethod
+    def _axes_from_quat_xyzw(q) -> Tuple[List[float], List[float]]:
+        """Approach (eef +z) and closing (eef +y) axes of an eef orientation given as xyzw."""
+        x, y, z, w = [float(v) for v in q]
+        # rotation matrix columns
+        col_y = [2 * (x * y - w * z), 1 - 2 * (x * x + z * z), 2 * (y * z + w * x)]
+        col_z = [2 * (x * z + w * y), 2 * (y * z - w * x), 1 - 2 * (x * x + y * y)]
+        return [round(v, 4) for v in col_z], [round(v, 4) for v in col_y]
+
+    @staticmethod
+    def _rel(path: str) -> str:
+        return os.path.relpath(path, REPO)
+
     def build_grasps(self) -> List[dict]:
         out = []
         if GL is None:
             return out
         for key in sorted(self.keys_used):
             res = self.results.get(key, {})
+            pipeline = GRASP_PIPELINE.get(res.get("constraint", ""), "")
+            common = {"key": key, "category": res.get("category", ""), "model": res.get("model", ""),
+                      "require": f"grasps:{pipeline}" if pipeline else "", "kind": f"{res.get('pipeline', '')}/{res.get('constraint', '')}".strip("/"),
+                      "path": self._rel(os.path.join(LIB, "results", f"{key}.json")), "source": os.path.basename(LIB),
+                      "task": res.get("task", ""), "pipeline": pipeline, "scale": json.dumps(res.get("scale")) if res.get("scale") else ""}
             try:
                 grasps = GL.load_grasps(key)
             except Exception as e:
-                out.append({**empty_row(GRASP_COLUMNS), "key": key, "flags": f"load failed: {e}"})
+                out.append({**empty_row(GRASP_COLUMNS), **common, "verdict": "none", "flags": f"load failed: {e}"})
                 continue
             cm = res.get("candidates_meta", {})
             for g in grasps:
                 fq = list(g.finger_q) if g.finger_q else ["", ""]
                 width = g.meta.get("width")
+                q = [round(float(v), 5) for v in g.quat.tolist()]
+                a, c = self._axes_from_quat_xyzw(q)
                 row = empty_row(GRASP_COLUMNS)
+                row.update(common)
                 row.update({
-                    "key": key, "category": res.get("category", ""), "model": res.get("model", ""), "task": res.get("task", ""),
-                    "pipeline": res.get("pipeline", ""), "constraint": res.get("constraint", ""),
+                    "name": g.name, "position": json.dumps([round(float(v), 4) for v in g.position.tolist()]),
+                    "axis_approach": json.dumps(a), "axis_close": json.dumps(c), "quat_xyzw": json.dumps(q),
                     "rest_quat_wxyz": json.dumps(cm.get("rest_quat_wxyz")) if cm.get("rest_quat_wxyz") else "",
-                    "scale": json.dumps(res.get("scale")) if res.get("scale") else "", "grasp": g.name,
                     "finger_q1": fq[0] if len(fq) > 0 else "", "finger_q2": fq[1] if len(fq) > 1 else "",
                     "width_m": width if width is not None else "",
                     "pad_clearance_m": f"{(GRIPPER_OPEN_M - float(width)) / 2:.4f}" if width is not None else "",
                     "com_perp_m": g.meta.get("com_perp", ""), "antipodal": g.meta.get("antipodal", ""), "coverage": g.meta.get("coverage", ""),
-                    "tilt_deg": g.meta.get("tilt_deg", ""), "verdict": g.verdict, "flags": ";".join(g.flags or []),
+                    "tilt_deg": g.meta.get("tilt_deg", ""), "verdict": g.verdict, "flags": ";".join(g.flags or []), "note": (g.note or "")[:200],
                 })
                 out.append(row)
+        return out
+
+    def _handle_rows(self, d: dict, path: str, scene: str = "", instance: str = "", reviews: Optional[dict] = None,
+                     manual: Optional[dict] = None, **extra) -> List[dict]:
+        """One row per handle candidate of every joint of one annotation file (canonical model or scaled scene instance).
+        Candidate names follow the review strips: ``<joint>#A..D`` protruding handles, ``#F`` the edge fallback, ``#M`` a
+        reviewer-placed manual pinch."""
+        rows = []
+        key, cat, model = d.get("key", ""), d.get("category", ""), d.get("model", "")
+        for j in d.get("joints", []):
+            joint = j["joint"]
+            rev = (reviews or {}).get((cat, model, joint), {})
+            man = ((manual or {}).get(key) or {}).get(joint) or {}
+            chosen_marker = rev.get("review_chosen", "") if rev.get("review_chosen", "") not in ("", "none") else ""
+            if man.get("use"):
+                chosen_marker = man["use"]
+            base = {**empty_row(HANDLE_COLUMNS), "key": key, "category": cat, "model": model, "scene": scene, "instance": instance,
+                    "require": "handle", "path": self._rel(path), "source": os.path.basename(os.path.dirname(os.path.dirname(path))) if scene else "grasp_library_20260905/artic/handles",
+                    "joint": joint, "joint_type": j.get("type", ""), "joint_kind": j.get("kind", ""), "status": j.get("status", ""),
+                    "axis_dir": json.dumps(j.get("axis_dir_obj")), "hinge_point": json.dumps(j.get("hinge_point_obj")),
+                    "lower": j.get("lower", ""), "upper": j.get("upper", ""), "closed_q": j.get("closed_q", ""),
+                    "front_free_m": j.get("front_free_m", ""), "front_free_eroded_m": j.get("front_free_eroded_m", ""),
+                    "review_graspable": rev.get("review_graspable", ""), "review_pinch": rev.get("review_pinch", ""),
+                    "note": (rev.get("handle_desc", "") or (extra.get("prior_review") or ""))[:200]}
+            base.update({k: v for k, v in extra.items() if k in base and k != "note"})
+            cands = [(f"{joint}#{chr(65 + i)}", h, h.get("kind", "")) for i, h in enumerate(j.get("handles", []))]
+            if j.get("fallback"):
+                cands.append((f"{joint}#F", j["fallback"], j["fallback"].get("kind", "")))
+            if man.get("contact"):
+                cands.append((f"{joint}#M", man, man.get("kind", "edge_manual")))
+            scale = extra.get("instance_scale")
+            unit_scale = not scale or all(abs(float(v) - 1.0) <= 0.02 for v in json.loads(scale))
+            for name, h, kind in cands:
+                r = dict(base)
+                exposed = h.get("exposed")
+                if name.endswith("#M"):  # reviewer-placed pinch, given in the canonical object frame
+                    verdict = "manual" if unit_scale else "manual_unscaled"
+                elif kind in ("bar", "knob"):
+                    verdict = "handle"
+                else:
+                    verdict = "edge" if exposed in (True, None) else "edge_blocked"
+                if man.get("skip"):
+                    verdict = "skip"
+                r.update({"name": name, "kind": kind, "verdict": verdict, "chosen": "1" if name.endswith("#" + chosen_marker) and chosen_marker else "",
+                          "position": json.dumps(h.get("contact")), "axis_approach": json.dumps(h.get("approach_dir")),
+                          "axis_close": json.dumps(h.get("pinch_axis")), "pull_dir": json.dumps(h.get("pull_dir")) if h.get("pull_dir") else "",
+                          "width_m": h.get("width", ""), "length_m": h.get("length", ""), "depth_m": h.get("depth", ""),
+                          "exposed": "" if exposed is None else ("1" if exposed else "0"),
+                          "position_world": json.dumps(h.get("contact_world")) if h.get("contact_world") else "",
+                          "height_world_m": h.get("height_world", ""),
+                          "flags": ";".join(f for f in (("manual_skip: " + man["skip"]) if man.get("skip") else "",
+                                                        ("manual: " + man["note"]) if man.get("note") and name.endswith("#M") else "",
+                                                        "manual contact is in the canonical frame: rescale to the instance" if verdict == "manual_unscaled" else "",
+                                                        h.get("note", "") if kind.startswith("edge") and not name.endswith("#M") else "") if f)[:200]})
+                rows.append(r)
+            if not cands:
+                r = dict(base)
+                r.update({"name": f"{joint}#-", "kind": "none", "verdict": "skip" if man.get("skip") else "ungraspable",
+                          "flags": ("manual_skip: " + man["skip"]) if man.get("skip") else "no protruding handle and no exposed edge"})
+                rows.append(r)
+        return rows
+
+    def build_handles(self) -> List[dict]:
+        """require/handles.csv: canonical handle annotations (grasp library artic/handles) with the reviewer verdicts, plus the
+        per-instance scaled annotations of the scene articulated objects (scene inventory, B4)."""
+        reviews = {}
+        try:
+            for r in csv.DictReader(open(os.path.join(ARTIC, "artic_results.csv"))):
+                reviews.setdefault((r["category"], r["model"], r["joint"]), r)
+        except FileNotFoundError:
+            pass
+        manual = {}
+        mp = os.path.join(ARTIC, "manual_handles.json")
+        if os.path.exists(mp):
+            manual = json.load(open(mp))
+        out: List[dict] = []
+        for path in sorted(glob.glob(os.path.join(ARTIC, "handles", "*.json"))):
+            d = json.load(open(path))
+            out += self._handle_rows(d, path, reviews=reviews, manual=manual)
+        for path in sorted(glob.glob(os.path.join(SCENE_INVENTORY, "*", "artic", "*.json"))):
+            d = json.load(open(path))
+            out += self._handle_rows(d, path, scene=d.get("scene", ""), instance=d.get("name", ""), reviews=reviews, manual=manual,
+                                     instance_scale=json.dumps(d.get("scale")) if d.get("scale") else "", prior_review=d.get("prior_review") or "")
+        return out
+
+    def build_contacts(self) -> List[dict]:
+        """require/contacts.csv from ``runlogs/contacts_<date>/<category>__<model>.json`` (B6). Expected file content:
+        ``{"key", "category", "model", "scale", "contacts": [{"name", "role": "push|brace|stop_edge", "position", "approach",
+        "closing", "direction", "shape_class", "verdict", "flags", "note"}]}`` (object base_link frame, metres). Header-only
+        while no such directory exists."""
+        out: List[dict] = []
+        dirs = sorted(glob.glob(CONTACTS_GLOB))
+        if not dirs:
+            return out
+        root = dirs[-1]
+        for path in sorted(glob.glob(os.path.join(root, "*.json"))):
+            d = json.load(open(path))
+            for c in d.get("contacts", []):
+                out.append({**empty_row(CONTACT_COLUMNS), "key": d.get("key", os.path.splitext(os.path.basename(path))[0]),
+                            "category": d.get("category", ""), "model": d.get("model", ""), "require": "contacts", "kind": c.get("role", ""),
+                            "name": c.get("name", ""), "position": json.dumps(c.get("position")), "axis_approach": json.dumps(c.get("approach")),
+                            "axis_close": json.dumps(c.get("closing")), "width_m": "", "verdict": c.get("verdict", "ok"),
+                            "flags": ";".join(c.get("flags", [])), "note": (c.get("note", "") or "")[:200], "path": self._rel(path),
+                            "source": os.path.basename(root), "contact_role": c.get("role", ""), "direction": json.dumps(c.get("direction")),
+                            "shape_class": c.get("shape_class", ""), "scale": json.dumps(d.get("scale")) if d.get("scale") else ""})
         return out
 
     def build_lookalikes(self) -> List[dict]:
@@ -596,8 +757,26 @@ class Builder:
             reason = g.get("reason", "") if isinstance(g, dict) else ""
             for m in members:
                 cat, model = m.split("/", 1)
-                out.append({"group_id": f"g{i:02d}", "category": cat, "model": model, "reason": reason, "source": "task_custom_lists.json (disembedding-0.distractors.lookalike_groups)"})
+                out.append({"relation": "lookalike", "group_id": f"g{i:02d}", "category": cat, "model": model, "reason": reason,
+                            "source": "task_custom_lists.json (disembedding-0.distractors.lookalike_groups)"})
         return out
+
+    @staticmethod
+    def link_libraries(req_dir: str):
+        """``require/lib/<name>`` -> the library directories the ``path`` columns refer to (relative symlinks, replaced on
+        every run; a library that does not exist yet gets no link)."""
+        lib_dir = os.path.join(req_dir, "lib")
+        os.makedirs(lib_dir, exist_ok=True)
+        targets = {"grasps": LIB, "handles": os.path.join(ARTIC, "handles"), "scene_inventory": SCENE_INVENTORY}
+        contacts = sorted(glob.glob(CONTACTS_GLOB))
+        if contacts:
+            targets["contacts"] = contacts[-1]
+        for name, target in targets.items():
+            link = os.path.join(lib_dir, name)
+            if os.path.islink(link) or os.path.exists(link):
+                os.remove(link)
+            if os.path.isdir(target):
+                os.symlink(os.path.relpath(target, lib_dir), link)
 
     def run(self, out_dir: str):
         self.build_camera_relocalization()
@@ -609,26 +788,38 @@ class Builder:
         self.build_alignment()
         self.build_iors()
         n_sup = self.build_supports()
-        self.build_combos()
+        self.mark_pins()
         grasps = self.build_grasps()
+        handles = self.build_handles()
+        contacts = self.build_contacts()
         lookalikes = self.build_lookalikes()
-        os.makedirs(out_dir, exist_ok=True)
-        for name, rows, cols in (("roles.csv", self.roles, ROLE_COLUMNS), ("pairs.csv", self.pairs, PAIR_COLUMNS),
-                                 ("combos.csv", self.combos, COMBO_COLUMNS), ("grasps.csv", grasps, GRASP_COLUMNS),
-                                 ("lookalikes.csv", lookalikes, ["group_id", "category", "model", "reason", "source"])):
-            with open(os.path.join(out_dir, name), "w", newline="") as f:
+        roles_dir, req_dir = os.path.join(out_dir, "roles"), os.path.join(out_dir, "require")
+        os.makedirs(roles_dir, exist_ok=True)
+        os.makedirs(req_dir, exist_ok=True)
+        for path, rows, cols in ((os.path.join(roles_dir, "candidates.csv"), self.roles, ROLE_COLUMNS),
+                                 (os.path.join(roles_dir, "constraints_compatible.csv"), self.pairs, PAIR_COLUMNS),
+                                 (os.path.join(roles_dir, "constraints_conflicting.csv"), lookalikes, CONFLICT_COLUMNS),
+                                 (os.path.join(req_dir, "grasps.csv"), grasps, GRASP_COLUMNS),
+                                 (os.path.join(req_dir, "handles.csv"), handles, HANDLE_COLUMNS),
+                                 (os.path.join(req_dir, "contacts.csv"), contacts, CONTACT_COLUMNS)):
+            with open(path, "w", newline="") as f:
                 w = csv.DictWriter(f, fieldnames=cols)
                 w.writeheader()
                 for r in rows:
                     w.writerow({c: r.get(c, "") for c in cols})
+        self.link_libraries(req_dir)
         # summary
         by = collections.Counter((r["subtask"], r["role"]) for r in self.roles)
-        print(f"roles.csv: {len(self.roles)} rows; supports union: {n_sup} scene objects; wall regions: {len(self.walls)}")
+        print(f"roles/candidates.csv: {len(self.roles)} rows; supports union: {n_sup} scene objects; wall regions: {len(self.walls)}; "
+              f"representative rows: {sum(r['representative'] == '1' for r in self.roles)}, test rows: {sum(r['test'] == '1' for r in self.roles)}")
         for (st, role), n in sorted(by.items()):
             print(f"  {st:58s} {role:12s} {n}")
-        print(f"pairs.csv: {len(self.pairs)} rows ({collections.Counter(p['relation'] for p in self.pairs)})")
-        print(f"combos.csv: {len(self.combos)} rows ({collections.Counter(c['kind'] for c in self.combos)})")
-        print(f"grasps.csv: {len(grasps)} rows from {len(self.keys_used)} keys; lookalikes.csv: {len(lookalikes)} rows")
+        print(f"roles/constraints_compatible.csv: {len(self.pairs)} rows ({collections.Counter(p['relation'] for p in self.pairs)})")
+        print(f"roles/constraints_conflicting.csv: {len(lookalikes)} rows")
+        print(f"require/grasps.csv: {len(grasps)} rows from {len(self.keys_used)} keys ({collections.Counter(g['require'] for g in grasps)})")
+        print(f"require/handles.csv: {len(handles)} rows ({collections.Counter(h['verdict'] for h in handles)}; "
+              f"{sum(1 for h in handles if h['scene'])} scene-instance rows)")
+        print(f"require/contacts.csv: {len(contacts)} rows")
 
 
 def main():

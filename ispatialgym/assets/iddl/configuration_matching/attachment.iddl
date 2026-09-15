@@ -1,7 +1,7 @@
 ; Configuration matching - attachment. Target = male part (grasped), partner = female part (stands on the support, braced
 ; by the other gripper while attaching). The assembly group carries the fixed member-to-slot layout target; the
 ; partner's pose stays as at init. Male / female pairs with matching BEHAVIOR attachment meta-links come from
-; pairs.csv (partner_of, attach_type); the partner brace is computed geometrically (no artefact).
+; roles/constraints_compatible.csv (partner_of, attach_type); the partner brace is computed geometrically (no artefact).
 (define (iddl configuration_matching-attachment)
     (:family configuration_matching)
     (:alias configuration_matching-attachment-{target}-{partner}-{support})

@@ -4,9 +4,12 @@ One `.iddl` file per subtask (21 files, one directory per task family). An iddl 
 written over **roles** instead of synset instances: no synsets appear (the agent excepted), no categories, no models,
 no object counts. Everything concrete lives elsewhere:
 
-- **icl** (`ispatialgym/assets/icl/`): which roles a subtask has, their *kind* (`sampleable` / `group` / `scene`) and
-  the candidate categories and models per role (`roles.csv`), how roles correlate (`pairs.csv`), the explicit test
-  combinations (`combos.csv`), the grasp library (`grasps.csv`) and the annotation artefacts `:require` points at.
+- **icl** (`ispatialgym/assets/icl/`): `roles/` — which roles a subtask has, their *kind* (`sampleable` / `group` /
+  `scene`), the candidate categories and models per role with the `representative` / `test` marks
+  (`candidates.csv`), which candidates go together (`constraints_compatible.csv`) and which must not
+  (`constraints_conflicting.csv`); `require/` — one compact row per computed grasp / handle pinch / contact
+  (`grasps.csv`, `handles.csv`, `contacts.csv`), the artefacts the `:require` block points at, with `lib/` symlinks to
+  the libraries.
 - **task customs list** (one entry per grounded alias, `docs/instance_sampling_spec.md` §2.3): how models are drawn
   (group sizes, identical vs unique members, spawn scales, chosen joints), the per‑scene whitelists / blacklists and
   every constraint sampling learned.
@@ -34,9 +37,9 @@ named by the `:alias` template — and into the task customs list; `sample_isg` 
 ## Roles
 
 Roles are bare names used in the literals; there is no declaration block. Every role of a subtask except the two
-implicit ones must have rows in `roles.csv` for that subtask, and the row's `kind` says how it is grounded:
+implicit ones must have rows in `roles/candidates.csv` for that subtask, and the row's `kind` says how it is grounded:
 
-| `roles.csv` kind | grounded to | notes |
+| `roles/candidates.csv` kind | grounded to | notes |
 |---|---|---|
 | `sampleable` | one spawned instance `<synset>_k` | category from the alias slot `{role}`, model drawn per template from the customs whitelist |
 | `group` | a BDDL group `<role>_group.n.01_1` with N spawned members | N and identical‑vs‑unique members from the customs list (`generation.groups.<role>`); the alias slot lists `<category>_<count>` tokens (e.g. `bottle_of_beer_3_bottle_of_sake_1`); goal assignment of a group with goal literals is `exchangeable` (one‑to‑one matching, `docs/task_bddl_formats.md`) |
@@ -56,27 +59,29 @@ here: *how* an object is manipulated (grasped, pushed, braced), hinges installed
 and group sizes are initialization rules or customs‑list parameters.
 
 ```
-(grasps <role> floating|tabletop|insert|attachment) ; grasps.csv rows of that pipeline for every model of the role
-                                                    ; (library keys __f / __t / __i / __a; the flower variant __fl
-                                                    ; counts as insert)
-(contacts <role>)                                   ; contacts/<category>__<model>.json for every model of the role
-                                                    ; (push ends, brace kinds, stop edges, no-go regions; TODO B6)
-(handle <role>)                                     ; handle annotation: artic/handles/<key>.json for spawned models,
-                                                    ; the scaled per-instance annotation of the scene inventory (B4)
-                                                    ; with status handle / edge for scene objects
+(grasps <role> floating|tabletop|insert|attachment) ; icl/require/grasps.csv: >= 1 row with require = grasps:<pipeline>
+                                                    ; and verdict ok / flag for every model of the role (library keys
+                                                    ; __f / __t / __i / __a; the flower variant __fl counts as insert)
+(contacts <role>)                                   ; icl/require/contacts.csv: >= 1 push row for every model of the role
+                                                    ; (push ends, brace kinds, stop edges; B6 fills the sheet)
+(handle <role>)                                     ; icl/require/handles.csv: >= 1 row with verdict handle / edge /
+                                                    ; manual for the model (spawned) or the (scene, instance) (scene
+                                                    ; objects, B4 scaled annotations); its joint is a roles.<role>.joint
+                                                    ; candidate
 ```
 
-`ground_isg` treats every line as an admissibility filter: a candidate model without the artefact is not grounded
-and is written to the customs blacklist with the reason `missing_grasps:<pipeline>` / `missing_contacts` /
+`ground_isg` treats every line as an admissibility filter over the `require/` sheets (the sheets summarise the
+libraries they link to under `require/lib/`, `path` column): a candidate model without an admissible row is not
+grounded and is written to the customs blacklist with the reason `missing_grasps:<pipeline>` / `missing_contacts` /
 `missing_handle`. Contacts that the sampler computes geometrically (small‑scale articulation base‑link brace,
 attachment partner brace, touching partner brace, block pushes) need no artefact and have no entry; block design
 therefore has no `:require` at all (generic cube grasp set).
 
 Where the former `:options` went: `articulated` → `(handle …)` + customs `roles.<role>.joint` / `handle_key`;
-`push` → `(contacts …)`; `attach` → derived from the `(attached …)` literal and `pairs.csv` (`partner_of`,
+`push` → `(contacts …)`; `attach` → derived from the `(attached …)` literal and `roles/constraints_compatible.csv` (`partner_of`,
 `attach_type`); `hinge` → initialization rule (spec §5.5, §6.10), recorded in the TRO constraints; `scale` → customs
-`roles.<role>.scale`; `scene <categories>` → `roles.csv` rows of kind `scene`; `group_size` / `same_model` → customs
-`generation.groups.<role>` (`size`, `draw`); role kinds → `roles.csv` `kind`.
+`roles.<role>.scale`; `scene <categories>` → `roles/candidates.csv` rows of kind `scene`; `group_size` / `same_model` → customs
+`generation.groups.<role>` (`size`, `draw`); role kinds → `roles/candidates.csv` `kind`.
 
 ## Literal semantics
 
@@ -90,10 +95,12 @@ for under(small‑scale) (the partner ends under the manipulated target).
 
 1. Collect the roles from the alias slots and the literals (the wall `support` of the two world‑alignment subtasks
    appears only in the alias: the target hangs on it through the sampler's hinge, not through a literal, but the
-   BDDL still declares it); look up their kind and candidates in `roles.csv` (subtask, role); `agent` and `floor` are
+   BDDL still declares it); look up their kind and candidates in `roles/candidates.csv` (subtask, role); `agent` and `floor` are
    implicit, `room` rows only bound the scene. A role without rows is an error, not a fallback.
-2. Enumerate the admitted category combinations from `pairs.csv` (only correlated pairs; `combos.csv` rows when
-   `--test-only`); apply the `:require` filters to the candidate models. Fill every alias slot: `{target}`,
+2. Enumerate the admitted category combinations from `roles/constraints_compatible.csv` (only correlated pairs;
+   `--test-only` keeps the combinations of `test = 1` candidates, `--representative-only` those of `representative = 1`
+   candidates — there is no separate combinations sheet); apply the `:require` filters to the candidate models,
+   `roles/constraints_conflicting.csv` to the pairs and sets. Fill every alias slot: `{target}`,
    `{partner}`, `{support}` → category names; `{distractors}` / `{targets}` / `{obstacles}` → `<category>_<count>`
    tokens with the count from the customs seed (`generation.groups.<role>.size`); the result is the BDDL
    `(:alias ...)` and the problem's id.

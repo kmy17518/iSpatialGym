@@ -1,5 +1,5 @@
 ; Configuration matching - articulation (large-scale, open). The target is a scene articulated object (cabinet, fridge,
-; oven, drawer, door; roles.csv kind scene, bound per scene); one joint is chosen (customs list roles.target.joint /
+; oven, drawer, door; roles/candidates.csv kind scene, bound per scene); one joint is chosen (customs list roles.target.joint /
 ; handle_key); closed -> open to a passively stable angle q_goal in S. Handle grasp with the arm on the handle's side;
 ; opening primarily by base / trunk motion (base-follow), arm secondary.
 (define (iddl configuration_matching-articulation_open_large_scale)

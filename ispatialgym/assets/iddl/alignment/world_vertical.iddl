@@ -1,4 +1,4 @@
-; Alignment - world vertical. The target hangs on the support (a wall region, roles.csv kind scene) through a revolute
+; Alignment - world vertical. The target hangs on the support (a wall region, roles/candidates.csv kind scene) through a revolute
 ; hinge at its centre of mass (axis = wall normal, TRO constraint installed by the sampler, spec 5.5), starts tilted
 ; 15-45 deg in the wall plane and must be pushed upright (tangential push at the low end + brace at the high end).
 ; Orientation-only target; the position is fixed by the hinge. Push / brace contacts from
