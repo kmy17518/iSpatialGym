@@ -1,0 +1,36 @@
+; IORS - under (large-scale). The target starts on a support (a table near the partner, the floor beside it, or the
+; partner's own top) and ends on the floor under a large fixed partner (bed, sofa, desk, breakfast table) at a goal cell
+; where an upward ray hits the partner above target height + 3 cm. Argument order: the target is under the partner.
+(define (iddl inter_object_relation_satisfaction-under_large_scale)
+    (:family inter_object_relation_satisfaction)
+    (:alias inter_object_relation_satisfaction-under_large_scale-{target}-{partner}-{support})
+    (:roles
+        target - object
+        partner - fixed
+        support - fixed
+        floor - fixed
+        agent - agent
+    )
+    (:options
+        (grasps target tabletop)
+        (scene partner bed sofa desk breakfast_table)
+        (scene support breakfast_table desk countertop bar bottom_cabinet coffee_table conference_table pedestal_table booth shelf bed sofa floors)
+        (scene floor floors)
+    )
+    (:init
+        (ontop target support)
+        (not (under target partner))
+        (ontop agent floor)
+    )
+    (:goal
+        (and
+            (under ?target ?partner)
+            (not (grasped ?agent ?target))
+            (pose_settled ?target)
+            (pose_settled ?agent)
+        )
+    )
+    (:measure
+        (pose_reached ?target)
+    )
+)

@@ -1,0 +1,36 @@
+; Configuration matching - block design. Four identical custom Kohs blocks (toy_dice/isgblk, ispatialgym-assets) scattered
+; on the support; the goal is the pattern's top faces in a touching 2x2 grid anchored at the top-left block, aligned with
+; the support edges, reached by the smallest rotation (yaw-align, one adjacent flip). layout_reached gates, pose_reached
+; is measured.
+(define (iddl configuration_matching-block_design)
+    (:family configuration_matching)
+    (:alias configuration_matching-block_design-{targets}-{support})
+    (:roles
+        targets - group
+        support - fixed
+        floor - fixed
+        agent - agent
+    )
+    (:options
+        (group_size targets 4 4)
+        (same_model targets)
+        (scene support breakfast_table desk countertop bar bottom_cabinet coffee_table conference_table pedestal_table booth shelf)
+        (scene floor floors)
+    )
+    (:init
+        (ontop targets support)
+        (ontop agent floor)
+    )
+    (:goal
+        (and
+            (ontop ?targets ?support)
+            (layout_reached ?targets)
+            (not (grasped ?agent ?targets))
+            (pose_settled ?targets)
+            (pose_settled ?agent)
+        )
+    )
+    (:measure
+        (pose_reached ?targets)
+    )
+)

@@ -1,0 +1,27 @@
+; Mental rotation. The target is held (right arm, fixed hold pose) at init and at the goal; the goal is a world-frame
+; orientation of the target, its position unchanged (TRO pose target: orientation_metric = full, equivalences per model).
+(define (iddl mental_rotation)
+    (:family mental_rotation)
+    (:alias mental_rotation-{target})
+    (:roles
+        target - object
+        floor - fixed
+        agent - agent
+    )
+    (:options
+        (grasps target floating)
+        (scene floor floors)
+    )
+    (:init
+        (ontop agent floor)
+        (grasped agent target)
+    )
+    (:goal
+        (and
+            (grasped ?agent ?target)
+            (pose_reached ?target)
+            (pose_settled ?target)
+            (pose_settled ?agent)
+        )
+    )
+)

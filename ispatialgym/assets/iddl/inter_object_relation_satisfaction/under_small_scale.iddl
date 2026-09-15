@@ -1,0 +1,39 @@
+; IORS - under (small-scale). Both objects on the support; the manipulated target (glass, teacup, fries, bottle) is set
+; down centred on the partner (coaster, saucer, platter, tray) so that the PARTNER ends under the target. Argument order
+; is therefore (under partner target). Both poses measured.
+(define (iddl inter_object_relation_satisfaction-under_small_scale)
+    (:family inter_object_relation_satisfaction)
+    (:alias inter_object_relation_satisfaction-under_small_scale-{target}-{partner}-{support})
+    (:roles
+        target - object
+        partner - object
+        support - fixed
+        floor - fixed
+        agent - agent
+    )
+    (:options
+        (grasps target tabletop)
+        (scene support breakfast_table desk countertop bar bottom_cabinet coffee_table conference_table pedestal_table booth shelf)
+        (scene floor floors)
+    )
+    (:init
+        (ontop target support)
+        (ontop partner support)
+        (not (under partner target))
+        (ontop agent floor)
+    )
+    (:goal
+        (and
+            (under ?partner ?target)
+            (not (grasped ?agent ?target))
+            (not (grasped ?agent ?partner))
+            (pose_settled ?target)
+            (pose_settled ?partner)
+            (pose_settled ?agent)
+        )
+    )
+    (:measure
+        (pose_reached ?target)
+        (pose_reached ?partner)
+    )
+)

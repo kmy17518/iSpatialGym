@@ -1,0 +1,38 @@
+; IORS - nextto. Target and partner on the support with an init gap above the NextTo bound; the target is moved to the
+; nearest position that satisfies NextTo (gap below mean(dims_a + dims_b)/6, adjacency rays), same orientation.
+(define (iddl inter_object_relation_satisfaction-nextto)
+    (:family inter_object_relation_satisfaction)
+    (:alias inter_object_relation_satisfaction-nextto-{target}-{partner}-{support})
+    (:roles
+        target - object
+        partner - object
+        support - fixed
+        floor - fixed
+        agent - agent
+    )
+    (:options
+        (grasps target tabletop)
+        (scene support breakfast_table desk countertop bar bottom_cabinet coffee_table conference_table pedestal_table booth shelf)
+        (scene floor floors)
+    )
+    (:init
+        (ontop target support)
+        (ontop partner support)
+        (not (nextto target partner))
+        (ontop agent floor)
+    )
+    (:goal
+        (and
+            (nextto ?target ?partner)
+            (not (grasped ?agent ?target))
+            (not (grasped ?agent ?partner))
+            (pose_settled ?target)
+            (pose_settled ?partner)
+            (pose_settled ?agent)
+        )
+    )
+    (:measure
+        (pose_reached ?target)
+        (pose_reached ?partner)
+    )
+)

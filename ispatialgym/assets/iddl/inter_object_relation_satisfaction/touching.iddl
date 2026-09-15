@@ -1,0 +1,38 @@
+; IORS - touching. Target grasped and set down next to the partner (partner on the robot's left), then pushed against it
+; while the other gripper braces the partner's far side; the partner must not move (> 5 mm) at the goal.
+(define (iddl inter_object_relation_satisfaction-touching)
+    (:family inter_object_relation_satisfaction)
+    (:alias inter_object_relation_satisfaction-touching-{target}-{partner}-{support})
+    (:roles
+        target - object
+        partner - object
+        support - fixed
+        floor - fixed
+        agent - agent
+    )
+    (:options
+        (grasps target tabletop)
+        (scene support breakfast_table desk countertop bar bottom_cabinet coffee_table conference_table pedestal_table booth shelf)
+        (scene floor floors)
+    )
+    (:init
+        (ontop target support)
+        (ontop partner support)
+        (not (touching target partner))
+        (ontop agent floor)
+    )
+    (:goal
+        (and
+            (touching ?target ?partner)
+            (not (grasped ?agent ?target))
+            (not (grasped ?agent ?partner))
+            (pose_settled ?target)
+            (pose_settled ?partner)
+            (pose_settled ?agent)
+        )
+    )
+    (:measure
+        (pose_reached ?target)
+        (pose_reached ?partner)
+    )
+)

@@ -1,0 +1,38 @@
+; IORS - inside. Target lowered into the partner (fillable container) on the support; the target's goal orientation is
+; whatever settles (TRO orientation_metric null), which also admits flowers stood in vases. Both poses measured.
+(define (iddl inter_object_relation_satisfaction-inside)
+    (:family inter_object_relation_satisfaction)
+    (:alias inter_object_relation_satisfaction-inside-{target}-{partner}-{support})
+    (:roles
+        target - object
+        partner - object
+        support - fixed
+        floor - fixed
+        agent - agent
+    )
+    (:options
+        (grasps target insert)
+        (scene support breakfast_table desk countertop bar bottom_cabinet coffee_table conference_table pedestal_table booth shelf)
+        (scene floor floors)
+    )
+    (:init
+        (ontop target support)
+        (ontop partner support)
+        (not (inside target partner))
+        (ontop agent floor)
+    )
+    (:goal
+        (and
+            (inside ?target ?partner)
+            (not (grasped ?agent ?target))
+            (not (grasped ?agent ?partner))
+            (pose_settled ?target)
+            (pose_settled ?partner)
+            (pose_settled ?agent)
+        )
+    )
+    (:measure
+        (pose_reached ?target)
+        (pose_reached ?partner)
+    )
+)

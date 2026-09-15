@@ -1,0 +1,36 @@
+; Configuration matching - articulation (small-scale, open). Spawned articulated object (toolbox, carton, hinged jar) on
+; the support (floor for objects taller than 0.6 m), facing the robot; closed -> open to q_goal in S. Handle arm + brace
+; arm on the base link; the object's root pose is measured (pose_reached in :measure), not gated.
+(define (iddl configuration_matching-articulation_open_small_scale)
+    (:family configuration_matching)
+    (:alias configuration_matching-articulation_open_small_scale-{target}-{support})
+    (:roles
+        target - object
+        support - fixed
+        floor - fixed
+        agent - agent
+    )
+    (:options
+        (articulated target)
+        (scene support breakfast_table desk countertop bar bottom_cabinet coffee_table conference_table pedestal_table booth shelf floors)
+        (scene floor floors)
+    )
+    (:init
+        (not (open target))
+        (ontop target support)
+        (ontop agent floor)
+    )
+    (:goal
+        (and
+            (open ?target)
+            (layout_reached ?target)
+            (ontop ?target ?support)
+            (not (grasped ?agent ?target))
+            (pose_settled ?target)
+            (pose_settled ?agent)
+        )
+    )
+    (:measure
+        (pose_reached ?target)
+    )
+)

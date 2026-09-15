@@ -1,0 +1,30 @@
+; Alignment - world horizontal. Same wall hinge as world vertical; the target is an elongated wall item whose long axis /
+; reference edge must end level. Models that look the same upside down carry the 180 deg equivalence (symmetric_180).
+(define (iddl alignment-world_horizontal)
+    (:family alignment)
+    (:alias alignment-world_horizontal-{target}-{support})
+    (:roles
+        target - object
+        support - fixed
+        floor - fixed
+        agent - agent
+    )
+    (:options
+        (push target)
+        (hinge target support normal)
+        (scale target configured)
+        (scene support walls)
+        (scene floor floors)
+    )
+    (:init
+        (ontop agent floor)
+    )
+    (:goal
+        (and
+            (pose_reached ?target)
+            (not (grasped ?agent ?target))
+            (pose_settled ?target)
+            (pose_settled ?agent)
+        )
+    )
+)

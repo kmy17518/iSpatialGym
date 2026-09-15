@@ -1,0 +1,35 @@
+; Configuration matching - articulation (small-scale, close). Spawned articulated object on the support, one joint open
+; at q_init in S -> closed limit. Handle arm + brace arm; root pose measured.
+(define (iddl configuration_matching-articulation_close_small_scale)
+    (:family configuration_matching)
+    (:alias configuration_matching-articulation_close_small_scale-{target}-{support})
+    (:roles
+        target - object
+        support - fixed
+        floor - fixed
+        agent - agent
+    )
+    (:options
+        (articulated target)
+        (scene support breakfast_table desk countertop bar bottom_cabinet coffee_table conference_table pedestal_table booth shelf floors)
+        (scene floor floors)
+    )
+    (:init
+        (open target)
+        (ontop target support)
+        (ontop agent floor)
+    )
+    (:goal
+        (and
+            (not (open ?target))
+            (layout_reached ?target)
+            (ontop ?target ?support)
+            (not (grasped ?agent ?target))
+            (pose_settled ?target)
+            (pose_settled ?agent)
+        )
+    )
+    (:measure
+        (pose_reached ?target)
+    )
+)

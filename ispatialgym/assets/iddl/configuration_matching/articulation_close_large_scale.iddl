@@ -1,0 +1,29 @@
+; Configuration matching - articulation (large-scale, close). Scene articulated object, one joint open at q_init in S
+; (must satisfy Open) -> closed limit. Handle grasp in this direction too; base / trunk primary, arm secondary.
+(define (iddl configuration_matching-articulation_close_large_scale)
+    (:family configuration_matching)
+    (:alias configuration_matching-articulation_close_large_scale-{target})
+    (:roles
+        target - fixed
+        floor - fixed
+        agent - agent
+    )
+    (:options
+        (articulated target)
+        (scene target bottom_cabinet bottom_cabinet_no_top top_cabinet fridge oven dishwasher door)
+        (scene floor floors)
+    )
+    (:init
+        (open target)
+        (ontop agent floor)
+    )
+    (:goal
+        (and
+            (not (open ?target))
+            (layout_reached ?target)
+            (not (grasped ?agent ?target))
+            (pose_settled ?target)
+            (pose_settled ?agent)
+        )
+    )
+)

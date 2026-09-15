@@ -1,0 +1,41 @@
+; Configuration matching - attachment. Target = male part (grasped), partner = female part (stands on the support, braced
+; by the other gripper while attaching). The assembly group carries the fixed member-to-slot layout target; the
+; partner's pose stays as at init.
+(define (iddl configuration_matching-attachment)
+    (:family configuration_matching)
+    (:alias configuration_matching-attachment-{target}-{partner}-{support})
+    (:roles
+        target - object
+        partner - object
+        support - fixed
+        floor - fixed
+        agent - agent
+    )
+    (:groups
+        target partner - assembly
+    )
+    (:options
+        (grasps target attachment)
+        (attach target partner)
+        (scene support breakfast_table desk countertop bar bottom_cabinet coffee_table conference_table pedestal_table booth shelf)
+        (scene floor floors)
+    )
+    (:init
+        (ontop assembly support)
+        (not (attached target partner))
+        (ontop agent floor)
+    )
+    (:goal
+        (and
+            (attached ?target ?partner)
+            (ontop ?partner ?support)
+            (layout_reached ?assembly)
+            (not (grasped ?agent ?assembly))
+            (pose_settled ?assembly)
+            (pose_settled ?agent)
+        )
+    )
+    (:measure
+        (pose_reached ?assembly)
+    )
+)
