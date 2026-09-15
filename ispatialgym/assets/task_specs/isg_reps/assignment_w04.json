@@ -1,0 +1,61 @@
+{
+ "bww745svp53k6o": [
+  "configuration_matching-articulation_close_large_scale-door__representative__target-crtrpa",
+  "inter_object_relation_satisfaction-under_small_scale-bottle_of_supplements-tray-breakfast_table__representative__target-oqakev__partner-hjxczh"
+ ],
+ "s9gu707jcu0c4t": [
+  "configuration_matching-articulation_close_large_scale-bottom_cabinet__representative__target-fancyy",
+  "inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-breakfast_table__representative__target-mxsliu__partner-httqaj"
+ ],
+ "xjcbf78x77u3ha": [
+  "configuration_matching-articulation_close_large_scale-bottom_cabinet_no_top__representative__target-gjrero"
+ ],
+ "m9bs9prd2le0sv": [
+  "configuration_matching-articulation_close_large_scale-fridge__representative__target-dszchb"
+ ],
+ "b3ekgyalgi2okl": [
+  "configuration_matching-articulation_close_large_scale-oven__representative__target-amblrk"
+ ],
+ "aey2b3zxtomj4w": [
+  "configuration_matching-articulation_close_large_scale-dishwasher__representative__target-ynrhuk"
+ ],
+ "04e370p8x5njx6": [
+  "configuration_matching-articulation_open_large_scale-door__representative__target-crtrpa"
+ ],
+ "iybnthuvpch63n": [
+  "configuration_matching-articulation_open_large_scale-bottom_cabinet__representative__target-fancyy"
+ ],
+ "2vcws019lyv2fo": [
+  "configuration_matching-articulation_open_large_scale-bottom_cabinet_no_top__representative__target-gjrero"
+ ],
+ "6stwopl6ugnsp9": [
+  "configuration_matching-articulation_open_large_scale-fridge__representative__target-dszchb"
+ ],
+ "w35hpk3bqt9hdg": [
+  "configuration_matching-articulation_open_large_scale-oven__representative__target-amblrk"
+ ],
+ "lbrh9ee7fm6w6s": [
+  "configuration_matching-articulation_open_large_scale-dishwasher__representative__target-ynrhuk"
+ ],
+ "hpli8clbgyuxo0": [
+  "inter_object_relation_satisfaction-ontop_large_scale-pen-bed-desk__representative__target-gzrbrx__partner-rrcvaq"
+ ],
+ "v32unigw9c7tvp": [
+  "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-countertop__representative__target-zoyyia__partner-fjkase"
+ ],
+ "x5goe1znwggxm9": [
+  "inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor__representative__target-gbzzcg__partner-xhjsub"
+ ],
+ "45io4gtk36x3qj": [
+  "inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar__representative__target-bclpiq__partner-lugrhk"
+ ],
+ "vvwjmktpeyfxel": [
+  "inter_object_relation_satisfaction-ontop_large_scale-beaker-bed-desk__representative__target-fyrkzs__partner-rrcvaq"
+ ],
+ "kr1rgi08w4xkcm": [
+  "inter_object_relation_satisfaction-under_small_scale-french_fries-platter-breakfast_table__representative__target-kxpfcj__partner-kiiamx"
+ ],
+ "x585ybii6bip1w": [
+  "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table__representative__target-cpozxi__partner-mgbeah"
+ ]
+}

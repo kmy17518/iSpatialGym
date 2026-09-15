@@ -91,6 +91,21 @@ The v1 pins are kept where the object survives the filter (test support `breakfa
 `bed_rrcvaq_0`, under support `desk_xhjsub_0`); a pin whose row is rejected is reported by the builder and left
 unmarked (`breakfast_table_rhjoby_0` as under(large‑scale) support: no admitted under partner within 3 m).
 
+### `representatives.csv`, `candidates_extra.csv`, `representatives_report.md` — the representative selection (A9)
+
+Written by `scripts/icl/select_representatives.py` (deterministic; re-run after every `build_icl.py`). One row per
+(pick, role, slot): `family, subtask, pick` (`<subtask>#NN`), `role`, `slot` — `representative` (the model
+`ground_isg` / `sample_isg` / the oracle run first; training), `variation_texture` (V‑OBJ: same geometry, other
+texture), `variation_geometry` (VB‑MOBJ / VB‑ISC: other geometry of the same category; scene roles: another support /
+partner / scene instance), `heldout` (generalization; **global per category** — the same model in every subtask, never
+drawn in any other role) — then `category, model, scene, name` (scene object), `joint`, `kind`, `grasp_key` (the
+pipeline key of the subtask), `scale`, `geometry_group` / `exact_group` (texture‑variant / duplicate ids from the
+reviews), `status`, `note`. `candidates_extra.csv` = candidate rows the icl did not have (`candidates.csv` columns +
+`plan`; `status = incomplete:<reason>`), merged by `ground_isg` until a survey validates them. The report lists per
+subtask which variation / generalization axes are unavailable and why, the slot‑availability table and the plan for
+the incomplete candidates. `ispatialgym/sampling/ground_isg.py` (v1 bridge) grounds the picks into
+`ispatialgym/assets/task_specs/isg_reps/`.
+
 ### `constraints_compatible.csv` — which candidates go together
 
 | relation | a → b |
