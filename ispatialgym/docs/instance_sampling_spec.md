@@ -282,6 +282,39 @@ values, grasp `(yaw, grasp_key, grasp_name)`, pre-/grasp/place eef poses, push a
 handle waypoints `h(q_k)`, `follow_mode`, transitions, paths, block order and per-block grasp/flip data, path bucket,
 per-object image-space descriptors for the language annotations — is written at sampling time.
 
+### 3.12 Look-alikes, exact duplicates and texture variants
+
+Three relations between models of one category, all recorded in the icl and all used by the samplers:
+
+| relation | definition (source) | icl | rule |
+|---|---|---|---|
+| **exact duplicate** | identical geometry *and* textures under different model ids (`runlogs/grasp_library_20260905/select/duplicates.md` + `duplicates/`, `runlogs/{world_alignment_selection_20260911,world_horizontal_selection_20260912,obstacle_selection_20260912}/duplicates.json` `exact_groups`) | `roles.csv: duplicate_of` (the group's first model) | one member is the candidate; the others are never spawned, never counted as "another model" when `sample_isg` iterates over the whitelist, never both in a test set |
+| **texture / colour variant** (same geometry) | identical geometry, different textures (`same_geometry` / `same_shape` in the same sources) | `roles.csv: geometry_group` | both are candidates (they look different); they count once for *geometry* coverage statistics, separately for model iteration; never two variants as the two test instances of a category (pair rule) |
+| **look-alike** | models that cannot be told apart from the robot's **init view** (exact duplicates + same-shape variants whose only difference is a small print, label or shade, judged on renders at the init distance where objects are 20–130 px tall; `lookalikes.csv`, 55 groups today, disembedding categories only) | `lookalikes.csv` (`group_id`) | the task-semantics notion: no instance may ask for an object that another object in the scene could be confused with |
+
+Rules that use them:
+
+1. **Disembedding.** For a target `C/m` the same-category pool is `pools[C].same_category` minus `m` and minus every
+   model in `m`'s look-alike group; the other-category pool likewise (groups may cross categories); distractors within a
+   template are unique models (exact duplicates count as one). Distractors may be look-alikes of *each other*. An empty
+   pool for the requested kind is not a fallback case: the alias fixes the distractor categories, so `ground_isg` only
+   grounds category combinations whose pools are non-empty after the exclusions.
+2. **Same-category or look-alike target–partner pairs** (IORS nextto / touching / ontop, e.g. salt shaker – pepper
+   shaker, teacup – teapot): a pair whose two models share a look-alike group is rejected (the instruction would be
+   ambiguous); a same-category pair of distinguishable models is allowed, and both objects get a spatial descriptor in
+   the sidecar (`language.objects.*.descriptor`) so the annotations can name them.
+3. **Groups of identical members** are the intended exception: blocks (`same_model`), and — if ever wanted — several
+   distractors of one model; `distractors_group` members are unique models by default.
+4. **Model iteration** in `sample_isg` ("iterate over all models before reusing one") counts exact duplicates as one
+   model and texture variants as distinct models.
+5. **Representative / test picks**: the representative is the pick-1 model of the (deduplicated) category; the two
+   test instances of a category are never exact duplicates or texture variants of each other (the selection contract's
+   pair rule).
+6. **Look-alike coverage beyond disembedding** (TODO A6): the init-view look-alike judgement exists only for the 39
+   disembedding categories; for the IORS pairs whose partner is of the same or a related category and for obstacle /
+   alignment categories only the geometry-based duplicate / variant flags exist. Until A6 delivers the review, rule 2
+   uses `duplicate_of` ∪ `geometry_group` as the look-alike proxy.
+
 ## 4. Tabletop initialization
 
 Applies to every task whose objects rest on a fixed support: disembedding, block design, attachment, axial
@@ -937,8 +970,9 @@ cartesian product of category lists: only correlated pairs from `pairs.csv` are 
 
 **`sample_isg`** (BDDL + customs → N templates). N = min(#valid model combinations, `templates_max`), minus one when
 `ground_isg` already produced the representative template (its pair is removed from the pool). Model draw: iterate
-over all whitelisted models before reusing one; unique models within a template (blocks excepted, `same_model`);
-disembedding distractors from the pools of the target's category minus look-alikes. Each template: full
+over all whitelisted models before reusing one (exact duplicates count as one model, texture variants as distinct
+models, section 3.12); unique models within a template (blocks excepted, `same_model`); disembedding distractors from
+the pools of the target's category minus the target's look-alike group; look-alike target–partner pairs rejected. Each template: full
 initialization → instance 0; failure → the model(s) responsible move to the blacklist (reason recorded); every
 success appends constraints (stance, grasp_set, joint_set, placement, contacts) with `source`.
 
