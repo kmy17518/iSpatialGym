@@ -330,6 +330,12 @@ class HeldObjectV2(SamplerV2):
             return True
         return self.world.scene.seg_map.get_room_instance_by_point(G.t(xy)[:2]) == room
 
+    def scene_obstacles(self) -> List[Any]:
+        """Every collision object but the robot: removed from the planner world for the robot-only facts (the hold and
+        the per-template goal screening depend on the robot and the object, not on where the robot happens to be
+        parked; the world is checked per instance at the sampled base pose)."""
+        return [o for o in self.world.scene.objects if o is not self.robot]
+
     # ------------------------------------------------------------------ the fixed hold (§6.3)
 
     def solve_hold(self) -> Dict[str, Any]:
@@ -358,13 +364,14 @@ class HeldObjectV2(SamplerV2):
                 q, source = qc, "cache"
             else:
                 log.warning("held hold cache %s: FK mismatch, re-solving", key)
-        if q is None:
-            q = self.kit.ik(eef_w, q0, arm=ARM)
+        with self.kit.ignoring(self.scene_obstacles()):  # a robot-only fact: solved and checked against the robot itself
             if q is None:
-                raise Reject("hold_pose", f"no right-arm IK solution for the fixed hold (depth {hc.depth_m}, trunk ({hc.translate}, {hc.tilt}), roll {hc.roll_deg} deg; "
-                                          f"pad in base {[round(float(v), 3) for v in C.relative((pad_w, C.IDENTITY_QUAT), base3)[0]]})")
-        if not bool(self.kit.collision_free(q, margin=0.01)[0]):
-            raise Reject("hold_pose", "the hold configuration collides (self or world at the parked pose)")
+                q = self.kit.ik(eef_w, q0, arm=ARM)
+                if q is None:
+                    raise Reject("hold_pose", f"no right-arm IK solution for the fixed hold (depth {hc.depth_m}, trunk ({hc.translate}, {hc.tilt}), roll {hc.roll_deg} deg; "
+                                              f"pad in base {[round(float(v), 3) for v in C.relative((pad_w, C.IDENTITY_QUAT), base3)[0]]})")
+            if not bool(self.kit.collision_free(q, margin=0.01)[0]):
+                raise Reject("hold_pose", "the hold configuration self-collides")
         q_rel = q.clone()
         q_rel[[self.kit.jidx[n] for n in M.BASE_VIRTUAL_JOINTS]] = 0.0
         self.q_hold_rel = q_rel
@@ -459,7 +466,8 @@ class HeldObjectV2(SamplerV2):
             target.keep_still()
             self.kit.sync_world()
             poses = [p for _, _, _, wps in entries for p in wps]
-            with attached(self.kit, ARM, target):
+            # robot + held object only (the world is re-checked per instance at the sampled base pose)
+            with self.kit.ignoring(self.scene_obstacles()), attached(self.kit, ARM, target):
                 ok = self.kit.ik_batch(poses, q_hold, arm=ARM)
             n_wp = len(entries[0][3])
             ok = ok.view(len(entries), n_wp).all(dim=1)
