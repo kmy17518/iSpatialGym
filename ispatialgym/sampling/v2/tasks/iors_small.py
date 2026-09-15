@@ -126,8 +126,15 @@ class IORSSmall(SamplerV2):
         rng_t = np.random.default_rng(self.ctx.base_seed)
         errors: List[str] = []
         self.init_stance = None
-        # Phases 1a / 1b / 1c per edge (§4.4 step 2: an edge whose margins exceed its length is skipped)
-        for edge, init in TT.edge_candidates(self, self.top, rng_t):
+        # Phases 1a / 1b / 1c per edge: §4.2 has no preference among the edges and §4.4 checks floor + collision per
+        # lateral position, so every edge with a free-floor run in front of it (a third of its 10 cm lateral raster at
+        # s = 0.45 on free floor) is tried; an edge whose margins exceed its length is skipped (§4.4 step 2)
+        for edge, init in TT.edge_frames(self, self.top, rng_t):
+            lats = th.linspace(-edge.length / 2 + 0.1, edge.length / 2 - 0.1, max(2, int(edge.length / 0.1))).tolist()
+            n_free = sum(1 for lat in lats if self.kit.trav_free(edge.base_xy(init.stand_off, lat)))
+            if n_free < max(1, len(lats) // 3):
+                errors.append(f"{edge.name}: free floor at {n_free}/{len(lats)} lateral positions")
+                continue
             try:
                 init = TT.phase1b_init_trunk(self, init, H_max, top=self.top)
                 self.init_stance = TT.phase1c_lateral(self, init, margins, rng_t, top=self.top)
