@@ -36,6 +36,7 @@ from ispatialgym.activity.problem import (
     ACTIVITY_DEFINITIONS_ROOT,
     AGENT_INSTANCE,
     ISGProblem,
+    canonical_activity,
     is_agent_instance,
     load_problem,
     to_bddl,
@@ -59,7 +60,9 @@ def _compact(expr) -> str:
 class ISpatialGymTask(BehaviorTask):
     """
     Args:
-        activity_name (str): iSpatialGym activity (directory under ``activity_definitions_root``).
+        activity_name (str): iSpatialGym activity (directory under ``activity_definitions_root``). A retired name
+            (``world_alignment``) is accepted and reported under its canonical name (``alignment``); a legacy root
+            whose directory still carries the retired name is found either way.
         activity_definition_id (int): problem file number (``problemN.bddl``).
         activity_instance_id (int): instance id (bookkeeping only; the TRO file is given explicitly).
         activity_definitions_root (None or str): override for the activity definitions directory.
@@ -169,7 +172,11 @@ class ISpatialGymTask(BehaviorTask):
         og.sim.add_callback_on_remove_obj(name=callback_name, callback=self._update_bddl_scope_from_removed_obj)
 
     def update_activity(self, env, activity_name, activity_definition_id):
-        self.activity_name = activity_name
+        # The evaluator keys on the canonical activity name; retired names (``world_alignment``) are accepted on input
+        # and resolve to the same problem files (``activity.problem.LEGACY_ACTIVITIES``).
+        self.activity_name = canonical_activity(activity_name)
+        if self.activity_name != activity_name:
+            log.info(f"Activity {activity_name!r} is a retired name of {self.activity_name!r}")
         self.activity_definition_id = int(activity_definition_id)
         self.problem = load_problem(activity_name, activity_definition_id, root=self.activity_definitions_root)
         self.compiled_task = self.problem.compile()

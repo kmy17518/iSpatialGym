@@ -13,11 +13,17 @@ Roles per activity (``*`` = list role):
 * configuration_matching-0 (block_design): blocks*, table, floor
 * configuration_matching-1/2 (articulation): artic, floor [, table]
 * configuration_matching-3 (attachment): male, female, table, floor
-* world_alignment-0 (table_surface): target, table, floor
-* world_alignment-1 (world_vertical): target, wall, floor
-* world_alignment-2 (world_horizontal): target, wall, floor
+* alignment-0 (table_surface): target, table, floor
+* alignment-1 (world_vertical): target, wall, floor
+* alignment-2 (world_horizontal): target, wall, floor
 * inter_object_relation_satisfaction-N: target, partner, floor [, table (init support of the target)]
   [, partner_support (init support of the partner)]
+
+The v1 samplers key the alignment activity by its retired name ``world_alignment`` (spec keys, sampled instances);
+``build_problem`` accepts both spellings and renders the problem under the name it was asked for, so the v1 output
+(``(define (problem world_alignment-0))``) is unchanged. The v1 group symbols (``blocks_group`` / ``attachment_group``)
+are likewise kept; the v2 grounding (``bddl_from_iddl``) uses ``targets_group`` / ``assembly_group``
+(``activity.problem.GROUP_SYMBOLS``), and the parser accepts either.
 """
 
 from __future__ import annotations
@@ -25,7 +31,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence
 
-from ispatialgym.activity.problem import AGENT_INSTANCE, ISGProblem, parse_problem_string
+from ispatialgym.activity.problem import AGENT_INSTANCE, ISGProblem, canonical_activity, parse_problem_string
 
 GROUP_NAMES = {
     "distractors": "distractors_group.n.01_1",
@@ -249,7 +255,7 @@ def build_problem_text(activity: str, definition_id: int, b: Bindings) -> str:
                 "and both parts are released.",
             )
         raise ValueError(f"configuration_matching has no definition {definition_id}")
-    if activity == "world_alignment":
+    if canonical_activity(activity) == "alignment":  # ``alignment`` or the retired ``world_alignment``
         t = b.one("target").name
         if definition_id == 0:
             table = b.one("table").name
@@ -280,7 +286,7 @@ def build_problem_text(activity: str, definition_id: int, b: Bindings) -> str:
                 "the object is released and its orientation is within tolerance of the level (world horizontal) goal; "
                 "models that look the same upside down carry the 180-degree flip in orientation_equivalences.",
             )
-        raise ValueError(f"world_alignment has no definition {definition_id}")
+        raise ValueError(f"{activity} has no definition {definition_id}")
     if activity == "inter_object_relation_satisfaction":
         rel = IORS_RELATIONS[definition_id]
         t, p = b.one("target").name, b.one("partner").name

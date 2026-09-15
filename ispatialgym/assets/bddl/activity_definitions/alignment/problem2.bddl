@@ -1,4 +1,4 @@
-(define (problem world_alignment-2)
+(define (problem alignment-2)
     (:domain ispatialgym)
 
     (:alias world_horizontal)

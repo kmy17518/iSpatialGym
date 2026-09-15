@@ -1,10 +1,17 @@
-"""Task samplers. ``get_sampler_class(problem_name)`` maps ``<activity>-<def_id>`` to a sampler class."""
+"""Task samplers. ``get_sampler_class(problem_name)`` maps ``<activity>-<def_id>`` to a sampler class.
+
+The v1 alignment samplers are keyed ``world_alignment-N`` (their spec key); the canonical activity name
+``alignment-N`` dispatches to the same classes.
+"""
 
 from __future__ import annotations
+
+from ispatialgym.activity.problem import canonical_activity
 
 
 def get_sampler_class(problem_name: str):
     activity, did = problem_name.rsplit("-", 1)
+    activity = canonical_activity(activity)
     did = int(did)
     if activity == "camera_relocalization":
         from ispatialgym.sampling.tasks.camera_relocalization import CameraRelocalizationSampler
@@ -35,7 +42,7 @@ def get_sampler_class(problem_name: str):
             from ispatialgym.sampling.tasks.attachment import AttachmentSampler
 
             return AttachmentSampler
-    if activity == "world_alignment":
+    if activity == "alignment":
         from ispatialgym.sampling.tasks.world_alignment import TableSurfaceSampler, WorldHorizontalSampler, WorldVerticalSampler
 
         if did == 0:

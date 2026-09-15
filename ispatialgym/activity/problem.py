@@ -24,11 +24,24 @@ group inside ``forall`` / ``exists`` / ``forpairs`` ...    rejected (v1)
 
 The result is compiled with the stock :mod:`bddl.condition_evaluation` machinery, with the group symbols added to
 the object scope so the aggregate atoms resolve to a nonphysical group entity at runtime.
+
+Activity names and definition ids
+---------------------------------
+
+Problem ``N`` of activity ``A`` lives in ``activity_definitions/A/problemN.bddl`` and is named ``A-N``. A retired
+activity name (:data:`LEGACY_ACTIVITIES`, e.g. ``world_alignment`` -> ``alignment``) is accepted wherever an activity
+is named -- in the problem name, as the directory of a legacy root, in ``load_problem`` / ``problem_path`` and in
+the TRO ``activity`` field -- and compares equal to its canonical name (:func:`canonical_activity`).
+
+``activity_definitions/A/problems.json`` is the optional alias <-> definition id registry written by the v2 grounding
+(``ground_isg``): :func:`load_problem_registry`, :func:`alias_of`, :func:`id_of_alias`,
+:func:`validate_problem_registry`. Without a registry the aliases are read from the problem files themselves.
 """
 
 from __future__ import annotations
 
 import copy
+import json
 import os
 import re
 from dataclasses import dataclass, field
@@ -51,6 +64,28 @@ ACTIVITY_DEFINITIONS_ROOT = os.path.join(ASSETS_ROOT, "bddl", "activity_definiti
 DOMAIN_NAME = "ispatialgym"
 AGENT_INSTANCE = "agent.n.01_1"
 
+#: Retired activity names -> canonical activity names. A retired name is accepted everywhere an activity is named
+#: (problem names, directories of legacy roots, the TRO ``activity`` field) and is equivalent to its canonical name;
+#: the v1 instances under ``runlogs/runpod/samp`` were sampled as ``world_alignment``.
+LEGACY_ACTIVITIES: Dict[str, str] = {"world_alignment": "alignment"}
+
+#: Optional alias <-> definition id registry of an activity directory (``ground_isg`` allocates ids per alias).
+PROBLEM_REGISTRY_FILE = "problems.json"
+
+#: Group symbols by iddl group role (``docs/task_bddl_formats.md`` "Object names") and the v1 spellings that the
+#: shipped templates / ``sampling.bddl_writer`` still use. Informational: the parser accepts any group symbol of the
+#: instance-name shape and nothing in the evaluator keys on these names.
+GROUP_SYMBOLS: Dict[str, str] = {
+    "targets": "targets_group.n.01_1",
+    "distractors": "distractors_group.n.01_1",
+    "assembly": "assembly_group.n.01_1",
+    "obstacles": "obstacles_group.n.01_1",
+}
+LEGACY_GROUP_SYMBOLS: Dict[str, str] = {
+    "blocks_group.n.01_1": GROUP_SYMBOLS["targets"],
+    "attachment_group.n.01_1": GROUP_SYMBOLS["assembly"],
+}
+
 #: Predicates evaluated once on a group (shared member-to-slot assignment) instead of being expanded per member.
 AGGREGATE_PREDICATES = frozenset({"layout_reached", "pose_reached"})
 #: Predicates allowed in the non-gating ``(:measure ...)`` section.
@@ -63,7 +98,10 @@ LOGICAL_TOKENS = frozenset({"and", "or", "not", "imply", "forall", "exists", "fo
 QUANTIFIER_TOKENS = frozenset({"forall", "exists", "forn", "forpairs", "fornpairs"})
 
 INSTANCE_RE = re.compile(r"^[a-z0-9_]+\.n\.\d{2}_\d+$")
-ALIAS_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+#: ``<family>-<subtask>-<category slots>`` (v2, e.g. ``inter_object_relation_satisfaction-ontop_small_scale-apple-
+#: plate-breakfast_table``) or a bare v1 variant (``table_surface``): segments of lowercase letters, digits and ``_``
+#: joined by single ``-``; the alias starts with a letter and has no empty segment.
+ALIAS_RE = re.compile(r"^[a-z][a-z0-9_]*(?:-[a-z0-9_]+)*$")
 PROBLEM_FILE_RE = re.compile(r"^problem(\d+)\.bddl$")
 
 
@@ -83,6 +121,32 @@ def synset_of(instance: str) -> str:
 
 def is_agent_instance(instance: str) -> bool:
     return instance.startswith("agent.n.")
+
+
+def canonical_activity(activity: str) -> str:
+    """Canonical name of ``activity``: ``world_alignment`` -> ``alignment``; canonical names map to themselves."""
+    return LEGACY_ACTIVITIES.get(activity, activity)
+
+
+def activity_names(activity: str) -> List[str]:
+    """Every accepted spelling of ``activity``: the canonical name first, then its retired names."""
+    canonical = canonical_activity(activity)
+    return [canonical] + [old for old, new in LEGACY_ACTIVITIES.items() if new == canonical]
+
+
+def same_activity(a: str, b: str) -> bool:
+    """Whether two activity names denote the same activity (retired names equal their canonical name)."""
+    return canonical_activity(a) == canonical_activity(b)
+
+
+def split_problem_name(problem_name: str) -> "tuple[str, int]":
+    """``alignment-0`` -> ``("alignment", 0)`` (the activity part is returned as written)."""
+    if not isinstance(problem_name, str):
+        raise ISGProblemError(f"Problem name must be a symbol, got {problem_name!r}")
+    activity, sep, id_str = problem_name.rpartition("-")
+    if not sep or not activity or not id_str.isdigit():
+        raise ISGProblemError(f"Problem name {problem_name!r} does not have the '<activity>-<definition id>' shape")
+    return activity, int(id_str)
 
 
 def _strip(token: str) -> str:
@@ -193,6 +257,15 @@ class ISGProblem:
     @property
     def name(self) -> str:
         return f"{self.activity}-{self.definition_id}"
+
+    @property
+    def canonical_activity(self) -> str:
+        """``activity`` with a retired name (``world_alignment``) replaced by its canonical name (``alignment``)."""
+        return canonical_activity(self.activity)
+
+    @property
+    def canonical_name(self) -> str:
+        return f"{self.canonical_activity}-{self.definition_id}"
 
     @property
     def task_variant(self) -> Optional[str]:
@@ -412,32 +485,67 @@ def _unique(items: Iterable[str]) -> List[str]:
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def problem_path(activity: str, definition_id: int, root: Optional[str] = None) -> str:
+def activity_dir(activity: str, root: Optional[str] = None) -> str:
+    """Directory of ``activity`` under ``root`` (default: the shipped ``activity_definitions``).
+
+    The canonical directory (``<root>/alignment``) wins; a directory under a retired name (``<root>/world_alignment``,
+    as the v1 samplers wrote next to their templates) is used when the canonical one does not exist. When neither
+    exists the canonical path is returned so that callers can name it in their errors.
+    """
     root = ACTIVITY_DEFINITIONS_ROOT if root is None else root
-    return os.path.join(root, activity, f"problem{int(definition_id)}.bddl")
+    candidates = [os.path.join(root, name) for name in activity_names(activity)]
+    for path in candidates:
+        if os.path.isdir(path):
+            return path
+    return candidates[0]
+
+
+def problem_path(activity: str, definition_id: int, root: Optional[str] = None) -> str:
+    return os.path.join(activity_dir(activity, root), f"problem{int(definition_id)}.bddl")
+
+
+def problem_registry_path(activity: str, root: Optional[str] = None) -> str:
+    return os.path.join(activity_dir(activity, root), PROBLEM_REGISTRY_FILE)
 
 
 def list_activities(root: Optional[str] = None) -> List[str]:
+    """Activity directories under ``root``, as named on disk (a legacy root may still say ``world_alignment``)."""
     root = ACTIVITY_DEFINITIONS_ROOT if root is None else root
-    return sorted(d for d in os.listdir(root) if os.path.isdir(os.path.join(root, d)))
+    return sorted(d for d in os.listdir(root) if os.path.isdir(os.path.join(root, d)) and not d.startswith(("_", ".")))
 
 
 def list_problem_ids(activity: str, root: Optional[str] = None) -> List[int]:
-    """Definition ids of ``activity`` (must be contiguous ``problem0.bddl``, ``problem1.bddl``, ...)."""
-    root = ACTIVITY_DEFINITIONS_ROOT if root is None else root
-    ids = sorted(
-        int(m.group(1)) for m in (PROBLEM_FILE_RE.match(f) for f in os.listdir(os.path.join(root, activity))) if m
-    )
+    """Definition ids of ``activity``: its ``problemN.bddl`` files, which must be contiguous from ``problem0.bddl``.
+
+    Other files of the directory (``problems.json``, notes) are ignored.
+    """
+    directory = activity_dir(activity, root)
+    if not os.path.isdir(directory):
+        raise FileNotFoundError(
+            f"No activity directory for {activity!r}: none of {activity_names(activity)} exists under "
+            f"{os.path.dirname(directory)}"
+        )
+    ids = sorted(int(m.group(1)) for m in (PROBLEM_FILE_RE.match(f) for f in os.listdir(directory)) if m)
     if ids != list(range(len(ids))):
-        raise ISGProblemError(f"Non-contiguous problem ids for activity '{activity}': {ids}")
+        missing = sorted(set(range(ids[-1] + 1)) - set(ids))
+        raise ISGProblemError(
+            f"Activity {activity!r} ({directory}) must have contiguous problem files problem0.bddl ... "
+            f"problem{ids[-1]}.bddl: found ids {ids}, missing {missing}"
+        )
     return ids
 
 
 def load_problem(activity: str, definition_id: int, root: Optional[str] = None) -> ISGProblem:
+    """Load ``problem<definition_id>.bddl`` of ``activity`` (a retired activity name is accepted).
+
+    The returned problem's ``activity`` is the directory it was loaded from: the canonical name for the shipped
+    templates (``load_problem("world_alignment", 0).activity == "alignment"``), a retired name only for a legacy
+    root that still uses it.
+    """
     path = problem_path(activity, definition_id, root)
     if not os.path.isfile(path):
         raise FileNotFoundError(f"No iSpatialGym problem file at {path}")
-    return parse_problem_file(path, activity=activity, definition_id=int(definition_id))
+    return parse_problem_file(path, activity=os.path.basename(os.path.dirname(path)), definition_id=int(definition_id))
 
 
 def parse_problem_file(path: str, activity: Optional[str] = None, definition_id: Optional[int] = None) -> ISGProblem:
@@ -449,6 +557,172 @@ def parse_problem_file(path: str, activity: Optional[str] = None, definition_id:
     problem = parse_problem_tokens(tokens, activity=activity, definition_id=definition_id)
     problem.path = path
     return problem
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Alias <-> definition id registry (problems.json)
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def _read_alias(path: str) -> Optional[str]:
+    """The ``(:alias ...)`` of a problem file without parsing / validating the rest of it."""
+    tokens = scan_tokens(filename=path)
+    for section in tokens[1:] if isinstance(tokens, list) else []:
+        if isinstance(section, list) and section and section[0] == ":alias":
+            if len(section) != 2 or not isinstance(section[1], str):
+                raise ISGProblemError(f"{path}: (:alias ...) must hold exactly one symbol, got {section[1:]!r}")
+            return section[1]
+    return None
+
+
+def _alias_repr(alias: Optional[str]) -> str:
+    return f"(:alias {alias})" if alias is not None else "no (:alias ...)"
+
+
+def problem_aliases(activity: str, root: Optional[str] = None) -> Dict[int, Optional[str]]:
+    """``{definition id: alias}`` read from the ``problemN.bddl`` files of ``activity`` (``None`` = no alias)."""
+    return {pid: _read_alias(problem_path(activity, pid, root)) for pid in list_problem_ids(activity, root)}
+
+
+def _registry_entries(data, what: str):
+    """Normalize the accepted ``problems.json`` shapes to ``(alias, id)`` pairs."""
+    if isinstance(data, dict) and "problems" in data:
+        data = data["problems"]
+    if isinstance(data, list):
+        for i, rec in enumerate(data):
+            if not isinstance(rec, dict) or "alias" not in rec:
+                raise ISGProblemError(f"{what}: entry {i} must be an object with 'alias' and 'id', got {rec!r}")
+            pid = rec.get("id", rec.get("definition_id"))
+            if pid is None:
+                raise ISGProblemError(f"{what}: entry {i} ({rec.get('alias')!r}) has no 'id' / 'definition_id'")
+            yield rec["alias"], pid
+    elif isinstance(data, dict):
+        if data and all(isinstance(k, str) and k.isdigit() for k in data):  # inverse shape {"<id>": "<alias>"}
+            for k, alias in data.items():
+                yield alias, int(k)
+        else:
+            yield from data.items()
+    else:
+        raise ISGProblemError(f"{what}: must be a JSON object {{alias: id}} or a list of {{alias, id}} records")
+
+
+def load_problem_registry(activity_dir: str, missing_ok: bool = False) -> Dict[str, int]:
+    """``{alias: definition id}`` from ``<activity_dir>/problems.json`` (``activity_dir`` may also be the file).
+
+    Canonical shape: a JSON object ``{"<alias>": <id>, ...}``. Also accepted: the inverse ``{"<id>": "<alias>"}``,
+    a list of ``{"alias": ..., "id" | "definition_id": ...}`` records, and any of these under a ``"problems"`` key
+    (an ``"activity"`` sibling, when present, must name this activity). Aliases must match :data:`ALIAS_RE` and be
+    unique; ids must be distinct non-negative integers. A missing file raises ``FileNotFoundError`` unless
+    ``missing_ok`` (then ``{}``).
+    """
+    path = activity_dir if os.path.isfile(activity_dir) else os.path.join(activity_dir, PROBLEM_REGISTRY_FILE)
+    if not os.path.isfile(path):
+        if missing_ok:
+            return {}
+        raise FileNotFoundError(f"No problem registry at {path}")
+    what = f"problem registry {path}"
+    with open(path, "r") as f:
+        try:
+            data = json.load(f)
+        except json.JSONDecodeError as e:
+            raise ISGProblemError(f"{what}: invalid JSON ({e})") from e
+    if isinstance(data, dict) and isinstance(data.get("activity"), str):
+        directory = os.path.basename(os.path.dirname(os.path.abspath(path)))
+        if not same_activity(data["activity"], directory):
+            raise ISGProblemError(f"{what}: 'activity' is {data['activity']!r} but the directory is {directory!r}")
+    registry: Dict[str, int] = {}
+    ids: Dict[int, str] = {}
+    for alias, pid in _registry_entries(data, what):
+        if not isinstance(alias, str) or not ALIAS_RE.match(alias):
+            raise ISGProblemError(f"{what}: invalid alias {alias!r}")
+        if isinstance(pid, bool) or not isinstance(pid, int) or pid < 0:
+            if isinstance(pid, str) and pid.isdigit():
+                pid = int(pid)
+            else:
+                raise ISGProblemError(f"{what}: id of {alias!r} must be a non-negative integer, got {pid!r}")
+        if alias in registry:
+            raise ISGProblemError(f"{what}: alias {alias!r} is registered more than once")
+        if pid in ids:
+            raise ISGProblemError(f"{what}: id {pid} is registered for both {ids[pid]!r} and {alias!r}")
+        registry[alias] = pid
+        ids[pid] = alias
+    return registry
+
+
+def alias_of(activity: str, definition_id: int, root: Optional[str] = None) -> Optional[str]:
+    """Alias of problem ``definition_id`` of ``activity``.
+
+    From ``problems.json`` when it registers the id (checked against the file's ``(:alias ...)`` when the file
+    exists), else from the problem file itself; ``None`` when the problem declares no alias.
+    """
+    definition_id = int(definition_id)
+    directory = activity_dir(activity, root)
+    registry = load_problem_registry(directory, missing_ok=True)
+    registered = next((alias for alias, pid in registry.items() if pid == definition_id), None)
+    path = problem_path(activity, definition_id, root)
+    if not os.path.isfile(path):
+        if registered is not None:
+            raise ISGProblemError(f"{PROBLEM_REGISTRY_FILE} of {activity!r} registers {registered!r} -> {definition_id} but {path} does not exist")
+        raise FileNotFoundError(f"Activity {activity!r} has no problem {definition_id}: neither a registry entry nor {path}")
+    declared = _read_alias(path)
+    if registered is not None and declared != registered:
+        raise ISGProblemError(
+            f"{PROBLEM_REGISTRY_FILE} of {activity!r} registers {registered!r} -> {definition_id} but {path} declares "
+            f"{_alias_repr(declared)}"
+        )
+    return declared
+
+
+def id_of_alias(activity: str, alias: str, root: Optional[str] = None) -> int:
+    """Definition id of the problem of ``activity`` whose alias is ``alias``.
+
+    From ``problems.json`` when it registers the alias (checked against the file when it exists), else by scanning
+    the ``(:alias ...)`` of the problem files. Raises :class:`ISGProblemError` naming the known aliases otherwise.
+    """
+    directory = activity_dir(activity, root)
+    registry = load_problem_registry(directory, missing_ok=True)
+    if alias in registry:
+        pid = registry[alias]
+        path = problem_path(activity, pid, root)
+        if os.path.isfile(path) and _read_alias(path) != alias:
+            raise ISGProblemError(
+                f"{PROBLEM_REGISTRY_FILE} of {activity!r} registers {alias!r} -> {pid} but {path} declares "
+                f"{_alias_repr(_read_alias(path))}"
+            )
+        return pid
+    declared = problem_aliases(activity, root)
+    matches = [pid for pid, a in declared.items() if a == alias]
+    if len(matches) > 1:
+        raise ISGProblemError(f"Activity {activity!r}: problems {matches} all declare (:alias {alias})")
+    if matches:
+        return matches[0]
+    known = sorted(set(registry) | {a for a in declared.values() if a})
+    raise ISGProblemError(f"Activity {activity!r} has no problem with alias {alias!r}; known aliases: {known}")
+
+
+def validate_problem_registry(activity: str, root: Optional[str] = None) -> Dict[str, int]:
+    """Check ``problems.json`` of ``activity`` against its problem files and return the registry.
+
+    Every registered id must have a ``problemN.bddl`` whose ``(:alias ...)`` is the registered alias, every problem
+    file that declares an alias must be registered under it, and the files must be contiguous. A problem without an
+    alias (the standard camera relocalization) need not be registered.
+    """
+    registry = load_problem_registry(activity_dir(activity, root))
+    declared = problem_aliases(activity, root)
+    for alias, pid in registry.items():
+        if pid not in declared:
+            raise ISGProblemError(f"{PROBLEM_REGISTRY_FILE} of {activity!r} registers {alias!r} -> {pid} but problem{pid}.bddl does not exist")
+        if declared[pid] != alias:
+            raise ISGProblemError(
+                f"{PROBLEM_REGISTRY_FILE} of {activity!r} registers {alias!r} -> {pid} but problem{pid}.bddl declares "
+                f"{_alias_repr(declared[pid])}"
+            )
+    for pid, alias in declared.items():
+        if alias is not None and registry.get(alias) != pid:
+            raise ISGProblemError(
+                f"problem{pid}.bddl of {activity!r} declares (:alias {alias}) but {PROBLEM_REGISTRY_FILE} does not register it"
+            )
+    return registry
 
 
 def parse_problem_string(text: str, activity: str, definition_id: int) -> ISGProblem:
@@ -518,12 +792,19 @@ def parse_problem_tokens(tokens, activity: str, definition_id: Optional[int]) ->
         raise ISGProblemError("(:alias ...) must directly follow (:domain ...)")
     if ":measure" in order and order.index(":measure") < order.index(":goal"):
         raise ISGProblemError("(:measure ...) must come after (:goal ...)")
-    if definition_id is not None and problem_name != f"{activity}-{definition_id}":
+    # ``<activity>-<definition id>``; a retired activity name (``world_alignment-0`` for ``alignment-0``) is accepted.
+    name_activity, name_id = split_problem_name(problem_name)
+    if not same_activity(name_activity, activity):
+        accepted = " / ".join(f"'{n}-{name_id if definition_id is None else definition_id}'" for n in activity_names(activity))
+        raise ISGProblemError(
+            f"Problem name {problem_name!r} does not match {accepted} (file naming convention: activity {activity!r})"
+        )
+    if definition_id is not None and name_id != int(definition_id):
         raise ISGProblemError(
             f"Problem name {problem_name!r} does not match '{activity}-{definition_id}' (file naming convention)"
         )
     if definition_id is None:
-        definition_id = int(problem_name.rsplit("-", 1)[1])
+        definition_id = name_id
 
     problem = ISGProblem(
         activity=activity,

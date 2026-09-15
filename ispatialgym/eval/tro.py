@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from ispatialgym.activity.problem import ISGCompiledTask, is_agent_instance
+from ispatialgym.activity.problem import ISGCompiledTask, is_agent_instance, same_activity
 from ispatialgym.eval.targets import TRO_KEY, ISGTroMeta, TROValidationError, parse_frame
 
 ROBOT_POSES_KEY = "robot_poses"
@@ -53,14 +53,16 @@ def physical_instances(compiled: ISGCompiledTask):
 def validate_tro_against_problem(meta: ISGTroMeta, compiled: ISGCompiledTask, require_bindings: bool = True) -> None:
     """Raise :class:`TROValidationError` if ``meta`` does not fit the compiled problem.
 
-    Checks: activity / definition id / alias agreement; every ``pose_reached`` / ``layout_reached`` atom of the goal
-    (gating) and of ``(:measure ...)`` (non-gating) has a matching target of the right kind; conversely every TRO
-    target corresponds to one of those atoms (the BDDL is the single statement of what is evaluated, the TRO only
-    supplies the numbers); target keys are declared instances or groups; group members agree; frame references are
-    declared instances; and (optionally) every physical instance has an object binding.
+    Checks: activity / definition id / alias agreement (a retired activity name such as ``world_alignment`` equals its
+    canonical name ``alignment``, so the v1 TROs still validate against the renamed problems); every ``pose_reached``
+    / ``layout_reached`` atom of the goal (gating) and of ``(:measure ...)`` (non-gating) has a matching target of
+    the right kind; conversely every TRO target corresponds to one of those atoms (the BDDL is the single statement
+    of what is evaluated, the TRO only supplies the numbers); target keys are declared instances or groups; group
+    members agree; frame references are declared instances; and (optionally) every physical instance has an object
+    binding.
     """
     problem = compiled.problem
-    if meta.activity != problem.activity or meta.activity_definition_id != problem.definition_id:
+    if not same_activity(meta.activity, problem.activity) or meta.activity_definition_id != problem.definition_id:
         raise TROValidationError(
             f"TRO is for {meta.name!r} but the problem is {problem.name!r}"
         )

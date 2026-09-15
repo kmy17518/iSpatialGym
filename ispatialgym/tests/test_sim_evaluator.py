@@ -5,7 +5,7 @@
 Covers the ``PoseReached`` metrics (full pose, depth along the head camera axis, orientation-only with symmetry
 equivalences), ``LayoutReached`` on an articulated object, group entities (shared assignment, layout vs. absolute
 placement), and the two-level task evaluation flow (binary success -> settle latency -> error snapshot) on
-``world_alignment-0``.
+``alignment-0`` (the ``test_alignment_*`` tests; ``-k alignment`` selects them).
 """
 
 import json
@@ -305,7 +305,7 @@ def test_group_entity_shared_assignment(state_env):
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def _world_alignment_cfg(task_extra=None):
+def _alignment_cfg(task_extra=None):
     cfg = {
         "env": {"action_frequency": 30, "physics_frequency": 120},
         "scene": {"type": "Scene", "use_floor_plane": False},
@@ -317,7 +317,7 @@ def _world_alignment_cfg(task_extra=None):
         "robots": [{"type": "R1Pro", "name": "robot_r1", "obs_modalities": ["rgb"], "position": [0.0, 0.0, 0.0], "orientation": [0.0, 0.0, 0.0, 1.0]}],
         "task": {
             "type": "ISpatialGymTask",
-            "activity_name": "world_alignment",
+            "activity_name": "alignment",
             "activity_definition_id": 0,
             "object_bindings": {"fishing_rod.n.01_1": "rod", "table.n.02_1": "table", "floor.n.01_1": "floor_slab"},
             "termination_config": {"max_steps": 80},
@@ -329,33 +329,33 @@ def _world_alignment_cfg(task_extra=None):
 
 @pytest.fixture(scope="module")
 def task_env(state_env):
-    """world_alignment-0 (table_surface) on a breakfast table; the fixture depends on ``state_env`` so that the
-    first environment is cleared before the second one is created."""
+    """alignment-0 (table_surface) on a breakfast table; the fixture depends on ``state_env`` so that the first
+    environment is cleared before the second one is created."""
     og.clear()
-    env = og.Environment(configs=_world_alignment_cfg())
+    env = og.Environment(configs=_alignment_cfg())
     yield env
     og.clear()
 
 
 @pytest.fixture(scope="module")
 def measure_task_env(task_env):
-    """The same scene with a TEST-ONLY copy of world_alignment-0, written to a temporary activity root, whose
+    """The same scene with a TEST-ONLY copy of alignment-0, written to a temporary activity root, whose
     ``pose_reached`` atom is moved from the goal to ``(:measure ...)``. It exercises the non-gating path (success is
-    relational only, the rod's orientation error is reported without gating). The shipped world_alignment problems
-    are untouched: there ``pose_reached`` stays in the goal and gates success."""
+    relational only, the rod's orientation error is reported without gating). The shipped alignment problems are
+    untouched: there ``pose_reached`` stays in the goal and gates success."""
     og.clear()
     from ispatialgym.activity import ACTIVITY_DEFINITIONS_ROOT
 
     tmp = tempfile.mkdtemp(prefix="isg_measure_")
-    os.makedirs(os.path.join(tmp, "world_alignment"))
-    with open(os.path.join(ACTIVITY_DEFINITIONS_ROOT, "world_alignment", "problem0.bddl")) as f:
+    os.makedirs(os.path.join(tmp, "alignment"))
+    with open(os.path.join(ACTIVITY_DEFINITIONS_ROOT, "alignment", "problem0.bddl")) as f:
         text = f.read()
     assert "            (pose_reached ?fishing_rod.n.01_1)\n" in text
     text = text.replace("            (pose_reached ?fishing_rod.n.01_1)\n", "")
     text = text.rstrip()[:-1] + "\n    (:measure\n        (pose_reached ?fishing_rod.n.01_1)\n    )\n)\n"
-    with open(os.path.join(tmp, "world_alignment", "problem0.bddl"), "w") as f:
+    with open(os.path.join(tmp, "alignment", "problem0.bddl"), "w") as f:
         f.write(text)
-    env = og.Environment(configs=_world_alignment_cfg({"activity_definitions_root": tmp}))
+    env = og.Environment(configs=_alignment_cfg({"activity_definitions_root": tmp}))
     yield env
     og.clear()
 
@@ -366,10 +366,10 @@ def _write_tro(env, q_goal, path):
         "fishing_rod.n.01_1": rod.dump_state(serialized=False),
         "ispatialgym": {
             "schema_version": "isg-tro-v1",
-            "activity": "world_alignment",
+            "activity": "alignment",
             "activity_definition_id": 0,
             "task_variant": "table_surface",
-            "instance_id": "world_alignment-test",
+            "instance_id": "alignment-test",
             "scene": {"model": "Scene"},
             "object_bindings": {
                 "fishing_rod.n.01_1": {"scene_object_name": "rod", "category": "fishing_rod", "model": "zhmrtc"},
@@ -395,10 +395,11 @@ def _write_tro(env, q_goal, path):
         json.dump(tro, f, cls=TorchEncoder)
 
 
-def test_task_two_level_evaluation(task_env):
+def test_alignment_task_two_level_evaluation(task_env):
     env = task_env
     task = env.task
     rod = env.scene.object_registry("name", "rod")
+    assert task.activity_name == "alignment" and task.problem.name == "alignment-0"
     assert task.task_variant == "table_surface"
     assert task.compiled_task.pose_reached_args == ["fishing_rod.n.01_1"]
     assert not task.measured_pose_instances  # nothing configured yet
@@ -465,7 +466,7 @@ def test_task_two_level_evaluation(task_env):
     assert isg["final_errors"] is isg["errors"] or isg["final_errors"] == isg["errors"]
 
 
-def test_task_non_gating_measure_atom(measure_task_env):
+def test_alignment_task_non_gating_measure_atom(measure_task_env):
     """(:measure (pose_reached ?rod)): the target is configured and reported but never gates success, and the
     representative error is the one at the first binary success even if the pose improves afterwards."""
     env = measure_task_env

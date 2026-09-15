@@ -1,4 +1,4 @@
-(define (problem world_alignment-0)
+(define (problem alignment-0)
     (:domain ispatialgym)
 
     (:alias table_surface)
