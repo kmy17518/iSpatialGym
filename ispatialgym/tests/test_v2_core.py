@@ -259,6 +259,40 @@ def test_program_check_target_extraction():
 
 
 # ----------------------------------------------------------------------------------------------------------------
+# CLIs (§9): path buckets, whitelist pruning after a failed template, exclusion of produced templates
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def test_multiply_path_buckets():
+    from ispatialgym.sampling.multiply_isg import parse_path_buckets
+
+    assert parse_path_buckets("3:10,5:10,10:5") == [{"max_m": 3.0, "n": 10}, {"max_m": 5.0, "n": 10}, {"max_m": 10.0, "n": 5}]
+    assert parse_path_buckets(None) is None
+
+
+def test_sample_isg_blacklist_after_failure_and_exclusion(tmp_path):
+    from ispatialgym.sampling.sample_isg import _existing_templates, blacklist_after_failure
+
+    gp = _problem(_entry(["a", "b"], ["p", "q"]))
+    choice = next(iter_template_choices(gp, "house_single_floor", np.random.default_rng(0)))
+    # a grasp failure blames the target only; a stance failure blames every sampleable model of the pair
+    out = blacklist_after_failure(gp, choice, {"rejections": {"grasp_unreachable": 5, "no_transition": 1}})
+    assert out == [f"target=apple/{choice.models['target'].model}"]
+    assert gp.blacklist("house_single_floor", "target")["apple"][choice.models["target"].model].endswith("grasp_unreachable")
+    out2 = blacklist_after_failure(gp, choice, {"rejections": {}, "reject_reason": "no_free_edge"})
+    assert len(out2) == 2 and gp.whitelist("house_single_floor", "partner") == {"plate": [m for m in ["p", "q"] if m != choice.models["partner"].model]}
+    # templates already on disk are excluded from the draw
+    d = tmp_path / gp.alias / choice.template_id
+    d.mkdir(parents=True)
+    (d / "template_meta.json").write_text(json.dumps({"scene": "house_single_floor", "choice": choice.to_json()}))
+    excl = _existing_templates(str(tmp_path), gp, "house_single_floor")
+    assert excl == [{r: f"{c.category}/{c.model}" for r, c in choice.models.items()}]
+    gp2 = _problem(_entry(["a", "b"], ["p", "q"]))
+    rest = list(iter_template_choices(gp2, "house_single_floor", np.random.default_rng(0), exclude=excl))
+    assert choice.template_id not in {t.template_id for t in rest} and len(rest) == 3
+
+
+# ----------------------------------------------------------------------------------------------------------------
 # summary layout (§3.5)
 # ----------------------------------------------------------------------------------------------------------------
 
