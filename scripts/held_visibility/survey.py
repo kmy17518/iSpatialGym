@@ -197,8 +197,7 @@ def solve_hold(world: EmptyWorld, kit: RobotKit, hc: HO.HoldConstants) -> Dict[s
     if not bool(kit.collision_free(q, margin=0.01)[0]):
         raise SystemExit("the fixed hold self-collides")
     arm_idx = world.robot.arm_control_idx[HO.ARM]
-    extras = {"idle_arms": HO.IDLE_ARMS, "contact_center_z": C.CONTACT_CENTER_Z, "cam_in_zed": [kit.cam_in_zed[0].tolist(), kit.cam_in_zed[1].tolist()], "robot_model": "r1pro"}
-    key = HO.hold_cache_key("r1pro", hc, extras)
+    key = HO.hold_cache_key("r1pro", hc, HO.hold_cache_extras(kit))
     eef_in_base = C.relative(eef_w, base3)
     cam_in_base = C.relative(cam, base3)
     sol = {"key": key, "robot": "r1pro", **hc.to_json(), "approach": "base +y", "closing": f"world down rolled {hc.roll_deg} deg about the approach",

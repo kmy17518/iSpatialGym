@@ -121,6 +121,13 @@ def hold_cache_key(robot_model: str, hold: HoldConstants, extras: Optional[Dict[
     return hashlib.sha256(json.dumps(d, sort_keys=True, default=str).encode("utf-8")).hexdigest()[:16]
 
 
+def hold_cache_extras(kit) -> Dict[str, Any]:
+    """The non-constant inputs of the hold solution (rounded so that every process computes the same key): the idle-arm
+    posture, the pad offset and the head-camera offset in the zed link."""
+    cam = [[round(float(v), 4) for v in kit.cam_in_zed[0]], [round(float(v), 4) for v in kit.cam_in_zed[1]]]
+    return {"idle_arms": IDLE_ARMS, "contact_center_z": round(float(C.CONTACT_CENTER_Z), 5), "cam_in_zed": cam, "robot_model": "r1pro"}
+
+
 def hold_eef_pose(cam_pose: C.Pose, base_yaw: float, hold: HoldConstants) -> Tuple[C.Pose, th.Tensor]:
     """The hold eef pose (world) for a head-camera pose and base yaw: pad centre on the optical axis at
     ``hold.depth_m``, approach ``a`` = base +y (robot's left), closing ``c`` = world down rolled ``roll_deg`` about
@@ -348,9 +355,7 @@ class HeldObjectV2(SamplerV2):
         q0 = self.kit.q_at_base_pose(self.kit.q_config(arms=IDLE_ARMS, translate=hc.translate, tilt=hc.tilt), x, y, yaw)
         cam = self.kit.camera_pose(q0)
         eef_w, pad_w = hold_eef_pose(cam, yaw, hc)
-        extras = {"idle_arms": IDLE_ARMS, "contact_center_z": C.CONTACT_CENTER_Z, "cam_in_zed": [self.kit.cam_in_zed[0].tolist(), self.kit.cam_in_zed[1].tolist()],
-                  "robot_model": "r1pro"}
-        key = hold_cache_key("r1pro", hc, extras)
+        key = hold_cache_key("r1pro", hc, hold_cache_extras(self.kit))
         arm_idx = self.robot.arm_control_idx[ARM]
         cache = _read_json(HOLD_CACHE_PATH)
         source = "solved"
@@ -847,6 +852,16 @@ class HeldObjectV2(SamplerV2):
 
     def refine_targets_from_goal(self, draft: Draft):
         pass
+
+    def check_stances_with_objects(self, draft: Draft):
+        """§4.6 step 5 for a stance that *holds* the object: the realised init configuration (hold arm, reset left arm)
+        is checked with the target attached to the planner — the core's generic check locks the arms untucked and keeps
+        the object as a world obstacle, which puts the untucked right hand into the held object. TEMP until the core
+        honours ``Stance.q`` / ``Stance.carried``."""
+        self.kit.sync_world()
+        with attached(self.kit, ARM, self.obj("target")):
+            if not bool(self.kit.collision_free(G.t(draft.robot_q), margin=0.01)[0]):
+                raise Reject("stance_collision_with_objects", "the hold configuration collides with the world at the init base pose (object attached)")
 
     def program_check(self, draft: Draft) -> Dict[str, Any]:
         """§3.5 with the held object attached: the program's first action (``Reorient``) already carries the target
