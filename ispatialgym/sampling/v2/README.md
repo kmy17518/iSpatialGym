@@ -123,3 +123,39 @@ phase3_target(s, manip: Stance, rng, grasps, hull, rest_quat, ignore_for_grasp) 
 
 `iors_small.py` draws the manipulation stance uniformly among the Phase-2 survivors and checks the §4.5 step 5 transition itself.
 Until `tabletop.py` exists, `iors_small._TabletopTemp` is a TEMP stand-in with these signatures (deleted when tabletop lands).
+
+### Sidecar semantics the task modules must keep (F6 programs read them)
+
+- `grasps[].yaw` is the drawn **object** yaw about world z relative to the rest orientation (§4.6); the recorded `grasp` /
+  `pre_grasp` poses are `compose(object init pose, T_obj→eef)` — a consumer that re-derives the grasp from the settled object pose
+  passes `yaw = 0` to `conventions.grasp_pose` (its docstring says so); `grasps[].place_on` = the bddl instance the object is
+  placed on / into (the F6 IORS programs require `pre_grasp`, `carry_height`, `place`, `place_on`).
+- `contacts.push.object` = the pushed instance, `contacts.brace.object` = the braced instance (`program_iors_touching` checks
+  push.object == grasps[0].object and brace.object == grasps[0].place_on).
+- Every stance the program visits has a `transitions[]` entry from the previous one when the trunk differs, and a `paths[]`
+  entry when the base moves without a transition (`programs._travel` rejects the sidecar otherwise).
+- `stances.<name>.arms` is `"untucked"` (init) or the list of working arms; the program check runs every action's targets from
+  the stance the program is at (tracked through `Navigate.path.to` / `Transition.transition.to`) with the object a preceding
+  `Grasp` picked up attached (the grasp record's `eef_in_object` puts it into the hand).
+
+## Status (D2 / D4, 2026-09-15) and gaps
+
+Implemented: §2.3 customs reading + write-back (`problem.py`), §9 model draw and `sample_isg` / `multiply_isg` (`iter_template_choices`,
+whitelist pruning, `SAMPLING_REPORT`, `summary.json`), §1 artefact layout, §3.2 placement helpers (v1 `SupportTop`, 2 cm margin, rest
+quaternion, 3 mm drop), §3.3 untucked posture / trunk grid / **parking rule**, §3.4 frustum test (5 %), §3.5 pipeline (settle,
+BEHAVIOR validation, goal feasibility with the robot parked, **program check** through `oracle.programs.expand` with the F6 draft —
+structural stub when the module is absent or `ISG_PROGRAM_CHECK=stub`), predicate-cache handling (v1), report layout, §3.6 IK
+conventions (`ik.py`), §3.7 paths (`navigation.plan_path`), §3.8 transitions (`navigation.transition`), §3.9 waypoint policy +
+eef-in-frame, §3.10 exact-IK and feasible-set caches keyed with the spawn scale, §3.11 / §7 sidecar draft, §6.11 rules in
+`tasks/iors_small.py`.
+
+Not implemented yet (owner / item): §3.5 **reload validation** in a fresh process and the contact sheet (D5 `validate_instances.py`
+— `core` writes everything it needs, nothing re-loads yet); §3.10 reach-volume / reach-band loading (B3 cache, consumed by
+`tabletop.py` / `prompt0.py`); §3.12 look-alike index reads `constraints_conflicting.csv` + `representatives.csv` (`exact_group` /
+`geometry_group`) — `candidates.csv` has no `duplicate_of` / `geometry_group` columns yet (A6); §3.13 `orientation_equivalences`
+are looked up through `customs.equivalence_group` (D1) and not yet written into `pose_targets` by `iors_small`; §4.3 / §4.4 / §4.5
+exact numbers (Δ solve from the FK tables, margin table with λ from the band extent and R_img, continuous tilt) are `tabletop.py`'s
+— the TEMP stand-in uses trunk (0.5, 0) at init, |λ| = 0.10, D_p ≤ 0.25 and the grid tilts; §4.6 step 5 (whole-body check at both
+stances *with the objects placed*) is done implicitly by the settle + exact IK, not as its own batched check; §6.11 inside drop
+test and the `does_not_fit_inside` protrusion rule are approximated by the footprint test; camera-relocalization path buckets are
+plumbed (`generation.path_buckets`, `--path-buckets`) but no task module fills them yet.

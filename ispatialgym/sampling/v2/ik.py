@@ -262,12 +262,25 @@ class IKChecker:
 
     # -- bands: feasible sets ------------------------------------------------------------------------------------
     def feasible_sets(self, cells: Sequence[Any], yaws: Sequence[float], grasps: Sequence[Any], pose_at: Callable[[Any, float], Pose], stance: Stance,
-                      arm: str = "right", ignore_for_grasp: Sequence[Any] = (), eef_of_grasp: Optional[Callable[[Any], Pose]] = None
-                      ) -> Dict[int, List[Tuple[float, Any]]]:
+                      arm: str = "right", ignore_for_grasp: Sequence[Any] = (), eef_of_grasp: Optional[Callable[[Any], Pose]] = None,
+                      scale_key: Any = None, cache: bool = True) -> Dict[int, List[Tuple[float, Any]]]:
         """§4.6 step 1 over many cells in one batch per trunk: for every cell index the feasible set F of ``(yaw, grasp)``
         pairs whose [pre-grasp, grasp] pass the screening IK from ``stance`` (grasp pose with ``ignore_for_grasp``
-        removed). ``pose_at(cell, yaw) -> object pose``; ``eef_of_grasp(grasp) -> T_obj→eef`` (default ``grasp.pose``)."""
+        removed). ``pose_at(cell, yaw) -> object pose``; ``eef_of_grasp(grasp) -> T_obj→eef`` (default ``grasp.pose``).
+        Cached (§3.10 band cache of F) under the stance, cells, yaws, grasp set, object poses at yaw 0 and ``scale_key``;
+        a cell with empty F is absent from the result (the caller removes it from the band)."""
         eef_of = eef_of_grasp or (lambda g: g.pose)
+        by_name = {getattr(g, "name", str(k)): g for k, g in enumerate(grasps)}
+        key = None
+        if cache:
+            key = cache_key("feasible_sets_v2", {**self.cache_scope, "base": list(stance.base_pose2d), "trunk": [stance.translate, stance.tilt], "arm": arm,
+                                                 "cells": [list(G.t(c).tolist()) for c in cells], "yaws": list(yaws), "scale": scale_key,
+                                                 "grasps": [(getattr(g, "key", None), getattr(g, "name", None), list(G.t(eef_of(g)[0]).tolist()), list(G.t(eef_of(g)[1]).tolist())) for g in grasps],
+                                                 "poses0": [list(G.t(pose_at(c, 0.0)[0]).tolist()) + list(G.t(pose_at(c, 0.0)[1]).tolist()) for c in cells],
+                                                 "ignore": sorted(getattr(o, "name", str(o)) for o in ignore_for_grasp), "seeds": SCREEN_SEEDS})
+            hit = cache_get(key)
+            if hit is not None:
+                return {int(i): [(float(yaw), by_name[gn]) for yaw, gn in lst if gn in by_name] for i, lst in hit.items()}
         pairs, index = [], []
         for i, cell in enumerate(cells):
             for yaw in yaws:
@@ -281,4 +294,6 @@ class IKChecker:
         for (i, yaw, g), s in zip(index, feas.tolist()):
             if s:
                 out.setdefault(i, []).append((yaw, g))
+        if key is not None:
+            cache_put(key, {str(i): [(yaw, getattr(g, "name", None)) for yaw, g in lst] for i, lst in out.items()})
         return out

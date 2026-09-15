@@ -346,22 +346,29 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
             n += len(poses)
             if not res.ok:
                 raise Reject("program_check_failed", f"{key}: {res.reason} (stance {stance_name}, arm {arm}, carried {carried})", action=name)
-        # base poses: transition drive-back / drive-in at both trunks, path waypoints at the stance trunk
-        base_poses: List[Tuple[float, float, float]] = []
-        trunks: List[Tuple[float, float]] = [(stance.translate, stance.tilt)]
+        # base poses: a transition's drive-back pose is visited with the departing trunk (arrival) and the arriving trunk
+        # (after the sweep), the drive-in pose with the arriving trunk only; a path's goal with the stance trunk
+        checks: List[Tuple[Tuple[float, float, float], Tuple[float, float]]] = []
+        to_trunk = (stance.translate, stance.tilt)
         if isinstance(targets, dict):
-            for k in ("drive_back", "drive_in", "goal"):
-                v = targets.get(k)
-                if isinstance(v, (list, tuple)) and len(v) == 3 and all(isinstance(x, (int, float)) for x in v):
-                    base_poses.append((float(v[0]), float(v[1]), float(v[2])))
+
+            def _p2d(v):
+                return (float(v[0]), float(v[1]), float(v[2])) if isinstance(v, (list, tuple)) and len(v) == 3 and all(isinstance(x, (int, float)) for x in v) else None
+
+            back, drive_in, goal = _p2d(targets.get("drive_back")), _p2d(targets.get("drive_in")), _p2d(targets.get("goal"))
             if name == "transition":
                 frm = sidecar.stances.get(getattr(action.transition, "frm", ""))
-                if frm is not None:
-                    trunks.append((frm.translate, frm.tilt))
-        for trunk in trunks:
-            if base_poses:
-                ok, bad = NAV.path_collision_free(sampler.kit, base_poses, trunk)
-                n += len(base_poses)
-                if not ok:
-                    raise Reject("program_check_failed", f"base pose {base_poses[bad]} collides at trunk {trunk}", action=name)
+                if back is not None:
+                    checks.append((back, to_trunk))
+                    if frm is not None:
+                        checks.append((back, (frm.translate, frm.tilt)))
+                if drive_in is not None:
+                    checks.append((drive_in, to_trunk))
+            elif goal is not None:
+                checks.append((goal, to_trunk))
+        for pose2d, trunk in checks:
+            ok, _ = NAV.path_collision_free(sampler.kit, [pose2d], trunk)
+            n += 1
+            if not ok:
+                raise Reject("program_check_failed", f"base pose {tuple(round(v, 3) for v in pose2d)} collides at trunk {trunk}", action=name)
     return n

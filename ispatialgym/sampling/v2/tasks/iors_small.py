@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch as th
@@ -106,12 +106,27 @@ class IORSSmall(SamplerV2):
         if int(self.top.free.sum()) < 50:
             raise Reject("support_small", f"{self.support.name}: too little free top")
         tt = _tabletop()
-        # Phase 1a / 1b / 1c: edge + stand-off, init trunk at tilt 0, lateral position (margins of the IORS row)
+        # Phase 1a / 1b / 1c: edge + stand-off, init trunk at tilt 0, lateral position (margins of the IORS row); an edge
+        # whose margins exceed its length is skipped (§4.4 step 2) and the next edge tried
         heights = {"H_max": max(self._height("target"), self._height("partner"))}
-        self.edge, self.init_stance = tt.phase1_edge_and_standoff(self, self.top, rng=np.random.default_rng(self.ctx.base_seed))
-        self.init_stance = tt.phase1b_init_trunk(self, self.init_stance, heights["H_max"])
         margins = self.lateral_margins()
-        self.init_stance = tt.phase1c_lateral(self, self.init_stance, margins, rng=np.random.default_rng(self.ctx.base_seed + 1))
+        rng_t = np.random.default_rng(self.ctx.base_seed)
+        tried: List[str] = []
+        errors: List[str] = []
+        while True:
+            try:
+                self.edge, init = tt.phase1_edge_and_standoff(self, self.top, rng=rng_t, exclude=tried)
+            except Reject as e:
+                raise Reject("no_free_edge", "; ".join(errors + [str(e)]))
+            tried.append(self.edge.name)
+            try:
+                init = tt.phase1b_init_trunk(self, init, heights["H_max"])
+                self.init_stance = tt.phase1c_lateral(self, init, margins, rng=rng_t)
+                break
+            except Reject as e:
+                if e.reason not in ("edge_too_short", "stance_collision"):
+                    raise
+                errors.append(f"{self.edge.name}: {e}")
         self.init_stance.name = "init"
         # Phase 2: manipulation stance candidates (best angle class), each with its focus
         self.manip_candidates = tt.phase2_manipulation_stance(self, self.init_stance, target_half_extent=self._half_extent("target"))
@@ -335,7 +350,14 @@ class IORSSmall(SamplerV2):
         with attached(self.kit, "right", with_obj, eef_in_object=grasp.eef_in_object):
             res = self.ikc.exact([pre_place, place], manip, "right", ignore_for_last=ignore, scale_key=self.choice.models["target"].scale, cache=False)
         if not res.ok:
-            raise Reject("place_unreachable", f"pre-place / place fail the exact IK from the manipulation stance: {res.reason}")
+            # diagnostics only on failure: is it reach (fails even without the object and without collision partners) or the
+            # attached object / collision?
+            r_pre = self.ikc.exact([pre_place], manip, "right", cache=False)
+            r_place = self.ikc.exact([place], manip, "right", ignore_for_last=ignore, cache=False)
+            _, lat = manip.local(goal_pos[:2])
+            raise Reject("place_unreachable", f"pre-place / place fail the exact IK from the manipulation stance with the object attached "
+                                              f"(without the object: pre-place {'ok' if r_pre.ok else 'fail'}, place {'ok' if r_place.ok else 'fail'}; "
+                                              f"goal lateral {lat:+.2f} m, trunk ({manip.translate}, {manip.tilt:.2f}), stand-off {manip.stand_off})")
         grasp.pre_place, grasp.place = pre_place, place
         cam = self.camera_pose_at(manip)
         if not self.ikc.eef_in_frame(place, cam) or not self.ikc.eef_in_frame(grasp.grasp, cam):
@@ -469,27 +491,29 @@ class _TabletopTemp:
     TILTS = (0.0, -0.3, -0.6, -0.9)
 
     @staticmethod
-    def phase1_edge_and_standoff(s: IORSSmall, top: SupportTop, rng=None, stand_off: float = 0.45) -> Tuple[EdgeFrame, Stance]:
-        """§4.2: any edge (no preference) whose stance at s = 0.45 (+ overhang >= 5 cm) is on free floor and whole-body
-        collision-free at trunk (0.5, 0); returns (edge, init stance at the edge midpoint)."""
+    def phase1_edge_and_standoff(s: IORSSmall, top: SupportTop, rng=None, stand_off: float = 0.45, exclude: Sequence[str] = ()) -> Tuple[EdgeFrame, Stance]:
+        """§4.2: any edge (no preference; ``exclude`` = edges already tried) with a free-floor run in front of it at
+        s = 0.45 (+ overhang >= 5 cm): at least a third of the lateral positions (10 cm raster) are on free floor.
+        Returns (edge, init stance at the edge midpoint, trunk (0.5, 0)); the collision check happens per lateral
+        position in Phase 1c."""
         lo, hi = s.support.aabb
         aabb_xy = G.aabb_corners(lo, hi)[:, :2]
-        edges = list(top.edges())
+        edges = [e for e in top.edges() if e[0] not in exclude]
+        if not edges:
+            raise Reject("no_free_edge", "every edge tried")
         order = rng.permutation(len(edges)) if rng is not None else range(len(edges))
         errors = []
         for i in order:
             name, mid, normal, length = edges[int(i)]
             overhang = max(0.0, float((aabb_xy @ normal).max()) - float(th.dot(mid, normal)))
             edge = EdgeFrame.from_edge(name, mid, normal, length, overhang if overhang >= 0.05 else 0.0)
+            lats = th.linspace(-length / 2 + 0.1, length / 2 - 0.1, max(2, int(length / 0.1))).tolist()
+            n_free = sum(1 for lat in lats if s.kit.trav_free(edge.base_xy(stand_off, lat)))
+            if n_free < max(1, len(lats) // 3):
+                errors.append(f"{name}: free floor at {n_free}/{len(lats)} lateral positions")
+                continue
             xy = edge.base_xy(stand_off, 0.0)
-            st = Stance("init", (float(xy[0]), float(xy[1]), edge.yaw), 0.5, 0.0, stand_off, edge, lateral=0.0)
-            if not s.kit.trav_free(xy):
-                errors.append(f"{name}: no floor")
-                continue
-            if not s.ikc.stance_collision_free(st):
-                errors.append(f"{name}: collides")
-                continue
-            return edge, st
+            return edge, Stance("init", (float(xy[0]), float(xy[1]), edge.yaw), 0.5, 0.0, stand_off, edge, lateral=0.0)
         raise Reject("no_free_edge", "; ".join(errors))
 
     @staticmethod
@@ -509,12 +533,22 @@ class _TabletopTemp:
         half = L / 2 - m
         if half < 0:
             raise Reject("edge_too_short", f"m_R + m_L = {2 * m:.2f} > L = {L:.2f}")
+        cands = []
         for _ in range(20):
             lat = float(rng.uniform(-half, half)) if rng is not None else 0.0
             st = init.shifted(lateral=lat, name="init")
-            if s.kit.trav_free(st.base_xy) and s.ikc.stance_collision_free(st):
+            if s.kit.trav_free(st.base_xy):
+                cands.append(st)
+        if not cands:
+            raise Reject("stance_collision", f"no lateral position in ±{half:.2f} m on free floor")
+        free = s.ikc.stances_collision_free(cands)
+        for st, f in zip(cands, free.tolist()):
+            if f:
                 return st
-        raise Reject("stance_collision", "no collision-free lateral position")
+        # diagnostics for the rejection: does the body without the arms fit (then the untucked hands hit something)?
+        n_body = int(s.kit.collision_free(th.stack([s.ikc.q_locked(c, arms="tucked") for c in cands]), margin=0.01).sum())
+        raise Reject("stance_collision", f"{len(cands)} lateral positions on free floor, none whole-body collision-free at trunk (0.5, 0) "
+                                         f"(arms hanging: {n_body} free; laterals {[round(c.lateral, 2) for c in cands[:6]]})")
 
     @staticmethod
     def phase2_manipulation_stance(s: IORSSmall, init: Stance, target_half_extent: float = 0.05) -> List[Stance]:
@@ -566,7 +600,7 @@ class _TabletopTemp:
         def pose_at(cell, yaw):
             return s.pose_on("target", cell, yaw)
 
-        F = s.ikc.feasible_sets([focus[:2]], yaws, grasps, pose_at, manip, "right", ignore_for_grasp).get(0, [])
+        F = s.ikc.feasible_sets([focus[:2]], yaws, grasps, pose_at, manip, "right", ignore_for_grasp, scale_key=s.choice.models["target"].scale).get(0, [])
         if not F:
             raise Reject("grasp_unreachable", f"empty feasible set F at the focus {focus[:2].tolist()}")
         order = rng.permutation(len(F))

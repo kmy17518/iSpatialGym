@@ -355,16 +355,35 @@ class SamplerV2(TaskSampler):
             self.kit.sync_world()
             self.configure_targets(draft)
 
+    def check_stances_with_objects(self, draft: Draft):
+        """§4.6 step 5: whole-body collision check of every recorded stance (init, manipulation, placement, ...) with the
+        objects placed (the Phase-2 scan ran without them); ``Reject("stance_collision_with_objects")``. Runs right after
+        ``apply_draft`` (objects at their draft poses, robot at init)."""
+        stances = [s for s in self.sidecar.stances.values() if s.name != "goal"]
+        if not stances:
+            return
+        self.kit.sync_world()
+        free = self.ikc.stances_collision_free(stances)
+        bad = [s.name for s, f in zip(stances, free.tolist()) if not f]
+        if bad:
+            raise Reject("stance_collision_with_objects", f"stances {bad} collide with the objects placed (trunks {[(s.translate, round(s.tilt, 2)) for s in stances if s.name in bad]})")
+        # §3.8 with the objects placed: the recorded transitions are swept again (the smallest free s_T may change)
+        for i, tr in enumerate(list(self.sidecar.transitions)):
+            frm, to = self.sidecar.stances.get(tr.frm), self.sidecar.stances.get(tr.to)
+            if frm is None or to is None:
+                continue
+            carried = to.carried
+            new = NAV.transition(self.kit, frm, to, carried_obj=self.objects.get(carried) if carried else None)
+            if new is None:
+                raise Reject("no_transition", f"{tr.frm} -> {tr.to}: no swept-free s_T with the objects placed")
+            self.sidecar.transitions[i] = new
+
     # ------------------------------------------------------------------ stances / transitions / paths helpers
 
     def stance_q(self, stance: Stance, **arm_q) -> th.Tensor:
-        """28-D configuration of a stance (cached on the stance)."""
-        if stance.q is None or arm_q:
-            q = self.ikc.q_locked(stance, **arm_q)
-            if not arm_q:
-                stance.q = q
-            return q
-        return stance.q
+        """28-D configuration of a stance, recomputed at every call: the virtual base joints are relative to the robot's
+        articulation root at call time (``RobotKit.q_at_base_pose``), so a configuration must not outlive a teleport."""
+        return self.ikc.q_locked(stance, **arm_q)
 
     def record_transition(self, frm: Stance, to: Stance, carried: Optional[str] = None, arm: str = "right") -> Transition:
         """§3.8 transition between two recorded stances (carried object attached); ``Reject("no_transition")``."""
@@ -495,6 +514,7 @@ class SamplerV2(TaskSampler):
                     t_sample = time.time() - t0
                     phase = "apply"
                     self.apply_draft(draft)
+                    self.check_stances_with_objects(draft)
                     t_apply = time.time() - t0 - t_sample
                     phase = "settle_validate"
                     self.settle_and_validate(draft)
