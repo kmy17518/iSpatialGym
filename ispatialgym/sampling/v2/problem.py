@@ -36,7 +36,9 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple
 from ispatialgym import ASSETS_ROOT
 from ispatialgym.sampling.spec import ModelChoice, RoleSpec, SceneSpec
 
-DEFAULT_CUSTOMS = os.path.join(ASSETS_ROOT, "task_specs", "task_custom_lists.json")
+#: the D1 customs file (``customs.py`` writes ``isg_customs.json``); the v1 list is the fallback for the facade path
+_CUSTOMS_CANDIDATES = (os.path.join(ASSETS_ROOT, "task_specs", "isg_customs.json"), os.path.join(ASSETS_ROOT, "task_specs", "task_custom_lists.json"))
+DEFAULT_CUSTOMS = next((p for p in _CUSTOMS_CANDIDATES if os.path.exists(p)), _CUSTOMS_CANDIDATES[0])
 DEFAULT_BDDL_ROOT = os.path.join(ASSETS_ROOT, "bddl", "activity_definitions")
 DEFAULT_IDDL_ROOT = os.path.join(ASSETS_ROOT, "iddl")
 DEFAULT_ICL_ROOT = os.path.join(ASSETS_ROOT, "icl")
@@ -185,7 +187,7 @@ class RoleEntry:
     """``roles.<role>`` of the customs entry (§2.3)."""
 
     name: str
-    category: Optional[str]
+    category: Optional[str]  # one category, or the first of a list (``categories`` keeps them all)
     sampleable: bool
     require: Dict[str, Any] = field(default_factory=dict)
     representative: Optional[str] = None
@@ -194,6 +196,9 @@ class RoleEntry:
     handle_key: Any = None
     dataset: str = "behavior-1k-assets"
     kind: str = "sampleable"  # sampleable | group | scene
+    categories: List[str] = field(default_factory=list)
+    grasp_keys: Dict[str, str] = field(default_factory=dict)  # "<category>/<model>" -> grasp library key (D1 extension)
+    orientation_equivalences: Dict[str, Any] = field(default_factory=dict)  # "<category>/<model>" -> symmetry tags (D1 extension)
 
     def grasp_pipeline(self) -> Optional[str]:
         g = self.require.get("grasps")
@@ -201,6 +206,19 @@ class RoleEntry:
 
     def scale_of(self, category: str, model: str):
         return self.scale.get(f"{category}/{model}", self.scale.get(model))
+
+    def grasp_key_of(self, category: str, model: str) -> Optional[str]:
+        return self.grasp_keys.get(f"{category}/{model}", self.grasp_keys.get(model))
+
+    def joint_of(self, key: str) -> Optional[str]:
+        """The chosen joint of an articulation target (``"<category>/<model>"`` or ``"<scene>/<name>"``)."""
+        if isinstance(self.joint, dict):
+            return self.joint.get(key)
+        return self.joint
+
+    def equivalence_tags(self, category: str, model: str) -> List[str]:
+        tags = self.orientation_equivalences.get(f"{category}/{model}", self.orientation_equivalences.get(model, []))
+        return list(tags) if isinstance(tags, (list, tuple)) else ([tags] if tags else [])
 
 
 class GroundedProblem:
@@ -225,9 +243,12 @@ class GroundedProblem:
         for name, r in (entry.get("roles") or {}).items():
             groups = (entry.get("generation") or {}).get("groups") or {}
             kind = "group" if name in groups else ("sampleable" if r.get("sampleable", False) else "scene")
-            self.roles[name] = RoleEntry(name, r.get("category"), bool(r.get("sampleable", False)), dict(r.get("require") or {}),
+            cat = r.get("category")
+            cats = [cat] if isinstance(cat, str) else list(cat or [])
+            self.roles[name] = RoleEntry(name, cats[0] if cats else None, bool(r.get("sampleable", False)), dict(r.get("require") or {}),
                                          r.get("representative"), dict(r.get("scale") or {}), r.get("joint"), r.get("handle_key"),
-                                         r.get("dataset", "behavior-1k-assets"), kind)
+                                         r.get("dataset") or "behavior-1k-assets", kind, cats, dict(r.get("grasp_keys") or {}),
+                                         dict(r.get("orientation_equivalences") or {}))
         self.entry.setdefault("constraints", [])
         self.entry.setdefault("scenes", {})
         self.entry.setdefault("generation", {})
@@ -424,6 +445,20 @@ class GroundedProblem:
     def tolerances(self) -> Dict[str, float]:
         return dict(self.generation.get("tolerances") or {"position": 0.03, "orientation": 0.20})
 
+    def orientation_equivalences(self, role: str, category: str, model: str) -> Optional[List[List[float]]]:
+        """§3.13: the rotation group of the model's symmetry tags as quaternions (xyzw) for ``pose_targets[...]
+        .orientation_equivalences``; ``None`` = no equivalence (asymmetric / not surveyed), ``[]`` with the tag ``full``
+        means ``orientation_metric: null``. Uses ``customs.equivalence_group`` (D1) when it exists."""
+        tags = self.roles[role].equivalence_tags(category, model) if role in self.roles else []
+        if not tags or tags == ["none"]:
+            return None
+        try:
+            from ispatialgym.sampling import customs as _customs  # type: ignore
+
+            return _customs.equivalence_group(tags)
+        except Exception:
+            return None
+
     def path_buckets(self) -> Optional[List[Dict[str, Any]]]:
         return self.generation.get("path_buckets")
 
@@ -600,7 +635,7 @@ def draw_group(problem: GroundedProblem, role: str, scene: str, rng, taken: Set[
     size = _draw_size(spec["size"], rng)
     wl = pools if pools is not None else problem.whitelist(scene, role)
     entry = problem.roles[role]
-    grasp_keys = (problem.entry["roles"].get(role) or {}).get("grasp_keys") or {}
+    grasp_keys = entry.grasp_keys
     cands = [(c, m) for c, ms in wl.items() for m in ms]
     la = problem.lookalikes
     if target is not None:
@@ -656,8 +691,7 @@ def iter_template_choices(problem: GroundedProblem, scene: str, rng, constraints
                 c, m = cm.split("/", 1)
                 if c in wl and m in wl[c]:
                     wl[c] = [x for x in wl[c] if x != m]
-        cy = ModelCycler(role, wl, rng, la, problem.roles[role].dataset, (problem.entry["roles"].get(role) or {}).get("grasp_keys"),
-                         problem.roles[role].scale)
+        cy = ModelCycler(role, wl, rng, la, problem.roles[role].dataset, problem.roles[role].grasp_keys, problem.roles[role].scale)
         cyclers[role] = cy
         n_combos *= max(len(cy), 0)
     if n_combos == 0:

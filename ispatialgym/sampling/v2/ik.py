@@ -93,25 +93,28 @@ def contact_eef(point, normal_into_object, wrist_yaw: float = 0.0, contact_cente
     return G.t(point) - a * cz, quat
 
 
-def handle_eef(contact, approach) -> Pose:
-    """Handle grasp: eef origin = contact − 0.012·a (spec §3.6)."""
+def handle_eef(contact, approach, closing=None) -> Pose:
+    """Handle grasp: approach a along ``approach`` (into the handle), pads closing along ``closing`` (default: horizontal
+    ⊥ a), eef origin = contact − 0.012·a (spec §3.6; conventions ``handle_eef``)."""
     C = _conventions()
     if C is not None and hasattr(C, "handle_eef"):
-        return C.handle_eef(contact, approach)
+        a = C.unit(approach)
+        return C.handle_eef(contact, a, C._default_closing(a) if closing is None else closing)
     p, q = contact_eef(contact, approach)
     return G.t(contact) - approach_axis((p, q)) * HANDLE_OFFSET, q
 
 
-def line_waypoints(p0: Pose, p1: Pose, n: int = 3) -> List[Pose]:
-    """Straight eef motion p0 -> p1 with ``n`` intermediate poses (orientation SLERP) — conventions ``line_waypoints``."""
+def line_waypoints(p0: Pose, p1: Pose, n: int = 3, endpoints: bool = False) -> List[Pose]:
+    """Straight eef motion p0 -> p1 at fractions k/n (start excluded, goal last; ``endpoints=True`` prepends the start),
+    orientation SLERPed — conventions ``line_waypoints``."""
     C = _conventions()
     if C is not None and hasattr(C, "line_waypoints"):
-        return C.line_waypoints(p0, p1, n)
+        return [(G.t(p[0]), G.t(p[1])) for p in C.line_waypoints(p0, p1, n, endpoints)]
     import omnigibson.utils.transform_utils as T
 
-    out = []
+    out = [(G.t(p0[0]), G.t(p0[1]))] if endpoints else []
     for k in range(1, n + 1):
-        s = k / (n + 1)
+        s = k / n
         q = T.quat_slerp(G.t(p0[1]), G.t(p1[1]), th.tensor(s)) if hasattr(T, "quat_slerp") else G.t(p1[1])
         out.append((G.t(p0[0]) * (1 - s) + G.t(p1[0]) * s, q))
     return out

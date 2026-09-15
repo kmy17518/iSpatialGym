@@ -195,6 +195,9 @@ class IORSSmall(SamplerV2):
                         raise Reject("not_in_frame", f"{role} not in the init image (5 %)")
                 # step 5: whole-body checks at init and manipulation with the objects placed (objects applied later; here the
                 # stances are checked without them, the settled check repeats it with them in after_settle)
+                grasp.place_on = pname
+                # carry height: the target's bottom clears the partner's top by 3 cm along the lateral carry
+                grasp.carry_height = max(0.12, self._height("partner") + 0.03)
                 self.sidecar.add_stance(manip)
                 self.sidecar.add_grasp(grasp)
                 d.object_poses[tname] = t_pose

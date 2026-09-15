@@ -140,6 +140,8 @@ def check_blocks(subtask: str, sidecar: Dict[str, Any]) -> List[str]:
 def _is_pose(v) -> bool:
     if isinstance(v, dict):
         return "position" in v and "orientation" in v
+    if hasattr(v, "position") and hasattr(v, "orientation"):  # oracle.sidecar.Pose
+        return True
     if isinstance(v, (tuple, list)) and len(v) == 2:
         try:
             return len(v[0]) == 3 and len(v[1]) == 4
@@ -151,6 +153,8 @@ def _is_pose(v) -> bool:
 def _as_pose(v):
     if isinstance(v, dict):
         return pose_from_sidecar(v)
+    if hasattr(v, "position") and hasattr(v, "orientation"):
+        return th.as_tensor(list(v.position), dtype=th.float32), th.as_tensor(list(v.orientation), dtype=th.float32)
     return th.as_tensor(v[0], dtype=th.float32), th.as_tensor(v[1], dtype=th.float32)
 
 
@@ -177,63 +181,180 @@ def iter_pose_targets(targets: Any, prefix: str = "") -> Iterable[Tuple[str, Lis
 # ----------------------------------------------------------------------------------------------------------------
 
 
+class _SamplerState:
+    """The ``State`` of oracle doc §3.6 backed by the sampler's world at init: ``object_pose(name)`` -> (pos, quat)."""
+
+    def __init__(self, sampler):
+        self.sampler = sampler
+
+    def object_pose(self, name: str):
+        obj = self.sampler.objects[name]
+        p, q = obj.get_position_orientation()
+        return p.float().clone(), q.float().clone()
+
+
+def _sidecar_object(sd: Dict[str, Any]):
+    """``oracle.sidecar.Sidecar`` built from the draft dict (``tro_sha256`` placeholder before the TRO exists)."""
+    from ispatialgym.oracle import sidecar as SC  # type: ignore
+
+    d = dict(sd)
+    if not isinstance(d.get("tro_sha256"), str):
+        d["tro_sha256"] = "0" * 64
+    return SC.Sidecar.from_dict(d)
+
+
 def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = None) -> Dict[str, Any]:
     """§3.5 program check. ``sampler`` supplies ``ikc`` (``IKChecker``), ``kit``, ``objects`` (bddl instance -> sim
     object), ``support_objects()`` (ignored for final grasp / contact poses) and ``subtask``. Returns a report
-    ``{"mode": "expand"|"stub", "actions": [{"name", "n_poses", "ok"}], ...}``; raises ``Reject("program_check_failed",
-    action=<name>)`` (``sim_utils.Reject``) on the first failing target."""
+    ``{"mode": "expand"|"stub", "actions": [{"name", "stance", "carried", "n_poses"}], ...}``; raises
+    ``Reject("program_check_failed", action=<name>)`` (``sim_utils.Reject``) on the first failing target."""
     from ispatialgym.sampling.sim_utils import Reject
 
     subtask = subtask or getattr(sampler, "subtask", alias)
     sd = sidecar.to_dict()
+    problems = check_blocks(subtask, sd)
+    if problems:
+        raise Reject("program_check_failed", "; ".join(problems), action="blocks")
     expand = _expand()
     if expand is None:
-        problems = check_blocks(subtask, sd)
-        if problems:
-            raise Reject("program_check_failed", "; ".join(problems), action="stub")
         return {"mode": "stub", "problems": [], "blocks": list(subtask_blocks(subtask))}
     try:
-        actions = expand(alias, sd)
+        sc = _sidecar_object(sd)
+        actions = expand(alias, sc)
     except Exception as e:  # a program that cannot expand is a sampler-side bug too
         raise Reject("program_check_failed", f"expand failed: {e!r}", action="expand")
-    report = {"mode": "expand", "actions": []}
-    state = getattr(sampler, "oracle_state", lambda: None)()
+    report: Dict[str, Any] = {"mode": "expand", "actions": []}
+    state = _SamplerState(sampler)
+    tracker = _Tracker(sidecar)
     for action in actions:
         name = getattr(action, "name", type(action).__name__)
         try:
-            targets = action.targets(sd, state)
+            targets = action.targets(sc, state)
         except Exception as e:
             raise Reject("program_check_failed", f"targets() failed: {e!r}", action=name)
-        n = check_action_targets(sidecar, sampler, action, targets)
-        report["actions"].append({"name": name, "n_poses": n, "ok": True})
+        stance_name, carried = tracker.before(action)
+        n = check_action_targets(sidecar, sampler, action, targets, stance_name, carried)
+        tracker.after(action)
+        report["actions"].append({"name": name, "stance": stance_name, "carried": carried, "n_poses": n})
     return report
 
 
-def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any) -> int:
-    """IK / collision check of every eef pose / waypoint list in ``targets`` in the action's recorded stance, with the
-    carried object attached (``action.carried`` / the grasp record of ``action.objects[0]`` when the action is a
-    Lift / Reorient / Place / Navigate with a held object). Returns the number of poses checked."""
+class _Tracker:
+    """Where the robot is and what it holds while the program runs: ``Navigate`` -> ``path.to``, ``Transition`` ->
+    ``transition.to``; ``Grasp`` picks up ``object`` (held until ``Place``)."""
+
+    def __init__(self, sidecar: SidecarDraft):
+        self.stance = "init"
+        self.carried: Optional[str] = None
+        self.sidecar = sidecar
+
+    def before(self, action) -> Tuple[str, Optional[str]]:
+        name = getattr(action, "name", "")
+        carried = self.carried
+        if name == "navigate":
+            carried = getattr(getattr(action, "path", None), "carried", None) or self.carried
+        elif name == "transition":
+            carried = getattr(action, "carried", None) or self.carried
+        stance = self.stance
+        if name == "navigate" and getattr(action, "path", None) is not None:
+            stance = action.path.to
+        elif name == "transition" and getattr(action, "transition", None) is not None:
+            stance = action.transition.to
+        elif name == "base_follow" and getattr(action, "stance", None) is not None:
+            for k, v in self.sidecar.stances.items():
+                if list(v.base_pose2d) == list(action.stance.base_pose2d):
+                    stance = k
+        return stance, carried
+
+    def after(self, action) -> None:
+        name = getattr(action, "name", "")
+        if name == "navigate" and getattr(action, "path", None) is not None:
+            self.stance = action.path.to
+        elif name == "transition" and getattr(action, "transition", None) is not None:
+            self.stance = action.transition.to
+        if name == "grasp":
+            self.carried = getattr(action, "object", None)
+        elif name == "place":
+            self.carried = None
+
+
+def _ignore_for(action, sampler, carried: Optional[str]) -> Tuple[List[Any], List[Any]]:
+    """(objects removed for the final pose only, objects removed for every waypoint) per §3.6: the support for grasp /
+    place / contact end poses; the pushed object along a push; the braced object at the brace contact; the object placed
+    on at the place pose (the carried object rests on it 1 cm above)."""
+    name = getattr(action, "name", "")
+    supports = list(sampler.support_objects())
+    objs = sampler.objects
+    last: List[Any] = []
+    every: List[Any] = []
+    if name in ("grasp", "brace"):
+        last += supports  # the final grasp / contact pose only
+    if name == "lift":
+        every += supports  # the lift starts at the grasp pose (object resting on the support) and goes up
+    if name == "place":
+        every += supports  # the descent ends 1 cm above the support / partner with the object attached
+        g = getattr(action, "grasp", None)
+        place_on = getattr(g, "place_on", None)
+        if place_on in objs:
+            every.append(objs[place_on])
+    if name == "push":
+        obj = getattr(getattr(action, "contact", None), "object", None)
+        if obj in objs:
+            every.append(objs[obj])  # the pushed object moves with the pads
+        every += supports
+    if name == "brace":
+        obj = getattr(getattr(action, "contact", None), "object", None)
+        if obj in objs:
+            last.append(objs[obj])
+    if name == "retreat":
+        obj = getattr(action, "object", None)
+        if obj in objs:
+            every.append(objs[obj])  # the retreat starts with the pads around the released object
+        every += supports
+    return last, every
+
+
+def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, stance_name: str, carried: Optional[str]) -> int:
+    """IK / collision check of every eef pose / waypoint list in ``targets`` from the recorded stance ``stance_name``
+    (posture: untucked idle arm, trunk of the stance) with the ``carried`` object attached to the working arm.
+    Base-pose targets (paths, transitions, base-follow) are whole-body collision-checked at the stance trunk.
+    Returns the number of poses checked."""
     from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.v2 import navigation as NAV
     from ispatialgym.sampling.v2.navigation import attached
 
     name = getattr(action, "name", type(action).__name__)
     arms = list(getattr(action, "arms", ()) or ["right"])
     arm = arms[0]
-    stance_name = getattr(action, "stance", None) or ("manipulation" if "manipulation" in sidecar.stances else "init")
     stance: Stance = sidecar.stance(stance_name)
-    carried = getattr(action, "carried", None)
     carried_obj = sampler.objects.get(carried) if carried else None
-    ignore_names = set(getattr(action, "ignore", ()) or ())
-    ignore = [o for o in sampler.support_objects() if name.lower() in ("grasp", "place", "push", "brace")]
-    ignore += [sampler.objects[n] for n in ignore_names if n in sampler.objects]
+    ignore_last, ignore_all = _ignore_for(action, sampler, carried)
     n = 0
     with attached(sampler.kit, arm if carried_obj is not None else None, carried_obj):
         for key, poses in iter_pose_targets(targets):
             if len(poses) == 1:
-                res = sampler.ikc.exact(poses, stance, arm, ignore_for_last=ignore, cache=False)
+                res = sampler.ikc.exact(poses, stance, arm, ignore_for_last=ignore_last + ignore_all, cache=False)
             else:
-                res = sampler.ikc.waypoints_ok(poses, stance, arm, ignore_for_last=ignore)
+                res = sampler.ikc.waypoints_ok(poses, stance, arm, ignore_for_last=ignore_last, ignore_all=ignore_all)
             n += len(poses)
             if not res.ok:
-                raise Reject("program_check_failed", f"{key}: {res.reason} (stance {stance_name}, arm {arm})", action=name)
+                raise Reject("program_check_failed", f"{key}: {res.reason} (stance {stance_name}, arm {arm}, carried {carried})", action=name)
+        # base poses: transition drive-back / drive-in at both trunks, path waypoints at the stance trunk
+        base_poses: List[Tuple[float, float, float]] = []
+        trunks: List[Tuple[float, float]] = [(stance.translate, stance.tilt)]
+        if isinstance(targets, dict):
+            for k in ("drive_back", "drive_in", "goal"):
+                v = targets.get(k)
+                if isinstance(v, (list, tuple)) and len(v) == 3 and all(isinstance(x, (int, float)) for x in v):
+                    base_poses.append((float(v[0]), float(v[1]), float(v[2])))
+            if name == "transition":
+                frm = sidecar.stances.get(getattr(action.transition, "frm", ""))
+                if frm is not None:
+                    trunks.append((frm.translate, frm.tilt))
+        for trunk in trunks:
+            if base_poses:
+                ok, bad = NAV.path_collision_free(sampler.kit, base_poses, trunk)
+                n += len(base_poses)
+                if not ok:
+                    raise Reject("program_check_failed", f"base pose {base_poses[bad]} collides at trunk {trunk}", action=name)
     return n

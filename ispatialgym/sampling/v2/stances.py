@@ -356,11 +356,20 @@ class GraspRecord:
     finger_q: Optional[List[float]] = None
     eef_in_object: Optional[Pose] = None
     stance: str = "manipulation"
+    place_on: Optional[str] = None  # bddl instance the object is placed on / into / attached to (F6 programs)
+    waypoints: Optional[List[Pose]] = None  # in-hand motion key poses (held-object tasks, attachment), last = end pose
 
     def to_sidecar(self) -> Dict[str, Any]:
         d = {"object": self.object, "arm": self.arm, "grasp_key": self.grasp_key, "grasp_name": self.grasp_name, "yaw": float(self.yaw),
-             "pre_grasp": pose_to_sidecar(self.pre_grasp), "grasp": pose_to_sidecar(self.grasp), "pre_place": pose_to_sidecar(self.pre_place),
-             "place": pose_to_sidecar(self.place), "carry_height": float(self.carry_height), "stance": self.stance}
+             "grasp": pose_to_sidecar(self.grasp), "carry_height": float(self.carry_height), "stance": self.stance}
+        for k in ("pre_grasp", "pre_place", "place"):
+            v = getattr(self, k)
+            if v is not None:
+                d[k] = pose_to_sidecar(v)
+        if self.place_on is not None:
+            d["place_on"] = self.place_on
+        if self.waypoints is not None:
+            d["waypoints"] = [pose_to_sidecar(p) for p in self.waypoints]
         if self.finger_q is not None:
             d["finger_q"] = [float(v) for v in self.finger_q]
         if self.eef_in_object is not None:
