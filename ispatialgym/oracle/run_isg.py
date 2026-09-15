@@ -732,9 +732,12 @@ def main(argv=None) -> int:
         cfg = build_env_config(template_dir, tmeta, tro, tro_path, activity, did, robot_name, args.image_size)
         t0 = time.time()
         env = og.Environment(configs=cfg)
-        from ispatialgym.sampling.scene_variants import patch_trav_map_from_meta
+        from ispatialgym.sampling.scene_variants import block_trav_map_from_meta, patch_trav_map_from_meta
 
         meta["trav_cells_freed"] = patch_trav_map_from_meta(env.scene, tmeta)
+        # obstructed camera relocalization: the obstacle footprints of this instance are blocked in the planner's map
+        # (TRO ``ispatialgym.scene.scene_variant.blocked_footprints``, spec 6.2); no-op for every other instance
+        meta["trav_cells_blocked"] = block_trav_map_from_meta(env.scene, tro.meta.scene or {})
         task = env.task
         robot = env.robots[0]
         cam_key = _first_key(robot.sensors, M.HEAD_CAMERA_SENSOR_SUFFIX)
