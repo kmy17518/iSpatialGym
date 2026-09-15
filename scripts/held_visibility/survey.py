@@ -31,7 +31,6 @@ import csv
 import datetime as _dt
 import json
 import logging
-import math
 import os
 import sys
 import time
@@ -53,7 +52,7 @@ from ispatialgym.robot import conventions as C  # noqa: E402
 from ispatialgym.sampling import geometry as G  # noqa: E402
 from ispatialgym.sampling import grasp_library as GL  # noqa: E402
 from ispatialgym.sampling.robot_utils import RobotKit  # noqa: E402
-from ispatialgym.sampling.sim_utils import HEAD_APERTURE_MM, IMAGE_SIZE, PARK_POSITION, SimWorld  # noqa: E402
+from ispatialgym.sampling.sim_utils import HEAD_APERTURE_MM, IMAGE_SIZE, SimWorld  # noqa: E402
 from ispatialgym.sampling.v2.tasks import held_object as HO  # noqa: E402
 
 log = logging.getLogger("held_visibility")
@@ -320,6 +319,7 @@ def main(argv=None):
     parser.add_argument("--models", default=None, help="restrict to category/model,... (debug)")
     parser.add_argument("--limit-models", type=int, default=None)
     parser.add_argument("--resume", action="store_true", help="skip models already in --out")
+    parser.add_argument("--redo-errors", action="store_true", help="with --resume: re-survey the models whose records are all errors")
     parser.add_argument("--in-frame-margin", type=float, default=0.05)
     parser.add_argument("--min-visible-fraction", type=float, default=None, help="default: generation_defaults object_scaling.min_visible_fraction")
     parser.add_argument("--log-level", default="INFO")
@@ -343,6 +343,12 @@ def main(argv=None):
     if args.resume and os.path.exists(args.out):
         with open(args.out) as f:
             records = json.load(f).get("records", [])
+        if args.redo_errors:
+            failed = {(r["category"], r["model"]) for r in records if r.get("error")}
+            measured = {(r["category"], r["model"]) for r in records if r.get("visible_fraction") is not None}
+            redo = failed - measured
+            records = [r for r in records if (r["category"], r["model"]) not in redo]
+            log.info("re-surveying %d models whose records were all errors: %s", len(redo), sorted(redo))
         done_models = {(r["category"], r["model"]) for r in records}
     picks = [p for p in picks if (p["category"], p["model"]) not in done_models]
     log.info("%d picks to survey (%d subtasks, slots %s), %d floating grasp rows indexed", len(picks), len(subtasks), slots, len(rows))

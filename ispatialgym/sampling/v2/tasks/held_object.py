@@ -74,9 +74,10 @@ ARM = "right"
 IDLE_ARMS = "tucked"
 #: grasp pipeline of the held-object tasks (§2.2): the iddl fixes it, the customs entry cannot change it
 PIPELINE = "floating"
-#: library key suffixes admitted for the floating pipeline ("" = GraspGen floating, ``__f`` floating re-run, ``__h``
-#: handle-half rows count as floating for knives)
-FLOATING_SUFFIXES = ("", "__f", "__h")
+#: library key suffixes admitted for the floating pipeline ("" = GraspGen floating, ``__f`` floating re-run, ``__sf``
+#: floating at the grasp-tested spawn scale of the thin models (§2.2), ``__h`` handle-half rows count as floating for
+#: knives)
+FLOATING_SUFFIXES = ("", "__f", "__sf", "__h")
 HOLD_CACHE_PATH = os.environ.get("ISPATIALGYM_HELD_HOLD_CACHE", os.path.expanduser("~/.cache/ispatialgym/held_hold.json"))
 VISIBILITY_PRIOR_PATH = os.environ.get("ISPATIALGYM_HELD_VISIBILITY", os.path.join(REPO_ROOT, "runlogs", "held_visibility_20260915", "visibility.json"))
 #: angle grid of the precomputed rotation set (the instance draws one element; 15° keeps the set at 13 x 14 candidates)

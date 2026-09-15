@@ -89,6 +89,73 @@ def test_path_cells_middle_of_the_path():
     assert set(CR.path_cells(rng, 3, 8)) == {1}
 
 
+def _straight(n, step=0.1, y=0.0):
+    return [(i * step, y) for i in range(n)]
+
+
+def test_divergence_index_common_prefix():
+    before = _straight(10)
+    # the detour leaves the straight path after waypoint 4 (shares 0..4, then swerves to y = 0.1)
+    after = before[:5] + [(0.5, 0.1), (0.6, 0.1), (0.7, 0.1), (0.8, 0.0), (0.9, 0.0)]
+    assert CR.divergence_index(before, after, tol=0.05) == 4
+    # identical paths share everything: the divergence is the last common waypoint
+    assert CR.divergence_index(before, list(before), tol=0.05) == 9
+    # paths that part immediately
+    assert CR.divergence_index(before, [(0.0, 0.0), (0.1, 0.3)], tol=0.05) == 0
+    # the tolerance is half a map cell: a 4 cm wobble still counts as the same waypoint
+    wobble = [(x, y + (0.04 if i == 2 else 0.0)) for i, (x, y) in enumerate(before)]
+    assert CR.divergence_index(before, wobble, tol=0.05) == 9
+    # a shorter path cannot share more than its own length
+    assert CR.divergence_index(before, before[:3], tol=0.05) == 2
+    # torch paths (what the planner returns) work too
+    assert CR.divergence_index(th.tensor(before), th.tensor(after), tol=0.05) == 4
+
+
+def test_view_candidates_restricted_to_before_divergence_with_unobstructed_heading():
+    before = _straight(10)
+    after = before[:5] + [(0.5, 0.1), (0.6, 0.2), (0.7, 0.2), (0.8, 0.1), (0.9, 0.0)]
+    idx, pts, yaws, k = CR.view_candidates(after, final_yaw=1.0, path_before=before, tol=0.05)
+    assert k == 4
+    assert idx == [0, 1, 2, 3, 4]
+    assert pts == after[:5]
+    # headings along the *unobstructed* path: straight ahead everywhere, also at the divergence waypoint (toward where
+    # the unobstructed path would have continued), never the detour's or the goal's yaw
+    assert yaws == pytest.approx([0.0] * 5)
+    # without a reference path every waypoint counts, with the blocked path's own headings and the goal yaw last
+    idx, pts, yaws, k = CR.view_candidates(after, final_yaw=1.0)
+    assert k is None and idx == list(range(10)) and yaws[-1] == pytest.approx(1.0)
+    assert yaws[4] == pytest.approx(math.atan2(0.1, 0.1))  # the detour heading at the divergence waypoint (not admissible as a view heading)
+
+
+def test_obstacle_seen_only_after_the_detour_is_rejected():
+    """An obstacle that enters the frame only at the last waypoint (the base turns to the goal yaw and looks back) is
+    not admissible; one seen on the shared prefix is (its first admissible waypoint is recorded)."""
+    divergence = 4
+    assert CR.first_admissible_view([9], divergence) is None  # seen only after the detour
+    assert CR.first_admissible_view([6, 7, 8], divergence) is None  # seen only along the detour
+    assert CR.first_admissible_view([], divergence) is None
+    assert CR.first_admissible_view([4], divergence) == 4  # the divergence waypoint itself counts
+    assert CR.first_admissible_view([9, 3, 7], divergence) == 3  # the first shared waypoint at which it is in frame
+    assert CR.first_admissible_view([9, 3], None) == 3  # no reference path: every waypoint counts
+
+
+def test_obstructed_path_record_carries_view_facts():
+    from ispatialgym.sampling.v2.stances import PathRecord
+
+    base = PathRecord("init", "goal", "global", [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.3)], 2.0, posture="tucked", carried=None, trunk=(0.5, 0.0))
+    view = {"view_waypoint_index": {"o": 1}, "divergence_waypoint_index": {"o": 1}, "view_pose2d": {"o": [1.0, 0.0, 0.0]}}
+    rec = CR.ObstructedPathRecord(base, view)
+    d = rec.to_sidecar()
+    assert PathRecord.schema_ok(d)
+    assert d["view_waypoint_index"] == {"o": 1} and d["divergence_waypoint_index"] == {"o": 1} and d["view_pose2d"]["o"] == [1.0, 0.0, 0.0]
+    assert d["waypoints"][-1] == [2.0, 0.0, 0.3] and d["length_m"] == 2.0
+    # the F6 sidecar dataclass keeps the extra facts
+    from ispatialgym.oracle import sidecar as SC
+
+    p = SC.Path.from_dict(d, "paths[0]")
+    assert p.extra["divergence_waypoint_index"] == {"o": 1} and p.goal == [2.0, 0.0, 0.3]
+
+
 def test_structural_categories_never_count():
     for c in ("walls", "floors", "ceilings", "window", "door", "downlight", "room_light", "table_lamp", "curtain"):
         assert CR.is_structural(c)
