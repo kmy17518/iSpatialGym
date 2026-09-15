@@ -304,7 +304,9 @@ class BlockDesign(SamplerV2):
         for a in range(n):
             for b in range(a + 1, n):
                 if TT._polygons_overlap(fps[a], fps[b], gap):
-                    raise Reject("layout", "block footprints closer than the gap")
+                    ext_a = (fps[a].max(dim=0).values - fps[a].min(dim=0).values).tolist()
+                    raise Reject("layout", f"block footprints {a} / {b} closer than the gap {gap} (centres {float(th.linalg.norm(chosen[a] - chosen[b])):.3f} m apart, "
+                                           f"footprint extents {[round(v, 3) for v in ext_a]}, region cells {len(region)})")
         missing = TT.all_in_frame(self, cam_init, [(names[bi], self.hull, poses[bi]) for bi in range(n)], TT.IN_FRAME_MARGIN)
         if missing:
             raise Reject("not_in_frame", f"{missing} not fully in the init image")
@@ -393,8 +395,9 @@ class BlockDesign(SamplerV2):
         cam_p = TT._t(cam[0])
         for bi, pose in poses.items():
             pts = TT.face_points(pose, goal_face[bi], self.edge)
-            starts = cam_p.unsqueeze(0).expand(len(pts), 3)
-            ends = pts + (pts - cam_p) / th.linalg.norm(pts - cam_p, dim=1, keepdim=True) * 0.01
+            dirs = (pts - cam_p) / th.linalg.norm(pts - cam_p, dim=1, keepdim=True)
+            starts = cam_p.unsqueeze(0) + dirs * 0.25  # the camera sits inside the robot's head: start the rays outside it
+            ends = pts + dirs * 0.01
             hits = self.world.raycast(starts, ends)
             prims = {l.prim_path for l in self.objects[names[bi]].links.values()}
             n_vis = 0

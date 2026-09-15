@@ -192,8 +192,9 @@ class AlignmentAxial(SamplerV2):
             return 0
         cam_p = TT._t(cam[0])
         sel = pts[inside]
-        starts = cam_p.unsqueeze(0).expand(len(sel), 3)
-        ends = sel + (sel - cam_p) / th.linalg.norm(sel - cam_p, dim=1, keepdim=True) * 0.01
+        dirs = (sel - cam_p) / th.linalg.norm(sel - cam_p, dim=1, keepdim=True)
+        starts = cam_p.unsqueeze(0) + dirs * 0.25  # the camera sits inside the robot's head: start the rays outside it
+        ends = sel + dirs * 0.01
         hits = self.world.raycast(starts, ends)
         support_prims = {l.prim_path for l in self.obj("support").links.values()}
         n_vis = 0
@@ -216,7 +217,9 @@ class AlignmentAxial(SamplerV2):
         return TT._t(pose[0]) + C.quat_rotate(TT._t(pose[1]), self.com_local)
 
     def _push_height(self) -> float:
-        return float(self.top.z) + max(0.6 * self.extents["height"], 0.03) + C.FINGERTIP_LENGTH
+        """eef origin height of the generic top-down push / stop poses: the band's generic-pinch height (§4.1: eef at
+        max(0.6·h, 0.03) above the top), so the closed fingers' blade spans the object's side face."""
+        return float(self.top.z) + max(0.6 * self.extents["height"], 0.03)
 
     # ------------------------------------------------------------------ instance
 
@@ -293,6 +296,8 @@ class AlignmentAxial(SamplerV2):
         d_goal = C.wrap_angle(yaw_goal - yaw0)  # signed rotation to the goal
         spin = 1.0 if d_goal > 0 else -1.0
         push = None
+        down = th.tensor([0.0, 0.0, -1.0])
+        push_fails = []
         for e, ok in zip(ends, in_band):
             if not ok:
                 continue
@@ -302,18 +307,22 @@ class AlignmentAxial(SamplerV2):
             d = d / th.linalg.norm(d)
             side_pt = self._extreme_point(pose, -d, near=e)  # the face the end moves away from
             side_pt = th.tensor([float(side_pt[0]), float(side_pt[1]), z_push])
-            quat = C.eef_quat(th.tensor([0.0, 0.0, -1.0]), d)  # top-down, the closed fingers' broad face along the push
-            p_init = (side_pt - d * FINGER_HALF_THICKNESS, quat)
-            arc = C.arc_waypoints(p_init, th.tensor([float(com[0]), float(com[1]), z_push]), th.tensor([0.0, 0.0, 1.0]), d_goal, n=2)
-            p_mid, p_goal = arc[0], arc[1]
-            p_pre = C.pre_pose(p_init)
-            res = self.ikc.waypoints_ok([p_pre, p_init, p_mid, p_goal], manip, "right", ignore_all=[support, target])
-            if res.ok:
-                dist = abs(d_goal) * float(th.linalg.norm(r_xy))
-                push = (p_pre, p_init, p_mid, p_goal, d, dist, e)
+            for c_sign in (1.0, -1.0):  # the closing axis is undirected: either wrist turn of the blade
+                quat = C.eef_quat(down, c_sign * d)  # top-down, the closed fingers' broad face along the push
+                p_init = (side_pt - d * FINGER_HALF_THICKNESS, quat)
+                arc = C.arc_waypoints(p_init, th.tensor([float(com[0]), float(com[1]), z_push]), th.tensor([0.0, 0.0, 1.0]), d_goal, n=2)
+                p_mid, p_goal = arc[0], arc[1]
+                p_pre = C.pre_pose(p_init)
+                res = self.ikc.waypoints_ok([p_pre, p_init, p_mid, p_goal], manip, "right", ignore_all=[support, target])
+                if res.ok:
+                    dist = abs(d_goal) * float(th.linalg.norm(r_xy))
+                    push = (p_pre, p_init, p_mid, p_goal, d, dist, e)
+                    break
+                push_fails.append(res.reason)
+            if push is not None:
                 break
         if push is None:
-            raise Reject("grasp_unreachable", "neither long-axis end inside the band has an IK-feasible top-down push arc")
+            raise Reject("grasp_unreachable", f"neither long-axis end inside the band has an IK-feasible top-down push arc ({push_fails[-2:]})")
         p_pre, p_init, p_mid, p_goal, d_push, dist, end = push
         # stop edge: the goal hull's extreme point along the pushed end's direction of motion at the goal orientation
         q_goal = C.quat_from_yaw(yaw_goal)
@@ -323,13 +332,18 @@ class AlignmentAxial(SamplerV2):
         d_stop = d_stop / th.linalg.norm(d_stop)
         stop_pt = self._extreme_point(goal_pose, d_stop)
         stop_pt = th.tensor([float(stop_pt[0]), float(stop_pt[1]), z_push]) + d_stop * STOP_CLEARANCE
-        quat_b = C.eef_quat(th.tensor([0.0, 0.0, -1.0]), d_stop)
-        brace = (stop_pt + d_stop * FINGER_HALF_THICKNESS, quat_b)
-        brace_pre = C.pre_pose(brace)
-        res = TT.brace_second_arm(self, manip, "right", [p_pre, p_init, p_mid, p_goal], "left", [brace_pre, brace], ignore_work_last=[support, target],
-                                  ignore_brace_last=[support])
-        if not res.ok:
-            raise Reject("contact_unreachable", f"stop-edge brace with the push arm locked: {res.reason}")
+        res = None
+        for c_sign in (1.0, -1.0):
+            quat_b = C.eef_quat(down, c_sign * d_stop)
+            brace = (stop_pt + d_stop * FINGER_HALF_THICKNESS, quat_b)
+            brace_pre = C.pre_pose(brace)
+            res = TT.brace_second_arm(self, manip, "right", [p_pre, p_init, p_mid, p_goal], "left", [brace_pre, brace], ignore_work_last=[support, target],
+                                      ignore_brace_last=[support])
+            if res.ok:
+                break
+        if res is None or not res.ok:
+            raise Reject("contact_unreachable", f"stop-edge brace with the push arm locked: {res.reason if res else 'no candidate'} (stop at "
+                                                f"{[round(float(v), 2) for v in stop_pt.tolist()]}, base-frame {[round(float(v), 2) for v in manip.world_to_base(stop_pt[:2]).tolist()]})")
         cam_manip = self.camera_pose_at(manip)
         for nm, p in (("push init", p_init), ("push goal", p_goal), ("brace", brace)):
             if not self.ikc.eef_in_frame(p, cam_manip):
