@@ -33,7 +33,7 @@ from ispatialgym.oracle import r1pro_model as M  # noqa: E402
 from ispatialgym.oracle.action import ActionState  # noqa: E402
 from ispatialgym.oracle.base_tracker import BaseTrackerConfig, BaseTrajectoryTracker  # noqa: E402
 from ispatialgym.oracle.curobo_planner import PlanResult  # noqa: E402
-from ispatialgym.oracle.poses import (  # noqa: E402
+from ispatialgym.robot.conventions import (  # noqa: E402  (moved from oracle/poses, F5)
     FramedPose,
     Pose,
     as_tensor,
@@ -48,6 +48,7 @@ from ispatialgym.oracle.poses import (  # noqa: E402
     wrap_angle,
     yaw_of,
 )
+from ispatialgym.robot.conventions import q_with_base_pose as _q_with_base_pose  # noqa: E402  (moved, F5)
 from ispatialgym.oracle.trunk import TrunkState  # noqa: E402
 
 log = logging.getLogger(__name__)
@@ -569,16 +570,8 @@ class Skills:
 
     def q_with_base_pose(self, q: th.Tensor, x: float, y: float, yaw: float) -> th.Tensor:
         """Copy of ``q`` with the virtual base joints set so that base_link is at world ``(x, y, yaw)``."""
-        j = self.backend._jidx
         rp, rq = self.backend.root_pose()
-        ryaw = yaw_of(rq)
-        c, s = math.cos(ryaw), math.sin(ryaw)
-        dx, dy = float(x - rp[0]), float(y - rp[1])
-        qk = as_tensor(q).clone()
-        qk[j["base_footprint_x_joint"]] = c * dx + s * dy
-        qk[j["base_footprint_y_joint"]] = -s * dx + c * dy
-        qk[j["base_footprint_rz_joint"]] = wrap_angle(float(yaw) - ryaw)
-        return qk
+        return _q_with_base_pose(q, x, y, yaw, root_pose2d=(float(rp[0]), float(rp[1]), yaw_of(rq)), joint_index=self.backend._jidx)
 
     def base_reference_collision_free(self, ref: th.Tensor, stride_m: float = 0.1) -> bool:
         """Whole-body collision check of a world-frame ``(x, y, yaw)`` reference at the current arm/torso pose."""

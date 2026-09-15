@@ -14,54 +14,18 @@ reproduces in :func:`TrunkState.step_towards`.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch as th
 
 from ispatialgym.oracle import r1pro_model as M
+from ispatialgym.robot.conventions import torso_q, torso_q_to_translate_tilt, translate_to_torso_q  # noqa: F401  (moved to robot/conventions, F5)
 
-_UPRIGHT = th.tensor(M.TORSO_UPRIGHT, dtype=th.float32)
-_DOWNWARD = th.tensor(M.TORSO_DOWNWARD, dtype=th.float32)
-_GROUND = th.tensor(M.TORSO_GROUND, dtype=th.float32)
+__all__ = ["TrunkState", "JOYLO_TRANSLATE_RATE", "JOYLO_TILT_RATE", "torso_q", "torso_q_to_translate_tilt", "translate_to_torso_q"]
 
 #: JoyLo defaults (scripts/run_joylo.py): translate rate when the button is held, tilt rate at full stick.
 JOYLO_TRANSLATE_RATE = 0.1  # [translate units / s]
 JOYLO_TILT_RATE = 0.05  # [rad / s]
-
-
-def translate_to_torso_q(translate: float) -> th.Tensor:
-    """Torso joint positions (4,) on the keyframe curve for ``translate`` in [0, 2] (tilt = 0)."""
-    lo, hi = M.TRUNK_TRANSLATE_RANGE
-    t = min(max(float(translate), lo), hi)
-    if t <= 1.0:
-        return (1.0 - t) * _UPRIGHT + t * _DOWNWARD
-    s = t - 1.0
-    return (1.0 - s) * _DOWNWARD + s * _GROUND
-
-
-def torso_q_to_translate_tilt(q: th.Tensor) -> Tuple[float, float]:
-    """Inverse of the keyframe curve using ``torso_joint1`` (monotonic along the curve); the tilt is
-    the residual of ``torso_joint3`` w.r.t. the curve value."""
-    q = th.as_tensor(q, dtype=th.float32)
-    j1 = float(q[0])
-    if j1 > float(_DOWNWARD[0]):
-        translate = 1.0 + (j1 - float(_DOWNWARD[0])) / (float(_GROUND[0]) - float(_DOWNWARD[0]))
-    else:
-        translate = (j1 - float(_UPRIGHT[0])) / (float(_DOWNWARD[0]) - float(_UPRIGHT[0]))
-    translate = min(max(translate, M.TRUNK_TRANSLATE_RANGE[0]), M.TRUNK_TRANSLATE_RANGE[1])
-    tilt = float(q[M.TRUNK_TILT_JOINT_INDEX] - translate_to_torso_q(translate)[M.TRUNK_TILT_JOINT_INDEX])
-    return translate, tilt
-
-
-def torso_q(translate: float, tilt: float, joint_limits: Optional[Tuple[th.Tensor, th.Tensor]] = None) -> th.Tensor:
-    """Torso joint positions for (translate, tilt); ``tilt`` is clamped to the joint limits if given."""
-    q = translate_to_torso_q(translate).clone()
-    j = M.TRUNK_TILT_JOINT_INDEX
-    val = float(q[j]) + float(tilt)
-    if joint_limits is not None:
-        val = min(max(val, float(joint_limits[0][j])), float(joint_limits[1][j]))
-    q[j] = val
-    return q
 
 
 @dataclass

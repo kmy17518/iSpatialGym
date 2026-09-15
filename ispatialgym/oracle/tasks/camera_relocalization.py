@@ -22,7 +22,7 @@ import omnigibson.utils.transform_utils as T
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.poses import Pose, as_tensor, compose, invert, quat_angle
 from ispatialgym.oracle.skills import Skills
-from ispatialgym.oracle.trunk import torso_q
+from ispatialgym.robot.conventions import camera_offset_in_zed, torso_q  # noqa: F401  (moved to robot/conventions, F5)
 
 log = logging.getLogger(__name__)
 
@@ -39,14 +39,6 @@ class Viewpoint:
     @property
     def pose2d(self) -> Tuple[float, float, float]:
         return (self.x, self.y, self.yaw)
-
-
-def camera_offset_in_zed(robot, sensor_key: Optional[str] = None) -> Pose:
-    """Fixed pose of the head camera sensor frame in ``zed_link``."""
-    key = sensor_key or [k for k in robot.sensors if k.endswith(M.HEAD_CAMERA_SENSOR_SUFFIX)][0]
-    cp, cq = robot.sensors[key].get_position_orientation()
-    zp, zq = robot.links[M.HEAD_CAMERA_LINK].get_position_orientation()
-    return T.relative_pose_transform(cp.float(), cq.float(), zp.float(), zq.float())
 
 
 def camera_pose_from_state(skills: Skills, q_full: th.Tensor, cam_in_zed: Pose) -> Pose:

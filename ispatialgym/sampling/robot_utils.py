@@ -20,17 +20,10 @@ from ispatialgym.oracle.curobo_planner import R1ProCuRobo  # noqa: F401  (must p
 import omnigibson.utils.transform_utils as T  # noqa: E402
 
 from ispatialgym.oracle import r1pro_model as M  # noqa: E402
-from ispatialgym.oracle.tasks.camera_relocalization import camera_offset_in_zed  # noqa: E402
-from ispatialgym.oracle.trunk import torso_q, torso_q_to_translate_tilt  # noqa: E402
+from ispatialgym.robot.conventions import CONTACT_CENTER_Z, FINGER_OPEN, NOMINAL_BASE_Z, camera_offset_in_zed, q_with_base_pose, torso_q, torso_q_to_translate_tilt  # noqa: E402,F401  (moved to robot/conventions, F5)
 from ispatialgym.sampling import geometry as G  # noqa: E402
 
 log = logging.getLogger("ispatialgym.sampling")
-
-#: right-gripper pad centre along the eef z axis (from the grasp library's gripper description)
-CONTACT_CENTER_Z = -0.01186
-FINGER_OPEN = 0.05
-#: base_link height above the floor when R1Pro stands on its wheels (measured on the flat floor plane)
-NOMINAL_BASE_Z = 0.0053
 
 
 @dataclass
@@ -105,21 +98,13 @@ class RobotKit:
         return torso_q_to_translate_tilt(q[self.robot.trunk_control_idx])
 
     def q_at_base_pose(self, q: th.Tensor, x: float, y: float, yaw: float) -> th.Tensor:
-        """Copy of ``q`` whose virtual base joints put base_link at world (x, y, yaw) given the current root pose."""
+        """Copy of ``q`` whose virtual base joints put base_link at world (x, y, yaw) given the current root pose.
+
+        The articulation root stays where the robot was spawned (possibly metres above the floor); the z / roll / pitch
+        virtual joints always put base_link upright at the nominal standing height, whatever ``q`` carried."""
         rp, rq = self.backend.root_pose()
-        ryaw = G.yaw_of(rq)
-        c, s = math.cos(ryaw), math.sin(ryaw)
-        dx, dy = float(x - rp[0]), float(y - rp[1])
-        qk = G.t(q).clone()
-        qk[self.jidx["base_footprint_x_joint"]] = c * dx + s * dy
-        qk[self.jidx["base_footprint_y_joint"]] = -s * dx + c * dy
-        qk[self.jidx["base_footprint_rz_joint"]] = G.wrap_angle(float(yaw) - ryaw)
-        # the articulation root stays where the robot was spawned (possibly metres above the floor); the z / roll / pitch
-        # virtual joints always put base_link upright at the nominal standing height, whatever ``q`` carried
-        qk[self.jidx["base_footprint_z_joint"]] = self.floor_z + NOMINAL_BASE_Z - float(rp[2])
-        qk[self.jidx["base_footprint_rx_joint"]] = 0.0
-        qk[self.jidx["base_footprint_ry_joint"]] = 0.0
-        return qk
+        return q_with_base_pose(q, x, y, yaw, root_pose2d=(float(rp[0]), float(rp[1]), G.yaw_of(rq)), base_z=self.floor_z + NOMINAL_BASE_Z,
+                                root_z=float(rp[2]), joint_index=self.jidx)
 
     def q_current(self) -> th.Tensor:
         return self.backend.q_full()
