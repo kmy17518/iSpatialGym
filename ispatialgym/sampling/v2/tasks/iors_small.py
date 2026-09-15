@@ -378,12 +378,23 @@ class IORSSmall(SamplerV2):
         with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
             res = self.ikc.exact([pre_place, place], manip, grasp.arm, ignore_for_last=ignore, scale_key=self.choice.models["target"].scale, cache=False)
         if not res.ok:
+            # diagnostics only on failure (which pose, and whether the attached object / the world / the reach is the cause)
+            def _ok(r):
+                return "ok" if r.ok else "fail"
+
             r_pre = self.ikc.exact([pre_place], manip, grasp.arm, cache=False)
             r_place = self.ikc.exact([place], manip, grasp.arm, ignore_for_last=ignore, cache=False)
+            everything = [o for o in self.world.scene.objects if self.world.obstacle_filter(o)]
+            with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
+                r_pre_obj = self.ikc.exact([pre_place], manip, grasp.arm, cache=False)
+                r_pre_obj_ign = self.ikc.exact([pre_place], manip, grasp.arm, ignore_for_last=ignore, cache=False)
+                r_place_obj = self.ikc.exact([place], manip, grasp.arm, ignore_for_last=ignore, cache=False)
+                r_place_obj_free = self.ikc.exact([place], manip, grasp.arm, ignore_for_last=everything, cache=False)
             _, lat = manip.local(goal_pos[:2])
             raise Reject("place_unreachable", f"pre-place / place fail the exact IK from the manipulation stance with the object attached "
-                                              f"(without the object: pre-place {'ok' if r_pre.ok else 'fail'}, place {'ok' if r_place.ok else 'fail'}; "
-                                              f"goal lateral {lat:+.2f} m, trunk ({manip.translate}, {manip.tilt:.2f}), stand-off {manip.stand_off})")
+                                              f"(without the object: pre-place {_ok(r_pre)}, place {_ok(r_place)}; with the object: pre-place {_ok(r_pre_obj)}, "
+                                              f"pre-place ignoring support+partner {_ok(r_pre_obj_ign)}, place {_ok(r_place_obj)}, place ignoring every object "
+                                              f"{_ok(r_place_obj_free)}; goal lateral {lat:+.2f} m, trunk ({manip.translate}, {manip.tilt:.2f}), stand-off {manip.stand_off})")
         grasp.pre_place, grasp.place = pre_place, place
         cam = self.camera_pose_at(manip)
         if not self.ikc.eef_in_frame(grasp.grasp, cam):
