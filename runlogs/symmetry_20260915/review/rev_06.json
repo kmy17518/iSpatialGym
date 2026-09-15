@@ -1,0 +1,113 @@
+{
+  "lemon__peqwoa": {
+    "y2": {"verdict": "broken", "note": "The dark navel/stem scar sits on the +x end only (a ~1 cm blotch in the +x tile, a dark speck at the tip in the side tiles); the half turn about y moves it to the other end, which is plain."},
+    "xinf": {"verdict": "preserved", "note": "Body of revolution about its long x axis: the navel scar sits on the axis and stays put at x101, the skin is uniform olive, and the tiny residual geometry difference is invisible."}
+  },
+  "lemon__pffkae": {
+    "y2": {"verdict": "broken", "note": "The dark navel scar is on the +x end only; after the flip the +x tile is plain and the −x tile shows the scar, and the speck shows at the tip in the side tiles."},
+    "xinf": {"verdict": "preserved", "note": "Round about its long axis: the on-axis navel scar does not move at x101, the skin colour is uniform, nothing in the row differs from the original."}
+  },
+  "lemon__pqweio": {
+    "y2": {"verdict": "broken", "note": "Navel scar on the +x end only (both ends have the same nipple shape, so the print is the tell); the half turn swaps the scarred and the plain end."},
+    "x4": {"verdict": "preserved", "note": "Rolling the lemon 90° about its long axis changes nothing a person could see: the navel scar is on the axis and the skin is uniform; the slight silhouette shift is a 1-2 mm wobble of a slightly tilted axis, not a visible feature."},
+    "x5": {"verdict": "preserved", "note": "Same as x4: on-axis navel scar, uniform skin, no readable feature moves under a 72° roll."},
+    "x6": {"verdict": "preserved", "note": "Same as x4: on-axis navel scar, uniform skin, the 60° roll is invisible."}
+  },
+  "lemon__pwqedq": {
+    "y2": {"verdict": "broken", "note": "Navel scar on the +x end only; the flip moves it to the −x tile and leaves the +x end plain."},
+    "x4": {"verdict": "preserved", "note": "Roll about the long axis: the on-axis navel scar stays in place, the skin is uniform, the silhouette wobble is millimetres and not visible at 1 m."},
+    "x5": {"verdict": "preserved", "note": "Same as x4: nothing readable moves under a 72° roll about the long axis."},
+    "x6": {"verdict": "preserved", "note": "Same as x4: the 60° roll about the long axis is invisible."}
+  },
+  "lemon__vuwehu": {
+    "y2": {"verdict": "broken", "note": "A small black stem dot (~5 mm) sits on the +x end only, clearly visible in the +x tile and at the tip in the −y/−z tiles; both ends have the same nipple shape, but the flip moves the dot to the plain end."}
+  },
+  "letter__bdlpry": {
+    "z2": {"verdict": "broken", "note": "Printed text covers the top face: after the half turn the text block is upside down, its blank margin and ragged line ends move to the opposite side of the page — a directional print readable at 1 m."}
+  },
+  "letter__csncjv": {
+    "z2": {"verdict": "broken", "note": "Printed page with a dense band of text lines at one end and lighter blocks at the other; after the half turn the dense band sits at the opposite end (and the curl of the sheet is not quite symmetric either)."}
+  },
+  "letter__dyvllf": {
+    "z2": {"verdict": "broken", "note": "Print with dense text lines on one half and a table/address block on the other; the half turn swaps the two halves."}
+  },
+  "letter__esmoua": {
+    "x2": {"verdict": "broken", "note": "The flip about x turns the printed face down: the +z tile shows the plain grey back of the sheet where the original shows text."},
+    "y2": {"verdict": "broken", "note": "The flip about y turns the printed face down: the +z tile shows the plain back, the text is only visible from below."},
+    "z2": {"verdict": "broken", "note": "Text lines aligned to one side of the page with ragged ends on the other; after the half turn the block is aligned to the opposite side and upside down."}
+  },
+  "letter__igvnic": {
+    "z2": {"verdict": "broken", "note": "Faint printed text lines with a blank band at one end of the page; after the half turn the blank band is at the opposite end — faint but visible print, and directional."}
+  },
+  "letter__jafvfh": {
+    "z2": {"verdict": "broken", "note": "Faint print: an off-centre smudge/logo and ruled lines on one half of the page only; the half turn moves both to the other half."}
+  },
+  "letter__oheufk": {
+    "x2": {"verdict": "broken", "note": "The flip about x puts the printed face down; the +z tile shows the plain back of the sheet."},
+    "y2": {"verdict": "broken", "note": "The flip about y puts the printed face down; the +z tile shows the plain back of the sheet."},
+    "z2": {"verdict": "broken", "note": "Dense printed text with a darker block near one end; the half turn moves the block to the other end and inverts the text."}
+  },
+  "letter__qrykxc": {
+    "z2": {"verdict": "broken", "note": "Form-like print with header lines at one end and bold blocks at the other; after the half turn the layout is mirrored and upside down."}
+  },
+  "lid__fnqhbz": {
+    "z5": {"verdict": "broken", "note": "The lid is oval (0.200 × 0.183 m): at 72° the top-view outline's long axis visibly turns from horizontal to near vertical, and the small tab inside the underside turns with it; only z2 is a real symmetry."},
+    "z6": {"verdict": "broken", "note": "Same oval outline: at 60° the long axis of the ellipse is visibly tilted against the original and the underside tab points elsewhere."}
+  },
+  "lid__kdswwr": {
+    "x2": {"verdict": "broken", "note": "The flip puts the striped top face down: the +z tile shows the plain dark-green back instead of the wavy stripes."},
+    "y2": {"verdict": "broken", "note": "The flip puts the striped top face down: the +z tile shows the plain back."},
+    "z2": {"verdict": "broken", "note": "The two handle slots are centrally symmetric, but the wavy two-tone stripe print is not: after the half turn the stripes sit at a different phase, corners and slots that were on a dark stripe are on an olive one."}
+  },
+  "lid__qferch": {
+    "zinf": {"verdict": "broken", "note": "A bar-shaped handle/ridge across the top (a faint line in the +z tile, a bump in the side tiles) is only 2-fold: at z101 it lies at a different angle than in the original."}
+  },
+  "lipstick__albshz": {
+    "y5": {"verdict": "broken", "note": "Square-section tube (y4 is exact): at 72° the rotated square shows a corner and two faces where the original shows one flat face (silhouette clearly wider), and the small pink logo on one face moves."}
+  },
+  "marker__ablbdc": {
+    "x4": {"verdict": "broken", "note": "One-sided pocket clip on the cap (light-edged): it shows in the +z tile of the original but in other tiles after the 90° roll — the clip moves around the barrel."},
+    "x5": {"verdict": "broken", "note": "The one-sided cap clip moves with the 72° roll (visible in the −y tile after the roll, absent there in the original)."},
+    "x6": {"verdict": "broken", "note": "The one-sided cap clip moves with the 60° roll and appears at the cap's lower edge instead of on top."}
+  },
+  "marker__bwwkmb": {
+    "x5": {"verdict": "broken", "note": "One-sided pocket clip on the cap: on top in the original +z tile, gone from it after the 72° roll."},
+    "x6": {"verdict": "broken", "note": "The one-sided cap clip moves with the 60° roll (shows at the cap's lower edge in the −y tile, not on top)."}
+  },
+  "marker__erhlbb": {
+    "x4": {"verdict": "broken", "note": "One-sided pocket clip on the cap: visible on top in the original +z tile, absent there after the 90° roll."},
+    "x5": {"verdict": "broken", "note": "The one-sided cap clip moves with the 72° roll and leaves the +z tile."},
+    "x6": {"verdict": "broken", "note": "The one-sided cap clip moves with the 60° roll (appears in the −y tile instead of the +z tile)."}
+  },
+  "marker__gldosk": {
+    "x4": {"verdict": "broken", "note": "One-sided pocket clip on the cap: on top in the original, out of the +z tile after the 90° roll."},
+    "x5": {"verdict": "broken", "note": "The one-sided cap clip moves with the 72° roll."},
+    "x6": {"verdict": "broken", "note": "The one-sided cap clip moves with the 60° roll and shows in the −y tile instead."}
+  },
+  "marker__jlvneb": {
+    "xinf": {"verdict": "broken", "note": "One-sided pocket clip on the cap: at the cap's lower edge in the original +z tile, on top of the cap at x163 — any roll moves it."}
+  },
+  "marker__mcpkkq": {
+    "xinf": {"verdict": "broken", "note": "One-sided pocket clip on the cap moves from the cap's lower edge to its top between the original and the x163 row; any roll about the axis is visible."}
+  },
+  "marker__mznenj": {
+    "xinf": {"verdict": "broken", "note": "One-sided pocket clip on the cap: lower edge in the original +z tile, on top of the cap at x197 (also visible in the −y tile)."}
+  },
+  "marker__oyjbhy": {
+    "xinf": {"verdict": "broken", "note": "One-sided pocket clip on the cap: on top of the cap in the original −z tile, at the lower edge at x163."}
+  },
+  "marker__slgheo": {
+    "x4": {"verdict": "broken", "note": "One-sided pocket clip on the cap: on top in the original +z tile, at the cap's lower edge in the −y tile after the 90° roll."},
+    "x5": {"verdict": "broken", "note": "The one-sided cap clip moves with the 72° roll (visible in the −y tile, gone from the +z tile)."},
+    "x6": {"verdict": "broken", "note": "The one-sided cap clip moves with the 60° roll."}
+  },
+  "marker__vjjsul": {
+    "xinf": {"verdict": "broken", "note": "One-sided pocket clip on the cap: on top of the cap in the original −z tile, at the lower edge at x197 (and now visible in the −y tile)."}
+  },
+  "marker__vrjwkg": {
+    "xinf": {"verdict": "broken", "note": "One-sided pocket clip on the cap: on top of the cap in the original −z tile, at the cap's lower edge at x163."}
+  },
+  "marker__xakoic": {
+    "xinf": {"verdict": "broken", "note": "One-sided pocket clip on the cap: at the cap's lower edge in the original +z tile, on top of the cap at x197."}
+  }
+}

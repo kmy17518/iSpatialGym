@@ -1,0 +1,240 @@
+{
+  "goblet__nawrfs": {
+    "zinf": {
+      "verdict": "broken",
+      "note": "Discrete blue and amber gems set into the cup band and the foot sit at fixed positions and visibly shift around the goblet under yaw (and a stray gem appears on the foot); only the dark body itself is round."
+    }
+  },
+  "green_bean__dyjvwv": {
+    "x2": {
+      "verdict": "preserved",
+      "note": "Uniform dark-green pod with both tips tapering alike; the end-swapped bean matches the original in every view and only a millimetre-scale curl at one tip differs, which is not readable at 1 m (the low silhouette IoU is the thin-object effect)."
+    }
+  },
+  "green_bean__lvbjws": {
+    "x2": {
+      "verdict": "preserved",
+      "note": "Uniform dark-green pod, both tips taper alike and the flipped bean is indistinguishable in all six views; only a tiny tip curl differs, below what a person could read at 1 m."
+    }
+  },
+  "guitar__hpqjrq": {
+    "x2": {
+      "verdict": "broken",
+      "note": "The double-cutaway body is asymmetric (the long horn swaps sides in the top/bottom views after the flip) and the flip shows the plain back in place of the face; a 1 m guitar makes this obvious."
+    }
+  },
+  "half_lime__dtyjkb": {
+    "zinf": {
+      "verdict": "broken",
+      "note": "The cut face (seen from -z) shows white radial segment membranes around a pith whose angle changes with yaw; only the uniform dark-green dome side is yaw-invariant."
+    }
+  },
+  "half_lime__mxmmcp": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "Uniform dark-green dome, the small stem nub sits on the axis (its sub-millimetre wobble is not readable), the cut face renders as a plain disc; the small geometry deviation is the polygon effect of a body of revolution."
+    }
+  },
+  "half_lime__wdadtn": {
+    "zinf": {
+      "verdict": "broken",
+      "note": "The cut face (seen from -z) shows white radial segment membranes and a pith whose angle changes with yaw; the dome side is uniform but the cut face reads the rotation."
+    }
+  },
+  "hamburger_bun__fqxumh": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "Uniform dark-brown top and sides; the underside shows only a faint, roughly concentric mottling with no distinct patch, and the outline is round to within 2 %, so nothing reads the yaw."
+    }
+  },
+  "hamburger_bun__jeygaq": {
+    "z4": {
+      "verdict": "preserved",
+      "note": "Geometrically round; the cut-face crumb mottling is an isotropic noise pattern with a roughly central darker region and the crust is uniform, so a quarter turn shows no readable feature."
+    },
+    "z5": {
+      "verdict": "preserved",
+      "note": "Same as z4: round bun, uniform crust, cut-face crumb texture is unreadable noise with no distinct patch or direction."
+    },
+    "z6": {
+      "verdict": "preserved",
+      "note": "Same as z4: round bun, uniform crust, cut-face crumb texture is unreadable noise with no distinct patch or direction."
+    }
+  },
+  "hamper__pdzaca": {
+    "zinf": {
+      "verdict": "broken",
+      "note": "Two opposite loop handles on the rim fix the yaw (modulo the half turn); already the 17° row moves them visibly and a 90° yaw puts them front/back instead of left/right."
+    }
+  },
+  "hamper__sijioo": {
+    "z3": {
+      "verdict": "preserved",
+      "note": "Wire-mesh basket with identical evenly spaced vertical wires (a multiple of 15 around), uniform rings, rim and grid bottom and no seam, weld, label or handle; the wires line up exactly after 120° and the residual texture score is thin-line aliasing."
+    },
+    "z5": {
+      "verdict": "preserved",
+      "note": "Same basket, the wire spacing repeats exactly after 72°; no seam or feature anywhere, so the rotated basket is indistinguishable."
+    }
+  },
+  "hanger__anobre": {
+    "x2": {
+      "verdict": "broken",
+      "note": "The hook curls to one side of the hanger's symmetry plane; after the flip it curls the other way (a mirror image), plainly visible from above/below on a 44 cm hanger."
+    }
+  },
+  "hardback__bgtbdp": {
+    "x2": {
+      "verdict": "preserved",
+      "note": "Front and back covers carry the identical grey cover / green band / maroon label design at the same place and the long side faces look alike, so the flipped book is indistinguishable; the label text is not legible at sheet scale so it cannot be read either way (rule 3)."
+    }
+  },
+  "ice_cube__dueotq": {
+    "z4": {
+      "verdict": "preserved",
+      "note": "Uniform pale glass tint (shape only); a slightly rounded near-cube whose corner bulges differ by well under a millimetre on a 2 cm cube, not readable at 1 m."
+    }
+  },
+  "ice_cube__lkirej": {
+    "z4": {
+      "verdict": "preserved",
+      "note": "Uniform pale glass tint (shape only); a slightly rounded near-cube whose corner bulges differ by well under a millimetre on a 2 cm cube, not readable at 1 m."
+    }
+  },
+  "jar_of_curry_powder__ozhftu": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "Round jar with a uniform fine-grained powder texture and a plain dark lid (the glass is omitted, so the lid floats); no label, seam or mark anywhere."
+    }
+  },
+  "jar_of_dill_seed__reavkt": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "Uniform random seed speckle on the body, plain dark lid, no label; the small silhouette wobble is millimetre-level polygon/fill irregularity that a person could not read."
+    }
+  },
+  "jar_of_mayonnaise__ktmjvg": {
+    "zinf": {
+      "verdict": "broken",
+      "note": "Several dark-teal diagonal streaks at irregular positions on the grey body (and on the bottom) move around the jar with yaw; the body shape itself is round."
+    }
+  },
+  "jar_of_tumeric__miivhi": {
+    "z4": {
+      "verdict": "broken",
+      "note": "A hexagonal emblem label sits on one face of the square jar only; after the quarter turn it appears on a different face."
+    }
+  },
+  "keyboard__jtdyix": {
+    "x2": {
+      "verdict": "broken",
+      "note": "The flip puts the keyboard face-down: the key grid and pad on the top face are replaced by the plain underside, and the wedge/lip profile flips."
+    }
+  },
+  "keyboard__uwacaq": {
+    "x2": {
+      "verdict": "broken",
+      "note": "The flip turns the slab face-down: the faint grey key legends on the top face are replaced by the plain underside and the wedge profile flips (silhouette mismatch)."
+    },
+    "y2": {
+      "verdict": "broken",
+      "note": "Half turn about the long axis also puts the keyboard face-down: legend-bearing key face swapped for the plain underside, wedge profile flipped."
+    },
+    "z2": {
+      "verdict": "broken",
+      "note": "symmetric_180 (alignment-axial), judged about the +z (up) axis: the faint grey key-legend groups sit at one end of the top face and move to the other end after the half turn, so the selection reviewer's value (not symmetric) is right and the survey is wrong; the flat-shaded render hides the key relief, which would only add to the difference."
+    }
+  },
+  "lemon__asdada": {
+    "y2": {
+      "verdict": "broken",
+      "note": "The dark stem scar on the +x tip and the small nipple on the -x tip swap ends under the half turn about y."
+    },
+    "z2": {
+      "verdict": "broken",
+      "note": "The dark stem scar on the +x tip and the nipple on the -x tip swap ends under the half turn about z."
+    }
+  },
+  "lemon__bbvonm": {
+    "y2": {
+      "verdict": "preserved",
+      "note": "Uniformly coloured lemon with no scar; the ends taper alike and only a ~1 mm nipple marks one end, which is not readable at 1 m."
+    },
+    "z2": {
+      "verdict": "preserved",
+      "note": "Same as y2: uniform colour, near-symmetric ellipsoid, the ~1 mm nipple is the only end marker and is not readable at 1 m."
+    },
+    "x5": {
+      "verdict": "preserved",
+      "note": "Uniform colour and a cross-section round to within ~5 %, so a turn about the long axis changes the outline by ~2 mm only."
+    },
+    "x6": {
+      "verdict": "preserved",
+      "note": "Uniform colour and a near-round cross-section; the 60° turn about the long axis changes the outline by ~2 mm only."
+    }
+  },
+  "lemon__bmvxas": {
+    "y2": {
+      "verdict": "broken",
+      "note": "The dark stem scar on the +x tip and the nipple on the -x tip swap ends under the half turn about y."
+    },
+    "xinf": {
+      "verdict": "preserved",
+      "note": "The scar and the nipple sit on the long axis and stay put under any turn about x (the scar does not move even at 180°), the skin is uniform and the residual is the polygon effect."
+    }
+  },
+  "lemon__dsacfa": {
+    "y2": {
+      "verdict": "broken",
+      "note": "The dark stem scar on the +x tip and the nipple on the -x tip swap ends under the half turn about y."
+    },
+    "x5": {
+      "verdict": "preserved",
+      "note": "Scar and nipple sit on the long axis and do not move under the 72° turn, skin uniform; the slight tilt of the lemon's own axis against frame x shifts the outline by ~2 mm only."
+    },
+    "x6": {
+      "verdict": "preserved",
+      "note": "Scar and nipple on the axis, uniform skin; the 60° turn shifts the outline by ~2 mm only, not a visible wobble on a 10 cm lemon."
+    }
+  },
+  "lemon__gkrfha": {
+    "y2": {
+      "verdict": "broken",
+      "note": "The dark stem scar on the +x tip and the nipple on the -x tip swap ends under the half turn about y."
+    },
+    "xinf": {
+      "verdict": "preserved",
+      "note": "Scar and nipple sit on the long axis and stay put under any turn about x, skin uniform; the slightly lumpy cross-section changes the outline by ~2 mm only."
+    }
+  },
+  "lemon__hoghjl": {
+    "y2": {
+      "verdict": "broken",
+      "note": "The dark stem scar on the +x tip and the nipple on the -x tip swap ends under the half turn about y."
+    },
+    "x6": {
+      "verdict": "preserved",
+      "note": "Scar and nipple on the axis, uniform skin; the lemon's own axis is slightly tilted against frame x so the outline shifts by ~2-3 mm after 60°, not a visible wobble on a 10 cm lemon."
+    }
+  },
+  "lemon__kvgfdl": {
+    "y2": {
+      "verdict": "broken",
+      "note": "The dark stem scar on the +x tip and the nipple on the -x tip swap ends under the half turn about y."
+    },
+    "xinf": {
+      "verdict": "preserved",
+      "note": "Scar and nipple sit on the long axis and stay put under any turn about x, uniform skin, exact body of revolution otherwise."
+    }
+  },
+  "lemon__ovbcff": {
+    "y2": {
+      "verdict": "broken",
+      "note": "The dark stem scar on the +x tip and the nipple on the -x tip swap ends under the half turn about y."
+    },
+    "x6": {
+      "verdict": "preserved",
+      "note": "Scar and nipple on the axis, uniform skin; the slight tilt of the lemon's own axis against frame x shifts the outline by ~2-3 mm after 60°, not readable at 1 m."
+    }
+  }
+}

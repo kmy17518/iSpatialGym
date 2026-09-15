@@ -1,0 +1,212 @@
+{
+  "pencil__lruiot": {
+    "xinf": {
+      "verdict": "preserved",
+      "note": "Turn about the long axis of a plain, uniformly navy hexagonal pencil: the sharpened tip stays at the same end and no print or seam is visible on the body in any tile (same mesh whose xinf the survey accepted for rzscao); the texture difference is only the dark edge pixels of a 4 mm rod."
+    }
+  },
+  "pencil__rzscao": {
+    "y2": {
+      "verdict": "broken",
+      "note": "The end-to-end flip swaps the sharpened conical tip with the flat cut end: in the +y/-y and +z/-z tiles the taper visibly switches from the right end to the left end."
+    },
+    "z2": {
+      "verdict": "broken",
+      "note": "The half turn about z also swaps the ends: the pointed tip moves to the other end of the rod (taper switches sides in the +y/-y and +z/-z tiles) while the other end stays flat."
+    }
+  },
+  "pencil__rzscao__scaled": {
+    "z2": {
+      "verdict": "broken",
+      "note": "On the thickened rod the light wood cone and graphite point are clearly at one end only; after z180 they sit at the opposite end in every side and top tile (and the rod wobbles slightly), so a person sees the pencil pointing the other way."
+    }
+  },
+  "pencil__vedvit__scaled": {
+    "z2": {
+      "verdict": "broken",
+      "note": "Sharpened tip at one end, flat hexagonal cut at the other: the z180 row shows the point on the opposite side in the +y, -y, +z and -z tiles, so the flipped pencil is not identical."
+    }
+  },
+  "pencil__vvofwr": {
+    "xinf": {
+      "verdict": "preserved",
+      "note": "Rotation about the long axis of a uniformly dark-teal hexagonal pencil: the tip remains at the same end and no print, logo or seam can be seen on the body in any tile; only edge pixels of the thin rod differ."
+    }
+  },
+  "pencil_case__acikzo": {
+    "z2": {
+      "verdict": "preserved",
+      "note": "Both ends carry the same wire loop, the zipper runs the full length and the brown/red band pattern reads the same after the half turn; no pull tab, print or feature sits at one end only, so the z180 row is indistinguishable from the original."
+    }
+  },
+  "pepper_shaker__stbqbt": {
+    "z5": {
+      "verdict": "preserved",
+      "note": "Uniform dark-brown low-poly frustum with a plain black cap: only the polygon corners of the body move under the 72 deg turn (rule 1) and the tiny cap holes cannot be read at 1 m; no label or print anywhere."
+    },
+    "z6": {
+      "verdict": "preserved",
+      "note": "Same as z5: plain faceted dark body and black cap, the 60 deg turn only shifts polygon corners; nothing in colour or print marks a direction."
+    }
+  },
+  "pepper_shaker__tgcwtr": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "Black cap, uniformly speckled dark-green body (noise texture, not a print) and plain black base band; all four side tiles and the top/bottom look the same at any yaw, no label or seam."
+    }
+  },
+  "pepper_shaker__ykujyn": {
+    "x2": {
+      "verdict": "broken",
+      "note": "The tall black cap and the thin dark base rim are different ends: after the flip the black cap sits at the bottom with the red-brown body above it, and the +z tile shows the red-brown base instead of the black cap."
+    },
+    "y2": {
+      "verdict": "broken",
+      "note": "Same as x2: the upside-down shaker shows its large black cap at the bottom and the red-brown speckled body on top, clearly different from the original from the side and from above."
+    }
+  },
+  "pickle__ifterk": {
+    "y4": {
+      "verdict": "preserved",
+      "note": "Low-poly (8-segment) pickle with a uniform noisy dark-olive skin: the quarter turn about the long axis leaves the silhouette and the skin the same, no stem scar, stripe or blemish readable in any tile."
+    }
+  },
+  "pickle__iobrqp": {
+    "y4": {
+      "verdict": "preserved",
+      "note": "Same shape and uniform speckled skin as the other pickle; the y90 row is indistinguishable from the original, no feature marks the roll angle about the long axis."
+    }
+  },
+  "picture__watgtj": {
+    "z2": {
+      "verdict": "broken",
+      "note": "The light 'HAPPY' print sits in one corner of the black picture; after z180 it appears upside down in the diagonally opposite corner (visible in the +z tile and the side tiles), which a person reads at once."
+    }
+  },
+  "plate__bgxzec": {
+    "x2": {
+      "verdict": "preserved",
+      "note": "Uniform grey 8 mm-thick disc: top and bottom faces are identical in colour and the flipped silhouette matches the original in every tile; nothing (foot ring, print, rim) marks which face is up."
+    },
+    "y2": {
+      "verdict": "preserved",
+      "note": "Same as x2: plain grey disc, both faces alike, the y180 tiles are indistinguishable from the original."
+    }
+  },
+  "plate__luhkiz": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "Dark grey plate with a fine, uniform beaded black rim (dozens of identical beads, no print or gap); the odd-angle rows read exactly the same as the original, the bead phase is a polygon-corner effect not readable at 1 m."
+    }
+  },
+  "plate__spppps": {
+    "z2": {
+      "verdict": "broken",
+      "note": "The red floral print covers one side of the rim with a large cluster and only a small cluster opposite; after z180 the large cluster is on the other side of the plate (top and side tiles), so the halves are not alike."
+    }
+  },
+  "pop_case__gwgaqb": {
+    "y2": {
+      "verdict": "broken",
+      "note": "The half turn about the long axis swaps top and bottom: the 'TRIBAL COLA' text on both end faces (+y/-y tiles) reads upside down with the wave graphic above it instead of below, a print a person reads at 1 m."
+    }
+  },
+  "pop_case__pldtgy": {
+    "x2": {
+      "verdict": "broken",
+      "note": "Turning the case about its long x axis leaves the end faces upside down: 'TRIBAL COLA' on the +x and -x ends is inverted in the x180 row, and the top-face can graphic is replaced by the bottom face."
+    }
+  },
+  "pop_case__qcfxec": {
+    "z2": {
+      "verdict": "broken",
+      "note": "The grey label panel sits in one corner of the top face (the opposite corner is plain) and the side label is off-centre; after z180 the panel is in the diagonally opposite corner in the +z and end tiles."
+    }
+  },
+  "public_trash_can__aefcem": {
+    "zinf": {
+      "verdict": "broken",
+      "note": "The base is a square frame with four feet, not a body of revolution: under z131 the feet at the bottom edge move from the corners to the centre of the side views and the square frame seen from below is visibly rotated; only the 4-fold turns hold."
+    }
+  },
+  "public_trash_can__hxsyxo": {
+    "z5": {
+      "verdict": "broken",
+      "note": "Single-sided features: the small grey emblem on the body, the side opening notch at the top and the off-centre perforated grate on the lid all move around the can under the 72 deg turn (emblem shifts from the centre to the edge of the +x tile)."
+    },
+    "z6": {
+      "verdict": "broken",
+      "note": "Same features as z5 (emblem, side notch, off-centre lid grate) sit at different positions after the 60 deg turn, so the can is not identical."
+    }
+  },
+  "public_trash_can__leazin": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "A cage of about twenty identical, evenly spaced bars and slats with no label, opening or single feature (checked with brightened tiles); the odd-angle row looks the same as the original from every camera and the bar phase is not readable at 1 m (rule 1)."
+    }
+  },
+  "public_trash_can__xkqkbf": {
+    "zinf": {
+      "verdict": "broken",
+      "note": "Not a body of revolution: the body has only about eight coarse vertical ribs whose phase visibly changes (a rib pair at the centre becomes a single rib), and the lid's rectangular opening and the base cross are rotated in the z101 row; only the half turn holds."
+    }
+  },
+  "radiator__arsjbe": {
+    "y2": {
+      "verdict": "broken",
+      "note": "The pipe and valve assembly at one end is not top-bottom symmetric: the pipe stub that runs down below the panel in the original sticks up above the panel after the half turn about y, with the valve knob at the other height (side and top tiles)."
+    }
+  },
+  "radiator__dwmloz": {
+    "x2": {
+      "verdict": "broken",
+      "note": "Judged the half turn about the +x front (wall-normal) axis: a single pipe elbow protrudes at one bottom corner of the panel and after x180 it sits at the opposite top corner (front, back and end tiles), a feature a person sees at 1 m; the selection reviewer's value (not symmetric) is right and the survey's exact x2 is wrong."
+    }
+  },
+  "radiator__xnoiwp": {
+    "y2": {
+      "verdict": "broken",
+      "note": "Same design as arsjbe: the pipe stub at one end points down below the panel in the original and up above it after y180, and the valve knob changes height, so the flipped radiator is distinguishable."
+    }
+  },
+  "rolling_pin__mwrdae": {
+    "x2": {
+      "verdict": "preserved",
+      "note": "Judged the half turn about the +x front axis, which swaps the ends: both ends carry the same round knob handle and the dark wood shows only a faint grain with no knot or seam readable at 1 m, so the x180 row is identical; the selection reviewer's symmetric_180 = 1 is right, the survey's symmetry_near was over-cautious."
+    },
+    "yinf": {
+      "verdict": "preserved",
+      "note": "Rolling the pin about its own axis shows the same plain turned wood from every camera; the faint grain is uniform and not readable, no print or seam."
+    }
+  },
+  "ruler__ujizkx": {
+    "x2": {
+      "verdict": "broken",
+      "note": "The single hole at one end of the ruler moves to the other end after x180 (visible in the +z/-z tiles), and the face is flipped as well."
+    },
+    "y2": {
+      "verdict": "unsure",
+      "note": "The half turn about the long axis keeps the hole at the same end and both faces appear as dark grey strips with fine tick striations; whether the numbering or a logo differs between the two faces (the survey measures a larger texture difference) cannot be resolved in the sheet."
+    },
+    "z2": {
+      "verdict": "broken",
+      "note": "The hole at one end moves to the opposite end after z180 (top and bottom tiles), so the end with the hole gives the orientation away."
+    }
+  },
+  "ruler__vmnaih": {
+    "x2": {
+      "verdict": "broken",
+      "note": "The single end hole switches ends after x180 (visible in the +z/-z tiles) and the face flips; not identical."
+    },
+    "z2": {
+      "verdict": "broken",
+      "note": "The end hole moves from one end to the other after z180 in the top and bottom tiles."
+    }
+  },
+  "salt_shaker__iomwtn": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "Plain dark turned-wood mill with a black knob: no label, seam or readable grain from any side (checked with brightened tiles) and the base opening is centred, so any yaw looks the same."
+    }
+  }
+}

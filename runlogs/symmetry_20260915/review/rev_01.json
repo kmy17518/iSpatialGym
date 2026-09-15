@@ -1,0 +1,95 @@
+{
+  "bottle_of_lotion__tkryrh": {
+    "zinf": {"verdict": "preserved", "note": "Unprinted dark-navy 12-gon bottle with a plain black cap; the rotated silhouette differs only by the polygon corners (about 1 px), nothing to read on it."}
+  },
+  "bottle_of_medicine__qqsukh": {
+    "z6": {"verdict": "broken", "note": "The wrap-around label carries a red brand header, a pill graphic and a barcode once around the bottle; after 60 deg the brand text and barcode sit in different views."}
+  },
+  "bottle_of_milk__ddvsgl": {
+    "x2": {"verdict": "preserved", "note": "The same red 'MILK / niu-nai + cow logo' print is on both z faces and the same small red text on both y faces (pixel diff shows only a 1-px stroke offset), and the red-cap end and plain end stay in place under the half turn about the long axis."}
+  },
+  "bottle_of_milk__qsnnbp": {
+    "x5": {"verdict": "broken", "note": "Large irregular dark-blue blotches (several cm, camouflage-like) on the grey body do not repeat around the long axis and change position in every view after 72 deg."},
+    "x6": {"verdict": "broken", "note": "Same irregular dark-blue blotch pattern moves after 60 deg; the blotches are readable at 1 m, only the low-poly silhouette is 6-fold."}
+  },
+  "bottle_of_mustard_seeds__grryaf": {
+    "zinf": {"verdict": "preserved", "note": "Plain black lid and a uniform seed-speckle body texture with no label or readable feature; the speckle is noise and the shape is round."}
+  },
+  "bottle_of_onion_powder__xruqod": {
+    "zinf": {"verdict": "broken", "note": "The powder body's top surface is slanted and notched (about 1 cm of height change across the 5 cm diameter, visible in every side view), so the silhouette changes with yaw; the cap is round but the fill line is not."}
+  },
+  "bottle_of_papaya_juice__nmfmxy": {
+    "z2": {"verdict": "broken", "note": "The label's green leaf and fruit graphics and the white nutrition panel are laid out once around the bottle, not repeated on the opposite side; after the half turn each camera sees a different panel."}
+  },
+  "bottle_of_pop__bqretx": {
+    "z4": {"verdict": "broken", "note": "The grey label carries a red script logo and a dark bottle icon once around; after 90 deg they sit in different positions in every view."},
+    "z3": {"verdict": "broken", "note": "Same single red script logo / dark icon on the label, not repeated three times; moves after 120 deg."},
+    "z5": {"verdict": "broken", "note": "Same single red script logo / dark icon on the label, not repeated five times; moves after 72 deg."}
+  },
+  "bottle_of_pop__cmqubs": {
+    "z2": {"verdict": "broken", "note": "A whitish streak/patch (baked highlight or worn label) sits on one side of the dark olive body and swaps sides after the half turn, visible in every side view."}
+  },
+  "bottle_of_pop__kviogj": {
+    "zinf": {"verdict": "broken", "note": "The grey label band carries a white text logo at one or two positions; any yaw moves it into a different camera."}
+  },
+  "bottle_of_pop__sevoto": {
+    "z2": {"verdict": "preserved", "note": "The red/orange logo and swoosh are printed on both front and back of the grey label and the side text panels match (pixel diff shows only fine-print and 1-px edge differences); nothing a person at 1 m could use to tell the half-turned bottle apart."}
+  },
+  "bottle_of_pop__twtsry": {
+    "zinf": {"verdict": "broken", "note": "Unprinted two-tone bottle but the body is oval (54 x 61 mm): from the same camera it is about 10 % wider along y than along x (20 vs 18 px in the tiles), so the silhouette changes with yaw and only z2 holds; not a polygon-corner effect."}
+  },
+  "bottle_of_poppy_seeds__xdtrgi": {
+    "zinf": {"verdict": "preserved", "note": "Black lid and a uniform brown seed-speckle body with no label; the speckle is noise and the shape is round."}
+  },
+  "bottle_of_seasoning__vqwqqv": {
+    "zinf": {"verdict": "preserved", "note": "Black lid and a uniform brown body with no label or print; round shape, silhouettes match in all views."}
+  },
+  "bottle_of_sesame_seeds__lzndie": {
+    "zinf": {"verdict": "preserved", "note": "Grey lid and a uniform black seed-speckle body with no label; the speckle is noise and the shape is round."}
+  },
+  "bottle_of_shampoo__lvvkhx": {
+    "z6": {"verdict": "broken", "note": "A single label on one side of the grey bottle; after 60 deg it appears in a different camera and is gone from the +x view."}
+  },
+  "bottle_of_shampoo__stjjjm": {
+    "z6": {"verdict": "broken", "note": "A single label on one side of the grey bottle (same design as lvvkhx); after 60 deg it appears in a different camera."}
+  },
+  "bottle_of_tea__iladfg": {
+    "z4": {"verdict": "broken", "note": "The green label has one barcode, one red seal and a large character block at distinct positions; after 90 deg the barcode moves to another view."},
+    "z3": {"verdict": "broken", "note": "Same single barcode / red seal / character block layout, not repeated three times; moves after 120 deg."},
+    "z5": {"verdict": "broken", "note": "Same single barcode / red seal / character block layout, not repeated five times; moves after 72 deg."}
+  },
+  "bottle_of_tea__yatmrs": {
+    "z2": {"verdict": "broken", "note": "The main label panels are duplicated but a white barcode patch is printed on one side only (visible in the +y view before and in the -y view after the half turn)."}
+  },
+  "bottle_of_tea_leaves__pfbtus": {
+    "z2": {"verdict": "preserved", "note": "Plain grey lid and a uniform tea-leaf speckle body with no label; the 1-2 mm unevenness of the fill top is not visible at 1 m."}
+  },
+  "bottle_of_water__cyzaue": {
+    "zinf": {"verdict": "preserved", "note": "Unprinted black hexagonal-prism bottle (44 faces) with a plain cap; only the polygon corners move (silhouette changes by 1-2 px), polygon count alone."}
+  },
+  "bottle_of_water__eeaimz": {
+    "zinf": {"verdict": "broken", "note": "The label wrap has a mottled grey pattern and a distinct dark emblem (at most twice around); any yaw moves the emblem into a different view."}
+  },
+  "bottle_of_water__emquat": {
+    "zinf": {"verdict": "preserved", "note": "Unprinted grey-blue body with a round white-topped cap and concentric base, silhouettes identical in all views; the only mark is a roughly 1-px (about 4 mm) dark speck on one side, too small to read the orientation from at 1 m."}
+  },
+  "bottle_of_water__lkpaas": {
+    "zinf": {"verdict": "preserved", "note": "All-glass bottle drawn in a uniform tint, judged on shape only: a body of revolution with ring ridges, silhouettes match within 1 px in every view."}
+  },
+  "bottle_of_water__migvlt": {
+    "zinf": {"verdict": "broken", "note": "Same label design as eeaimz: mottled wrap with a distinct dark emblem that any yaw moves into a different view."}
+  },
+  "bottle_of_water__rmtdxh": {
+    "z5": {"verdict": "broken", "note": "The swing-top wire bail and lever on the neck have a single orientation and look different in every camera (and from above) after 72 deg; the body is also slightly oval (66 x 71 mm)."},
+    "z6": {"verdict": "broken", "note": "Same swing-top bail/lever, not 6-fold; its profile changes in every view after 60 deg."}
+  },
+  "bottle_of_water__sxffiv": {
+    "z2": {"verdict": "broken", "note": "The blue label has the white brand name on one side and a text block with a white bar on the opposite side; after the half turn the +x camera sees the text block instead of the brand name."}
+  },
+  "bottle_of_wine__cldder": {
+    "zinf": {"verdict": "broken", "note": "A single brown label on one side of the green bottle; any yaw moves it into a different view."}
+  },
+  "bottle_of_wine__dijgvu": {
+    "zinf": {"verdict": "broken", "note": "The gold band at the base carries small text and an emblem that do not repeat continuously (only twice around, hence the survey's z2); the emblem visible in the -x view moves under yaw."}
+  }
+}
