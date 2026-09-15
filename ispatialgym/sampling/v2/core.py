@@ -306,8 +306,32 @@ class SamplerV2(TaskSampler):
     def run_template(self):
         """Template facts once: bands, caches, representative test (``sample_template``); recorded in ``template_meta``."""
         self.park_robot()
+        self.adopt_existing_template()
         self.sample_template()
         self.template_meta["template_facts"] = _jsonable(self.template_facts)
+
+    def adopt_existing_template(self) -> bool:
+        """``multiply_isg``: when ``<out_dir>/template.json`` exists (written by ``sample_isg`` with instance 0), keep it —
+        the new instances must reference the same template (``scene.template_sha256`` in every TRO) — and continue its
+        ``template_meta.json`` instead of re-saving. Returns True when a template was adopted."""
+        full = os.path.join(self.ctx.out_dir, "template.json")
+        partial = os.path.join(self.ctx.out_dir, "template-partial_rooms.json")
+        meta_path = os.path.join(self.ctx.out_dir, "template_meta.json")
+        if not (os.path.exists(full) and os.path.exists(meta_path)):
+            return False
+        with open(meta_path) as f:
+            old = json.load(f)
+        self.template_paths = (partial if os.path.exists(partial) else full, full)
+        self.template_sha = sha256_of_file(full)
+        keep = {k: v for k, v in old.items() if k not in ("timings", "rejections", "rejection_examples", "seeds", "kit_stats")}
+        self.template_meta = {**keep, **self.template_meta, "timings": {**old.get("timings", {}), **self.template_meta.get("timings", {})}}
+        self.template_meta["n_written_before"] = int(old.get("n_written", 0))
+        self.template_meta["n_written"] = int(old.get("n_written", 0))
+        for k, v in (old.get("rejections") or {}).items():
+            self.rejection_log.counts[k] = self.rejection_log.counts.get(k, 0) + int(v)
+        self.instance_seeds = list(old.get("seeds") or [])
+        log.info("%s: continuing template %s (%d instances so far, sha %s)", self.gp.alias, self.ctx.template_id, self.template_meta["n_written"], self.template_sha[:12])
+        return True
 
     # ------------------------------------------------------------------ parking (§3.3)
 
