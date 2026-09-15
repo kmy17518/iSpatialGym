@@ -1,0 +1,194 @@
+{
+  "asparagus__eodozo": {
+    "y6": {
+      "verdict": "preserved",
+      "note": "Unprinted stalk of uniform green grain turned 60 deg about its own long axis: the tip and cut end stay where they are and the silhouette changes by at most 1-2 px of edge jitter (about 3-4 mm on a 190 mm stalk, the stalk's own bow is only ~4 mm), nothing a person at 1 m could read."
+    }
+  },
+  "asparagus__xguktb": {
+    "y5": {
+      "verdict": "preserved",
+      "note": "Rotation about the stalk's long axis keeps tip and cut end in place; the stalk is nearly straight (~3 mm bow) with a uniform grain and no scale/knot stands out, so the 1-3 px centreline jitter in the tiles is not readable at 1 m."
+    },
+    "y6": {
+      "verdict": "preserved",
+      "note": "Same as y5: straight unprinted stalk with uniform grain rotated about its long axis, only sub-3 px edge jitter and no feature marks the turn."
+    }
+  },
+  "beeswax_candle__nhdnje": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "Plain uniform-wax cylinder; the faint wick sits on the axis (no measurable shift under rotation) and there is no seam, print or grain, only the polygon-corner effect."
+    }
+  },
+  "beeswax_candle__nxewyk": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "Plain uniform-wax cylinder with a centred, barely visible wick and no seam or print; the rotated tiles are indistinguishable apart from polygon corners."
+    }
+  },
+  "beeswax_candle__oimgmh": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "Plain uniform-wax cylinder, wick on the axis, no seam or print; nothing changes with the yaw beyond polygon corners."
+    }
+  },
+  "beeswax_candle__ouzkdj": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "Plain uniform-wax cylinder with a centred wick and no seam or print; the rotated tiles are identical to the eye."
+    }
+  },
+  "beeswax_candle__pfewit": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "Plain uniform-wax cylinder with a centred, low-contrast wick and no seam or print; only polygon corners move."
+    }
+  },
+  "bottle_of_beer__zlmwyn": {
+    "z4": {
+      "verdict": "broken",
+      "note": "The single dark rectangular label on the lower body (visible from -y in the original) moves to the side under the quarter turn, so the labelled face and the blank faces swap."
+    },
+    "z5": {
+      "verdict": "broken",
+      "note": "The single dark rectangular label on the lower body is only on one side and moves round the bottle with the 72 deg turn."
+    },
+    "z6": {
+      "verdict": "broken",
+      "note": "The single dark rectangular label on the lower body is only on one side and moves round the bottle with the 60 deg turn."
+    }
+  },
+  "bottle_of_catsup__bcqfxb": {
+    "z2": {
+      "verdict": "preserved",
+      "note": "A blank grey label of the same notched shape sits on both wide faces and cap and body are symmetric, so the half turn shows an identical bottle (both sides alike)."
+    }
+  },
+  "bottle_of_coconut_water__lsixio": {
+    "z2": {
+      "verdict": "preserved",
+      "note": "The palm-tree logo panel is printed identically on front and back; the only residual is a very faint (~15/255) shift of the dark panel edge in the side views that a person at 1 m would not notice."
+    }
+  },
+  "bottle_of_essential_oil__eyyhld": {
+    "z4": {
+      "verdict": "broken",
+      "note": "The 'ESSENTIAL OIL' text block on the pale wrap-around label is on one side only and moves to another side under the quarter turn."
+    },
+    "z5": {
+      "verdict": "broken",
+      "note": "The 'ESSENTIAL OIL' text block on the pale label moves round the bottle with the 72 deg turn, a readable print cue."
+    },
+    "z6": {
+      "verdict": "broken",
+      "note": "The 'ESSENTIAL OIL' text block on the pale label moves round the bottle with the 60 deg turn, a readable print cue."
+    }
+  },
+  "bottle_of_essential_oil__wansva": {
+    "z5": {
+      "verdict": "broken",
+      "note": "The 'ESSENTIAL OIL' text block on the pale wrap-around label is on one side only and moves with the 72 deg turn."
+    },
+    "z6": {
+      "verdict": "broken",
+      "note": "The 'ESSENTIAL OIL' text block on the pale wrap-around label is on one side only and moves with the 60 deg turn."
+    }
+  },
+  "bottle_of_essential_oil__xvqshn": {
+    "z6": {
+      "verdict": "broken",
+      "note": "The 'ESSENTIAL OIL' text block on the pale wrap-around label is on one side only and moves with the 60 deg turn."
+    }
+  },
+  "bottle_of_ginger__drqhzo": {
+    "z6": {
+      "verdict": "broken",
+      "note": "The spice fill's top surface is heaped to one side (about 3-5 mm higher, a lip that nearly touches the floating lid on one side and leaves a gap on the other) and the 60 deg turn moves the heap to a different side, a real silhouette change rather than polygon corners, though marginal at 1 m."
+    }
+  },
+  "bottle_of_ground_cloves__vzamzb": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "Plain grey lid over a level, uniformly speckled fill with no label, print or seam; only the speckle noise and polygon corners change with the yaw."
+    }
+  },
+  "bottle_of_ground_nutmeg__qebruq": {
+    "z5": {
+      "verdict": "broken",
+      "note": "The fill's top surface is heaped to one side (about 3-5 mm, visible as a lip in the gap under the lid) and the 72 deg turn moves the heap to another side, a silhouette change beyond polygon corners, though marginal at 1 m."
+    },
+    "z6": {
+      "verdict": "broken",
+      "note": "Same heaped fill surface (about 3-5 mm lip under the lid) swaps sides under the 60 deg turn, a silhouette change beyond polygon corners, though marginal at 1 m."
+    }
+  },
+  "bottle_of_paprika__nrdgrp": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "Plain grey lid over a level, uniformly speckled red fill with no label, print or seam; only the speckle noise and polygon corners change with the yaw."
+    }
+  },
+  "bottle_of_pop__wuuoes": {
+    "z4": {
+      "verdict": "broken",
+      "note": "A dark elongated mark printed on the cap top (about 12 x 5 mm, ~70/255 contrast) turns from vertical to horizontal with the quarter turn and is readable from above; the octagonal body and base are otherwise identical."
+    },
+    "z3": {
+      "verdict": "broken",
+      "note": "The same dark mark on the cap top turns to a diagonal under 120 deg; the octagonal body's corner shift alone would only be the polygon-corner effect."
+    }
+  },
+  "bottle_of_pop__zjbqvb": {
+    "z4": {
+      "verdict": "broken",
+      "note": "A dark elongated mark printed on the cap top (about 20 x 7 mm) turns from vertical to horizontal with the quarter turn and is readable from above; the octagonal body and base are otherwise identical."
+    }
+  },
+  "bottle_of_sage__bterim": {
+    "z5": {
+      "verdict": "preserved",
+      "note": "Plain grey lid over a level, uniformly speckled green fill with no print or seam; only the speckle noise pattern changes."
+    },
+    "z6": {
+      "verdict": "preserved",
+      "note": "Plain grey lid over a level, uniformly speckled green fill with no print or seam; only the speckle noise pattern changes."
+    }
+  },
+  "bottle_of_salsa__nafwlf": {
+    "z4": {
+      "verdict": "preserved",
+      "note": "Plain dark cap and a uniformly speckled orange fill (largest speck under 3 mm), no label or distinct chunk a person could read, silhouettes identical."
+    },
+    "z5": {
+      "verdict": "preserved",
+      "note": "Plain dark cap and uniformly speckled orange fill with no readable feature; the tiles differ only in speckle noise."
+    },
+    "z6": {
+      "verdict": "preserved",
+      "note": "Plain dark cap and uniformly speckled orange fill with no readable feature; the tiles differ only in speckle noise."
+    }
+  },
+  "bottle_of_seasoning__vqwqqv": {
+    "z5": {
+      "verdict": "broken",
+      "note": "The fill's top surface is heaped to one side (about 3-5 mm, visible as a lip in the gap under the lid) and the 72 deg turn moves the heap to another side, a silhouette change beyond polygon corners, though marginal at 1 m."
+    },
+    "z6": {
+      "verdict": "broken",
+      "note": "Same heaped fill surface (about 3-5 mm lip under the lid) swaps sides under the 60 deg turn, a silhouette change beyond polygon corners, though marginal at 1 m."
+    }
+  },
+  "bottle_of_tea_leaves__pfbtus": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "Plain grey lid over a level, uniformly speckled dark fill with no label, print or seam; only the speckle noise and polygon corners change with the yaw."
+    }
+  },
+  "bottle_of_water__cyzaue": {
+    "z6": {
+      "verdict": "preserved",
+      "note": "The hexagonal prism body maps onto itself under 60 deg, the cork-like cap shows only a uniform mottled texture with no knot or print, and the base is plain."
+    }
+  }
+}

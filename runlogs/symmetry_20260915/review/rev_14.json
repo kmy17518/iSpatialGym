@@ -1,0 +1,158 @@
+{
+  "pencil__vpzhth": {
+    "y2": {
+      "verdict": "broken",
+      "note": "The end-to-end flip about y swaps the sharpened, tapering tip with the flat-cut end; the taper is plainly visible in the +y/-y/+z/-z tiles and a person at 1 m reads which end is the point, even though the body is one uniform dark colour."
+    },
+    "xinf": {
+      "verdict": "preserved",
+      "note": "Uniform dark unprinted body of revolution about its own axis: the tile thickness stays about 2.4 px in every view after x101 and x90, and the only change is a sub-pixel shift of the ends from the pencil's slight tilt against the frame x axis (the 6 x 4 mm bbox), not readable at 1 m."
+    }
+  },
+  "pencil__vvofwr": {
+    "y2": {
+      "verdict": "broken",
+      "note": "The end-to-end flip about y swaps the sharpened, tapering tip with the flat-cut end, clearly visible in the side and top tiles; the uniform dark teal body carries no print, so the differing ends are what break it."
+    }
+  },
+  "pepper_shaker__tgcwtr": {
+    "z5": {
+      "verdict": "preserved",
+      "note": "Plain black cap and base with a green speckle-noise body; the amplified difference against the z72 row is uniform speckle only, with no label, seam or band anywhere and nothing on the bottom, so nothing marks the turn."
+    },
+    "z6": {
+      "verdict": "preserved",
+      "note": "Same object seen at z60: black cap and base unchanged, the green body differs only in its fine speckle noise, no readable feature on the sides or the bottom."
+    }
+  },
+  "pepper_shaker__ykujyn": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "Black cap and dark brown speckle body with no label, seam or bottom mark; z2-z6 already match and the z131 row differs only in the fine speckle noise, so any yaw is invisible."
+    }
+  },
+  "plate__luhkiz": {
+    "z4": {
+      "verdict": "preserved",
+      "note": "Plain grey face; the dark beaded rim is a fine repeating pattern whose period divides 90 deg (rim differences at z90 are two to three times smaller than at z72/z197 and stay at polygon-corner level), so the quarter turn is invisible."
+    },
+    "z6": {
+      "verdict": "preserved",
+      "note": "Plain grey face; the beaded rim realigns at 60 deg as well (differences at z60 are as small as at z90/z180, unlike z72/z197), so the sixth turn is invisible."
+    }
+  },
+  "plate__mtetqm": {
+    "z4": {
+      "verdict": "preserved",
+      "note": "Uniform grey rounded-square plate with a centred round well; the 214 vs 219 mm x/y bbox difference (2 %) and the low-poly corner positions move the outline by about one tile pixel only, which a person at 1 m could not see."
+    }
+  },
+  "rolling_pin__smnklu": {
+    "yinf": {
+      "verdict": "preserved",
+      "note": "Turned barrel and handles in one uniform colour each (barrel colour spread about 2/255, no grain, no print); the y163 row is identical up to polygon corners."
+    }
+  },
+  "salt_shaker__iomwtn": {
+    "z4": {
+      "verdict": "preserved",
+      "note": "Very dark, uniformly coloured turned body (luma spread about 10/255) with a centred knob and a centred bottom filling hole; no grain or print readable, differences only at the polygonal rim of the hole."
+    },
+    "z5": {
+      "verdict": "preserved",
+      "note": "Same dark uniform turned body; the z72 row matches the original in every view, knob and bottom hole stay centred, no readable grain or print."
+    },
+    "z6": {
+      "verdict": "preserved",
+      "note": "Same dark uniform turned body; the z60 row matches the original in every view, differences limited to the polygonal rim of the bottom hole."
+    }
+  },
+  "shelf__kxvbui": {
+    "z2": {
+      "verdict": "preserved",
+      "note": "Plain black rectangular slab with no visible edge feature: the z180 tiles match the originals to a few single edge pixels in all six views (as few as the accepted x2 row), and the survey's ~1 cm silhouette sliver on a 1.24 m board is not readable at 1 m; judged about the +z (front) axis, the selection reviewer's value 1 is right and the survey is wrong."
+    }
+  },
+  "spray_can__tehmzy": {
+    "z4": {
+      "verdict": "preserved",
+      "note": "Uniform dark green can with a centred grey nozzle cap and no label; the only +z differences are the same cap-edge ring seen for the accepted z5/z6 rows, with no off-centre spray hole or tab."
+    }
+  },
+  "taboret__bciekv": {
+    "z4": {
+      "verdict": "preserved",
+      "note": "The four sides carry the same carved volute face and the top the same square relief; the grey stone mottling is a low-contrast noise texture (differences spread as speckle, no coherent patch), so the quarter turn cannot be read."
+    }
+  },
+  "taboret__wjrpwg": {
+    "z3": {
+      "verdict": "broken",
+      "note": "The round wooden seat shows a plank seam and grain running in one direction; after z120 the grain runs 120 deg differently (a structured difference across the whole 40 cm seat), readable at 1 m even though the three legs and the ring map onto each other."
+    }
+  },
+  "taboret__ysrhuw": {
+    "z2": {
+      "verdict": "preserved",
+      "note": "The four-leg black frame and the mottled red seat map onto themselves at 180 deg (seat differences stay at noise level with no patch); only z4 breaks on the seat pattern."
+    }
+  },
+  "teacup__cpozxi": {
+    "z5": {
+      "verdict": "preserved",
+      "note": "Five identical dark-blue petal motifs around the cup with a plain rim band and base; the base bottom shows the same faint centre smudge under every rotation, so the 72 deg step is invisible."
+    }
+  },
+  "towel_rack__quznqx": {
+    "y2": {
+      "verdict": "preserved",
+      "note": "Plain grey bar of one colour; the half turn about its long axis reproduces every tile pixel for pixel."
+    },
+    "z2": {
+      "verdict": "preserved",
+      "note": "Both ends of the plain grey bar are identical plain cuts and the profile is symmetric: the z180 tiles equal the original's opposite-camera views exactly and the geometry matches within a millimetre."
+    }
+  },
+  "toy_dice__krpdji": {
+    "x2": {
+      "verdict": "broken",
+      "note": "After the half turn the engraved fish outlines on the +x/-x faces face the other way and the top digit reads 9 instead of 6 (only the 180-deg-symmetric H faces still match); thin dark lines that a person reads easily at 1 m, which the survey's blob metric under-weights."
+    }
+  },
+  "trash_can__hqdnjz": {
+    "zinf": {
+      "verdict": "preserved",
+      "note": "Plain tapered grey-brown bin with black rim and base, uniform colour (spread about 5/255) and no print; the z131 row differs only by polygon corners."
+    }
+  },
+  "vidalia_onion__dejqhf": {
+    "xinf": {
+      "verdict": "preserved",
+      "note": "Near-black uniform onion with the stem/root on the x axis (its end-on spot stays put in the +x view); only the ~4 mm curl of the stem tip changes direction, too small to read at 1 m."
+    }
+  },
+  "wall_mounted_tv__dxyfxf": {
+    "x2": {
+      "verdict": "broken",
+      "note": "The rear housing/bracket box hangs from the top edge of the panel and sits at the bottom after the flip (a large silhouette change in the -x view, also visible edge-on in the +y/-y views), while the front is a plain black panel; judged about the +x (front) axis, the survey is right and the selection reviewer's value 1 is wrong."
+    }
+  },
+  "wall_mounted_tv__ggfznh": {
+    "x2": {
+      "verdict": "preserved",
+      "note": "Plain grey screen in a black bezel with a plain black back: the flipped tiles match to single edge pixels in all six views, the screen sits at most ~5 mm off-centre in its bezel on a 56 cm set and the rear notch is ~16 mm, neither readable at 1 m; judged about the +x (front) axis, the selection reviewer's value 1 is right and the survey is wrong."
+    }
+  },
+  "wall_mounted_tv__sodbbr": {
+    "x2": {
+      "verdict": "broken",
+      "note": "Same build as dxyfxf: the rear housing/bracket box hangs from the top edge and ends up at the bottom after the flip (large silhouette change in the -x view, visible in the side views too), the front being a plain black panel; judged about the +x (front) axis, the survey is right and the selection reviewer's value 1 is wrong."
+    }
+  },
+  "wall_mounted_tv__ylvjhb": {
+    "x2": {
+      "verdict": "preserved",
+      "note": "Simple box TV with a plain grey screen, a bezel equal top and bottom to under 1 mm and a plain black back; the flipped tiles differ only by one-pixel edge slivers (~1 cm on a 0.9 m set), so the half turn is invisible; judged about the +x (front) axis, the selection reviewer's value 1 is right and the survey is wrong."
+    }
+  }
+}
