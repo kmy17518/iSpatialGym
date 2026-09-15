@@ -12,19 +12,20 @@
   trunk and returns F per cell.
 * **Exact-IK cache** of v1 (``ISPATIALGYM_SAMPLING_CACHE``): every key includes the spawn scale vector of the object.
 
-Geometry (grasp / pre poses) comes from ``ispatialgym.robot.conventions`` (F5) through :mod:`ispatialgym.sampling.v2`'s
-thin adapter below; until F5 lands the adapter holds the documented formulas (oracle doc §3.5), to be deleted then.
+Geometry (grasp / pre / contact poses, waypoints) is ``ispatialgym.robot.conventions`` (F5, commit ``dc91cfb``); the
+thin wrappers below only fix the argument shapes the task modules use (tensor pairs in, tensor pairs out) — v2 never
+re-implements a conventions function (README contract 2).
 """
 
 from __future__ import annotations
 
 import logging
-import math
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import torch as th
 
+from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling.cache import cache_get, cache_key, cache_put
 from ispatialgym.sampling.v2.stances import Pose, Stance
@@ -33,91 +34,55 @@ log = logging.getLogger("ispatialgym.sampling.v2")
 
 SCREEN_SEEDS = 12
 EXACT_SEEDS = 32
-PRE_DIST = 0.10
-HANDLE_OFFSET = 0.012
+PRE_DIST = C.PRE_DIST
+HANDLE_OFFSET = C.HANDLE_EEF_OFFSET
 IN_FRAME_MARGIN = 0.05
 
 # ----------------------------------------------------------------------------------------------------------------
-# conventions adapter (F5): pure pose functions; replaced by ``ispatialgym.robot.conventions`` when it lands
+# conventions (F5) — argument-shape wrappers
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def _conventions():
-    try:
-        from ispatialgym.robot import conventions as C  # type: ignore
-
-        return C
-    except Exception:
-        return None
+def _pair(pose) -> Pose:
+    p, q = C.as_pose(pose)
+    return G.t(p), G.t(q)
 
 
 def approach_axis(pose: Pose) -> th.Tensor:
-    """a = eef +z in world."""
-    return G.rotate(G.t(pose[1]), th.tensor([0.0, 0.0, 1.0]))
+    """a = eef +z in world (conventions ``approach_axis``)."""
+    return C.approach_axis(G.t(pose[1]))
 
 
 def pre_pose(pose: Pose, dist: float = PRE_DIST) -> Pose:
-    """Pre-grasp / pre-contact: the pose moved ``dist`` back along -a (spec §3.6; conventions ``pre_pose``)."""
-    C = _conventions()
-    if C is not None and hasattr(C, "pre_pose"):
-        return C.pre_pose(pose, dist)
-    return G.t(pose[0]) - approach_axis(pose) * dist, G.t(pose[1])
+    """Pre-grasp / pre-contact / pre-place: the pose moved ``dist`` back along -a (spec §3.6; conventions ``pre_pose``)."""
+    return _pair(C.pre_pose((G.t(pose[0]), G.t(pose[1])), dist))
 
 
 def grasp_pose(obj_pose: Pose, eef_in_object: Pose) -> Pose:
-    """eef pose = object pose ∘ T_obj→eef (conventions ``grasp_pose``; the grasp-library entry gives T_obj→eef)."""
-    C = _conventions()
-    if C is not None and hasattr(C, "grasp_pose_from_transform"):
-        return C.grasp_pose_from_transform(obj_pose, eef_in_object)
-    return G.compose((G.t(obj_pose[0]), G.t(obj_pose[1])), (G.t(eef_in_object[0]), G.t(eef_in_object[1])))
+    """eef pose = object pose ∘ T_obj→eef (conventions ``grasp_pose_from_transform``; the grasp-library entry gives
+    T_obj→eef; the recorded ``grasps[].yaw`` is the object yaw, so consumers re-deriving from the settled object pose
+    call ``conventions.grasp_pose(obj_pose, key, name)`` with ``yaw = 0``)."""
+    return _pair(C.grasp_pose_from_transform((G.t(obj_pose[0]), G.t(obj_pose[1])), (G.t(eef_in_object[0]), G.t(eef_in_object[1]))))
 
 
-def contact_eef(point, normal_into_object, wrist_yaw: float = 0.0, contact_center_z: Optional[float] = None) -> Pose:
-    """Push / brace contact: pad centre on ``point``, approach a = -normal (into the object), eef origin = point −
-    CONTACT_CENTER_Z·a (spec §3.6; conventions ``contact_eef``)."""
-    C = _conventions()
-    if C is not None and hasattr(C, "contact_eef"):
-        return C.contact_eef(point, normal_into_object)
-    from ispatialgym.sampling.robot_utils import CONTACT_CENTER_Z
-
-    cz = CONTACT_CENTER_Z if contact_center_z is None else contact_center_z
-    a = G.t(normal_into_object)
-    a = a / th.linalg.norm(a)
-    up = th.tensor([0.0, 0.0, 1.0]) if abs(float(a[2])) < 0.9 else th.tensor([math.cos(wrist_yaw), math.sin(wrist_yaw), 0.0])
-    x = up - th.dot(up, a) * a
-    x = x / th.linalg.norm(x)
-    y = th.cross(a, x, dim=0)
-    import omnigibson.utils.transform_utils as T
-
-    quat = T.mat2quat(th.stack([x, y, a], dim=1))
-    return G.t(point) - a * cz, quat
+def contact_eef(point, approach_into_object, closing=None) -> Pose:
+    """Push / brace contact: pad centre on ``point``, approach a along ``approach_into_object`` (= -outward normal),
+    pads closing along ``closing`` (default horizontal ⊥ a), eef origin = point − CONTACT_CENTER_Z·a (spec §3.6;
+    conventions ``contact_eef``)."""
+    return _pair(C.contact_eef(G.t(point), G.t(approach_into_object), None if closing is None else G.t(closing)))
 
 
 def handle_eef(contact, approach, closing=None) -> Pose:
     """Handle grasp: approach a along ``approach`` (into the handle), pads closing along ``closing`` (default: horizontal
     ⊥ a), eef origin = contact − 0.012·a (spec §3.6; conventions ``handle_eef``)."""
-    C = _conventions()
-    if C is not None and hasattr(C, "handle_eef"):
-        a = C.unit(approach)
-        return C.handle_eef(contact, a, C._default_closing(a) if closing is None else closing)
-    p, q = contact_eef(contact, approach)
-    return G.t(contact) - approach_axis((p, q)) * HANDLE_OFFSET, q
+    a = C.unit(G.t(approach))
+    return _pair(C.handle_eef(G.t(contact), a, C._default_closing(a) if closing is None else G.t(closing)))
 
 
 def line_waypoints(p0: Pose, p1: Pose, n: int = 3, endpoints: bool = False) -> List[Pose]:
     """Straight eef motion p0 -> p1 at fractions k/n (start excluded, goal last; ``endpoints=True`` prepends the start),
-    orientation SLERPed — conventions ``line_waypoints``."""
-    C = _conventions()
-    if C is not None and hasattr(C, "line_waypoints"):
-        return [(G.t(p[0]), G.t(p[1])) for p in C.line_waypoints(p0, p1, n, endpoints)]
-    import omnigibson.utils.transform_utils as T
-
-    out = [(G.t(p0[0]), G.t(p0[1]))] if endpoints else []
-    for k in range(1, n + 1):
-        s = k / n
-        q = T.quat_slerp(G.t(p0[1]), G.t(p1[1]), th.tensor(s)) if hasattr(T, "quat_slerp") else G.t(p1[1])
-        out.append((G.t(p0[0]) * (1 - s) + G.t(p1[0]) * s, q))
-    return out
+    orientation SLERPed (conventions ``line_waypoints``)."""
+    return [_pair(p) for p in C.line_waypoints((G.t(p0[0]), G.t(p0[1])), (G.t(p1[0]), G.t(p1[1])), n, endpoints)]
 
 
 # ----------------------------------------------------------------------------------------------------------------
