@@ -4155,5 +4155,32 @@
   "scene": "house_single_floor",
   "roles": {},
   "note": []
+ },
+ {
+  "id": "configuration_matching-attachment-cork-vinegar_bottle-breakfast_table__representative__target-uyceta__partner-hbsbwt",
+  "alias": "configuration_matching-attachment-cork-vinegar_bottle-breakfast_table",
+  "subtask": "configuration_matching-attachment",
+  "pick": "configuration_matching-attachment#02",
+  "slot": "representative",
+  "v1_key": "configuration_matching-3",
+  "scene": "house_single_floor",
+  "roles": {
+   "target": {
+    "category": "cork",
+    "model": "uyceta",
+    "name": ""
+   },
+   "partner": {
+    "category": "vinegar_bottle",
+    "model": "hbsbwt",
+    "name": ""
+   },
+   "support": {
+    "category": "breakfast_table",
+    "model": "",
+    "name": "breakfast_table_rhjoby_0"
+   }
+  },
+  "note": []
  }
 ]

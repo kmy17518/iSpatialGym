@@ -307,6 +307,9 @@ class Selector:
         rep = None
         marked = [r for r in avail if r.get("representative") == "1"]
         pool_order = marked + [r for r in avail if r not in marked]
+        if not prefer_unused and rows and rows[0] is not avail[0] and rows[0] in avail:
+            # caller-ordered pool (attachment: models that mate with the chosen female first) wins over the icl mark
+            pool_order = [r for r in rows if r in avail]
         if prefer_unused:
             unused = [r for r in pool_order if (cat, r["model"]) not in self.used_models]
             if unused:
