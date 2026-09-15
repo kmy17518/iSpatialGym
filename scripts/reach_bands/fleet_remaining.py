@@ -29,6 +29,7 @@ def main():
     ap.add_argument("--manifest", nargs="+", required=True)
     ap.add_argument("--pods-file", default=os.path.join(REPO, "runlogs", "runpod", "rb", "pods.txt"))
     ap.add_argument("--local", nargs="*", default=[], help="local runner output roots (jobs with a .npz there count as done)")
+    ap.add_argument("--pulled", nargs="*", default=[], help="pulled fleet roots (<root>/<pod>/<job>/*.npz), for pods that are gone")
     ap.add_argument("--out", required=True)
     ap.add_argument("--only-kinds", nargs="*", default=None)
     args = ap.parse_args()
@@ -65,6 +66,9 @@ def main():
             running.add(cur)
     for root in args.local:
         for f in glob.glob(os.path.join(root, "*", "*.npz")):
+            done.add(os.path.basename(os.path.dirname(f)))
+    for root in args.pulled:  # collect.py / pull_loop.sh layout: <root>/<pod name>/<job id>/*.npz (pods that are gone)
+        for f in glob.glob(os.path.join(root, "*", "*", "*.npz")):
             done.add(os.path.basename(os.path.dirname(f)))
     remaining = [j for j in jobs if j["id"] not in done and j["id"] not in running and (not args.only_kinds or j["kind"] in args.only_kinds)]
     with open(args.out, "w") as f:
