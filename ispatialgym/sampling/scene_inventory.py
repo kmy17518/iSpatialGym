@@ -270,6 +270,9 @@ class Inventory:
         self.load_s = time.time() - t0
         self.render = render
         self.markers = None
+        if render:
+            for o in self.world.render_hidden:  # hidden by SimWorld against the seg_instance crash; rgb-only here
+                o.visible = True
         self.summary: Dict[str, Any] = {"scene": scene_model, "load_s": round(self.load_s, 1), "artic": {}, "supports": {}, "partners": {}}
         self._prim_to_obj = {l.prim_path: o for o in self.scene.objects for l in o.links.values()}
 
@@ -407,6 +410,35 @@ class Inventory:
                 og.sim.load_state(state)
                 log.error("artic %s failed: %r\n%s", obj.name, e, traceback.format_exc())
                 self.summary["artic"][obj.name] = {"category": obj.category, "model": obj.model, "error": repr(e)}
+
+    def rerender_artic(self, only: Optional[Sequence[str]] = None):
+        """Re-render the review strips from the existing ``artic/<name>.json`` records (no re-measurement)."""
+        import omnigibson as og
+
+        adir = os.path.join(self.out, "artic")
+        names = sorted(fn[:-5] for fn in os.listdir(adir) if fn.endswith(".json"))
+        if only:
+            names = [n for n in names if n in only]
+        for name in names:
+            with open(os.path.join(adir, f"{name}.json")) as f:
+                rec = json.load(f)
+            if not rec.get("joints"):
+                continue
+            try:
+                obj = self.world.obj(name)
+            except KeyError:
+                continue
+            state = og.sim.dump_state()
+            try:
+                rec["strip"] = self._render_strip(obj, rec)
+                with open(os.path.join(adir, f"{name}.json"), "w") as f:
+                    json.dump(rec, f, indent=1)
+                log.info("re-rendered %s", name)
+            except Exception as e:
+                log.warning("%s: render failed: %r", name, e)
+            finally:
+                og.sim.load_state(state)
+                self.world.keep_still(self.scene.objects)
 
     def _openable_meta(self, obj) -> Optional[list]:
         from omnigibson.utils.asset_utils import get_dataset_path
@@ -636,6 +668,8 @@ class Inventory:
                 m.set_position_orientation(self._far, th.tensor([0.0, 0.0, 0.0, 1.0]))
 
     def _place_markers(self, items):
+        import omnigibson as og
+
         self._park_markers()
         used = {k: 0 for k in self.markers}
         for letter, p in items:
@@ -643,6 +677,7 @@ class Inventory:
             if k < len(self.markers[letter]):
                 self.markers[letter][k].set_position_orientation(th.as_tensor(p, dtype=th.float32), th.tensor([0.0, 0.0, 0.0, 1.0]))
                 used[letter] = k + 1
+        og.sim.step()
 
     def _grab(self, cam_pos, target, path, size: int = 420):
         import omnigibson as og
@@ -699,7 +734,7 @@ class Inventory:
                 q[names.index(j["joint"])] = j["closed_q"]
         obj.set_joint_positions(q)
         obj.keep_still()
-        og.sim.step_physics()
+        og.sim.step()  # full step: the render transforms only follow physics in a full simulator step
 
         def world(p):
             return R @ np.array(p) + rp
@@ -742,13 +777,13 @@ class Inventory:
                 q2[i] = j["closed_q"] + j["open_sign"] * 0.6 * (j["upper"] - j["lower"])
         obj.set_joint_positions(q2)
         obj.keep_still()
-        og.sim.step_physics()
+        og.sim.step()
         p_open = os.path.join(rdir, f"{obj.name}__open.png")
         self._grab(c + n0 * d * 0.85 + side * d * 0.35 + np.array([0, 0, d * 0.25]), c, p_open)
         views.append(("opened 60 % (markers at closed positions)", p_open))
         obj.set_joint_positions(q)
         obj.keep_still()
-        og.sim.step_physics()
+        og.sim.step()
         self._park_markers()
         S = 420
         cols = min(len(views), 4)
@@ -934,7 +969,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--scene", required=True, choices=SCENES)
     ap.add_argument("--out", default=os.path.join(REPO_ROOT, "runlogs", "scene_inventory_20260915"))
-    ap.add_argument("--parts", default="artic,supports,partners", help="comma-separated subset of artic,supports,partners")
+    ap.add_argument("--parts", default="artic,supports,partners", help="comma-separated subset of artic,supports,partners,renders (renders = re-render strips from existing artic JSONs)")
     ap.add_argument("--only", nargs="*", default=None, help="restrict the artic / supports parts to these scene object names")
     ap.add_argument("--no-render", action="store_true")
     ap.add_argument("--log-level", default=os.environ.get("ISPATIALGYM_LOG_LEVEL", "INFO"))
@@ -956,6 +991,8 @@ def main():
         inv.inventory_partners(support_records)
     if "artic" in parts:
         inv.inventory_artic(only=args.only)
+    if "renders" in parts:
+        inv.rerender_artic(only=args.only)
     inv.summary["total_s"] = round(time.time() - t0, 1)
     inv.write_summary()
     print(json.dumps({"scene": args.scene, "artic": len(inv.summary["artic"]), "supports": len(inv.summary["supports"]), "partners": len(inv.summary["partners"]),
