@@ -1,0 +1,30 @@
+(define (problem alignment-17)
+    (:domain ispatialgym)
+    (:alias alignment-world_horizontal-wall_mounted_tv-walls)
+
+    ; ground_isg 2.0.0 2026-09-15: alignment-world_horizontal-wall_mounted_tv-walls (alignment/world_horizontal.iddl; alignment-world_horizontal#05/representative)
+    ; Alignment - world horizontal. Same wall hinge as world vertical (installed by the sampler, spec 5.5); the target is an
+    ; elongated wall item whose long axis / reference edge must end level. Models that look the same upside down carry the
+    ; 180 deg equivalence (symmetric_180, roles/candidates.csv). The support is a wall region (roles/candidates.csv kind scene). Push / brace
+    ; contacts from contacts/<category>__<model>.json; spawn scale from the customs list (roles.target.scale).
+
+    (:objects
+        television_receiver.n.01_1 - television_receiver.n.01
+        wall.n.01_1 - wall.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (pose_reached ?television_receiver.n.01_1)
+            (not (grasped ?agent.n.01_1 ?television_receiver.n.01_1))
+            (pose_settled ?television_receiver.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+)

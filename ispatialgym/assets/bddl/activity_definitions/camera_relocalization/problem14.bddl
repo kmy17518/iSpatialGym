@@ -1,0 +1,33 @@
+(define (problem camera_relocalization-14)
+    (:domain ispatialgym)
+    (:alias camera_relocalization-obstructed-vacuum_1)
+
+    ; ground_isg 2.0.0 2026-09-15: camera_relocalization-obstructed-vacuum_1 (camera_relocalization/obstructed.iddl; camera_relocalization-obstructed#14/representative)
+    ; Camera relocalization - obstructed. As standard, plus an obstacle group placed on the eroded shortest path so that the
+    ; shortest path changes; the obstacle must be in the head camera's view at a waypoint of the new path *before* the path
+    ; departs from the unobstructed shortest path (owner decision 2026-09-15; spec 6.2); the new path must stay inside the
+    ; instance's length bucket. Never manipulated. One obstacle for now: the group size is a customs
+    ; list parameter (generation.groups.obstacles.size = 1), the candidate categories come from roles/candidates.csv.
+
+    (:objects
+        vacuum.n.04_1 - vacuum.n.04
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:groups
+        vacuum.n.04_1 - obstacles_group.n.01_1
+    )
+
+    (:init
+        (ontop obstacles_group.n.01_1 floor.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (pose_reached ?agent.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+)

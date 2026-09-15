@@ -1,0 +1,360 @@
+{
+ "activity": "inter_object_relation_satisfaction",
+ "problems": [
+  {
+   "alias": "ontop",
+   "id": 0,
+   "legacy": true
+  },
+  {
+   "alias": "under",
+   "id": 1,
+   "legacy": true
+  },
+  {
+   "alias": "inside",
+   "id": 2,
+   "legacy": true
+  },
+  {
+   "alias": "nextto",
+   "id": 3,
+   "legacy": true
+  },
+  {
+   "alias": "touching",
+   "id": 4,
+   "legacy": true
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
+   "id": 5,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-inside",
+   "iddl": "inter_object_relation_satisfaction/inside.iddl",
+   "pick": "inter_object_relation_satisfaction-inside#01",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-inside-hard_candy-hingeless_jar-breakfast_table",
+   "id": 6,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-inside",
+   "iddl": "inter_object_relation_satisfaction/inside.iddl",
+   "pick": "inter_object_relation_satisfaction-inside#02",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-inside-quartz-saucepot-breakfast_table",
+   "id": 7,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-inside",
+   "iddl": "inter_object_relation_satisfaction/inside.iddl",
+   "pick": "inter_object_relation_satisfaction-inside#03",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-inside-ice_cube-beer_glass-breakfast_table",
+   "id": 8,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-inside",
+   "iddl": "inter_object_relation_satisfaction/inside.iddl",
+   "pick": "inter_object_relation_satisfaction-inside#04",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-inside-sunflower-vase-breakfast_table",
+   "id": 9,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-inside",
+   "iddl": "inter_object_relation_satisfaction/inside.iddl",
+   "pick": "inter_object_relation_satisfaction-inside#05",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-nextto-pencil-ruler-breakfast_table",
+   "id": 10,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-nextto",
+   "iddl": "inter_object_relation_satisfaction/nextto.iddl",
+   "pick": "inter_object_relation_satisfaction-nextto#01",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
+   "id": 11,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-nextto",
+   "iddl": "inter_object_relation_satisfaction/nextto.iddl",
+   "pick": "inter_object_relation_satisfaction-nextto#02",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table",
+   "id": 12,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-nextto",
+   "iddl": "inter_object_relation_satisfaction/nextto.iddl",
+   "pick": "inter_object_relation_satisfaction-nextto#03",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-nextto-cinnamon_stick-star_anise-breakfast_table",
+   "id": 13,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-nextto",
+   "iddl": "inter_object_relation_satisfaction/nextto.iddl",
+   "pick": "inter_object_relation_satisfaction-nextto#04",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-nextto-jar_of_spaghetti_sauce-canned_food-breakfast_table",
+   "id": 14,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-nextto",
+   "iddl": "inter_object_relation_satisfaction/nextto.iddl",
+   "pick": "inter_object_relation_satisfaction-nextto#05",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-countertop",
+   "id": 15,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+   "iddl": "inter_object_relation_satisfaction/ontop_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-ontop_large_scale#02",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor",
+   "id": 16,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+   "iddl": "inter_object_relation_satisfaction/ontop_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-ontop_large_scale#03",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar",
+   "id": 17,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+   "iddl": "inter_object_relation_satisfaction/ontop_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-ontop_large_scale#04",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-ontop_large_scale-beaker-bed-desk",
+   "id": 18,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+   "iddl": "inter_object_relation_satisfaction/ontop_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-ontop_large_scale#05",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
+   "id": 19,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
+   "iddl": "inter_object_relation_satisfaction/ontop_small_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-ontop_small_scale#01",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-ontop_small_scale-apple-plate-breakfast_table",
+   "id": 20,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
+   "iddl": "inter_object_relation_satisfaction/ontop_small_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-ontop_small_scale#02",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-ontop_small_scale-coffee_cup-saucer-breakfast_table",
+   "id": 21,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
+   "iddl": "inter_object_relation_satisfaction/ontop_small_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-ontop_small_scale#03",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-ontop_small_scale-pickle-cutting_board-breakfast_table",
+   "id": 22,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
+   "iddl": "inter_object_relation_satisfaction/ontop_small_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-ontop_small_scale#04",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-ontop_small_scale-half_bagel-plate-breakfast_table",
+   "id": 23,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
+   "iddl": "inter_object_relation_satisfaction/ontop_small_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-ontop_small_scale#05",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
+   "id": 24,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "pick": "inter_object_relation_satisfaction-touching#01",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching-teacup-teapot-breakfast_table",
+   "id": 25,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "pick": "inter_object_relation_satisfaction-touching#02",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-touching-carton_of_milk-box_of_cookies-breakfast_table",
+   "id": 26,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "iddl": "inter_object_relation_satisfaction/touching.iddl",
+   "pick": "inter_object_relation_satisfaction-touching#03",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-desk",
+   "id": 27,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#01",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-marker-desk-floor",
+   "id": 28,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#02",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-pencil-sofa-desk",
+   "id": 29,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#03",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-apple-desk-floor",
+   "id": 30,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#05",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_small_scale-french_fries-platter-breakfast_table",
+   "id": 31,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-under_small_scale",
+   "iddl": "inter_object_relation_satisfaction/under_small_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_small_scale#01",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
+   "id": 32,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-under_small_scale",
+   "iddl": "inter_object_relation_satisfaction/under_small_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_small_scale#02",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_small_scale-bottle_of_supplements-tray-breakfast_table",
+   "id": 33,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-under_small_scale",
+   "iddl": "inter_object_relation_satisfaction/under_small_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_small_scale#03",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-breakfast_table",
+   "id": 34,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "inter_object_relation_satisfaction-under_small_scale",
+   "iddl": "inter_object_relation_satisfaction/under_small_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_small_scale#04",
+   "slot": "representative",
+   "mode": "representative"
+  }
+ ]
+}

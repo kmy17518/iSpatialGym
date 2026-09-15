@@ -1,0 +1,39 @@
+(define (problem inter_object_relation_satisfaction-12)
+    (:domain ispatialgym)
+    (:alias inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table)
+
+    ; ground_isg 2.0.0 2026-09-15: inter_object_relation_satisfaction-nextto-parsnip-carrot-breakfast_table (inter_object_relation_satisfaction/nextto.iddl; inter_object_relation_satisfaction-nextto#03/representative)
+    ; IORS - nextto. Target and partner on the support with an init gap above the NextTo bound; the target is moved to the
+    ; nearest position that satisfies NextTo (gap below mean(dims_a + dims_b)/6, adjacency rays), same orientation.
+
+    (:objects
+        parsnip.n.03_1 - parsnip.n.03
+        carrot.n.03_1 - carrot.n.03
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop parsnip.n.03_1 breakfast_table.n.01_1)
+        (ontop carrot.n.03_1 breakfast_table.n.01_1)
+        (not (nextto parsnip.n.03_1 carrot.n.03_1))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (nextto ?parsnip.n.03_1 ?carrot.n.03_1)
+            (not (grasped ?agent.n.01_1 ?parsnip.n.03_1))
+            (not (grasped ?agent.n.01_1 ?carrot.n.03_1))
+            (pose_settled ?parsnip.n.03_1)
+            (pose_settled ?carrot.n.03_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?parsnip.n.03_1)
+        (pose_reached ?carrot.n.03_1)
+    )
+)

@@ -1,0 +1,28 @@
+(define (problem object_scaling-19)
+    (:domain ispatialgym)
+    (:alias object_scaling-jar_of_spaghetti_sauce)
+
+    ; ground_isg 2.0.0 2026-09-15: object_scaling-jar_of_spaghetti_sauce (object_scaling/object_scaling.iddl; object_scaling#19/representative)
+    ; Object scaling. The target is held (right arm, fixed hold pose) at init and at the goal; the goal is a depth change of
+    ; the target along the head-camera optical axis (TRO pose target: frame = head camera, position_metric = depth).
+
+    (:objects
+        jar__of__spaghetti_sauce.n.01_1 - jar__of__spaghetti_sauce.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop agent.n.01_1 floor.n.01_1)
+        (grasped agent.n.01_1 jar__of__spaghetti_sauce.n.01_1)
+    )
+
+    (:goal
+        (and
+            (grasped ?agent.n.01_1 ?jar__of__spaghetti_sauce.n.01_1)
+            (pose_reached ?jar__of__spaghetti_sauce.n.01_1)
+            (pose_settled ?jar__of__spaghetti_sauce.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+)

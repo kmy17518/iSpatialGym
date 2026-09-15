@@ -1,0 +1,36 @@
+(define (problem inter_object_relation_satisfaction-16)
+    (:domain ispatialgym)
+    (:alias inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor)
+
+    ; ground_isg 2.0.0 2026-09-15: inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor (inter_object_relation_satisfaction/ontop_large_scale.iddl; inter_object_relation_satisfaction-ontop_large_scale#03/representative)
+    ; IORS - ontop (large-scale). The target starts on a support (a table within 3 m of the partner, or the floor beside it -
+    ; an explicit support choice made by ground_isg, never a runtime fallback) and ends on top of a large scene partner
+    ; (bed, sofa, desk, breakfast table, countertop; roles/candidates.csv kind scene). Three recorded stances: init A, manipulation B,
+    ; placement C.
+
+    (:objects
+        pencil.n.01_1 - pencil.n.01
+        desk.n.01_1 - desk.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop pencil.n.01_1 floor.n.01_1)
+        (not (ontop pencil.n.01_1 desk.n.01_1))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (ontop ?pencil.n.01_1 ?desk.n.01_1)
+            (not (grasped ?agent.n.01_1 ?pencil.n.01_1))
+            (pose_settled ?pencil.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?pencil.n.01_1)
+    )
+)

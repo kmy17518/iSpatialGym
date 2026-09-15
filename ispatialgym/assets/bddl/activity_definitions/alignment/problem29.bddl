@@ -1,0 +1,31 @@
+(define (problem alignment-29)
+    (:domain ispatialgym)
+    (:alias alignment-world_vertical-fire_extinguisher-walls)
+
+    ; ground_isg 2.0.0 2026-09-15: alignment-world_vertical-fire_extinguisher-walls (alignment/world_vertical.iddl; alignment-world_vertical#07/representative)
+    ; Alignment - world vertical. The target hangs on the support (a wall region, roles/candidates.csv kind scene) through a revolute
+    ; hinge at its centre of mass (axis = wall normal, TRO constraint installed by the sampler, spec 5.5), starts tilted
+    ; 15-45 deg in the wall plane and must be pushed upright (tangential push at the low end + brace at the high end).
+    ; Orientation-only target; the position is fixed by the hinge. Push / brace contacts from
+    ; contacts/<category>__<model>.json; spawn scale from the customs list (roles.target.scale).
+
+    (:objects
+        fire_extinguisher.n.01_1 - fire_extinguisher.n.01
+        wall.n.01_1 - wall.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (pose_reached ?fire_extinguisher.n.01_1)
+            (not (grasped ?agent.n.01_1 ?fire_extinguisher.n.01_1))
+            (pose_settled ?fire_extinguisher.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+)

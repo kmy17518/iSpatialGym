@@ -1,0 +1,38 @@
+(define (problem inter_object_relation_satisfaction-21)
+    (:domain ispatialgym)
+    (:alias inter_object_relation_satisfaction-ontop_small_scale-coffee_cup-saucer-breakfast_table)
+
+    ; ground_isg 2.0.0 2026-09-15: inter_object_relation_satisfaction-ontop_small_scale-coffee_cup-saucer-breakfast_table (inter_object_relation_satisfaction/ontop_small_scale.iddl; inter_object_relation_satisfaction-ontop_small_scale#03/representative)
+    ; IORS - ontop (small-scale). Target and partner both on the support; the target ends centred on top of the partner with
+    ; its init orientation; the partner stays where it was. Both poses measured.
+
+    (:objects
+        coffee_cup.n.01_1 - coffee_cup.n.01
+        saucer.n.02_1 - saucer.n.02
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop coffee_cup.n.01_1 breakfast_table.n.01_1)
+        (ontop saucer.n.02_1 breakfast_table.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (ontop ?coffee_cup.n.01_1 ?saucer.n.02_1)
+            (not (grasped ?agent.n.01_1 ?coffee_cup.n.01_1))
+            (not (grasped ?agent.n.01_1 ?saucer.n.02_1))
+            (pose_settled ?coffee_cup.n.01_1)
+            (pose_settled ?saucer.n.02_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?coffee_cup.n.01_1)
+        (pose_reached ?saucer.n.02_1)
+    )
+)

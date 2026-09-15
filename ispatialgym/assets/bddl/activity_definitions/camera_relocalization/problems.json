@@ -1,0 +1,210 @@
+{
+ "activity": "camera_relocalization",
+ "problems": [
+  {
+   "alias": "camera_relocalization-obstructed-hamper_1",
+   "id": 1,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-obstructed",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "pick": "camera_relocalization-obstructed#01",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "camera_relocalization-obstructed-pot_plant_1",
+   "id": 2,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-obstructed",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "pick": "camera_relocalization-obstructed#02",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "camera_relocalization-obstructed-public_trash_can_1",
+   "id": 3,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-obstructed",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "pick": "camera_relocalization-obstructed#03",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "camera_relocalization-obstructed-straight_chair_1",
+   "id": 4,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-obstructed",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "pick": "camera_relocalization-obstructed#04",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "camera_relocalization-obstructed-swivel_chair_1",
+   "id": 5,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-obstructed",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "pick": "camera_relocalization-obstructed#05",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "camera_relocalization-obstructed-trash_can_1",
+   "id": 6,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-obstructed",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "pick": "camera_relocalization-obstructed#06",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "camera_relocalization-obstructed-taboret_1",
+   "id": 7,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-obstructed",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "pick": "camera_relocalization-obstructed#07",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "camera_relocalization-obstructed-wicker_basket_1",
+   "id": 8,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-obstructed",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "pick": "camera_relocalization-obstructed#08",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "camera_relocalization-obstructed-carton_1",
+   "id": 9,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-obstructed",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "pick": "camera_relocalization-obstructed#09",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "camera_relocalization-obstructed-ottoman_1",
+   "id": 10,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-obstructed",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "pick": "camera_relocalization-obstructed#10",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "camera_relocalization-obstructed-teddy_bear_1",
+   "id": 11,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-obstructed",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "pick": "camera_relocalization-obstructed#11",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "camera_relocalization-obstructed-poinsettia_1",
+   "id": 12,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-obstructed",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "pick": "camera_relocalization-obstructed#12",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "camera_relocalization-obstructed-toy_car_1",
+   "id": 13,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-obstructed",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "pick": "camera_relocalization-obstructed#13",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "camera_relocalization-obstructed-vacuum_1",
+   "id": 14,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-obstructed",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "pick": "camera_relocalization-obstructed#14",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "camera_relocalization-obstructed-footstool_1",
+   "id": 15,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-obstructed",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "pick": "camera_relocalization-obstructed#15",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "camera_relocalization-obstructed-music_stool_1",
+   "id": 16,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-obstructed",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "pick": "camera_relocalization-obstructed#16",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "camera_relocalization-obstructed-serving_cart_1",
+   "id": 17,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-obstructed",
+   "iddl": "camera_relocalization/obstructed.iddl",
+   "pick": "camera_relocalization-obstructed#17",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "camera_relocalization-standard",
+   "id": 18,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "camera_relocalization-standard",
+   "iddl": "camera_relocalization/standard.iddl",
+   "pick": "camera_relocalization-standard#00",
+   "slot": "representative",
+   "mode": "representative"
+  }
+ ],
+ "unregistered": [
+  {
+   "id": 0,
+   "alias": null,
+   "why": "the problem declares no alias"
+  }
+ ]
+}

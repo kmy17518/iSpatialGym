@@ -1,0 +1,342 @@
+{
+ "activity": "disembedding",
+ "problems": [
+  {
+   "alias": "disembedding-box_of_shampoo-box_of_shampoo_2_bottle_of_shampoo_1-breakfast_table",
+   "id": 1,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#01",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-box_of_cereal-box_of_cereal_2_box_of_baking_mix_1-breakfast_table",
+   "id": 2,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#02",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-box_of_cookies-box_of_cookies_2_bag_of_cookies_1-breakfast_table",
+   "id": 3,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#03",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-box_of_sanitary_napkins-box_of_sanitary_napkins_2_bag_of_breadcrumbs_1-breakfast_table",
+   "id": 4,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#04",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-video_game-video_game_2_board_game_1-breakfast_table",
+   "id": 5,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#05",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-bottle_of_shampoo-bottle_of_cologne_1_bottle_of_conditioner_1_bottle_of_dish_soap_1-breakfast_table",
+   "id": 6,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#06",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-bottle_of_milk-bottle_of_milk_2_bottle_of_apple_juice_1-breakfast_table",
+   "id": 7,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#07",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-notebook-notebook_2_board_game_1-breakfast_table",
+   "id": 8,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#08",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-soap_dispenser-soap_dispenser_2_bleaching_agent_atomizer_1-breakfast_table",
+   "id": 9,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#09",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-beaker-beaker_2_beer_glass_1-breakfast_table",
+   "id": 10,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#10",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-bottle_of_beer-bottle_of_beer_2_bottle_of_champagne_1-breakfast_table",
+   "id": 11,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#11",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-box_of_cane_sugar-box_of_cane_sugar_2_bag_of_flour_1-breakfast_table",
+   "id": 12,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#12",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-carton_of_milk-bottle_of_coconut_milk_1_bottle_of_milk_1_bottle_of_soy_milk_1-breakfast_table",
+   "id": 13,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#13",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-chili-asparagus_1_bacon_1_banana_1-breakfast_table",
+   "id": 14,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#14",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-pack_of_cigarettes-pack_of_cigarettes_2_bandage_1-breakfast_table",
+   "id": 15,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#15",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-teaspoon-teaspoon_2_chopstick_1-breakfast_table",
+   "id": 16,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#16",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-box_of_rice-bag_of_flour_1_box_of_baking_mix_1_box_of_baking_powder_1-breakfast_table",
+   "id": 17,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#17",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-cellulose_tape-biscuit_1_butter_cookie_1_cap_1-breakfast_table",
+   "id": 18,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#18",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-conditioner_dispenser-bottle_of_cologne_1_bottle_of_dish_soap_1_bottle_of_lotion_1-breakfast_table",
+   "id": 19,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#19",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-pencil_case-chocolate_bar_1_flashlight_1_granola_bar_1-breakfast_table",
+   "id": 20,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#20",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-box_of_baking_mix-box_of_baking_mix_2_box_of_baking_powder_1-breakfast_table",
+   "id": 21,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#21",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-bottle_of_medicine-bottle_of_medicine_2_bottle_of_antihistamines_1-breakfast_table",
+   "id": 22,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#22",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-bottle_of_wine-bottle_of_wine_2_bottle_of_beer_1-breakfast_table",
+   "id": 23,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#23",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-can_of_soda-can_of_soda_2_can_of_baking_mix_1-breakfast_table",
+   "id": 24,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#24",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-mug-mug_2_beaker_1-breakfast_table",
+   "id": 25,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#25",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-toy_dice-toy_dice_2_bar_soap_1-breakfast_table",
+   "id": 26,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#26",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-box_of_tissues-bag_of_cookies_1_bag_of_cream_cheese_1_bag_of_ice_cream_1-breakfast_table",
+   "id": 27,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#27",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-mouse-mouse_2_bar_soap_1-breakfast_table",
+   "id": 28,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#28",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-tablefork-tablefork_2_chopstick_1-breakfast_table",
+   "id": 29,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#29",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table",
+   "id": 30,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "disembedding",
+   "iddl": "disembedding/disembedding.iddl",
+   "pick": "disembedding#30",
+   "slot": "representative",
+   "mode": "representative"
+  }
+ ],
+ "unregistered": [
+  {
+   "id": 0,
+   "alias": null,
+   "why": "the problem declares no alias"
+  }
+ ]
+}

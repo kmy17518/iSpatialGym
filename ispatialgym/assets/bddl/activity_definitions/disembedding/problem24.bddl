@@ -1,0 +1,48 @@
+(define (problem disembedding-24)
+    (:domain ispatialgym)
+    (:alias disembedding-can_of_soda-can_of_soda_2_can_of_baking_mix_1-breakfast_table)
+
+    ; ground_isg 2.0.0 2026-09-15: disembedding-can_of_soda-can_of_soda_2_can_of_baking_mix_1-breakfast_table (disembedding/disembedding.iddl; disembedding#24/representative)
+    ; Disembedding. Target and distractors on the source tray, destination tray beside it on the support; the target ends on
+    ; the destination tray (centre, init orientation), no distractor does. Distractor categories come from the icl pools
+    ; (roles/constraints_compatible.csv same-category / other-category), the member count (1-3) from the customs list
+    ; (generation.groups.distractors); both are part of the alias (e.g. bottle_of_beer_3_bottle_of_sake_1). Trays are
+    ; fixed models for now (tray gsxbym source, tray hvlfig destination; roles/candidates.csv).
+
+    (:objects
+        can__of__soda.n.01_1 can__of__soda.n.01_2 can__of__soda.n.01_3 - can__of__soda.n.01
+        can__of__baking_mix.n.01_1 - can__of__baking_mix.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        tray.n.01_1 tray.n.01_2 - tray.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:groups
+        can__of__soda.n.01_2 can__of__soda.n.01_3 can__of__baking_mix.n.01_1 - distractors_group.n.01_1
+    )
+
+    (:init
+        (ontop tray.n.01_1 breakfast_table.n.01_1)
+        (ontop tray.n.01_2 breakfast_table.n.01_1)
+        (ontop can__of__soda.n.01_1 tray.n.01_1)
+        (ontop distractors_group.n.01_1 tray.n.01_1)
+        (not (ontop can__of__soda.n.01_1 tray.n.01_2))
+        (not (ontop distractors_group.n.01_1 tray.n.01_2))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (ontop ?can__of__soda.n.01_1 ?tray.n.01_2)
+            (not (ontop ?distractors_group.n.01_1 ?tray.n.01_2))
+            (not (grasped ?agent.n.01_1 ?can__of__soda.n.01_1))
+            (pose_settled ?can__of__soda.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?can__of__soda.n.01_1)
+    )
+)

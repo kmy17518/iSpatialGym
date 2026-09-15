@@ -1,0 +1,28 @@
+(define (problem mental_rotation-25)
+    (:domain ispatialgym)
+    (:alias mental_rotation-potato)
+
+    ; ground_isg 2.0.0 2026-09-15: mental_rotation-potato (mental_rotation/mental_rotation.iddl; mental_rotation#25/representative)
+    ; Mental rotation. The target is held (right arm, fixed hold pose) at init and at the goal; the goal is a world-frame
+    ; orientation of the target, its position unchanged (TRO pose target: orientation_metric = full, equivalences per model).
+
+    (:objects
+        potato.n.01_1 - potato.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop agent.n.01_1 floor.n.01_1)
+        (grasped agent.n.01_1 potato.n.01_1)
+    )
+
+    (:goal
+        (and
+            (grasped ?agent.n.01_1 ?potato.n.01_1)
+            (pose_reached ?potato.n.01_1)
+            (pose_settled ?potato.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+)

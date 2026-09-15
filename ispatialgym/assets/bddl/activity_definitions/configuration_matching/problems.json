@@ -1,0 +1,346 @@
+{
+ "activity": "configuration_matching",
+ "problems": [
+  {
+   "alias": "block_design",
+   "id": 0,
+   "legacy": true
+  },
+  {
+   "alias": "articulation",
+   "id": 1,
+   "legacy": true
+  },
+  {
+   "alias": "attachment",
+   "id": 3,
+   "legacy": true
+  },
+  {
+   "alias": "configuration_matching-articulation_close_large_scale-door",
+   "id": 4,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_close_large_scale",
+   "iddl": "configuration_matching/articulation_close_large_scale.iddl",
+   "pick": "configuration_matching-articulation_close_large_scale#01",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_close_large_scale-bottom_cabinet",
+   "id": 5,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_close_large_scale",
+   "iddl": "configuration_matching/articulation_close_large_scale.iddl",
+   "pick": "configuration_matching-articulation_close_large_scale#02",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_close_large_scale-bottom_cabinet_no_top",
+   "id": 6,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_close_large_scale",
+   "iddl": "configuration_matching/articulation_close_large_scale.iddl",
+   "pick": "configuration_matching-articulation_close_large_scale#03",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_close_large_scale-fridge",
+   "id": 7,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_close_large_scale",
+   "iddl": "configuration_matching/articulation_close_large_scale.iddl",
+   "pick": "configuration_matching-articulation_close_large_scale#04",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_close_large_scale-oven",
+   "id": 8,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_close_large_scale",
+   "iddl": "configuration_matching/articulation_close_large_scale.iddl",
+   "pick": "configuration_matching-articulation_close_large_scale#05",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_close_large_scale-dishwasher",
+   "id": 9,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_close_large_scale",
+   "iddl": "configuration_matching/articulation_close_large_scale.iddl",
+   "pick": "configuration_matching-articulation_close_large_scale#06",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_close_small_scale-blender-breakfast_table",
+   "id": 10,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_close_small_scale",
+   "iddl": "configuration_matching/articulation_close_small_scale.iddl",
+   "pick": "configuration_matching-articulation_close_small_scale#01",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_close_small_scale-hinged_jar-breakfast_table",
+   "id": 11,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_close_small_scale",
+   "iddl": "configuration_matching/articulation_close_small_scale.iddl",
+   "pick": "configuration_matching-articulation_close_small_scale#02",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_close_small_scale-laptop-breakfast_table",
+   "id": 12,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_close_small_scale",
+   "iddl": "configuration_matching/articulation_close_small_scale.iddl",
+   "pick": "configuration_matching-articulation_close_small_scale#03",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_close_small_scale-toolbox-breakfast_table",
+   "id": 13,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_close_small_scale",
+   "iddl": "configuration_matching/articulation_close_small_scale.iddl",
+   "pick": "configuration_matching-articulation_close_small_scale#04",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_close_small_scale-carton-floor",
+   "id": 14,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_close_small_scale",
+   "iddl": "configuration_matching/articulation_close_small_scale.iddl",
+   "pick": "configuration_matching-articulation_close_small_scale#05",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_open_large_scale-door",
+   "id": 15,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_open_large_scale",
+   "iddl": "configuration_matching/articulation_open_large_scale.iddl",
+   "pick": "configuration_matching-articulation_open_large_scale#01",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_open_large_scale-bottom_cabinet",
+   "id": 16,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_open_large_scale",
+   "iddl": "configuration_matching/articulation_open_large_scale.iddl",
+   "pick": "configuration_matching-articulation_open_large_scale#02",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_open_large_scale-bottom_cabinet_no_top",
+   "id": 17,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_open_large_scale",
+   "iddl": "configuration_matching/articulation_open_large_scale.iddl",
+   "pick": "configuration_matching-articulation_open_large_scale#03",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_open_large_scale-fridge",
+   "id": 18,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_open_large_scale",
+   "iddl": "configuration_matching/articulation_open_large_scale.iddl",
+   "pick": "configuration_matching-articulation_open_large_scale#04",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_open_large_scale-oven",
+   "id": 19,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_open_large_scale",
+   "iddl": "configuration_matching/articulation_open_large_scale.iddl",
+   "pick": "configuration_matching-articulation_open_large_scale#05",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_open_large_scale-dishwasher",
+   "id": 20,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_open_large_scale",
+   "iddl": "configuration_matching/articulation_open_large_scale.iddl",
+   "pick": "configuration_matching-articulation_open_large_scale#06",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_open_small_scale-blender-breakfast_table",
+   "id": 21,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_open_small_scale",
+   "iddl": "configuration_matching/articulation_open_small_scale.iddl",
+   "pick": "configuration_matching-articulation_open_small_scale#01",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_open_small_scale-hinged_jar-breakfast_table",
+   "id": 22,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_open_small_scale",
+   "iddl": "configuration_matching/articulation_open_small_scale.iddl",
+   "pick": "configuration_matching-articulation_open_small_scale#02",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_open_small_scale-laptop-breakfast_table",
+   "id": 23,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_open_small_scale",
+   "iddl": "configuration_matching/articulation_open_small_scale.iddl",
+   "pick": "configuration_matching-articulation_open_small_scale#03",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_open_small_scale-toolbox-breakfast_table",
+   "id": 24,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_open_small_scale",
+   "iddl": "configuration_matching/articulation_open_small_scale.iddl",
+   "pick": "configuration_matching-articulation_open_small_scale#04",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_open_small_scale-carton-floor",
+   "id": 25,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_open_small_scale",
+   "iddl": "configuration_matching/articulation_open_small_scale.iddl",
+   "pick": "configuration_matching-articulation_open_small_scale#05",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-attachment-dip_candle-candle_holder-breakfast_table",
+   "id": 26,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-attachment",
+   "iddl": "configuration_matching/attachment.iddl",
+   "pick": "configuration_matching-attachment#01",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-attachment-cork-vinegar_bottle-breakfast_table",
+   "id": 27,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-attachment",
+   "iddl": "configuration_matching/attachment.iddl",
+   "pick": "configuration_matching-attachment#02",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-attachment-light_bulb-table_lamp-breakfast_table",
+   "id": 28,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-attachment",
+   "iddl": "configuration_matching/attachment.iddl",
+   "pick": "configuration_matching-attachment#03",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-attachment-skateboard_wheel_assembly-skateboard_deck-breakfast_table",
+   "id": 29,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-attachment",
+   "iddl": "configuration_matching/attachment.iddl",
+   "pick": "configuration_matching-attachment#04",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-attachment-lid-teapot-breakfast_table",
+   "id": 30,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-attachment",
+   "iddl": "configuration_matching/attachment.iddl",
+   "pick": "configuration_matching-attachment#05",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table",
+   "id": 31,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-attachment",
+   "iddl": "configuration_matching/attachment.iddl",
+   "pick": "configuration_matching-attachment#06",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-block_design-block_4-breakfast_table",
+   "id": 32,
+   "grounded": "2026-09-15",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-block_design",
+   "iddl": "configuration_matching/block_design.iddl",
+   "pick": "configuration_matching-block_design#01",
+   "slot": "representative",
+   "mode": "representative"
+  }
+ ],
+ "unregistered": [
+  {
+   "id": 2,
+   "alias": "articulation",
+   "why": "duplicate alias of problem1"
+  }
+ ]
+}
