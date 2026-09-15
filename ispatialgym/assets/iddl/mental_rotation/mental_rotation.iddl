@@ -3,14 +3,8 @@
 (define (iddl mental_rotation)
     (:family mental_rotation)
     (:alias mental_rotation-{target})
-    (:roles
-        target - object
-        floor - fixed
-        agent - agent
-    )
-    (:options
+    (:require
         (grasps target floating)
-        (scene floor floors)
     )
     (:init
         (ontop agent floor)

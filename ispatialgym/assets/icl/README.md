@@ -16,22 +16,22 @@ in language annotations.
 | column | meaning |
 |---|---|
 | `subtask` | iddl subtask id (`disembedding`, `inter_object_relation_satisfaction-ontop_small_scale`, …) |
-| `role` | iddl role: `target`, `targets`, `partner`, `source`, `destination`, `distractors`, `obstacles`, `support`, `room` |
-| `kind` | `object` (one spawned instance), `group` (member candidate of a group role), `fixed` (scene object / wall region / room) |
-| `category`, `model` | BEHAVIOR category and model id; for `fixed` rows `model` is the scene object name (or the wall object / room) |
+| `role` | iddl role: `target`, `targets`, `partner`, `source`, `destination`, `distractors`, `obstacles`, `support`, `room` (the iddl files declare no roles; a role's rows here define it for the subtask) |
+| `kind` | how `ground_isg` grounds the role: `sampleable` (one spawned instance, model drawn per template), `group` (member candidate of a group role; member count and identical‑vs‑unique draw are customs list parameters, `generation.groups.<role>`), `scene` (scene object / wall region / room bound per scene; `room` rows bound a subtask to one scene / room) |
+| `category`, `model` | BEHAVIOR category and model id; for `scene` rows `model` is the scene object name (or the wall object / room) |
 | `display_name`, `synset` | language‑annotation phrase; KB synset of the category |
-| `scene`, `room` | fixed rows: where the object is |
+| `scene`, `room` | scene rows: where the object is |
 | `representative`, `test`, `rank`, `source_selection` | `pick 1` / pinned rows are the representative models (`ground_isg` tests them first); `pick 1` + `pick 2` + pinned are the test set; `rank` 0 pinned, 1 pick 1, 2 pick 2, 3 alternate, 4 candidate/viable/partner, 5 pool, 6 reserve |
 | `status` | `untested` for every row (see above) |
-| `grasp_key` | grasp‑library key (`runlogs/grasp_library_20260905/{cands,results,review}`) when the role is grasped; empty = no grasps yet (touching round‑1 targets are flagged in `note`) |
+| `grasp_key` | grasp‑library key (`runlogs/grasp_library_20260905/{cands,results,review}`) when the role is grasped; empty = no grasps yet (touching round‑1 targets are flagged in `note`). The iddl `(grasps <role> <pipeline>)` requirement is checked against `grasps.csv` rows of that pipeline for the model |
 | `scale` | per‑axis scale of the grasp‑tested variant (scaled categories such as `garlic_clove`, `pencil`, `french_fries`) |
 | `bbox_x/y/z` | canonical bounding box (m) from the KB inventory |
 | `natural_scenes` | obstacles: scenes where the category is natural |
 | `frame_front`, `frame_up`, `frame_level`, `frame_long`, `symmetric_180` | alignment targets: reviewed canonical frame (`+x` …), long axis, half‑turn symmetry |
-| `joint`, `handle_key`, `handle_kind`, `handle_annotated`, `instance_scale` | articulated targets: joint(s) (`joint:status` list for scene objects), `artic/handles/<key>.json` key and whether it exists, the scene instance's scale relative to the canonical model (handles must be rescaled) |
+| `joint`, `handle_key`, `handle_kind`, `handle_annotated`, `instance_scale` | articulated targets: joint(s) (`joint:status` list for scene objects), `artic/handles/<key>.json` key and whether it exists, the scene instance's scale relative to the canonical model (handles must be rescaled). The iddl `(handle <role>)` requirement is checked against `handle_annotated` / the scene inventory's per‑instance handle status; the joint actually used is a customs list value (`roles.<role>.joint`) |
 | `region_id`, `p0`, `p1`, `normal`, `hang_z`, `length_m`, `max_object_m` | wall regions (`<room>/<wall>/<rNN>`, world xy at hang height, normal into the room) |
 | `top_z`, `world_ext_x/y`, `pos_x/y`, `yaw_deg` | supports / big partners: geometry from `runlogs/table_selection_20260911/inventory.csv` |
-| `dataset`, `count` | non‑BEHAVIOR assets (`ispatialgym-assets` for the block), group member count |
+| `dataset` | non‑BEHAVIOR assets (`ispatialgym-assets` for the block). Group member counts are **not** in this sheet: they are customs list parameters (`generation.groups.<role>.size` / `.draw`) |
 | `ready` | 1 = no unprocessed KB complaint |
 | `note`, `source` | reviewer note (trimmed), provenance file |
 
@@ -59,7 +59,19 @@ never drawn as each other's distractors (from `task_custom_lists.json`, `disembe
 `kind = spec`: the current test set (`task_custom_lists.json` pins), `test = 1`; `kind = representative`: one combo per
 (subtask, target category) with the representative target, the pick‑1 partner of its paired category and the test
 support — what `ground_isg` runs first. `assignment` is `role=category/model;role=scene:scene_object;…`
-(`*4` = group count, `(joint)` = articulation joint, `scene:room/*` = any validated wall region of the room).
+(`*4` = the group size of that explicit combination, `(joint)` = articulation joint, `scene:room/*` = any validated
+wall region of the room).
+
+### Annotation artefacts referenced by the iddl `:require` block
+
+| requirement | artefact | status |
+|---|---|---|
+| `(grasps <role> <pipeline>)` | `grasps.csv` rows with that `pipeline` for the model (library keys `__f` floating, `__t` tabletop, `__i` insert / `__fl` flower stem, `__a` attachment) | built |
+| `(contacts <role>)` | `contacts/<category>__<model>.json` — push ends (E_low / E_high), brace kinds, stop edges, no‑go regions of the alignment targets | TODO B6 |
+| `(handle <role>)` | `runlogs/grasp_library_20260905/artic/handles/<key>.json` (spawned models) and the scene inventory's per‑instance scaled handle annotation with `status` `handle` / `edge` (`runlogs/scene_inventory_<date>/<scene>/artic/<name>.json`, B4) | built; reviewer round C3 pending |
+
+A candidate model without the required artefact is not grounded (`ground_isg` blacklists it with `missing_grasps:<pipeline>` /
+`missing_contacts` / `missing_handle`).
 
 ### `grasps.csv` — every validated grasp of every referenced key
 

@@ -444,7 +444,7 @@ Used by `pose_reached(g)` and `layout_reached(g)`:
 
 ## Public task, subtask and alias mapping
 
-| Family (activity dir) | Subtask | Alias template | Fixed roles in the alias |
+| Family (activity dir) | Subtask | Alias template | Scene roles in the alias (icl `kind = scene`) |
 | --- | --- | --- | --- |
 | `camera_relocalization` | standard | `camera_relocalization-standard` | – |
 | `camera_relocalization` | obstructed | `camera_relocalization-obstructed-{obstacles}` | obstacle category (one for now) |

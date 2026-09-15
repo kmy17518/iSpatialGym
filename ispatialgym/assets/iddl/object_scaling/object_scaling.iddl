@@ -3,14 +3,8 @@
 (define (iddl object_scaling)
     (:family object_scaling)
     (:alias object_scaling-{target})
-    (:roles
-        target - object
-        floor - fixed
-        agent - agent
-    )
-    (:options
+    (:require
         (grasps target floating)
-        (scene floor floors)
     )
     (:init
         (ontop agent floor)

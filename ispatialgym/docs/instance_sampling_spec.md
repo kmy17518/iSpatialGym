@@ -26,7 +26,8 @@ iSpatialGym:  ground_isg   : iddl + icl               ─ground→   bddl per ca
   this target, distractor pools for this target, female for this male), which combinations are *test* combinations,
   supports and wall regions per scene, per-model frame axes / scale / grasp keys.
 - **task customs list** (`task_custom_lists.json`, section 2.3): per alias, per-scene whitelists and blacklists of
-  models, fixed bindings, generation parameters and the *constraints* every successful sampling run adds.
+  models, bindings of the scene roles, generation parameters (group sizes and draw mode, scales, joints, counts,
+  tolerances) and the *constraints* every successful sampling run adds.
 
 Principles, in the order they are traded off:
 
@@ -66,7 +67,7 @@ Principles, in the order they are traded off:
         <instance_id>.summary.json                what was sampled / measured (debug)
 ```
 
-- `template_id = <scene>__<role>-<category>-<model>[__...]` for the spawned roles; fixed roles are recorded in
+- `template_id = <scene>__<role>-<category>-<model>[__...]` for the spawned roles; scene roles are recorded in
   `template_meta.json` and in the alias.
 - `instance_id = <alias>__<template_id>__<NNNN>`.
 - The TRO keeps BEHAVIOR's layout and the `isg-tro-v1` block exactly as in `task_bddl_formats.md`. Everything the
@@ -81,29 +82,37 @@ Principles, in the order they are traded off:
 
 ### 2.1 iddl
 
-See `ispatialgym/assets/iddl/README.md`. Roles: `target`, `targets` (group), `partner`, `source`, `destination`,
-`distractors` (group with `same_category` / `other_category` pools), `obstacles` (group, obstructed camera
-relocalization only), `support`, implicit `floor` and `agent`.
+See `ispatialgym/assets/iddl/README.md`. An iddl file is the BDDL skeleton over bare role names (`:alias`, optional
+`:groups` composites, `:init`, `:goal`, `:measure`) plus a `:require` block naming the icl artefacts a role's models
+must have — `(grasps <role> floating|tabletop|insert|attachment)`, `(contacts <role>)`, `(handle <role>)` — which
+`ground_isg` applies as admissibility filters. It declares no roles, kinds, categories, counts or scales: role kinds
+and candidates are the icl's (`roles.csv`), draw parameters the customs list's (`generation`), everything about
+placement and installed constraints (hinges) is in sections 3–6 here. Roles in use: `target`, `targets` (group),
+`partner`, `source`, `destination`, `distractors` (group with `same_category` / `other_category` pools), `obstacles`
+(group, obstructed camera relocalization only), `support`, implicit `floor` and `agent`.
 
 ### 2.2 icl (candidate list)
 
-`ispatialgym/assets/icl/` — categories, never synsets:
+`ispatialgym/assets/icl/` — categories, never synsets; schema in its `README.md`:
 
 | sheet | one row per | key columns |
 |---|---|---|
-| `roles.csv` | (subtask, role, category, model) | `representative` (the one model of the category tested by `ground_isg`), `test` (test-instance models), `scenes_natural` (where the category may be drawn), `grasp_key` / `grasp_pipeline`, `scale`, frame axes (`front_axis`, `up_axis`, `level_axis`, `long_axis`, `symmetric_180`), `display_name`, `status` (`candidate` / `whitelisted` / `blacklisted` + reason), `notes` |
-| `pairs.csv` | (subtask, role_a, category_a[/model_a], role_b, category_b[/models_b], relation) | how roles correlate: target→partner, target→distractor pool (same/other category, look-alike groups), male→female (attachment type), target→support class, obstacle→scene |
-| `combos.csv` | explicit combination | `test=1` combinations that `ground_isg` must test (representative models), scenes |
-| `supports.csv` | (scene, object name) | category, room, top height, footprint, per-edge free-floor run, chairs removed, `status` per subtask; the 31 supports of the union plus the 78 wall regions and the large partners |
-| `grasps.csv` | (grasp key, grasp name) | `width` (pinch width), `finger_q`, `pad_clearance = (0.10 − width)/2`, verdict |
+| `roles.csv` | (subtask, role, category, model) | `kind` — `sampleable` (one spawned instance), `group` (member candidate of a group role), `scene` (scene object / wall region / room bound per scene; supports, walls, scene articulated objects, big partners, `room` bounds); `representative` (the one model of the category tested by `ground_isg`), `test` (test-instance models), `natural_scenes` (where an obstacle category may be drawn), `grasp_key`, `scale` (grasp-tested variant), frame axes (`frame_front`, `frame_up`, `frame_level`, `frame_long`, `symmetric_180`), articulation (`joint`, `handle_key`, `handle_annotated`, `instance_scale`), wall-region / support geometry, `display_name`, `status` (`untested` until `ground_isg` writes the per-scene verdicts into the customs list), `note` |
+| `pairs.csv` | (subtask, relation, role_a, category_a[/model_a], role_b, category_b[/model_b]) | how roles correlate: target→partner (`partner_of`, attachment `attach_type`), target→distractor pool (`distractor_same_category` / `distractor_other_category`, tier) |
+| `lookalikes.csv` | (group, category, model) | models indistinguishable from the init view (section 3.12) |
+| `combos.csv` | explicit combination | `test=1` combinations that `ground_isg` must test (representative models), scenes; `*N` spells the group size of that combination |
+| `grasps.csv` | (grasp key, grasp name) | `pipeline`, `width_m` (pinch width), `finger_q1/2`, `pad_clearance_m = (0.10 − width)/2`, verdict — what `(grasps …)` requirements are checked against |
 
-Everything that used to be a "viable" list (supports, walls, articulated objects) is a *candidate* here until
-`ground_isg` re-derives it.
+Artefacts referenced by `:require` beyond the sheets: `contacts/<category>__<model>.json` (alignment push / brace
+contacts, B6) and the handle annotations (`artic/handles/<key>.json`; per-instance scaled copies with `status` in the
+B4 scene inventory). Everything that used to be a "viable" list (supports, walls, articulated objects) is a
+*candidate* here until `ground_isg` re-derives it.
 
 ### 2.3 Task customs list
 
-One entry per alias. Scene-independent model pools are the icl's job; the customs list holds what a scene changes
-and what sampling learned.
+One entry per alias. Scene-independent model pools are the icl's job; the customs list holds **how models are drawn**
+(`generation`: group sizes and draw mode, spawn scales, chosen joints, counts, tolerances), what a scene changes
+(`scenes`: bindings of the scene roles, per-scene whitelists / blacklists) and what sampling learned (`constraints`).
 
 ```json
 {
@@ -111,23 +120,25 @@ and what sampling learned.
     "iddl": "inter_object_relation_satisfaction/nextto.iddl",
     "definition_id": 3,
     "roles": {
-      "target":  {"category": "spatula",    "grasps": "tabletop", "representative": "hkvsep"},
-      "partner": {"category": "soup_ladle", "representative": "cfzneb"},
-      "support": {"category": "breakfast_table", "fixed": true},
-      "floor":   {"fixed": true}
+      "target":  {"category": "spatula",    "sampleable": true,  "require": {"grasps": "tabletop"}, "representative": "hkvsep"},
+      "partner": {"category": "soup_ladle", "sampleable": true,  "representative": "cfzneb"},
+      "support": {"category": "breakfast_table", "sampleable": false},
+      "floor":   {"sampleable": false}
     },
     "scenes": {
       "house_single_floor": {
         "rooms": ["dining_room_0"],
-        "fixed": {"support": ["breakfast_table_rhjoby_0"], "floor": {"room": "dining_room_0"}},
+        "bindings": {"support": ["breakfast_table_rhjoby_0"], "floor": {"room": "dining_room_0"}},
         "whitelist": {"target": {"spatula": ["hkvsep", "ktkigm", "ymvrct"]}, "partner": {"soup_ladle": ["cfzneb", "hgvzdm"]}},
-        "blacklist": {"target": {"spatula": {"pdqgzq": "ground_isg 2026-09-20: grasp_unreachable at every focus cell"}}}
+        "blacklist": {"target": {"spatula": {"pdqgzq": "ground_isg 2026-09-20: grasp_unreachable at every focus cell",
+                                             "qwbmxs": "ground_isg 2026-09-20: missing_grasps:tabletop"}}}
       },
       "restaurant_diner": {"...": "one block per candidate scene; unbounded scenes list all seven"}
     },
     "generation": {
       "templates_max": 20, "instances_per_template": 5,
       "tolerances": {"position": 0.03, "orientation": 0.20},
+      "groups": {},
       "path_buckets": null
     },
     "constraints": [
@@ -143,12 +154,30 @@ and what sampling learned.
 }
 ```
 
+- `roles.<role>`: the grounded category, `sampleable` (`true` = spawned from the whitelist per template; `false` =
+  a scene role bound per scene under `scenes.<scene>.bindings`), the copied `require` entries of the iddl
+  (`grasps: <pipeline>`, `contacts: true`, `handle: true` — the loader and oracle read the grasp pipeline from here),
+  the representative model, and the per-role draw parameters that are not group-related: `scale` (per-model spawn
+  scale map of the alignment targets, `{"keyboard/hgtbot": 0.8}`; absent = 1), `joint` / `handle_key` (the one joint
+  of an articulation target, per model or per scene object name).
 - `whitelist` / `blacklist` are **per scene**; a scene block exists for every candidate scene (`house_single_floor`,
   `house_double_floor_upper`, `house_double_floor_lower`, `Rs_int`, `hotel_suite_large`, `restaurant_diner`,
-  `office_cubicles_right`) unless the iddl/icl bounds the scene (camera relocalization: `house_single_floor` /
-  `living_room_0` only for now). Whitelists start as the full icl candidate pool per category except models removed
-  by a failed representative test (they move to the blacklist with the reason); scene-dependent objects (supports,
-  walls, scene articulated objects, big partners) are listed per scene.
+  `office_cubicles_right`) unless the icl bounds the scene (`room` rows: camera relocalization and the held-object
+  tasks are `house_single_floor` / `living_room_0` only for now). Whitelists start as the full icl candidate pool per
+  category minus the models rejected by the iddl `:require` filters (blacklisted as `missing_grasps:<pipeline>`,
+  `missing_contacts`, `missing_handle`) and minus models removed by a failed representative test (blacklisted with
+  the reason); scene-dependent objects (supports, walls, scene articulated objects, big partners) are listed per
+  scene under `bindings`.
+- `generation.groups.<role>` for every group role: `size` (an integer or `[min, max]`, drawn per template) and
+  `draw` — `unique` (pairwise distinct models, look-alike exclusions of section 3.12 on top; the default) or
+  `same_model` (all members one model). Current values: `targets` `{size: 4, draw: same_model}` (block design),
+  `distractors` `{size: [1, 3], draw: unique}`, `obstacles` `{size: 1, draw: unique}`. The size is part of the alias
+  (`block_4`, `bottle_of_beer_3_…`), so changing it grounds a new problem instead of re-grounding the old one.
+- **Seeding.** `ground_isg` creates the entry: `generation` (and the `roles.<role>.scale` / `joint` values) is
+  copied from the existing entry when the alias was grounded before, otherwise from the per-subtask defaults in
+  `ispatialgym/sampling/generation_defaults.py`, whose values are the numbers written in this document (4 blocks, 1–3
+  distractors, one obstacle, tolerances of section 8, path buckets below, `require_goal_handle: auto`, `arm: auto`).
+  There are no defaults hidden in the samplers.
 - `generation.path_buckets` (camera relocalization only): `[{"max_m": 3, "n": 10}, {"max_m": 5, "n": 10},
   {"max_m": 10, "n": 5}]`; buckets are half-open ranges of the geodesic path length `(0, 3]`, `(3, 5]`, `(5, 10]`;
   `multiply_isg --path-buckets 3:10,5:10,10:5` overrides; the bucket is recorded in the sidecar and used in the
@@ -305,8 +334,9 @@ Rules that use them:
    shaker, teacup – teapot): a pair whose two models share a look-alike group is rejected (the instruction would be
    ambiguous); a same-category pair of distinguishable models is allowed, and both objects get a spatial descriptor in
    the sidecar (`language.objects.*.descriptor`) so the annotations can name them.
-3. **Groups of identical members** are the intended exception: blocks (`same_model`), and — if ever wanted — several
-   distractors of one model; `distractors_group` members are unique models by default.
+3. **Groups of identical members** are the intended exception: blocks (`generation.groups.targets.draw =
+   same_model`), and — if ever wanted — several distractors of one model; `distractors_group` members are unique
+   models (`draw = unique`, the default).
 4. **Model iteration** in `sample_isg` ("iterate over all models before reusing one") counts exact duplicates as one
    model and texture variants as distinct models.
 5. **Which models are the representative and the test models of a category** (a constraint on `build_icl.py`, not a
@@ -548,8 +578,9 @@ instance: the draw, step 5, step 6. Variety comes from β, the step-4 draw and t
 
 ### 5.3 Prompt 1 — articulation, large-scale (open / close)
 
-Target bound to a scene articulated object (`fixed.target` names or categories within the task rooms: cabinets,
-fridges, ovens, dishwashers, drawers, doors); one joint per object (`roles.target.joint`, `roles.target.handle_key`).
+Target bound to a scene articulated object (`bindings.target` names, from the `roles.csv` scene rows of the task rooms:
+cabinets, fridges, ovens, dishwashers, drawers, doors, iddl `(handle target)` satisfied); one joint per object
+(`roles.target.joint`, `roles.target.handle_key`).
 Handle annotation `artic/handles/<key>.json` → joint, contact, pinch_axis, approach_dir (target frame, closed
 configuration), kind (bar / knob / edge / fallback), outward_normal, axis_dir_obj, hinge_point_obj — **scaled by the
 scene instance's per-axis scale** before use (scene instances are non-uniformly scaled; the pinch width must stay
@@ -606,7 +637,7 @@ scan), `view_translates` (Phase 1b), tucked reach arms, right-arm-only.
 Tabletop Phases 1–2 for stance and view (support = the fixed `support`, or the floor for objects taller than 0.6 m);
 everything object-related follows this section, which wins over section 4 where they differ — small-scale
 articulation is not a pick-and-place (some objects have no grasp, only an edge pinch). Roles: `target` (spawned
-articulated object; `roles.target.joint`, `handle_key`), fixed `support`. Handle annotation, joint states, S (probed
+articulated object; `roles.target.joint`, `handle_key`), scene `support`. Handle annotation, joint states, S (probed
 on a band cell of the top), h(q), waypoints and the auto required-waypoint rule as in 5.3.
 
 - **Target yaw is not free**: the facing direction f (target frame: the moving face's outward normal; for lids the
@@ -653,12 +684,13 @@ Removed from v1: `lateral_center` −0.15, `lateral_half` 0.15, `depth_range` (b
 
 ### 5.5 Alignment — world vertical and world horizontal
 
-Roles: `target` (hung), fixed `support` (the wall: `fixed.support` = allowed wall object names,
-`fixed.support_regions` = the surveyed wall segments). Prompt 0 with the wall as the face (n = wall normal, P = hinge
+Roles: `target` (hung; iddl `(contacts target)`), scene `support` (the wall: `bindings.support` = allowed wall object
+names, `bindings.support_regions` = the surveyed wall segments). The hinge below is an initialization rule of this
+section, not an iddl requirement. Prompt 0 with the wall as the face (n = wall normal, P = hinge
 point on the wall at hang height). Arc lattice, single right-arm push into the wall and `view_translates` of v1 are
 replaced by the Phase 1 ray + Phase 2 lattice and the tangential push + brace below.
 
-Kept (target side): wall spots from `fixed.support_regions` (0.25 m seeding) or the 24-ray search; flat patch 5 × 5
+Kept (target side): wall spots from `bindings.support_regions` (0.25 m seeding) or the 24-ray search; flat patch 5 × 5
 rays within 1 cm over (w + 0.10) × (h + 0.10) (horizontal: swept extents over the max deviation, `swept_patch`);
 front clearance 0.35 m; in-room test 0.8 m in front; one wall per template (most spots); frame from `front_axis` /
 `up_axis` / `level_axis` (dict form), `symmetric_180`; hang pose (up axis along world z, front axis along n, centre at
@@ -971,7 +1003,9 @@ size-normalised errors.
 
 **`ground_isg`** (iddl + icl → BDDL + customs list). For each iddl file and each category combination admitted by the
 icl (`pairs.csv`; only the `combos.csv` rows when `--test-only`): write the BDDL (alias, synsets from the KB, groups),
-the customs entry (per-scene whitelists = full icl pools, fixed bindings, options, generation defaults), then test the
+the customs entry (per-scene whitelists = full icl pools minus the `:require` rejects — `missing_grasps:<pipeline>` /
+`missing_contacts` / `missing_handle` in the blacklist —, bindings of the scene roles, `generation` seeded from the
+existing entry or `generation_defaults.py`, section 2.3), then test the
 combination with **one representative model per category** (`roles.csv`) on every candidate scene / support / partner:
 run the full initialization once (template + instance 0). Success → the template and instance 0 are kept, the
 constraints learned are appended; failure → the representative model is moved to that scene's blacklist with the
@@ -982,7 +1016,9 @@ cartesian product of category lists: only correlated pairs from `pairs.csv` are 
 **`sample_isg`** (BDDL + customs → N templates). N = min(#valid model combinations, `templates_max`), minus one when
 `ground_isg` already produced the representative template (its pair is removed from the pool). Model draw: iterate
 over all whitelisted models before reusing one (exact duplicates count as one model, texture variants as distinct
-models, section 3.12); unique models within a template (blocks excepted, `same_model`); disembedding distractors from
+models, section 3.12); group members per `generation.groups.<role>` (`size` drawn per template, `draw = unique`
+pairwise distinct — the default — or `same_model` for the blocks), unique models across roles within a template;
+disembedding distractors from
 the pools of the target's category minus the target's look-alike group, at most one model per look-alike group in the
 set; look-alike target–partner pairs rejected. Each template: full
 initialization → instance 0; failure → the model(s) responsible move to the blacklist (reason recorded); every

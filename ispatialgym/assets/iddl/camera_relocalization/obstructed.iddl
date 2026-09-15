@@ -1,18 +1,10 @@
 ; Camera relocalization - obstructed. As standard, plus an obstacle group placed on the eroded shortest path so that the
 ; shortest path changes; the obstacle must be in the head camera's view at some point along the new path; the new path
-; must stay inside the instance's length bucket. One obstacle for now (group_size 1 1); never manipulated.
+; must stay inside the instance's length bucket. Never manipulated. One obstacle for now: the group size is a customs
+; list parameter (generation.groups.obstacles.size = 1), the candidate categories come from roles.csv.
 (define (iddl camera_relocalization-obstructed)
     (:family camera_relocalization)
     (:alias camera_relocalization-obstructed-{obstacles})
-    (:roles
-        obstacles - group
-        floor - fixed
-        agent - agent
-    )
-    (:options
-        (scene floor floors)
-        (group_size obstacles 1 1)
-    )
     (:init
         (ontop obstacles floor)
         (ontop agent floor)

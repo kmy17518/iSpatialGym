@@ -1,20 +1,12 @@
-; Alignment - world horizontal. Same wall hinge as world vertical; the target is an elongated wall item whose long axis /
-; reference edge must end level. Models that look the same upside down carry the 180 deg equivalence (symmetric_180).
+; Alignment - world horizontal. Same wall hinge as world vertical (installed by the sampler, spec 5.5); the target is an
+; elongated wall item whose long axis / reference edge must end level. Models that look the same upside down carry the
+; 180 deg equivalence (symmetric_180, roles.csv). The support is a wall region (roles.csv kind scene). Push / brace
+; contacts from contacts/<category>__<model>.json; spawn scale from the customs list (roles.target.scale).
 (define (iddl alignment-world_horizontal)
     (:family alignment)
     (:alias alignment-world_horizontal-{target}-{support})
-    (:roles
-        target - object
-        support - fixed
-        floor - fixed
-        agent - agent
-    )
-    (:options
-        (push target)
-        (hinge target support normal)
-        (scale target configured)
-        (scene support walls)
-        (scene floor floors)
+    (:require
+        (contacts target)
     )
     (:init
         (ontop agent floor)

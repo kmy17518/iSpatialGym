@@ -70,7 +70,11 @@ ROLE_COLUMNS = ["subtask", "role", "kind", "category", "model", "display_name", 
                 "rank", "source_selection", "status", "grasp_key", "scale", "bbox_x", "bbox_y", "bbox_z", "natural_scenes",
                 "frame_front", "frame_up", "frame_level", "frame_long", "symmetric_180", "joint", "handle_key", "handle_kind",
                 "handle_annotated", "instance_scale", "region_id", "p0", "p1", "normal", "hang_z", "length_m", "max_object_m",
-                "top_z", "world_ext_x", "world_ext_y", "pos_x", "pos_y", "yaw_deg", "dataset", "count", "ready", "note", "source"]
+                "top_z", "world_ext_x", "world_ext_y", "pos_x", "pos_y", "yaw_deg", "dataset", "ready", "note", "source"]
+# roles.csv `kind`: how ground_isg grounds the role (the iddl files carry no role declarations)
+KIND_SAMPLEABLE = "sampleable"  # one spawned instance, model drawn per template
+KIND_GROUP = "group"            # member candidate of a group role (size / draw mode in the customs list generation.groups)
+KIND_SCENE = "scene"            # scene object / wall region / room bound per scene
 PAIR_COLUMNS = ["subtask", "relation", "role_a", "category_a", "model_a", "role_b", "category_b", "model_b", "tier", "attach_type",
                 "ready", "note", "source"]
 COMBO_COLUMNS = ["combo_id", "subtask", "kind", "test", "scene", "assignment", "note"]
@@ -208,7 +212,7 @@ class Builder:
         self.keys_used: set = set()
 
     # -- generic object row
-    def add_object(self, subtask: str, role: str, category: str, row: dict, kind: str = "object", **extra) -> dict:
+    def add_object(self, subtask: str, role: str, category: str, row: dict, kind: str = KIND_SAMPLEABLE, **extra) -> dict:
         r = empty_row(ROLE_COLUMNS)
         model = row.get("model", "")
         sel = row.get("selection", "")
@@ -232,7 +236,7 @@ class Builder:
 
     def add_fixed(self, subtask: str, role: str, scene: str, name: str, category: str, room: str = "", **extra) -> dict:
         r = empty_row(ROLE_COLUMNS)
-        r.update({"subtask": subtask, "role": role, "kind": "fixed", "category": category, "model": name, "display_name": display_name(category),
+        r.update({"subtask": subtask, "role": role, "kind": KIND_SCENE, "category": category, "model": name, "display_name": display_name(category),
                   "synset": synset(category), "scene": scene, "room": room, "rank": "4", "status": "untested", "source": extra.pop("source", "")})
         r.update({k: v for k, v in extra.items() if k in r})
         self.roles.append(r)
@@ -252,7 +256,7 @@ class Builder:
                            note="camera relocalization constrained to this room for now (decision 2026-09-14)")
         for cat, row in self.blocks[("camera_relocalization-0", "obstacle")]:
             nat = re.sub(r"^natural in:\s*", "", row.get("pair", "")).replace("*", "")
-            self.add_object("camera_relocalization-obstructed", "obstacles", cat, row, kind="group", natural_scenes=nat, count="1")
+            self.add_object("camera_relocalization-obstructed", "obstacles", cat, row, kind=KIND_GROUP, natural_scenes=nat)
 
     def build_held(self):
         for old, new in (("object_scaling-0", "object_scaling"), ("mental_rotation-0", "mental_rotation")):
@@ -272,7 +276,7 @@ class Builder:
             if (cat, model) not in seen:
                 seen.add((cat, model))
                 self.add_object(st, "distractors", cat, {"model": model, "selection": row["selection"], "note": row.get("note", ""),
-                                                          "duplicates": row.get("duplicates", "")}, kind="group")
+                                                          "duplicates": row.get("duplicates", "")}, kind=KIND_GROUP)
         for tcat, row in self.blocks[("disembedding-0", "distractor_pool")]:
             if "/" not in row["model"]:
                 continue
@@ -283,7 +287,7 @@ class Builder:
             if (dcat, dmodel) not in seen:
                 seen.add((dcat, dmodel))
                 self.add_object(st, "distractors", dcat, {"model": dmodel, "selection": row["selection"], "note": row.get("note", ""),
-                                                            "duplicates": row.get("duplicates", "")}, kind="group")
+                                                            "duplicates": row.get("duplicates", "")}, kind=KIND_GROUP)
         for old_role, new_role in (("tray_source", "source"), ("tray_dest", "destination")):
             for cat, row in self.blocks[("disembedding-0", old_role)]:
                 self.add_object(st, new_role, cat, row, note="fixed model for now (decision 2026-09-14); " + row.get("note", ""))
@@ -291,8 +295,9 @@ class Builder:
     def build_block_design(self):
         st = f"{CM}-block_design"
         for cat, row in self.blocks[("configuration_matching-0 (block_design)", "blocks")]:
-            self.add_object(st, "targets", cat, row, kind="group", dataset="ispatialgym-assets", count="4",
-                            note="custom Blender Kohs block; 4 blocks (2x2) for now; " + row.get("note", ""))
+            self.add_object(st, "targets", cat, row, kind=KIND_GROUP, dataset="ispatialgym-assets",
+                            note="custom Blender Kohs block; group size / identical members are customs list parameters "
+                                 "(generation.groups.targets: size 4, draw same_model); " + row.get("note", ""))
 
     def build_articulation(self):
         # small-scale: every table/floor articulated model with a graspable handle or edge (artic results), one row per joint
@@ -509,7 +514,7 @@ class Builder:
         # representative combos: pick 1 of every target category with the pick-1 partner of its paired category on the test support
         reps = collections.defaultdict(dict)  # (subtask, role) -> category -> model
         for r in self.roles:
-            if r["representative"] == "1" and r["kind"] in ("object", "group"):
+            if r["representative"] == "1" and r["kind"] in (KIND_SAMPLEABLE, KIND_GROUP):
                 reps[(r["subtask"], r["role"])].setdefault(r["category"], r["model"])
         partner_of = collections.defaultdict(list)
         for p in self.pairs:

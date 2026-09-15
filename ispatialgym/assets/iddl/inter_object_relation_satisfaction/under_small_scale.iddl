@@ -4,17 +4,8 @@
 (define (iddl inter_object_relation_satisfaction-under_small_scale)
     (:family inter_object_relation_satisfaction)
     (:alias inter_object_relation_satisfaction-under_small_scale-{target}-{partner}-{support})
-    (:roles
-        target - object
-        partner - object
-        support - fixed
-        floor - fixed
-        agent - agent
-    )
-    (:options
+    (:require
         (grasps target tabletop)
-        (scene support breakfast_table desk countertop bar bottom_cabinet coffee_table conference_table pedestal_table booth shelf)
-        (scene floor floors)
     )
     (:init
         (ontop target support)

@@ -34,8 +34,9 @@ Each benchmark instance consists of:
    evaluation targets.
 3. A task spec entry (iSpatialGym's version of the BEHAVIOR task-custom list)
    describing how instances of that problem are generated: per-scene model
-   whitelists / blacklists, fixed bindings, generation parameters and the
-   constraints learned from earlier instances.
+   whitelists / blacklists, bindings of the scene roles, generation parameters
+   (group sizes and draw mode, spawn scales, chosen joints, counts, tolerances)
+   and the constraints learned from earlier instances.
 4. An **oracle sidecar** (`<instance_id>.oracle.json`) with everything the
    scripted demonstration policy needs (stances, grasps, contacts, waypoints,
    paths); the evaluator never reads it and the public release may omit it.
@@ -70,19 +71,32 @@ metadata directory, never BEHAVIOR's) with a different entry structure
 - **Key by alias** (`inter_object_relation_satisfaction-nextto-spatula-soup_ladle-breakfast_table`):
   one entry per grounded BDDL problem. The definition id is recorded inside
   (`definition_id`, from `activity_definitions/<activity>/problems.json`).
-- **`roles`**: the iddl roles with their grounded category, grasp pipeline,
-  representative model and options; fixed roles are flagged.
-- **`scenes`**: one block per candidate scene (all seven unless the subtask
-  bounds the scene): task rooms, `fixed` bindings of the fixed roles to scene
-  object names (or `{"category": [...]}` / `{"room": ...}`), and the **per-scene
+- **`roles`**: the roles of the grounded problem (from the icl `roles.csv`, the
+  iddl declares none) with their grounded category, a `sampleable` flag
+  (`true` = spawned from the whitelist per template, `false` = a scene role
+  bound per scene), the iddl `require` entries (`grasps: <pipeline>`,
+  `contacts`, `handle`) the loader and oracle read the grasp pipeline from, the
+  representative model, and the per-role draw parameters: `scale` (per-model
+  spawn scale, alignment targets) and `joint` / `handle_key` (articulation).
+- **`scenes`**: one block per candidate scene (all seven unless the icl bounds
+  the scene): task rooms, `bindings` of the scene roles to scene object names
+  (or `{"category": [...]}` / `{"room": ...}`), and the **per-scene
   `whitelist` / `blacklist`** of models per role and category. Whitelists start
-  as the full icl pool; a model that fails its representative test moves to the
-  blacklist with the rejection reason. Scene-dependent objects (supports, walls,
-  scene articulated objects, big partners) are listed per scene.
-- **`generation`**: scene-independent parameters — template and instance
-  counts, tolerances, and the camera-relocalization `path_buckets`
-  (`[{"max_m": 3, "n": 10}, ...]`, half-open geodesic ranges, overridable on the
-  `multiply_isg` command line).
+  as the full icl pool minus the models rejected by the iddl `:require` filters
+  (`missing_grasps:<pipeline>`, `missing_contacts`, `missing_handle`); a model
+  that fails its representative test moves to the blacklist with the rejection
+  reason. Scene-dependent objects (supports, walls, scene articulated objects,
+  big partners) are listed per scene.
+- **`generation`**: scene-independent draw parameters — template and instance
+  counts, tolerances, `groups.<role>` for every group role (`size`: integer or
+  `[min, max]`; `draw`: `unique` or `same_model` — blocks `{4, same_model}`,
+  distractors `{[1, 3], unique}`, obstacles `{1, unique}`), and the
+  camera-relocalization `path_buckets` (`[{"max_m": 3, "n": 10}, ...]`,
+  half-open geodesic ranges, overridable on the `multiply_isg` command line).
+  `ground_isg` seeds it from the existing entry of the alias or from the
+  per-subtask defaults (`ispatialgym/sampling/generation_defaults.py`, the
+  numbers of `instance_sampling_spec.md`); the samplers hold no defaults of
+  their own.
 - **`constraints`**: typed, scoped records appended by every successful
   sampling run (`stance`, `grasp_set`, `joint_set`, `placement`, `scale`,
   `band_ref`, `contacts`, `blacklist`) with `hard` and `source` fields. Soft
@@ -91,7 +105,7 @@ metadata directory, never BEHAVIOR's) with a different entry structure
   initialization rule that a successful instance confirmed is expressed for
   reuse, next to the BEHAVIOR predicate sampling the samplers still use.
 
-Generation runs per scene: bind fixed objects, spawn models from the whitelist,
+Generation runs per scene: bind the scene roles, spawn models from the whitelist,
 run the initialization rules of `instance_sampling_spec.md`, settle, validate
 (`:init` true, goal false, goal feasible, every recorded oracle pose IK- and
 collision-feasible), derive rooms, and write the TRO with `object_bindings`,
