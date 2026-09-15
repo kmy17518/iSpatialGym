@@ -1,0 +1,96 @@
+# v2 sampling spec: gap review against the previous documents (2026-09-15)
+
+Scope: `instance_sampling_spec.md` (v2) diffed against `instance_sampling_spec_v1.md`,
+`task_definition_and_evaluation.md`, `task_bddl_formats.md`, `grasp_library_design.md`,
+`oracle_primitives_design.md`, the header notes of
+`runlogs/grasp_library_20260905/select/task_object_selection.csv` and the selection runlog READMEs
+(`grasp_library_20260905`, `disembedding_distractors_20260911`, `obstacle_selection_20260912`,
+`iors_touching_selection_20260911`, `table_selection_20260911`, `world_alignment_selection_20260911`).
+
+`instance_sampling_spec.md` section 3.12 (exact duplicates / texture variants / look-alikes) was added on
+2026-09-15 as the first result of this review; everything below is what is still missing or
+inconsistent. Status column: **missing** = not in v2 at all, **implicit** = covered only by a "kept from
+v1" remark, **conflict** = v2 says something incompatible with another document or with the code.
+Action column: **spec** = add to `instance_sampling_spec.md` (section), **icl** = column / rule of the
+candidate list (`build_icl.py`, TODO A2 / A6), **oracle** = `oracle_primitives_design.md`, **loader** =
+`run_isg` / `load_tro_instance` (TODO F1), **drop** = obsolete in v2, record only here.
+
+## 1. Object / asset level
+
+| # | Item | Source | Status | Action |
+| --- | --- | --- | --- | --- |
+| 1.1 | **Readiness filter**: a model is a candidate only if its BEHAVIOR KB entry has no unprocessed complaint ("ready"), it is on disk and (for rigid roles) has a single rigid link. | CSV notes, every selection README | missing | icl `ready` column; spec 2.2 states `ground_isg` skips non-ready rows and lists them in the report. |
+| 1.2 | **Grasp-tested scale must be the spawn scale**: 49 thin models (pencil, garlic_clove, ...) only have valid grasps at a per-axis scale that makes the thinnest extent 20 mm (`best_per_model.json`, key suffix `__s`); the scaled variant is chosen per model. | grasp library README round 2 | implicit (icl `scale` column mentioned) | spec 3.2 / 3.6: "an object is spawned at the scale its grasp rows were validated at; `scale` comes from the icl and is written into the customs list `models` entry". Non-uniform scale also invalidates canonical-mesh rest poses and visibility caches (7.x keyed by model only): cache keys must include the scale vector. |
+| 1.3 | **Grasp pipeline per subtask** and key resolution: floating `__f` (held tasks), tabletop `__t` (disembedding, IORS ontop/under/nextto/touching), insert `__i` and flower `__fl` (IORS inside), attachment_free `__a` (attachment male), handle_half `__h` (knives), `__s*` scaled; `resolve_key` prefers the pipeline of the subtask. | grasp library README, `grasp_library.py` | implicit (iddl `:options (grasps ...)`) | spec 3.6: table subtask → pipeline; unknown / mismatched pipeline is a `ground_isg` error, not a fallback. |
+| 1.4 | **Reviewer verdict filter**: only grasps with verdict `ok` or with flags ⊆ {`one_finger`} are used; `end_grasp`, `gap`, `fragile`, `penetration`, `task_violation` exclude the row; `one_finger` is an AG artefact that also appears in demos (fingers close asymmetrically). | grasp README, v1 3.9 | missing | spec 3.6 (one sentence) and oracle QA: an asymmetric finger closure is not a failed grasp. |
+| 1.5 | **Rest pose from the grasp library** (`rest_quat_wxyz`, objects that must stand on a side face to be pinchable): the spawn orientation of a tabletop target is the rest quaternion of its grasp row, not the canonical frame. | grasp README round 1 (25 models) | implicit (3.2 "rest quaternion") | spec 3.2: name the source (`grasps.csv rest_quat`) and require that the sampled yaw is applied on top of it. |
+| 1.6 | **Rotational symmetry of held targets**: mental-rotation targets must have a readable orientation change (not rotationally symmetric); object-scaling targets prefer symmetric bodies. v2 says "equivalences per model" for `orientation_equivalences` but no artefact provides them. | CSV notes for object_scaling / mental_rotation | missing | icl: `symmetry` column on `roles.csv` (`none`, `z2`, `z4`, `zinf`, ...) filled by agent review (new review round, C3); `ground_isg` writes `orientation_equivalences` from it; mental-rotation goals avoid rotations that map the object onto itself. |
+| 1.7 | **Attachment meta-link pair recorded** (`male` / `female` link names) and the child gets the `attachable` ability at spawn; symmetry of the mating axis detected by the revolute test (5 mm slabs, 10 %) and written as `orientation_equivalences` for both members. | v1 5.6, task_definition (Attachment variant) | implicit ("as in v1") | spec 5.6: keep explicitly; the TRO must name the link pair (BEHAVIOR serialises only the parent). |
+| 1.8 | **Zero-grasp categories are excluded from grasping roles** (cap, lid without knob, license_plate, dartboard, briefcase, fries, cinnamon_stick, ...), but may still serve as **partner / distractor / obstacle**. | grasp README | missing | icl: `roles.csv` `graspable` flag; `ground_isg` refuses a non-graspable model in a manipulated role. |
+| 1.9 | **Custom assets** (block, disembedding trays if custom) live in the `ispatialgym-assets` dataset and need `dataset` in the customs list `models` entry and a registered synset. | task_bddl_formats 2 | missing in v2 spec (present in bddl doc) | spec 2.3: `dataset` field in the customs list model entry. |
+
+## 2. Pair / role admissibility rules (were selection criteria, must become `ground_isg` checks)
+
+| # | Item | Source | Status | Action |
+| --- | --- | --- | --- | --- |
+| 2.1 | **Support admissibility**: top height 0.55–1.20 m (verdict `low` / `high` otherwise), top ≥ 0.30 m short side and ≥ 0.12 m² (`small`), single flat top link, in a room the robot can stand in; chairs are not supports; office cubicle desks are one object with several tops. | table_selection notes, v1 3.5 | implicit (3.2 "supports list") | spec 3.2: list the admissibility rule; `ground_isg` re-checks it from the scene inventory (B4) rather than trusting the icl. |
+| 2.2 | **Ontop / under-small partner fit tiers**: `any_yaw` (target footprint fits the partner top at any yaw), `aligned` (fits only aligned), `centred` (fits only centred); v1 used the tier to drive the goal sampler. | v1 5.10, CSV `pair` cells | missing | spec 5.7: partner top must admit the target with ≥ 1 cm margin at the sampled yaw (`any_yaw` preferred; `aligned` restricts the yaw candidates; `centred` restricts the offset). |
+| 2.3 | **Inside admissibility**: opening ≥ target footprint + 1 cm, depth ≤ target height + `fillable` centroid rule, verified by a drop simulation in `ground_isg` (v1 did this per pair in the CSV round). | v1 5.10, CSV notes IORS-2 | missing | spec 5.7 inside: pair test = teleport-drop + settle, `inside` predicate true, target does not protrude above the rim by more than its half height. |
+| 2.4 | **Nextto pair rule**: `gap_ok` / `gap_tight` (both fit side by side in the support's reach band; centre heights overlap so `nextto` holds). | v1 5.10 | missing | spec 5.7 nextto: centre-height overlap requirement and the NextTo distance bound as a pair check. |
+| 2.5 | **Touching partner stability**: flat base (≥ 25 % of the footprint in contact or a foot ≥ 0.6× / 0.45× the body width), height ≤ 3× / 2.5× smallest horizontal extent, no rolling body; **target pushability**: smallest horizontal extent ≤ 8.9 cm (pinchable) or push-only, long side ≤ 30 cm, height ≤ 30 cm. | iors_touching README | missing | spec 5.7 touching: partner stability and target size rules as `ground_isg` geometry checks (they explain the "partner moved ≤ 5 mm" rejection rate). |
+| 2.6 | **Under-large partner clearance** (desk 0.75, breakfast_table 0.70, bed frame; coffee tables excluded) and the target must fit under with the untucked arm. | CSV IORS-6 notes, v1 | partly (5.7 clearance rule) | spec 5.7 under-large: pin the clearance test (target height + gripper + 5 cm ≤ underside height). |
+| 2.7 | **Obstacle admissibility**: floor-natural in the scene (`natural_scenes`), size fit (footprint 0.20–0.55 m, height 0.20–1.10 m preferred), stands stably in its canonical +z-up pose (`rest_ok`), never manipulated, never a look-alike of a scene object the policy must reason about. | obstacle README | missing (5.1 only says "one obstacle") | spec 5.1 obstructed: obstacle rests in canonical pose on the floor, must divert the path (path length increase ≥ 0.3 m) but not close the corridor (a new path ≤ MAX length exists). |
+| 2.8 | **Alignment model rules**: axial targets need a readable front axis (`front_axis`) and a flat base; wall targets must be flat-backed and thin (0.25–0.9 m), hangable, with a readable "up" (vertical) or "level" (horizontal) direction; `symmetric_180` per model. | world_alignment README, CSV notes | implicit (frames file) | icl `frames` / review columns; spec 5.8 says `ground_isg` rejects a wall target without a frame record. |
+| 2.9 | **Camera-relocalization room inventory**: living room of `house_single_floor` only (decided), ≥ N scene objects with ≥ 200 px visible at init and goal; structural categories (walls, floors, ceilings, doors, windows, lights) never count. | v1 5.1, CSV | partly (5.1) | spec 5.1: list the structural category set and `min_object_pixels = 200`. |
+
+## 3. Scene / renderer / world facts (operational rules that change results)
+
+| # | Item | Source | Status | Action |
+| --- | --- | --- | --- | --- |
+| 3.1 | **Collision-world parity**: v1 sampler loads only the task rooms (neighbours off: the `seg_instance` renderer crashes when garden / kitchen prims are in view), and cuRobo's obstacle filter keeps meshes within 1 m of the task rooms; the oracle loads task rooms + neighbours. Stances and paths validated in sampling can collide with neighbouring-room furniture in the demo. | v1 3.1, 3.6, 8; oracle doc | **conflict** | spec 3.1 + 3.3: sampling and `run_isg` must use the same room set; load neighbours in sampling and take segmentation renders only with the crash guard (hide light prims, camera pointed into the task room); if the crash persists for a scene, record it in `scene_variants` and exclude that room pair. Pilot item (C2). |
+| 3.2 | **Light fixtures hidden during renders** (`light`, `lamp`, `chandelier` substrings, `ISG_HIDE_CATEGORY_SUBSTRINGS`): visibility counts and occlusion ratios never include them; goal images in `run_isg` need the same guard or a renderer fix. | v1 3.1, 8 | missing | spec 3.4; oracle doc recording section. |
+| 3.3 | **Room membership of spawned objects** (`in_rooms`) so partial-room loading and evaluation keep them; open-plan boundaries: the base may straddle two floors, `(ontop agent floor)` needs 3 physics steps. | v1 3.1, 3.6 | missing | spec 3.5 (TRO writing) and loader. |
+| 3.4 | **Kinematic predicate cache trap**: OmniGibson caches `ontop` / `inside` / `touching` per pair and treats a sleeping object as unchanged; code that steps physics without evaluating goals must wake / re-place objects before querying predicates. | task_definition (caveat) | missing | spec 3.5 common checks: "wake objects before the `:init` / goal truth table". |
+| 3.5 | **Reload validation**: every template / instance is re-loaded in a fresh process, settled 60 steps, robot pose within 2 mm / 0.02 rad, objects within 1 mm / 0.005 rad of the stored state; contact sheets rendered for review. | v1 3.6 (`validate_instances.py`, `render_instances.py`) | implicit | spec 3.5: keep as a mandatory stage between `multiply_isg` and `run_isg` (D5). |
+| 3.6 | **Report / summary contents**: `:init` truth table, goal truth table (must be false), rejections per rule, phase timings, kit counters, seeds per template / instance. | v1 3.6, CHANGELOG | implicit | spec 3.5: name the report file and the required fields so `bench_report.py` can stay compatible. |
+| 3.7 | **Parking**: the robot is parked at `PARK_POSITION` above loaded floor during object settling; parking over an unloaded room makes the base fall. | v1 3.3 | missing | spec 3.3: park inside the task room's floor polygon. |
+
+## 4. Per-task rules that v1 had and v2 dropped or weakened
+
+| # | Item | Source | Status | Action |
+| --- | --- | --- | --- | --- |
+| 4.1 | **Block design visible-face rule**: every face colour / pattern used in the goal must be visible from the init stance (v1: the two goal-side faces not on top are given to blocks whose faces are yawed toward the robot). Without it the policy cannot know which face to turn up. | v1 5.4, `isg_block_faces.json` | **missing** | spec 5.4: init assigns up faces and yaws so that all six patterns appear in the init image (4 up faces + at least two robot-facing side faces suffice); confirmed with one segmentation render (visibility cache 7.x). |
+| 4.2 | **Axial alignment reference edge**: the table edge the object must align with is visible (≥ 3 of 9 samples along the edge in view). | v1 5.7 | missing | spec 5.8 axial. |
+| 4.3 | **Table-hinge sink** 1 mm below the top to avoid rocking; hinge drift ≤ 1 mm / 0.005 rad checked after 60 steps. | v1 5.8 | implicit ("installed after settling") | spec 5.8 wall variants: keep the numbers. |
+| 4.4 | **IORS goal placement numbers**: ontop z = partner top + target bottom offset + 1 cm drop; inside drop from partner rim + 5 mm, xy at the `fillable` meta-link centroid; nextto: centre heights overlap; touching: 1 mm nudges (≤ 25), partner displacement ≤ 5 mm. | v1 5.10 | partly | spec 5.7: keep the numbers (they define the oracle's place height too). |
+| 4.5 | **Disembedding mechanics**: source-tray floor raster 1 cm, inner floor = tray floor minus wall thickness; distractor footprint budget ≤ 0.45 of the tray floor; occlusion measured on segmentation renders with distractors hidden for the reference silhouette; `min_visible_pixels = 400`; destination tray confirmed visible by one render; realised occlusion, visible area, occluder ids and camera key written to the TRO `initial_occlusion` record (bucket field dropped in v2, ratio ≤ 0.30). | v1 5.3, task_definition (initial occlusion) | partly | spec 5.3: add the numbers and the TRO record; task_definition still describes the two-bucket scheme, add a v2 note there. |
+| 4.6 | **Held-object details**: goal options precomputed per template (base-invariant), AG attach failure at the hold pose is a rejection (no heuristic fallback), the realised grasp (finger joints, object pose in eef) is written to the TRO so the loader can restore it. | v1 5.2 | partly | spec 5.2 + loader. |
+| 4.7 | **Articulation infrastructure not carried into v2**: v1 could swap a candidate articulated model into a scene host slot (`scene_assign`); v2 uses only actual scene objects. Also: stable-angle probe (`ISG_SKIP_STABLE_PROBE`), edge-pinch fallback for handle-less lids, `manual_handles.json` review overrides, joint friction facts (lids drift closed). | v1 5.5, artic RESUME | conflict / missing | spec 5.5: state "no model swaps; scene objects only" and keep the probe + manual override path (they feed B4). |
+| 4.8 | **Attachment collision filter** between child and parent at attach time and at evaluation (open point in v1 8). | v1 5.6 | implicit | loader (F1) and spec 5.6. |
+| 4.9 | **`hands_over_tray` realism preference** (v1 disembedding): v2's placement stance and Δ_min hover rule supersede it. | v1 5.3 | drop | note only. |
+
+## 5. Evaluation / loader items that the sampling spec should reference
+
+| # | Item | Source | Status | Action |
+| --- | --- | --- | --- | --- |
+| 5.1 | **Loader restoration list**: hinge constraints recreated after every reset, grasps restored (AG attach from the recorded finger joints / eef pose), attachment joint + collision filter, controller targets, `orientation_equivalences`, `evaluation_profile`. | task_bddl_formats 3–5, v1 8 | missing (v2 only says "TRO + sidecar") | spec 3.5 / new 3.13 "what the TRO must let `run_isg` restore"; F1 owner. |
+| 5.2 | **Goal image capture**: ≥ 3 renders (use 10) with everything stationary, stored with the physics-synced sensor pose, same camera profile as evaluation, lights guard (3.2). | task_definition (observation timing) | missing in spec / oracle doc | oracle doc recording section. |
+| 5.3 | **Evaluation profile `isg-v1`** pins the camera (1080×1080, 40 mm aperture, `n_render_iterations = 1`); the tolerance table in spec 8 must be written into the profile, not hard-coded per task. | task_definition | missing | spec 8: "profile = `isg-v1` unless the customs list overrides". |
+| 5.4 | **Tray semantics**: destination membership is `ontop` only; `inside` never gates disembedding. | task_definition | implicit | spec 5.3 one line. |
+| 5.5 | **Fixed partners** get no `pose_settled` atom; large-scale under uses `(under target partner)` while small-scale uses `(under partner target)`. | task_bddl_formats 7 | present in bddl doc | spec 5.7 cross-reference only. |
+
+## 6. Duplicates / variants / look-alikes: remaining items after section 3.12
+
+| # | Item | Status | Action |
+| --- | --- | --- | --- |
+| 6.1 | Look-alike groups exist only for the 39 disembedding categories; IORS partners / distractors, block design (irrelevant), obstacles and camera-relocalization scene objects have none. | missing | icl A6: extend `lookalikes.csv` to every category that appears as target + distractor / partner in one scene; review round on head-camera crops (C3). |
+| 6.2 | Same-category **partners** in IORS (e.g. two jars) are legal in v1 pools; v2 3.12 forbids a target's look-alike as distractor but says nothing about a look-alike **partner**. | missing | spec 3.12: a partner is never a look-alike of the target (the instruction names them by category). |
+| 6.3 | Texture variants and language: when two texture variants of one geometry are in the same scene, the sidecar descriptor must include a colour / print word or a spatial disambiguator. | missing | oracle doc language section; sidecar `descriptor` rule. |
+| 6.4 | Exact-duplicate folding across **datasets** (BEHAVIOR vs custom block / trays) is not needed; note that `duplicate_of` is per dataset. | note | icl README. |
+| 6.5 | Camera relocalization "shared fraction" counts scene objects; two texture variants of one geometry standing in the room count as two objects (they are distinguishable in RGB). | note | spec 5.1 one line. |
+
+## 7. Suggested order
+
+1. Spec edits with no open decision (1.2–1.5, 1.7, 1.9, 2.1–2.9, 3.2–3.7, 4.1–4.6, 4.8, 5.1–5.5, 6.2, 6.5): one commit, then bump the spec's "kept from v1" remarks into explicit rules.
+2. Decisions needed from the user: 3.1 (collision-world parity: load neighbours in sampling?), 1.6 (symmetry review round), 4.7 (confirm no model swaps), 6.1 (extend look-alike review beyond disembedding: ~40 more categories).
+3. icl work (A2 / A6): 1.1, 1.6, 1.8, 2.8, 6.1, 6.4.
