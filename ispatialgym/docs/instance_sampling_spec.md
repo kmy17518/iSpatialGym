@@ -295,10 +295,12 @@ Three relations between models of one category, all recorded in the icl and all 
 Rules that use them:
 
 1. **Disembedding.** For a target `C/m` the same-category pool is `pools[C].same_category` minus `m` and minus every
-   model in `m`'s look-alike group; the other-category pool likewise (groups may cross categories); distractors within a
-   template are unique models (exact duplicates count as one). Distractors may be look-alikes of *each other*. An empty
-   pool for the requested kind is not a fallback case: the alias fixes the distractor categories, so `ground_isg` only
-   grounds category combinations whose pools are non-empty after the exclusions.
+   model in `m`'s look-alike group; the other-category pool likewise (groups may cross categories). The distractor set
+   of a template contains **at most one model per look-alike group** and no exact duplicates: no distractor is a
+   look-alike of the target, and no two distractors are look-alikes of each other (a look-alike group counts as one
+   candidate when the set is drawn). An empty pool for the requested kind is not a fallback case: the alias fixes the
+   distractor categories, so `ground_isg` only grounds category combinations whose pools are non-empty after the
+   exclusions.
 2. **Same-category or look-alike target–partner pairs** (IORS nextto / touching / ontop, e.g. salt shaker – pepper
    shaker, teacup – teapot): a pair whose two models share a look-alike group is rejected (the instruction would be
    ambiguous); a same-category pair of distinguishable models is allowed, and both objects get a spatial descriptor in
@@ -981,7 +983,8 @@ cartesian product of category lists: only correlated pairs from `pairs.csv` are 
 `ground_isg` already produced the representative template (its pair is removed from the pool). Model draw: iterate
 over all whitelisted models before reusing one (exact duplicates count as one model, texture variants as distinct
 models, section 3.12); unique models within a template (blocks excepted, `same_model`); disembedding distractors from
-the pools of the target's category minus the target's look-alike group; look-alike target–partner pairs rejected. Each template: full
+the pools of the target's category minus the target's look-alike group, at most one model per look-alike group in the
+set; look-alike target–partner pairs rejected. Each template: full
 initialization → instance 0; failure → the model(s) responsible move to the blacklist (reason recorded); every
 success appends constraints (stance, grasp_set, joint_set, placement, contacts) with `source`.
 
