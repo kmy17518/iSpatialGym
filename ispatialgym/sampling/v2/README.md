@@ -121,8 +121,10 @@ phase2_manipulation_stance(s, init: Stance, target_half_extent: float) -> list[S
 phase3_target(s, manip: Stance, rng, grasps, hull, rest_quat, ignore_for_grasp) -> (obj_pose, GraspRecord)   # §4.6 step 1 (F at the focus, exact IK)
 ```
 
-`iors_small.py` draws the manipulation stance uniformly among the Phase-2 survivors and checks the §4.5 step 5 transition itself.
-Until `tabletop.py` exists, `iors_small._TabletopTemp` is a TEMP stand-in with these signatures (deleted when tabletop lands).
+`iors_small.py` draws the manipulation stance uniformly among the Phase-2 survivors and checks the §4.5 step 5 transition itself;
+it also calls `tabletop.edge_candidates` (per-edge retry when Phase 1c rejects an edge), `library_grasps`, `place_partner`,
+`brace_second_arm`, `in_frame` / `hull_corners_world` / `height_of` / `half_extent` / `hull_extents`. The TEMP stand-in is gone
+(tabletop landed in `957c767`); `iors_small._tabletop()` remains as the accessor `iors_large` imports.
 
 ### Sidecar semantics the task modules must keep (F6 programs read them)
 
@@ -140,22 +142,27 @@ Until `tabletop.py` exists, `iors_small._TabletopTemp` is a TEMP stand-in with t
 
 ## Status (D2 / D4, 2026-09-15) and gaps
 
-Implemented: §2.3 customs reading + write-back (`problem.py`), §9 model draw and `sample_isg` / `multiply_isg` (`iter_template_choices`,
-whitelist pruning, `SAMPLING_REPORT`, `summary.json`), §1 artefact layout, §3.2 placement helpers (v1 `SupportTop`, 2 cm margin, rest
-quaternion, 3 mm drop), §3.3 untucked posture / trunk grid / **parking rule**, §3.4 frustum test (5 %), §3.5 pipeline (settle,
-BEHAVIOR validation, goal feasibility with the robot parked, **program check** through `oracle.programs.expand` with the F6 draft —
-structural stub when the module is absent or `ISG_PROGRAM_CHECK=stub`), predicate-cache handling (v1), report layout, §3.6 IK
-conventions (`ik.py`), §3.7 paths (`navigation.plan_path`), §3.8 transitions (`navigation.transition`), §3.9 waypoint policy +
-eef-in-frame, §3.10 exact-IK and feasible-set caches keyed with the spawn scale, §3.11 / §7 sidecar draft, §6.11 rules in
-`tasks/iors_small.py`.
+Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,
+orientation_equivalences, scale, joint}`, per-scene whitelists / blacklists, `generation`, `constraints`), §9 model draw and
+`sample_isg` / `multiply_isg` (`iter_template_choices`, whitelist pruning after a failed template, `SAMPLING_REPORT`, `summary.json`),
+§1 artefact layout, §3.2 placement helpers (v1 `SupportTop`, 2 cm margin, rest quaternion, 3 mm drop), §3.3 untucked posture /
+trunk grid / **parking rule** (`navigation.park_pose`), §3.4 frustum test (5 %), §3.5 pipeline (settle, BEHAVIOR validation, goal
+feasibility with the robot parked, **§4.6 step 5** whole-body check of every recorded stance with the objects placed + transitions
+re-swept, **program check** through `oracle.programs.expand` (F6) with stance / carried-object tracking; `ISG_PROGRAM_CHECK=stub`
+keeps the structural check only), predicate-cache handling (v1), report layout (rejections per reason with the first three examples),
+§3.6 IK conventions (`ik.py`, forwarding to `robot.conventions` F5), §3.7 paths (`navigation.plan_path`), §3.8 transitions
+(`navigation.transition`, both endpoints swept), §3.9 waypoint policy + eef-in-frame, §3.10 exact-IK and feasible-set caches keyed
+with the spawn scale, §3.11 / §7 sidecar draft (F6-compatible dicts), §3.13 `orientation_equivalences` into `pose_targets`
+(`customs.equivalence_group`), §6.11 rules in `tasks/iors_small.py` (pair admissibility tiers, gap rule, goal per relation, place IK
+with the object attached, inside protrusion test, touching push + brace, `grasp_set` / `placement` / `band_ref` / `stance` records).
 
-Not implemented yet (owner / item): §3.5 **reload validation** in a fresh process and the contact sheet (D5 `validate_instances.py`
-— `core` writes everything it needs, nothing re-loads yet); §3.10 reach-volume / reach-band loading (B3 cache, consumed by
-`tabletop.py` / `prompt0.py`); §3.12 look-alike index reads `constraints_conflicting.csv` + `representatives.csv` (`exact_group` /
-`geometry_group`) — `candidates.csv` has no `duplicate_of` / `geometry_group` columns yet (A6); §3.13 `orientation_equivalences`
-are looked up through `customs.equivalence_group` (D1) and not yet written into `pose_targets` by `iors_small`; §4.3 / §4.4 / §4.5
-exact numbers (Δ solve from the FK tables, margin table with λ from the band extent and R_img, continuous tilt) are `tabletop.py`'s
-— the TEMP stand-in uses trunk (0.5, 0) at init, |λ| = 0.10, D_p ≤ 0.25 and the grid tilts; §4.6 step 5 (whole-body check at both
-stances *with the objects placed*) is done implicitly by the settle + exact IK, not as its own batched check; §6.11 inside drop
-test and the `does_not_fit_inside` protrusion rule are approximated by the footprint test; camera-relocalization path buckets are
-plumbed (`generation.path_buckets`, `--path-buckets`) but no task module fills them yet.
+Not implemented yet (owner / item): §3.5 **reload validation** in a fresh process and the contact sheet (D5 `validate_instances.py` —
+`core` writes everything it needs; the v1 validator still loads the artefacts because `template_meta.problem` stays
+`<activity>-<def_id>` and the BDDL is also written inside the template directory); §3.12 the look-alike index reads
+`constraints_conflicting.csv` + `representatives.csv` (`exact_group` / `geometry_group`) — `candidates.csv` has no `duplicate_of` /
+`geometry_group` columns yet (A6), so texture variants outside the representatives sheet are not recognised; §6.11 inside: the drop
+test is the goal-feasibility settle + the protrusion rule, the fillable-volume centroid comes from the container meta link (no
+opening-shape test beyond the footprint); §3.8 the sweep samples both endpoints (6 configurations with F5's `trunk_sweep(endpoints=
+True)` semantics; spec says "5 samples between"); the carry height of IORS is `max(0.12, partner height + 0.03)` (no rule in §6.11
+— flagged for the spec); camera-relocalization path buckets are plumbed (`generation.path_buckets`, `--path-buckets`,
+`sidecar.path_bucket_m`) and filled by the camera-relocalization module, not by core.
