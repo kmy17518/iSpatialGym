@@ -1,0 +1,1 @@
+{"key": "cheesecake__epmobi", "category": "cheesecake", "model": "epmobi", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.056602070671127575, "p95": 0.13856209150326798, "p99": 0.16732026143790849, "mad_union": 0.14645333416194317, "iou": 0.8652771052515738, "worst": "x180"}}, "render_s": 0.107}

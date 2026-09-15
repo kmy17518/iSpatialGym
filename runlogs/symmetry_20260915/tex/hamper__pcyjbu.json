@@ -1,0 +1,1 @@
+{"key": "hamper__pcyjbu", "category": "hamper", "model": "pcyjbu", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.006777891844672179, "p95": 0.01568627450980392, "p99": 0.040522875816993466, "mad_union": 0.006947201497990935, "iou": 0.9996897134664355, "worst": "z180"}}, "render_s": 0.099}

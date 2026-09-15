@@ -1,0 +1,1 @@
+{"key": "letter__dyvllf", "category": "letter", "model": "dyvllf", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.03150459245447974, "p95": 0.08758169934640522, "p99": 0.12287581699346405, "mad_union": 0.045927400048764055, "iou": 0.9732726309385977, "worst": "z180"}}, "render_s": 0.113}

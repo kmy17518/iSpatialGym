@@ -1,0 +1,1 @@
+{"key": "pickle__rxuimv", "category": "pickle", "model": "rxuimv", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.055817191073960444, "p95": 0.10196078431372549, "p99": 0.12549019607843137, "mad_union": 0.1269063834553403, "iou": 0.9070814162832567, "worst": "z180"}}, "render_s": 0.104}

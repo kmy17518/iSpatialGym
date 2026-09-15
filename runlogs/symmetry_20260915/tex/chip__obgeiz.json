@@ -1,0 +1,1 @@
+{"key": "chip__obgeiz", "category": "chip", "model": "obgeiz", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.008625185730829241, "p95": 0.02091503267973856, "p99": 0.02875816993464052, "mad_union": 0.008678541910063316, "iou": 0.9994463071764742, "worst": "z180"}}, "render_s": 0.118}

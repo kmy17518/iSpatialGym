@@ -1,0 +1,1 @@
+{"key": "bottle_of_shampoo__hlkpwd", "category": "bottle_of_shampoo", "model": "hlkpwd", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.02446514232894458, "p95": 0.07450980392156863, "p99": 0.1568627450980392, "mad_union": 0.11477085593147113, "iou": 0.858843537414966, "worst": "z180"}}, "render_s": 0.11}

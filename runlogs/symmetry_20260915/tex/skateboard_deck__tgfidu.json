@@ -1,0 +1,1 @@
+{"key": "skateboard_deck__tgfidu", "category": "skateboard_deck", "model": "tgfidu", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.018711248039613732, "p95": 0.11372549019607843, "p99": 0.1709281045751613, "mad_union": 0.14345938597555474, "iou": 0.8471759479612883, "worst": "z180"}}, "render_s": 0.124}

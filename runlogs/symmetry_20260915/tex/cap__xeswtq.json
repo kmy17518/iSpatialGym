@@ -1,0 +1,1 @@
+{"key": "cap__xeswtq", "category": "cap", "model": "xeswtq", "scale": null, "n_glass": 1, "glass_only": true, "n_textured": 0, "base": {"z2": {"mad": 3.3890099249576373e-06, "p95": 0.0, "p99": 0.0, "mad_union": 1.0264143019471902e-05, "iou": 0.9999100908082836, "worst": "z180"}}, "render_s": 0.098}

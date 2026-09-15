@@ -1,0 +1,1 @@
+{"key": "bottle_of_dish_soap__bnmixt", "category": "bottle_of_dish_soap", "model": "bnmixt", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.007461650781425499, "p95": 0.05228758169934641, "p99": 0.11503267973856209, "mad_union": 0.007754940813842049, "iou": 0.9991743725231176, "worst": "z180"}}, "render_s": 0.146}

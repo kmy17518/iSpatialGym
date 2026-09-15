@@ -1,0 +1,1 @@
+{"key": "boxed_ink_cartridge__oinelo", "category": "boxed_ink_cartridge", "model": "oinelo", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.12016711586677112, "p95": 0.2366013071895425, "p99": 0.2549019607843137, "mad_union": 0.23724255748212966, "iou": 0.8176088154269973, "worst": "z180"}}, "render_s": 0.11}

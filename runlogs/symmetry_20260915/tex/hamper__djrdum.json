@@ -1,0 +1,1 @@
+{"key": "hamper__djrdum", "category": "hamper", "model": "djrdum", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.044071119505399686, "p95": 0.23921568627450981, "p99": 0.3568627450980392, "mad_union": 0.4165522656810582, "iou": 0.42502335404735797, "worst": "z180"}}, "render_s": 0.145}

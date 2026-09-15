@@ -1,0 +1,1 @@
+{"key": "coffee_cup__ykuftq", "category": "coffee_cup", "model": "ykuftq", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.0055340612964272975, "p95": 0.032679738562091505, "p99": 0.09673202614379085, "mad_union": 0.0897664071752597, "iou": 0.8593115451556759, "worst": "x180"}}, "render_s": 0.117}

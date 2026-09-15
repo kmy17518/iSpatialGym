@@ -1,0 +1,1 @@
+{"key": "hamper__wqxrbf", "category": "hamper", "model": "wqxrbf", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.009619939806096956, "p95": 0.02091503267973856, "p99": 0.030065359477124184, "mad_union": 0.009613169996629069, "iou": 0.9999470153761378, "worst": "z180"}}, "render_s": 0.1}

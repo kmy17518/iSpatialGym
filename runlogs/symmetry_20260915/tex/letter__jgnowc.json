@@ -1,0 +1,1 @@
+{"key": "letter__jgnowc", "category": "letter", "model": "jgnowc", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.03497566411574949, "p95": 0.08235294117647059, "p99": 0.10980392156862745, "mad_union": 0.12782942551015225, "iou": 0.862122942064749, "worst": "z180"}}, "render_s": 0.106}

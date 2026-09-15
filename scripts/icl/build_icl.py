@@ -15,7 +15,9 @@ Inputs (all committed under ``runlogs/``):
   (B6; the sheet is header-only until they exist),
 * ``runlogs/table_selection_20260911/inventory.csv`` - geometry of every work surface / big partner in the 7 scenes,
 * ``runlogs/world_alignment_selection_20260911/wall_candidates.json`` - the 78 validated wall regions,
-* ``ispatialgym/assets/task_specs/task_custom_lists.json`` - the v1 test pins and the look-alike groups.
+* ``ispatialgym/assets/task_specs/task_custom_lists.json`` - the v1 test pins and the look-alike groups,
+* ``runlogs/symmetry_<date>/symmetry.json`` (``--symmetry``) - the rotational-symmetry survey (geometry + texture,
+  ``scripts/symmetry/survey_symmetry.py``) -> ``symmetry`` / ``symmetry_near`` columns of ``roles/candidates.csv``.
 
 Outputs (``ispatialgym/assets/icl/``, schema in its ``README.md``):
 
@@ -34,7 +36,7 @@ combinations from the marks and ``constraints_compatible.csv``).
 Run inside the ``ispatialgym`` conda env (BDDL knowledge base for synsets / bounding boxes / readiness; graceful
 degradation without it)::
 
-    python scripts/icl/build_icl.py [--out ispatialgym/assets/icl]
+    python scripts/icl/build_icl.py [--out ispatialgym/assets/icl] [--symmetry runlogs/symmetry_<date>/symmetry.json]
 """
 
 from __future__ import annotations
@@ -58,6 +60,7 @@ WALLS = os.path.join(REPO, "runlogs", "world_alignment_selection_20260911", "wal
 SPEC = os.path.join(REPO, "ispatialgym", "assets", "task_specs", "task_custom_lists.json")
 SCENE_INVENTORY = os.path.join(REPO, "runlogs", "scene_inventory_20260915")
 CONTACTS_GLOB = os.path.join(REPO, "runlogs", "contacts_*")
+SYMMETRY_DEFAULT = os.path.join(REPO, "runlogs", "symmetry_20260915", "symmetry.json")
 sys.path.insert(0, REPO)
 
 try:  # knowledge base (synsets, bboxes, readiness); optional
@@ -85,7 +88,7 @@ TEST_SUPPORT = ("house_single_floor", "breakfast_table_rhjoby_0")
 
 ROLE_COLUMNS = ["subtask", "role", "kind", "category", "model", "display_name", "synset", "scene", "room", "representative", "test",
                 "rank", "source_selection", "status", "grasp_key", "scale", "bbox_x", "bbox_y", "bbox_z", "natural_scenes",
-                "frame_front", "frame_up", "frame_level", "frame_long", "symmetric_180", "joint", "handle_key", "handle_kind",
+                "frame_front", "frame_up", "frame_level", "frame_long", "symmetric_180", "symmetry", "symmetry_near", "joint", "handle_key", "handle_kind",
                 "handle_annotated", "instance_scale", "region_id", "p0", "p1", "normal", "hang_z", "length_m", "max_object_m",
                 "top_z", "world_ext_x", "world_ext_y", "pos_x", "pos_y", "yaw_deg", "dataset", "ready", "note", "source"]
 # roles.csv `kind`: how ground_isg grounds the role (the iddl files carry no role declarations)
@@ -749,6 +752,33 @@ class Builder:
                             "shape_class": c.get("shape_class", ""), "scale": json.dumps(d.get("scale")) if d.get("scale") else ""})
         return out
 
+    # -- rotational symmetry (survey runlog)
+    def apply_symmetry(self, path: Optional[str]) -> Dict[str, int]:
+        """``symmetry`` / ``symmetry_near`` of every sampleable / group candidate from ``symmetry.json`` of
+        ``scripts/symmetry/survey_symmetry.py`` (comma-separated generator tags ``x2 y2 z2 x4 y4 z4 z3 z5 z6 xinf yinf
+        zinf full``; ``none`` = surveyed and asymmetric / nothing to review; empty = not surveyed). A row whose grasp-tested
+        ``scale`` matches the surveyed scale gets the scaled variant's verdict (a non-uniform scale can break a symmetry).
+        ``symmetric_180`` (reviewer column of the alignment targets) is kept untouched; the disagreements are listed in
+        the survey's ``report.md``."""
+        stats = {"surveyed": 0, "scaled": 0, "not_surveyed": 0}
+        if not path or not os.path.exists(path):
+            return stats
+        sym = json.load(open(path))
+        for r in self.roles:
+            if r["kind"] not in (KIND_SAMPLEABLE, KIND_GROUP) or not r["model"]:
+                continue
+            rec = sym.get(f"{r['category']}__{r['model']}")
+            if rec is None:
+                stats["not_surveyed"] += 1
+                continue
+            tags, near = rec.get("symmetry") or ["none"], rec.get("symmetry_near") or []
+            if r["scale"] and rec.get("symmetry_scaled") and rec.get("scale") == json.loads(r["scale"]):
+                tags, near = rec["symmetry_scaled"] or ["none"], rec.get("symmetry_near_scaled") or []
+                stats["scaled"] += 1
+            r["symmetry"], r["symmetry_near"] = ",".join(tags), ",".join(near) if near else "none"
+            stats["surveyed"] += 1
+        return stats
+
     def build_lookalikes(self) -> List[dict]:
         out = []
         groups = (self.spec.get("disembedding-0", {}).get("distractors", {}) or {}).get("lookalike_groups", [])
@@ -778,7 +808,7 @@ class Builder:
             if os.path.isdir(target):
                 os.symlink(os.path.relpath(target, lib_dir), link)
 
-    def run(self, out_dir: str):
+    def run(self, out_dir: str, symmetry: Optional[str] = None):
         self.build_camera_relocalization()
         self.build_held()
         self.build_disembedding()
@@ -789,6 +819,7 @@ class Builder:
         self.build_iors()
         n_sup = self.build_supports()
         self.mark_pins()
+        sym_stats = self.apply_symmetry(symmetry)
         grasps = self.build_grasps()
         handles = self.build_handles()
         contacts = self.build_contacts()
@@ -814,6 +845,15 @@ class Builder:
               f"representative rows: {sum(r['representative'] == '1' for r in self.roles)}, test rows: {sum(r['test'] == '1' for r in self.roles)}")
         for (st, role), n in sorted(by.items()):
             print(f"  {st:58s} {role:12s} {n}")
+        if symmetry and os.path.exists(symmetry):
+            unsurveyed = collections.Counter((r["subtask"], r["role"]) for r in self.roles
+                                             if r["kind"] in (KIND_SAMPLEABLE, KIND_GROUP) and r["model"] and not r["symmetry"])
+            print(f"symmetry ({os.path.relpath(symmetry, REPO)}): {sym_stats['surveyed']} candidate rows with symmetry / symmetry_near "
+                  f"({sym_stats['scaled']} at the grasp-tested scale), {sym_stats['not_surveyed']} sampleable/group rows not surveyed: "
+                  + ", ".join(f"{st}/{role} {n}" for (st, role), n in sorted(unsurveyed.items())))
+            print(f"  symmetry values: {collections.Counter(r['symmetry'] for r in self.roles if r['symmetry']).most_common(12)}")
+        else:
+            print("symmetry: no survey file given / found -> symmetry / symmetry_near columns left empty")
         print(f"roles/constraints_compatible.csv: {len(self.pairs)} rows ({collections.Counter(p['relation'] for p in self.pairs)})")
         print(f"roles/constraints_conflicting.csv: {len(lookalikes)} rows")
         print(f"require/grasps.csv: {len(grasps)} rows from {len(self.keys_used)} keys ({collections.Counter(g['require'] for g in grasps)})")
@@ -825,8 +865,10 @@ class Builder:
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", default=os.path.join(REPO, "ispatialgym", "assets", "icl"))
+    ap.add_argument("--symmetry", default=SYMMETRY_DEFAULT if os.path.exists(SYMMETRY_DEFAULT) else None,
+                    help="symmetry.json of scripts/symmetry/survey_symmetry.py (default: the latest committed survey runlog if it exists)")
     args = ap.parse_args()
-    Builder().run(args.out)
+    Builder().run(args.out, symmetry=args.symmetry)
 
 
 if __name__ == "__main__":

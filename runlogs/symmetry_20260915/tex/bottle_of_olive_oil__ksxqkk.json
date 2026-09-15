@@ -1,0 +1,1 @@
+{"key": "bottle_of_olive_oil__ksxqkk", "category": "bottle_of_olive_oil", "model": "ksxqkk", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.0079820045081929, "p95": 0.05751633986928104, "p99": 0.10411764705882544, "mad_union": 0.2369548345858958, "iou": 0.7101847400590618, "worst": "z180"}}, "render_s": 0.114}

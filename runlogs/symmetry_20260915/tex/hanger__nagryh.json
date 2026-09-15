@@ -1,0 +1,1 @@
+{"key": "hanger__nagryh", "category": "hanger", "model": "nagryh", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.016499364890232796, "p95": 0.05228758169934641, "p99": 0.1830065359477124, "mad_union": 0.16866602324840868, "iou": 0.7651933701657458, "worst": "x180"}}, "render_s": 0.109}

@@ -1,0 +1,1 @@
+{"key": "hanger__agrpio", "category": "hanger", "model": "agrpio", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.014959507798882608, "p95": 0.05620915032679739, "p99": 0.20416993464052235, "mad_union": 0.23168895154285388, "iou": 0.6969498910675381, "worst": "x180"}}, "render_s": 0.104}

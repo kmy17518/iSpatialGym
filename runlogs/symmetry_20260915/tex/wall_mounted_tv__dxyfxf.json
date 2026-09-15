@@ -1,0 +1,1 @@
+{"key": "wall_mounted_tv__dxyfxf", "category": "wall_mounted_tv", "model": "dxyfxf", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"x2": {"mad": 0.0048022448665621656, "p95": 0.01568627450980392, "p99": 0.11764705882352941, "mad_union": 0.22432695439535386, "iou": 0.7533605928954766, "worst": "x180"}}, "render_s": 0.122}

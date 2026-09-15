@@ -1,0 +1,1 @@
+{"key": "paper_towel_dispenser__lahuhb", "category": "paper_towel_dispenser", "model": "lahuhb", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.11591677479404362, "p95": 0.17647058823529413, "p99": 0.17647058823529413, "mad_union": 0.1740974827771594, "iou": 0.8959726512130026, "worst": "z180"}}, "render_s": 0.112}

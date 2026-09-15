@@ -1,0 +1,1 @@
+{"key": "tray__hbjdlb", "category": "tray", "model": "hbjdlb", "scale": null, "n_glass": 0, "glass_only": false, "n_textured": 1, "base": {"z2": {"mad": 0.05847802421316873, "p95": 0.15947712418300652, "p99": 0.2875816993464052, "mad_union": 0.10595409845466645, "iou": 0.8933765676410281, "worst": "z180"}}, "render_s": 0.122}

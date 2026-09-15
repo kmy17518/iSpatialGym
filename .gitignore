@@ -57,3 +57,5 @@ runlogs/runpod/
 # scene inventory renders (review material, regenerable with --parts renders)
 runlogs/scene_inventory_*/**/renders/
 runlogs/scene_inventory_*/**/strips/
+# symmetry survey contact sheets: small JPEGs (<= 100 KB each) kept for the review round
+!runlogs/symmetry_*/renders/*.jpg
