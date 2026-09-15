@@ -375,15 +375,24 @@ class Monitors:
         return name
 
     def _check_collision(self) -> Optional[Verdict]:
-        own_prefixes = [self.robot.prim_path + "/"] + [o.prim_path + "/" for o in self.held]
+        robot_prefix = self.robot.prim_path + "/"
+        held_prefixes = [o.prim_path + "/" for o in self.held]
+        own_prefixes = [robot_prefix] + held_prefixes
         seen: Counter = Counter()
         for own, other in self._contact_pairs():
             if any(other.startswith(p) for p in own_prefixes):
-                continue
+                continue  # robot / held object against itself
+            if own.startswith(robot_prefix):
+                own_link = own.rsplit("/", 1)[1]
+            elif any(own.startswith(p) for p in held_prefixes):
+                if self.manipulation:
+                    continue  # a held object touching the world is what manipulation is (placing, pushing with it)
+                own_link = "held:" + own.rsplit("/", 1)[1]
+            else:
+                continue  # not one of our bodies
             name = self._object_of(other)
             if name is None or name in self.intended:
                 continue
-            own_link = own.rsplit("/", 1)[1]
             if own_link in self.exempt_links:
                 continue
             seen[(own_link, name)] += 1
