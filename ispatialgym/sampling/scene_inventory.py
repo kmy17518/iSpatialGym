@@ -1027,7 +1027,8 @@ def main():
     if "renders" in parts:
         inv.rerender_artic(only=args.only)
     inv.summary["total_s"] = round(time.time() - t0, 1)
-    inv.write_summary()
+    if parts & {"artic", "supports", "partners"}:  # a renders-only pass must not overwrite the measurement summary
+        inv.write_summary()
     print(json.dumps({"scene": args.scene, "artic": len(inv.summary["artic"]), "supports": len(inv.summary["supports"]), "partners": len(inv.summary["partners"]),
                       "load_s": inv.summary["load_s"], "total_s": inv.summary["total_s"], "out": inv.out}), flush=True)
     import omnigibson as og
