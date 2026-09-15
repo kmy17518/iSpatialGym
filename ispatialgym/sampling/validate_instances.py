@@ -84,7 +84,7 @@ def validate_template(template_dir: str, extra_steps: int, check_goal: bool, pos
         "robots": [
             M.joylo_robot_config(
                 "robot_r1",
-                obs_modalities=["rgb"],  # no seg_instance: Isaac 5.1 synthetic-data graph crashes with the neighbouring rooms in view
+                obs_modalities=["rgb"],  # validation renders contact sheets only; seg reads live in SimWorld (B10: showLights=0 guard)
                 sensor_config={"VisionSensor": {"sensor_kwargs": {"image_height": IMAGE_SIZE, "image_width": IMAGE_SIZE}}},
                 position=PARK_POSITION.tolist(),
             )
