@@ -199,10 +199,11 @@ def texture_variant(renderer, meshes, g: dict, tags: List[str]) -> Tuple[Dict[st
     return scores, base, imgs
 
 
-def sheet_rows(g: dict, tex: Dict[str, dict]) -> List[str]:
-    """Tags shown on the contact sheet: the reduced exact + near sets plus every texture-borderline tag, <= SHEET_MAX_ROWS."""
+def sheet_rows(g: dict, tex: Dict[str, dict], first: List[str] = ()) -> List[str]:
+    """Tags shown on the contact sheet: ``first`` (tags a review asks for), then the reduced exact + near sets, every
+    texture-borderline tag, then the other rendered tags, <= SHEET_MAX_ROWS."""
     ex, nr = S.classify_geom(g["tags"])
-    show = S.reduce_tags(ex) + [t for t in S.reduce_tags(nr) if t not in ex]
+    show = list(first) + [t for t in S.reduce_tags(ex) if t not in first] + [t for t in S.reduce_tags(nr) if t not in ex and t not in first]
     for t in tex:
         if t not in show and S.classify_tex(tex[t]) == "borderline":
             show.append(t)
@@ -244,13 +245,18 @@ def write_sheet(path: str, title: str, base_imgs, rows: List[tuple]):
             break
 
 
-def texture_one(entry: dict, geom_rec: dict, renderer, out_dir: str, renders_dir: str, force: bool = False) -> str:
+def texture_one(entry: dict, geom_rec: dict, renderer, out_dir: str, renders_dir: str, force: bool = False,
+                extra_tags: Optional[Dict[str, List[str]]] = None) -> str:
+    """Texture scores + contact sheet of one model. ``extra_tags`` = {"base" | "scaled": [tags]} a review round asks
+    for: rendered even when they are no geometric candidate, shown first on the sheet, and the sheet is written even
+    for a model without a geometric candidate."""
     key = entry["key"]
     path = os.path.join(out_dir, key + ".json")
     if os.path.exists(path) and not force:
         return "skip"
+    extra_tags = extra_tags or {}
     variants = [(v, geom_rec[v]) for v in ("base", "scaled") if geom_rec.get(v)]
-    todo = [(v, g, candidate_tags(g["tags"])) for v, g in variants]
+    todo = [(v, g, [t for t in S.TAG_ORDER if t in set(candidate_tags(g["tags"])) | set(extra_tags.get(v, []))]) for v, g in variants]
     todo = [(v, g, tags) for v, g, tags in todo if tags]
     if not todo:
         return "nocand"
@@ -279,12 +285,13 @@ def texture_one(entry: dict, geom_rec: dict, renderer, out_dir: str, renders_dir
             scores, base_imgs, imgs = texture_variant(renderer, ms, g, tags)
             rec[v] = scores
             sheet = os.path.join(renders_dir, key + ("" if v == "base" else "__scaled") + ".jpg")
-            if not any(S.classify_geom(g["tags"])):  # scores kept (re-tuning), but no review sheet without a geometric candidate
+            forced = [t for t in extra_tags.get(v, []) if t in scores]
+            if not any(S.classify_geom(g["tags"])) and not forced:  # scores kept (re-tuning), but no review sheet without a geometric candidate
                 if os.path.exists(sheet):
                     os.remove(sheet)
                 continue
             rows = []
-            for t in sheet_rows(g, scores):
+            for t in sheet_rows(g, scores, first=forced):
                 gs, ts = g["tags"][t], scores[t]
                 lines = [f"{t}  ({ts['worst']}) {S.classify_tex(ts)}",
                          f"geom mean {gs['mean'] * 100:.2f}% p95 {gs['p95'] * 100:.2f}%",
@@ -312,6 +319,10 @@ def stage_texture(args):
     if args.shard:
         k, n = (int(v) for v in args.shard.split("/"))
         models = [m for i, m in enumerate(models) if i % n == k]
+    extra: Dict[str, Dict[str, List[str]]] = {}
+    if args.tags_file:  # {"<key>": {"base": [tags], "scaled": [tags]}} - render these, sheet them first
+        extra = json.load(open(args.tags_file))
+        models = [m for m in models if m["key"] in extra]
     geom_dir, out_dir, renders_dir = os.path.join(args.out, "geom"), os.path.join(args.out, "tex"), os.path.join(args.out, "renders")
     os.makedirs(out_dir, exist_ok=True)
     os.makedirs(renders_dir, exist_ok=True)
@@ -327,7 +338,7 @@ def stage_texture(args):
         if "error" in g:
             counts["geomerror"] += 1
             continue
-        status = texture_one(m, g, renderer, out_dir, renders_dir, args.force)
+        status = texture_one(m, g, renderer, out_dir, renders_dir, args.force or bool(extra), extra.get(m["key"]))
         counts[status] += 1
         if status == "error":
             print(f"FAILED {m['key']}", flush=True)
@@ -391,6 +402,34 @@ def most_common_tags(verdicts: List[List[str]]) -> str:
     return ", ".join(f"`{k}` x{n}" for k, n in c.most_common(3))
 
 
+def alignment_half_turns(icl: List[dict], out: Dict[str, dict]) -> List[dict]:
+    """Every alignment target row with the half turn that matters for its subtask (the wall normal = ``frame_front`` for
+    the wall subtasks, the vertical = ``frame_up`` / canonical z for ``alignment-axial``): ``tag`` (``x2`` ...),
+    ``axis_note``, the reviewer's ``symmetric_180`` flag, whether the survey has the half turn in ``symmetry`` (``has``)
+    or in ``symmetry_near`` (``near``), and ``disagree`` = flag != has."""
+    rows = []
+    for r in icl:
+        if not (r["subtask"].startswith("alignment") and r["role"] == "target"):
+            continue
+        rec = out.get(key_of(r["category"], r["model"]))
+        if rec is None:
+            continue
+        if r["subtask"] == "alignment-axial":
+            axis_src = r.get("frame_up") or "+z"
+            axis_note = f"{axis_src} (up)"
+        else:
+            axis_src = r.get("frame_front") or "+x"
+            axis_note = f"{axis_src} (front)"
+        tag = f"{axis_src[-1]}2"
+        has = tag in S.expand_tags(rec["symmetry"])
+        near = tag in S.expand_tags(rec["symmetry_near"]) or tag in rec["symmetry_near"]
+        flag = r.get("symmetric_180") == "1"
+        rows.append({"subtask": r["subtask"], "category": r["category"], "model": r["model"], "key": key_of(r["category"], r["model"]),
+                     "tag": tag, "axis_note": axis_note, "symmetric_180": r.get("symmetric_180") or "", "flag": flag, "has": has, "near": near,
+                     "disagree": has != flag})
+    return rows
+
+
 def stage_report(args):
     models = load_models(args, full=True)
     icl = list(csv.DictReader(open(args.icl)))
@@ -415,7 +454,7 @@ def stage_report(args):
         if g.get("scaled"):
             sc = classify_model(g["scaled"], tex.get("scaled"))
             rec["symmetry_scaled"], rec["symmetry_near_scaled"] = sc["symmetry"], sc["symmetry_near"]
-            rec["scaled"] = {k: sc[k] for k in ("geom_exact", "geom_near", "texture_preserved", "scores", "bbox")}
+            rec["scaled"] = {k: sc[k] for k in ("geom_exact", "geom_near", "texture_preserved", "scores", "bbox", "geom_exact_raw", "geom_near_raw")}
         else:
             rec["symmetry_scaled"], rec["symmetry_near_scaled"] = None, None
         rec["n_faces"], rec["n_meshes"] = g.get("n_faces"), g.get("n_meshes")
@@ -490,27 +529,13 @@ def stage_report(args):
     L.append("| subtask | category | model | half-turn axis | `symmetric_180` | survey half turn | survey `symmetry` | `symmetry_near` |\n|---|---|---|---|---|---|---|---|")
     n_dis = 0
     n_dis_flagged = 0
-    for r in icl:
-        if not (r["subtask"].startswith("alignment") and r["role"] == "target"):
-            continue
-        rec = out.get(key_of(r["category"], r["model"]))
-        if rec is None:
-            continue
-        if r["subtask"] == "alignment-axial":
-            axis_src = r.get("frame_up") or "+z"
-            axis_note = f"{axis_src} (up)"
-        else:
-            axis_src = r.get("frame_front") or "+x"
-            axis_note = f"{axis_src} (front)"
-        tag = f"{axis_src[-1]}2"
-        has = tag in S.expand_tags(rec["symmetry"])
-        near = tag in S.expand_tags(rec["symmetry_near"]) or tag in rec["symmetry_near"]
-        flag = r.get("symmetric_180") == "1"
-        if has != flag:
+    for h in alignment_half_turns(icl, out):
+        if h["disagree"]:
+            rec = out[h["key"]]
             n_dis += 1
-            n_dis_flagged += int(flag)
-            L.append(f"| {r['subtask']} | {r['category']} | {r['model']} | {axis_note} | {r.get('symmetric_180') or '-'} | "
-                     f"{'yes' if has else ('near' if near else 'no')} | `{' '.join(rec['symmetry'])}` | `{' '.join(rec['symmetry_near']) or '-'}` |")
+            n_dis_flagged += int(h["flag"])
+            L.append(f"| {h['subtask']} | {h['category']} | {h['model']} | {h['axis_note']} | {h['symmetric_180'] or '-'} | "
+                     f"{'yes' if h['has'] else ('near' if h['near'] else 'no')} | `{' '.join(rec['symmetry'])}` | `{' '.join(rec['symmetry_near']) or '-'}` |")
     L.append(f"\n{n_dis} alignment-target rows disagree ({n_dis_flagged} flagged `symmetric_180 = 1` without a confirmed survey half turn, "
              f"{n_dis - n_dis_flagged} with a survey half turn the sheet does not record).\n")
     # failures / review
@@ -558,6 +583,9 @@ def main():
     ap.add_argument("--only", default=None, help="comma separated category or category/model filters")
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--shard", default=None, help="texture stage: K/N (this process renders every N-th model starting at K)")
+    ap.add_argument("--tags-file", default=None,
+                    help="texture stage: json {key: {base: [tags], scaled: [tags]}} of extra rotations to render and to put first on the "
+                         "sheet (review round); only these models are (re-)rendered")
     ap.add_argument("--size", type=int, default=192)
     args = ap.parse_args()
     {"models": stage_models, "geom": stage_geom, "texture": stage_texture, "report": stage_report}[args.stage](args)

@@ -1,0 +1,1095 @@
+{
+ "batch_id": "rev_00",
+ "contract": "runlogs/symmetry_20260915/review_contract.md",
+ "output": "runlogs/symmetry_20260915/review/rev_00.json",
+ "n_models": 29,
+ "n_candidates": 37,
+ "models": [
+  {
+   "key": "address__pbfbxj",
+   "category": "address",
+   "model": "pbfbxj",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/address__pbfbxj.jpg",
+   "bbox_m": [
+    0.03603,
+    0.57714,
+    0.16091
+   ],
+   "n_faces": 1112,
+   "uses": [
+    "alignment-world_horizontal/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "x2",
+     "y2"
+    ]
+   },
+   "candidates": {
+    "x2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.21 %, p95 0.89 %, frac2 0.6 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x180",
+     "survey_texture": "borderline (MAD 5.6, p95 20.7, p99 30 /255 on the fully covered pixels; union-mask MAD 14.9, silhouette IoU 0.952)",
+     "sheet_row": "x2  (x180)"
+    },
+    "y2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.84 %, p95 1.62 %, frac2 0.8 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "y180",
+     "survey_texture": "borderline (MAD 7.7, p95 25.0, p99 32 /255 on the fully covered pixels; union-mask MAD 29.5, silhouette IoU 0.890)",
+     "sheet_row": "y2  (y180)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "apple__agveuv",
+   "category": "apple",
+   "model": "agveuv",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/apple__agveuv.jpg",
+   "bbox_m": [
+    0.08722,
+    0.07437,
+    0.07435
+   ],
+   "n_faces": 2201,
+   "uses": [
+    "object_scaling/target",
+    "inter_object_relation_satisfaction-ontop_small_scale/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "x5",
+     "x6"
+    ]
+   },
+   "candidates": {
+    "x5": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.43 %, p95 1.53 %, frac2 2.9 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x72",
+     "survey_texture": "borderline (MAD 4.2, p95 10.7, p99 21 /255 on the fully covered pixels; union-mask MAD 9.5, silhouette IoU 0.969)",
+     "sheet_row": "x5  (x72)"
+    },
+    "x6": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.37 %, p95 1.31 %, frac2 1.7 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x60",
+     "survey_texture": "borderline (MAD 4.6, p95 11.7, p99 20 /255 on the fully covered pixels; union-mask MAD 9.1, silhouette IoU 0.973)",
+     "sheet_row": "x6  (x60)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bandage__riftxh",
+   "category": "bandage",
+   "model": "riftxh",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bandage__riftxh.jpg",
+   "bbox_m": [
+    0.07748,
+    0.02065,
+    0.00058
+   ],
+   "n_faces": 39878,
+   "uses": [
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "z2"
+    ],
+    "symmetry_near": [
+     "x2",
+     "y2"
+    ]
+   },
+   "candidates": {
+    "x2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.17 %, p95 0.29 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x180",
+     "survey_texture": "borderline (MAD 6.1, p95 23.0, p99 26 /255 on the fully covered pixels; union-mask MAD 8.7, silhouette IoU 0.978)",
+     "sheet_row": "x2  (x180)"
+    },
+    "y2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.17 %, p95 0.29 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "y180",
+     "survey_texture": "borderline (MAD 6.1, p95 23.0, p99 26 /255 on the fully covered pixels; union-mask MAD 8.8, silhouette IoU 0.978)",
+     "sheet_row": "y2  (y180)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bar_soap__feqemg",
+   "category": "bar_soap",
+   "model": "feqemg",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bar_soap__feqemg.jpg",
+   "bbox_m": [
+    0.11307,
+    0.08927,
+    0.06106
+   ],
+   "n_faces": 3968,
+   "uses": [
+    "object_scaling/target",
+    "disembedding/target",
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "z2"
+    ]
+   },
+   "candidates": {
+    "z2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.72 %, p95 1.75 %, frac2 1.9 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "z180",
+     "survey_texture": "preserved (MAD 0.2, p95 0.0, p99 5 /255 on the fully covered pixels; union-mask MAD 7.3, silhouette IoU 0.955)",
+     "sheet_row": "z2  (z180)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "baseball_bat__yalgei",
+   "category": "baseball_bat",
+   "model": "yalgei",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/baseball_bat__yalgei.jpg",
+   "bbox_m": [
+    0.8128,
+    0.06584,
+    0.06671
+   ],
+   "n_faces": 1280,
+   "uses": [
+    "alignment-world_horizontal/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "xinf"
+    ]
+   },
+   "candidates": {
+    "xinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.18 %, p95 0.47 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x163",
+     "survey_texture": "borderline (MAD 5.1, p95 12.7, p99 30 /255 on the fully covered pixels; union-mask MAD 18.5, silhouette IoU 0.930)",
+     "sheet_row": "xinf  (x197)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "beaker__effbnc",
+   "category": "beaker",
+   "model": "effbnc",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/beaker__effbnc.jpg",
+   "bbox_m": [
+    0.12285,
+    0.12285,
+    0.14556
+   ],
+   "n_faces": 154,
+   "uses": [
+    "object_scaling/target",
+    "disembedding/target",
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "z6"
+    ],
+    "symmetry_near": [
+     "zinf"
+    ]
+   },
+   "candidates": {
+    "zinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.31 %, p95 0.75 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "z17",
+     "survey_texture": "borderline (MAD 4.8, p95 12.0, p99 20 /255 on the fully covered pixels; union-mask MAD 9.8, silhouette IoU 0.972)",
+     "sheet_row": "zinf  (z197)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "beefsteak_tomato__pnrdxh",
+   "category": "beefsteak_tomato",
+   "model": "pnrdxh",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/beefsteak_tomato__pnrdxh.jpg",
+   "bbox_m": [
+    0.09339,
+    0.09126,
+    0.07419
+   ],
+   "n_faces": 386,
+   "uses": [
+    "object_scaling/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "z6"
+    ]
+   },
+   "candidates": {
+    "z6": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.66 %, p95 1.73 %, frac2 2.8 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "z60",
+     "survey_texture": "preserved (MAD 0.7, p95 1.3, p99 24 /255 on the fully covered pixels; union-mask MAD 10.5, silhouette IoU 0.951)",
+     "sheet_row": "z6  (z60)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "beeswax_candle__oimgmh",
+   "category": "beeswax_candle",
+   "model": "oimgmh",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/beeswax_candle__oimgmh.jpg",
+   "bbox_m": [
+    0.05629,
+    0.05629,
+    0.20575
+   ],
+   "n_faces": 38534,
+   "uses": [
+    "object_scaling/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "zinf"
+    ],
+    "symmetry_near": [
+     "x2",
+     "y2"
+    ]
+   },
+   "candidates": {
+    "x2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.10 %, p95 0.34 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "x180",
+     "survey_texture": "borderline (MAD 3.7, p95 10.7, p99 57 /255 on the fully covered pixels; union-mask MAD 4.5, silhouette IoU 0.993)",
+     "sheet_row": "x2  (x180)"
+    },
+    "y2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.10 %, p95 0.34 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "y180",
+     "survey_texture": "borderline (MAD 3.7, p95 10.7, p99 57 /255 on the fully covered pixels; union-mask MAD 4.5, silhouette IoU 0.992)",
+     "sheet_row": "y2  (y180)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "biscuit__ukcwqw",
+   "category": "biscuit",
+   "model": "ukcwqw",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/biscuit__ukcwqw.jpg",
+   "bbox_m": [
+    0.04379,
+    0.04683,
+    0.01804
+   ],
+   "n_faces": 192,
+   "uses": [
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "z2"
+    ]
+   },
+   "candidates": {
+    "z2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.08 %, p95 0.16 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z180",
+     "survey_texture": "borderline (MAD 3.6, p95 10.7, p99 14 /255 on the fully covered pixels; union-mask MAD 3.6, silhouette IoU 1.000)",
+     "sheet_row": "z2  (z180)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_beer__fgzjnb",
+   "category": "bottle_of_beer",
+   "model": "fgzjnb",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_beer__fgzjnb.jpg",
+   "bbox_m": [
+    0.06821,
+    0.06931,
+    0.21724
+   ],
+   "n_faces": 15512,
+   "uses": [
+    "object_scaling/target",
+    "disembedding/target",
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "z6"
+    ],
+    "symmetry_near": [
+     "zinf"
+    ]
+   },
+   "candidates": {
+    "zinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.28 %, p95 0.61 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z163",
+     "survey_texture": "borderline (MAD 4.4, p95 21.7, p99 32 /255 on the fully covered pixels; union-mask MAD 13.6, silhouette IoU 0.957)",
+     "sheet_row": "zinf  (z197)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_beer__nfzzqc",
+   "category": "bottle_of_beer",
+   "model": "nfzzqc",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_beer__nfzzqc.jpg",
+   "bbox_m": [
+    0.0925,
+    0.0932,
+    0.36891
+   ],
+   "n_faces": 15600,
+   "uses": [
+    "object_scaling/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "zinf"
+    ]
+   },
+   "candidates": {
+    "zinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.22 %, p95 0.47 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z163",
+     "survey_texture": "borderline (MAD 4.6, p95 20.5, p99 31 /255 on the fully covered pixels; union-mask MAD 11.2, silhouette IoU 0.966)",
+     "sheet_row": "zinf  (z197)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_black_pepper__honise",
+   "category": "bottle_of_black_pepper",
+   "model": "honise",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_black_pepper__honise.jpg",
+   "bbox_m": [
+    0.04484,
+    0.04782,
+    0.10726
+   ],
+   "n_faces": 23805,
+   "uses": [
+    "object_scaling/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "z4"
+    ]
+   },
+   "candidates": {
+    "z4": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.65 %, p95 1.53 %, frac2 1.8 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "z90",
+     "survey_texture": "borderline (MAD 5.7, p95 18.3, p99 28 /255 on the fully covered pixels; union-mask MAD 21.4, silhouette IoU 0.904)",
+     "sheet_row": "z4  (z90)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_black_pepper__ydzzrv",
+   "category": "bottle_of_black_pepper",
+   "model": "ydzzrv",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_black_pepper__ydzzrv.jpg",
+   "bbox_m": [
+    0.06172,
+    0.06025,
+    0.07327
+   ],
+   "n_faces": 5102,
+   "uses": [
+    "object_scaling/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "zinf"
+    ]
+   },
+   "candidates": {
+    "zinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.53 %, p95 1.20 %, frac2 2.2 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z163",
+     "survey_texture": "borderline (MAD 5.4, p95 19.3, p99 29 /255 on the fully covered pixels; union-mask MAD 17.1, silhouette IoU 0.942)",
+     "sheet_row": "zinf  (z197)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_carrot_juice__jkuhio",
+   "category": "bottle_of_carrot_juice",
+   "model": "jkuhio",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_carrot_juice__jkuhio.jpg",
+   "bbox_m": [
+    0.04375,
+    0.04306,
+    0.20251
+   ],
+   "n_faces": 5758,
+   "uses": [
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "z2"
+    ]
+   },
+   "candidates": {
+    "z2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.09 %, p95 0.17 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z180",
+     "survey_texture": "borderline (MAD 3.7, p95 25.0, p99 50 /255 on the fully covered pixels; union-mask MAD 3.7, silhouette IoU 1.000)",
+     "sheet_row": "z2  (z180)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_coconut_milk__idenxg",
+   "category": "bottle_of_coconut_milk",
+   "model": "idenxg",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_coconut_milk__idenxg.jpg",
+   "bbox_m": [
+    0.09978,
+    0.09978,
+    0.28356
+   ],
+   "n_faces": 38926,
+   "uses": [
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "z4",
+     "z5",
+     "z6"
+    ]
+   },
+   "candidates": {
+    "z4": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.11 %, p95 0.22 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z90",
+     "survey_texture": "borderline (MAD 4.4, p95 22.7, p99 49 /255 on the fully covered pixels; union-mask MAD 4.4, silhouette IoU 1.000)",
+     "sheet_row": "z4  (z90)"
+    },
+    "z5": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.11 %, p95 0.21 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z72",
+     "survey_texture": "borderline (MAD 4.2, p95 21.0, p99 48 /255 on the fully covered pixels; union-mask MAD 4.3, silhouette IoU 0.999)",
+     "sheet_row": "z5  (z72)"
+    },
+    "z6": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.10 %, p95 0.20 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z60",
+     "survey_texture": "borderline (MAD 4.1, p95 20.7, p99 46 /255 on the fully covered pixels; union-mask MAD 4.0, silhouette IoU 1.000)",
+     "sheet_row": "z6  (z60)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_coconut_water__lsixio",
+   "category": "bottle_of_coconut_water",
+   "model": "lsixio",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_coconut_water__lsixio.jpg",
+   "bbox_m": [
+    0.07257,
+    0.07257,
+    0.23177
+   ],
+   "n_faces": 92,
+   "uses": [
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "z4"
+    ],
+    "symmetry_near": [
+     "zinf"
+    ]
+   },
+   "candidates": {
+    "zinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.41 %, p95 0.87 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "z251",
+     "survey_texture": "borderline (MAD 3.3, p95 17.3, p99 34 /255 on the fully covered pixels; union-mask MAD 11.2, silhouette IoU 0.957)",
+     "sheet_row": "zinf  (z251)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_disinfectant__faedff",
+   "category": "bottle_of_disinfectant",
+   "model": "faedff",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_disinfectant__faedff.jpg",
+   "bbox_m": [
+    0.07455,
+    0.10414,
+    0.21478
+   ],
+   "n_faces": 6984,
+   "uses": [
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "z2"
+    ]
+   },
+   "candidates": {
+    "z2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.18 %, p95 0.24 %, frac2 1.1 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z180",
+     "survey_texture": "preserved (MAD 1.8, p95 5.0, p99 10 /255 on the fully covered pixels; union-mask MAD 7.5, silhouette IoU 0.958)",
+     "sheet_row": "z2  (z180)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_essential_oil__eyyhld",
+   "category": "bottle_of_essential_oil",
+   "model": "eyyhld",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_essential_oil__eyyhld.jpg",
+   "bbox_m": [
+    0.02217,
+    0.02218,
+    0.05996
+   ],
+   "n_faces": 11767,
+   "uses": [
+    "object_scaling/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "zinf"
+    ]
+   },
+   "candidates": {
+    "zinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.14 %, p95 0.28 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z53",
+     "survey_texture": "borderline (MAD 4.9, p95 20.0, p99 36 /255 on the fully covered pixels; union-mask MAD 5.5, silhouette IoU 0.995)",
+     "sheet_row": "zinf  (z197)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_essential_oil__wansva",
+   "category": "bottle_of_essential_oil",
+   "model": "wansva",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_essential_oil__wansva.jpg",
+   "bbox_m": [
+    0.02216,
+    0.02215,
+    0.05999
+   ],
+   "n_faces": 11875,
+   "uses": [
+    "object_scaling/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "zinf"
+    ]
+   },
+   "candidates": {
+    "zinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.15 %, p95 0.28 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "z131",
+     "survey_texture": "borderline (MAD 4.6, p95 17.3, p99 33 /255 on the fully covered pixels; union-mask MAD 5.7, silhouette IoU 0.992)",
+     "sheet_row": "zinf  (z197)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_essential_oil__xhoipk",
+   "category": "bottle_of_essential_oil",
+   "model": "xhoipk",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_essential_oil__xhoipk.jpg",
+   "bbox_m": [
+    0.02218,
+    0.02217,
+    0.05996
+   ],
+   "n_faces": 11877,
+   "uses": [
+    "object_scaling/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "zinf"
+    ]
+   },
+   "candidates": {
+    "zinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.14 %, p95 0.28 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "z53",
+     "survey_texture": "borderline (MAD 5.5, p95 20.7, p99 34 /255 on the fully covered pixels; union-mask MAD 6.0, silhouette IoU 0.995)",
+     "sheet_row": "zinf  (z197)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_essential_oil__xvqshn",
+   "category": "bottle_of_essential_oil",
+   "model": "xvqshn",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_essential_oil__xvqshn.jpg",
+   "bbox_m": [
+    0.02219,
+    0.02217,
+    0.05996
+   ],
+   "n_faces": 11887,
+   "uses": [
+    "object_scaling/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "zinf"
+    ]
+   },
+   "candidates": {
+    "zinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.14 %, p95 0.28 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "z53",
+     "survey_texture": "borderline (MAD 4.5, p95 16.7, p99 35 /255 on the fully covered pixels; union-mask MAD 5.1, silhouette IoU 0.994)",
+     "sheet_row": "zinf  (z197)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_essential_oil__yjxvpg",
+   "category": "bottle_of_essential_oil",
+   "model": "yjxvpg",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_essential_oil__yjxvpg.jpg",
+   "bbox_m": [
+    0.02219,
+    0.02217,
+    0.05996
+   ],
+   "n_faces": 11883,
+   "uses": [
+    "object_scaling/target"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "zinf"
+    ]
+   },
+   "candidates": {
+    "zinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.14 %, p95 0.27 %, frac2 0.0 % of the bbox diagonal; about the centroid centre)",
+     "worst_rotation": "z131",
+     "survey_texture": "borderline (MAD 4.5, p95 17.7, p99 34 /255 on the fully covered pixels; union-mask MAD 5.3, silhouette IoU 0.994)",
+     "sheet_row": "zinf  (z197)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_face_cream__dztaed",
+   "category": "bottle_of_face_cream",
+   "model": "dztaed",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_face_cream__dztaed.jpg",
+   "bbox_m": [
+    0.07659,
+    0.07671,
+    0.05407
+   ],
+   "n_faces": 4608,
+   "uses": [
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "zinf"
+    ],
+    "symmetry_near": [
+     "x2",
+     "y2"
+    ]
+   },
+   "candidates": {
+    "x2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.18 %, p95 0.69 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "x180",
+     "survey_texture": "borderline (MAD 11.9, p95 15.0, p99 21 /255 on the fully covered pixels; union-mask MAD 15.8, silhouette IoU 0.970)",
+     "sheet_row": "x2  (x180)"
+    },
+    "y2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.20 %, p95 0.71 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "y180",
+     "survey_texture": "borderline (MAD 11.8, p95 15.0, p99 21 /255 on the fully covered pixels; union-mask MAD 15.8, silhouette IoU 0.970)",
+     "sheet_row": "y2  (y180)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_fennel__ihlkfu",
+   "category": "bottle_of_fennel",
+   "model": "ihlkfu",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_fennel__ihlkfu.jpg",
+   "bbox_m": [
+    0.06,
+    0.06,
+    0.07186
+   ],
+   "n_faces": 5022,
+   "uses": [
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "zinf"
+    ]
+   },
+   "candidates": {
+    "zinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.20 %, p95 0.38 %, frac2 0.7 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z163",
+     "survey_texture": "borderline (MAD 3.8, p95 13.7, p99 21 /255 on the fully covered pixels; union-mask MAD 5.3, silhouette IoU 0.992)",
+     "sheet_row": "zinf  (z251)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_fruit_punch__azcigi",
+   "category": "bottle_of_fruit_punch",
+   "model": "azcigi",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_fruit_punch__azcigi.jpg",
+   "bbox_m": [
+    0.07625,
+    0.07625,
+    0.23397
+   ],
+   "n_faces": 108,
+   "uses": [
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "z2"
+    ]
+   },
+   "candidates": {
+    "z2": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "exact (mean 0.07 %, p95 0.14 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z180",
+     "survey_texture": "borderline (MAD 4.7, p95 16.7, p99 22 /255 on the fully covered pixels; union-mask MAD 4.7, silhouette IoU 1.000)",
+     "sheet_row": "z2  (z180)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_ginger__drqhzo",
+   "category": "bottle_of_ginger",
+   "model": "drqhzo",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_ginger__drqhzo.jpg",
+   "bbox_m": [
+    0.06613,
+    0.06622,
+    0.07931
+   ],
+   "n_faces": 5102,
+   "uses": [
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "zinf"
+    ]
+   },
+   "candidates": {
+    "zinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.28 %, p95 0.43 %, frac2 2.2 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z163",
+     "survey_texture": "preserved (MAD 2.1, p95 7.7, p99 13 /255 on the fully covered pixels; union-mask MAD 6.1, silhouette IoU 0.978)",
+     "sheet_row": "zinf  (z101)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_ginger_beer__zkocwb",
+   "category": "bottle_of_ginger_beer",
+   "model": "zkocwb",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_ginger_beer__zkocwb.jpg",
+   "bbox_m": [
+    0.05016,
+    0.05448,
+    0.19004
+   ],
+   "n_faces": 1444,
+   "uses": [
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "z2"
+    ],
+    "symmetry_near": [
+     "z5",
+     "z6"
+    ]
+   },
+   "candidates": {
+    "z5": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.64 %, p95 1.28 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z72",
+     "survey_texture": "borderline (MAD 5.1, p95 25.0, p99 37 /255 on the fully covered pixels; union-mask MAD 11.5, silhouette IoU 0.964)",
+     "sheet_row": "z5  (z72)"
+    },
+    "z6": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.59 %, p95 1.20 %, frac2 0.0 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z60",
+     "survey_texture": "borderline (MAD 4.9, p95 24.7, p99 37 /255 on the fully covered pixels; union-mask MAD 12.6, silhouette IoU 0.958)",
+     "sheet_row": "z6  (z60)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_ground_mace__lgpxro",
+   "category": "bottle_of_ground_mace",
+   "model": "lgpxro",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_ground_mace__lgpxro.jpg",
+   "bbox_m": [
+    0.05988,
+    0.05989,
+    0.07186
+   ],
+   "n_faces": 5102,
+   "uses": [
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "zinf"
+    ]
+   },
+   "candidates": {
+    "zinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.25 %, p95 0.43 %, frac2 2.1 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z131",
+     "survey_texture": "preserved (MAD 2.3, p95 7.8, p99 12 /255 on the fully covered pixels; union-mask MAD 6.3, silhouette IoU 0.980)",
+     "sheet_row": "zinf  (z197)"
+    }
+   },
+   "symmetric_180": []
+  },
+  {
+   "key": "bottle_of_ground_nutmeg__qebruq",
+   "category": "bottle_of_ground_nutmeg",
+   "model": "qebruq",
+   "variant": "base",
+   "scale": null,
+   "sheet": "runlogs/symmetry_20260915/renders/bottle_of_ground_nutmeg__qebruq.jpg",
+   "bbox_m": [
+    0.06011,
+    0.0602,
+    0.0721
+   ],
+   "n_faces": 5102,
+   "uses": [
+    "disembedding/distractors"
+   ],
+   "survey": {
+    "symmetry": [
+     "none"
+    ],
+    "symmetry_near": [
+     "zinf"
+    ]
+   },
+   "candidates": {
+    "zinf": {
+     "asked_because": "symmetry_near",
+     "survey_geometry": "near (mean 0.28 %, p95 0.43 %, frac2 2.2 % of the bbox diagonal; about the bbox centre)",
+     "worst_rotation": "z163",
+     "survey_texture": "preserved (MAD 2.1, p95 7.7, p99 13 /255 on the fully covered pixels; union-mask MAD 6.1, silhouette IoU 0.978)",
+     "sheet_row": "zinf  (z101)"
+    }
+   },
+   "symmetric_180": []
+  }
+ ]
+}

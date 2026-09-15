@@ -68888,7 +68888,9 @@
 0.0328,
 0.05004,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 536,
 "n_meshes": 1,
@@ -68961,7 +68963,9 @@
 0.02741,
 0.04468,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 536,
 "n_meshes": 1,
@@ -69070,7 +69074,9 @@
 0.03525,
 0.05071,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 536,
 "n_meshes": 1,
@@ -69179,7 +69185,9 @@
 0.03336,
 0.05033,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 536,
 "n_meshes": 1,
@@ -69252,7 +69260,9 @@
 0.02899,
 0.04451,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 536,
 "n_meshes": 1,
@@ -69343,7 +69353,9 @@
 0.02928,
 0.04377,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 536,
 "n_meshes": 1,
@@ -69416,7 +69428,9 @@
 0.03185,
 0.04839,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 536,
 "n_meshes": 1,
@@ -69525,7 +69539,9 @@
 0.02,
 0.02671,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 7424,
 "n_meshes": 1,
@@ -69598,7 +69614,9 @@
 0.02524,
 0.04914,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 4464,
 "n_meshes": 1,
@@ -69671,7 +69689,9 @@
 0.03294,
 0.0543,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 4560,
 "n_meshes": 1,
@@ -136592,7 +136612,16 @@
 0.0758,
 0.0758,
 0.01999
-]
+],
+"geom_exact_raw": [
+"z2",
+"z4",
+"z3",
+"z5",
+"z6",
+"zinf"
+],
+"geom_near_raw": []
 },
 "n_faces": 544,
 "n_meshes": 1,
@@ -144897,7 +144926,16 @@
 0.07582,
 0.07582,
 0.01999
-]
+],
+"geom_exact_raw": [
+"z2",
+"z4",
+"z3",
+"z5",
+"z6",
+"zinf"
+],
+"geom_near_raw": []
 },
 "n_faces": 544,
 "n_meshes": 1,
@@ -172834,7 +172872,7 @@
 "symmetry_near_scaled": null,
 "n_faces": 100,
 "n_meshes": 1,
-"render": null
+"render": "runlogs/symmetry_20260915/renders/shelf__wvkefp.jpg"
 },
 "radiator__arfdpk": {
 "category": "radiator",
@@ -184294,7 +184332,9 @@
 0.06656,
 0.02,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 816,
 "n_meshes": 1,
@@ -184393,7 +184433,9 @@
 0.05915,
 0.02,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 1680,
 "n_meshes": 1,
@@ -184615,7 +184657,9 @@
 0.04902,
 0.02,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 496,
 "n_meshes": 1,
@@ -184813,7 +184857,9 @@
 0.07903,
 0.02,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 912,
 "n_meshes": 1,
@@ -185026,7 +185072,9 @@
 0.08236,
 0.02,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 736,
 "n_meshes": 1,
@@ -185224,7 +185272,9 @@
 0.08297,
 0.02,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 816,
 "n_meshes": 1,
@@ -185413,7 +185463,9 @@
 0.06547,
 0.02,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 736,
 "n_meshes": 1,
@@ -185584,7 +185636,9 @@
 0.05887,
 0.02,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 912,
 "n_meshes": 1,
@@ -185824,7 +185878,9 @@
 0.08182,
 0.02,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 816,
 "n_meshes": 1,
@@ -194824,6 +194880,17 @@
 0.02117,
 0.16113,
 0.01999
+],
+"geom_exact_raw": [],
+"geom_near_raw": [
+"x2",
+"y2",
+"z2",
+"y4",
+"y3",
+"y5",
+"y6",
+"yinf"
 ]
 },
 "n_faces": 1372,
@@ -195182,6 +195249,10 @@
 0.02147,
 0.13066,
 0.02
+],
+"geom_exact_raw": [],
+"geom_near_raw": [
+"y2"
 ]
 },
 "n_faces": 1372,
@@ -195537,6 +195608,10 @@
 0.01999,
 0.14341,
 0.02
+],
+"geom_exact_raw": [],
+"geom_near_raw": [
+"x2"
 ]
 },
 "n_faces": 1372,
@@ -195899,6 +195974,11 @@
 0.02,
 0.13961,
 0.02
+],
+"geom_exact_raw": [],
+"geom_near_raw": [
+"z2",
+"y6"
 ]
 },
 "n_faces": 1372,
@@ -196260,7 +196340,9 @@
 0.02,
 0.11313,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 1372,
 "n_meshes": 1,
@@ -196630,6 +196712,14 @@
 0.02,
 0.13677,
 0.02
+],
+"geom_exact_raw": [],
+"geom_near_raw": [
+"x2",
+"y2",
+"z2",
+"y5",
+"y6"
 ]
 },
 "n_faces": 1372,
@@ -196915,7 +197005,9 @@
 0.02138,
 0.09802,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 1372,
 "n_meshes": 1,
@@ -197221,7 +197313,9 @@
 0.02001,
 0.09235,
 0.02
-]
+],
+"geom_exact_raw": [],
+"geom_near_raw": []
 },
 "n_faces": 20004,
 "n_meshes": 1,
@@ -197952,6 +198046,10 @@
 0.12389,
 0.02,
 0.02001
+],
+"geom_exact_raw": [],
+"geom_near_raw": [
+"z2"
 ]
 },
 "n_faces": 11760,
@@ -198315,6 +198413,10 @@
 0.12388,
 0.02,
 0.02001
+],
+"geom_exact_raw": [],
+"geom_near_raw": [
+"z2"
 ]
 },
 "n_faces": 11760,
@@ -198673,6 +198775,10 @@
 0.12388,
 0.02001,
 0.02001
+],
+"geom_exact_raw": [],
+"geom_near_raw": [
+"z2"
 ]
 },
 "n_faces": 11760,
@@ -199036,6 +199142,16 @@
 0.12388,
 0.02,
 0.01999
+],
+"geom_exact_raw": [],
+"geom_near_raw": [
+"x2",
+"z2",
+"x4",
+"x3",
+"x5",
+"x6",
+"xinf"
 ]
 },
 "n_faces": 11760,
@@ -199340,6 +199456,10 @@
 0.12389,
 0.02,
 0.02001
+],
+"geom_exact_raw": [],
+"geom_near_raw": [
+"z2"
 ]
 },
 "n_faces": 11760,
@@ -199698,6 +199818,10 @@
 0.12388,
 0.02,
 0.02
+],
+"geom_exact_raw": [],
+"geom_near_raw": [
+"z2"
 ]
 },
 "n_faces": 11760,
@@ -200033,6 +200157,10 @@
 0.12389,
 0.02001,
 0.02001
+],
+"geom_exact_raw": [],
+"geom_near_raw": [
+"z2"
 ]
 },
 "n_faces": 11760,
@@ -200368,6 +200496,10 @@
 0.12389,
 0.02,
 0.02
+],
+"geom_exact_raw": [],
+"geom_near_raw": [
+"z2"
 ]
 },
 "n_faces": 11760,
@@ -200676,6 +200808,10 @@
 0.12389,
 0.02001,
 0.02
+],
+"geom_exact_raw": [],
+"geom_near_raw": [
+"z2"
 ]
 },
 "n_faces": 11760,
@@ -201011,6 +201147,10 @@
 0.12389,
 0.02001,
 0.02001
+],
+"geom_exact_raw": [],
+"geom_near_raw": [
+"z2"
 ]
 },
 "n_faces": 11760,
@@ -201313,6 +201453,10 @@
 0.12389,
 0.02,
 0.02
+],
+"geom_exact_raw": [],
+"geom_near_raw": [
+"z2"
 ]
 },
 "n_faces": 11760,
@@ -201650,6 +201794,10 @@
 0.12389,
 0.02001,
 0.02
+],
+"geom_exact_raw": [],
+"geom_near_raw": [
+"z2"
 ]
 },
 "n_faces": 11760,

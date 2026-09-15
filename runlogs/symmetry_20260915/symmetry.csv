@@ -1240,7 +1240,7 @@ shelf,xogqqm,none,,,,,,,,0.00075,x2,0.00440,0.0843,3.97,10.33,324,,alignment-wor
 shelf,qrmiur,none,"x2,y2,z2","x2,y2,z2",,,,,,0.00061,y2,0.00219,0.0000,7.99,19.33,692,runlogs/symmetry_20260915/renders/shelf__qrmiur.jpg,alignment-world_horizontal/target
 shelf,iruewm,none,"x2,y2,z2","x2,y2,z2",,,,,,0.00082,x2,0.00082,0.0000,3.45,9.00,20,runlogs/symmetry_20260915/renders/shelf__iruewm.jpg,alignment-world_horizontal/target
 shelf,kxvbui,"x2,y2,z2",,"x2,y2,z2",,"x2,y2,z2",,,,0.00072,x2,0.00074,0.0000,1.11,2.67,616,runlogs/symmetry_20260915/renders/shelf__kxvbui.jpg,alignment-world_horizontal/target
-shelf,wvkefp,none,,,,,,,,0.00089,z2,0.00320,0.0517,3.59,43.67,100,,alignment-world_horizontal/target
+shelf,wvkefp,none,,,,,,,,0.00089,z2,0.00320,0.0517,3.59,43.67,100,runlogs/symmetry_20260915/renders/shelf__wvkefp.jpg,alignment-world_horizontal/target
 radiator,arfdpk,none,,,,,,,,0.00074,z2,0.00555,0.0832,8.20,22.00,2991,,alignment-world_horizontal/target
 radiator,arsjbe,none,y2,,y2,y2,,,,0.00070,y2,0.00347,0.0244,1.96,8.00,8016,runlogs/symmetry_20260915/renders/radiator__arsjbe.jpg,alignment-world_horizontal/target
 radiator,dwmloz,x2,,x2,,x2,,,,0.00081,x2,0.00262,0.0043,1.81,5.33,11398,runlogs/symmetry_20260915/renders/radiator__dwmloz.jpg,alignment-world_horizontal/target

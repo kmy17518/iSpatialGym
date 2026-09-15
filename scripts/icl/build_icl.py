@@ -17,7 +17,9 @@ Inputs (all committed under ``runlogs/``):
 * ``runlogs/world_alignment_selection_20260911/wall_candidates.json`` - the 78 validated wall regions,
 * ``ispatialgym/assets/task_specs/task_custom_lists.json`` - the v1 test pins and the look-alike groups,
 * ``runlogs/symmetry_<date>/symmetry.json`` (``--symmetry``) - the rotational-symmetry survey (geometry + texture,
-  ``scripts/symmetry/survey_symmetry.py``) -> ``symmetry`` / ``symmetry_near`` columns of ``roles/candidates.csv``.
+  ``scripts/symmetry/survey_symmetry.py``) -> ``symmetry`` / ``symmetry_near`` columns of ``roles/candidates.csv``;
+  ``review_verdicts.json`` next to it (``scripts/symmetry/aggregate_review.py``, the reviewer round) overrides the
+  survey for the reviewed models and settles ``symmetric_180`` where the review answered the disagreement.
 
 Outputs (``ispatialgym/assets/icl/``, schema in its ``README.md``):
 
@@ -758,25 +760,41 @@ class Builder:
         ``scripts/symmetry/survey_symmetry.py`` (comma-separated generator tags ``x2 y2 z2 x4 y4 z4 z3 z5 z6 xinf yinf
         zinf full``; ``none`` = surveyed and asymmetric / nothing to review; empty = not surveyed). A row whose grasp-tested
         ``scale`` matches the surveyed scale gets the scaled variant's verdict (a non-uniform scale can break a symmetry).
-        ``symmetric_180`` (reviewer column of the alignment targets) is kept untouched; the disagreements are listed in
-        the survey's ``report.md``."""
-        stats = {"surveyed": 0, "scaled": 0, "not_surveyed": 0}
+
+        When ``review_verdicts.json`` (``scripts/symmetry/aggregate_review.py``, the reviewer round) sits next to
+        ``symmetry.json``, its per-model verdicts replace the survey's for the reviewed models (``preserved`` tags joined
+        ``symmetry``, ``broken`` ones left ``symmetry_near``). ``symmetric_180`` (the selection reviewer's column of the
+        alignment targets) is only changed where the review answered the disagreement question of that (subtask,
+        model) explicitly: ``preserved`` -> ``1``, ``broken`` -> ``0``; otherwise the reviewer's value stays."""
+        stats = {"surveyed": 0, "scaled": 0, "not_surveyed": 0, "reviewed": 0, "symmetric_180_set": 0}
         if not path or not os.path.exists(path):
             return stats
         sym = json.load(open(path))
+        review_path = os.path.join(os.path.dirname(path), "review_verdicts.json")
+        review = json.load(open(review_path)).get("models", {}) if os.path.exists(review_path) else {}
         for r in self.roles:
             if r["kind"] not in (KIND_SAMPLEABLE, KIND_GROUP) or not r["model"]:
                 continue
-            rec = sym.get(f"{r['category']}__{r['model']}")
+            key = f"{r['category']}__{r['model']}"
+            rec = sym.get(key)
             if rec is None:
                 stats["not_surveyed"] += 1
                 continue
-            tags, near = rec.get("symmetry") or ["none"], rec.get("symmetry_near") or []
-            if r["scale"] and rec.get("symmetry_scaled") and rec.get("scale") == json.loads(r["scale"]):
-                tags, near = rec["symmetry_scaled"] or ["none"], rec.get("symmetry_near_scaled") or []
+            rv = review.get(key)
+            src = rv if rv else rec
+            tags, near = src.get("symmetry") or ["none"], src.get("symmetry_near") or []
+            if r["scale"] and src.get("symmetry_scaled") and rec.get("scale") == json.loads(r["scale"]):
+                tags, near = src["symmetry_scaled"] or ["none"], src.get("symmetry_near_scaled") or []
                 stats["scaled"] += 1
             r["symmetry"], r["symmetry_near"] = ",".join(tags), ",".join(near) if near else "none"
             stats["surveyed"] += 1
+            if rv:
+                stats["reviewed"] += 1
+                if r["subtask"].startswith("alignment") and r["role"] == "target":
+                    for q in rv.get("symmetric_180", []):
+                        if q.get("subtask") == r["subtask"] and q.get("value") in ("0", "1"):
+                            r["symmetric_180"] = q["value"]
+                            stats["symmetric_180_set"] += 1
         return stats
 
     def build_lookalikes(self) -> List[dict]:
@@ -848,9 +866,15 @@ class Builder:
         if symmetry and os.path.exists(symmetry):
             unsurveyed = collections.Counter((r["subtask"], r["role"]) for r in self.roles
                                              if r["kind"] in (KIND_SAMPLEABLE, KIND_GROUP) and r["model"] and not r["symmetry"])
+            review_path = os.path.join(os.path.dirname(symmetry), "review_verdicts.json")
             print(f"symmetry ({os.path.relpath(symmetry, REPO)}): {sym_stats['surveyed']} candidate rows with symmetry / symmetry_near "
                   f"({sym_stats['scaled']} at the grasp-tested scale), {sym_stats['not_surveyed']} sampleable/group rows not surveyed: "
                   + ", ".join(f"{st}/{role} {n}" for (st, role), n in sorted(unsurveyed.items())))
+            if os.path.exists(review_path):
+                print(f"  review verdicts ({os.path.relpath(review_path, REPO)}): {sym_stats['reviewed']} rows use the reviewed values, "
+                      f"symmetric_180 set from the review on {sym_stats['symmetric_180_set']} alignment rows")
+            else:
+                print("  no review_verdicts.json next to symmetry.json -> survey values only (run scripts/symmetry/aggregate_review.py after the review round)")
             print(f"  symmetry values: {collections.Counter(r['symmetry'] for r in self.roles if r['symmetry']).most_common(12)}")
         else:
             print("symmetry: no survey file given / found -> symmetry / symmetry_near columns left empty")

@@ -254,6 +254,22 @@ samples, ≈ 20 coarse and ≈ 5–40 full KD-tree passes); `texture` 4.3 min on
 models, 6 × (1 + Σ rotations) renders per model; 1.5–3 s for the 384 px pencils); `report` 2 s. Everything is
 idempotent (`--force` recomputes); the full survey is ≈ 25 min on the local 4090 box.
 
+## Review round (prepared, not yet run)
+
+- `review_contract.md` — the reviewer's question (identical from the robot's head camera at 0.5–1.5 m?), the three
+  verdicts `preserved` / `broken` / `unsure`, rules of thumb, the tag / axis convention, the output schema.
+- `assign/rev_00.json … rev_10.json` (`scripts/symmetry/prepare_review.py`) — 11 batches of ≤ 29 entries, 319 entries in
+  all: the 302 models with a `symmetry_near` entry, the 9 spawn-scaled variants with a `symmetry_near_scaled` entry
+  (`<key>__scaled`, judged on `renders/<key>__scaled.jpg`) and the 8 further alignment targets of the 15
+  `symmetric_180` disagreement rows (the other 7 were already in the set); 454 candidate tags, 15 entries carry a
+  `symmetric_180` question. Each entry: key, sheet, candidate tags with the survey's scores / classes and the sheet row
+  to look at, uses, scale, bbox. `assign/index.json` lists the batches; `assign/review_tags.json` the one sheet that had
+  to be rendered for the round (`shelf/wvkefp`, no geometric candidate, its `z2` row forced).
+- Reviewers write `review/rev_XX.json`; `scripts/symmetry/aggregate_review.py` merges them into `review_verdicts.json`
+  + `review_summary.md` (`preserved` → joins `symmetry`, `broken` → leaves `symmetry_near`, `unsure` → stays;
+  `symmetric_180` value per alignment subtask), and `build_icl.py --symmetry` uses `review_verdicts.json` when it sits
+  next to `symmetry.json`.
+
 ## Caveats for the review round
 
 - Only frame-axis rotations are tested; a symmetry about a tilted axis (egg, scaled pencils) is reported as `none`.
