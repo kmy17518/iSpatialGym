@@ -1,0 +1,578 @@
+{
+  "schema": "isg-oracle-v1",
+  "instance_id": "configuration_matching-block_design-block_4-breakfast_table__house_single_floor__targets-toy_dice-isgblk__0000",
+  "tro_sha256": "98cf08d1032bc4f4d818064a610b428550e389c26e79f5b391f0530234c2f517",
+  "task_family": "configuration_matching",
+  "alias": "configuration_matching-block_design-block_4-breakfast_table",
+  "path_bucket_m": null,
+  "stances": {
+    "init": {
+      "base_pose2d": [
+        7.04,
+        2.4545,
+        1.5708
+      ],
+      "translate": 0.5,
+      "tilt": 0.0,
+      "arms": "untucked",
+      "stand_off": 0.45,
+      "edge": "-v"
+    },
+    "manipulation": {
+      "base_pose2d": [
+        7.04,
+        2.5545,
+        1.5708
+      ],
+      "translate": 0.75,
+      "tilt": -0.55,
+      "stand_off": 0.35,
+      "lateral": -0.255,
+      "focus": [
+        7.04,
+        3.1045,
+        0.813
+      ],
+      "arms": [
+        "right"
+      ],
+      "edge": "-v"
+    }
+  },
+  "transitions": [
+    {
+      "from": "init",
+      "to": "manipulation",
+      "stand_off": 0.55,
+      "order": [
+        "drive-back",
+        "trunk",
+        "drive-in"
+      ]
+    }
+  ],
+  "blocks": [
+    {
+      "instance": "toy_dice.n.01_1",
+      "order": 0,
+      "face_pair": "x",
+      "tilt_pick_deg": 0.0,
+      "tilt_place_deg": 0.0,
+      "yaw_deg": 12.0,
+      "flip_axis": null,
+      "flip_sign": 0,
+      "pick": {
+        "position": [
+          7.02,
+          3.12,
+          0.8375
+        ],
+        "orientation": [
+          0.994522,
+          0.104528,
+          0.0,
+          0.0
+        ]
+      },
+      "place": {
+        "position": [
+          7.02,
+          3.12,
+          0.8415
+        ],
+        "orientation": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "carry_height": 0.1
+    },
+    {
+      "instance": "toy_dice.n.01_3",
+      "order": 1,
+      "face_pair": "y",
+      "tilt_pick_deg": -45.0,
+      "tilt_place_deg": 45.0,
+      "yaw_deg": -31.0,
+      "flip_axis": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "flip_sign": 1,
+      "pick": {
+        "position": [
+          7.11,
+          3.21,
+          0.8375
+        ],
+        "orientation": [
+          0.890279,
+          -0.246896,
+          0.368765,
+          -0.102268
+        ]
+      },
+      "place": {
+        "position": [
+          7.046,
+          3.12,
+          0.8415
+        ],
+        "orientation": [
+          0.92388,
+          0.0,
+          -0.382683,
+          0.0
+        ]
+      },
+      "carry_height": 0.1,
+      "brace_row": {
+        "arm": "left",
+        "object": "toy_dice.n.01_1",
+        "kind": "row_left",
+        "pre": {
+          "position": [
+            6.9015,
+            3.12,
+            0.8255
+          ],
+          "orientation": [
+            -0.0,
+            0.707107,
+            0.0,
+            0.707107
+          ]
+        },
+        "contact": {
+          "position": [
+            7.0015,
+            3.12,
+            0.8255
+          ],
+          "orientation": [
+            -0.0,
+            0.707107,
+            0.0,
+            0.707107
+          ]
+        },
+        "direction": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      "push_row": {
+        "arm": "right",
+        "object": "toy_dice.n.01_3",
+        "pre": {
+          "position": [
+            7.1645,
+            3.12,
+            0.8255
+          ],
+          "orientation": [
+            -0.0,
+            -0.707107,
+            0.0,
+            0.707107
+          ]
+        },
+        "init": {
+          "position": [
+            7.0645,
+            3.12,
+            0.8255
+          ],
+          "orientation": [
+            -0.0,
+            -0.707107,
+            0.0,
+            0.707107
+          ]
+        },
+        "goal": {
+          "position": [
+            7.0565,
+            3.12,
+            0.8255
+          ],
+          "orientation": [
+            -0.0,
+            -0.707107,
+            0.0,
+            0.707107
+          ]
+        },
+        "direction": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "distance_m": 0.008
+      }
+    },
+    {
+      "instance": "toy_dice.n.01_2",
+      "order": 2,
+      "face_pair": "y",
+      "tilt_pick_deg": 0.0,
+      "tilt_place_deg": 0.0,
+      "yaw_deg": 0.0,
+      "flip_axis": null,
+      "flip_sign": 0,
+      "pick": {
+        "position": [
+          6.94,
+          3.04,
+          0.8375
+        ],
+        "orientation": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "place": {
+        "position": [
+          7.02,
+          3.094,
+          0.8415
+        ],
+        "orientation": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "carry_height": 0.1,
+      "brace_col": {
+        "arm": "left",
+        "object": "toy_dice.n.01_1",
+        "kind": "column_top",
+        "pre": {
+          "position": [
+            7.02,
+            3.2385,
+            0.8255
+          ],
+          "orientation": [
+            0.707107,
+            0.0,
+            0.0,
+            0.707107
+          ]
+        },
+        "contact": {
+          "position": [
+            7.02,
+            3.1385,
+            0.8255
+          ],
+          "orientation": [
+            0.707107,
+            0.0,
+            0.0,
+            0.707107
+          ]
+        },
+        "direction": [
+          0.0,
+          -1.0,
+          0.0
+        ]
+      },
+      "push_col": {
+        "arm": "right",
+        "object": "toy_dice.n.01_2",
+        "pre": {
+          "position": [
+            7.02,
+            2.9755,
+            0.8255
+          ],
+          "orientation": [
+            -0.707107,
+            0.0,
+            0.0,
+            0.707107
+          ]
+        },
+        "init": {
+          "position": [
+            7.02,
+            3.0755,
+            0.8255
+          ],
+          "orientation": [
+            -0.707107,
+            0.0,
+            0.0,
+            0.707107
+          ]
+        },
+        "goal": {
+          "position": [
+            7.02,
+            3.0835,
+            0.8255
+          ],
+          "orientation": [
+            -0.707107,
+            0.0,
+            0.0,
+            0.707107
+          ]
+        },
+        "direction": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "distance_m": 0.008
+      }
+    },
+    {
+      "instance": "toy_dice.n.01_4",
+      "order": 3,
+      "face_pair": "x",
+      "tilt_pick_deg": -45.0,
+      "tilt_place_deg": 45.0,
+      "yaw_deg": 27.0,
+      "flip_axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "flip_sign": -1,
+      "pick": {
+        "position": [
+          7.15,
+          3.02,
+          0.8375
+        ],
+        "orientation": [
+          0.898353,
+          0.215675,
+          -0.089336,
+          0.37211
+        ]
+      },
+      "place": {
+        "position": [
+          7.046,
+          3.094,
+          0.8415
+        ],
+        "orientation": [
+          0.92388,
+          0.0,
+          0.0,
+          -0.382683
+        ]
+      },
+      "carry_height": 0.1,
+      "brace_row": {
+        "arm": "left",
+        "object": "toy_dice.n.01_2",
+        "kind": "row_left",
+        "pre": {
+          "position": [
+            6.9015,
+            3.094,
+            0.8255
+          ],
+          "orientation": [
+            -0.0,
+            0.707107,
+            0.0,
+            0.707107
+          ]
+        },
+        "contact": {
+          "position": [
+            7.0015,
+            3.094,
+            0.8255
+          ],
+          "orientation": [
+            -0.0,
+            0.707107,
+            0.0,
+            0.707107
+          ]
+        },
+        "direction": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      "push_row": {
+        "arm": "right",
+        "object": "toy_dice.n.01_4",
+        "pre": {
+          "position": [
+            7.1645,
+            3.094,
+            0.8255
+          ],
+          "orientation": [
+            -0.0,
+            -0.707107,
+            0.0,
+            0.707107
+          ]
+        },
+        "init": {
+          "position": [
+            7.0645,
+            3.094,
+            0.8255
+          ],
+          "orientation": [
+            -0.0,
+            -0.707107,
+            0.0,
+            0.707107
+          ]
+        },
+        "goal": {
+          "position": [
+            7.0565,
+            3.094,
+            0.8255
+          ],
+          "orientation": [
+            -0.0,
+            -0.707107,
+            0.0,
+            0.707107
+          ]
+        },
+        "direction": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "distance_m": 0.008
+      },
+      "brace_col": {
+        "arm": "left",
+        "object": "toy_dice.n.01_3",
+        "kind": "column_top",
+        "pre": {
+          "position": [
+            7.046,
+            3.2385,
+            0.8255
+          ],
+          "orientation": [
+            0.707107,
+            0.0,
+            0.0,
+            0.707107
+          ]
+        },
+        "contact": {
+          "position": [
+            7.046,
+            3.1385,
+            0.8255
+          ],
+          "orientation": [
+            0.707107,
+            0.0,
+            0.0,
+            0.707107
+          ]
+        },
+        "direction": [
+          0.0,
+          -1.0,
+          0.0
+        ]
+      },
+      "push_col": {
+        "arm": "right",
+        "object": "toy_dice.n.01_4",
+        "pre": {
+          "position": [
+            7.046,
+            2.9755,
+            0.8255
+          ],
+          "orientation": [
+            -0.707107,
+            0.0,
+            0.0,
+            0.707107
+          ]
+        },
+        "init": {
+          "position": [
+            7.046,
+            3.0755,
+            0.8255
+          ],
+          "orientation": [
+            -0.707107,
+            0.0,
+            0.0,
+            0.707107
+          ]
+        },
+        "goal": {
+          "position": [
+            7.046,
+            3.0835,
+            0.8255
+          ],
+          "orientation": [
+            -0.707107,
+            0.0,
+            0.0,
+            0.707107
+          ]
+        },
+        "direction": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "distance_m": 0.008
+      }
+    }
+  ],
+  "language": {
+    "objects": {
+      "toy_dice.n.01_1": {
+        "display_name": "block",
+        "descriptor": "the block at the back left"
+      },
+      "toy_dice.n.01_2": {
+        "display_name": "block",
+        "descriptor": "the block nearest to you on the left"
+      },
+      "toy_dice.n.01_3": {
+        "display_name": "block",
+        "descriptor": "the block at the back right"
+      },
+      "toy_dice.n.01_4": {
+        "display_name": "block",
+        "descriptor": "the block nearest to you on the right"
+      }
+    },
+    "goal_numbers": {
+      "pattern": "K3",
+      "edge_mm": 25.0,
+      "pitch_mm": 26.0
+    }
+  },
+  "waypoint_policy": "checked"
+}

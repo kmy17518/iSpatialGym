@@ -1,0 +1,200 @@
+{
+  "schema": "isg-oracle-v1",
+  "instance_id": "disembedding-bottle_of_beer-box_of_cereal_2_bar_soap_1-breakfast_table__house_single_floor__target-bottle_of_beer-meqliv__0000",
+  "tro_sha256": "c6ccc86c2144f2ce1a64c9c0c36090a8397592991999ef133a36a696b8ae1921",
+  "task_family": "disembedding",
+  "alias": "disembedding-bottle_of_beer-box_of_cereal_2_bar_soap_1-breakfast_table",
+  "path_bucket_m": null,
+  "stances": {
+    "init": {
+      "base_pose2d": [
+        7.05,
+        2.4545,
+        1.5708
+      ],
+      "translate": 0.5,
+      "tilt": 0.0,
+      "arms": "untucked",
+      "stand_off": 0.45,
+      "edge": "-v"
+    },
+    "manipulation": {
+      "base_pose2d": [
+        7.05,
+        2.5545,
+        1.5708
+      ],
+      "translate": 0.75,
+      "tilt": -0.42,
+      "stand_off": 0.35,
+      "lateral": -0.245,
+      "focus": [
+        7.05,
+        3.1245,
+        0.813
+      ],
+      "arms": [
+        "right"
+      ],
+      "edge": "-v"
+    },
+    "placement": {
+      "base_pose2d": [
+        7.42,
+        2.5545,
+        1.5708
+      ],
+      "translate": 0.75,
+      "tilt": -0.42,
+      "stand_off": 0.35,
+      "lateral": 0.125,
+      "focus": [
+        7.42,
+        3.1245,
+        0.813
+      ],
+      "arms": [
+        "right"
+      ],
+      "edge": "-v"
+    }
+  },
+  "transitions": [
+    {
+      "from": "init",
+      "to": "manipulation",
+      "stand_off": 0.55,
+      "order": [
+        "drive-back",
+        "trunk",
+        "drive-in"
+      ]
+    }
+  ],
+  "paths": [
+    {
+      "from": "manipulation",
+      "to": "placement",
+      "mode": "local",
+      "waypoints": [
+        [
+          7.05,
+          2.5545,
+          1.5708
+        ],
+        [
+          7.2,
+          2.5545,
+          1.5708
+        ],
+        [
+          7.42,
+          2.5545,
+          1.5708
+        ]
+      ],
+      "length_m": 0.37,
+      "posture": "untucked",
+      "carried": "bottle_of_beer.n.01_1"
+    }
+  ],
+  "grasps": [
+    {
+      "object": "bottle_of_beer.n.01_1",
+      "arm": "right",
+      "grasp_key": "bottle_of_beer__meqliv__t",
+      "grasp_name": "grasp_3",
+      "yaw": 1.22,
+      "pre_grasp": {
+        "position": [
+          7.03,
+          3.13,
+          1.048
+        ],
+        "orientation": [
+          0.819648,
+          0.572867,
+          0.0,
+          0.0
+        ]
+      },
+      "grasp": {
+        "position": [
+          7.03,
+          3.13,
+          0.948
+        ],
+        "orientation": [
+          0.819648,
+          0.572867,
+          0.0,
+          0.0
+        ]
+      },
+      "pre_place": {
+        "position": [
+          7.42,
+          3.13,
+          1.058
+        ],
+        "orientation": [
+          0.819648,
+          0.572867,
+          0.0,
+          0.0
+        ]
+      },
+      "place": {
+        "position": [
+          7.42,
+          3.13,
+          0.958
+        ],
+        "orientation": [
+          0.819648,
+          0.572867,
+          0.0,
+          0.0
+        ]
+      },
+      "carry_height": 0.16,
+      "place_on": "tray.n.01_2"
+    }
+  ],
+  "language": {
+    "objects": {
+      "bottle_of_beer.n.01_1": {
+        "display_name": "beer bottle",
+        "descriptor": "the beer bottle between the two cereal boxes"
+      },
+      "tray.n.01_1": {
+        "display_name": "tray",
+        "descriptor": "the tray in front of you"
+      },
+      "tray.n.01_2": {
+        "display_name": "tray",
+        "descriptor": "the tray on the right"
+      },
+      "box_of_cereal.n.01_1": {
+        "display_name": "cereal box",
+        "descriptor": "the cereal box on the left"
+      },
+      "box_of_cereal.n.01_2": {
+        "display_name": "cereal box",
+        "descriptor": "the cereal box at the back"
+      },
+      "bar_soap.n.01_1": {
+        "display_name": "bar of soap"
+      }
+    },
+    "goal_numbers": {
+      "occlusion_ratio": 0.18,
+      "move_right_cm": 39.0
+    }
+  },
+  "waypoint_policy": "checked",
+  "occlusion": {
+    "ratio": 0.18,
+    "visible_area": 5120
+  }
+}

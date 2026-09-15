@@ -1,0 +1,80 @@
+{
+  "schema": "isg-oracle-v1",
+  "instance_id": "camera_relocalization-obstructed-hamper_1__house_single_floor__obstacles-hamper-clziqw__0000",
+  "tro_sha256": "664259079a7412a73c34a0deafc7caf7af3fabe65c6b5e0d93d1edabb5183c11",
+  "task_family": "camera_relocalization",
+  "alias": "camera_relocalization-obstructed-hamper_1",
+  "path_bucket_m": 5.0,
+  "stances": {
+    "init": {
+      "base_pose2d": [
+        13.2,
+        0.8,
+        0.3
+      ],
+      "translate": 0.5,
+      "tilt": 0.0,
+      "arms": "untucked"
+    }
+  },
+  "paths": [
+    {
+      "from": "init",
+      "to": "goal",
+      "mode": "global",
+      "waypoints": [
+        [
+          13.2,
+          0.8,
+          0.3
+        ],
+        [
+          13.7,
+          1.5,
+          0.9
+        ],
+        [
+          14.3,
+          2.2,
+          0.3
+        ],
+        [
+          15.1,
+          2.3,
+          -0.4
+        ],
+        [
+          15.6,
+          1.9,
+          -1.2
+        ]
+      ],
+      "length_m": 3.42,
+      "posture": "reset",
+      "carried": null
+    }
+  ],
+  "goal": {
+    "base_pose2d": [
+      15.6,
+      1.9,
+      -1.2
+    ],
+    "translate": 1.0,
+    "tilt": 0.35,
+    "arms": "untucked"
+  },
+  "language": {
+    "objects": {
+      "hamper.n.02_1": {
+        "display_name": "hamper",
+        "descriptor": "the wicker hamper in the middle of the room"
+      }
+    },
+    "goal_numbers": {
+      "path_length_m": 3.42,
+      "detour_m": 0.71
+    }
+  },
+  "waypoint_policy": "checked"
+}

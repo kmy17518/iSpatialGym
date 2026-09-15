@@ -1,0 +1,76 @@
+{
+  "schema": "isg-oracle-v1",
+  "instance_id": "camera_relocalization-standard__house_single_floor__living_room_0__0000",
+  "tro_sha256": "d1102d24e684e04181b4983c7add9ced6342f84b46db6e93fa50fb0f47489177",
+  "task_family": "camera_relocalization",
+  "alias": "camera_relocalization-standard",
+  "path_bucket_m": 3.0,
+  "stances": {
+    "init": {
+      "base_pose2d": [
+        13.2,
+        0.8,
+        0.3
+      ],
+      "translate": 0.5,
+      "tilt": 0.0,
+      "arms": "untucked"
+    }
+  },
+  "paths": [
+    {
+      "from": "init",
+      "to": "goal",
+      "mode": "global",
+      "waypoints": [
+        [
+          13.2,
+          0.8,
+          0.3
+        ],
+        [
+          13.8,
+          1.1,
+          0.4
+        ],
+        [
+          14.5,
+          1.4,
+          0.2
+        ],
+        [
+          15.2,
+          1.7,
+          -0.6
+        ],
+        [
+          15.6,
+          1.9,
+          -1.2
+        ]
+      ],
+      "length_m": 2.71,
+      "posture": "reset",
+      "carried": null
+    }
+  ],
+  "goal": {
+    "base_pose2d": [
+      15.6,
+      1.9,
+      -1.2
+    ],
+    "translate": 0.8,
+    "tilt": -0.25,
+    "arms": "same"
+  },
+  "language": {
+    "objects": {},
+    "goal_numbers": {
+      "path_length_m": 2.71,
+      "goal_translate": 0.8,
+      "goal_tilt": -0.25
+    }
+  },
+  "waypoint_policy": "checked"
+}

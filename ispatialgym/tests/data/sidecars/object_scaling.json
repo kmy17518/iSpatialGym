@@ -1,0 +1,102 @@
+{
+  "schema": "isg-oracle-v1",
+  "instance_id": "object_scaling-beaker__house_single_floor__target-beaker-rhohgs__0000",
+  "tro_sha256": "2f4af07e089dd3e485d5492877a486820acba92ae5c6e0b31db3773634b985e5",
+  "task_family": "object_scaling",
+  "alias": "object_scaling-beaker",
+  "path_bucket_m": null,
+  "grasps": [
+    {
+      "object": "beaker.n.02_1",
+      "arm": "right",
+      "grasp_key": "beaker__rhohgs",
+      "grasp_name": "grasp_2",
+      "yaw": 0.0,
+      "grasp": {
+        "position": [
+          14.1664,
+          0.6351,
+          1.15
+        ],
+        "orientation": [
+          -0.055395,
+          0.800378,
+          0.077915,
+          0.591824
+        ]
+      },
+      "waypoints": [
+        {
+          "position": [
+            14.1325,
+            0.6282,
+            1.1644
+          ],
+          "orientation": [
+            -0.055395,
+            0.800378,
+            0.077915,
+            0.591824
+          ]
+        },
+        {
+          "position": [
+            14.0986,
+            0.6213,
+            1.1788
+          ],
+          "orientation": [
+            -0.055395,
+            0.800378,
+            0.077915,
+            0.591824
+          ]
+        },
+        {
+          "position": [
+            14.0647,
+            0.6145,
+            1.1932
+          ],
+          "orientation": [
+            -0.055395,
+            0.800378,
+            0.077915,
+            0.591824
+          ]
+        },
+        {
+          "position": [
+            14.0307,
+            0.6076,
+            1.2076
+          ],
+          "orientation": [
+            -0.055395,
+            0.800378,
+            0.077915,
+            0.591824
+          ]
+        }
+      ],
+      "hold": {
+        "depth_m": 0.5,
+        "roll_deg": 15.0,
+        "translate": 0.5,
+        "tilt": 0.0
+      }
+    }
+  ],
+  "language": {
+    "objects": {
+      "beaker.n.02_1": {
+        "display_name": "beaker"
+      }
+    },
+    "goal_numbers": {
+      "depth_init_m": 0.5,
+      "depth_goal_m": 0.35
+    }
+  },
+  "waypoint_policy": "checked"
+}

@@ -1,0 +1,191 @@
+{
+  "schema": "isg-oracle-v1",
+  "instance_id": "inter_object_relation_satisfaction-ontop_large_scale-canned_food-sofa-floor__house_single_floor__target-canned_food-ycbspm__0000",
+  "tro_sha256": "f9b7692db4dace591b7e668684ddaa970a6ec9381eb50e7b0e39e8b9f5f26142",
+  "task_family": "inter_object_relation_satisfaction",
+  "alias": "inter_object_relation_satisfaction-ontop_large_scale-canned_food-sofa-floor",
+  "path_bucket_m": null,
+  "stances": {
+    "init": {
+      "base_pose2d": [
+        13.9,
+        1.25,
+        -1.5707963267948966
+      ],
+      "translate": 0.5,
+      "tilt": 0.0,
+      "arms": "untucked",
+      "distance": 0.95
+    },
+    "manipulation": {
+      "base_pose2d": [
+        13.9,
+        0.75,
+        -1.5707963267948966
+      ],
+      "translate": 0.95,
+      "tilt": -1.2,
+      "stand_off": 0.45,
+      "focus": [
+        13.9,
+        0.3,
+        0.0
+      ],
+      "arms": [
+        "right"
+      ]
+    },
+    "placement": {
+      "base_pose2d": [
+        14.6,
+        0.34,
+        -1.5707963267948966
+      ],
+      "translate": 0.75,
+      "tilt": -0.5,
+      "stand_off": 0.45,
+      "lateral": -0.4,
+      "focus": [
+        14.6,
+        -0.4,
+        0.399
+      ],
+      "goal_cell": [
+        14.6,
+        -0.4
+      ],
+      "arms": [
+        "right"
+      ]
+    }
+  },
+  "transitions": [
+    {
+      "from": "init",
+      "to": "manipulation",
+      "stand_off": 0.65,
+      "order": [
+        "drive-back",
+        "trunk",
+        "drive-in"
+      ]
+    },
+    {
+      "from": "manipulation",
+      "to": "placement",
+      "stand_off": 0.55,
+      "order": [
+        "drive-back",
+        "trunk",
+        "drive-in"
+      ]
+    }
+  ],
+  "paths": [
+    {
+      "from": "manipulation",
+      "to": "placement",
+      "mode": "local",
+      "waypoints": [
+        [
+          13.9,
+          0.75,
+          -1.5707963267948966
+        ],
+        [
+          14.2,
+          0.7,
+          -1.3
+        ],
+        [
+          14.6,
+          0.34,
+          -1.5707963267948966
+        ]
+      ],
+      "length_m": 0.86,
+      "posture": "untucked",
+      "carried": "canned_food.n.01_1"
+    }
+  ],
+  "grasps": [
+    {
+      "object": "canned_food.n.01_1",
+      "arm": "right",
+      "grasp_key": "canned_food__ycbspm__t",
+      "grasp_name": "grasp_0",
+      "yaw": 0.4,
+      "pre_grasp": {
+        "position": [
+          13.9,
+          0.3,
+          0.16
+        ],
+        "orientation": [
+          0.980067,
+          0.198669,
+          0.0,
+          0.0
+        ]
+      },
+      "grasp": {
+        "position": [
+          13.9,
+          0.3,
+          0.06
+        ],
+        "orientation": [
+          0.980067,
+          0.198669,
+          0.0,
+          0.0
+        ]
+      },
+      "pre_place": {
+        "position": [
+          14.6,
+          -0.4,
+          0.569
+        ],
+        "orientation": [
+          0.980067,
+          0.198669,
+          0.0,
+          0.0
+        ]
+      },
+      "place": {
+        "position": [
+          14.6,
+          -0.4,
+          0.469
+        ],
+        "orientation": [
+          0.980067,
+          0.198669,
+          0.0,
+          0.0
+        ]
+      },
+      "carry_height": 0.2,
+      "place_on": "sofa.n.01_1"
+    }
+  ],
+  "language": {
+    "objects": {
+      "canned_food.n.01_1": {
+        "display_name": "can",
+        "descriptor": "the can on the floor"
+      },
+      "sofa.n.01_1": {
+        "display_name": "sofa",
+        "descriptor": "the sofa"
+      }
+    },
+    "goal_numbers": {
+      "geodesic_m": 0.86
+    }
+  },
+  "waypoint_policy": "checked",
+  "init_surface": "floor"
+}

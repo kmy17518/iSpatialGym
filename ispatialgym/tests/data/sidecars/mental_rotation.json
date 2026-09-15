@@ -1,0 +1,106 @@
+{
+  "schema": "isg-oracle-v1",
+  "instance_id": "mental_rotation-mug__house_single_floor__target-mug-ppzttc__0000",
+  "tro_sha256": "25ba1273ba7b71ecdc2bbc3d0edefed0f5cf2d1e85f5a5efb96029972d2f9003",
+  "task_family": "mental_rotation",
+  "alias": "mental_rotation-mug",
+  "path_bucket_m": null,
+  "grasps": [
+    {
+      "object": "mug.n.04_1",
+      "arm": "right",
+      "grasp_key": "mug__ppzttc",
+      "grasp_name": "grasp_1",
+      "yaw": 0.0,
+      "grasp": {
+        "position": [
+          14.1664,
+          0.6351,
+          1.15
+        ],
+        "orientation": [
+          -0.055395,
+          0.800378,
+          0.077915,
+          0.591824
+        ]
+      },
+      "waypoints": [
+        {
+          "position": [
+            14.1619,
+            0.6314,
+            1.1494
+          ],
+          "orientation": [
+            -0.140006,
+            0.728106,
+            0.192712,
+            0.642746
+          ]
+        },
+        {
+          "position": [
+            14.1587,
+            0.6268,
+            1.1478
+          ],
+          "orientation": [
+            -0.220675,
+            0.635334,
+            0.302083,
+            0.675573
+          ]
+        },
+        {
+          "position": [
+            14.1571,
+            0.6218,
+            1.1452
+          ],
+          "orientation": [
+            -0.295132,
+            0.524676,
+            0.402949,
+            0.68938
+          ]
+        },
+        {
+          "position": [
+            14.1575,
+            0.6169,
+            1.1421
+          ],
+          "orientation": [
+            -0.361279,
+            0.399246,
+            0.492471,
+            0.683778
+          ]
+        }
+      ],
+      "hold": {
+        "depth_m": 0.5,
+        "roll_deg": 15.0,
+        "translate": 0.5,
+        "tilt": 0.0
+      }
+    }
+  ],
+  "language": {
+    "objects": {
+      "mug.n.04_1": {
+        "display_name": "mug"
+      }
+    },
+    "goal_numbers": {
+      "rotation_deg": 77.0,
+      "axis": [
+        0.300587,
+        -0.500978,
+        0.811584
+      ]
+    }
+  },
+  "waypoint_policy": "checked"
+}

@@ -1,0 +1,221 @@
+{
+  "schema": "isg-oracle-v1",
+  "instance_id": "configuration_matching-articulation_open_large_scale-fridge__house_single_floor__target-fridge-dszchb__0000",
+  "tro_sha256": "951c9781bfdcb1a51a617a39d4b1cd8b2b9d08b1dc8db2390e0b71ebf1ddba97",
+  "task_family": "configuration_matching",
+  "alias": "configuration_matching-articulation_open_large_scale-fridge",
+  "path_bucket_m": null,
+  "stances": {
+    "init": {
+      "base_pose2d": [
+        4.9,
+        -1.9,
+        2.9
+      ],
+      "translate": 0.25,
+      "tilt": 0.0,
+      "arms": "untucked",
+      "face_normal": [
+        1.0,
+        0.0
+      ],
+      "bearing_deg": -12.0,
+      "distance": 1.6
+    },
+    "manipulation": {
+      "base_pose2d": [
+        4.05,
+        -1.45,
+        3.141592653589793
+      ],
+      "translate": 0.5,
+      "tilt": -0.2,
+      "stand_off": 0.55,
+      "lateral": 0.23,
+      "focus": [
+        3.3,
+        -1.68,
+        1.05
+      ],
+      "arms": [
+        "right"
+      ],
+      "handle_class": "fwd_pinch_v"
+    }
+  },
+  "transitions": [
+    {
+      "from": "init",
+      "to": "manipulation",
+      "stand_off": 0.75,
+      "order": [
+        "drive-back",
+        "trunk",
+        "drive-in"
+      ]
+    }
+  ],
+  "paths": [
+    {
+      "from": "init",
+      "to": "manipulation",
+      "mode": "local",
+      "waypoints": [
+        [
+          4.9,
+          -1.9,
+          2.9
+        ],
+        [
+          4.5,
+          -1.6,
+          3.05
+        ],
+        [
+          4.05,
+          -1.45,
+          3.1416
+        ]
+      ],
+      "length_m": 0.98,
+      "posture": "untucked",
+      "carried": null
+    }
+  ],
+  "articulation": {
+    "object": "fridge.n.01_1",
+    "joint": "j_link_0",
+    "joint_type": "revolute",
+    "q_init": 0.0,
+    "q_goal": 1.35,
+    "waypoints": {
+      "0.0": {
+        "contact": [
+          3.3,
+          -1.68,
+          1.05
+        ],
+        "approach": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "pinch": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "0.25": {
+        "contact": [
+          3.4921,
+          -1.6473,
+          1.05
+        ],
+        "approach": [
+          -0.943585,
+          -0.331129,
+          0.0
+        ],
+        "pinch": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "0.5": {
+        "contact": [
+          3.6624,
+          -1.5528,
+          1.05
+        ],
+        "approach": [
+          -0.780707,
+          -0.624897,
+          0.0
+        ],
+        "pinch": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "0.75": {
+        "contact": [
+          3.7919,
+          -1.4073,
+          1.05
+        ],
+        "approach": [
+          -0.529742,
+          -0.848159,
+          0.0
+        ],
+        "pinch": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "1.0": {
+        "contact": [
+          3.8659,
+          -1.227,
+          1.05
+        ],
+        "approach": [
+          -0.219007,
+          -0.975723,
+          0.0
+        ],
+        "pinch": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "handle_reach": {
+      "0.25": true,
+      "0.5": true,
+      "0.75": true,
+      "1.0": true
+    },
+    "passive_from": 0.75,
+    "follow_mode": "base",
+    "base_follow": {
+      "0.25": [
+        4.081,
+        -1.6321,
+        2.8041
+      ],
+      "0.5": [
+        4.1706,
+        -1.7937,
+        2.4666
+      ],
+      "0.75": [
+        4.3086,
+        -1.9165,
+        2.1291
+      ],
+      "1.0": [
+        4.4795,
+        -1.9866,
+        1.7916
+      ]
+    }
+  },
+  "language": {
+    "objects": {
+      "fridge.n.01_1": {
+        "display_name": "fridge",
+        "descriptor": "the fridge"
+      }
+    },
+    "goal_numbers": {
+      "open_deg": 77.3
+    }
+  },
+  "waypoint_policy": "checked"
+}

@@ -1,0 +1,198 @@
+{
+  "schema": "isg-oracle-v1",
+  "instance_id": "alignment-world_horizontal-towel_rack-walls__house_single_floor__target-towel_rack-kqrmrh__0000",
+  "tro_sha256": "e13e6b4068094a615fe1bde1dc7337354acdde7dad16075325e80d2b45fb1217",
+  "task_family": "alignment",
+  "alias": "alignment-world_horizontal-towel_rack-walls",
+  "path_bucket_m": null,
+  "contacts": {
+    "push": {
+      "arm": "left",
+      "object": "towel_rack.n.01_1",
+      "pre": {
+        "position": [
+          17.617,
+          2.0507,
+          1.2705
+        ],
+        "orientation": [
+          -0.173587,
+          0.0,
+          0.0,
+          0.984819
+        ]
+      },
+      "init": {
+        "position": [
+          17.617,
+          2.0849,
+          1.3645
+        ],
+        "orientation": [
+          -0.173587,
+          0.0,
+          0.0,
+          0.984819
+        ]
+      },
+      "mid": {
+        "position": [
+          17.617,
+          2.0962,
+          1.4066
+        ],
+        "orientation": [
+          -0.173587,
+          0.0,
+          0.0,
+          0.984819
+        ]
+      },
+      "goal": {
+        "position": [
+          17.617,
+          2.1,
+          1.45
+        ],
+        "orientation": [
+          -0.173587,
+          0.0,
+          0.0,
+          0.984819
+        ]
+      },
+      "direction": [
+        0.0,
+        0.34202,
+        0.939693
+      ],
+      "distance_m": 0.087
+    },
+    "brace": {
+      "arm": "right",
+      "object": "towel_rack.n.01_1",
+      "kind": "above_low",
+      "pre": {
+        "position": [
+          17.617,
+          2.07,
+          1.585
+        ],
+        "orientation": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "contact": {
+        "position": [
+          17.617,
+          2.07,
+          1.485
+        ],
+        "orientation": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "direction": [
+        0.0,
+        0.0,
+        -1.0
+      ]
+    }
+  },
+  "language": {
+    "objects": {
+      "towel_rack.n.01_1": {
+        "display_name": "towel rack",
+        "descriptor": "the towel rack"
+      }
+    },
+    "goal_numbers": {
+      "deviation_deg": -20.0
+    }
+  },
+  "stances": {
+    "init": {
+      "base_pose2d": [
+        16.55,
+        1.85,
+        0.0
+      ],
+      "translate": 0.5,
+      "tilt": 0.0,
+      "arms": "untucked",
+      "face_normal": [
+        -1.0,
+        0.0
+      ],
+      "bearing_deg": 5.0,
+      "distance": 1.08
+    },
+    "manipulation": {
+      "base_pose2d": [
+        17.05,
+        1.85,
+        0.0
+      ],
+      "translate": 0.25,
+      "tilt": 0.0,
+      "stand_off": 0.59,
+      "lateral": 0.0,
+      "focus": [
+        17.617,
+        1.85,
+        1.45
+      ],
+      "arms": [
+        "right",
+        "left"
+      ],
+      "deviation_deg": 30.0
+    }
+  },
+  "transitions": [
+    {
+      "from": "init",
+      "to": "manipulation",
+      "stand_off": 0.69,
+      "order": [
+        "drive-back",
+        "trunk",
+        "drive-in"
+      ]
+    }
+  ],
+  "paths": [
+    {
+      "from": "init",
+      "to": "manipulation",
+      "mode": "local",
+      "waypoints": [
+        [
+          16.55,
+          1.85,
+          0.0
+        ],
+        [
+          16.8,
+          1.85,
+          0.0
+        ],
+        [
+          17.05,
+          1.85,
+          0.0
+        ]
+      ],
+      "length_m": 0.5,
+      "posture": "untucked",
+      "carried": null
+    }
+  ],
+  "waypoint_policy": "checked"
+}

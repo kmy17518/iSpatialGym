@@ -1,0 +1,199 @@
+{
+  "schema": "isg-oracle-v1",
+  "instance_id": "configuration_matching-articulation_close_large_scale-dishwasher__house_single_floor__target-dishwasher-ynrhuk__0000",
+  "tro_sha256": "451c5bc62c811b270724d53d162b7353525e43387d1948a45f8bc8ffa0e39331",
+  "task_family": "configuration_matching",
+  "alias": "configuration_matching-articulation_close_large_scale-dishwasher",
+  "path_bucket_m": null,
+  "stances": {
+    "init": {
+      "base_pose2d": [
+        1.35,
+        -2.4,
+        1.5707963267948966
+      ],
+      "translate": 0.25,
+      "tilt": 0.0,
+      "arms": "untucked",
+      "face_normal": [
+        0.0,
+        -1.0
+      ],
+      "bearing_deg": 8.0,
+      "distance": 1.5
+    },
+    "manipulation": {
+      "base_pose2d": [
+        1.1,
+        -1.55,
+        1.5707963267948966
+      ],
+      "translate": 0.75,
+      "tilt": -0.6,
+      "stand_off": 0.6,
+      "lateral": -0.1,
+      "focus": [
+        1.2,
+        -0.98,
+        0.72
+      ],
+      "arms": [
+        "right"
+      ],
+      "handle_class": "fwd_pinch_h"
+    }
+  },
+  "transitions": [
+    {
+      "from": "init",
+      "to": "manipulation",
+      "stand_off": 0.8,
+      "order": [
+        "drive-back",
+        "trunk",
+        "drive-in"
+      ]
+    }
+  ],
+  "paths": [
+    {
+      "from": "init",
+      "to": "manipulation",
+      "mode": "local",
+      "waypoints": [
+        [
+          1.35,
+          -2.4,
+          1.5707963267948966
+        ],
+        [
+          1.2,
+          -2.0,
+          1.5707963267948966
+        ],
+        [
+          1.1,
+          -1.55,
+          1.5707963267948966
+        ]
+      ],
+      "length_m": 0.88,
+      "posture": "untucked",
+      "carried": null
+    }
+  ],
+  "articulation": {
+    "object": "dishwasher.n.01_1",
+    "joint": "j_link_2",
+    "joint_type": "revolute",
+    "q_init": 1.2,
+    "q_goal": 0.0,
+    "waypoints": {
+      "0.0": {
+        "contact": [
+          1.2,
+          -0.98,
+          0.72
+        ],
+        "approach": [
+          0.0,
+          0.970143,
+          0.242536
+        ],
+        "pinch": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      "0.25": {
+        "contact": [
+          1.2,
+          -0.7686,
+          0.8785
+        ],
+        "approach": [
+          0.0,
+          0.998487,
+          -0.054994
+        ],
+        "pinch": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      "0.5": {
+        "contact": [
+          1.2,
+          -0.5199,
+          0.9674
+        ],
+        "approach": [
+          0.0,
+          0.937639,
+          -0.34761
+        ],
+        "pinch": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      "0.75": {
+        "contact": [
+          1.2,
+          -0.256,
+          0.9789
+        ],
+        "approach": [
+          0.0,
+          0.793035,
+          -0.609176
+        ],
+        "pinch": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      "1.0": {
+        "contact": [
+          1.2,
+          -0.0004,
+          0.9118
+        ],
+        "approach": [
+          0.0,
+          0.577591,
+          -0.816326
+        ],
+        "pinch": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "handle_reach": {
+      "0.25": true,
+      "0.5": true,
+      "0.75": true,
+      "1.0": true
+    },
+    "passive_from": null,
+    "follow_mode": "arm"
+  },
+  "language": {
+    "objects": {
+      "dishwasher.n.01_1": {
+        "display_name": "dishwasher",
+        "descriptor": "the dishwasher"
+      }
+    },
+    "goal_numbers": {
+      "close_deg": 68.8
+    }
+  },
+  "waypoint_policy": "checked"
+}
