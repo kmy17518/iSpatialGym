@@ -713,6 +713,23 @@ class Inventory:
         s = min(h, w)
         Image.fromarray(rgb[(h - s) // 2:(h - s) // 2 + s, (w - s) // 2:(w - s) // 2 + s]).resize((size, size), Image.LANCZOS).save(path)
 
+    def _clamp_cam(self, obj, anchor, cam_pos, min_d: float = 0.9):
+        """Move ``cam_pos`` back toward ``anchor`` (a point just in front of the object) if a scene surface lies in
+        between, so that the camera never ends up inside a wall or a neighbouring piece of furniture."""
+        anchor = np.asarray(anchor, dtype=float)
+        cam_pos = np.asarray(cam_pos, dtype=float)
+        v = cam_pos - anchor
+        L = float(np.linalg.norm(v))
+        if L < 1e-6:
+            return cam_pos
+        own = {l.prim_path for l in obj.links.values()} | {m.prim_path for ms in (self.markers or {}).values() for m in ms}
+        hits = self.world.raycast(th.tensor(anchor, dtype=th.float32).unsqueeze(0), th.tensor(cam_pos, dtype=th.float32).unsqueeze(0))
+        for h in hits:
+            if h["hit"] and h["rigidBody"] not in own:
+                t = float(h["distance"])
+                return anchor + v / L * max(min_d, t - 0.15)
+        return cam_pos
+
     def _render_strip(self, obj, rec: dict) -> str:
         import omnigibson as og
         from PIL import Image, ImageDraw, ImageFont
@@ -765,7 +782,9 @@ class Inventory:
         views = []
         self._place_markers(items)
         p_over = os.path.join(rdir, f"{obj.name}__overview.png")
-        self._grab(c + n0 * d * 0.9 + side * d * 0.2 + np.array([0, 0, d * 0.25]), c, p_over)
+        anchor = c + n0 * (0.5 * float(np.abs(ext @ np.abs(n0))) + 0.25)  # just outside the face the joints open toward
+        cam_over = self._clamp_cam(obj, anchor, c + n0 * d * 0.9 + side * d * 0.2 + np.array([0, 0, d * 0.25]))
+        self._grab(cam_over, c, p_over)
         views.append(("overview (closed)", p_over))
         for ji, j in enumerate(joints):
             jitems = [("ABCD"[k], world(h["contact"])) for k, h in enumerate(j.get("handles", [])[:4])]
@@ -781,7 +800,7 @@ class Inventory:
             sd = np.cross(n, [0, 0, 1.0]) if abs(n[2]) < 0.7 else np.array([1.0, 0, 0])
             dz = 1.1 * lext + 0.25
             p = os.path.join(rdir, f"{obj.name}__{ji}_zoom.png")
-            self._grab(lc + n * dz * 0.85 + sd * dz * 0.3 + np.array([0, 0, dz * 0.25]), lc, p)
+            self._grab(self._clamp_cam(obj, lc + n * 0.2, lc + n * dz * 0.85 + sd * dz * 0.3 + np.array([0, 0, dz * 0.25]), min_d=0.6), lc, p)
             views.append((f"{j['joint']} ({j.get('kind')}, {j['status']})", p))
         self._place_markers(items)
         q2 = q.clone()
@@ -793,7 +812,7 @@ class Inventory:
         obj.keep_still()
         og.sim.step()
         p_open = os.path.join(rdir, f"{obj.name}__open.png")
-        self._grab(c + n0 * d * 0.9 + side * d * 0.2 + np.array([0, 0, d * 0.25]), c, p_open)
+        self._grab(cam_over, c, p_open)
         views.append(("opened 60 % (markers at closed positions)", p_open))
         obj.set_joint_positions(q)
         obj.keep_still()
