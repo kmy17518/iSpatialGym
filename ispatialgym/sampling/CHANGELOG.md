@@ -14,6 +14,13 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
   label maps no longer contain `unlabelled` regions in the affected views. Measured on house_single_floor with the
   neighbours loaded: 8 living-room views x 4-6 renders crash-free; the v1 guard still crashed on the kitchen view,
   the viewer-camera workaround of BEHAVIOR-1K #2312 and translucency off did not help. Spec 3.1 / 3.4.
+- **Settled segmentation reads.** A sensor read returns a buffer one to two rendered frames old (load-dependent), and
+  a scene change reaches the renderer one frame late, so v1's "three renders then read" in `SimWorld.seg_instance`
+  reported the state of the *previous* measurement when measurements followed each other (the distractor-hidden
+  reference silhouette equalled the occluded one; the tray counts read next carried the hidden state).
+  `seg_instance` now renders >= 4 frames and continues one frame at a time until two consecutive raw-buffer fetches
+  are identical (cap 8), then reads; `rgb()` reads after the same settling. ~0.3 s per measurement instead of
+  ~0.17 s. Same-pose measurements are now identical across repeats and across room sets. Spec 3.4.
 - **World horizontal (`world_alignment-2`, alias `world_horizontal`)**: new problem (BDDL template
   `world_alignment/problem2.bddl`, `bddl_writer`, `WorldHorizontalSampler` in `tasks/world_alignment.py`, spec entry,
   docs spec §5.9 / `task_bddl_formats.md` §6c). Same wall hinge, arc and pushing rules as world vertical; the target

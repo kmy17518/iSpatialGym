@@ -305,8 +305,19 @@ the instance-mapping table) does not cover this crash, and translucency off does
 rules: light fixtures are labelled objects now, so the structural-category exclusion (`downlight`, `room_light`; 6.1)
 is what keeps them out of visibility counts; objects of the neighbours seen through glass count as visible where a
 rule counts non-structural objects. `ISG_HIDE_CATEGORY_SUBSTRINGS` (default empty) remains as an emergency override.
-A label map lags the physics pose by one rendered frame (the first frame after a teleport shows the previous view),
-hence three renders per measurement.
+
+**Settled reads.** The annotator data lags the scene: a pose or visibility change reaches the renderer one frame
+late, and the buffer a sensor read returns trails the last rendered frame by a further, GPU-load-dependent one to two
+frames (measured 2026-09-15: change, three renders, read → the old view; read again without rendering → the same;
+under load even render, read, render, read → the old view). v1's fixed "three renders then read" therefore reported
+the state of the *previous* measurement whenever two measurements followed each other (e.g. the reference silhouette
+with the distractors hidden came out equal to the occluded one, and the tray counts right after it carried the
+hidden state). `SimWorld.seg_instance` now renders at least four frames and keeps rendering one frame at a time
+until two consecutive fetches of the raw segmentation buffer are identical (the scene is static during a measurement,
+so a settled buffer repeats exactly; cap eight frames), then reads the remapped observation. Cost ≈ 0.3 s per
+measurement at 1080² (≈ 0.17 s before). Verified on a sampled disembedding instance: with the same robot and object
+poses the target, source-tray and destination-tray pixel counts are identical with and without the neighbours
+loaded (100596 / 59332 / 15447 px), and repeated measurements agree exactly.
 
 ### 3.5 Checks common to every task
 

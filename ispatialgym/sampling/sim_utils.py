@@ -410,13 +410,44 @@ class SimWorld:
         for _ in range(n):
             og.sim.render()
 
+    #: frames rendered per measurement: at least this many (see ``seg_instance``), at most ``SEG_MAX_RENDERS``
+    SEG_MIN_RENDERS = 4
+    SEG_MAX_RENDERS = 8
+
+    def _raw_seg_instance(self) -> th.Tensor:
+        """The head camera's instance-segmentation buffer as the annotator currently holds it (unremapped ids, a
+        copy); a cheap fetch (no rgb / semantic read, no remapping) used to detect when the buffer has settled."""
+        raw = self.cam._annotators["seg_instance"].get_data(device=og.sim.device)
+        data = raw["data"] if isinstance(raw, dict) else raw
+        seg = self.cam._preprocess_cpu_obs(data, "seg_instance") if og.sim.device == "cpu" else self.cam._preprocess_gpu_obs(data, "seg_instance")
+        return seg.clone()
+
     def seg_instance(self, n_renders: int = 3) -> Tuple[th.Tensor, Dict[int, str]]:
-        """Instance segmentation of the head camera after ``n_renders`` frames: ``(label map (H, W) int64,
-        {id: object name | 'background' | 'unlabelled' | 'groundPlane' | particle system})``. The label map lags the
-        physics pose by one frame (measured 2026-09-15: after a teleport the first rendered frame still shows the
-        previous view, the second is current; the very first read of a process is all background), hence the default
-        of three renders. Callers compare the mapping values (object names), never the ids."""
-        self.render(n_renders)
+        """Instance segmentation of the head camera: ``(label map (H, W) int64, {id: object name | 'background' |
+        'unlabelled' | 'groundPlane' | particle system})``. Callers compare the mapping values (object names), never
+        the ids.
+
+        The annotator data lags the scene: a pose or visibility change reaches the renderer one frame late, and the
+        buffer a read returns trails the last rendered frame by a further, load-dependent one to two frames (measured
+        2026-09-15: change, 3 renders, read = the old view; a second read without rendering = the same; under GPU load
+        even render, read, render, read returned the old view). A fixed number of frames is therefore not enough. This
+        renders at least ``max(n_renders, SEG_MIN_RENDERS)`` frames and keeps rendering one frame at a time until two
+        consecutive fetches of the raw buffer are identical (the scene is static during a measurement, so a settled
+        buffer repeats exactly), up to ``SEG_MAX_RENDERS``; then the remapped observation is read."""
+        n_min = max(int(n_renders), self.SEG_MIN_RENDERS)
+        self.render(n_min - 2)
+        prev = self._raw_seg_instance()
+        n = n_min - 2
+        while True:
+            self.render(1)
+            n += 1
+            cur = self._raw_seg_instance()
+            if n >= n_min and th.equal(cur, prev):
+                break
+            if n >= self.SEG_MAX_RENDERS:
+                log.warning("seg_instance: label map still changing after %d frames; using the latest", n)
+                break
+            prev = cur
         obs, info = self.robot.get_obs()
         seg = obs[self.cam_key]["seg_instance"]
         mapping = {int(k): v for k, v in info[self.cam_key]["seg_instance"].items()}
@@ -497,7 +528,9 @@ class SimWorld:
         return present()
 
     def rgb(self, n_renders: int = 3):
-        self.render(n_renders)
+        """Head camera rgb (debug / contact sheets, no measurement). Read after the segmentation buffer has settled
+        (:meth:`seg_instance`): a lone read returns a frame one to two renders old, see there."""
+        self.seg_instance(n_renders)
         obs, _ = self.robot.get_obs()
         return obs[self.cam_key]["rgb"][..., :3].cpu()
 
