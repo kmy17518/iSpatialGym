@@ -50,3 +50,6 @@ runlogs/**/*.pkl
 runlogs/**/*.usd
 runlogs/**/*.usda
 runlogs/**/*.usdc
+
+# RunPod fleet state (pod ids, billing samples, benchmark pulls)
+runlogs/runpod/
