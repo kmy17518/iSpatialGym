@@ -220,11 +220,9 @@ class Disembedding(SamplerV2):
         self.bind_scene_object("support", self.world.obj(names[0]))
 
     def support_objects(self) -> List[Any]:
-        out = [self.obj("support")]
-        for role in (self.src_role, self.dst_role):
-            if self.bindings.has(role):
-                out.append(self.obj(role))
-        return out
+        """The table and both trays (ignored for the final grasp / place pose only, §3.6); bound roles only (parking runs
+        before the roles are bound)."""
+        return [self.obj(role) for role in ("support", self.src_role, self.dst_role) if self.bindings.has(role)]
 
     def spawn_roles(self):
         super().spawn_roles()
