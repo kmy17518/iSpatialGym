@@ -240,6 +240,9 @@ the per-object descriptors recorded at sampling time ("the cereal box on the lef
 concrete numbers of the action ("push the towel rack up 3 cm at its left end"). Each demo carries (a) the task family
 name, (b) the family-level description shared by all instances, (c) the template-level description with the involved
 categories, and (d) the instance-level description with the goal numbers (a replacement for the goal image).
+Descriptors must single out the object among the objects in view: when two texture variants of one geometry (or two
+look-alikes, spec §3.12) are both visible, the descriptor carries a colour / print word or a spatial relation
+("the blue mug", "the mug nearer the tray"), never the bare `display_name`.
 
 ### 6.4 Real-time QA (hard failures, `run_isg`)
 
@@ -247,7 +250,9 @@ Binary success not reached, measured error above tolerance, robot or object moti
 collision (whole body vs scene / objects other than the intended contacts), ghost hand (assisted-grasp artefact),
 prolonged pause (except the final stop), gripper out of the head camera's FOV during a manipulation action, failed
 grasp for grasp actions (not checked for push / brace actions). A hard failure ends the episode; the checkpoint of the
-last successful action allows one retry of the failed action.
+last successful action allows one retry of the failed action. "Failed grasp" means the assisted grasp did not attach
+(both pads never touched the object); an asymmetric closure — one finger at 0 mm, the other at 30–50 mm — is the
+normal `one_finger` artefact of position-controlled fingers under assisted grasping and is not a failure.
 
 ### 6.5 `run_isg` modes and recording
 
@@ -256,6 +261,10 @@ replays actions from a LeRobot episode, or (iii) runs the oracle; the same loade
 Recording modes: demos → hdf5 replayable by the BEHAVIOR tooling **and** the LeRobot v3 ingredients (observations,
 actions, annotations) written by the same wrapper (no second replay pass; see
 `OmniGibson/omnigibson/envs/lerobot_data_wrapper.py`); QA-only → the rollout observation video of `replay_data.py`.
+Goal images (instance conditioning) are captured by `run_isg` with the robot and every task object stationary at the
+goal configuration, after ≥ 3 renders (10, as the playback wrapper does), with the physics-synced sensor pose stored
+as `goal_observation.camera_pose_world`, the evaluation camera profile (`isg-v1`), and the same segmentation /
+render guards as sampling (spec §3.4): no prim is hidden for a goal image once the viewer-camera path (B10) is in.
 
 ## 7. Running it
 

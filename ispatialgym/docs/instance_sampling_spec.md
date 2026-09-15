@@ -110,6 +110,31 @@ concrete categories and models to the iddl roles, `require/` holds the artefacts
 used to be a "viable" list (supports, walls, articulated objects) is a *candidate* here until `ground_isg` re-derives
 it.
 
+**Row admissibility that `ground_isg` enforces before anything is spawned** (each failure is a blacklist entry with
+the reason in parentheses; the selection runlogs applied these by hand, here they are checks):
+
+- `ready = 1` — no unprocessed BEHAVIOR-KB complaint, asset on disk, single rigid link for rigid roles
+  (`not_ready`). Scene rows are exempt (they are what the scene contains).
+- A manipulated role (grasped or pushed) needs a `graspable` model: ≥ 1 admissible grasp / handle / contact row for
+  the pipeline the iddl asks for (`missing_grasps:<pipeline>`, `missing_handle`, `missing_contacts`). The
+  zero-grasp categories of the grasp library (cap without knob, lid, license_plate, dartboard, briefcase,
+  french_fries, cinnamon_stick, …) therefore only appear as partner, distractor or obstacle.
+- **Grasp pipeline per subtask** (the iddl `(grasps <role> <pipeline>)` form; no fallback to another pipeline):
+  `floating` (`__f`) for object scaling and mental rotation; `tabletop` (`__t`) for disembedding and IORS ontop /
+  under / nextto / touching; `insert` (`__i`, flowers `__fl`) for IORS inside; `attachment` (`__a`) for the
+  attachment male. `handle_half` (`__h`) rows count as `floating` for knives. A model whose only rows belong to
+  another pipeline is `missing_grasps:<pipeline>`.
+- **Reviewer verdicts**: a grasp row is admissible when `verdict = ok`, or `flag` with flags ⊆ {`one_finger`};
+  `end_grasp`, `gap`, `fragile`, `penetration`, `task_violation` exclude the row. `one_finger` is an artefact of
+  assisted grasping (the fingers are position-controlled independently: the first pad to touch pushes the object into
+  the other pad and keeps closing), it happens in demos too and is not a grasp failure.
+- **Spawn scale = grasp-tested scale**: a row with a non-empty `scale` (the thin objects re-run at a per-axis scale
+  that makes their thinnest extent 20 mm: pencil, garlic_clove, french_fries, cinnamon_stick, two caps) is spawned at
+  exactly that scale (`roles.<role>.scale` in the customs list, written by `ground_isg`), never at the canonical
+  scale, and its rest pose, symmetry (3.13) and every per-model cache (3.10) are keyed by the scale vector.
+- Alignment targets need a reviewed frame record (`frame_front` / `frame_up` or `frame_level`, `frame_long`) —
+  otherwise `missing_frame`; wall targets additionally need `symmetric_180` filled (0 or 1).
+
 ### 2.3 Task customs list
 
 One entry per alias. Scene-independent model pools are the icl's job; the customs list holds **how models are drawn**
@@ -160,8 +185,11 @@ One entry per alias. Scene-independent model pools are the icl's job; the custom
   a scene role bound per scene under `scenes.<scene>.bindings`), the copied `require` entries of the iddl
   (`grasps: <pipeline>`, `contacts: true`, `handle: true` — the loader and oracle read the grasp pipeline from here),
   the representative model, and the per-role draw parameters that are not group-related: `scale` (per-model spawn
-  scale map of the alignment targets, `{"keyboard/hgtbot": 0.8}`; absent = 1), `joint` / `handle_key` (the one joint
-  of an articulation target, per model or per scene object name).
+  scale map: the configured scale of the alignment targets, `{"keyboard/hgtbot": 0.8}`, and the grasp-tested scale
+  of the thin models copied from the icl, `{"pencil/xyz": [1.0, 3.6, 5.1]}`; absent = 1), `joint` / `handle_key`
+  (the one joint of an articulation target, per model or per scene object name), and `dataset` for models that are
+  not BEHAVIOR assets (`"dataset": "ispatialgym-assets"` for the block and any custom tray; the synset must be
+  registered in the ispatialgym BDDL domain).
 - `whitelist` / `blacklist` are **per scene**; a scene block exists for every candidate scene (`house_single_floor`,
   `house_double_floor_upper`, `house_double_floor_lower`, `Rs_int`, `hotel_suite_large`, `restaurant_diner`,
   `office_cubicles_right`) unless the icl bounds the scene (`room` rows: camera relocalization and the held-object
@@ -208,10 +236,17 @@ footprint as `blocked_footprints` in the same structure.
 
 - An object placed on a surface has its **whole footprint** (AABB projected after the sampled yaw) inside the support
   polygon (top face of the collision geometry, not the AABB) shrunk by 2 cm (0.5 cm on a tray floor).
-- Rest orientation = canonical up, or the grasp library's rest quaternion for models that lie on a side, times the
-  sampled yaw; z = support top + bottom offset + 3 mm.
+- Rest orientation = canonical up, or the grasp library's rest quaternion for models that lie on a side
+  (`require/grasps.csv rest_quat_wxyz` of the drawn grasp row — the grasps were validated in that pose, so a model
+  whose rows carry a rest quaternion is always spawned in it), times the sampled yaw; z = support top + bottom
+  offset + 3 mm. Objects with a non-empty icl `scale` are spawned at that scale (2.2).
 - Footprints keep ≥ 3 cm clearance (target–partner) unless a rule states otherwise; nothing is placed inside the
   robot's or another object's AABB.
+- **Support admissibility** (re-derived by `ground_isg` from the B4 inventory, never trusted from the icl): a single
+  flat top link, top height 0.55–1.20 m (`support_low` / `support_high`), top polygon ≥ 0.30 m on its short side and
+  ≥ 0.12 m² (`support_small`), at least one edge with a free-floor run for the stances of section 4 (`no_free_edge`),
+  in a room the robot can stand in. Chairs are never supports; a cubicle desk is one object with several tops, each
+  top is a separate support entry. Small-scale articulation targets taller than 0.6 m use the floor (5.4).
 
 ### 3.3 Robot
 
@@ -232,6 +267,9 @@ footprint as `blocked_footprints` in the same structure.
   along n, λ = lateral offset from P along the face tangent (+ = robot's left when facing the face).
 - Whole-body collision freedom: cuRobo spheres against every collision mesh of the loaded rooms, 1 cm margin for
   non-floor links (2 cm where a rule says so).
+- **Parking** (object settling, goal-feasibility checks, template resets): the robot is parked tucked at a free cell
+  inside the task room's floor polygon, ≥ 1 m from every spawned object and support (a base parked over an unloaded
+  room falls through; the v1 room-centre `PARK_POSITION` is replaced by this rule).
 
 ### 3.4 Camera model and visibility
 
@@ -250,6 +288,25 @@ then the validation steps of v1 §3.6, unchanged: settle (90 physics steps + 10)
 init, goal feasibility by teleport + settle (120 steps) **with the robot parked** (tucked, room centre) and every
 binary goal atom true, drift ≤ tolerance, TRO written and validated against the BDDL. Every attempt and every
 template starts from the stable scene (`reset_scene_objects`, robot parked).
+
+Details kept from v1 that the checks depend on:
+
+- **Predicate cache**: OmniGibson caches kinematic predicates (`ontop`, `inside`, `touching`, `nextto`) per object
+  pair and treats a sleeping object as unchanged without comparing its pose. Every truth table (`:init`, binary goal
+  at init, goal feasibility) is evaluated only after the objects were woken or re-placed in the same step; a
+  predicate read across a settle without a wake is a bug, not a check.
+- **Room membership**: every spawned object is registered with the room it stands in (`in_rooms`), so partial-room
+  loading and evaluation keep it; `(ontop agent floor)` is evaluated after 3 physics steps (the base needs contact)
+  and holds when the base straddles two floor pieces of an open-plan room.
+- **Reload validation** is a pipeline stage, not optional: every template and every instance is re-loaded in a fresh
+  process from its TRO, settled 60 steps, and must reproduce the stored state — robot base within 2 mm / 0.02 rad,
+  every object within 1 mm / 0.005 rad, joints within ½ tolerance, `:init` true and the binary goal false; a contact
+  sheet (init view, goal view when the goal is materialised) is rendered per instance for the review rounds. Failing
+  instances are deleted and counted (`reload_failed`), never patched.
+- **Report**: `summary.json` per run keeps the v1 fields — the `:init` truth table, the goal truth table at init
+  (all false) and at the goal check (all true), rejections per rule with counts and the first three examples, phase
+  timings, kit / cache counters, and the seeds of every template and instance (`problems.<problem>.<template>.
+  {n_written, time_s}` is the layout `bench_report.py` reads).
 
 ### 3.6 IK conventions
 
@@ -305,6 +362,8 @@ replaces the oracle's "torso first or drive first" guess and its `ready_arms` fa
   removed from the band.
 - Stance survivors of Prompt 0 steps 1–3 per (scene, target, init state).
 - `ISPATIALGYM_SAMPLING_CACHE` for the exact-IK results of v1 stays.
+- Every per-model cache key (grasp masks, held-object visibility, rest pose, symmetry) includes the spawn scale
+  vector; a canonical-scale entry is never reused for a scaled variant (2.2).
 
 ### 3.11 What is recorded for the oracle
 
@@ -366,14 +425,17 @@ evaluated at the grasp-tested `scale` when the row has one). Tags name the gener
 the object looks identical: `x2 y2 z2` (half turns about a canonical axis), `x4 z4 …` (quarter turns), `z3 z5 z6`,
 `xinf yinf zinf` (bodies of revolution), `full` (spheres); `none` = surveyed and asymmetric; empty = not surveyed.
 `symmetry_near` lists candidates that were geometrically or texturally borderline and await the review round
-(`runlogs/symmetry_20260915/report.md`, 302 models); until reviewed they count as symmetries wherever a symmetry
-*restricts* a role (rule 1) and as asymmetries wherever it *relaxes* evaluation (rule 2).
+(`runlogs/symmetry_20260915/report.md`, 302 models); until reviewed they count as asymmetric (a symmetry only
+takes effect once it is confirmed).
 
-1. **Mental rotation targets must be asymmetric**: `ground_isg` admits a `mental_rotation` target only when
-   `symmetry = none` and `symmetry_near` is empty (rejection `symmetric_target`). The five symmetric picks of the
-   selection sheet (`teacup/zdvgol`, `teacup/cpozxi`, `teacup/tfzfam`, `hook/wmvozo`, `cookie_cutter/lqrfzo`) are
-   therefore dropped from that role; they stay admissible elsewhere. Object scaling has no such rule (its goal is a
-   depth, symmetric bodies are welcome).
+1. **Mental rotation targets must be asymmetric** (decision 2026-09-15): rotationally symmetric models are
+   **removed from the candidate list** — `build_icl.py` drops every `mental_rotation` / `target` row whose
+   `symmetry ≠ none` and promotes the next-ranked model of the category to `representative` / `test` when a pick was
+   dropped (the drop is listed in the build report and the row's `note`). The five symmetric picks of the selection
+   sheet (`teacup/zdvgol`, `teacup/cpozxi`, `teacup/tfzfam`, `hook/wmvozo`, `cookie_cutter/lqrfzo`) go first; a
+   borderline model follows as soon as the review round confirms its symmetry. The models stay candidates for every
+   other role. `ground_isg` additionally rejects a symmetric model that reaches it through a customs-list override
+   (`symmetric_target`). Object scaling has no such rule (its goal is a depth, symmetric bodies are welcome).
 2. **Equivalences from the tags**: for every orientation-evaluated target (held object, disembedding measure,
    IORS small-scale, attachment members, alignment) `ground_isg` writes `orientation_equivalences` as the rotation
    group generated by the `symmetry` tags, in the object's canonical frame: finite groups are enumerated (a `z2 x2`
@@ -383,6 +445,27 @@ the object looks identical: `x2 y2 z2` (half turns about a canonical axis), `x4 
    half-turn about the wall normal; the 15 disagreements listed in the survey report go to the review round and the
    column is corrected from its outcome, not from the geometry alone.
 3. **Look-alikes**: a rotational symmetry is not a look-alike relation (3.12); the two columns are independent.
+
+### 3.14 What the TRO must let `run_isg` restore (loader contract, TODO F1)
+
+The sampler only guarantees what the loader can reproduce. Beyond the BEHAVIOR object states and `robot_poses`,
+`load_tro_instance` restores, after **every** `scene.reset()`:
+
+- `constraints` — the COM hinges of the alignment tasks (revolute joint parent = support root link or wall, child =
+  target, anchor = COM, axis as recorded) are re-created; the table hinge sits 1 mm below the top so the object
+  cannot rock; a hinge that is missing at evaluation is a loader error, not a free-spinning object.
+- `grasps` — the held object of object scaling / mental rotation: the object is placed at
+  `grasps[0].object_pose_in_eef_frame`, the recorded finger joints are applied and the assisted grasp is attached
+  before the first policy step; an attach failure fails the load (`grasp_restore_failed`), it never silently starts
+  ungrasped.
+- `attachments` — the named male / female meta-link pair and the collision filter between the two members, both at
+  load and when the policy attaches during the episode (the v1 open point is closed by the loader, not by sampling).
+- `articulation_targets` and the initial joint values of every non-fixed joint of the target, with the moving link
+  held during the settle so lids and doors do not drift before step 0.
+- `orientation_equivalences` (3.13), `pose_targets` metrics / frames / tolerances, `groups` with `target_slots` and
+  relations, `initial_occlusion` (6.4), and the `evaluation_profile` (`isg-v1` unless the customs list overrides:
+  camera key `robot_r1:zed_link:Camera:0`, 1080 × 1080, 40 mm aperture, `n_render_iterations = 1`).
+- Nothing is re-sampled at load. The reload validation of 3.5 is the test of this contract.
 
 ## 4. Tabletop initialization
 
@@ -667,7 +750,17 @@ within 15–80 mm after scaling). Single arm; the object holds itself, no brace 
 
 Kept from v1: stable-angle probe, tolerances, `Open` semantics, whole target in frame at init, pre-grasp 10 cm / eef
 offset 1.2 cm. Replaced: `scene_distances` × lateral list and the drive-forward {0, 0.15, 0.3} (subsumed by the d
-scan), `view_translates` (Phase 1b), tucked reach arms, right-arm-only.
+scan), `view_translates` (Phase 1b), tucked reach arms, right-arm-only. **Dropped**: the v1 model-swap path
+(`scene_assign`, a candidate articulated model swapped into a scene host slot) — v2 large-scale targets are the
+scene's own objects, nothing is swapped in.
+
+Handle rows without a protruding handle (icl `require/handles.csv`): an **edge pinch** (`<joint>#F`, verdict `edge`)
+is the pinch across the leaf thickness `width_m` at the recorded point of the exposed edge (the free edge of a lid
+or door, the top lip of a drawer front), pinch axis = the leaf normal, approach = into the edge along the leaf plane,
+same 1.2 cm eef offset and 10 cm pre-grasp; `edge_blocked` rows are not admissible. A reviewer pinch (`#M`,
+`manual`) is used as recorded; `manual_unscaled` (pinch placed on the canonical model of a non-unit-scale scene
+instance) is rescaled by the instance's per-axis scale before use and its `width_m` re-checked against the 15–80 mm
+pinch range. Rows with verdict `skip` or `ungraspable` exclude the joint.
 
 ### 5.4 Prompt 2 — articulation, small-scale (open / close)
 
@@ -876,6 +969,11 @@ Init = the sampled configuration, goal = what the TRO targets describe. Everythi
   range (`goal_translate_range` [0, 1.25], `goal_tilt_range` [−0.5, 0.5] `[pilot]`); the camera forward-axis angle
   between init and goal ≤ 60°; goal render: ≥ 3 non-structural objects each ≥ 200 px, ≥ 30 % of them visible from the
   init; both configurations whole-body collision-free (2 cm).
+- **Object counting** (kept from v1): an object counts when its segmentation mask has ≥ `min_object_pixels = 200`
+  pixels; structural categories never count — `walls`, `floors`, `ceilings`, `window`, `door` frames / leaves,
+  `light` / `lamp` fixtures, `room_light`, `downlight`, curtains fixed to the structure — nor does the robot; two
+  texture variants of one geometry standing in the room are two objects (they are distinguishable in RGB). The
+  shared fraction is computed on that object set.
 - TRO: `pose_targets[agent]` = goal camera sensor pose (5 cm / 0.10 rad); sidecar: goal base pose, trunk, arms, path
   (3.7), bucket.
 
@@ -887,6 +985,14 @@ the eroded shortest path so that the shortest path on the map **with the obstacl
 stay inside the bucket; the obstacle must be inside the head camera's frame (5 %) at some pose along the new path,
 evaluated with the JoyLo reset trunk used at init (the oracle navigates first, then adjusts the torso). The obstacle
 is never touched; it is `ontop floor` in `:init` and its displacement is checked at the goal settle.
+
+**Obstacle admissibility** (the selection criteria of `runlogs/obstacle_selection_20260912`, now checks): the
+category is natural on the floor of the scene (`natural_scenes`), the model stands stably in its canonical +z-up
+pose (settled 60 steps, drift ≤ 5 mm; balls, lying and hanging models are out), footprint 0.12–0.80 m and height
+0.10–1.70 m (preferred 0.20–0.55 m / 0.20–1.10 m, relative to the 0.33 m chassis half-diagonal and ~1 m
+corridors), and it **diverts without closing**: the blocked-map path is ≥ 0.3 m longer than the free path, still
+inside the bucket, and the corridor around the obstacle keeps ≥ 0.75 m of free width on one side (the eroded map
+must stay connected). The obstacle is not a look-alike of any object the init view or the goal view counts (3.12).
 
 ### 6.3 Object scaling and mental rotation (held object)
 
@@ -903,6 +1009,13 @@ is never touched; it is `ontop floor` in `:init` and its displacement is checked
 - Feasibility: the goal arm configuration is solved with the **right-arm embodiment only** (the oracle moves the arm,
   not the torso); the motion between init and goal (straight line along the camera ray / SLERP about the object) is
   checked at 3 intermediate waypoints (3.9); whole-body collision-free with the object attached at every checked pose.
+- Kept from v1 §5.2: the goal options (depth grid × orientation set, or axis × angle set) are precomputed **once per
+  template** — they depend on the hold and the object, not on the base pose — and each instance draws from the
+  precomputed feasible set; an assisted-grasp attach that fails at the hold for a library row is a rejection of that
+  row (`grasp_failed`, the next row is tried), never a fallback to an AABB heuristic; the realised grasp (finger
+  joint positions after the press, object pose in the eef frame, the grasp key / name) is what the TRO stores and the
+  loader restores (3.14). Self-occlusion is measured with one segmentation render each at init and at the goal with
+  everything but the object and the gripper hidden.
 - Sidecar: hold constant, grasp, goal arm configuration, waypoints.
 
 ### 6.4 Disembedding
@@ -911,6 +1024,21 @@ Init per section 4 (+ 4.7). Goal: target at the **centre of the destination tray
 (measured, 0.03 / 0.20); no distractor on the destination tray; feasibility by teleport + settle. Sidecar:
 `init_stance`, `manipulation_stance`, `placement_stance`, transitions, carry height, grasp with both eef poses, place
 eef pose, occlusion ratio, per-object image-space descriptors.
+
+Numbers and records kept from v1 §5.3:
+
+- Source-tray placement raster 1 cm over the tray's **inner floor** (floor polygon minus the wall thickness), 0.5 cm
+  footprint margin (3.2); the distractor set's footprints, each grown by its `pad_clearance_m`, may cover at most
+  **0.45** of the inner floor (`tray_budget`), so the target stays pickable from above.
+- Occlusion: `external_occlusion_ratio = 1 − V / A` from two segmentation renders at the init stance — the complete
+  scene, and the same view with the other candidate objects hidden (A = the target's own visible area, so
+  self-occlusion is excluded); the target's projection must lie fully inside a 5 % image margin; ratio ≤ 0.30 and
+  visible area ≥ `min_visible_pixels = 400`; the destination tray must be visible in one confirmation render (its
+  floor ≥ 30 % unoccluded). The TRO keeps the v1 `initial_occlusion` record (`ratio`, `visible_area`,
+  `reference_area`, `occluder_ids`, `camera_key`; the `bucket` field is dropped) and the loader re-measures it after
+  the deterministic settle (tolerance 0.05 on the ratio).
+- Tray semantics: destination membership is `(ontop target destination)` only; `inside` never gates or excludes;
+  distractors must satisfy `(not (ontop distractor destination))`.
 
 ### 6.5 Configuration matching — block design (goal and cube grasp rule)
 
@@ -957,6 +1085,14 @@ partner's face opposite to the insertion direction (pre-contact + contact IK wit
 solution; combined whole-body check). Group target: fixed assignment, relation partner → target, tolerances 0.01 /
 0.15, symmetry equivalences as in v1.
 
+Kept from v1 §5.6, now explicit: the male gets the `attachable` ability at spawn; the TRO names the exact male /
+female meta-link pair (BEHAVIOR serialises only the parent); the collision filter between the two members is applied
+before the goal check and restored by the loader at load and at in-episode attachment (3.14); the mating-axis
+symmetry test (rotate the child about the female axis in 5 mm-slab steps, accept a rotation when ≥ 90 % of the
+slabs match) writes `orientation_equivalences` for **both** group members; a partner whose KB entry is not ready
+is not a candidate (2.2). Only the male is grasped; the attachment grasp rows (`__a`) keep every gripper sphere
+≥ 1 cm from the male meta-link and the contact off the mating side.
+
 ### 6.9 Alignment — world vertical / world horizontal
 
 Section 5.5. Goal: position as at init (hinge), orientation = aligned (upright / level), tolerance 0.08 rad.
@@ -964,7 +1100,8 @@ Section 5.5. Goal: position as at init (hinge), orientation = aligned (upright /
 ### 6.10 Alignment — axial
 
 Tabletop sections 4.2–4.6 with the axial rules: target yaw = aligned yaw ± U(20°, 70°); a vertical hinge through the
-COM (TRO constraint, parent = support) installed after settling; push contact = the long-axis end inside the band,
+COM (TRO constraint, parent = support) installed after settling, its anchor sunk 1 mm below the top so the object
+cannot rock, drift ≤ 1 mm / 0.005 rad over the 60-step check; push contact = the long-axis end inside the band,
 generic top-down push pose, arc waypoints at δ/2 and the goal (3.9); **stop edge** for the other arm = the target's
 edge (left or right, depending on the spin direction to the goal) that protrudes most along that direction at the
 goal orientation, braced with the closed left gripper: pre-contact + contact IK at the manipulation stance, combined
@@ -993,10 +1130,33 @@ is on the robot's left; the oracle places the target at the nextto position and 
 right hand while the closed left gripper braces the partner's far (left) side: the push contact on the target's right
 face, its direction and distance, and the brace pre-contact + contact (left arm) are IK-checked and recorded.
 
+**Pair admissibility** (`ground_isg`, once per (target, partner) pair; the selection rounds applied these by hand):
+
+- ontop / under(small): the partner's top face admits the target footprint with ≥ 1 cm margin — tier `any_yaw`
+  (fits at every yaw; preferred), `aligned` (fits only with the long axes aligned: the goal yaw set is restricted to
+  those yaws), `centred` (fits only centred: the goal offset is 0); no tier → `partner_too_small`.
+- inside: opening ≥ target footprint + 1 cm at the target's standing or lying orientation, and a **drop test**
+  (target released 5 mm above the rim at the `fillable` centroid, settled 120 steps): `Inside` true and the target
+  protrudes above the rim by ≤ half its height (`does_not_fit_inside`). Flowers (stem grasps) use the standing
+  orientation.
+- nextto: both fit side by side inside the reach band with the g_NT gap, and the objects' centre heights overlap
+  (the taller one's base below the shorter one's top; `nextto_height_mismatch`) so `NextTo` can be true.
+- touching: **partner stability** — base contact ≥ 25 % of its footprint (or a foot ≥ 0.6 × / 0.45 × the body width),
+  height ≤ 2.5 × its smallest horizontal extent, no rolling body (`partner_unstable`); **target pushability** —
+  smallest horizontal extent ≤ 8.9 cm when it is grasped (pinch width), long side ≤ 30 cm, height ≤ 30 cm, flat base
+  (`target_not_pushable`).
+
+Goal numbers kept from v1 §5.10: ontop / under(small) z = partner top + target bottom offset + 1 cm drop; inside drop
+from partner rim + 5 mm, xy at the `fillable` meta-link centroid; touching nudges of 1 mm (≤ 25) with physics steps
+between them; partner displacement ≤ 5 mm at the goal; a fixed partner gets no `pose_settled` atom.
+
 ### 6.12 IORS — ontop / under (large-scale)
 
 Section 5.6. Goal: partner unchanged; target orientation as at init; position = the goal cell (nearest band cell to
 the init pose inside the eroded placement face, margin = half-extent + 0.05), verified `OnTop` / `Under`.
+Under-large partner admissibility: the underside clearance at the goal cell ≥ target height + 0.12 m (gripper
+below the wrist) + 0.05 m, checked on the B4 under-clearance map (desks and breakfast tables at 0.70–0.75 m qualify,
+coffee tables do not; `under_clearance`), and the target's footprint fits between the legs with 5 cm margin.
 
 ## 7. Oracle sidecar (`<iid>.oracle.json`)
 
@@ -1042,6 +1202,11 @@ size-normalised errors.
 | alignment vertical / horizontal | orientation | 0.08 rad |
 | alignment axial | orientation | 0.10 rad |
 | disembedding, IORS | measured only | 0.03 m / 0.20 rad; override threshold for "goal := settled pose" = max(0.01 m, 0.25 × smallest horizontal extent) / 0.20 rad |
+
+The tolerances are written into the TRO per target and pinned by the evaluation profile `isg-v1` together with the
+camera configuration and `n_render_iterations = 1` (`task_definition_and_evaluation.md`, observation timing);
+`generation.tolerances` in the customs list overrides per alias, never per instance. Continuous
+`orientation_equivalences` are enumerated at 5° (3.13), finer than every orientation tolerance above.
 
 ## 9. `ground_isg`, `sample_isg`, `multiply_isg`
 
