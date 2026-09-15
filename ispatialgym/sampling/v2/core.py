@@ -545,7 +545,7 @@ class SamplerV2(TaskSampler):
                     self.rejection_log.add(e.reason, str(e), phase=phase, index=index, attempt=attempt, seed=seed, **_plain_details(e.details))
                     log.debug("rejection traceback", exc_info=True)
                     self.rejections[e.reason] = self.rejections.get(e.reason, 0) + 1
-                    log.info("%s: instance %d attempt %d rejected in %s: %s", self.gp.alias, index, attempt, phase, e)
+                    log.info("%s: instance %d attempt %d rejected in %s after %.1fs: %s", self.gp.alias, index, attempt, phase, time.time() - t0, e)
                     self.on_reject(e)
             if not ok:
                 log.error("%s: instance %d failed after %d attempts; rejections=%s", self.gp.alias, index, max_attempts, self.rejection_log.counts)

@@ -90,6 +90,46 @@ def line_waypoints(p0: Pose, p1: Pose, n: int = 3, endpoints: bool = False) -> L
 # ----------------------------------------------------------------------------------------------------------------
 
 
+class _Ignoring:
+    """Switch the collision meshes of ``objs`` off in the cuRobo world for the block; meshes disabled for another
+    reason (attached objects, removed objects) are left alone. Falls back to ``RobotKit.ignoring`` (two world syncs)
+    when the backend has no per-mesh switch."""
+
+    def __init__(self, kit, objs: List[Any]):
+        self.kit = kit
+        self.objs = objs
+        self.names: List[str] = []
+        self._fallback = None
+
+    def __enter__(self):
+        if not self.objs:
+            return self
+        backend = self.kit.backend
+        if not (hasattr(backend, "_mesh_enable") and hasattr(backend, "_world_mesh_names")):
+            self._fallback = self.kit.ignoring(self.objs)
+            self._fallback.__enter__()
+            return self
+        self.kit._ensure_synced()
+        disabled = getattr(backend, "_disabled_obstacles", set())
+        for o in self.objs:
+            for link in getattr(o, "links", {}).values():
+                for cm in getattr(link, "collision_meshes", {}).values():
+                    name = cm.prim_path
+                    if name in backend._world_mesh_names and name not in disabled:
+                        backend._mesh_enable(name, False)
+                        self.names.append(name)
+        return self
+
+    def __exit__(self, *exc):
+        if self._fallback is not None:
+            self._fallback.__exit__(*exc)
+            return False
+        for name in self.names:
+            self.kit.backend._mesh_enable(name, True)
+        self.names = []
+        return False
+
+
 @dataclass
 class IKResult:
     ok: bool
@@ -108,6 +148,12 @@ class IKChecker:
         #: marginal pose can pass once and fail when re-solved (the program check re-solves every recorded pose): the
         #: sampler's own solution is used as the seed configuration then. Cleared per attempt (``core``).
         self.solutions: Dict[Tuple[str, Tuple[float, ...]], th.Tensor] = {}
+
+    def ignoring(self, objs: Sequence[Any]):
+        """Context manager: ``objs`` leave the cuRobo collision world for the queries inside (§3.6 "support ignored for the
+        grasp pose only"). Their collision meshes are switched off by name (``R1ProCuRobo._mesh_enable``, what
+        ``attach_object`` does) instead of the two full world re-syncs of ``RobotKit.ignoring`` (0.5–13 s each)."""
+        return _Ignoring(self.kit, list(objs))
 
     @staticmethod
     def _pose_key(pose: Pose) -> Tuple[float, ...]:
@@ -147,7 +193,8 @@ class IKChecker:
         if len(poses) == 0:
             return th.zeros(0, dtype=th.bool)
         q0 = self.q_locked(stance) if q_seed is None else q_seed
-        return self.kit.ik_batch(list(poses), q0, arm=arm, ignore=list(ignore))
+        with self.ignoring(ignore):
+            return self.kit.ik_batch(list(poses), q0, arm=arm)
 
     def screen_pairs(self, pairs: Sequence[Sequence[Pose]], stance: Stance, arm: str = "right", ignore_for_last: Sequence[Any] = (),
                      q_seed: Optional[th.Tensor] = None) -> th.Tensor:
@@ -161,7 +208,8 @@ class IKChecker:
         idx = [i for i, s in enumerate(ok_pre.tolist()) if s]
         out = th.zeros(len(pairs), dtype=th.bool)
         if idx:
-            ok_f = self.kit.ik_batch([finals[i] for i in idx], q0, arm=arm, ignore=list(ignore_for_last))
+            with self.ignoring(ignore_for_last):
+                ok_f = self.kit.ik_batch([finals[i] for i in idx], q0, arm=arm)
             for i, s in zip(idx, ok_f.tolist()):
                 out[i] = bool(s)
         return out
@@ -188,7 +236,16 @@ class IKChecker:
                 if q_hit is not None:
                     self.solutions[(arm, self._pose_key(poses[-1]))] = q_hit.clone()
                 return IKResult(bool(hit["ok"]), q_hit, "cache", len(poses))
-        q = self.kit.reachable(list(poses), q0, arm=arm, ignore_for_last=list(ignore_for_last))
+        q = None
+        n = len(poses)
+        for i, p in enumerate(poses):
+            if i == n - 1 and ignore_for_last:
+                with self.ignoring(ignore_for_last):
+                    q = self.kit.ik(p, q0, arm=arm)
+            else:
+                q = self.kit.ik(p, q0, arm=arm)
+            if q is None:
+                break
         res = IKResult(q is not None, q, "" if q is not None else "exact IK failed", len(poses))
         if q is not None:
             self.solutions[(arm, self._pose_key(poses[-1]))] = q.clone()
