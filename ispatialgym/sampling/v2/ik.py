@@ -476,12 +476,15 @@ class IKChecker:
     APPROACH_WAYPOINT_M = 0.1 / 3
 
     def track_segment(self, q_from: th.Tensor, pose_from: Pose, pose_to: Pose, arm: str, ignore_mid: Sequence[Any] = (),
-                      ignore_end: Sequence[Any] = ()) -> Tuple[Optional[th.Tensor], str]:
+                      ignore_end: Sequence[Any] = (), ignore_start: Sequence[Any] = ()) -> Tuple[Optional[th.Tensor], str]:
         """Differential-IK tracking (``backend.solve_ik_path``) of the straight segment ``pose_from -> pose_to`` from the
         configuration ``q_from`` (which reaches ``pose_from``) in ``APPROACH_STEP_M`` steps: continuous joint path, no
         step above ``APPROACH_MAX_STEP`` rad, joint excursion between consecutive §3.9 waypoints ≤ ``APPROACH_MAX_EXCURSION``,
-        intermediate configurations collision-free with ``ignore_mid`` removed, the end one with ``ignore_mid + ignore_end``
-        removed. Returns ``(q_end, "ok")`` or ``(None, reason)``."""
+        every configuration collision-free with ``ignore_mid`` removed — the ones within ``APPROACH_WAYPOINT_M`` of the end
+        pose additionally with ``ignore_end`` removed (the last centimetres of a grasp descent run inside the support's
+        sphere margin, as the end pose does: §3.6 "support ignored for the grasp pose only" at the §3.9 waypoint
+        granularity), the ones within it of the start pose with ``ignore_start`` removed (backward tracking).
+        Returns ``(q_end, "ok")`` or ``(None, reason)``."""
         from ispatialgym.oracle import r1pro_model as M
 
         p0, p1 = (G.t(pose_from[0]), G.t(pose_from[1])), (G.t(pose_to[0]), G.t(pose_to[1]))
@@ -502,14 +505,39 @@ class IKChecker:
         exc = max(float(th.max(th.abs(traj[b, idx] - traj[a, idx]))) for a, b in zip(coarse[:-1], coarse[1:]))
         if exc > self.APPROACH_MAX_EXCURSION:
             return None, f"approach_untrackable: joint excursion {exc:.2f} rad between consecutive waypoints (> {self.APPROACH_MAX_EXCURSION})"
-        if len(traj) > 2:
-            with self.ignoring(ignore_mid):
-                if not bool(self.kit.collision_free(traj[1:-1], margin=0.0).all()):
-                    return None, "approach_untrackable: an intermediate configuration of the approach collides"
+        # configuration i (1..n) sits i / n of the way; the tails near the start / end poses take those poses' ignore sets
+        m = len(traj) - 1
+        near_end = [i for i in range(1, m) if dist * (m - i) / m < self.APPROACH_WAYPOINT_M - 1e-9]
+        near_start = [i for i in range(1, m) if dist * i / m < self.APPROACH_WAYPOINT_M - 1e-9 and i not in near_end]
+        body = [i for i in range(1, m) if i not in near_end and i not in near_start]
+        for idxs, extra, what in ((body, (), "an intermediate configuration of the approach collides"),
+                                  (near_start, ignore_start, "a configuration just after the start pose collides"),
+                                  (near_end, ignore_end, "a configuration just before the end pose collides")):
+            if not idxs:
+                continue
+            ign = list(ignore_mid) + list(extra)
+            with self.ignoring(ign):
+                free = self.kit.collision_free(traj[idxs], margin=0.0)
+            if not bool(free.all()):
+                bad = [idxs[j] for j, f in enumerate(free.tolist()) if not f]
+                return None, f"approach_untrackable: {what} ({len(bad)}/{len(idxs)}, {[round(dist * i / m, 3) for i in bad[:3]]} m from the start; {self._collision_blame(traj[bad[0]], ign)})"
         with self.ignoring(list(ignore_mid) + list(ignore_end)):
             if not bool(self.kit.collision_free(traj[-1], margin=0.0)[0]):
                 return None, "approach_untrackable: the end configuration collides"
         return traj[-1].clone(), "ok"
+
+    def _collision_blame(self, q: th.Tensor, ignored: Sequence[Any]) -> str:
+        """Diagnostic: which spawned object (or 'scene / self') a colliding configuration collides with — each spawned
+        object is removed in turn on top of ``ignored``."""
+        world = getattr(self.kit, "world", None)
+        spawned = list(getattr(world, "spawned", {}).values()) if world is not None else []
+        for o in spawned:
+            if any(o is x for x in ignored):
+                continue
+            with self.ignoring(list(ignored) + [o]):
+                if bool(self.kit.collision_free(q, margin=0.0)[0]):
+                    return f"collides with {getattr(o, 'name', o)}"
+        return "collides with the scene / itself"
 
     def track_approach(self, q_pre: th.Tensor, pre: Pose, end: Pose, arm: str, ignore_end: Sequence[Any] = (), ignore_mid: Sequence[Any] = (),
                        q_hint: Optional[th.Tensor] = None) -> Tuple[Optional[th.Tensor], str]:
@@ -527,7 +555,7 @@ class IKChecker:
             q_alt = self.kit.ik(end, self._seeded(G.t(seed), end, arm), arm=arm)
         if q_alt is None:
             return None, f"{why}; the end pose has no solution on its own either"
-        q_pre2, why2 = self.track_segment(q_alt, end, pre, arm, ignore_mid=ignore_mid, ignore_end=())
+        q_pre2, why2 = self.track_segment(q_alt, end, pre, arm, ignore_mid=ignore_mid, ignore_end=(), ignore_start=ignore_end)
         if q_pre2 is None:
             return None, f"{why}; from the end's branch: {why2}"
         self._last_track_start = q_pre2.clone()
