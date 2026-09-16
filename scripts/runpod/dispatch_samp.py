@@ -132,6 +132,7 @@ def main():
     ap.add_argument("--no-sync", action="store_true", help="do not rsync the code to the pods (a --sync-only pass did it)")
     ap.add_argument("--code-ref", default="HEAD", help="git ref whose committed tree is synced to the pods")
     ap.add_argument("--rebalance", action="store_true", help="drop every queued job on the ready pods and re-dispatch the manifest jobs that are neither done nor running")
+    ap.add_argument("--no-start", action="store_true", help="with --restart-runner: stop the runner (and the job) without starting it again")
     ap.add_argument("--force", action="store_true", help="with --restart-runner: also on busy pods (kills the current job and re-queues it)")
     ap.add_argument("--restart-runner", action="store_true", help="on idle pods (no current job) restart the runner with the current RUNNER script")
     ap.add_argument("--exclude-subtasks", nargs="*", default=None)
@@ -200,6 +201,9 @@ def main():
             stop += ("rm -f /tmp/seen_jids; for f in $(ls /root/samp/queue/*.job 2>/dev/null | sort); do jid=$(cut -f1 \"$f\"); "
                      "if grep -qsx \"$jid\" /tmp/seen_jids; then rm -f \"$f\"; else echo \"$jid\" >> /tmp/seen_jids; fi; done; rm -f /tmp/seen_jids; ")
             rp.ssh_run(*ep, stop + "cat > /root/samp/run_jobs.sh && chmod +x /root/samp/run_jobs.sh", timeout=120, stdin_text=RUNNER)
+            if args.no_start:  # leave the runner stopped (a following --rebalance re-queues with the new manifest and starts it)
+                print(f"{pid} {fleet['pods'][pid]['name']}: runner stopped{' (job re-queued)' if busy else ''}")
+                continue
             remote = "cd /root && rm -f /root/JOB_DONE /root/samp/CLOSE && setsid nohup /root/samp/run_jobs.sh > /root/samp/runner.log 2>&1 < /dev/null & disown"
             try:
                 subprocess.run(rp.ssh_base(*ep) + [remote], text=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
