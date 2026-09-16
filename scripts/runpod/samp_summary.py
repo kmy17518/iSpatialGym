@@ -87,6 +87,9 @@ def main():
                     d = json.load(open(rep))
                 except Exception:
                     continue
+                n_rep = sum(int(t.get("n_written", 0)) for prob in d.get("problems", {}).values() for t in prob.values() if isinstance(t, dict))
+                if jid in done and done[jid]["n_written"] < 0 and n_rep > 0:
+                    done[jid]["n_written"] = n_rep  # the runner's count was missing (v1 report name); the report itself knows
                 for prob in d.get("problems", {}).values():
                     for t in prob.values():
                         if isinstance(t, dict):
