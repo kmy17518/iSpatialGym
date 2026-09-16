@@ -28,8 +28,8 @@
   "last_change": "2026-09-16 03:00 PDT"
  },
  "disembedding": {
-  "blocking": "bottle_of_milk success 11:22 (1ca84d2) predates fd0411c/9729372 \u2192 re-run for validity; old chili instance blocked by branch-inconsistent witnesses (re-sample)",
-  "owner": "loop"
+  "blocking": "-",
+  "owner": "-"
  },
  "configuration_matching-block_design": {
   "blocking": "DECISION: picks pass now; every remaining failure is the pre-place of the flipped in-hand orientation (no IK at any trunk) \u2014 options: goal face up at init (no flips), flip on the table, or 3 blocks no-flip",
@@ -56,16 +56,16 @@
   "owner": "large-scale"
  },
  "alignment-world_vertical": {
-  "blocking": "transition passes now (d03b21d); brace: right wrist camera into the wall from the recorded side_high pose (wall ignored for the whole arm in the sampler's chain) \u2192 large-scale: keep the wall for the arm/wrist links, ignore it for the pads only / off-wall pre-contact",
+  "blocking": "after the wrist-camera fix: push_unreachable x8 (26dfaab) \u2192 large-scale",
   "owner": "large-scale"
  },
  "alignment-world_horizontal": {
-  "blocking": "same brace geometry; decorative_sign push_unreachable",
-  "owner": "large-scale"
+  "blocking": "first horizontal instance sampled (15:02); demo plan_failed at push \u2192 oracle / large-scale",
+  "owner": "oracle"
  },
  "alignment-axial": {
-  "blocking": "sweep-1 program check rejected push-only instances (core PROGRAM_BLOCKS still required the brace) \u2192 fixed 6c3d967, re-running",
-  "owner": "loop"
+  "blocking": "-",
+  "owner": "-"
  },
  "inter_object_relation_satisfaction-ontop_small_scale": {
   "pre_fix_demo": true,
@@ -75,7 +75,7 @@
   "last_change": "2026-09-16 04:37 PDT"
  },
  "inter_object_relation_satisfaction-under_small_scale": {
-  "blocking": "french_fries: branch problem gone (witness reached, 3.1 mm) \u2192 ghost_hand at lift (grasp physics); teacup-saucer: placed_orientation \u2192 core release height (item C) then re-run",
+  "blocking": "sweep: placed_orientation again with the well release (cup still tips) \u2192 core: check the landing (well rim vs bottom) / drop height",
   "owner": "core"
  },
  "inter_object_relation_satisfaction-inside": {
@@ -91,8 +91,8 @@
   "owner": "core"
  },
  "inter_object_relation_satisfaction-ontop_large_scale": {
-  "blocking": "(a)(d) A goal-region rule + (c) C in-frame rule landed \u2192 countertop pair running on the local GPU; sofa-bar next",
-  "owner": "coordinator (local) / large-scale"
+  "blocking": "countertop pair (local, 11:15): stance A failed the new goal-region rule on all 6 lateral redraws at the only free edge (+u), no reason logged \u2192 large-scale to diagnose; sofa-bar running locally with the C in-frame rule",
+  "owner": "large-scale / coordinator (local)"
  },
  "inter_object_relation_satisfaction-under_large_scale": {
   "blocking": "push-under sampler + program landed; no instance yet (floor reach at the envelope edge; side stances, deepest trunk first untested) \u2192 loop run on the pool now",
