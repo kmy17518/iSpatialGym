@@ -1372,9 +1372,15 @@ class IORSLarge(SamplerV2):
         max_len = self.num("max_partner_geodesic_m", 3.0) + self.num("path_max_extra_m", 1.0)
         order = list(rng.permutation(len(c_pool)))
         n_try = 6
-        if self.push_under:  # side stances first (the frontal ones put the lane out of the floor reach — see push_under_candidates)
-            order = [k for k in order if c_pool[k].extras.get("stance_kind") == "side"] + [k for k in order if c_pool[k].extras.get("stance_kind") != "side"]
-            n_try = 12
+        if self.push_under:
+            # side stances first (the frontal ones put the lane out of the floor reach — see push_under_candidates), the
+            # deepest trunk first within a kind (B3: the floor is reached at translate 0.95 / tilt −1.2 only); every side
+            # survivor is tried before the frontal ones
+            side = [k for k in order if c_pool[k].extras.get("stance_kind") == "side"]
+            front = [k for k in order if c_pool[k].extras.get("stance_kind") != "side"]
+            depth = lambda k: (-float(c_pool[k].translate), float(c_pool[k].tilt))  # noqa: E731
+            order = sorted(side, key=depth) + sorted(front, key=depth)
+            n_try = max(12, len(side))
         errors = []
         for kc in order[:n_try]:
             place = c_pool[int(kc)].with_trunk(c_pool[int(kc)].translate, c_pool[int(kc)].tilt, "placement")
@@ -1396,6 +1402,9 @@ class IORSLarge(SamplerV2):
             F_goal = self.ikc.feasible_sets([release_xy], yaws, self.grasps, lambda xy, yaw: release_pose(xy, G.qmul(G.quat_from_yaw(yaw), self.rest)), place, "right",
                                             ignore_place).get(0, [])
             F = intersect_feasible(F_init, F_goal)
+            if push:
+                log.info("%s: push-under C try %s d %.2f λ %+.2f trunk (%.2f, %.1f): F_init %d, F_goal %d, F %d at drop %s", self.gp.alias, place.extras.get("stance_kind"),
+                         place.stand_off or 0.0, place.lateral, place.translate, place.tilt, len(F_init), len(F_goal), len(F), [round(float(v), 2) for v in release_xy])
             if not F:
                 if push and not F_goal and not getattr(self, "_drop_debugged", False):
                     self._drop_debugged = True
