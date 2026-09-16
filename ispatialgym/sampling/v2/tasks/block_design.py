@@ -512,13 +512,16 @@ class BlockDesign(SamplerV2):
         ok_pick = self.ikc.screen_pairs(pre_picks, manip, "right", ignore_for_last=[support, block])
         idx = [i for i, s in enumerate(ok_pick.tolist()) if s]
         if not idx:
+            self._log_pick_failure("screen", manip, names, bi, world_poses, screened, pre_picks, support, block)
             raise Reject("grasp_unreachable", f"block {names[bi]}: no pick passes the screening IK")
         chosen = None
+        place_diag: List[str] = []
         for i in [idx[j] for j in rng.permutation(len(idx))]:
             pair, tilt_pick, tilt_place, yaw, sign, g_pick, place_eef = screened[i]
             pre_pick = IK.pre_pose(g_pick.eef)
             res = self.ikc.exact([pre_pick, g_pick.eef], manip, "right", ignore_for_last=[support, block])
             if not res.ok:
+                place_diag.append(f"{pair}/t{tilt_pick:+.0f}/y{math.degrees(yaw) % 360:.0f}: pick exact {res.reason}")
                 continue
             # place (and pre-place) with the block in hand; the world: placed blocks at their slots, this block removed (attached)
             place_margin_pose = (place_eef[0] + _xy3(right) * PLACE_MARGIN + _xy3(toward) * PLACE_MARGIN, place_eef[1])
@@ -540,10 +543,14 @@ class BlockDesign(SamplerV2):
                         r_w = self.ikc.waypoints_ok([lift] + wps, manip, "right", ignore_all=[support])
                         wps_ok = r_w.ok
             if not res_p.ok or not wps_ok:
+                place_diag.append(f"{pair}/t{tilt_pick:+.0f}/y{math.degrees(yaw) % 360:.0f}: {'place exact ' + res_p.reason if not res_p.ok else 'flip waypoints ' + r_w.reason}")
                 continue
             chosen = (pair, tilt_pick, tilt_place, yaw, sign, g_pick, place_margin_pose, pre_pick, pre_place, wps)
             break
         if chosen is None:
+            self._log_pick_failure("place", manip, names, bi, world_poses, screened, pre_picks, support, block, extra={"per_class": place_diag[:12], "goal_slot_base":
+                                   [round(float(v), 3) for v in manip.world_to_base(self._centre(place_pose)[0][:2]).tolist()],
+                                   "placed_neighbours_base": {names[o]: [round(float(v), 3) for v in manip.world_to_base(self._centre(goal_pose[o])[0][:2]).tolist()] for j, o in enumerate(order) if j < step}})
             raise Reject("place_unreachable", f"block {names[bi]}: no cube grasp passes pick + place (+ flip waypoints) exact IK")
         pair, tilt_pick, tilt_place, yaw, sign, g_pick, place_eef, pre_pick, pre_place, wps = chosen
         # tilts about the *snapped* closing axis of the pick grasp: pick from ``cube_grasp``, place from the carried eef
@@ -579,6 +586,41 @@ class BlockDesign(SamplerV2):
         rec["brace"] = "present" if any(v == "present" for v in outcomes.values()) else ("none" if outcomes else "not_needed")
         rec["brace_reasons"] = outcomes
         return rec
+
+    def _log_pick_failure(self, stage: str, manip: Stance, names: List[str], bi: int, world_poses: Dict[str, TT.Pose], screened, pre_picks, support, block, extra=None):
+        """Owner 2026-09-16 12:52 item 1: one INFO line (JSON) per failing block with everything the probe needs to replay
+        it — trunk, base-frame centre, up face, yaw (deg, incl. the jitter), the other blocks' base-frame centres and
+        centre distances, the pick classes tried and, for a screening failure, the pre / grasp screening masks."""
+        try:
+            c = self._centre(world_poses[names[bi]])
+            yaw_deg = math.degrees(C.yaw_of(c[1])) if hasattr(C, "yaw_of") else float("nan")
+            others = {}
+            for n, p in world_poses.items():
+                if n == names[bi]:
+                    continue
+                cc = self._centre(p)[0]
+                others[n] = {"base": [round(float(v), 3) for v in manip.world_to_base(cc[:2]).tolist()], "dist": round(float(th.linalg.norm(cc[:2] - c[0][:2])), 3)}
+            rec = {"stage": stage, "block": names[bi], "trunk": [manip.translate, round(manip.tilt, 2)], "stand_off": manip.stand_off,
+                   "base_xy": [round(float(v), 3) for v in manip.world_to_base(c[0][:2]).tolist()], "up": TT.up_face(c[1]), "yaw_deg": round(yaw_deg, 1),
+                   "others": others, "classes": [f"{p_}/t{t_:+.0f}/y{math.degrees(y_) % 360:.0f}" for p_, t_, _, y_, _, _, _ in screened]}
+            if stage == "screen":
+                pres = [pp[0] for pp in pre_picks]
+                grasps = [pp[1] for pp in pre_picks]
+                ok_pre = self.ikc.screen(pres, manip, "right")
+                ok_g = self.ikc.screen(grasps, manip, "right", ignore=[support, block])
+                rec["pre_ok"] = [rec["classes"][i] for i, o in enumerate(ok_pre.tolist()) if o]
+                rec["grasp_ok_alone"] = [rec["classes"][i] for i, o in enumerate(ok_g.tolist()) if o]
+                # the same grasp poses with every other block removed: the neighbours' share of the failure
+                with self.ikc.ignoring([self.objects[n] for n in world_poses if n != names[bi]]):
+                    ok_pre_nn = self.ikc.screen(pres, manip, "right")
+                    ok_g_nn = self.ikc.screen(grasps, manip, "right", ignore=[support, block])
+                rec["pre_ok_without_neighbours"] = int(ok_pre_nn.sum())
+                rec["grasp_ok_without_neighbours"] = int(ok_g_nn.sum())
+            if extra:
+                rec.update(extra)
+            log.info("%s: PICK_FAILURE %s", self.gp.alias, json.dumps(rec, default=str))
+        except Exception as e:  # noqa: BLE001 - diagnostics must never change the sampling outcome
+            log.info("%s: PICK_FAILURE logging failed: %r", self.gp.alias, e)
 
     def _carry_height(self) -> float:
         return 2.0 * self.edge + 0.03
