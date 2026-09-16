@@ -1269,6 +1269,8 @@ class IORSLarge(SamplerV2):
                 d.pose_targets[tname] = full_pose_target(t_pose[0], t_pose[1], self.tol("position", 0.03), self.tol("orientation", 0.20))
                 self.sidecar.describe(tname, self.choice.models["target"].category.replace("_", " "))
                 self.sidecar.describe(pname, partner.category.replace("_", " "), path_length_m=path_bc.length_m)
+                if push and floor_name:
+                    self.sidecar.describe(floor_name, "floor", push_distance_cm=100.0 * float(chain["distance_m"]))
                 return d
             errors.append("C: no (yaw, grasp) of F passes the exact IK at B and C")
         raise Reject("grasp_unreachable", "; ".join(errors[-3:]) if errors else "no placement candidate")
