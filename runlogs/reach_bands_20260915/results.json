@@ -837,16 +837,16 @@
    "kind": "contact",
    "wave": null,
    "subtasks": "brace",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-l40s-0",
+   "wall_s": 377,
+   "trunks_free": 1,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "contact__restaurant_diner__commercial_kitchen_table_vxvtec_0__left_h0.02__64fd55ccbfa20c8b",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__contact__restaurant_diner__commercial_kitchen_table_vxvtec_0__h0.04__left",
@@ -902,13 +902,13 @@
    "wave": 2,
    "subtasks": "inter_object_relation_satisfaction-under_large_scale",
    "status": "empty band",
-   "pod": "rb2-l40s-0",
-   "wall_s": 243,
-   "trunks_free": 18,
+   "pod": "pilot2-l40s-2",
+   "wall_s": 294,
+   "trunks_free": 22,
    "trunks_total": 25,
    "cells_total": 0,
    "union_extent": "null",
-   "band_file": "floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd__9711cb2e70faa16e",
+   "band_file": "floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd__bb446b7f69120067",
    "error": "",
    "script": "current"
   },
@@ -1222,13 +1222,13 @@
    "wave": 2,
    "subtasks": "inter_object_relation_satisfaction-under_large_scale",
    "status": "empty band",
-   "pod": "rb2-a40b-0",
-   "wall_s": 518,
+   "pod": "pilot2-l40s-3",
+   "wall_s": 317,
    "trunks_free": 0,
    "trunks_total": 25,
    "cells_total": 0,
    "union_extent": "null",
-   "band_file": "floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt__0a61931458a5be5c",
+   "band_file": "floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt__c0bf96e7d6f8b1e6",
    "error": "",
    "script": "current"
   },
@@ -1254,13 +1254,13 @@
    "wave": 1,
    "subtasks": "inter_object_relation_satisfaction-under_large_scale",
    "status": "empty band",
-   "pod": "rb-l40s-1",
-   "wall_s": 291,
-   "trunks_free": 0,
+   "pod": "pilot2-l40s-1",
+   "wall_s": 306,
+   "trunks_free": 15,
    "trunks_total": 25,
    "cells_total": 0,
    "union_extent": "null",
-   "band_file": "floor__house_single_floor__floor-under-desk_xhjsub_0__apple-omzprq__d6e1267127546ad2",
+   "band_file": "floor__house_single_floor__floor-under-desk_xhjsub_0__apple-omzprq__78f1105d40d78021",
    "error": "",
    "script": "current"
   },
@@ -5990,13 +5990,13 @@
    "wave": 2,
    "subtasks": "inter_object_relation_satisfaction-ontop_large_scale",
    "status": "empty band",
-   "pod": "rb4-l40s-3",
-   "wall_s": 697,
+   "pod": "pilot2-l40s-9",
+   "wall_s": 395,
    "trunks_free": 0,
    "trunks_total": 20,
    "cells_total": 0,
    "union_extent": "null",
-   "band_file": "tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai__dffae0e4492e7605",
+   "band_file": "tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai__b6a4253d631673e1",
    "error": "",
    "script": "current"
   },
@@ -6070,13 +6070,13 @@
    "wave": 2,
    "subtasks": "inter_object_relation_satisfaction-under_large_scale",
    "status": "empty band",
-   "pod": "rb5-l40s-0",
-   "wall_s": 347,
+   "pod": "pilot2-l40s-10",
+   "wall_s": 406,
    "trunks_free": 0,
    "trunks_total": 20,
    "cells_total": 0,
    "union_extent": "null",
-   "band_file": "tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd__a57209a3275a7cdf",
+   "band_file": "tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd__11ceb613ee474f8a",
    "error": "",
    "script": "current"
   },
@@ -6134,13 +6134,13 @@
    "wave": 1,
    "subtasks": "inter_object_relation_satisfaction-ontop_large_scale",
    "status": "empty band",
-   "pod": "rb-a40b-1",
-   "wall_s": 1359,
+   "pod": "pilot2-l40s-7",
+   "wall_s": 278,
    "trunks_free": 0,
    "trunks_total": 20,
    "cells_total": 0,
    "union_extent": "null",
-   "band_file": "tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__3c82b9e70f90af66",
+   "band_file": "tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__1bb8a573c1504557",
    "error": "",
    "script": "current"
   },
@@ -7893,16 +7893,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "alignment-axial",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-a40-4",
+   "wall_s": 2529,
+   "trunks_free": 17,
+   "trunks_total": 20,
+   "cells_total": 861,
+   "union_extent": "[-0.800000011920929, 0.0]",
+   "band_file": "tabletop__office_cubicles_right__desk_mdhelw_1__frying_pan-sfbdjn__b7164030cad17353",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__office_cubicles_right__desk_mdhelw_1__gym_shoe-qxecbh__gp",
@@ -8149,16 +8149,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-a40-5",
+   "wall_s": 790,
+   "trunks_free": 17,
+   "trunks_total": 20,
+   "cells_total": 99,
+   "union_extent": "[-0.1599999964237213, 0.0]",
+   "band_file": "tabletop__office_cubicles_right__desk_mdhelw_1__pack_of_cigarettes-qabdgg__placed-tray-gsxbym__51e809e71744bb43",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__office_cubicles_right__desk_mdhelw_1__pack_of_kielbasa-femhoz",
@@ -8181,80 +8181,80 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "alignment-axial",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-a40-8",
+   "wall_s": 2461,
+   "trunks_free": 17,
+   "trunks_total": 20,
+   "cells_total": 839,
+   "union_extent": "[-0.800000011920929, 0.0]",
+   "band_file": "tabletop__office_cubicles_right__desk_mdhelw_1__paperback_book-aubynm__1bd678912173e628",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__office_cubicles_right__desk_mdhelw_1__parsnip-invznw",
    "kind": "tabletop",
    "wave": null,
    "subtasks": "inter_object_relation_satisfaction-nextto",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-a40-9",
+   "wall_s": 2955,
+   "trunks_free": 17,
+   "trunks_total": 20,
+   "cells_total": 877,
+   "union_extent": "[-0.800000011920929, 0.07999999821186066]",
+   "band_file": "tabletop__office_cubicles_right__desk_mdhelw_1__parsnip-invznw__fe2af5a1c4d01cb2",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__office_cubicles_right__desk_mdhelw_1__pencil-rzscao__scaled",
    "kind": "tabletop",
    "wave": null,
    "subtasks": "inter_object_relation_satisfaction-nextto",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-a40-10",
+   "wall_s": 2497,
+   "trunks_free": 17,
+   "trunks_total": 20,
+   "cells_total": 647,
+   "union_extent": "[-0.800000011920929, 0.0]",
+   "band_file": "tabletop__office_cubicles_right__desk_mdhelw_1__pencil-rzscao__bb5ef00c0371e13e",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__office_cubicles_right__desk_mdhelw_1__pencil_case-cqxkgl__placed-tray-gsxbym",
    "kind": "tabletop",
    "wave": null,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-a40-11",
+   "wall_s": 756,
+   "trunks_free": 17,
+   "trunks_total": 20,
+   "cells_total": 108,
+   "union_extent": "[-0.1599999964237213, 0.0]",
+   "band_file": "tabletop__office_cubicles_right__desk_mdhelw_1__pencil_case-cqxkgl__placed-tray-gsxbym__a8c7da69edf38d48",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__office_cubicles_right__desk_mdhelw_1__pickle-ifterk",
    "kind": "tabletop",
    "wave": null,
    "subtasks": "inter_object_relation_satisfaction-ontop_small_scale",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-0",
+   "wall_s": 1483,
+   "trunks_free": 17,
+   "trunks_total": 20,
+   "cells_total": 922,
+   "union_extent": "[-0.800000011920929, 0.07999999821186066]",
+   "band_file": "tabletop__office_cubicles_right__desk_mdhelw_1__pickle-ifterk__c975d7653be0292c",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__office_cubicles_right__desk_mdhelw_1__quartz-poplsu",
@@ -8389,16 +8389,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-a40-5",
+   "wall_s": 810,
+   "trunks_free": 17,
+   "trunks_total": 20,
+   "cells_total": 108,
+   "union_extent": "[-0.1599999964237213, 0.0]",
+   "band_file": "tabletop__office_cubicles_right__desk_mdhelw_1__toy_dice-ievnsq__placed-tray-gsxbym__3dc651ef76226ae1",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__office_cubicles_right__desk_mdhelw_1__video_game-ppnzqm__placed-tray-gsxbym",
@@ -9525,16 +9525,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-0",
+   "wall_s": 473,
+   "trunks_free": 12,
+   "trunks_total": 20,
+   "cells_total": 37,
+   "union_extent": "[-0.1599999964237213, 0.0]",
+   "band_file": "tabletop__restaurant_diner__bar_xxftww_0__box_of_cane_sugar-rvsivw__placed-tray-gsxbym__fbb8f01e85b998ed",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__box_of_cereal-sgirte__placed-tray-gsxbym",
@@ -9765,16 +9765,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-0",
+   "wall_s": 464,
+   "trunks_free": 12,
+   "trunks_total": 20,
+   "cells_total": 22,
+   "union_extent": "[-0.1599999964237213, 0.0]",
+   "band_file": "tabletop__restaurant_diner__bar_xxftww_0__conditioner_dispenser-udeflt__placed-tray-gsxbym__6535229549b40578",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__cork-lseuwf",
@@ -9829,16 +9829,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "alignment-axial",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-4",
+   "wall_s": 1008,
+   "trunks_free": 12,
+   "trunks_total": 20,
+   "cells_total": 620,
+   "union_extent": "[-0.800000011920929, 0.0]",
+   "band_file": "tabletop__restaurant_diner__bar_xxftww_0__frying_pan-aewpzn__0732a01efc3d15ac",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__gym_shoe-arigtn__gp",
@@ -10293,16 +10293,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "alignment-axial",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-l40s-3",
+   "wall_s": 257,
+   "trunks_free": 1,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__bag_of_chips-ennnjj__64e994e29f384ec5",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__bar_soap-utgixp__placed-tray-gsxbym",
@@ -10325,16 +10325,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-l40s-7",
+   "wall_s": 232,
+   "trunks_free": 1,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__beaker-exzsal__placed-tray-gsxbym__23591629a0faa60e",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__board_game-frgdqh__gp",
@@ -10533,16 +10533,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-l40s-3",
+   "wall_s": 248,
+   "trunks_free": 1,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_sanitary_napkins-arqcyu__placed-tray-gsxbym__9bf5160988d7ad0b",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_shampoo-tzghev__placed-tray-gsxbym",
@@ -10565,16 +10565,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-l40s-7",
+   "wall_s": 212,
+   "trunks_free": 1,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_tissues-xwstls__placed-tray-gsxbym__52cdaa0eff28a522",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__brussels_sprouts-vdamtq",
@@ -10757,32 +10757,32 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "alignment-axial",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-l40s-2",
+   "wall_s": 231,
+   "trunks_free": 1,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__frying_pan-aewpzn__f9836629c514b742",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__gym_shoe-arigtn__gp",
    "kind": "tabletop",
    "wave": null,
    "subtasks": "alignment-axial",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-l40s-3",
+   "wall_s": 266,
+   "trunks_free": 1,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__gym_shoe-arigtn__2dc6bb28c1817916",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__hard_candy-vyxhmv",
@@ -10805,16 +10805,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "alignment-axial",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-l40s-7",
+   "wall_s": 226,
+   "trunks_free": 1,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__hardback-bqvvvx__3895e35e9dffcf4a",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__ice_cube-kdlafa",
@@ -10981,48 +10981,48 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-l40s-1",
+   "wall_s": 236,
+   "trunks_free": 1,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_cigarettes-ppbmak__placed-tray-gsxbym__e955295502d91965",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_kielbasa-fwqdoy",
    "kind": "tabletop",
    "wave": null,
    "subtasks": "inter_object_relation_satisfaction-ontop_small_scale",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-l40s-2",
+   "wall_s": 228,
+   "trunks_free": 1,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_kielbasa-fwqdoy__47d5769c6c4bc313",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__paperback_book-vciijb__gp",
    "kind": "tabletop",
    "wave": null,
    "subtasks": "alignment-axial",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-l40s-3",
+   "wall_s": 249,
+   "trunks_free": 1,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__paperback_book-vciijb__fe2f8f6f9888d7dd",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__parsnip-fwmatc",
@@ -11045,32 +11045,32 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "inter_object_relation_satisfaction-nextto",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-l40s-7",
+   "wall_s": 239,
+   "trunks_free": 1,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil-fnlbpu__8b11dadb985d05da",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil_case-acikzo__placed-tray-gsxbym",
    "kind": "tabletop",
    "wave": null,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-l40s-9",
+   "wall_s": 299,
+   "trunks_free": 1,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil_case-acikzo__placed-tray-gsxbym__0e8b289d10418c5c",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pickle-gytwes",
@@ -12954,6 +12954,191 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__office_cubicles_right__desk_mdhelw_1__pencil-rzscao__scaled": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-10/rb__tabletop__office_cubicles_right__desk_mdhelw_1__pencil-rzscao__scaled",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-10/rb__tabletop__office_cubicles_right__desk_mdhelw_1__pencil-rzscao__scaled/tabletop__office_cubicles_right__desk_mdhelw_1__pencil-rzscao__bb5ef00c0371e13e"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__office_cubicles_right__desk_mdhelw_1__pencil-rzscao__scaled/tabletop__office_cubicles_right__desk_mdhelw_1__pencil-rzscao__bb5ef00c0371e13e.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.0
+    ],
+    "n_reachable_total": 647,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      16,
+      false,
+      114.09,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      31,
+      false,
+      101.24,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      47,
+      false,
+      148.08,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      49,
+      false,
+      166.6,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      23,
+      false,
+      72.63,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      40,
+      false,
+      122.88,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      49,
+      false,
+      147.07,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      53,
+      false,
+      177.98,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      30,
+      false,
+      96.23,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      41,
+      false,
+      129.97,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      49,
+      false,
+      167.95,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      53,
+      false,
+      185.15,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      30,
+      false,
+      101.89,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      39,
+      false,
+      135.31,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      45,
+      false,
+      172.87,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      20,
+      false,
+      95.15,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      32,
+      false,
+      139.26,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 2481.5
+   },
+   "error": null,
+   "pod": "pilot2-a40-10",
+   "rc": 0,
+   "wall_s": 2497,
+   "band_files": [
+    "tabletop__office_cubicles_right__desk_mdhelw_1__pencil-rzscao__bb5ef00c0371e13e"
+   ],
+   "current_code": true
+  },
   "v2__camera_relocalization-obstructed-footstool_1": {
    "dir": "runlogs/runpod/rb/pilot2-a40-11/v2__camera_relocalization-obstructed-footstool_1",
    "files": [],
@@ -14716,6 +14901,191 @@
    "wall_s": 2790,
    "band_files": [
     "tabletop__office_cubicles_right__desk_mdhelw_1__jar_of_spaghetti_sauce-fyocnu__55af586f322545d1"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__office_cubicles_right__desk_mdhelw_1__pencil_case-cqxkgl__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-11/rb__tabletop__office_cubicles_right__desk_mdhelw_1__pencil_case-cqxkgl__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-11/rb__tabletop__office_cubicles_right__desk_mdhelw_1__pencil_case-cqxkgl__placed-tray-gsxbym/tabletop__office_cubicles_right__desk_mdhelw_1__pencil_case-cqxkgl__placed-tray-gsxbym__a8c7da69edf38d48"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__office_cubicles_right__desk_mdhelw_1__pencil_case-cqxkgl__placed-tray-gsxbym/tabletop__office_cubicles_right__desk_mdhelw_1__pencil_case-cqxkgl__placed-tray-gsxbym__a8c7da69edf38d48.npz",
+    "union_extent": [
+     -0.1599999964237213,
+     0.0
+    ],
+    "n_reachable_total": 108,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      2,
+      false,
+      38.02,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      6,
+      false,
+      67.2,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      11,
+      false,
+      31.95,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      8,
+      false,
+      30.49,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      3,
+      false,
+      23.8,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      9,
+      false,
+      33.82,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      10,
+      false,
+      28.19,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      5,
+      false,
+      25.88,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      5,
+      false,
+      28.02,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      9,
+      false,
+      28.28,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      7,
+      false,
+      28.65,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      4,
+      false,
+      21.35,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      4,
+      false,
+      24.59,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      9,
+      false,
+      28.64,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      8,
+      false,
+      29.69,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      2,
+      false,
+      23.1,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      6,
+      false,
+      29.17,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 740.4
+   },
+   "error": null,
+   "pod": "pilot2-a40-11",
+   "rc": 0,
+   "wall_s": 756,
+   "band_files": [
+    "tabletop__office_cubicles_right__desk_mdhelw_1__pencil_case-cqxkgl__placed-tray-gsxbym__a8c7da69edf38d48"
    ],
    "current_code": true
   },
@@ -16518,6 +16888,191 @@
    "wall_s": 782,
    "band_files": [
     "tabletop__office_cubicles_right__desk_mdhelw_1__box_of_shampoo-nijidu__placed-tray-gsxbym__6d248964a5202d76"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__office_cubicles_right__desk_mdhelw_1__frying_pan-sfbdjn__gp": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-4/rb__tabletop__office_cubicles_right__desk_mdhelw_1__frying_pan-sfbdjn__gp",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-4/rb__tabletop__office_cubicles_right__desk_mdhelw_1__frying_pan-sfbdjn__gp/tabletop__office_cubicles_right__desk_mdhelw_1__frying_pan-sfbdjn__b7164030cad17353"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__office_cubicles_right__desk_mdhelw_1__frying_pan-sfbdjn__gp/tabletop__office_cubicles_right__desk_mdhelw_1__frying_pan-sfbdjn__b7164030cad17353.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.0
+    ],
+    "n_reachable_total": 861,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      17,
+      false,
+      84.2,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      34,
+      false,
+      107.44,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      51,
+      false,
+      130.07,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      65,
+      false,
+      169.33,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      28,
+      false,
+      76.03,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      44,
+      false,
+      114.76,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      60,
+      false,
+      154.12,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      68,
+      false,
+      188.68,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      39,
+      false,
+      91.75,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      50,
+      false,
+      130.94,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      59,
+      false,
+      162.97,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      69,
+      false,
+      185.98,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      46,
+      false,
+      108.58,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      58,
+      false,
+      144.09,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      67,
+      false,
+      173.52,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      45,
+      false,
+      109.36,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      61,
+      false,
+      143.69,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 2511.3
+   },
+   "error": null,
+   "pod": "pilot2-a40-4",
+   "rc": 0,
+   "wall_s": 2529,
+   "band_files": [
+    "tabletop__office_cubicles_right__desk_mdhelw_1__frying_pan-sfbdjn__b7164030cad17353"
    ],
    "current_code": true
   },
@@ -18525,6 +19080,376 @@
    "wall_s": 2576,
    "band_files": [
     "tabletop__office_cubicles_right__desk_mdhelw_1__gym_shoe-qxecbh__8c4658a0c2f0b843"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__office_cubicles_right__desk_mdhelw_1__pack_of_cigarettes-qabdgg__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-5/rb__tabletop__office_cubicles_right__desk_mdhelw_1__pack_of_cigarettes-qabdgg__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-5/rb__tabletop__office_cubicles_right__desk_mdhelw_1__pack_of_cigarettes-qabdgg__placed-tray-gsxbym/tabletop__office_cubicles_right__desk_mdhelw_1__pack_of_cigarettes-qabdgg__placed-tray-gsxbym__51e809e71744bb43"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__office_cubicles_right__desk_mdhelw_1__pack_of_cigarettes-qabdgg__placed-tray-gsxbym/tabletop__office_cubicles_right__desk_mdhelw_1__pack_of_cigarettes-qabdgg__placed-tray-gsxbym__51e809e71744bb43.npz",
+    "union_extent": [
+     -0.1599999964237213,
+     0.0
+    ],
+    "n_reachable_total": 99,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      1,
+      false,
+      64.5,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      4,
+      false,
+      70.09,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      10,
+      false,
+      43.61,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      8,
+      false,
+      28.4,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      3,
+      false,
+      23.67,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      7,
+      false,
+      51.21,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      9,
+      false,
+      28.17,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      5,
+      false,
+      25.9,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      4,
+      false,
+      39.66,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      9,
+      false,
+      28.21,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      7,
+      false,
+      44.47,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      4,
+      false,
+      21.31,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      4,
+      false,
+      24.52,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      9,
+      false,
+      28.64,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      8,
+      false,
+      29.66,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      2,
+      false,
+      23.05,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      5,
+      false,
+      25.35,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 773.6
+   },
+   "error": null,
+   "pod": "pilot2-a40-5",
+   "rc": 0,
+   "wall_s": 790,
+   "band_files": [
+    "tabletop__office_cubicles_right__desk_mdhelw_1__pack_of_cigarettes-qabdgg__placed-tray-gsxbym__51e809e71744bb43"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__office_cubicles_right__desk_mdhelw_1__toy_dice-ievnsq__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-5/rb__tabletop__office_cubicles_right__desk_mdhelw_1__toy_dice-ievnsq__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-5/rb__tabletop__office_cubicles_right__desk_mdhelw_1__toy_dice-ievnsq__placed-tray-gsxbym/tabletop__office_cubicles_right__desk_mdhelw_1__toy_dice-ievnsq__placed-tray-gsxbym__3dc651ef76226ae1"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__office_cubicles_right__desk_mdhelw_1__toy_dice-ievnsq__placed-tray-gsxbym/tabletop__office_cubicles_right__desk_mdhelw_1__toy_dice-ievnsq__placed-tray-gsxbym__3dc651ef76226ae1.npz",
+    "union_extent": [
+     -0.1599999964237213,
+     0.0
+    ],
+    "n_reachable_total": 108,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      2,
+      false,
+      49.42,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      6,
+      false,
+      86.79,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      10,
+      false,
+      39.82,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      8,
+      false,
+      44.18,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      3,
+      false,
+      29.5,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      9,
+      false,
+      51.57,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      10,
+      false,
+      28.2,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      5,
+      false,
+      25.91,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      5,
+      false,
+      39.79,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      9,
+      false,
+      28.29,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      7,
+      false,
+      28.66,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      4,
+      false,
+      25.03,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      5,
+      false,
+      36.58,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      9,
+      false,
+      28.68,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      8,
+      false,
+      29.75,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      2,
+      false,
+      23.08,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      6,
+      false,
+      25.44,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 794.4
+   },
+   "error": null,
+   "pod": "pilot2-a40-5",
+   "rc": 0,
+   "wall_s": 810,
+   "band_files": [
+    "tabletop__office_cubicles_right__desk_mdhelw_1__toy_dice-ievnsq__placed-tray-gsxbym__3dc651ef76226ae1"
    ],
    "current_code": true
   },
@@ -22519,6 +23444,191 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__office_cubicles_right__desk_mdhelw_1__paperback_book-aubynm__gp": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-8/rb__tabletop__office_cubicles_right__desk_mdhelw_1__paperback_book-aubynm__gp",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-8/rb__tabletop__office_cubicles_right__desk_mdhelw_1__paperback_book-aubynm__gp/tabletop__office_cubicles_right__desk_mdhelw_1__paperback_book-aubynm__1bd678912173e628"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__office_cubicles_right__desk_mdhelw_1__paperback_book-aubynm__gp/tabletop__office_cubicles_right__desk_mdhelw_1__paperback_book-aubynm__1bd678912173e628.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.0
+    ],
+    "n_reachable_total": 839,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      15,
+      false,
+      79.39,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      28,
+      false,
+      92.23,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      49,
+      false,
+      126.25,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      65,
+      false,
+      177.08,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      26,
+      false,
+      76.03,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      42,
+      false,
+      107.04,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      58,
+      false,
+      146.15,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      67,
+      false,
+      180.81,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      39,
+      false,
+      91.82,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      50,
+      false,
+      131.1,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      59,
+      false,
+      163.18,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      69,
+      false,
+      186.15,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      45,
+      false,
+      108.72,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      57,
+      false,
+      136.38,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      65,
+      false,
+      173.58,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      45,
+      false,
+      109.59,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      60,
+      false,
+      143.88,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 2444.8
+   },
+   "error": null,
+   "pod": "pilot2-a40-8",
+   "rc": 0,
+   "wall_s": 2461,
+   "band_files": [
+    "tabletop__office_cubicles_right__desk_mdhelw_1__paperback_book-aubynm__1bd678912173e628"
+   ],
+   "current_code": true
+  },
   "v2__alignment-axial-board_game-breakfast_table": {
    "dir": "runlogs/runpod/rb/pilot2-a40-9/v2__alignment-axial-board_game-breakfast_table",
    "files": [],
@@ -24238,6 +25348,191 @@
    "wall_s": 2474,
    "band_files": [
     "tabletop__office_cubicles_right__desk_mdhelw_1__hardback-agbqsy__e4aa3f104d70fac9"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__office_cubicles_right__desk_mdhelw_1__parsnip-invznw": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-9/rb__tabletop__office_cubicles_right__desk_mdhelw_1__parsnip-invznw",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-9/rb__tabletop__office_cubicles_right__desk_mdhelw_1__parsnip-invznw/tabletop__office_cubicles_right__desk_mdhelw_1__parsnip-invznw__fe2af5a1c4d01cb2"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__office_cubicles_right__desk_mdhelw_1__parsnip-invznw/tabletop__office_cubicles_right__desk_mdhelw_1__parsnip-invznw__fe2af5a1c4d01cb2.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.07999999821186066
+    ],
+    "n_reachable_total": 877,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      14,
+      false,
+      139.34,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      31,
+      false,
+      99.7,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      53,
+      false,
+      152.37,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      69,
+      false,
+      178.2,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      24,
+      false,
+      89.97,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      44,
+      false,
+      132.89,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      62,
+      false,
+      172.35,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      70,
+      false,
+      214.05,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      37,
+      false,
+      123.1,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      55,
+      false,
+      168.6,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      69,
+      false,
+      195.27,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      77,
+      false,
+      228.13,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      44,
+      false,
+      146.85,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      62,
+      false,
+      174.64,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      72,
+      false,
+      210.89,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      39,
+      false,
+      120.67,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      55,
+      false,
+      171.4,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 2938.2
+   },
+   "error": null,
+   "pod": "pilot2-a40-9",
+   "rc": 0,
+   "wall_s": 2955,
+   "band_files": [
+    "tabletop__office_cubicles_right__desk_mdhelw_1__parsnip-invznw__fe2af5a1c4d01cb2"
    ],
    "current_code": true
   },
@@ -30433,6 +31728,743 @@
    "wall_s": 1155,
    "band_files": [
     "tabletop__office_cubicles_right__desk_mdhelw_1__keyboard-jtdyix__cc0f13504eb61b78"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__office_cubicles_right__desk_mdhelw_1__pickle-ifterk": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-0/rb__tabletop__office_cubicles_right__desk_mdhelw_1__pickle-ifterk",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-0/rb__tabletop__office_cubicles_right__desk_mdhelw_1__pickle-ifterk/tabletop__office_cubicles_right__desk_mdhelw_1__pickle-ifterk__c975d7653be0292c"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__office_cubicles_right__desk_mdhelw_1__pickle-ifterk/tabletop__office_cubicles_right__desk_mdhelw_1__pickle-ifterk__c975d7653be0292c.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.07999999821186066
+    ],
+    "n_reachable_total": 922,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      14,
+      false,
+      79.69,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      33,
+      false,
+      53.97,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      56,
+      false,
+      78.56,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      76,
+      false,
+      82.47,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      25,
+      false,
+      46.48,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      45,
+      false,
+      70.07,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      67,
+      false,
+      87.32,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      79,
+      false,
+      92.79,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      37,
+      false,
+      65.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      59,
+      false,
+      82.52,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      73,
+      false,
+      94.14,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      79,
+      false,
+      108.43,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      44,
+      false,
+      70.68,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      62,
+      false,
+      85.0,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      74,
+      false,
+      100.96,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      40,
+      false,
+      51.48,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      59,
+      false,
+      62.63,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 1466.6
+   },
+   "error": null,
+   "pod": "pilot2-l40s-0",
+   "rc": 0,
+   "wall_s": 1483,
+   "band_files": [
+    "tabletop__office_cubicles_right__desk_mdhelw_1__pickle-ifterk__c975d7653be0292c"
+   ],
+   "current_code": true
+  },
+  "rb__contact__restaurant_diner__commercial_kitchen_table_vxvtec_0__h0.02__left": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-0/rb__contact__restaurant_diner__commercial_kitchen_table_vxvtec_0__h0.02__left",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-0/rb__contact__restaurant_diner__commercial_kitchen_table_vxvtec_0__h0.02__left/contact__restaurant_diner__commercial_kitchen_table_vxvtec_0__left_h0.02__64fd55ccbfa20c8b"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__contact__restaurant_diner__commercial_kitchen_table_vxvtec_0__h0.02__left/contact__restaurant_diner__commercial_kitchen_table_vxvtec_0__left_h0.02__64fd55ccbfa20c8b.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      40.38,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 360.9
+   },
+   "error": null,
+   "pod": "pilot2-l40s-0",
+   "rc": 0,
+   "wall_s": 377,
+   "band_files": [
+    "contact__restaurant_diner__commercial_kitchen_table_vxvtec_0__left_h0.02__64fd55ccbfa20c8b"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__restaurant_diner__bar_xxftww_0__box_of_cane_sugar-rvsivw__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-0/rb__tabletop__restaurant_diner__bar_xxftww_0__box_of_cane_sugar-rvsivw__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-0/rb__tabletop__restaurant_diner__bar_xxftww_0__box_of_cane_sugar-rvsivw__placed-tray-gsxbym/tabletop__restaurant_diner__bar_xxftww_0__box_of_cane_sugar-rvsivw__placed-tray-gsxbym__fbb8f01e85b998ed"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__restaurant_diner__bar_xxftww_0__box_of_cane_sugar-rvsivw__placed-tray-gsxbym/tabletop__restaurant_diner__bar_xxftww_0__box_of_cane_sugar-rvsivw__placed-tray-gsxbym__fbb8f01e85b998ed.npz",
+    "union_extent": [
+     -0.1599999964237213,
+     0.0
+    ],
+    "n_reachable_total": 37,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      5,
+      false,
+      37.19,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      8,
+      false,
+      24.73,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      9,
+      false,
+      29.94,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      3,
+      false,
+      11.36,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      7,
+      false,
+      14.08,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      5,
+      false,
+      14.79,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      false,
+      10.69,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      false,
+      11.16,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      false,
+      10.92,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      false,
+      11.12,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      10.87,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      10.98,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 457.9
+   },
+   "error": null,
+   "pod": "pilot2-l40s-0",
+   "rc": 0,
+   "wall_s": 473,
+   "band_files": [
+    "tabletop__restaurant_diner__bar_xxftww_0__box_of_cane_sugar-rvsivw__placed-tray-gsxbym__fbb8f01e85b998ed"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__restaurant_diner__bar_xxftww_0__conditioner_dispenser-udeflt__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-0/rb__tabletop__restaurant_diner__bar_xxftww_0__conditioner_dispenser-udeflt__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-0/rb__tabletop__restaurant_diner__bar_xxftww_0__conditioner_dispenser-udeflt__placed-tray-gsxbym/tabletop__restaurant_diner__bar_xxftww_0__conditioner_dispenser-udeflt__placed-tray-gsxbym__6535229549b40578"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__restaurant_diner__bar_xxftww_0__conditioner_dispenser-udeflt__placed-tray-gsxbym/tabletop__restaurant_diner__bar_xxftww_0__conditioner_dispenser-udeflt__placed-tray-gsxbym__6535229549b40578.npz",
+    "union_extent": [
+     -0.1599999964237213,
+     0.0
+    ],
+    "n_reachable_total": 22,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      3,
+      false,
+      38.02,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      6,
+      false,
+      24.97,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      6,
+      false,
+      27.29,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      2,
+      false,
+      11.33,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      5,
+      false,
+      12.37,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      false,
+      11.17,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      false,
+      10.67,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      false,
+      11.15,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      false,
+      10.91,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      false,
+      11.1,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      9.81,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      10.97,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 447.3
+   },
+   "error": null,
+   "pod": "pilot2-l40s-0",
+   "rc": 0,
+   "wall_s": 464,
+   "band_files": [
+    "tabletop__restaurant_diner__bar_xxftww_0__conditioner_dispenser-udeflt__placed-tray-gsxbym__6535229549b40578"
    ],
    "current_code": true
   },
@@ -38994,6 +41026,410 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_cigarettes-ppbmak__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-1/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_cigarettes-ppbmak__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-1/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_cigarettes-ppbmak__placed-tray-gsxbym/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_cigarettes-ppbmak__placed-tray-gsxbym__e955295502d91965"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_cigarettes-ppbmak__placed-tray-gsxbym/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_cigarettes-ppbmak__placed-tray-gsxbym__e955295502d91965.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      23.82,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 223.6
+   },
+   "error": null,
+   "pod": "pilot2-l40s-1",
+   "rc": 0,
+   "wall_s": 236,
+   "band_files": [
+    "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_cigarettes-ppbmak__placed-tray-gsxbym__e955295502d91965"
+   ],
+   "current_code": true
+  },
+  "rb__floor__house_single_floor__floor-under-desk_xhjsub_0__apple-omzprq": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-1/rb__floor__house_single_floor__floor-under-desk_xhjsub_0__apple-omzprq",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-1/rb__floor__house_single_floor__floor-under-desk_xhjsub_0__apple-omzprq/floor__house_single_floor__floor-under-desk_xhjsub_0__apple-omzprq__78f1105d40d78021"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__floor__house_single_floor__floor-under-desk_xhjsub_0__apple-omzprq/floor__house_single_floor__floor-under-desk_xhjsub_0__apple-omzprq__78f1105d40d78021.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      0.02,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      false,
+      0.02,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      false,
+      0.02,
+      "ready"
+     ],
+     [
+      0.0,
+      -1.2,
+      0,
+      false,
+      0.01,
+      "ready"
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      false,
+      0.01,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      false,
+      0.02,
+      "tucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      false,
+      0.02,
+      "tucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      false,
+      0.01,
+      "ready"
+     ],
+     [
+      0.25,
+      -1.2,
+      0,
+      false,
+      0.02,
+      "tucked"
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      false,
+      0.02,
+      "tucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      false,
+      0.02,
+      "tucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      false,
+      0.02,
+      "tucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      false,
+      0.02,
+      "tucked"
+     ],
+     [
+      0.5,
+      -1.2,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -1.2,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -1.2,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 293.7
+   },
+   "error": null,
+   "pod": "pilot2-l40s-1",
+   "rc": 0,
+   "wall_s": 306,
+   "band_files": [
+    "floor__house_single_floor__floor-under-desk_xhjsub_0__apple-omzprq__78f1105d40d78021"
+   ],
+   "current_code": true
+  },
   "v2__alignment-axial-paperback_book-breakfast_table": {
    "dir": "runlogs/runpod/rb/pilot2-l40s-10/v2__alignment-axial-paperback_book-breakfast_table",
    "files": [],
@@ -47283,6 +49719,188 @@
    "wall_s": 312,
    "band_files": [
     "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pickle-gytwes__2efa1608ecb8035e"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-10/rb__tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-10/rb__tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd/tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd__11ceb613ee474f8a"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd/tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd__11ceb613ee474f8a.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      true,
+      0.1,
+      null
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 387.8
+   },
+   "error": null,
+   "pod": "pilot2-l40s-10",
+   "rc": 0,
+   "wall_s": 406,
+   "band_files": [
+    "tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd__11ceb613ee474f8a"
    ],
    "current_code": true
   },
@@ -55709,6 +58327,592 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__frying_pan-aewpzn__gp": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-2/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__frying_pan-aewpzn__gp",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-2/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__frying_pan-aewpzn__gp/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__frying_pan-aewpzn__f9836629c514b742"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__frying_pan-aewpzn__gp/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__frying_pan-aewpzn__f9836629c514b742.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      39.32,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 219.2
+   },
+   "error": null,
+   "pod": "pilot2-l40s-2",
+   "rc": 0,
+   "wall_s": 231,
+   "band_files": [
+    "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__frying_pan-aewpzn__f9836629c514b742"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_kielbasa-fwqdoy": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-2/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_kielbasa-fwqdoy",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-2/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_kielbasa-fwqdoy/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_kielbasa-fwqdoy__47d5769c6c4bc313"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_kielbasa-fwqdoy/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_kielbasa-fwqdoy__47d5769c6c4bc313.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      38.86,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 215.8
+   },
+   "error": null,
+   "pod": "pilot2-l40s-2",
+   "rc": 0,
+   "wall_s": 228,
+   "band_files": [
+    "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_kielbasa-fwqdoy__47d5769c6c4bc313"
+   ],
+   "current_code": true
+  },
+  "rb__floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-2/rb__floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-2/rb__floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd/floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd__bb446b7f69120067"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd/floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd__bb446b7f69120067.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      0.09,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -1.2,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      -1.2,
+      0,
+      false,
+      0.01,
+      "tucked"
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      -1.2,
+      0,
+      false,
+      32.34,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      false,
+      0.04,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      false,
+      17.62,
+      "tucked"
+     ],
+     [
+      0.75,
+      -1.2,
+      0,
+      false,
+      43.33,
+      "tucked"
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      14.57,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -1.2,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 283.3
+   },
+   "error": null,
+   "pod": "pilot2-l40s-2",
+   "rc": 0,
+   "wall_s": 294,
+   "band_files": [
+    "floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd__bb446b7f69120067"
+   ],
+   "current_code": true
+  },
   "v2__alignment-axial-gym_shoe-breakfast_table": {
    "dir": "runlogs/runpod/rb/pilot2-l40s-3/v2__alignment-axial-gym_shoe-breakfast_table",
    "files": [],
@@ -63835,6 +67039,956 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__bag_of_chips-ennnjj__gp": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-3/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__bag_of_chips-ennnjj__gp",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-3/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__bag_of_chips-ennnjj__gp/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__bag_of_chips-ennnjj__64e994e29f384ec5"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__bag_of_chips-ennnjj__gp/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__bag_of_chips-ennnjj__64e994e29f384ec5.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      39.18,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 241.3
+   },
+   "error": null,
+   "pod": "pilot2-l40s-3",
+   "rc": 0,
+   "wall_s": 257,
+   "band_files": [
+    "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__bag_of_chips-ennnjj__64e994e29f384ec5"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_sanitary_napkins-arqcyu__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-3/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_sanitary_napkins-arqcyu__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-3/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_sanitary_napkins-arqcyu__placed-tray-gsxbym/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_sanitary_napkins-arqcyu__placed-tray-gsxbym__9bf5160988d7ad0b"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_sanitary_napkins-arqcyu__placed-tray-gsxbym/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_sanitary_napkins-arqcyu__placed-tray-gsxbym__9bf5160988d7ad0b.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      24.06,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 235.1
+   },
+   "error": null,
+   "pod": "pilot2-l40s-3",
+   "rc": 0,
+   "wall_s": 248,
+   "band_files": [
+    "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_sanitary_napkins-arqcyu__placed-tray-gsxbym__9bf5160988d7ad0b"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__gym_shoe-arigtn__gp": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-3/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__gym_shoe-arigtn__gp",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-3/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__gym_shoe-arigtn__gp/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__gym_shoe-arigtn__2dc6bb28c1817916"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__gym_shoe-arigtn__gp/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__gym_shoe-arigtn__2dc6bb28c1817916.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      50.26,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 253.5
+   },
+   "error": null,
+   "pod": "pilot2-l40s-3",
+   "rc": 0,
+   "wall_s": 266,
+   "band_files": [
+    "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__gym_shoe-arigtn__2dc6bb28c1817916"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__paperback_book-vciijb__gp": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-3/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__paperback_book-vciijb__gp",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-3/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__paperback_book-vciijb__gp/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__paperback_book-vciijb__fe2f8f6f9888d7dd"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__paperback_book-vciijb__gp/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__paperback_book-vciijb__fe2f8f6f9888d7dd.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      39.55,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 235.9
+   },
+   "error": null,
+   "pod": "pilot2-l40s-3",
+   "rc": 0,
+   "wall_s": 249,
+   "band_files": [
+    "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__paperback_book-vciijb__fe2f8f6f9888d7dd"
+   ],
+   "current_code": true
+  },
+  "rb__floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-3/rb__floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-3/rb__floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt/floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt__c0bf96e7d6f8b1e6"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt/floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt__c0bf96e7d6f8b1e6.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -1.2,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -1.2,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -1.2,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -1.2,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -1.2,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 303.8
+   },
+   "error": null,
+   "pod": "pilot2-l40s-3",
+   "rc": 0,
+   "wall_s": 317,
+   "band_files": [
+    "floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt__c0bf96e7d6f8b1e6"
+   ],
+   "current_code": true
+  },
   "v2__alignment-axial-hardback-breakfast_table": {
    "dir": "runlogs/runpod/rb/pilot2-l40s-4/v2__alignment-axial-hardback-breakfast_table",
    "files": [],
@@ -71399,6 +75553,191 @@
    "wall_s": 977,
    "band_files": [
     "tabletop__restaurant_diner__bar_xxftww_0__box_of_sanitary_napkins-arqcyu__6af8e1b5557744af"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__restaurant_diner__bar_xxftww_0__frying_pan-aewpzn__gp": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-4/rb__tabletop__restaurant_diner__bar_xxftww_0__frying_pan-aewpzn__gp",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-4/rb__tabletop__restaurant_diner__bar_xxftww_0__frying_pan-aewpzn__gp/tabletop__restaurant_diner__bar_xxftww_0__frying_pan-aewpzn__0732a01efc3d15ac"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__restaurant_diner__bar_xxftww_0__frying_pan-aewpzn__gp/tabletop__restaurant_diner__bar_xxftww_0__frying_pan-aewpzn__0732a01efc3d15ac.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.0
+    ],
+    "n_reachable_total": 620,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      43,
+      false,
+      68.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      56,
+      false,
+      84.23,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      60,
+      false,
+      82.19,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      50,
+      false,
+      55.22,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      60,
+      false,
+      70.88,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      62,
+      false,
+      79.02,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      51,
+      false,
+      61.34,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      62,
+      false,
+      73.38,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      44,
+      false,
+      58.55,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.3,
+      57,
+      false,
+      70.76,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      32,
+      false,
+      47.45,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      43,
+      false,
+      57.56,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 995.3
+   },
+   "error": null,
+   "pod": "pilot2-l40s-4",
+   "rc": 0,
+   "wall_s": 1008,
+   "band_files": [
+    "tabletop__restaurant_diner__bar_xxftww_0__frying_pan-aewpzn__0732a01efc3d15ac"
    ],
    "current_code": true
   },
@@ -79716,6 +84055,916 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__beaker-exzsal__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-7/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__beaker-exzsal__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-7/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__beaker-exzsal__placed-tray-gsxbym/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__beaker-exzsal__placed-tray-gsxbym__23591629a0faa60e"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__beaker-exzsal__placed-tray-gsxbym/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__beaker-exzsal__placed-tray-gsxbym__23591629a0faa60e.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      32.95,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 220.6
+   },
+   "error": null,
+   "pod": "pilot2-l40s-7",
+   "rc": 0,
+   "wall_s": 232,
+   "band_files": [
+    "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__beaker-exzsal__placed-tray-gsxbym__23591629a0faa60e"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_tissues-xwstls__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-7/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_tissues-xwstls__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-7/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_tissues-xwstls__placed-tray-gsxbym/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_tissues-xwstls__placed-tray-gsxbym__52cdaa0eff28a522"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_tissues-xwstls__placed-tray-gsxbym/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_tissues-xwstls__placed-tray-gsxbym__52cdaa0eff28a522.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      22.86,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 200.6
+   },
+   "error": null,
+   "pod": "pilot2-l40s-7",
+   "rc": 0,
+   "wall_s": 212,
+   "band_files": [
+    "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_tissues-xwstls__placed-tray-gsxbym__52cdaa0eff28a522"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__hardback-bqvvvx__gp": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-7/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__hardback-bqvvvx__gp",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-7/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__hardback-bqvvvx__gp/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__hardback-bqvvvx__3895e35e9dffcf4a"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__hardback-bqvvvx__gp/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__hardback-bqvvvx__3895e35e9dffcf4a.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      38.58,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 214.3
+   },
+   "error": null,
+   "pod": "pilot2-l40s-7",
+   "rc": 0,
+   "wall_s": 226,
+   "band_files": [
+    "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__hardback-bqvvvx__3895e35e9dffcf4a"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil-fnlbpu__scaled": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-7/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil-fnlbpu__scaled",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-7/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil-fnlbpu__scaled/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil-fnlbpu__8b11dadb985d05da"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil-fnlbpu__scaled/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil-fnlbpu__8b11dadb985d05da.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      47.37,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 227.4
+   },
+   "error": null,
+   "pod": "pilot2-l40s-7",
+   "rc": 0,
+   "wall_s": 239,
+   "band_files": [
+    "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil-fnlbpu__8b11dadb985d05da"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__scaled": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-7/rb__tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__scaled",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-7/rb__tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__scaled/tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__1bb8a573c1504557"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__scaled/tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__1bb8a573c1504557.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 266.0
+   },
+   "error": null,
+   "pod": "pilot2-l40s-7",
+   "rc": 0,
+   "wall_s": 278,
+   "band_files": [
+    "tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__1bb8a573c1504557"
+   ],
+   "current_code": true
+  },
   "v2__alignment-axial-magazine-breakfast_table": {
    "dir": "runlogs/runpod/rb/pilot2-l40s-9/v2__alignment-axial-magazine-breakfast_table",
    "files": [],
@@ -87174,6 +92423,370 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil_case-acikzo__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-9/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil_case-acikzo__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-9/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil_case-acikzo__placed-tray-gsxbym/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil_case-acikzo__placed-tray-gsxbym__0e8b289d10418c5c"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil_case-acikzo__placed-tray-gsxbym/tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil_case-acikzo__placed-tray-gsxbym__0e8b289d10418c5c.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      26.21,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 283.3
+   },
+   "error": null,
+   "pod": "pilot2-l40s-9",
+   "rc": 0,
+   "wall_s": 299,
+   "band_files": [
+    "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil_case-acikzo__placed-tray-gsxbym__0e8b289d10418c5c"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-9/rb__tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-9/rb__tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai/tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai__b6a4253d631673e1"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai/tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai__b6a4253d631673e1.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 378.0
+   },
+   "error": null,
+   "pod": "pilot2-l40s-9",
+   "rc": 0,
+   "wall_s": 395,
+   "band_files": [
+    "tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai__b6a4253d631673e1"
+   ],
+   "current_code": true
+  },
   "rb__brace__house_single_floor__breakfast_table_rhjoby_0__blender-cwkvib-j_lid": {
    "dir": "runlogs/runpod/rb/rb7-l40s-4/rb__brace__house_single_floor__breakfast_table_rhjoby_0__blender-cwkvib-j_lid",
    "files": [
@@ -93845,168 +99458,6 @@
    ],
    "current_code": true
   },
-  "rb__tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__scaled": {
-   "dir": "runlogs/runpod/rb/rb-a40b-1/rb__tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__scaled",
-   "files": [
-    "runlogs/runpod/rb/rb-a40b-1/rb__tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__scaled/tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__3c82b9e70f90af66"
-   ],
-   "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__scaled/tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__3c82b9e70f90af66.npz",
-    "union_extent": null,
-    "n_reachable_total": 0,
-    "trunks": [
-     [
-      0.0,
-      0.0,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.0,
-      -0.3,
-      0,
-      true,
-      0.08
-     ],
-     [
-      0.0,
-      -0.6,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.0,
-      -0.9,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.25,
-      0.0,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.25,
-      -0.3,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.25,
-      -0.6,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.25,
-      -0.9,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.5,
-      0.0,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.5,
-      -0.3,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.5,
-      -0.6,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.5,
-      -0.9,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.75,
-      0.0,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.75,
-      -0.3,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.75,
-      -0.6,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.75,
-      -0.9,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.95,
-      0.0,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.95,
-      -0.3,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.95,
-      -0.6,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.95,
-      -0.9,
-      0,
-      true,
-      0.01
-     ]
-    ],
-    "time_s": 1340.0
-   },
-   "error": null,
-   "pod": "rb-a40b-1",
-   "rc": 0,
-   "wall_s": 1359,
-   "band_files": [
-    "tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__3c82b9e70f90af66"
-   ],
-   "current_code": true
-  },
   "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_cookies-apjokz__placed-tray-gsxbym": {
    "dir": "runlogs/runpod/rb/rb-a40b-1/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_cookies-apjokz__placed-tray-gsxbym",
    "files": [
@@ -97045,203 +102496,6 @@
    "wall_s": 1167,
    "band_files": [
     "brace__house_single_floor__breakfast_table_rhjoby_0__laptop-nvulcs__d53ed8f891126a9e"
-   ],
-   "current_code": true
-  },
-  "rb__floor__house_single_floor__floor-under-desk_xhjsub_0__apple-omzprq": {
-   "dir": "runlogs/runpod/rb/rb-l40s-1/rb__floor__house_single_floor__floor-under-desk_xhjsub_0__apple-omzprq",
-   "files": [
-    "runlogs/runpod/rb/rb-l40s-1/rb__floor__house_single_floor__floor-under-desk_xhjsub_0__apple-omzprq/floor__house_single_floor__floor-under-desk_xhjsub_0__apple-omzprq__d6e1267127546ad2"
-   ],
-   "summary": {
-    "file": "/root/samp/rb__floor__house_single_floor__floor-under-desk_xhjsub_0__apple-omzprq/floor__house_single_floor__floor-under-desk_xhjsub_0__apple-omzprq__d6e1267127546ad2.npz",
-    "union_extent": null,
-    "n_reachable_total": 0,
-    "trunks": [
-     [
-      0.0,
-      0.0,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.0,
-      -0.3,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.0,
-      -0.6,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.0,
-      -0.9,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.0,
-      -1.2,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.25,
-      0.0,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.25,
-      -0.3,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.25,
-      -0.6,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.25,
-      -0.9,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.25,
-      -1.2,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.5,
-      0.0,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.5,
-      -0.3,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.5,
-      -0.6,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.5,
-      -0.9,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.5,
-      -1.2,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.75,
-      0.0,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.75,
-      -0.3,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.75,
-      -0.6,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.75,
-      -0.9,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.75,
-      -1.2,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.95,
-      0.0,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.95,
-      -0.3,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.95,
-      -0.6,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.95,
-      -0.9,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.95,
-      -1.2,
-      0,
-      true,
-      0.0
-     ]
-    ],
-    "time_s": 278.6
-   },
-   "error": null,
-   "pod": "rb-l40s-1",
-   "rc": 0,
-   "wall_s": 291,
-   "band_files": [
-    "floor__house_single_floor__floor-under-desk_xhjsub_0__apple-omzprq__d6e1267127546ad2"
    ],
    "current_code": true
   },
@@ -100809,203 +106063,6 @@
    ],
    "current_code": true
   },
-  "rb__floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt": {
-   "dir": "runlogs/runpod/rb/rb2-a40b-0/rb__floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt",
-   "files": [
-    "runlogs/runpod/rb/rb2-a40b-0/rb__floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt/floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt__0a61931458a5be5c"
-   ],
-   "summary": {
-    "file": "/root/samp/rb__floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt/floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt__0a61931458a5be5c.npz",
-    "union_extent": null,
-    "n_reachable_total": 0,
-    "trunks": [
-     [
-      0.0,
-      0.0,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.0,
-      -0.3,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.0,
-      -0.6,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.0,
-      -0.9,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.0,
-      -1.2,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.25,
-      0.0,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.25,
-      -0.3,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.25,
-      -0.6,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.25,
-      -0.9,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.25,
-      -1.2,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.5,
-      0.0,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.5,
-      -0.3,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.5,
-      -0.6,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.5,
-      -0.9,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.5,
-      -1.2,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.75,
-      0.0,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.75,
-      -0.3,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.75,
-      -0.6,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.75,
-      -0.9,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.75,
-      -1.2,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.95,
-      0.0,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.95,
-      -0.3,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.95,
-      -0.6,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.95,
-      -0.9,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.95,
-      -1.2,
-      0,
-      true,
-      0.01
-     ]
-    ],
-    "time_s": 503.7
-   },
-   "error": null,
-   "pod": "rb2-a40b-0",
-   "rc": 0,
-   "wall_s": 518,
-   "band_files": [
-    "floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt__0a61931458a5be5c"
-   ],
-   "current_code": true
-  },
   "rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_cane_sugar-qvjiti__placed-tray-gsxbym": {
    "dir": "runlogs/runpod/rb/rb2-a40b-1/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_cane_sugar-qvjiti__placed-tray-gsxbym",
    "files": [
@@ -103180,203 +108237,6 @@
    "wall_s": 499,
    "band_files": [
     "tabletop__house_single_floor__countertop_ikwqer_0__pack_of_cigarettes-qabdgg__a174e818da614af4"
-   ],
-   "current_code": true
-  },
-  "rb__floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd": {
-   "dir": "runlogs/runpod/rb/rb2-l40s-0/rb__floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd",
-   "files": [
-    "runlogs/runpod/rb/rb2-l40s-0/rb__floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd/floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd__9711cb2e70faa16e"
-   ],
-   "summary": {
-    "file": "/root/samp/rb__floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd/floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd__9711cb2e70faa16e.npz",
-    "union_extent": null,
-    "n_reachable_total": 0,
-    "trunks": [
-     [
-      0.0,
-      0.0,
-      0,
-      false,
-      0.02
-     ],
-     [
-      0.0,
-      -0.3,
-      0,
-      false,
-      0.01
-     ],
-     [
-      0.0,
-      -0.6,
-      0,
-      false,
-      0.01
-     ],
-     [
-      0.0,
-      -0.9,
-      0,
-      false,
-      0.01
-     ],
-     [
-      0.0,
-      -1.2,
-      0,
-      false,
-      0.01
-     ],
-     [
-      0.25,
-      0.0,
-      0,
-      false,
-      0.01
-     ],
-     [
-      0.25,
-      -0.3,
-      0,
-      false,
-      0.01
-     ],
-     [
-      0.25,
-      -0.6,
-      0,
-      false,
-      0.01
-     ],
-     [
-      0.25,
-      -0.9,
-      0,
-      false,
-      0.01
-     ],
-     [
-      0.25,
-      -1.2,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.5,
-      0.0,
-      0,
-      false,
-      0.01
-     ],
-     [
-      0.5,
-      -0.3,
-      0,
-      false,
-      0.01
-     ],
-     [
-      0.5,
-      -0.6,
-      0,
-      false,
-      0.01
-     ],
-     [
-      0.5,
-      -0.9,
-      0,
-      false,
-      0.01
-     ],
-     [
-      0.5,
-      -1.2,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.75,
-      0.0,
-      0,
-      false,
-      0.01
-     ],
-     [
-      0.75,
-      -0.3,
-      0,
-      false,
-      0.01
-     ],
-     [
-      0.75,
-      -0.6,
-      0,
-      false,
-      0.14
-     ],
-     [
-      0.75,
-      -0.9,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.75,
-      -1.2,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.95,
-      0.0,
-      0,
-      false,
-      0.01
-     ],
-     [
-      0.95,
-      -0.3,
-      0,
-      false,
-      11.9
-     ],
-     [
-      0.95,
-      -0.6,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.95,
-      -0.9,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.95,
-      -1.2,
-      0,
-      true,
-      0.01
-     ]
-    ],
-    "time_s": 227.5
-   },
-   "error": null,
-   "pod": "rb2-l40s-0",
-   "rc": 0,
-   "wall_s": 243,
-   "band_files": [
-    "floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd__9711cb2e70faa16e"
    ],
    "current_code": true
   },
@@ -109054,168 +113914,6 @@
    ],
    "current_code": true
   },
-  "rb__tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai": {
-   "dir": "runlogs/runpod/rb/rb4-l40s-3/rb__tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai",
-   "files": [
-    "runlogs/runpod/rb/rb4-l40s-3/rb__tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai/tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai__dffae0e4492e7605"
-   ],
-   "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai/tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai__dffae0e4492e7605.npz",
-    "union_extent": null,
-    "n_reachable_total": 0,
-    "trunks": [
-     [
-      0.0,
-      0.0,
-      0,
-      true,
-      0.24
-     ],
-     [
-      0.0,
-      -0.3,
-      0,
-      true,
-      0.23
-     ],
-     [
-      0.0,
-      -0.6,
-      0,
-      true,
-      0.23
-     ],
-     [
-      0.0,
-      -0.9,
-      0,
-      true,
-      0.23
-     ],
-     [
-      0.25,
-      0.0,
-      0,
-      true,
-      0.23
-     ],
-     [
-      0.25,
-      -0.3,
-      0,
-      true,
-      0.23
-     ],
-     [
-      0.25,
-      -0.6,
-      0,
-      true,
-      0.23
-     ],
-     [
-      0.25,
-      -0.9,
-      0,
-      true,
-      0.23
-     ],
-     [
-      0.5,
-      0.0,
-      0,
-      true,
-      0.23
-     ],
-     [
-      0.5,
-      -0.3,
-      0,
-      true,
-      0.23
-     ],
-     [
-      0.5,
-      -0.6,
-      0,
-      true,
-      0.23
-     ],
-     [
-      0.5,
-      -0.9,
-      0,
-      true,
-      0.23
-     ],
-     [
-      0.75,
-      0.0,
-      0,
-      true,
-      0.09
-     ],
-     [
-      0.75,
-      -0.3,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.75,
-      -0.6,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.75,
-      -0.9,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.95,
-      0.0,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.95,
-      -0.3,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.95,
-      -0.6,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.95,
-      -0.9,
-      0,
-      true,
-      0.0
-     ]
-    ],
-    "time_s": 668.6
-   },
-   "error": null,
-   "pod": "rb4-l40s-3",
-   "rc": 0,
-   "wall_s": 697,
-   "band_files": [
-    "tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai__dffae0e4492e7605"
-   ],
-   "current_code": true
-  },
   "rb__tabletop__house_single_floor__countertop_ikwqer_0__hard_candy-yuatcg": {
    "dir": "runlogs/runpod/rb/rb4-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__hard_candy-yuatcg",
    "files": [
@@ -110368,168 +115066,6 @@
    "wall_s": 414,
    "band_files": [
     "tabletop__house_single_floor__countertop_ikwqer_0__notebook-yibctu__f8f1d71d7f26ebed"
-   ],
-   "current_code": true
-  },
-  "rb__tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd": {
-   "dir": "runlogs/runpod/rb/rb5-l40s-0/rb__tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd",
-   "files": [
-    "runlogs/runpod/rb/rb5-l40s-0/rb__tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd/tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd__a57209a3275a7cdf"
-   ],
-   "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd/tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd__a57209a3275a7cdf.npz",
-    "union_extent": null,
-    "n_reachable_total": 0,
-    "trunks": [
-     [
-      0.0,
-      0.0,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.0,
-      -0.3,
-      0,
-      true,
-      0.08
-     ],
-     [
-      0.0,
-      -0.6,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.0,
-      -0.9,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.25,
-      0.0,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.25,
-      -0.3,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.25,
-      -0.6,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.25,
-      -0.9,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.5,
-      0.0,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.5,
-      -0.3,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.5,
-      -0.6,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.5,
-      -0.9,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.75,
-      0.0,
-      0,
-      true,
-      0.0
-     ],
-     [
-      0.75,
-      -0.3,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.75,
-      -0.6,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.75,
-      -0.9,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.95,
-      0.0,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.95,
-      -0.3,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.95,
-      -0.6,
-      0,
-      true,
-      0.01
-     ],
-     [
-      0.95,
-      -0.9,
-      0,
-      true,
-      0.0
-     ]
-    ],
-    "time_s": 327.3
-   },
-   "error": null,
-   "pod": "rb5-l40s-0",
-   "rc": 0,
-   "wall_s": 347,
-   "band_files": [
-    "tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd__a57209a3275a7cdf"
    ],
    "current_code": true
   },
