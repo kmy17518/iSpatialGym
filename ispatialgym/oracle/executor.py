@@ -433,6 +433,21 @@ class Executor:
 
     # ------------------------------------------------------------------ one action
 
+    def witnesses_for(self, index: int) -> Dict[str, th.Tensor]:
+        """The sampler's IK witnesses of action ``index`` (sidecar ``ik_witnesses[].targets[key].q``, the 28-D joint
+        solution of every checked end pose, written by the program check) as ``{target key: q}``; ``{}`` when the
+        sidecar has none (pre-2026-09-16 sidecars)."""
+        entries = (getattr(self.sidecar, "extra", None) or {}).get("ik_witnesses") or []
+        out: Dict[str, th.Tensor] = {}
+        for e in entries:
+            if not isinstance(e, dict) or e.get("action") != index:
+                continue
+            for key, w in (e.get("targets") or {}).items():
+                q = w.get("q") if isinstance(w, dict) else None
+                if q is not None and len(q) == 28:
+                    out[key] = th.tensor([float(v) for v in q], dtype=th.float32)
+        return out
+
     def _scene_names(self, instances: Iterable[str]) -> set:
         out = set()
         for inst in instances:
@@ -453,6 +468,7 @@ class Executor:
             self.stats.record(v)
             return v, ctx
         ctx["targets_keys"] = sorted(targets.keys())
+        ctx["witnesses"] = self.witnesses_for(index)
         if self.monitors is not None:
             self.monitors.begin_action(action, index, attempt, intended=self._scene_names(action.objects), held=self.state.held_objects(), manipulation=is_manipulation(action),
                                        fov=fov_monitored(action))

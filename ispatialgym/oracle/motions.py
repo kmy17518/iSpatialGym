@@ -82,9 +82,11 @@ class MotionsConfig:
     cartesian_ang_speed: float = 0.6
     cartesian_step: float = 0.01
     cartesian_rot_step: float = 0.05
-    #: differential-IK tolerances (see ``R1ProCuRobo.solve_ik_path``)
+    #: differential-IK tolerances and iteration budget per waypoint (see ``R1ProCuRobo.solve_ik_path``; v1 used 30
+    #: iterations, too few near a stretched-arm configuration where the damped steps shrink)
     diff_ik_pos_tol: float = 2e-3
     diff_ik_rot_tol: float = 1e-2
+    diff_ik_max_iters: int = 100
     #: gripper actuation wait (steps)
     gripper_steps: int = 60
     #: base tracking (paths) and base-follow (articulation) tracker configurations
@@ -406,17 +408,39 @@ class Motions:
     def _emb_for(arms: Sequence[str]) -> str:
         return "both_arms" if len(arms) == 2 else f"{arms[0]}_arm"
 
-    def arm_to(self, arms: Union[str, Sequence[str]], pose: Any = None, q: Any = None, ignore_objects=()) -> Iterator[th.Tensor]:
+    def arm_to(self, arms: Union[str, Sequence[str]], pose: Any = None, q: Any = None, ignore_objects=(), q_hint: Any = None) -> Iterator[th.Tensor]:
         """cuRobo trajopt of the arm(s) with the trunk locked, then streamed. Exactly one of ``pose`` (a world pose
         for one arm, or ``{arm: pose}``) or ``q`` (a 28-D vector, ``{joint_name: value}`` or ``{arm: q7}``) is the
         target. Raises ``plan_failed`` when no trajectory is found (the sampler proved the key poses, not the
-        trajectory between them, §3.9)."""
+        trajectory between them, §3.9).
+
+        ``q_hint`` (a 28-D configuration, the sampler's IK witness of ``pose``): the arm is planned in **joint space**
+        to the witness's arm joints — the IK branch the sampler validated the following approach / descent from —
+        and the residual to ``pose`` (the object settled a few mm away from its recorded pose) is closed with a short
+        ``arm_along``. Without a hint cuRobo picks its own IK branch for the pose goal."""
         arms = (arms,) if isinstance(arms, str) else tuple(arms)
         emb = self._emb_for(arms)
         self.backend.update_world(ignore_objects=ignore_objects)
         q_start = self.backend.q_full()
         if (pose is None) == (q is None):
             raise ValueError("arm_to needs exactly one of pose / q")
+        if pose is not None and q_hint is not None and len(arms) == 1:
+            arm = arms[0]
+            q28 = C.as_tensor(q_hint).reshape(-1)
+            q_goal = q_start.clone()
+            q_goal[self.robot.arm_control_idx[arm]] = q28[self.robot.arm_control_idx[arm]]
+            res = self.backend.plan_joint(emb, q_goal, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
+            if not res.success:
+                raise SkillError("plan_failed", f"arm_to({arm}, witness q): {res.status}", diagnostics=dict(res.diagnostics), stage="trajopt")
+            log.info("arm_to(%s): %d waypoints to the recorded IK witness (%.1fs), planned in %.2fs", arm, len(res.q_traj), res.duration, res.plan_time)
+            yield from self.execute_joint_trajectory(res.q_traj, arms=arms)
+            target = as_world_pose(pose)
+            cur = self.eef_pose(arm)
+            dp, da = float(th.linalg.norm(cur[0] - target[0])), C.quat_angle(cur[1], target[1])
+            if dp > 2e-3 or da > 0.01:
+                log.info("arm_to(%s): witness residual %.1f mm / %.3f rad, closing it along a straight segment", arm, dp * 1000, da)
+                yield from self.arm_along(arm, [target])
+            return
         if pose is not None:
             poses = pose if isinstance(pose, dict) and set(pose) <= set(M.ARMS) else {arms[0]: pose}
             targets = {M.EEF_LINK[a]: as_world_pose(p) for a, p in poses.items()}
@@ -474,6 +498,7 @@ class Motions:
             [{frame: wp} for wp in dense],
             pos_tol=self.cfg.diff_ik_pos_tol,
             rot_tol=self.cfg.diff_ik_rot_tol,
+            max_iters=self.cfg.diff_ik_max_iters,
             check_collisions=False,
             sync_world=False,
         )

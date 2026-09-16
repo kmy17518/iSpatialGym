@@ -753,6 +753,37 @@ def test_program_runs_end_to_end_with_retry_from_checkpoint(tmp_path):
     assert rec.actions[-1].step_end == result["n_action_steps"]
 
 
+def test_grasp_plans_to_the_recorded_ik_witness_and_closes_the_residual(tmp_path):
+    """Sidecars carry ``ik_witnesses`` (the program check's joint solutions per checked end pose); ``arm_to`` then plans
+    in joint space to the witness — the IK branch the approach was validated from — and closes the residual to the
+    pose with a straight segment (the pilot's nextto grasps failed the approach 9 mm short in cuRobo's own branch)."""
+    sc, env = iors_world()
+    env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path)
+    actions = expand(sc.alias, sc)
+    grasp = actions[1]
+    pre = grasp.targets(sc, ex.state)["pre_grasp"]
+    q28 = env.robot.q.clone()
+    q28[env.robot.arm_control_idx["right"]] = env.robot.ik("right", pre) + th.tensor([0.0, 0.0, 0.02, 0.0, 0.0, 0.0, 0.0])  # 1 cm off: the residual is closed
+    sc.extra["ik_witnesses"] = [{"action": 1, "name": "grasp", "stance": "manipulation", "arm": "right", "carried": None,
+                                 "targets": {"pre_grasp": {"pose": pre.to_dict(), "q": q28.tolist()}}}]
+    assert set(ex.witnesses_for(1)) == {"pre_grasp"} and ex.witnesses_for(0) == {}
+    n_before = len(backend.calls)
+    assert ex.run_action(0, actions[0]) is None
+    n_after_transition = len(backend.calls)
+    assert ex.run_action(1, grasp) is None
+    calls = backend.calls[n_after_transition:]
+    assert calls[0] == "plan_joint" and "plan_pose" not in calls and calls.count("solve_ik_path") == 2  # residual + approach
+    assert env.robot._ag_obj_in_hand["right"] is env.objects["apple.n.01_1"]
+    # without a witness the pose goal is planned as before
+    sc.extra["ik_witnesses"] = []
+    sc2, env2 = iors_world()
+    ex2, motions2, backend2, _ = make_executor(env2, sc2, tmp_path / "b")
+    for i in range(2):
+        assert ex2.run_action(i, expand(sc2.alias, sc2)[i]) is None
+    assert "plan_pose" in backend2.calls
+
+
 def test_transition_moves_the_idle_arm_to_its_recorded_posture_before_the_trunk(tmp_path):
     """A6: the arriving stance records the idle arm's joint values (``arms_q``) / posture (``idle_posture``); the
     oracle moves that arm there at the stand-off, before the trunk motion (the sampler swept the trunk with it)."""

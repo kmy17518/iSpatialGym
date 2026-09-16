@@ -129,6 +129,12 @@ def _cfg(ctx: Dict[str, Any]) -> ExecuteConfig:
     return ctx.get("cfg") or CONFIG
 
 
+def _witness(ctx: Dict[str, Any], key: str):
+    """The sampler's IK witness (28-D q) of the action target ``key`` when the sidecar recorded one (``arm_to`` then
+    plans to that configuration, i.e. into the branch the following approach / descent was validated from)."""
+    return (ctx.get("witnesses") or {}).get(key)
+
+
 def _pose_error(a, b) -> Tuple[float, float]:
     (pa, qa), (pb, qb) = as_world_pose(a), as_world_pose(b)
     return float(th.linalg.norm(pa - pb)), C.quat_angle(qa, qb)
@@ -284,7 +290,7 @@ def post_set_torso(action: SetTorso, state, targets, ctx) -> Optional[str]:
 def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     arm = action.arm
     yield from motions.gripper(arm, close=False)
-    yield from motions.arm_to(arm, pose=targets["pre_grasp"])
+    yield from motions.arm_to(arm, pose=targets["pre_grasp"], q_hint=_witness(ctx, "pre_grasp"))
     yield from motions.arm_along(arm, targets["approach"])
     yield from motions.gripper(arm, close=True)
     obj = state.object(action.object)
@@ -330,7 +336,7 @@ def _release(motions: Motions, state, arm: str) -> None:
 def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.arm
-    yield from motions.arm_to(arm, pose=targets["pre_place"])
+    yield from motions.arm_to(arm, pose=targets["pre_place"], q_hint=_witness(ctx, "pre_place"))
     yield from motions.arm_along(arm, targets["descent"])
     yield from motions.gripper(arm, close=False)
     _release(motions, state, arm)
@@ -374,7 +380,7 @@ def post_retreat(action: Retreat, state, targets, ctx) -> Optional[str]:
 def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     arm = action.contact.arm
     yield from motions.gripper(arm, close=True)
-    yield from motions.arm_to(arm, pose=targets["pre"])
+    yield from motions.arm_to(arm, pose=targets["pre"], q_hint=_witness(ctx, "pre"))
     ctx["object_pose0"] = tuple(x.clone() for x in state.object_pose(action.contact.object))
     yield from motions.arm_along(arm, targets["waypoints"])
 
@@ -395,7 +401,7 @@ def post_push(action: Push, state, targets, ctx) -> Optional[str]:
 def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     arm = action.contact.arm
     yield from motions.gripper(arm, close=True)
-    yield from motions.arm_to(arm, pose=targets["pre"])
+    yield from motions.arm_to(arm, pose=targets["pre"], q_hint=_witness(ctx, "pre"))
     yield from motions.arm_along(arm, targets["approach"])
 
 
