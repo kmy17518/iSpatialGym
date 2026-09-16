@@ -28,27 +28,27 @@
   "last_change": "2026-09-16 03:00 PDT"
  },
  "disembedding": {
-  "blocking": "owner 10:47: bottle_of_milk on the w11 1.25-tray bands (landing), thin objects later",
-  "owner": "tabletop / loop"
+  "blocking": "instance sampled with the 1.25 tray (band 703 cells in-process); demo failed at grasp: oracle keeps the source tray as an obstacle (sampler ignores it per 3.6) \u2192 oracle grasp_from rule; sampler rerun: approach_untrackable x4 (core item A), path_collision carried soap vs tray x16; next alias bottle_of_milk on the w11 band",
+  "owner": "oracle / core / tabletop"
  },
  "configuration_matching-block_design": {
-  "blocking": "owner 10:47: re-run on HEAD (witness screening), then probe + pitched picks primary + region 0.5-0.6 m + 1 mm tip clearance",
-  "owner": "tabletop"
+  "blocking": "0/8 at 10.1 cm: picks/places marginal at \u03bb\u22480 (left-band anchor rule) \u2014 owner ladder (pitched primary, region 0.5\u20130.6 m, 1 mm tip) in progress; question: brace optional for blocks too?",
+  "owner": "tabletop / owner"
  },
  "configuration_matching-attachment": {
   "blocking": "one attempt took 1457 s (brace candidates) \u2192 remote_run timeout; needs the attempt budget cut",
   "owner": "tabletop"
  },
  "configuration_matching-articulation_open_small_scale": {
-  "blocking": "hinged_jar run hit the core's in-progress floor_z edit (park_cell) \u2192 re-run after the core commit; toolbox no_workspace, laptop target_placement",
-  "owner": "tabletop / core"
+  "blocking": "left-band body-face brace wired (c0bbe0f); toolbox lid handle at 85\u00b0 out of reach (no_workspace); hinged_jar rerun in progress",
+  "owner": "tabletop"
  },
  "configuration_matching-articulation_close_small_scale": {
   "blocking": "same as open",
   "owner": "tabletop"
  },
  "configuration_matching-articulation_open_large_scale": {
-  "blocking": "floor_z fixed (Phase 1 passes now); handle_unreachable x8 on rvunhj_0 (edge-door pinch 0.69 m, arm-only class) \u2192 large-scale",
+  "blocking": "floor fixed (7 Phase-2 survivors/attempt); step 5: handle [pre, final] exact IK fails (pinch -1) x15, arm reaches j_link_2 only to fraction \u2264 0.11 from d 0.75\u20130.80 x8 \u2192 large-scale (stance distance / opening reach); no blacklist before the verdict (owner)",
   "owner": "large-scale"
  },
  "configuration_matching-articulation_close_large_scale": {
@@ -75,7 +75,7 @@
   "last_change": "2026-09-16 04:37 PDT"
  },
  "inter_object_relation_satisfaction-under_small_scale": {
-  "blocking": "honest fail now: placed_orientation (cup falls at release) \u2192 core item 3 release height from the raycast surface, then re-run",
+  "blocking": "french_fries: branch problem gone (witness reached, 3.1 mm) \u2192 ghost_hand at lift (grasp physics); teacup-saucer: placed_orientation \u2192 core release height (item C) then re-run",
   "owner": "core"
  },
  "inter_object_relation_satisfaction-inside": {

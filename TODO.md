@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 10:53 PDT — 2/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 10:54 PDT — 2/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -126,18 +126,18 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | camera_relocalization-obstructed | valid demo | tracker corner fix d4a1745 not yet re-demoed | oracle |
 | object_scaling | demo run (pre-fix success) | - | - |
 | mental_rotation | demo run (pre-fix success) | - | - |
-| disembedding | demo run | owner 10:47: bottle_of_milk on the w11 1.25-tray bands (landing), thin objects later | tabletop / loop |
-| CM block_design | no instance | owner 10:47: re-run on HEAD (witness screening), then probe + pitched picks primary + region 0.5-0.6 m + 1 mm tip clearance | tabletop |
+| disembedding | demo run | instance sampled with the 1.25 tray (band 703 cells in-process); demo failed at grasp: oracle keeps the source tray as an obstacle (sampler ignores it per 3.6) → oracle grasp_from rule; sampler rerun: approach_untrackable x4 (core item A), path_collision carried soap vs tray x16; next alias bottle_of_milk on the w11 band | oracle / core / tabletop |
+| CM block_design | no instance | 0/8 at 10.1 cm: picks/places marginal at λ≈0 (left-band anchor rule) — owner ladder (pitched primary, region 0.5–0.6 m, 1 mm tip) in progress; question: brace optional for blocks too? | tabletop / owner |
 | CM attachment | no instance | one attempt took 1457 s (brace candidates) → remote_run timeout; needs the attempt budget cut | tabletop |
-| CM articulation_open_small_scale | no instance | hinged_jar run hit the core's in-progress floor_z edit (park_cell) → re-run after the core commit; toolbox no_workspace, laptop target_placement | tabletop / core |
+| CM articulation_open_small_scale | no instance | left-band body-face brace wired (c0bbe0f); toolbox lid handle at 85° out of reach (no_workspace); hinged_jar rerun in progress | tabletop |
 | CM articulation_close_small_scale | no instance | same as open | tabletop |
-| CM articulation_open_large_scale | no instance | floor_z fixed (Phase 1 passes now); handle_unreachable x8 on rvunhj_0 (edge-door pinch 0.69 m, arm-only class) → large-scale | large-scale |
+| CM articulation_open_large_scale | no instance | floor fixed (7 Phase-2 survivors/attempt); step 5: handle [pre, final] exact IK fails (pinch -1) x15, arm reaches j_link_2 only to fraction ≤ 0.11 from d 0.75–0.80 x8 → large-scale (stance distance / opening reach); no blacklist before the verdict (owner) | large-scale |
 | CM articulation_close_large_scale | no instance | same as open | large-scale |
 | alignment-world_vertical | demo run | drive-in with untucked arms (arms_q applied to idle arms only) → oracle applies arms_q to every free arm; conditional brush rule if a brush remains (owner 10:47) | oracle |
 | alignment-world_horizontal | no instance | same transition fix; decorative_sign push_unreachable x8 → next alias | oracle / loop |
 | alignment-axial | demo run (pre-fix success) | - | - |
 | IORS ontop_small_scale | demo run (pre-fix success) | - | - |
-| IORS under_small_scale | demo run (pre-fix success) | honest fail now: placed_orientation (cup falls at release) → core item 3 release height from the raycast surface, then re-run | core |
+| IORS under_small_scale | demo run (pre-fix success) | french_fries: branch problem gone (witness reached, 3.1 mm) → ghost_hand at lift (grasp physics); teacup-saucer: placed_orientation → core release height (item C) then re-run | core |
 | IORS inside | demo run (pre-fix success) | re-sample after 160c518 (release height) + drop executor | core / oracle |
 | IORS nextto | demo run (pre-fix success) | near-side goal 160c518 (future sampling) | - |
 | IORS touching | no instance | approach_untrackable (intermediate waypoint collides with the target itself) + place_unreachable → core: ignore the target along the approach segment | core |
@@ -265,3 +265,4 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026‑09‑16 09:55 PDT agent-e2e: large‑articulation `no_stance` diagnosed (see the pitfall) → core agent interrupted with the `floor_z` fix (measured floor under the park cell) + loop re‑run on `rvunhj_0`; affects every non‑zero‑floor scene (T2/T3 supports).
 - 2026‑09‑16 10:25 PDT agent-e2e: owner decisions 10:15 logged (register above); dispatched: oracle → (1) FOV monitor + (2) `--demo-gating placed_orientation`; core → (1b) pre‑poses in the sampler's frame check, (3) release height from the raycast surface, (4) `goal_tipped` guard, plus the touching / under‑small `approach_untrackable` false rejection (intermediate approach waypoints must ignore the target); (5) large articulation waits for the core's `floor_z` commit, then the loop on `rvunhj_0` — no blacklist before the verdict.
 - 2026‑09‑16 10:55 PDT agent-e2e: owner decisions 10:47 logged; the second wall‑vertical demo (on `417fbbe`, which contains the fingers fix) failed again with the left finger on the wall during the transition drive‑in — but with untucked arms (`idle_arms_moved: []`): both arms are working arms in the stance so the oracle never applied the recorded tucked `arms_q` → oracle fixes that first, then the conditional brush rule if a brush remains; large‑scale agent gets the §5.6 visibility items (a–d) + the sofa C diagnosis; tabletop agent gets the block escalation ladder and the disembedding switch to `bottle_of_milk` on the w11 bands (landing: `…placed-tray-gsxbym-s1.25-focus…` files in `bands/`). Board fell to 2/21 valid when the FOV‑arming fix (`c88a3e3`) invalidated every manipulation demo per the validity rule; 6 re‑runs in flight.
+- 2026‑09‑16 11:00 PDT agent-e2e: core landed the floor fix (`2893a09`: `shared_office_0` floor +7.1 mm measured, settled‑base probe 0.0 mm off) — large articulation now gets 7 Phase‑2 survivors per attempt and fails in step 5 instead (handle [pre, final] exact IK ×15, opening reach fraction ≤ 0.11 from d 0.75–0.80 ×8 → large‑scale agent; per the owner no blacklist before that verdict); branch‑consistent approaches (`21ebae6`: french fries now reaches its witness, fails later at lift with `ghost_hand`), per‑role scale (`29a59b5`), touching brace like axial (`265650b`), `brace_off_band` (`4cb3ec5`). Tabletop: axial push‑only (`af84343`) — the valid demo ran with the program check stubbed via a marker file (F6 lacked the optional brace then; marker removed now that `9b03aa4` is in, the 10:50 re‑run uses the real check); disembedding samples with the 1.25 tray (in‑process band 703 cells) but the demo fails at grasp because the oracle keeps the source tray as an obstacle → oracle `grasp_from` rule queued; small articulation brace wired, toolbox lid out of reach, hinged jar rerunning; block design 0/8 at 10.1 cm (grid forced to λ ≈ 0 by the left‑band anchor) → owner question: brace optional for blocks too? Core got items A–E (approach ignores the target along the whole segment, pre‑poses in the frame check, release height from the raycast surface, `goal_tipped` guard, ContactSolution reason).
