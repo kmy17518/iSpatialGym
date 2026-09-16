@@ -165,11 +165,25 @@ class AlignmentAxial(SamplerV2):
                 for _ in range(8):  # §6.10: retry the next lateral position before the next edge (8 draws: the rule is sensitive to the lateral)
                     cand = TT.phase1c_lateral(self, init0, margins, rng, top=self.top, bands=bands)
                     cand.name = "init"
-                    n_vis = self._edge_visible_points(cand, self.camera_pose_at(cand), 0.0, None)
-                    if n_vis >= int(ev.get("min_visible", 3)):
-                        init = cand
+                    # the reference edge must be in frame from the init camera: with the recomputed (deeper) bands Δ_aim
+                    # puts the camera high enough for the near edge to leave the image bottom, so the init translate is
+                    # moved within its admissible range [Δ_min, Δ_max] (§4.3 / §4.4 check (2) style) before the next
+                    # lateral draw — the lowest camera (largest translate) first
+                    t_lo, t_hi = (float(v) for v in cand.extras.get("t_range", [cand.translate, cand.translate]))
+                    trials = [cand] + [cand.with_trunk(t, 0.0, "init") for t in sorted(np.linspace(t_lo, t_hi, 5).tolist(), reverse=True) if abs(t - cand.translate) > 1e-6]
+                    n_vis = 0
+                    for st_try in trials:
+                        n_vis, n_in = self._edge_visible_points(st_try, self.camera_pose_at(st_try), 0.0, None, with_in_frame=True)
+                        if n_vis >= int(ev.get("min_visible", 3)) and (st_try is cand or (self.ikc.stance_collision_free(st_try) and TT.trunk_sweep_free(self, st_try))):
+                            if st_try is not cand:
+                                st_try.extras.update({**cand.extras, "init_translate_moved_for_edge": True})
+                                st_try.lateral = cand.lateral
+                            init = st_try
+                            break
+                        log.info("%s: edge %s lateral %.2f t %.2f: reference edge %d/%d points visible from init (%d in frame)", self.gp.alias, edge.name, cand.lateral,
+                                 st_try.translate, n_vis, int(ev.get("points", 9)), n_in)
+                    if init is not None:
                         break
-                    log.info("%s: edge %s lateral %.2f: reference edge %d/%d points visible from init", self.gp.alias, edge.name, cand.lateral, n_vis, int(ev.get("points", 9)))
                 if init is None:
                     raise Reject("edge_not_visible", "the front edge is not visible from the init stance at 8 lateral draws")
                 cands = TT.phase2_manipulation_stance(self, init, w_diag, target_height=ez, bands=bands, top=self.top, focus_z=self.top.z + 0.5 * ez)
@@ -188,15 +202,17 @@ class AlignmentAxial(SamplerV2):
                                     "left_band": getattr(self.left_bands, "path", None) if self.left_bands is not None else None,
                                     "front_axis": self.front_axis.tolist(), "long_axis": self.long_axis.tolist()})
 
-    def _edge_visible_points(self, stance: Stance, cam, target_lat: float, target_pose: Optional[TT.Pose]) -> int:
+    def _edge_visible_points(self, stance: Stance, cam, target_lat: float, target_pose: Optional[TT.Pose], with_in_frame: bool = False):
         """§6.10 reference edge: of 9 points along the front edge over [λ − 0.30, λ + 0.30], how many are in frame (5 %) and
-        unoccluded (the ray from the camera reaches the point; the support itself may be hit within 1 cm of it)."""
+        unoccluded (the ray from the camera reaches the point; the support itself may be hit within 1 cm of it).
+        ``with_in_frame`` also returns the number of points inside the image."""
         ev = self.g("edge_visibility") or {}
         n, win, margin = int(ev.get("points", 9)), float(ev.get("window_m", 0.30)), float(ev.get("in_frame_margin", 0.05))
         pts = th.stack([th.tensor([*stance.world(0.0, target_lat + l).tolist(), float(self.top.z)]) for l in np.linspace(-win, win, n)])
         inside = self.world.camera_model.inside(cam, pts, margin)
-        if int(inside.sum()) == 0:
-            return 0
+        n_in = int(inside.sum())
+        if n_in == 0:
+            return (0, 0) if with_in_frame else 0
         cam_p = TT._t(cam[0])
         sel = pts[inside]
         # reverse rays: from 3 mm above the edge point toward the camera, stopped 0.25 m short of it (the camera sits inside
@@ -205,7 +221,8 @@ class AlignmentAxial(SamplerV2):
         starts = sel + th.tensor([0.0, 0.0, 0.003])
         ends = cam_p.unsqueeze(0) - dirs * 0.25
         hits = self.world.raycast(starts, ends)
-        return sum(1 for h in hits if not h["hit"])
+        n_vis = sum(1 for h in hits if not h["hit"])
+        return (n_vis, n_in) if with_in_frame else n_vis
 
     # ------------------------------------------------------------------ geometry
 
