@@ -1109,8 +1109,8 @@ class IORSLarge(SamplerV2):
             disc = th.stack([th.cat([c_d + tangent * half, th.tensor([self.floor_z])]), th.cat([c_d - tangent * half, th.tensor([self.floor_z])]),
                              th.cat([c_d + d2 * half, th.tensor([self.floor_z])]), th.cat([c_d - d2 * half, th.tensor([self.floor_z])])])
             e0 = mid + tangent * float(st.lateral)
-            line = th.stack([th.cat([e0 - tangent * margin, th.tensor([z_bottom])]), th.cat([e0 + tangent * margin, th.tensor([z_bottom])])])
-            if not P0.in_frame(self, cam, th.cat([disc, line])):
+            lane = th.cat([e0, th.tensor([z_bottom])]).reshape(1, 3)  # the edge's bottom point at the push lane
+            if not P0.in_frame(self, cam, th.cat([disc, lane])):
                 continue
             ang = P0.axis_angle(self, cam, st.focus)
             if ang > math.radians(P0.AXIS_LOOSE_DEG):
@@ -1119,8 +1119,33 @@ class IORSLarge(SamplerV2):
             classed.append((st, 1))
         stats["visible"] = len(classed)
         out_ = P0.best_class(classed)
+        stats["survivor_trunks"] = sorted({(float(st.translate), round(float(st.tilt), 2)) for st in out_})
+        stats["survivor_stand_offs"] = sorted({round(float(st.stand_off), 2) for st in out_})
+        stats["collision_free_trunks"] = sorted({(float(st.translate), round(float(st.tilt), 2)) for st in cands})
         log.info("%s: push-under stance C at %s edge %s: %d survivors (%s)", self.gp.alias, partner.name, edge.name, len(out_), stats)
         return out_
+
+    def debug_drop_ik(self, place: Stance, release_xy, yaws: Sequence[float]) -> str:
+        """Diagnostic when F_goal is empty at the drop cell: for the first yaw and every library grasp, the drop grasp pose
+        from stance C with the floor ignored vs. with every collision object ignored (reach vs. collision), and the eef
+        height above the floor / distance ahead of the base."""
+        try:
+            floor = self.obj("floor")
+            others = [o for o in self.world.scene.objects if o.name in self.world.scene_object_names]
+            yaw = float(yaws[0]) if len(yaws) else 0.0
+            quat = G.qmul(G.quat_from_yaw(yaw), self.rest)
+            pose = self.drop_pose_at(release_xy, quat)
+            parts = []
+            for g in self.grasps[:3]:
+                eef = IK.grasp_pose(pose, g.pose)
+                r1 = self.ikc.exact([eef], place, "right", ignore_for_last=[floor], cache=False)
+                with self.ikc.ignoring(others):
+                    r2 = self.ikc.exact([eef], place, "right", cache=False)
+                p_base = P0.to_base_frame(eef[0], place.base_pose2d, P0.base_z(self))
+                parts.append(f"{g.name}: floor-ignored {r1.ok}, world-free {r2.ok}, eef in base {[round(float(v), 2) for v in p_base.tolist()]}")
+            return f"stance d {place.stand_off:.2f} trunk ({place.translate}, {place.tilt:.1f}) drop ahead {place.extras.get('drop_ahead_m')}: " + "; ".join(parts)
+        except Exception as e:  # noqa: BLE001 — diagnostics never fail the attempt
+            return f"debug failed: {e}"
 
     @staticmethod
     def _snap(band_world: th.Tensor, goal_cells: th.Tensor, lattice: float) -> th.Tensor:
@@ -1214,6 +1239,9 @@ class IORSLarge(SamplerV2):
                                             ignore_place).get(0, [])
             F = intersect_feasible(F_init, F_goal)
             if not F:
+                if push and not F_goal and not getattr(self, "_drop_debugged", False):
+                    self._drop_debugged = True
+                    log.info("%s: drop IK debug — %s", self.gp.alias, self.debug_drop_ik(place, release_xy, yaws))
                 errors.append(f"C: F_init ({len(F_init)}) ∩ F_goal ({len(F_goal)}) empty at {'drop' if push else 'goal'} cell {[round(v, 2) for v in release_xy]}")
                 continue
             for i in rng.permutation(len(F))[:4]:
