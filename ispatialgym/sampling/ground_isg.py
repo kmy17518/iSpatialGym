@@ -154,6 +154,17 @@ def _parse_scale(value: str) -> Optional[List[float]]:
     return [float(x) for x in v]
 
 
+def _pad_clearance(pinch_width: float) -> float:
+    """``ispatialgym.robot.conventions.pad_clearance`` (F5) -- the same formula (0.10 - width) / 2 when the conventions
+    module is not importable (it needs torch)."""
+    try:
+        from ispatialgym.robot.conventions import pad_clearance
+
+        return max(0.0, float(pad_clearance(pinch_width)))
+    except Exception:
+        return max(0.0, 0.5 * (0.10 - float(pinch_width)))
+
+
 def _scene_object_key(row: Dict[str, str]) -> str:
     """The name a scene candidate row is bound by: the wall region id for wall regions, else the scene object name."""
     return row.get("region_id") or row.get("model") or ""
@@ -515,6 +526,7 @@ class RolePick:
     joint: Optional[str] = None  # articulation: the pick's joint
     pick_row: Optional[Dict[str, str]] = None
     allow_heldout: bool = False  # the heldout slot itself was requested for this role
+    budget: Dict[str, Any] = field(default_factory=dict)  # distractors: the §6.4 tray budget maths (generation.distractor_budget)
 
     @property
     def is_floor(self) -> bool:
@@ -1001,9 +1013,80 @@ class Grounder:
         lo = size[0] if isinstance(size, list) else int(size)
         if sum(members.values()) < lo:
             raise Skip("empty_distractor_pool", f"target {tcat}/{tmodel}: pools too small after the look-alike / held-out exclusions")
+        # owner decision 2026-09-16 4a: the §6.4 tray budget is applied here -- the grown footprints of the member set must
+        # fit 45 % of the source tray's inner floor; drop members (last pattern slot first) until they do
+        rp.budget = self._distractor_budget(tcat, tmodel, members, pools, lo)
         rp.members = members
         rp.pools = pools
         rp.models = [(c, m) for c, ms in pools.items() for m in ms]
+
+    def _distractor_budget(self, tcat: str, tmodel: str, members: Dict[str, int], pools: Dict[str, List[str]], lo: int) -> Dict[str, Any]:
+        """§6.4 / owner decision 2026-09-16 4a. Footprint of a distractor = a conservative square of side ``max(bbox_x, bbox_y)
+        + 2 · pad_clearance`` (icl dims; the pad clearance of the target's tightest tabletop grasp, grown along the pinch
+        axis); per category the largest model of the pool counts (any draw fits). The set must cover ≤ ``tray_budget`` of the
+        source tray's inner floor (``source_tray_inner_floor_m2`` at scale 1 × ``source_tray_scale``²); otherwise members are
+        dropped from the end of the pattern (other-category first, then the second same-category one) down to ``lo``."""
+        gen = G.defaults_for("disembedding")
+        tray_scale = float(gen.get("source_tray_scale") or 1.0)
+        floors = gen.get("source_tray_inner_floor_m2") or {}
+        source_rows = [r for r in self.icl.rows("disembedding", "source") if (r.get("representative") or "") in _TRUE] or self.icl.rows("disembedding", "source")
+        tray_key = f"{source_rows[0]['category']}/{source_rows[0]['model']}" if source_rows else None
+        floor_native = float(floors.get(tray_key, 0.0)) if tray_key else 0.0
+        floor_m2 = floor_native * tray_scale * tray_scale
+        fraction = float(gen.get("tray_budget") or 0.45)
+        # pad clearance of the target's tightest admissible tabletop grasp (conventions.pad_clearance; icl width_m)
+        widths = [float(g["width_m"]) for g in self.icl.admissible_grasps(tcat, tmodel, "tabletop") if g.get("width_m")]
+        clearance = _pad_clearance(min(widths)) if widths else 0.0
+
+        def footprint(cat: str, rule: str) -> Tuple[float, str]:
+            """Largest grown footprint of the category's pool: ``square`` = (long + 2c)², ``rectangle`` = (long + 2c) · short
+            (the pinch axis of a thin object runs across its short side; used when the square admits no member at all)."""
+            best, best_m = 0.0, ""
+            for m in pools.get(cat, []):
+                row = self.icl.row("disembedding", "distractors", cat, m) or {}
+                try:
+                    x, y = float(row.get("bbox_x") or 0.0), float(row.get("bbox_y") or 0.0)
+                except ValueError:
+                    x, y = 0.0, 0.0
+                long_, short = max(x, y), min(x, y)
+                area = (long_ + 2.0 * clearance) ** 2 if rule == "square" else (long_ + 2.0 * clearance) * short
+                if area > best:
+                    best, best_m = area, m
+            return best, best_m
+
+        original = dict(members)
+        budget: Dict[str, Any] = {"tray": tray_key, "tray_scale": tray_scale, "tray_floor_m2": round(floor_m2, 4), "budget_fraction": fraction,
+                                  "pad_clearance_m": round(clearance, 4), "footprint_rule": "square", "dropped": []}
+        if floor_m2 > 0:
+            # the conservative square decides the member count (3 -> 2 -> 1); when it admits not even one member, the
+            # single remaining member is re-measured with the pinch-axis rectangle (thin objects: forks, spoons, chilies)
+            for rule in ("square", "rectangle"):
+                if rule == "square":
+                    members.clear()
+                    members.update(original)
+                areas = {cat: footprint(cat, rule) for cat in members}
+                used = lambda: sum(areas[c][0] * n for c, n in members.items())  # noqa: E731
+                while used() > fraction * floor_m2 and sum(members.values()) > max(lo, 1):
+                    cat = list(members)[-1]  # last pattern slot first (other-category, then the second same-category member)
+                    members[cat] -= 1
+                    budget["dropped"].append(cat)
+                    if members[cat] == 0:
+                        del members[cat]
+                budget.update({"footprint_rule": rule, "footprints_m2": {c: round(a, 4) for c, (a, _) in areas.items() if c in members},
+                               "largest_models": {c: m for c, (_, m) in areas.items() if c in members}})
+                if used() <= fraction * floor_m2:
+                    break
+            else:
+                raise Skip("distractor_budget", f"target {tcat}/{tmodel}: even one distractor ({list(members)}) exceeds {fraction:.0%} of the "
+                                                f"{floor_m2:.3f} m2 source tray floor ({used():.3f} m2, rectangle rule)")
+            for cat in list(pools):
+                if cat not in members:
+                    del pools[cat]
+            budget["used_m2"] = round(used(), 4)
+        else:
+            budget["used_m2"] = None
+        budget["n_distractors"] = sum(members.values())
+        return budget
 
     def _scene_pick(self, iddl: I.IDDL, role: str, row: Optional[Dict[str, str]], comb: Combination) -> RolePick:
         subtask = iddl.subtask
@@ -1300,7 +1383,7 @@ class Grounder:
             return float(self.opt.scale_overrides[alias]), "override"
         for e in self.customs.entries.values():
             if e.fallback_of == alias and e.fallback_kind == "scale" and e.fallback_params.get("scale_source") == "override" \
-                    and not e.fallback_params.get("superseded_by"):
+                    and e.is_live:
                 return float(e.fallback_params["scale"]), "override"
         hint = self.opt.scale_hints.get(alias)
         if hint:
@@ -1407,6 +1490,8 @@ class Grounder:
                 seed = entry.generation.setdefault("groups", {}).setdefault(role, G.group_seed(subtask, role))
                 seed["size"] = sum(rp.members.values())
                 seed["members"] = dict(rp.members)
+                if rp.budget:
+                    entry.generation["distractor_budget"] = dict(rp.budget)  # owner decision 2026-09-16 4a (§6.4 budget at grounding)
             elif rp.kind == "sampleable":
                 re_.category = rp.category
                 re_.sampleable = True
@@ -1660,6 +1745,7 @@ class Grounder:
                         outcome = run_representative_test(gp, self.customs, sc)
                         if outcome:
                             self.report.tests.append(f"{gp.alias} @ {sc}: {outcome}")
+            self._supersede_stale_primaries(subtask)
             if self.opt.reseed_generation:
                 # entries of the subtask this run did not produce (superseded fallbacks) follow the spec number too
                 produced = {gp.alias for gp in self.grounded if gp.subtask == subtask}
@@ -1675,24 +1761,59 @@ class Grounder:
         """``primary.fallbacks`` = the fallbacks produced by this run (rank order). A fallback entry of an earlier run
         that this run no longer produces (another scale after a new hint, another next model) is **superseded**: it
         keeps its entry, id and BDDL (ids are never reused) but leaves the primary's list and is marked
-        ``fallback_params.superseded_by = <the new alias of its kind>`` (or ``true``), so a scheduler iterating
-        ``primary.fallbacks`` never queues it."""
+        ``superseded_by = <the new alias of its kind>`` (or ``true``), so a scheduler never queues it."""
         kinds = {a: self.customs.entries[a].fallback_kind for a in produced if a in self.customs.entries}
         for alias, e in self.customs.entries.items():
             if e.fallback_of != gp.alias or alias in produced:
                 continue
-            if e.fallback_params.get("superseded_by"):
+            if e.superseded_by:
                 continue
             newer = next((a for a, k in kinds.items() if k == e.fallback_kind), None)
-            e.fallback_params["superseded_by"] = newer or True
+            e.superseded_by = newer or True
             self.report.notes[gp.subtask].append(f"{alias}: superseded fallback of {gp.alias}" + (f" (now {newer})" if newer else ""))
         # a superseded fallback that this run produces again (a hint went back) is live again
         for a in produced:
             e = self.customs.entries.get(a)
             if e is not None:
-                e.fallback_params.pop("superseded_by", None)
+                e.superseded_by = None
         live = [a for a in produced if a in self.customs.entries]
         gp.entry.fallbacks = sorted(live, key=lambda a: (self.customs.entries[a].fallback_rank or 0, a))
+
+    def _supersede_stale_primaries(self, subtask: str) -> None:
+        """A primary of an earlier grounding that this run replaced -- same pick / slot / mode, another alias (the
+        distractor token changed with the tray budget, the support pick changed) -- is marked ``superseded_by`` the new
+        alias, together with its fallbacks; a produced alias is live again. Uses the ``problems.json`` records (pick /
+        slot / mode per alias)."""
+        iddl = self.iddls[subtask]
+        activity_dir = os.path.join(self.bddl_root, self.activity_of(iddl))
+        if not os.path.isdir(activity_dir):
+            return
+        from ispatialgym.sampling.bddl_from_iddl import ProblemRegistry
+
+        registry = ProblemRegistry.load(activity_dir, self.activity_of(iddl))
+        produced = {gp.alias: gp for gp in self.grounded if gp.subtask == subtask and gp.combination.fallback is None}
+        by_key: Dict[Tuple[str, str, str], str] = {}
+        for gp in produced.values():
+            by_key[(gp.combination.pick, gp.combination.slot, self.opt.mode)] = gp.alias
+        for rec in registry.records:
+            if rec.get("subtask") != subtask or rec.get("fallback_of") or rec.get("legacy"):
+                continue
+            alias = rec.get("full_alias", rec["alias"])
+            entry = self.customs.entries.get(alias)
+            if entry is None:
+                continue
+            if alias in produced:
+                entry.superseded_by = None
+                continue
+            newer = by_key.get((rec.get("pick"), rec.get("slot"), rec.get("mode")))
+            if newer and newer != alias and not entry.superseded_by:
+                entry.superseded_by = newer
+                self.report.notes[subtask].append(f"{alias}: superseded primary (now {newer})")
+                for fb_alias in entry.fallbacks:
+                    fb = self.customs.entries.get(fb_alias)
+                    if fb is not None and not fb.superseded_by:
+                        fb.superseded_by = newer
+                entry.fallbacks = []
 
     def _ground_or_skip(self, comb: Combination) -> Optional[GroundedProblem]:
         subtask = comb.subtask

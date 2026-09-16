@@ -46,10 +46,12 @@ plus ``fallback_of`` (the primary alias), ``fallback_rank`` (1 = tried first aft
 ontop: support → floor; ``scale`` — wall / axial alignment target spawned at ``roles.target.scale``; ``next_model`` —
 small-scale articulation: the next candidate model of the category) and ``fallback_params`` (kind-specific facts, e.g.
 ``{"scale": 0.7, "scale_source": "template_meta.scale_hint" | "override" | "default_step"}``). The primary lists its
-**live** fallbacks in rank order under ``fallbacks``; a fallback entry an earlier grounding produced and the current one
-does not (another scale after a new hint) keeps its entry / id / BDDL but carries ``fallback_params.superseded_by``
-(the alias that replaced it, or ``true``) and leaves the primary's list. A scheduler queues the aliases of
-``primary.fallbacks`` only after the primary produced nothing; the sampler itself never falls back (spec principle 2).
+**live** fallbacks in rank order under ``fallbacks``. An entry an earlier grounding produced and the current one does
+not -- a fallback at another scale after a new hint, a primary whose distractor token changed with the tray budget --
+keeps its entry / id / BDDL (ids are never reused) but carries ``superseded_by`` (the alias that replaced it, or
+``true``) and leaves every live list. A scheduler skips entries with ``superseded_by``, queues primaries, and queues the
+aliases of ``primary.fallbacks`` only after the primary produced nothing; the sampler itself never falls back (spec
+principle 2).
 
 Dataclasses here are thin, typed views over that JSON; :class:`Customs` loads / saves the file and hands out entries.
 """
@@ -91,8 +93,8 @@ SCOPE_KEYS = ("scene", "support", "partner", "target", "model", "support_height"
 #: Fields a ``hold`` record carries (``Constraint.fields``); the write-back adds ``source``.
 HOLD_FIELDS = ("robot", "depth_m", "trunk", "roll_deg", "eef_in_base", "approach", "closing", "right_arm_q", "idle_arms")
 #: Keys of a customs entry, in the order they are written (the fallback keys only when set).
-ENTRY_KEYS = ("iddl", "definition_id", "fallback_of", "fallback_rank", "fallback_kind", "fallback_params", "fallbacks", "roles", "scenes",
-              "generation", "constraints")
+ENTRY_KEYS = ("iddl", "definition_id", "fallback_of", "fallback_rank", "fallback_kind", "fallback_params", "fallbacks", "superseded_by",
+              "roles", "scenes", "generation", "constraints")
 #: ``fallback_kind`` values (see the module docstring).
 FALLBACK_KINDS = ("init_surface", "scale", "next_model")
 #: Keys of a role entry, in the order they are written (§2.3 + the documented extensions).
@@ -336,10 +338,16 @@ class CustomsEntry:
     fallback_params: Dict[str, Any] = field(default_factory=dict)
     # ... and, on a primary, its fallbacks in rank order
     fallbacks: List[str] = field(default_factory=list)
+    # set when a later grounding replaced this alias (the replacing alias, or True): dormant, never queued
+    superseded_by: Union[None, str, bool] = None
 
     @property
     def is_fallback(self) -> bool:
         return self.fallback_of is not None
+
+    @property
+    def is_live(self) -> bool:
+        return not self.superseded_by
 
     def set_fallback(self, primary: str, rank: int, kind: str, params: Optional[Dict[str, Any]] = None) -> None:
         if kind not in FALLBACK_KINDS:
@@ -399,6 +407,8 @@ class CustomsEntry:
                 d["fallback_params"] = copy.deepcopy(self.fallback_params)
         if self.fallbacks:
             d["fallbacks"] = list(self.fallbacks)
+        if self.superseded_by:
+            d["superseded_by"] = self.superseded_by
         d.update(
             {
                 "roles": {r: e.to_dict() for r, e in self.roles.items()},
@@ -423,9 +433,13 @@ class CustomsEntry:
             generation=copy.deepcopy(d.get("generation") or {}),
             constraints=[Constraint.from_dict(c) for c in (d.get("constraints") or [])],
             fallbacks=list(d.get("fallbacks") or []),
+            superseded_by=d.get("superseded_by") or None,
         )
         if d.get("fallback_of") is not None:
             entry.set_fallback(d["fallback_of"], int(d.get("fallback_rank") or 1), d.get("fallback_kind") or "init_surface", d.get("fallback_params"))
+            legacy = entry.fallback_params.pop("superseded_by", None)  # written at the top level since 2026-09-16
+            if legacy and not entry.superseded_by:
+                entry.superseded_by = legacy
         return entry
 
 

@@ -253,9 +253,18 @@ def test_groups(grounded):
     assert obstructed.entry.generation["groups"]["obstacles"]["size"] == 1
     assert obstructed.entry.generation["path_buckets"] == G.DEFAULTS["camera_relocalization-obstructed"]["path_buckets"]
     assert len(obstructed.problem.groups["obstacles_group.n.01_1"]) == 1
+    budgets = []
     for gp in _entries(grounded, "disembedding"):
         g = gp.entry.generation["groups"]["distractors"]
         assert g["draw"] == "unique" and g["size"] == sum(g["members"].values()) and 1 <= g["size"] <= 3
+        # owner decision 2026-09-16 4a: the §6.4 tray budget decided the member count at grounding
+        b = gp.entry.generation["distractor_budget"]
+        assert {"tray_floor_m2", "used_m2", "n_distractors"} <= set(b) and b["n_distractors"] == g["size"]
+        assert b["tray"] == "tray/gsxbym" and b["tray_scale"] == 1.25 and abs(b["tray_floor_m2"] - 0.107 * 1.25 ** 2) < 1e-3
+        assert b["used_m2"] <= b["budget_fraction"] * b["tray_floor_m2"] + 1e-9
+        assert b["footprint_rule"] in ("square", "rectangle") and set(b["footprints_m2"]) == set(g["members"])
+        assert abs(sum(b["footprints_m2"][c] * n for c, n in g["members"].items()) - b["used_m2"]) < 1e-3
+        budgets.append(b)
         token = gp.alias.split("-")[2]
         assert token == "_".join(f"{c}_{n}" for c, n in g["members"].items())
         members = gp.problem.groups["distractors_group.n.01_1"]
@@ -266,6 +275,8 @@ def test_groups(grounded):
         target = gp.entry.roles["target"]
         assert target.representative not in sc.whitelist["distractors"].get(target.category, [])
         assert ["ontop", "distractors_group.n.01_1", gp.rendered.instances["source"]] in gp.problem.raw_init
+    assert {b["n_distractors"] for b in budgets} == {1, 2, 3}  # the shipped picks span the whole 3 -> 2 -> 1 range
+    assert any(b["dropped"] for b in budgets) and any(b["footprint_rule"] == "rectangle" for b in budgets)
     attachment = _entries(grounded, "configuration_matching-attachment")[0]
     assert "assembly_group.n.01_1" in attachment.problem.groups
     assert attachment.entry.generation["groups"] == {}  # the composite is not a drawn group
@@ -545,7 +556,8 @@ def test_scale_fallbacks(grounded, tmp_path):
     new = g4.customs.entries["alignment-axial-letter_s090-breakfast_table"]
     assert new.fallback_params == {"scale": 0.9, "scale_source": "override"} and new.roles["target"].scale["default"] == 0.9
     old = g4.customs.entries["alignment-axial-letter_s080-breakfast_table"]
-    assert old.fallback_params["superseded_by"] == "alignment-axial-letter_s090-breakfast_table" and old.definition_id != new.definition_id
+    assert old.superseded_by == "alignment-axial-letter_s090-breakfast_table" and old.definition_id != new.definition_id and not old.is_live
+    assert "superseded_by" in old.to_dict() and "superseded_by" not in new.to_dict()
     assert P.list_problem_ids("alignment", str(tmp_path / "bddl"))  # the superseded problem file stays (ids are never reused)
     g5 = GI.Grounder(IDDLS, grounded.icl, C.Customs.load(str(tmp_path / "c.json")), bddl_root=str(tmp_path / "bddl"),
                      options=GI.Options(representative_test=False, scale_hints=hints, fallback_scale=0.75))

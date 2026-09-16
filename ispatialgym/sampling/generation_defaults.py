@@ -177,6 +177,12 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "groups": {"distractors": {"size": [1, 3], "draw": "unique"}},  # §2.3 distractors {size: [1, 3], draw: unique}
         "path_buckets": None,
         "tray_budget": 0.45,  # §6.4 distractor footprints (grown by pad_clearance_m) cover ≤ 0.45 of the inner floor
+        # owner decision 2026-09-16 4a/4b: the budget is applied at grounding (ground_isg picks the member count 3 -> 2 -> 1
+        # from the icl footprints, generation.distractor_budget records the maths); the source tray spawns at 1.25 (uniform,
+        # roles.source.scale), the destination tray stays 1.0. Inner floor area of the source tray at scale 1 as the pilot
+        # measured it (1 cm raster, house_single_floor); the area scales with the square of the tray scale.
+        "source_tray_scale": 1.25,  # owner decision 2026-09-16 4b
+        "source_tray_inner_floor_m2": {"tray/gsxbym": 0.107},  # pilot measurement at scale 1 (2026-09-16)
         "tray_raster_m": 0.01,  # §6.4 placement raster 1 cm over the tray's inner floor
         "tray_footprint_margin_m": 0.005,  # §3.2 / §6.4 0.5 cm footprint margin on a tray floor
         "distractor_spacing_extra_m": 0.01,  # §4.6 x = pad_clearance + 0.01 along the pinch axis
