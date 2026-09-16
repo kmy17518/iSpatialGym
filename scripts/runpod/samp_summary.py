@@ -34,7 +34,7 @@ def pull(api, pid: str, name: str) -> None:
     os.makedirs(dst, exist_ok=True)
     ssh_cmd = " ".join(shlex.quote(x) for x in rp.ssh_base(ip, port)[:-1])
     subprocess.run(["rsync", "-az", "-e", ssh_cmd, "--include", "*/", "--include", "done.txt", "--include", "current.txt",
-                    "--include", "sampling_report_*.json", "--include", "run.log", "--exclude", "*", "--prune-empty-dirs",
+                    "--include", "sampling_report_*.json", "--include", "summary.json", "--include", "run.log", "--exclude", "*", "--prune-empty-dirs",
                     f"root@{ip}:/root/samp/", dst + "/"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=300)
 
 
@@ -82,7 +82,7 @@ def main():
             prev = done.get(jid)
             if prev is None or nw > prev["n_written"]:
                 done[jid] = {"rc": rc, "wall": wall, "n_written": nw, "pod": name}
-            for rep in glob.glob(os.path.join(pod_dir, jid, "sampling_report_*.json")):
+            for rep in glob.glob(os.path.join(pod_dir, jid, "sampling_report_*.json")) + glob.glob(os.path.join(pod_dir, jid, "summary.json")):  # v1 / v2 layouts
                 try:
                     d = json.load(open(rep))
                 except Exception:
