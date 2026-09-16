@@ -1,4 +1,4 @@
-# First-demo board (2026-09-16 08:15 PDT)
+# First-demo board (2026-09-16 08:21 PDT)
 
 **4 / 21 subtasks with a valid demo.**
 
@@ -10,7 +10,7 @@ state ∈ {no instance, instance, demo run, valid demo}; a demo is valid only wh
 | camera_relocalization-obstructed | valid demo | tracker corner fix d4a1745 not yet re-demoed | oracle | 7a340e4, d4a1745 | success | runlogs/pilot_20260915/first_demo/camera_relocalization-obstructed/0916-065800/demo/camera_relocalization-obstructed-footstool_1__house_single_floor__obstacles-footstool_1__0000/meta.json | 2026-09-16 07:23 PDT |
 | object_scaling | valid demo | - | - | 7a340e4 | success | runlogs/pilot_20260915/first_demo/object_scaling/0916-065754/demo/object_scaling-beaker__house_single_floor__target-beaker-rhohgs__0000/meta.json | 2026-09-16 07:27 PDT |
 | mental_rotation | valid demo | - | - | 7a340e4 | success | runlogs/pilot_20260915/first_demo/mental_rotation/0916-065751/demo/mental_rotation-banana__house_single_floor__target-banana-znakxm__0000/meta.json | 2026-09-16 07:28 PDT |
-| disembedding | no instance | 4a/4b landed (D1 d455b77/b4ab9f9), tray band keying (634f423/8bd1012); per-role scale spawn (core) pending; bands computing (1.25 tray) | core / tabletop / bands | 1d20a68, 2cec470, 5552ee8, 7a340e4, 9744b34, d4a1745 |  |  |  |
+| disembedding | demo run | 4a/4b landed (D1 d455b77/b4ab9f9), tray band keying (634f423/8bd1012); per-role scale spawn (core) pending; bands computing (1.25 tray) | core / tabletop / bands | 1d20a68, 2cec470, 5552ee8, 7a340e4, 9744b34, d4a1745 | oracle_failed / plan_failed @ grasp:plan_failed | runlogs/pilot_20260915/first_demo/disembedding/0916-070306/demo/disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table__house_single_floor__destination-tray-hvlfig__source-tray-gsxbym__target-bar_soap-ofargb__distractors-bar_soap_2-biscuit_1__0000/meta.json | 2026-09-16 08:18 PDT |
 | configuration_matching-block_design | no instance | pick spacing 10.1 cm smoke; left band + A1 placement | tabletop | 1d20a68, 4fd4c89, 5552ee8, 7a340e4, d4a1745 |  |  |  |
 | configuration_matching-attachment | no instance | left band + A1 placement (skateboard edge_too_short = yield) | tabletop | 1d20a68, 4074359, 4fd4c89, 5552ee8, 7a340e4, d4a1745 |  |  |  |
 | configuration_matching-articulation_open_small_scale | no instance | brace band empty (§5.4) → left contact band wiring; floor_support_todo | tabletop | 7a340e4, fcf7bfc |  |  |  |
@@ -25,7 +25,7 @@ state ∈ {no instance, instance, demo run, valid demo}; a demo is valid only wh
 | inter_object_relation_satisfaction-inside | demo run (pre-fix success) | re-sample after 160c518 (release height) + drop executor | core / oracle | 160c518, 1d20a68, 5552ee8, 750627b, 7a340e4, d4a1745, e4a1b5c | success | runlogs/pilot_20260915/first_demo/inter_object_relation_satisfaction-inside/0916-065809/demo/inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table__house_single_floor__partner-bowl-belcml__target-brussels_sprouts-mbkrxe__0000/meta.json | 2026-09-16 07:54 PDT |
 | inter_object_relation_satisfaction-nextto | demo run | near-side goal 160c518 (future sampling) | - | 160c518, 1d20a68, 5552ee8, 7a340e4, d4a1745 | oracle_failed / plan_failed @ grasp:plan_failed | runlogs/pilot_20260915/first_demo/inter_object_relation_satisfaction-nextto/0916-065806/demo/inter_object_relation_satisfaction-nextto-jar_of_spaghetti_sauce-canned_food-breakfast_table__house_single_floor__partner-canned_food-acgdtc__target-jar_of_spaghetti_sauce-exmsmm__0000/meta.json | 2026-09-16 08:01 PDT |
 | inter_object_relation_satisfaction-touching | no instance | left band + joint gate (core landed), blade stand-off | core / tabletop | 160c518, 4074359, 7a340e4, d4a1745, e4a1b5c |  |  |  |
-| inter_object_relation_satisfaction-ontop_large_scale | no instance | T2/T3 supports or floor class (new machinery) | large-scale | 7a340e4 |  |  |  |
+| inter_object_relation_satisfaction-ontop_large_scale | no instance | floor-class alias running on the local GPU (owner 08:19); floor cells in-process if the band is empty | coordinator (local) | 7a340e4 |  |  |  |
 | inter_object_relation_satisfaction-under_large_scale | no instance | push-under: sampler landed (25e94d3/8140025/032d849), program + executor (oracle) pending | large-scale / oracle | 7a340e4, 8140025 |  |  |  |
 
 ## Fix log

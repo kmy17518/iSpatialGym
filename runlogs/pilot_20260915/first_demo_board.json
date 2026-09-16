@@ -94,8 +94,8 @@
   "owner": "core / tabletop"
  },
  "inter_object_relation_satisfaction-ontop_large_scale": {
-  "blocking": "T2/T3 supports or floor class (new machinery)",
-  "owner": "large-scale"
+  "blocking": "floor-class alias running on the local GPU (owner 08:19); floor cells in-process if the band is empty",
+  "owner": "coordinator (local)"
  },
  "inter_object_relation_satisfaction-under_large_scale": {
   "blocking": "push-under: sampler landed (25e94d3/8140025/032d849), program + executor (oracle) pending",
