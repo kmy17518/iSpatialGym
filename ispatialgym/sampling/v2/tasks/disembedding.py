@@ -53,6 +53,38 @@ SUBTASK = "disembedding"
 # ----------------------------------------------------------------------------------------------------------------
 
 
+#: a tray counts as resting on the top when its lowest hull point is within this of the top and its floor normal is
+#: within ``REST_TILT_MAX_DEG`` of vertical after the measurement settle
+REST_Z_TOL = 0.01
+REST_TILT_MAX_DEG = 3.0
+#: floor cells = tray hits within this band of the floor level (10 % quantile of the hit heights); at least ``FLOOR_MIN_CELLS``
+FLOOR_BAND = 0.004
+FLOOR_QUANTILE = 0.10
+FLOOR_MIN_CELLS = 40
+
+
+def repark_spawned(s) -> None:
+    """Teleport every spawned object back onto its parking slot before any of its geometry is read.
+
+    Why (E1 pilot, every disembedding alias): ``SimWorld.park`` disables gravity through the PhysX view only, and the
+    ``og.sim.stop()`` / ``play()`` of every later ``spawn`` rebuilds PhysX from USD, so the objects parked earlier fall
+    again (no floor under the parking slots) during the following simulator steps. ``SimWorld.local_hull`` then mixes
+    the *render-side* (Fabric) link transforms, which physics-only steps leave at the last rendered pose, with the
+    current PhysX root pose: the hull of a falling body comes out shifted by the distance fallen since the last
+    render (+6.5 cm in z for the source tray), ``bottom_offset`` is off by the same amount and the tray is placed
+    inside the table top (6 cm slab), pushed through it and found tilted 24 cm lower. A teleport writes PhysX *and*
+    Fabric, zeroes the velocities and re-disables gravity; no stop / play happens during a template, so one re-park
+    at the start of ``sample_template`` keeps every hull consistent for the template's lifetime."""
+    for i, o in enumerate(s.world.spawned.values()):
+        s.world.park(o, i)
+
+
+def tilt_deg(quat) -> float:
+    """Angle between the body's local z axis and the world vertical, in degrees."""
+    up = C.quat_rotate(TT._t(quat), th.tensor([0.0, 0.0, 1.0]))
+    return math.degrees(math.acos(max(-1.0, min(1.0, float(up[2])))))
+
+
 class TrayFloor:
     """Inner floor of a tray measured once in the tray's root frame (cells = local xy of the floor raster, ``z_local`` =
     floor height above the root origin); ``at(pose)`` gives the world view used for placements."""
@@ -95,23 +127,47 @@ class TrayFloor:
         return TrayFloorWorld(self, pose)
 
     @staticmethod
+    def floor_cells(zs: th.Tensor, band: float = FLOOR_BAND, quantile: float = FLOOR_QUANTILE):
+        """Floor level and cell mask from the per-ray tray hit heights (``nan`` = the ray missed the tray): the floor is the
+        ``quantile`` of the hit heights (the lowest inner level; the rim and the wall tops are higher), a cell is a floor
+        cell when its hit lies within ``band`` of it. Returns ``(floor_z, keep)``; ``floor_z`` is ``nan`` without hits."""
+        valid = zs[~th.isnan(zs)]
+        if len(valid) == 0:
+            return float("nan"), th.zeros(len(zs), dtype=th.bool)
+        floor_z = float(th.quantile(valid, quantile))
+        keep = (~th.isnan(zs)) & ((zs - floor_z).abs() < band)
+        return floor_z, keep
+
+    @staticmethod
     def measure(s, tray, top, res: float = 0.01) -> "TrayFloor":
         """Place the tray on the free centre of the top, raycast a ``res`` raster from above, keep the cells whose first
-        hit is the tray at its lowest inner level (10 % quantile of the hit heights + 4 mm), park the tray again."""
+        hit is the tray at its lowest inner level (10 % quantile of the hit heights + 4 mm), park the tray again.
+
+        The tray is re-parked first so that ``local_hull`` reads a consistent body (see :func:`repark_spawned`), and after
+        the settle it must rest on the top (bottom within ``REST_Z_TOL`` of the top, tilt < ``REST_TILT_MAX_DEG``): a tray
+        that fell through or off the support is a ``Reject("support")`` with the geometry, not a raster of nothing."""
+        s.world.park(tray, list(s.world.spawned).index(tray.name))
         hull = s.world.local_hull(tray)
+        if len(hull) == 0:
+            raise Reject("support", f"{tray.name}: no collision hull")
         cells = top.cells(free_only=True)
         centre = cells.mean(dim=0) if len(cells) else th.tensor([float(top.xs.mean()), float(top.ys.mean())])
         quat = C.IDENTITY_QUAT.clone()
-        pos = th.tensor([float(centre[0]), float(centre[1]), top.z + s.world.bottom_offset(hull, quat) + 0.003])
+        pos = th.tensor([float(centre[0]), float(centre[1]), top.z + s.world.bottom_offset(hull, quat) + TT.Z_OFFSET])
         tray.set_position_orientation(pos, quat)
         s.world.activate(tray)
         s.world.step_physics(20, still=[s.robot])
         try:
             rp, rq = tray.get_position_orientation()
             rp, rq = rp.float(), rq.float()
-            # raster over the hull's bounds at the settled pose (``tray.aabb`` can lag a physics-side teleport)
+            # raster over the hull's bounds at the settled pose (``tray.aabb`` lags physics-only steps; the PhysX pose does not)
             world_hull = C.transform_points((rp, rq), hull)
             lo, hi = world_hull.min(dim=0).values, world_hull.max(dim=0).values
+            tilt = tilt_deg(rq)
+            where = (f"tray at {[round(float(v), 3) for v in rp.tolist()]} (placed at {[round(float(v), 3) for v in pos.tolist()]}), hull z {float(lo[2]):.3f}..{float(hi[2]):.3f}, "
+                     f"tilt {tilt:.1f} deg, top z {float(top.z):.3f}")
+            if abs(float(lo[2]) - float(top.z)) > REST_Z_TOL or tilt > REST_TILT_MAX_DEG:
+                raise Reject("support", f"{tray.name}: not resting on the top after the settle ({where})")
             xs = th.arange(float(lo[0]) + res / 2, float(hi[0]), res)
             ys = th.arange(float(lo[1]) + res / 2, float(hi[1]), res)
             gx, gy = th.meshgrid(xs, ys, indexing="ij")
@@ -121,18 +177,22 @@ class TrayFloor:
             hits = s.world.raycast(starts, ends)
             prims = tuple({l.prim_path for l in tray.links.values()} | {tray.prim_path})
             zs = th.tensor([float(h["position"][2]) if (h["hit"] and str(h["rigidBody"]).startswith(prims)) else float("nan") for h in hits])
-            valid = zs[~th.isnan(zs)]
-            if len(valid) == 0:
+            floor_z, keep = TrayFloor.floor_cells(zs)
+            n_tray = int((~th.isnan(zs)).sum())
+            if n_tray == 0:
                 bodies = sorted({str(h["rigidBody"]) for h in hits if h["hit"]})[:6]
-                raise Reject("support", f"{tray.name}: no raycast hits on the tray ({sum(1 for h in hits if h['hit'])}/{len(hits)} rays hit {bodies}; tray at "
-                                        f"{[round(float(v), 3) for v in rp.tolist()]}, hull z {float(lo[2]):.3f}..{float(hi[2]):.3f}, top z {float(top.z):.3f})")
-            floor_z = float(th.quantile(valid, 0.10))
-            keep = (~th.isnan(zs)) & ((zs - floor_z).abs() < 0.004)
+                raise Reject("support", f"{tray.name}: no raycast hits on the tray ({sum(1 for h in hits if h['hit'])}/{len(hits)} rays hit {bodies}; rays from z "
+                                        f"{float(starts[0, 2]):.3f} to {float(ends[0, 2]):.3f}; {where})")
             world_xy = starts[keep][:, :2]
-            if len(world_xy) < 40:
-                raise Reject("support", f"{tray.name}: inner floor too small ({int(keep.sum())} cells)")
-            local = C.transform_points(C.invert((rp.float(), rq.float())), th.cat([world_xy, th.full((len(world_xy), 1), floor_z)], dim=1))
+            if len(world_xy) < FLOOR_MIN_CELLS:
+                valid = zs[~th.isnan(zs)]
+                raise Reject("support", f"{tray.name}: inner floor too small ({int(keep.sum())} cells within {FLOOR_BAND * 1000:.0f} mm of the floor z {floor_z:.3f}; "
+                                        f"{n_tray}/{len(hits)} rays hit the tray at z {float(valid.min()):.3f}..{float(valid.max()):.3f}, raster {len(xs)}x{len(ys)} "
+                                        f"at {res:.3f} m; {where})")
+            local = C.transform_points(C.invert((rp, rq)), th.cat([world_xy, th.full((len(world_xy), 1), floor_z)], dim=1))
             rim = float(hi[2]) - float(rp[2])
+            log.info("%s: inner floor %d cells at %.3f m (%.4f m2), floor %.3f m above the root, rim %.3f m", tray.name, len(world_xy), res, len(world_xy) * res * res,
+                     float(local[:, 2].mean()), rim)
             return TrayFloor(local[:, :2].clone(), float(local[:, 2].mean()), res, rim)
         finally:
             s.world.park(tray, list(s.world.spawned).index(tray.name))
@@ -270,6 +330,9 @@ class Disembedding(SamplerV2):
 
     def sample_template(self):
         tgt, src, dst = self.obj("target"), self.obj(self.src_role), self.obj(self.dst_role)
+        # every hull below is read off a parked body: re-park first (consistent PhysX / render-side transforms, gravity
+        # off again after the spawns' stop / play), see ``repark_spawned``
+        repark_spawned(self)
         self.grasps, self.grasp_key, self.rest["target"] = TT.library_grasps(self, "target", "tabletop")
         for key, o in (("target", tgt), (self.src_role, src), (self.dst_role, dst)):
             self.hull[key] = self.world.local_hull(o)
@@ -300,7 +363,19 @@ class Disembedding(SamplerV2):
         margins = {"kind": "disembedding", "lateral_margin": float(self.g("lateral_margin_m")), "safety": 0.02, "H_max": H_max}
         rng = np.random.default_rng(self.ctx.base_seed)
         errors = []
-        for edge, st in TT.edge_candidates(self, self.top, rng):
+        # §4.2 has no preference among the edges and §4.4 checks floor + collision per lateral position (Phase 1c), so
+        # every edge with a free-floor run in front of it is tried (a third of its 10 cm lateral raster at s = 0.45 on
+        # free floor, as the IORS reference task does) instead of ``edge_candidates``, which drops an edge when its
+        # *midpoint* stance alone is blocked: on breakfast_table_rhjoby_0 that is the 2.9 m edge — the only one long
+        # enough for the disembedding margins (m_R + m_L ≈ 2.26 m) — whose midpoint sits on a 0.4 m patch the scene
+        # variant leaves blocked in the traversability map (baked chair footprint wider than the freed bbox)
+        for edge, st in TT.edge_frames(self, self.top, rng):
+            lats = th.linspace(-edge.length / 2 + 0.1, edge.length / 2 - 0.1, max(2, int(edge.length / 0.1))).tolist()
+            n_free = sum(1 for lat in lats if self.kit.trav_free(edge.base_xy(st.stand_off, lat)))
+            if n_free < max(1, len(lats) // 3):
+                errors.append(f"edge {edge.name}: free floor at {n_free}/{len(lats)} lateral positions")
+                log.info("%s: %s", self.gp.alias, errors[-1])
+                continue
             try:
                 bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
                 init = TT.phase1b_init_trunk(self, st, H_max, bands=bands, top=self.top)

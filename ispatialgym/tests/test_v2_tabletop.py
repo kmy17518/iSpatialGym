@@ -299,6 +299,98 @@ def test_tilt_scan_runs_from_zero_to_the_joint_limit():
 
 
 # ----------------------------------------------------------------------------------------------------------------
+# §6.4 disembedding: the tray inner-floor raster (``tasks/disembedding.TrayFloor``); the module imports the sampler core
+# (OmniGibson importable without a launch, as in test_v2_large_scale.py) but nothing here needs a live world
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def _disembedding():
+    return pytest.importorskip("ispatialgym.sampling.v2.tasks.disembedding")
+
+
+def _synthetic_tray_hits(nx=30, ny=44, rim=2, floor_z=0.005, rim_z=0.030, tilt_per_cell=0.0, miss=()):
+    """Per-ray tray hit heights of a raster over a tray footprint: ``rim`` cells of wall top around an inner floor
+    (optionally sloping ``tilt_per_cell`` along x); cells in ``miss`` hit nothing (nan)."""
+    zs = th.full((nx * ny,), float("nan"))
+    inner = th.zeros(nx * ny, dtype=th.bool)
+    for i in range(nx):
+        for j in range(ny):
+            k = i * ny + j
+            if (i, j) in miss:
+                continue
+            if rim <= i < nx - rim and rim <= j < ny - rim:
+                zs[k] = floor_z + tilt_per_cell * i
+                inner[k] = True
+            else:
+                zs[k] = rim_z
+    return zs, inner
+
+
+def test_tray_floor_cells_keep_the_inner_floor_and_drop_the_rim():
+    D = _disembedding()
+    zs, inner = _synthetic_tray_hits(miss={(0, 0), (15, 20)})
+    floor_z, keep = D.TrayFloor.floor_cells(zs)
+    assert floor_z == pytest.approx(0.005)
+    assert th.equal(keep, inner)  # every inner cell, no rim cell, no missed ray
+    assert int(keep.sum()) == 26 * 40 - 1 >= D.FLOOR_MIN_CELLS
+    # a tray that toppled (floor sloping 1 cm per cell): only one 4 mm band of cells survives near the lowest level
+    zs_t, _ = _synthetic_tray_hits(rim=0, tilt_per_cell=0.01)
+    fz_t, keep_t = D.TrayFloor.floor_cells(zs_t)
+    assert int(keep_t.sum()) <= 44 < 0.1 * int(keep.sum()) and fz_t > 0.005
+    # no tray hit at all: nan level, empty mask (the caller reports the raycast geometry)
+    fz_n, keep_n = D.TrayFloor.floor_cells(th.full((12,), float("nan")))
+    assert math.isnan(fz_n) and not bool(keep_n.any()) and keep_n.shape == (12,)
+
+
+def test_tray_floor_grid_and_world_view():
+    D = _disembedding()
+    res = 0.01
+    xs = th.arange(-0.125, 0.126, res)  # 26 cells along x (short axis), centred on the root
+    ys = th.arange(-0.195, 0.196, res)  # 40 cells along y (long axis)
+    gx, gy = th.meshgrid(xs, ys, indexing="ij")
+    cells = th.stack([gx.flatten(), gy.flatten()], dim=1)
+    floor = D.TrayFloor(cells, z_local=0.005, res=res, rim_local=0.030)
+    assert floor.n_cells == 26 * 40 and floor.area() == pytest.approx(26 * 40 * res * res)
+    assert floor.contains_local((0.0, 0.0)) and floor.contains_local((0.0, 0.0), margin=0.005)
+    assert floor.contains_local((0.122, 0.19)) and not floor.contains_local((0.122, 0.19), margin=0.01)  # a margin pushes the outermost cell out
+    assert not floor.contains_local((0.14, 0.0)) and not floor.contains_local((0.0, -0.21))
+    # world view: tray root at (1, 2, 0.82) yawed 90 deg -> the long (local y) axis lies along world x, the short one along world y
+    pose = (th.tensor([1.0, 2.0, 0.82]), C.quat_from_yaw(math.pi / 2))
+    w = floor.at(pose)
+    assert w.z == pytest.approx(0.825) and w.rim_z == pytest.approx(0.85)
+    assert th.allclose(w.centre, th.tensor([1.0, 2.0]), atol=1e-6)
+    assert w.contains((1.0, 2.0)) and w.contains((1.0 - 0.19, 2.0)) and w.contains((1.0, 2.0 + 0.12))
+    assert not w.contains((1.0, 2.0 + 0.19)) and not w.contains((1.0 + 0.25, 2.0))  # the short axis is along world y now
+    square = th.tensor([[0.98, 1.98], [1.02, 1.98], [1.02, 2.02], [0.98, 2.02]])
+    assert w.polygon_supported(square, margin=0.005)
+    assert not w.polygon_supported(square + th.tensor([0.0, 0.115]), margin=0.005)  # straddles the long side
+    assert w.cells().shape == (26 * 40, 2) and w.area() == pytest.approx(floor.area())
+
+
+def test_tray_rest_tilt_and_repark_slots():
+    D = _disembedding()
+    assert D.tilt_deg(C.IDENTITY_QUAT) == pytest.approx(0.0, abs=1e-6)
+    assert D.tilt_deg(C.quat_from_axis_angle(th.tensor([1.0, 0.0, 0.0]), math.radians(14.5))) == pytest.approx(14.5, abs=1e-4)
+    assert D.tilt_deg(C.quat_from_yaw(1.0)) == pytest.approx(0.0, abs=1e-5)  # a yaw is not a tilt
+    assert D.REST_Z_TOL == pytest.approx(0.01) and D.REST_TILT_MAX_DEG == pytest.approx(3.0)
+
+    class World:
+        def __init__(self):
+            self.spawned = {"target_0": object(), "source_tray_0": object(), "destination_tray_0": object()}
+            self.calls = []
+
+        def park(self, obj, index):
+            self.calls.append((obj, index))
+
+    class S:
+        world = World()
+
+    D.repark_spawned(S)
+    # every spawned object, at the slot the core uses (its position in ``world.spawned``)
+    assert S.world.calls == [(o, list(S.world.spawned).index(n)) for n, o in S.world.spawned.items()]
+
+
+# ----------------------------------------------------------------------------------------------------------------
 # sidecar blocks the tabletop tasks emit, read back by the F6 sidecar / programs (schema compatibility, no simulator)
 # ----------------------------------------------------------------------------------------------------------------
 
