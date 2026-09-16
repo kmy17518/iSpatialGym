@@ -793,15 +793,23 @@ within 15–80 mm after scaling). Single arm; the object holds itself, no brace 
   (contact ± 0.10 m along the pinch axis) in frame (5 %), optical axis within 8° (else 20°). Step 5 exact IK:
   [pre-grasp, grasp] at q_init, then the grasp pose at each required q_k with the world re-synced at q_k (target
   ignored for the grasp poses only). Cache per (scene, target name, joint, q_init) (close: one entry per element of S).
-- **Base-follow feasibility (primary opening mode).** The handle is grasped in both directions. With the arm locked at
-  its q_init IK solution q*, the eef pose relative to the base is fixed, so base-follow means
-  b_k = h(q_k) ∘ T_eef→base(q*). `follow_mode` per joint type: **base** for vertical-axis revolute joints and
-  horizontal prismatic joints (h(q) changes only in x, y, yaw — the holonomic base matches it exactly), **arm** for
-  horizontal-axis revolute joints (pitch and height change; base + trunk cannot match). Base mode checks, per
-  required q_k: b_k on free floor (un-eroded), whole-body collision-free with the target at q_k (the grasped link
-  ignored for the gripper only), base path b_0 → b_k collision-checked per 3.7; and, as the oracle's secondary mode,
-  arm-only IK at each waypoint from the manipulation stance. Arm mode = the step-5 waypoint IK. Record
-  `follow_mode`, `base_follow = {q_k: base_pose2d}`.
+- **Articulation class and follow mode (owner decision 2026‑09‑16, A4).** The handle is grasped in both directions and
+  the pinch is tried with both closing signs (the recorded pinch axis carries the sign). Class per joint:
+  `drawer` (prismatic) — **base** mode as before: with the arm locked at its q_init IK solution q*, the eef pose relative
+  to the base is fixed, so b_k = h(q_k) ∘ T_eef→base(q*); per required q_k: b_k on free floor (un-eroded), whole-body
+  collision-free with the target at q_k (the grasped link ignored for the gripper only), base path b_0 → b_k per 3.7;
+  `cabinet` (revolute door or flap of a furniture piece: cabinets, fridge, dishwasher, oven, …) — the manipulation
+  stance stands on the **hinge side** (Λ toward the hinge, the base between handle and hinge; the arm on the handle's
+  side of that stance), `follow_mode: arm`, and the goal set of a stance is S restricted to the joint values the arm
+  reaches from it (h(q) on a 10° / 5 cm grid from the closed joint up to the first unreachable value, the target
+  ignored for the grasp only); when no element of S is reachable, the reach limit itself is the goal provided it opens
+  ≥ 50° (0.10 m) and holds passively — a 50–70° opening is a valid configuration-matching goal; `reachable_fraction`
+  per stance in the template meta and the articulation block; `room_door` (revolute door leaf) — **hybrid** follow:
+  per handle waypoint a base pose near the current base on free floor, collision-free, with feasible arm IK, minimum
+  displacement (not implemented yet: `Reject("room_door_hybrid_todo")`). The rigid eef→base sweep is no longer used
+  for revolute furniture doors (the pilot: the base orbits the hinge at ≈ 1 m through 55–110° into the kitchen).
+  Record `door_class`, `hinge_side`, `follow_mode ∈ {arm, base, hybrid}`, `goal_set`, `q_reach`, `base_follow`
+  (base mode only).
 - **Phase 3**: nothing is spawned. Joints at q_init, `settle_free = []`, the moving link held at q_init during
   settling; after settling the joint may not have drifted > ½ tolerance; `articulation_targets` = every non-fixed joint
   at its init value except the chosen one at q_goal, tolerance per type; then the pipeline (`:init` true, binary goal
@@ -886,7 +894,9 @@ rays within 1 cm over (w + 0.10) × (h + 0.10) (horizontal: swept extents over t
 front clearance 0.35 m; in-room test 0.8 m in front; one wall per template (most spots); frame from `front_axis` /
 `up_axis` / `level_axis` (dict form), `symmetric_180`; hang pose (up axis along world z, front axis along n, centre at
 height 1.45 m, thickness/2 + 0.01 off the wall); hinge at the COM with axis n, parent = the support's wall link (TRO
-`constraints`); init in-plane angle δ = sign · U(15°, 45°); goal = level pose (rotation 0), orientation tolerance
+`constraints`); init in-plane angle δ = sign · U(15°, 25°) (owner decision 2026‑09‑16, A8: |δ| > 25° is beyond the
+one-stroke push of the R1Pro; a two-stroke push for larger tilts is recommended later); the template filter uses
+δ = ±25°; goal = level pose (rotation 0), orientation tolerance
 0.08, equivalences (`symmetric_180` half turn + explicit); `settle_free = []`; hinge drift ≤ 0.03 rad after settling;
 ≥ `min_visible_objects` (5) objects with ≥ 200 px, structure included, in the init render; whole tilted target in frame
 at init (5 %).
@@ -938,6 +948,14 @@ reject `no_stance` (with `scale_hint`).
 `:init` true, goal false, goal feasibility by teleport to the level pose + settle). Sidecar: `init_stance`,
 `manipulation_stance`, `push_contacts`, `constraints`, `scale`.
 
+**Two-arm stance posture (A6).** The manipulation stance records the idle-arm / drive-in posture it was checked with
+(`arms_q`, `idle_posture`, `fingers`; the wall uses `tucked` with closed pads: hanging arms clear the wall at
+d = 0.5–0.55 m where untucked or ready hands do not), self-collision on; the drive-in s_T → s is checked with that
+posture, the path init → s_T with the init posture (3.8 order: s_T first). Step 5 solves the brace approach segment
+(pre → contact, 3 poses) exactly so every pose has a witness; the wall is removed from the collision world along the
+whole brace chain and the whole push chain (the target only for the push poses); the program check applies the same
+ignore sets per waypoint.
+
 ### 5.6 IORS large-scale — three stances (ontop, under)
 
 Partner = a large fixed scene object (ontop: bed, sofa, desk, breakfast_table, countertop; under: bed, sofa, desk,
@@ -945,12 +963,17 @@ breakfast_table — filtered per target height class by the under-clearance rule
 library grasps), fixed `partner`, fixed `support` (the init surface), `floor`. Three recorded stances: **A** init pose
 and **B** manipulation stance at the init surface, **C** placement stance at the partner.
 
-**Init surface** — an explicit choice of `ground_isg` (it is in the alias), never a runtime fallback: (a) a support
-object whose near AABB side lies within `max_partner_geodesic` (3.0 m, eroded map) of the partner's near AABB side;
-(b) **the partner's own top** (under only: "take it from the bed and put it under the bed"; for ontop the goal would
-hold at init); (c) **the floor** beside the partner (`support = floor`). Per template one candidate of the grounded
-class is drawn uniformly; if A–C cannot be built on it, the remaining candidates *of the same class* are tried in
-random order; none → reject the template.
+**Init surface** — an explicit choice of `ground_isg` (it is in the alias), never a runtime fallback. Selection order
+(owner decision 2026‑09‑16, A5; minimise floor inits): under — (a) a support object whose near AABB side lies within
+`max_partner_geodesic` (3.0 m, eroded map) of the partner's near AABB side → (b) **the partner's own top** ("take it
+from the bed and put it under the bed"; alias `…-<partner>-<partner>`, `bindings.support == bindings.partner`) → (c)
+**the floor** beside the partner (`support = floor`); ontop — (a) support → (c) floor (the own top would hold at
+init). `ground_isg` emits the later classes as fallback aliases (`fallback_of`, `fallback_rank`); the scheduler queues
+a fallback only after the primary yields nothing; within an alias the candidates stay in the same class (no runtime
+class switching; cross-category init surfaces are separate aliases, VB-ISC). Own top: A/B by the tabletop phases with
+the partner as the support (the partner-visibility redraw does not apply), C at the same partner. Per template one
+candidate of the grounded class is drawn uniformly; if A–C cannot be built on it, the remaining candidates *of the
+same class* are tried in random order; none → reject the template.
 
 **Stance A** — tabletop Phase 1 at the support, target the only object on it, plus partner visible: ≥ 4 of the
 partner's 8 AABB corners in frame (0 margin) and its AABB centre in frame. If the lateral draw fails this, redraw the
@@ -983,8 +1006,10 @@ uniform along the edge minus margins, trunk from the band, uniform draw among su
   above the floor (this is exactly OmniGibson's `Under` test: the ray from the target's AABB-centre column), within
   0.45 m of the partner's near AABB edge. Band from the reach-band script with h = floor z (`--support floor --under
   <partner>`; tilt −1.2 added; the partner's frame is an obstacle, the floor ignored for the grasp pose only). Base
-  square to the partner's near AABB edge nearest the init pose; visibility: the near edge's two bottom AABB corners in
-  frame (5 %) and the optical axis within 20° of the goal cell (the cell itself is hidden). **Goal cell** = the band
+  square to the partner's near AABB edge nearest the init pose; visibility: the near edge's bottom line at the goal
+  cell's lateral position ± (target half-extent + 0.10 m) in frame (5 %) and the optical axis within 20° of the goal
+  cell (the cell itself is hidden; the earlier "two bottom AABB corners" rule is unsatisfiable for bed / sofa edges of
+  ± 1 m at s = 0.45 — 65° off-axis). **Goal cell** = the band
   cell nearest the init pose.
 
 Record `placement_stance = {stand_off, lateral, translate, tilt, focus / goal_cell, base_pose2d, grasp}`. B → C path
