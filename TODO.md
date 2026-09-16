@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 11:16 PDT — 5/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 12:08 PDT — 4/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -126,19 +126,19 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | camera_relocalization-obstructed | valid demo | tracker corner fix d4a1745 not yet re-demoed | oracle |
 | object_scaling | valid demo | - | - |
 | mental_rotation | valid demo | - | - |
-| disembedding | demo run | instance sampled with the 1.25 tray (band 703 cells in-process); demo failed at grasp: oracle keeps the source tray as an obstacle (sampler ignores it per 3.6) → oracle grasp_from rule; sampler rerun: approach_untrackable x4 (core item A), path_collision carried soap vs tray x16; next alias bottle_of_milk on the w11 band | oracle / core / tabletop |
+| disembedding | demo run (pre-fix success) | bottle_of_milk success 11:22 (1ca84d2) predates fd0411c/9729372 → re-run for validity; old chili instance blocked by branch-inconsistent witnesses (re-sample) | loop |
 | CM block_design | no instance | 0/8 at 10.1 cm: picks/places marginal at λ≈0 (left-band anchor rule) — owner ladder (pitched primary, region 0.5–0.6 m, 1 mm tip) in progress; question: brace optional for blocks too? | tabletop / owner |
 | CM attachment | no instance | one attempt took 1457 s (brace candidates) → remote_run timeout; needs the attempt budget cut | tabletop |
 | CM articulation_open_small_scale | no instance | left-band body-face brace wired (c0bbe0f); toolbox lid handle at 85° out of reach (no_workspace); hinged_jar rerun in progress | tabletop |
 | CM articulation_close_small_scale | no instance | same as open | tabletop |
 | CM articulation_open_large_scale | no instance | floor fixed (7 Phase-2 survivors/attempt); step 5: handle [pre, final] exact IK fails (pinch -1) x15, arm reaches j_link_2 only to fraction ≤ 0.11 from d 0.75–0.80 x8 → large-scale (stance distance / opening reach); no blacklist before the verdict (owner) | large-scale |
 | CM articulation_close_large_scale | no instance | same as open | large-scale |
-| alignment-world_vertical | demo run | drive-in with untucked arms (arms_q applied to idle arms only) → oracle applies arms_q to every free arm; conditional brush rule if a brush remains (owner 10:47) | oracle |
-| alignment-world_horizontal | no instance | same transition fix; decorative_sign push_unreachable x8 → next alias | oracle / loop |
+| alignment-world_vertical | demo run | transition passes now (d03b21d); brace: right wrist camera into the wall from the recorded side_high pose (wall ignored for the whole arm in the sampler's chain) → large-scale: keep the wall for the arm/wrist links, ignore it for the pads only / off-wall pre-contact | large-scale |
+| alignment-world_horizontal | no instance | same brace geometry; decorative_sign push_unreachable | large-scale |
 | alignment-axial | demo run (pre-fix success) | - | - |
 | IORS ontop_small_scale | demo run (pre-fix success) | - | - |
 | IORS under_small_scale | demo run (pre-fix success) | french_fries: branch problem gone (witness reached, 3.1 mm) → ghost_hand at lift (grasp physics); teacup-saucer: placed_orientation → core release height (item C) then re-run | core |
-| IORS inside | valid demo | re-sample after 160c518 (release height) + drop executor | core / oracle |
+| IORS inside | demo run (pre-fix success) | re-sample after 160c518 (release height) + drop executor | core / oracle |
 | IORS nextto | demo run (pre-fix success) | near-side goal 160c518 (future sampling) | - |
 | IORS touching | no instance | approach_untrackable (intermediate waypoint collides with the target itself) + place_unreachable → core: ignore the target along the approach segment | core |
 | IORS ontop_large_scale | no instance | (a)(d) A goal-region rule + (c) C in-frame rule landed → countertop pair running on the local GPU; sofa-bar next | coordinator (local) / large-scale |

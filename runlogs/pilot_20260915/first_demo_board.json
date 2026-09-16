@@ -28,8 +28,8 @@
   "last_change": "2026-09-16 03:00 PDT"
  },
  "disembedding": {
-  "blocking": "instance sampled with the 1.25 tray (band 703 cells in-process); demo failed at grasp: oracle keeps the source tray as an obstacle (sampler ignores it per 3.6) \u2192 oracle grasp_from rule; sampler rerun: approach_untrackable x4 (core item A), path_collision carried soap vs tray x16; next alias bottle_of_milk on the w11 band",
-  "owner": "oracle / core / tabletop"
+  "blocking": "bottle_of_milk success 11:22 (1ca84d2) predates fd0411c/9729372 \u2192 re-run for validity; old chili instance blocked by branch-inconsistent witnesses (re-sample)",
+  "owner": "loop"
  },
  "configuration_matching-block_design": {
   "blocking": "0/8 at 10.1 cm: picks/places marginal at \u03bb\u22480 (left-band anchor rule) \u2014 owner ladder (pitched primary, region 0.5\u20130.6 m, 1 mm tip) in progress; question: brace optional for blocks too?",
@@ -56,12 +56,12 @@
   "owner": "large-scale"
  },
  "alignment-world_vertical": {
-  "blocking": "drive-in with untucked arms (arms_q applied to idle arms only) \u2192 oracle applies arms_q to every free arm; conditional brush rule if a brush remains (owner 10:47)",
-  "owner": "oracle"
+  "blocking": "transition passes now (d03b21d); brace: right wrist camera into the wall from the recorded side_high pose (wall ignored for the whole arm in the sampler's chain) \u2192 large-scale: keep the wall for the arm/wrist links, ignore it for the pads only / off-wall pre-contact",
+  "owner": "large-scale"
  },
  "alignment-world_horizontal": {
-  "blocking": "same transition fix; decorative_sign push_unreachable x8 \u2192 next alias",
-  "owner": "oracle / loop"
+  "blocking": "same brace geometry; decorative_sign push_unreachable",
+  "owner": "large-scale"
  },
  "alignment-axial": {
   "blocking": "-",
