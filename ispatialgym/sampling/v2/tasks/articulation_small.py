@@ -385,8 +385,9 @@ class ArticulationSmall(SamplerV2):
         base_cells, world_cells = bc.lattice_on_cells(stance, self.top.cells(free_only=True))
         # the §5.3 required set exactly as the instance checks it (q_init + every q_k up to the passive fraction); B3's brace
         # bands record n_all_q = 0 for every target at all five fractions, so requiring q_goal itself would empty the band
-        q_values = [self.q_init] + [self.q_init + k * (self.q_goal - self.q_init) for k in self.required]
-        log.info("%s: handle band over q = %s (required fractions %s, passive from %s)", self.gp.alias, [round(v, 3) for v in q_values], self.required, self.passive_from)
+        q_values = [self.q_init] + ([self.q_init + max(self.required) * (self.q_goal - self.q_init)] if self.required else [])
+        log.info("%s: handle band over q = %s (q_init + the last required fraction of %s, passive from %s; one yaw = the face yaw)", self.gp.alias,
+                 [round(v, 3) for v in q_values], self.required, self.passive_from)
         x0, y0, yaw0 = stance["base_pose2d"]
         face_off = C.wrap_angle(self.face_yaw - yaw0)
         trunks = RB.trunk_grid(self.top.z - kit.floor_z)
@@ -408,7 +409,7 @@ class ArticulationSmall(SamplerV2):
                 shoulder, arm_len = bc.shoulder_and_reach(q, self.handle_arm)
                 pts = th.cat([world_cells, th.full((len(world_cells), 1), self.top.z)], dim=1)
                 near = th.linalg.norm(pts - shoulder, dim=1) <= arm_len + float(th.linalg.norm(th.tensor(self.handle["contact"]))) + RB.PRE_GRASP + 0.05
-                combos = [(i, dy) for i in range(len(base_cells)) if bool(near[i]) for dy in (face_off, face_off - 0.1, face_off + 0.1)]
+                combos = [(i, dy) for i in range(len(base_cells)) if bool(near[i]) for dy in (face_off,)]  # the face yaw only (the instance jitters ±yaw_jitter)
                 obj_poses = {c: TT.object_pose_on(self, self.hull, C.IDENTITY_QUAT, world_cells[c[0]], yaw0 + c[1], self.top.z) for c in combos}
                 pairs = {c: [self._handle_pairs(obj_poses[c], qv) for qv in q_values] for c in combos}
                 flat = [(c, k) for c in combos for k in range(len(q_values))]
@@ -422,7 +423,7 @@ class ArticulationSmall(SamplerV2):
                         handle_ok.setdefault(c, []).append(k)
                 feasible = []
                 for i in range(len(base_cells)):
-                    for dy in (face_off, face_off - 0.1, face_off + 0.1):
+                    for dy in (face_off,):
                         c = (i, dy)
                         if c in handle_ok and len(handle_ok[c]) == len(q_values):
                             feasible.append({"cell": base_cells[i].tolist(), "yaw_offset": dy, "q_feasible": q_values, "brace_kinds": ["left_band"]})
