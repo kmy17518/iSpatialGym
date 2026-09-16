@@ -361,10 +361,15 @@ class AlignmentWall(SamplerV2):
         # the other wrist turn (closing axis −n): the same pad contact with the gripper's broad faces swapped — the wrist
         # camera (right_realsense_link) sits on one of them and ends inside the wall for one of the two turns (first demo
         # 2026‑09‑16); step 5 picks the turn whose configuration clears the wall
-        push_init_b = C.contact_eef(E_low, a_push, closing=-n)
-        arc_b = C.arc_waypoints(push_init_b, C_, n, -delta, n=2)
-        push_variants = [{"wrist": 1.0, "pre": push_pre, "init": push_init, "mid": push_mid, "goal": push_goal},
-                         {"wrist": -1.0, "pre": C.pre_pose(push_init_b), "init": push_init_b, "mid": arc_b[0], "goal": arc_b[1]}]
+        # ... and the closing axis IN the wall plane (⟂ a and n): the gripper's thin side then faces the wall — with the
+        # closing axis along n the palm (far wider than the fingers along the closing axis) sits centred 2 cm off the
+        # wall and penetrates it whichever way the wrist turns (first-demo loop 12:12: both turns "inside the wall")
+        c_in = C.unit(th.cross(a_push, n, dim=0))
+        push_variants = []
+        for label, closing in (("in+", c_in), ("in-", -c_in), ("n+", n), ("n-", -n)):
+            init_v = push_init if label == "n+" else C.contact_eef(E_low, a_push, closing=closing)
+            arc_v = arc if label == "n+" else C.arc_waypoints(init_v, C_, n, -delta, n=2)
+            push_variants.append({"wrist": label, "pre": C.pre_pose(init_v), "init": init_v, "mid": arc_v[0], "goal": arc_v[1]})
         # brace candidates on the level pose; E_high's side along the level axis
         side_l = G.rotate(pose_l[1], self.side)
         C_l = pose_l[0] + G.rotate(pose_l[1], self.com_local if com is None else com)
@@ -383,11 +388,12 @@ class AlignmentWall(SamplerV2):
             # has to be ignored along the whole brace chain (as along the push chain), in the sampler and in the program
             # check alike.
             off_wall = float(self.param("brace_pre_offset_wall_m", 0.0))
-            for wrist in (1.0, -1.0):  # both wrist turns of the same pad contact (see the push variants above)
-                eef_w = eef if wrist > 0 else (eef[0], C.eef_quat(a, -n))
+            c_in_b = C.unit(th.cross(a, n, dim=0))  # closing axis in the wall plane (see the push variants above)
+            for label, closing in (("in+", c_in_b), ("in-", -c_in_b), ("n+", n), ("n-", -n)):
+                eef_w = eef if label == "n+" else (eef[0], C.eef_quat(a, closing))
                 pre_a = C.pre_pose(eef_w)
                 pre = (pre_a[0] + off_wall * n, pre_a[1]) if off_wall else pre_a
-                braces.append({"kind": kind, "B": B, "a": a, "pose": eef_w, "pre": pre, "wrist": wrist})
+                braces.append({"kind": kind, "B": B, "a": a, "pose": eef_w, "pre": pre, "wrist": label})
         push_arm = push_arm_of(E_low, C_, th.tensor([float(n[1]), -float(n[0]), 0.0]))
         return {"pose_tilted": pose_t, "pose_level": pose_l, "hull_tilted": pts_t, "hull_level": pts_l, "C": C_, "E_low": E_low, "E_high": E_high,
                 "push": {"pre": push_pre, "init": push_init, "mid": push_mid, "goal": push_goal, "direction": a_push, "arm": push_arm,
@@ -770,7 +776,7 @@ class AlignmentWall(SamplerV2):
         why: List[str] = []
         solved = None
         for b, sp in braces:  # the target is *not* ignored for the brace (§5.5: ≥ 2 cm clear of the tilted hull)
-            tag = f"{b['kind']}{'' if b.get('wrist', 1.0) > 0 else '-'}"
+            tag = f"{b['kind']}/{b.get('wrist', 'n+')}"
             r_pre_b = self.ikc.exact([b["pre"]], manip, brace_arm, ignore_for_last=wall, q_seed=q0, cache=False)
             if not r_pre_b.ok:
                 why.append(f"{tag}: brace pre-contact")
@@ -792,7 +798,7 @@ class AlignmentWall(SamplerV2):
             q_seed[arm_b] = res.q[arm_b]
             arm_p = self.kit.robot.arm_control_idx[push_arm]
             for push in geo["push"].get("variants") or [geo["push"]]:
-                ptag = f"{tag}/push{'' if push.get('wrist', 1.0) > 0 else '-'}"
+                ptag = f"{tag}/push-{push.get('wrist', 'n+')}"
                 # the push pre-contact lies 10 cm along -a from E_low (the low *side* of the target), i.e. alongside the hull
                 # with ~2 cm of air: the target is removed for it as for the contact poses (the approach pre -> init runs along
                 # the side and the pads only meet the target at init; documented relaxation of §3.6 for the wall push)
@@ -832,7 +838,7 @@ class AlignmentWall(SamplerV2):
                          f"no (brace, push) chain passes the exact IK from the manipulation stance: {'; '.join(why) or 'no brace candidate'}")
         b, push = solved
         manip.contacts = ["push", "brace"]
-        manip.extras["wrist_turns"] = {"brace": b.get("wrist", 1.0), "push": push.get("wrist", 1.0)}
+        manip.extras["closing_axes"] = {"brace": b.get("wrist", "n+"), "push": push.get("wrist", "n+")}
         self.sidecar.add_stance(manip)
         P0.connect(self, init, manip, float(self.param("path_max_m", P0.PATH_MAX_M)))
         tname = self.tname
