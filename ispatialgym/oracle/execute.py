@@ -225,9 +225,32 @@ def idle_arm_targets(record, state) -> Dict[str, th.Tensor]:
     return out
 
 
+def stance_fingers(record) -> Optional[float]:
+    """``stances.<name>.fingers``: the finger opening the stance's checks used (written when it is not the open
+    default; closed pads for the wall two-arm stance), None when not recorded."""
+    extra = getattr(record, "extra", None) or {}
+    f = getattr(record, "fingers", None)
+    if f is None:
+        f = extra.get("fingers")
+    return None if f is None else float(f)
+
+
 def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any]) -> Iterator[th.Tensor]:
-    """``arm_to`` the idle arms of ``record`` to their recorded posture (A6) — before the trunk motion, so the swept
-    trunk motion is the one the sampler checked with those arm values. Arms already there are left alone."""
+    """Put the arms into the stance's recorded drive-in posture before the trunk motion (A6): ``arm_to`` the idle
+    arms to their recorded joints, and set the recorded finger opening (``fingers``: closed pads for the wall two-arm
+    stance) on every arm that holds nothing — so the swept trunk motion is the one the sampler checked. Arms already
+    there are left alone."""
+    fingers = stance_fingers(record)
+    set_fingers = []
+    if fingers is not None:
+        want_close = fingers <= 0.5 * float(C.FINGER_OPEN)
+        for arm in M.ARMS:
+            if state.held_object(arm) is not None:
+                continue  # a carried object keeps its grasp
+            if motions.gripper_closed(arm) != want_close:
+                set_fingers.append(arm)
+                yield from motions.gripper(arm, close=want_close)
+    ctx["fingers_set"] = {"arms": set_fingers, "closed": (fingers is not None and fingers <= 0.5 * float(C.FINGER_OPEN))} if fingers is not None else None
     targets = idle_arm_targets(record, state)
     q = state.robot.get_joint_positions()
     move = {arm: qa for arm, qa in targets.items() if float(th.max(th.abs(q[state.robot.arm_control_idx[arm]].float() - qa))) > IDLE_ARM_TOL}
@@ -778,6 +801,6 @@ def coverage() -> Dict[str, bool]:
 __all__ = [
     "PrivilegedState", "ExecuteConfig", "CONFIG", "EXECUTORS", "MANIPULATION_ACTIONS", "FOV_EXEMPT_ACTIONS", "executor_for",
     "is_manipulation", "fov_monitored", "run_action", "check_postcondition", "coverage", "camera_goal", "joint_tolerance",
-    "idle_arm_targets", "move_idle_arms", "posture_q", "IDLE_POSTURES", "IDLE_ARM_TOL", "intended_contacts", "forbidden_contacts", "offset_brace",
+    "idle_arm_targets", "move_idle_arms", "stance_fingers", "posture_q", "IDLE_POSTURES", "IDLE_ARM_TOL", "intended_contacts", "forbidden_contacts", "offset_brace",
     "push_geometry", "push_residual", "extend_push", "push_tangent", "PushGeometry",
 ]

@@ -1242,7 +1242,28 @@ def test_transition_moves_the_idle_arm_to_its_recorded_posture_before_the_trunk(
     assert th.allclose(env.robot.q[env.robot.arm_control_idx["right"]], th.from_numpy(q[0][env.robot.arm_control_idx["right"].numpy()]), atol=1e-6)
     ctx = {}
     list(EX.move_idle_arms(motions, ex.state, manip, ctx))
-    assert ctx["idle_arms_moved"] == []
+    assert ctx["idle_arms_moved"] == [] and ctx["fingers_set"] is None
+    # item 5: the stance's recorded finger opening (closed pads for the wall two-arm stance) is applied with arms_q on
+    # every arm that holds nothing; an arm carrying an object keeps its grasp
+    manip.extra["fingers"] = 0.0
+    assert EX.stance_fingers(manip) == 0.0
+    assert not motions.gripper_closed("left") and not motions.gripper_closed("right")
+    ctx = {}
+    for a in EX.move_idle_arms(motions, ex.state, manip, ctx):
+        env.step(a)
+    assert ctx["fingers_set"] == {"arms": ["left", "right"], "closed": True} and motions.gripper_closed("left") and motions.gripper_closed("right")
+    assert float(env.robot.q[env.robot.gripper_control_idx["left"]].max()) < 0.01
+    ctx = {}
+    list(EX.move_idle_arms(motions, ex.state, manip, ctx))
+    assert ctx["fingers_set"] == {"arms": [], "closed": True}  # already closed: nothing to do
+    manip.extra["fingers"] = 0.05
+    env.robot._ag_obj_in_hand["right"] = env.objects["apple.n.01_1"]  # the right hand carries: its grasp is kept
+    ctx = {}
+    for a in EX.move_idle_arms(motions, ex.state, manip, ctx):
+        env.step(a)
+    assert ctx["fingers_set"] == {"arms": ["left"], "closed": False} and not motions.gripper_closed("left") and motions.gripper_closed("right")
+    env.robot._ag_obj_in_hand["right"] = None
+    del manip.extra["fingers"]
     # a posture name alone works too, and a posture-string stance (init) treats both arms as idle
     init = sc.stance("init")
     init.extra["idle_posture"] = "tucked"

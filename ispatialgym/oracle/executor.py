@@ -123,7 +123,7 @@ TASK_TRACKING_ATTRS = ("_first_success_step", "_first_settled_success_step", "_e
 
 
 #: ctx keys the execute functions write for the record (meta.json ``actions[].notes``)
-NOTE_KEYS = ("push_residual", "push_pivot_offset_m", "push_object_drift_m", "approach_finish", "descent_finish", "idle_arms_moved", "object_motion",
+NOTE_KEYS = ("push_residual", "push_pivot_offset_m", "push_object_drift_m", "approach_finish", "descent_finish", "idle_arms_moved", "fingers_set", "object_motion",
              "camera_error_before_correction", "camera_error", "attached")
 
 
