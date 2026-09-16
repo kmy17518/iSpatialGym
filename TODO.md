@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 10:44 PDT — 2/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 10:53 PDT — 2/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -126,22 +126,22 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | camera_relocalization-obstructed | valid demo | tracker corner fix d4a1745 not yet re-demoed | oracle |
 | object_scaling | demo run (pre-fix success) | - | - |
 | mental_rotation | demo run (pre-fix success) | - | - |
-| disembedding | demo run | chili: empty feasible set F at the focus (tray 1.25 bands landing ≈10:15; in-process band used?) | tabletop / bands |
-| CM block_design | no instance | target_placement x8: no pick passes the screening IK / place + flip exact IK / row brace | tabletop |
+| disembedding | demo run | owner 10:47: bottle_of_milk on the w11 1.25-tray bands (landing), thin objects later | tabletop / loop |
+| CM block_design | no instance | owner 10:47: re-run on HEAD (witness screening), then probe + pitched picks primary + region 0.5-0.6 m + 1 mm tip clearance | tabletop |
 | CM attachment | no instance | one attempt took 1457 s (brace candidates) → remote_run timeout; needs the attempt budget cut | tabletop |
 | CM articulation_open_small_scale | no instance | hinged_jar run hit the core's in-progress floor_z edit (park_cell) → re-run after the core commit; toolbox no_workspace, laptop target_placement | tabletop / core |
 | CM articulation_close_small_scale | no instance | same as open | tabletop |
 | CM articulation_open_large_scale | no instance | floor_z fixed (Phase 1 passes now); handle_unreachable x8 on rvunhj_0 (edge-door pinch 0.69 m, arm-only class) → large-scale | large-scale |
 | CM articulation_close_large_scale | no instance | same as open | large-scale |
-| alignment-world_vertical | demo run | instance OK; demo: transition drive-in with untucked arms hits the wall — the stance records arm_posture tucked + arms_q for BOTH arms but the oracle's move_idle_arms moves idle arms only (idle_arms_moved: []) → oracle: apply arms_q to every free arm before the drive-in | oracle |
-| alignment-world_horizontal | no instance | decorative_sign: push_unreachable x8; picture_s070: no spot → next alias / scale fallback | loop / large-scale |
+| alignment-world_vertical | demo run | drive-in with untucked arms (arms_q applied to idle arms only) → oracle applies arms_q to every free arm; conditional brush rule if a brush remains (owner 10:47) | oracle |
+| alignment-world_horizontal | no instance | same transition fix; decorative_sign push_unreachable x8 → next alias | oracle / loop |
 | alignment-axial | demo run (pre-fix success) | - | - |
 | IORS ontop_small_scale | demo run (pre-fix success) | - | - |
 | IORS under_small_scale | demo run (pre-fix success) | honest fail now: placed_orientation (cup falls at release) → core item 3 release height from the raycast surface, then re-run | core |
 | IORS inside | demo run (pre-fix success) | re-sample after 160c518 (release height) + drop executor | core / oracle |
 | IORS nextto | demo run (pre-fix success) | near-side goal 160c518 (future sampling) | - |
 | IORS touching | no instance | approach_untrackable (intermediate waypoint collides with the target itself) + place_unreachable → core: ignore the target along the approach segment | core |
-| IORS ontop_large_scale | no instance | floor class: floor band empty; sofa-bar: stance C 0 survivors (visibility stage) → large-scale; countertop pair needs the visibility relaxation (decision) | large-scale / owner |
+| IORS ontop_large_scale | no instance | owner 10:47: A goal-region visibility (relaxed partner rule), B no partner redraw, C sofa diagnosis (13 free / 0 visible) → then local runs countertop pair first | large-scale / coordinator (local) |
 | IORS under_large_scale | no instance | push-under: sampler landed (25e94d3/8140025/032d849), program + executor (oracle) pending | large-scale / oracle |
 <!-- /first-demo-board -->
 
