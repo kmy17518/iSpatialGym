@@ -34,7 +34,7 @@ import json
 import logging
 import math
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -123,6 +123,80 @@ def follow_mode(joint_type: str, axis_world) -> str:
     if "prismatic" in kind or "slider" in kind:
         return "base" if not vertical else "arm"
     return "base" if vertical else "arm"
+
+
+ROOM_DOOR_CATEGORIES = ("door",)
+MIN_REACHABLE_OPENING = {"revolute_deg": 50.0, "prismatic_m": 0.10}
+REACH_GRID_STEP = {"revolute_deg": 10.0, "prismatic_m": 0.05}
+
+
+def door_class(category: str, joint_type: str) -> str:
+    """§5.3 (owner decision A4, 2026‑09‑16) articulation class of a scene joint: ``drawer`` = prismatic joint (base
+    mode), ``room_door`` = the revolute leaf of a room ``door`` (hybrid follow), ``cabinet`` = every other revolute door /
+    flap of a furniture piece (cabinets, fridge, dishwasher, oven, microwave, ...: arm-only follow from a stance on
+    the hinge side)."""
+    kind = joint_type.lower()
+    if "prismatic" in kind or "slider" in kind:
+        return "drawer"
+    return "room_door" if category.lower() in ROOM_DOOR_CATEGORIES else "cabinet"
+
+
+def follow_mode_by_class(cls: str, joint_type: str, axis_world) -> str:
+    """``follow_mode`` per class: cabinet → ``arm``; room_door → ``hybrid``; drawer → the geometric rule (``base`` for
+    a horizontal prismatic axis, ``arm`` for a vertical one)."""
+    if cls == "cabinet":
+        return "arm"
+    if cls == "room_door":
+        return "hybrid"
+    return follow_mode(joint_type, axis_world)
+
+
+def axis_is_vertical(axis_world, tol_deg: float = 20.0) -> bool:
+    a = th.as_tensor(axis_world, dtype=th.float32)
+    a = a / th.linalg.norm(a)
+    return abs(float(a[2])) > math.cos(math.radians(tol_deg))
+
+
+def hinge_side(hinge_xy, contact_xy, tangent_left) -> str:
+    """Side of the hinge as seen by the robot facing the face: ``left`` when the hinge lies on the robot's left of the
+    handle contact (along the face frame's left tangent), else ``right``."""
+    h = th.as_tensor(hinge_xy, dtype=th.float32)[:2]
+    c = th.as_tensor(contact_xy, dtype=th.float32)[:2]
+    t = th.as_tensor(tangent_left, dtype=th.float32)[:2]
+    return "left" if float(th.dot(h - c, t)) > 0.0 else "right"
+
+
+def hinge_side_lateral(side: str, lam_max: float = 0.60) -> Tuple[float, float]:
+    """A4: Λ toward the hinge — the base stands between the handle and the hinge (+λ = robot's left)."""
+    return (0.0, float(lam_max)) if side == "left" else (-float(lam_max), 0.0)
+
+
+def arm_for_hinge_side(side: str) -> str:
+    """A4: the base on the hinge side puts the handle on the robot's other side → that arm works the handle."""
+    return "right" if side == "left" else "left"
+
+
+def reach_grid(q_from: float, q_to: float, step: float) -> List[float]:
+    """Ascending grid ``q_from + step, q_from + 2·step, ..., q_to`` (``q_to`` always included; empty when q_to <= q_from)."""
+    if q_to <= q_from + 1e-9 or step <= 0:
+        return []
+    n = int(math.floor((q_to - q_from) / step + 1e-9))
+    out = [q_from + i * step for i in range(1, n + 1)]
+    if not out or out[-1] < q_to - 1e-6:
+        out.append(float(q_to))
+    return [float(v) for v in out]
+
+
+def restrict_goal_set(stable: Sequence[float], q_reach: float, lower: float, min_open: float, tol: float = 1e-6) -> List[float]:
+    """A4: the goal set of a stance = the stable angles the arm reaches from it (``s <= q_reach``); when none does, the
+    reach limit itself is the (single) goal candidate provided it opens the joint by at least ``min_open`` (a 50–70°
+    opening is a valid configuration-matching goal) — its passive stability is probed by the caller."""
+    out = [float(s) for s in stable if s <= q_reach + tol]
+    if out:
+        return out
+    if q_reach - lower >= min_open - tol:
+        return [float(q_reach)]
+    return []
 
 
 def pinch_classes(pinch_axis_world, kind: str, vertical_threshold: float = 0.7) -> Tuple[str, ...]:
@@ -306,6 +380,10 @@ class ArticulationLarge(SamplerV2):
         self.face_manip: Optional[FaceFrame] = None
         self.arm = "right"
         self.mode = "base"
+        self.door_class = "cabinet"
+        self.hinge_side: Optional[str] = None
+        self.lam_range: Optional[Tuple[float, float]] = None
+        self.pinch_sign = 1.0
         self.hull: Optional[th.Tensor] = None
         self.handle_rows: List[HandleRow] = []
 
@@ -445,8 +523,14 @@ class ArticulationLarge(SamplerV2):
         return p.float().clone(), q.float().clone()
 
     def h(self, q_values: Sequence[float]) -> List[C.HandleWaypoint]:
-        """h(q) in the world frame through the conventions (``handle_waypoints``)."""
-        return C.handle_waypoints(self.handle, self.jinfo, list(q_values), obj_pose=self.obj_pose())
+        """h(q) in the world frame through the conventions (``handle_waypoints``). ``pinch_sign`` flips the closing axis
+        (the same parallel-jaw pinch with the wrist turned by a half turn about the approach: one of the two is
+        reachable for one arm where the other is not — the arms are not mirror images); the flipped pinch is recorded
+        in the waypoints, so the oracle rebuilds the same eef frame."""
+        handle = dict(self.handle)
+        if self.pinch_sign < 0:
+            handle["pinch_axis"] = [-float(v) for v in handle["pinch_axis"]]
+        return C.handle_waypoints(handle, self.jinfo, list(q_values), obj_pose=self.obj_pose())
 
     def joint_index(self) -> int:
         return list(self.target.joints).index(self.joint_name)
@@ -541,13 +625,30 @@ class ArticulationLarge(SamplerV2):
         off_left = float(th.dot((contact - Pc)[:2], self.face_view.tangent))
         self.arm = arm_rule(off_left, float(self.gp.gen("arm_side_threshold_m", 0.10)), self.gp.gen("arm", "auto"))
         axis_world = G.rotate(self.obj_pose()[1], th.as_tensor(self.jinfo["axis_dir_obj"], dtype=th.float32))
-        self.mode = follow_mode(self.jinfo["type"], axis_world)
+        # A4 (owner decision 2026‑09‑16): class → follow mode / stance side / arm
+        self.door_class = door_class(obj.category, self.jinfo["type"])
+        self.mode = follow_mode_by_class(self.door_class, self.jinfo["type"], axis_world)
+        lam_cfg = self.gp.gen("lateral_range_m") or {"right": [-0.10, 0.60], "left": [-0.60, 0.10]}
+        self.lam_range = tuple(lam_cfg[self.arm]) if isinstance(lam_cfg, dict) else tuple(lam_cfg)
+        self.hinge_side = None
+        if self.door_class == "cabinet" and axis_is_vertical(axis_world) and self.jinfo.get("hinge_point_obj") is not None:
+            hinge_w = G.local_points_world(th.as_tensor([self.jinfo["hinge_point_obj"]], dtype=th.float32), self.obj_pose())[0]
+            self.hinge_side = hinge_side(hinge_w, contact, self.face_view.tangent)
+            lam_max = max(abs(float(v)) for v in self.lam_range) if self.lam_range else 0.60
+            if self.gp.gen("arm", "auto") not in ("left", "right"):
+                self.arm = arm_for_hinge_side(self.hinge_side)
+            self.lam_range = hinge_side_lateral(self.hinge_side, lam_max)
         self.template_facts.update({"joint": self.joint_name, "joint_type": self.jinfo["type"], "limits": [self.lower, self.upper], "direction": self.direction,
                                     "stable_set": self.stable, "stable_fractions": [(s - self.lower) / max(self.upper - self.lower, 1e-9) for s in self.stable],
                                     "passive_from": dict(self.passive), "face_normal": n.tolist(), "face_centre": Pc.tolist(), "P_manip": P_manip.tolist(),
-                                    "handle_offset_left_m": off_left, "arm": self.arm, "follow_mode": self.mode, "axis_world": axis_world.tolist()})
-        log.info("%s: %s/%s %s: S=%s, arm %s (handle %.2f m left of the face centre), follow_mode %s", self.gp.alias, obj.name, self.joint_name, self.direction,
-                 [round(s, 3) for s in self.stable], self.arm, off_left, self.mode)
+                                    "handle_offset_left_m": off_left, "arm": self.arm, "follow_mode": self.mode, "axis_world": axis_world.tolist(),
+                                    "door_class": self.door_class, "hinge_side": self.hinge_side, "lateral_range_m": list(self.lam_range)})
+        log.info("%s: %s/%s %s: class %s, S=%s, arm %s (handle %.2f m left of the face centre, hinge %s), follow_mode %s, Λ %s", self.gp.alias, obj.name,
+                 self.joint_name, self.direction, self.door_class, [round(s, 3) for s in self.stable], self.arm, off_left, self.hinge_side, self.mode, self.lam_range)
+        if self.mode == "hybrid":
+            # A4: room doors follow with base poses re-chosen per handle waypoint (free floor near the current base, arm
+            # IK feasible, minimum displacement) — not implemented yet (owner: after the pilot if time is short)
+            raise Reject("room_door_hybrid_todo", f"{obj.name}/{self.joint_name}: class room_door needs the hybrid base-follow (§5.3 A4), not implemented")
 
     def stable_set(self) -> List[float]:
         """§5.3 stable set S: 7 fractions of ``open_fraction_range`` + the upper limit, each held 120 steps and kept when
@@ -605,10 +706,13 @@ class ArticulationLarge(SamplerV2):
 
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         obj = self.target
-        q_init, q_goal = self.draw_joint_targets(rng)
-        pf = self.passive.get(f"{q_init:.4f}->{q_goal:.4f}")
+        arm_mode = self.mode == "arm"
+        if arm_mode:  # A4: the goal is drawn per stance from the angles the arm reaches (open); close draws q_init from S
+            q_init = self.lower if self.direction == "open" else float(self.stable[int(rng.integers(len(self.stable)))])
+            q_goal = None
+        else:
+            q_init, q_goal = self.draw_joint_targets(rng)
         fractions = list(self.gp.gen("waypoint_fractions", WAYPOINT_FRACTIONS))
-        required = required_fractions(pf, fractions, self.gp.gen("require_goal_handle", "auto"))
         # the target in its init state for every check of this attempt
         self.pose_joint(q_init)
         gen_p0 = dict(self.gp.gen("prompt0") or {})
@@ -618,12 +722,10 @@ class ArticulationLarge(SamplerV2):
         init.name = "init"
         self.sidecar.add_stance(init)
         # Phase 2: contact set = the h(q_init) grasp of the handle arm
-        wps = self.h([q_init] + [qk for _, qk in waypoint_values(q_init, q_goal, fractions)])
-        h0 = wps[0]
+        h0 = self.h([q_init])[0]
         classes = pinch_classes(h0.pinch, self.handle.get("kind", "bar"), float(self.gp.gen("pinch_axis_vertical_threshold", 0.7)))
         contact = P0.ContactSpec("handle", self.arm, h0.eef, h0.pre_grasp, classes=classes, ignore_for_last=[obj])
-        lam_cfg = self.gp.gen("lateral_range_m") or {"right": [-0.10, 0.60], "left": [-0.60, 0.10]}
-        lam_range = tuple(lam_cfg[self.arm]) if isinstance(lam_cfg, dict) else tuple(lam_cfg)
+        lam_range = tuple(self.lam_range) if self.lam_range else (-0.10, 0.60)
         d_range = (0.35, float(gen_p0.get("d_scan_max_m", 1.10)))
         half = float(self.gp.gen("face_patch_half_width_m", 0.10))
         patch = th.stack([h0.contact - h0.pinch * half, h0.contact, h0.contact + h0.pinch * half])
@@ -632,7 +734,7 @@ class ArticulationLarge(SamplerV2):
             return P0.in_frame(self, cam, patch)
 
         scope = {"scene": self.world.scene_model, "target": obj.name, "joint": self.joint_name, "q_init": round(q_init, 2), "arm": self.arm,
-                 "sampler": "articulation_large"}
+                 "sampler": "articulation_large", "class": self.door_class, "lam": [round(v, 2) for v in lam_range]}
         stats: Dict[str, Any] = {}
         survivors = P0.phase2_manipulation(self, self.face_manip, [contact], lam_range, [self.arm], d_range, extra_vis, focus=h0.contact, cache_scope=scope,
                                            cache_contacts=True, stats=stats)
@@ -646,27 +748,129 @@ class ArticulationLarge(SamplerV2):
             if manip is None:
                 errors.append("drawn tilt fails the re-check")
                 continue
-            try:
-                d = self._solve_from(manip, init, q_init, q_goal, wps, required, contact, h0)
-            except Reject as e:
-                errors.append(f"{e.reason}: {e}")
-                self.sidecar.stances.pop("manipulation", None)
-                self.sidecar.transitions.clear()
-                self.sidecar.paths.clear()
-                self.sidecar.articulation = None
-                continue
-            d.summary.update({"direction": self.direction, "joint": self.joint_name, "q_init": q_init, "q_goal": q_goal, "required_fractions": required,
-                              "passive_from": pf, "arm": self.arm, "follow_mode": self.mode, "phase2": stats, "init_stance": P0.summarize_stance(init),
-                              "manipulation_stance": P0.summarize_stance(manip)})
-            return d
+            # both closing signs of the pinch (the wrist turned by a half turn about the approach): the reach-volume class is
+            # the same, the exact IK is not — one of the two is usually reachable where the other is not
+            for sign in (1.0, -1.0):
+                self.pinch_sign = sign
+                h0s = self.h([q_init])[0]
+                contact_s = P0.ContactSpec("handle", self.arm, h0s.eef, h0s.pre_grasp, classes=classes, ignore_for_last=[obj])
+                try:
+                    goal_set = None
+                    reach_info: Dict[str, Any] = {}
+                    if arm_mode:
+                        q_goal, goal_set, reach_info = self.goal_for_stance(manip, init, q_init, contact_s, rng)
+                    wps = self.h([q_init] + [qk for _, qk in waypoint_values(q_init, q_goal, fractions)])
+                    pf = self.passive_for(q_init, q_goal)
+                    required = required_fractions(pf, fractions, self.gp.gen("require_goal_handle", "auto"))
+                    d = self._solve_from(manip, init, q_init, q_goal, wps, required, contact_s, h0s, goal_set=goal_set, reach_info=reach_info)
+                except Reject as e:
+                    errors.append(f"pinch {sign:+.0f}: {e.reason}: {e}")
+                    self.sidecar.stances.pop("manipulation", None)
+                    self.sidecar.transitions.clear()
+                    self.sidecar.paths.clear()
+                    self.sidecar.articulation = None
+                    continue
+                d.summary.update({"direction": self.direction, "joint": self.joint_name, "q_init": q_init, "q_goal": q_goal, "required_fractions": required,
+                                  "passive_from": pf, "arm": self.arm, "follow_mode": self.mode, "door_class": self.door_class, "hinge_side": self.hinge_side,
+                                  "pinch_sign": sign, "phase2": stats, "init_stance": P0.summarize_stance(init), "manipulation_stance": P0.summarize_stance(manip),
+                                  **reach_info})
+                return d
+        self.pinch_sign = 1.0
         raise Reject("handle_unreachable", f"{len(survivors)} Phase-2 survivors, none passes step 5 / base-follow / step 6: " + "; ".join(errors[-4:]))
 
+    def passive_for(self, q_init: float, q_goal: float) -> Optional[float]:
+        """The passive-continuation waypoint of a (q_init, q_goal) pair: the template's table, probed on demand for a
+        goal outside S (the A4 reach limit) and remembered."""
+        key = f"{q_init:.4f}->{q_goal:.4f}"
+        if key not in self.passive:
+            mode = self.gp.gen("require_goal_handle", "auto")
+            self.passive[key] = self.passive_from(q_init, q_goal) if mode == "auto" else None
+            self.template_facts["passive_from"] = dict(self.passive)
+        return self.passive[key]
+
+    # ------------------------------------------------------------------ A4: arm-only reach along h(q)
+
+    def _stance_key(self, manip: Stance) -> str:
+        return f"d{manip.stand_off:.2f}_l{manip.lateral:+.2f}_t{manip.translate:.2f}_{manip.tilt:+.2f}_p{self.pinch_sign:+.0f}"
+
+    def arm_reach_limit(self, manip: Stance, q_from: float, q_seed: Optional[th.Tensor]) -> float:
+        """The largest joint value on the grid ``q_from → upper`` (10° / 5 cm steps, upper included) whose handle grasp
+        pose the arm reaches from ``manip`` with the world re-synced at that value (target ignored for the grasp pose);
+        the sweep stops at the first miss, so every value up to the limit is reachable."""
+        obj = self.target
+        step_cfg = dict(self.gp.gen("reach_grid_step") or REACH_GRID_STEP)
+        step = math.radians(float(step_cfg.get("revolute_deg", 10.0))) if self.joint.is_revolute else float(step_cfg.get("prismatic_m", 0.05))
+        q_now = self.joint_value()
+        reach, seed = float(q_from), q_seed
+        try:
+            for q in reach_grid(q_from, self.upper, step):
+                self.pose_joint(q)
+                w = self.h([q])[0]
+                res = self.ikc.exact([w.eef], manip, self.arm, ignore_for_last=[obj], q_seed=seed, cache=False)
+                if not res.ok:
+                    break
+                reach = q
+                if res.q is not None:
+                    seed = res.q
+        finally:
+            self.pose_joint(q_now)
+        return reach
+
+    def holds_passively(self, q: float) -> bool:
+        """A single stable-set probe (§5.3): ``q`` held ``stable_hold_steps`` steps stays within ½ probe tolerance."""
+        if any(abs(q - s) <= 1e-6 for s in self.stable):
+            return True
+        steps = int(self.gp.gen("stable_hold_steps", 120))
+        drift_frac = float(self.gp.gen("stable_drift_tolerance_fraction", 0.5))
+        state = self.world.snapshot()
+        try:
+            self.set_joint(q)
+            self.world.step_physics(steps, still=[self.robot])
+            ok = abs(self.joint_value() - q) <= drift_frac * self.probe_tol
+        finally:
+            self.world.restore(state)
+            self.target.keep_still()
+            self.kit.sync_world()
+        return ok
+
+    def goal_for_stance(self, manip: Stance, init: Stance, q_init: float, contact: P0.ContactSpec, rng: np.random.Generator) -> Tuple[float, List[float], Dict[str, Any]]:
+        """A4 arm mode: the goal set of a drawn stance = S ∩ [lower, q_reach] (q_reach = ``arm_reach_limit`` from the
+        closed joint), else {q_reach} when it opens ≥ ``min_reachable_opening`` and holds passively; ``reachable_fraction``
+        is recorded per stance in the template meta. Open: q_goal drawn from that set; close: q_init must lie in it
+        (the whole closing sweep is reachable) and the goal is the lower limit."""
+        obj = self.target
+        sol = P0.exact_contacts(self, manip, [contact], ignore_combined=[obj])
+        if not sol.ok:
+            raise Reject("handle_unreachable", sol.reason)
+        q_reach = self.arm_reach_limit(manip, self.lower, sol.q)
+        span = max(self.upper - self.lower, 1e-9)
+        frac = (q_reach - self.lower) / span
+        key = self._stance_key(manip)
+        rf = self.template_meta.setdefault("reachable_fraction", {})
+        rf[key] = round(frac, 4)
+        self.template_meta["reachable_fraction_max"] = max(float(v) for v in rf.values())
+        min_cfg = dict(self.gp.gen("min_reachable_opening") or MIN_REACHABLE_OPENING)
+        min_open = math.radians(float(min_cfg.get("revolute_deg", 50.0))) if self.joint.is_revolute else float(min_cfg.get("prismatic_m", 0.10))
+        goal_set = restrict_goal_set(self.stable, q_reach, self.lower, min_open)
+        if goal_set and goal_set[0] not in self.stable and not self.holds_passively(goal_set[0]):
+            goal_set = []
+        info = {"reachable_fraction": frac, "q_reach": q_reach, "goal_set": list(goal_set)}
+        log.info("%s: stance %s reaches %s up to %.3f (fraction %.2f); goal set %s", self.gp.alias, key, self.joint_name, q_reach, frac, [round(s, 3) for s in goal_set])
+        if not goal_set:
+            raise Reject("handle_unreachable", f"the arm reaches {self.joint_name} only up to {q_reach:.3f} (fraction {frac:.2f}) from stance {key}: no goal opens ≥ {min_open:.2f}")
+        if self.direction == "open":
+            return float(goal_set[int(rng.integers(len(goal_set)))]), goal_set, info
+        if q_init > q_reach + 1e-6:
+            raise Reject("handle_unreachable", f"closing from {q_init:.3f} needs the arm to reach up to it; the limit from stance {key} is {q_reach:.3f}")
+        return float(self.lower), goal_set, info
+
     def _solve_from(self, manip: Stance, init: Stance, q_init: float, q_goal: float, wps: List[C.HandleWaypoint], required: List[float],
-                    contact: P0.ContactSpec, h0: C.HandleWaypoint) -> Draft:
+                    contact: P0.ContactSpec, h0: C.HandleWaypoint, goal_set: Optional[List[float]] = None, reach_info: Optional[Dict[str, Any]] = None) -> Draft:
         """Steps 5–6 of §5.2 for one drawn manipulation stance plus the §5.3 base-follow feasibility; fills the sidecar
         (``manipulation`` stance, transition, path, ``articulation``) and returns the draft."""
         obj, tname = self.target, self.tname
         manip.arms = [self.arm]
+        reach_info = dict(reach_info or {})
         # step 5a: [pre-grasp, grasp] at q_init (target ignored for the grasp pose only)
         sol = P0.exact_contacts(self, manip, [contact], ignore_combined=[obj])
         if not sol.ok:
@@ -721,9 +925,13 @@ class ArticulationLarge(SamplerV2):
         self.sidecar.articulation = {"object": tname, "joint": self.joint_name, "joint_type": "prismatic" if "rismatic" in self.jinfo["type"] else "revolute",
                                      "q_init": float(q_init), "q_goal": float(q_goal), "waypoints": waypoints, "handle_reach": handle_reach,
                                      "passive_from": pf, "follow_mode": mode, "base_follow": base_follow,
-                                     "handle": {"kind": self.handle.get("kind"), "classes": list(contact.classes or ()), "width_m": self.handle.get("width")},
+                                     "handle": {"kind": self.handle.get("kind"), "classes": list(contact.classes or ()), "width_m": self.handle.get("width"),
+                                                "pinch_sign": float(self.pinch_sign)},
                                      "required_fractions": [fraction_key(k) for k in required], "arm_reach": arm_reach,
-                                     "primary_follow_mode": self.mode, "base_follow_blocked": base_follow_reason}
+                                     "primary_follow_mode": self.mode, "base_follow_blocked": base_follow_reason,
+                                     # A4: the class and the stance-side rule behind the follow mode; the goal set of this stance
+                                     "door_class": self.door_class, "hinge_side": self.hinge_side, "goal_set": [float(s) for s in (goal_set or self.stable)],
+                                     "reachable_fraction": reach_info.get("reachable_fraction"), "q_reach": reach_info.get("q_reach")}
         self.sidecar.describe(tname, obj.category.replace("_", " "))
         # draft: joints only (nothing spawned), robot at the init stance, the moving link held while settling
         d = Draft()

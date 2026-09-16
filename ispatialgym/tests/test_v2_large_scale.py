@@ -184,6 +184,43 @@ def test_arm_rule_and_follow_mode_and_classes():
     assert AL.joint_tolerance("PrismaticJoint", 0.36, {"revolute": 0.05, "prismatic": 0.01, "joint_fraction": 0.10}) == pytest.approx(0.036)
 
 
+def test_a4_door_class_follow_mode_and_hinge_side():
+    # A4 (owner decision 2026-09-16): class by category / joint type, follow mode by class
+    assert AL.door_class("bottom_cabinet", "RevoluteJoint") == "cabinet"
+    assert AL.door_class("fridge", "RevoluteJoint") == "cabinet" and AL.door_class("dishwasher", "RevoluteJoint") == "cabinet"
+    assert AL.door_class("door", "RevoluteJoint") == "room_door"
+    assert AL.door_class("bottom_cabinet", "PrismaticJoint") == "drawer" and AL.door_class("door", "PrismaticJoint") == "drawer"  # sliding door = prismatic
+    assert AL.follow_mode_by_class("cabinet", "RevoluteJoint", [0, 0, 1]) == "arm"
+    assert AL.follow_mode_by_class("room_door", "RevoluteJoint", [0, 0, 1]) == "hybrid"
+    assert AL.follow_mode_by_class("drawer", "PrismaticJoint", [1, 0, 0]) == "base"
+    assert AL.follow_mode_by_class("drawer", "PrismaticJoint", [0, 0, 1]) == "arm"
+    assert AL.axis_is_vertical([0, 0, 1]) and AL.axis_is_vertical([0.1, 0, 0.99]) and not AL.axis_is_vertical([0, 1, 0])
+    # the hinge side is read along the face frame's left tangent: hinge on the robot's left -> base to the left (Λ ⊂ [0, 0.6]) -> right arm
+    tangent_left = th.tensor([0.0, 1.0])  # the robot faces +x, its left is +y
+    assert AL.hinge_side([1.0, 0.5], [1.0, 0.0], tangent_left) == "left"
+    assert AL.hinge_side([1.0, -0.5], [1.0, 0.0], tangent_left) == "right"
+    assert AL.hinge_side_lateral("left") == (0.0, 0.60) and AL.hinge_side_lateral("right", 0.5) == (-0.5, 0.0)
+    assert AL.arm_for_hinge_side("left") == "right" and AL.arm_for_hinge_side("right") == "left"
+
+
+def test_a4_reach_grid_and_goal_set_restriction():
+    step = math.radians(10.0)
+    grid = AL.reach_grid(0.0, math.radians(95.0), step)
+    assert grid[0] == pytest.approx(step) and grid[-1] == pytest.approx(math.radians(95.0)) and len(grid) == 10
+    assert all(b > a for a, b in zip(grid, grid[1:]))
+    assert AL.reach_grid(0.5, 0.5, step) == [] and AL.reach_grid(0.0, 0.05, 0.05) == [pytest.approx(0.05)]
+    stable = [0.96, 1.20, 1.44, 1.68, 1.92]
+    min_open = math.radians(50.0)
+    # the arm reaches up to 1.3 rad: the stable angles below it form the goal set
+    assert AL.restrict_goal_set(stable, 1.30, 0.0, min_open) == [0.96, 1.20]
+    # nothing stable within reach but a 52 deg opening (below the first stable angle 0.96 rad = 55 deg): the reach limit itself
+    assert AL.restrict_goal_set(stable, math.radians(52.0), 0.0, min_open) == [pytest.approx(math.radians(52.0))]
+    # below the minimum opening: no goal
+    assert AL.restrict_goal_set(stable, math.radians(40.0), 0.0, min_open) == []
+    # a reach limit equal to a stable angle keeps it (tolerance)
+    assert AL.restrict_goal_set(stable, 0.96 - 1e-9, 0.0, min_open) == [0.96]
+
+
 def test_base_follow_composition():
     """b_k = h(q_k) ∘ T_eef→base(q*): with the arm locked, the base follows the handle exactly for a vertical door."""
     obj_pose = (th.tensor([0.0, 0.0, 1.0]), C.IDENTITY_QUAT.clone())
@@ -359,6 +396,22 @@ def test_init_surface_class_enumeration():
     assert IL.alias_support_token(f"{st}-toy_figure-bed-desk", st) == "desk"
     assert IL.alias_support_token("under", st) is None
     assert set(IL.INIT_SURFACE_CLASSES) == {"support", "partner", "floor"}
+    # A5 (owner decision 2026-09-16): the class is fixed by the alias — D1's floor aliases bind the support to a room dict,
+    # the own-top fallback repeats the partner token (``…-<partner>-<partner>``); the selection order is alias-level
+    assert IL.init_surface_class("under", {"room": "childs_room_0"}, ["desk_xhjsub_0"], alias_support_token="floor") == "floor"
+    assert IL.init_surface_class("ontop", {"room": "childs_room_0"}, ["desk_xhjsub_0"]) == "floor"
+    assert IL.alias_partner_token(f"{st}-sandal-bed-bed", st) == "bed" and IL.alias_support_token(f"{st}-sandal-bed-bed", st) == "bed"
+    assert IL.init_surface_class("under", None, ["bed_rrcvaq_0"], alias_support_token="bed", alias_partner_token="bed") == "partner"
+    assert IL.init_surface_class("under", ["bed_rrcvaq_0"], ["bed_rrcvaq_0"], alias_support_token="bed", alias_partner_token="bed") == "partner"
+    with pytest.raises(ValueError):
+        IL.init_surface_class("ontop", None, ["desk_xhjsub_0"], alias_support_token="desk", alias_partner_token="desk")
+    assert IL.SELECTION_ORDER == {"under": ("support", "partner", "floor"), "ontop": ("support", "floor")}
+    assert IL.alias_tokens(f"{st}-sandal-bed-desk", st) == ["sandal", "bed", "desk"] and IL.alias_tokens(st, st) == []
+
+
+def test_a8_deviation_cap_constant():
+    # A8: |δ| ≤ 25° until the two-stroke push exists (the module caps a wider customs range at MAX_DEVIATION_DEG)
+    assert AW.MAX_DEVIATION_DEG == 25.0
 
 
 def test_aabb_edges_and_nearest_and_erosion():

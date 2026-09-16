@@ -78,15 +78,24 @@ YAWS = [k * math.pi / 4 for k in range(8)]
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def init_surface_class(relation: str, support_binding: Any, partner_names: Sequence[str], alias_support_token: Optional[str] = None) -> str:
-    """§5.6 init-surface class from the grounding: ``"floor"`` (the binding / alias token says floor), ``"partner"``
-    (the support binding names the partner; under only) or ``"support"`` (a support object). ``ValueError`` for the
-    ontop + partner combination (the goal would hold at init)."""
+#: §5.6 / owner decision A5 (2026‑09‑16): the alias-level selection order of the init surface, applied by ``ground_isg``
+#: through fallback aliases (primary → fallback when the primary yields nothing); a module never switches class at run time
+SELECTION_ORDER = {"under": ("support", "partner", "floor"), "ontop": ("support", "floor")}
+
+
+def init_surface_class(relation: str, support_binding: Any, partner_names: Sequence[str], alias_support_token: Optional[str] = None,
+                       alias_partner_token: Optional[str] = None) -> str:
+    """§5.6 init-surface class fixed by the alias (A5: no runtime switching): ``"floor"`` (the binding / alias token
+    says floor, or the binding is a room dict), ``"partner"`` (the support binding names the partner, or the alias
+    repeats the partner token ``…-<partner>-<partner>``; under only) or ``"support"`` (a support object). ``ValueError``
+    for the ontop + partner combination (the goal would hold at init)."""
     names = [n for n in support_binding if isinstance(n, str)] if isinstance(support_binding, list) else []
     token = (alias_support_token or "").lower()
-    if names == ["floor"] or token == "floor" or (isinstance(support_binding, dict) and support_binding.get("floor")):
+    ptoken = (alias_partner_token or "").lower()
+    if names == ["floor"] or token in ("floor", "floors") or (isinstance(support_binding, dict) and (support_binding.get("floor") or support_binding.get("room"))):
         return "floor"
-    if names and all(n in set(partner_names) for n in names):
+    own_top = (names and all(n in set(partner_names) for n in names)) or (not names and token and ptoken and token == ptoken)
+    if own_top:
         if relation == "ontop":
             raise ValueError("ontop with the partner's own top as the init surface: the goal would hold at init")
         return "partner"
@@ -95,11 +104,22 @@ def init_surface_class(relation: str, support_binding: Any, partner_names: Seque
     return "support"
 
 
+def alias_tokens(alias: str, subtask: str) -> List[str]:
+    """The ``{target}-{partner}-{support}`` tokens of ``<subtask>-{target}-{partner}-{support}`` ([] without tokens)."""
+    rest = alias[len(subtask):].strip("-") if alias.startswith(subtask) else ""
+    return [p for p in rest.split("-") if p]
+
+
 def alias_support_token(alias: str, subtask: str) -> Optional[str]:
     """The ``{support}`` token of ``<subtask>-{target}-{partner}-{support}`` (None when the alias has no tokens)."""
-    rest = alias[len(subtask):].strip("-") if alias.startswith(subtask) else ""
-    parts = [p for p in rest.split("-") if p]
+    parts = alias_tokens(alias, subtask)
     return parts[-1] if len(parts) >= 3 else None
+
+
+def alias_partner_token(alias: str, subtask: str) -> Optional[str]:
+    """The ``{partner}`` token (None when the alias has fewer than three tokens)."""
+    parts = alias_tokens(alias, subtask)
+    return parts[-2] if len(parts) >= 3 else None
 
 
 def nearest_edge(edges: Sequence[EdgeFrame], xy) -> EdgeFrame:
@@ -249,7 +269,12 @@ class IORSLarge(SamplerV2):
     def surface_candidates(self) -> Tuple[str, List[Any]]:
         b = self.choice.bindings
         req = b.get("support")
-        kind = init_surface_class(self.relation, req, [self.partner.name], alias_support_token(self.gp.alias, self.subtask))
+        try:
+            kind = init_surface_class(self.relation, req, [self.partner.name], alias_support_token(self.gp.alias, self.subtask),
+                                      alias_partner_token(self.gp.alias, self.subtask))
+        except ValueError as e:
+            raise Reject("spec", str(e))
+        self.template_facts["init_surface_selection_order"] = list(SELECTION_ORDER.get(self.relation, ()))
         if kind == "floor":
             return kind, [self.obj("floor")]
         if kind == "partner":
@@ -554,14 +579,17 @@ class IORSLarge(SamplerV2):
         half, height = self.target_dims()
         margins = {"w_t": half, "w_p": 0.0, "W_p": 0.0, "D_p_max": 0.0, "safety": 0.02, "relation": self.relation, "g_NT": None, "H_max": height}
         n_min = int(self.num("partner_corners_in_frame_min", 4))
+        # A5 "partner's own top": the partner is the support under the target, so the partner-visibility redraw does not
+        # apply (the target cell in frame is on the partner); stances A / B come from the tabletop phases unchanged
+        own_top = support is self.partner
         errors: List[str] = []
         for edge, init in TT.edge_candidates(self, top, rng):
             try:
                 init = TT.phase1b_init_trunk(self, init, height, top=top)
                 chosen = None
-                for _ in range(6):  # §5.6: redraw the lateral position (≤ 6) until the partner is visible
+                for _ in range(1 if own_top else 6):  # §5.6: redraw the lateral position (≤ 6) until the partner is visible
                     st = TT.phase1c_lateral(self, init, margins, rng, top=top)
-                    if self.partner_visible(st, n_min):
+                    if own_top or self.partner_visible(st, n_min):
                         chosen = st
                         break
             except Reject as e:

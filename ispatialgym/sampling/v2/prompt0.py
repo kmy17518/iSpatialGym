@@ -325,15 +325,21 @@ def base_ok(s, xy) -> bool:
     return bool(s.kit.trav_free(xy)) and in_task_rooms(s, xy)
 
 
-def body_free(s, stances: Sequence[Stance], arms_excluded: bool = False, margin: float = COLLISION_MARGIN, chunk: int = 256) -> th.Tensor:
+def body_free(s, stances: Sequence[Stance], arms_excluded: bool = False, margin: float = COLLISION_MARGIN, chunk: int = 256,
+              posture: Optional[str] = None, fingers: Optional[float] = None) -> th.Tensor:
     """Whole-body collision check of many stances (1 cm). ``arms_excluded`` → the documented stand-in (arms hanging,
-    self-collision off): base + torso + head against the scene."""
+    self-collision off): base + torso + head against the scene. ``posture`` (A6, §3.6) → the honest check of a named
+    recorded arm posture (``untucked`` / ``tucked`` / ``ready``, self-collision on, ``fingers`` opening): the posture the
+    stance will record in ``q`` and drive in with; it overrides ``arms_excluded``."""
     if not stances:
         return th.zeros(0, dtype=th.bool)
     out = []
     for i in range(0, len(stances), chunk):
         part = stances[i:i + chunk]
-        if arms_excluded:
+        if posture is not None:
+            qs = th.stack([s.ikc.q_locked(st, arms=posture, fingers=fingers) for st in part])
+            out.append(s.kit.collision_free(qs, margin=margin))
+        elif arms_excluded:
             qs = th.stack([s.ikc.q_locked(st, arms="tucked") for st in part])
             s.kit._ensure_synced()
             out.append(~s.kit.backend.check_collision(qs, emb_name="whole_body", sync_world=False, self_collision=False, margin=margin))
@@ -486,15 +492,17 @@ def phase2_lattice(face: FaceFrame, d_range: Tuple[float, float], lam_range: Tup
 
 
 def phase2_step1(s, face: FaceFrame, d_range: Tuple[float, float], lam_range: Tuple[float, float], arms_excluded: bool,
-                 cache_scope: Optional[Dict[str, Any]] = None, translates: Sequence[float] = TRANSLATES, tilts: Sequence[float] = TILTS) -> List[Stance]:
+                 cache_scope: Optional[Dict[str, Any]] = None, translates: Sequence[float] = TRANSLATES, tilts: Sequence[float] = TILTS,
+                 posture: Optional[str] = None, fingers: Optional[float] = None) -> List[Stance]:
     """§5.2 Phase 2 step 1 over the lattice: base on free floor and in room, whole-body collision-free (1 cm) against the
     scene with the target in its init state (the caller synced the world). Cached per ``cache_scope`` (scene, target,
-    init state, lattice, arm rule) — the survivors do not depend on any per-instance draw."""
+    init state, lattice, arm rule) — the survivors do not depend on any per-instance draw. ``posture`` (A6): the named
+    arm posture the stance records and drives in with (self-collision on) instead of the arms-excluded stand-in."""
     key = None
     if cache_scope is not None:
         key = cache_key("prompt0_step1", {**cache_scope, "face": face.to_json(), "d_range": list(d_range), "lam_range": list(lam_range),
                                           "translates": list(translates), "tilts": list(tilts), "arms_excluded": arms_excluded,
-                                          "lattice": [D_STEP, LAMBDA_STEP], "margin": COLLISION_MARGIN})
+                                          "lattice": [D_STEP, LAMBDA_STEP], "margin": COLLISION_MARGIN, "posture": posture, "fingers": fingers})
         hit = cache_get(key)
         if hit is not None:
             out = []
@@ -513,10 +521,10 @@ def phase2_step1(s, face: FaceFrame, d_range: Tuple[float, float], lam_range: Tu
             base_free[k] = base_ok(s, st.base_xy)
         if base_free[k]:
             keep.append(st)
-    free = body_free(s, keep, arms_excluded=arms_excluded)
+    free = body_free(s, keep, arms_excluded=arms_excluded, posture=posture, fingers=fingers)
     out = [st for st, f in zip(keep, free.tolist()) if f]
     log.info("Phase 2 step 1: %d lattice candidates, %d on free floor, %d collision-free (arms %s)", len(cands), len(keep), len(out),
-             "excluded" if arms_excluded else "untucked")
+             posture or ("excluded" if arms_excluded else "untucked"))
     if not out and keep:
         flat = [st for st in keep if abs(st.tilt) < 1e-9 and abs(st.translate - 0.5) < 1e-9]
         debug_collisions(s, [flat[i] for i in range(0, len(flat), max(1, len(flat) // 6))][:6], arms_excluded)
@@ -563,12 +571,13 @@ def phase2_screen(s, cands: Sequence[Stance], contact_set: Sequence[ContactSpec]
 def phase2_manipulation(s, face: FaceFrame, contact_set: Sequence[ContactSpec], lam_range: Tuple[float, float], arms: Sequence[str],
                         d_range: Tuple[float, float] = D_RANGE_DEFAULT, extra_visibility: Optional[Callable[[Pose], bool]] = None,
                         focus=None, cache_scope: Optional[Dict[str, Any]] = None, cache_contacts: bool = False,
-                        translates: Sequence[float] = TRANSLATES, tilts: Sequence[float] = TILTS, stats: Optional[Dict[str, int]] = None) -> List[Stance]:
+                        translates: Sequence[float] = TRANSLATES, tilts: Sequence[float] = TILTS, stats: Optional[Dict[str, int]] = None,
+                        posture: Optional[str] = None, fingers: Optional[float] = None) -> List[Stance]:
     """§5.2 Phase 2 steps 1–3: the survivors of the best angle class (each a grid-trunk stance with its tilt band and
-    focus). ``arms`` = the working arms of the task (two arms → arms excluded from the stance collision check);
-    ``focus`` defaults to the first contact's pad point. ``cache_scope`` caches step 1; with ``cache_contacts`` the
-    steps 1–3 survivors are cached under the contact set too (articulation: the contact set is fixed per (target,
-    joint, q_init); alignment: per-instance δ → not cached)."""
+    focus). ``arms`` = the working arms of the task (two arms → arms excluded from the stance collision check unless
+    ``posture`` names the recorded arm posture of the stance, A6); ``focus`` defaults to the first contact's pad point.
+    ``cache_scope`` caches step 1; with ``cache_contacts`` the steps 1–3 survivors are cached under the contact set too
+    (articulation: the contact set is fixed per (target, joint, q_init); alignment: per-instance δ → not cached)."""
     arms_excluded = len(set(arms)) > 1
     foc = _t(focus) if focus is not None else C.pad_center(contact_set[0].pose)
     key = None
@@ -576,7 +585,7 @@ def phase2_manipulation(s, face: FaceFrame, contact_set: Sequence[ContactSpec], 
         key = cache_key("prompt0_step123", {**cache_scope, "face": face.to_json(), "d_range": list(d_range), "lam_range": list(lam_range),
                                             "translates": list(translates), "tilts": list(tilts), "arms": sorted(set(arms)),
                                             "contacts": contact_set_key(contact_set), "focus": foc, "margin": IN_FRAME_MARGIN,
-                                            "classes": [AXIS_TIGHT_DEG, AXIS_LOOSE_DEG]})
+                                            "classes": [AXIS_TIGHT_DEG, AXIS_LOOSE_DEG], "posture": posture, "fingers": fingers})
         hit = cache_get(key)
         if hit is not None:
             out = []
@@ -587,7 +596,7 @@ def phase2_manipulation(s, face: FaceFrame, contact_set: Sequence[ContactSpec], 
                 out.append(st)
             log.info("Phase 2 steps 1–3: %d survivors from the cache", len(out))
             return out
-    step1 = phase2_step1(s, face, d_range, lam_range, arms_excluded, cache_scope, translates, tilts)
+    step1 = phase2_step1(s, face, d_range, lam_range, arms_excluded, cache_scope, translates, tilts, posture=posture, fingers=fingers)
     st_ = stats if stats is not None else {}
     st_["step1"] = len(step1)
     out = phase2_screen(s, step1, contact_set, foc, extra_visibility, stats=st_)
@@ -601,12 +610,14 @@ def phase2_manipulation(s, face: FaceFrame, contact_set: Sequence[ContactSpec], 
 
 def draw_manipulation(s, survivors: Sequence[Stance], rng: np.random.Generator, arms: Sequence[str], focus=None,
                       extra_visibility: Optional[Callable[[Pose], bool]] = None, arms_excluded: Optional[bool] = None,
-                      in_frame_margin: float = IN_FRAME_MARGIN, name: str = "manipulation", tilt_draws: int = 3) -> Tuple[int, Optional[Stance]]:
+                      in_frame_margin: float = IN_FRAME_MARGIN, name: str = "manipulation", tilt_draws: int = 3,
+                      posture: Optional[str] = None, fingers: Optional[float] = None) -> Tuple[int, Optional[Stance]]:
     """§5.2 step 4: one survivor drawn uniformly (its index is returned so the caller can drop it) with the tilt drawn
     continuously inside its band; the drawn stance is re-checked (collision, focus in frame, extra visibility, optical
     axis within its class). The tilt is redrawn up to ``tilt_draws`` times inside the band (the grid tilt itself, which
     passed steps 1–3, is the last draw); when every draw fails the re-check ``(index, None)`` is returned and the
-    caller takes the next survivor."""
+    caller takes the next survivor. ``posture`` (A6): the stance is checked in that named arm posture and records it
+    (``q`` = the configuration the checks locked, ``fingers`` its gripper opening, ``extras["arm_posture"]``)."""
     if not survivors:
         return -1, None
     i = int(rng.integers(len(survivors)))
@@ -620,8 +631,12 @@ def draw_manipulation(s, survivors: Sequence[Stance], rng: np.random.Generator, 
         st.arms = list(arms)
         st.extras = {k: v for k, v in grid.extras.items() if k in ("band", "angle_class")}
         st.extras["grid_tilt"] = grid.tilt
-        if not bool(body_free(s, [st], arms_excluded=excl)[0]):
+        if not bool(body_free(s, [st], arms_excluded=excl, posture=posture, fingers=fingers)[0]):
             continue
+        if posture is not None:
+            st.fingers = fingers
+            st.q = s.ikc.q_locked(st, arms=posture, fingers=fingers)
+            st.extras["arm_posture"] = posture
         cam = camera_poses(s, [st])[0]
         if st.focus is not None:
             if not in_frame(s, cam, st.focus.reshape(1, 3), in_frame_margin):
@@ -696,24 +711,73 @@ def exact_contacts(s, stance: Stance, contact_set: Sequence[ContactSpec], order:
 
 def connect(s, init: Stance, manip: Stance, path_max_m: float = PATH_MAX_M, carried: Optional[str] = None, arm: str = "right",
             blocked: Sequence[Any] = ()) -> Tuple[PathRecord, Transition]:
-    """§5.2 step 6: the base path init → manipulation (§3.7, ≤ ``path_max_m``) and the transition (§3.8), both recorded
-    in the sidecar; ``Reject`` (``no_path`` / ``path_collision`` / ``path_too_long`` / ``no_transition``) otherwise.
+    """§5.2 step 6 in the §3.8 order: the base path init → manipulation (§3.7, ≤ ``path_max_m``) and the transition,
+    both recorded in the sidecar; ``Reject`` (``no_path`` / ``path_collision`` / ``path_too_long`` / ``no_transition``)
+    otherwise.
 
-    The path is driven **before** the trunk change (§3.8: drive-back → trunk → drive-in at the arriving stance), so its
-    whole-body checks run at the *departing* stance's trunk (the navigation posture "trunk as recorded" of §3.7); the
-    core's ``record_path`` default (the arriving trunk) would check a leaning manipulation trunk at the init position."""
+    The transition stand-off s_T is chosen first, smallest candidate first (§3.8 ``{s, s+0.1, …, s+0.5}``): at s_T the
+    trunk sweep **and the drive-in s_T → s** are checked with the *arriving* stance's arms (its recorded configuration —
+    the A6 posture of a two-arm stance, the idle posture of a one-arm stance — via ``ik.stance_arm_vectors``) and the
+    arriving trunk. The path is then planned from ``init`` to the **drive-back pose at s_T** and checked at the
+    *departing* stance's trunk and arms (the robot drives before the trunk / arm change). The recorded path therefore
+    ends at the drive-back pose (``Path.to`` stays the manipulation stance: the oracle's Transition drive-back is a
+    no-op there); driving the untucked arms all the way to a stance 0.5 m from a wall would otherwise put the hands
+    into the wall, which is what blocked every two-arm wall stance in the pilot."""
     from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.v2 import ik as IK
     from ispatialgym.sampling.v2 import navigation as NAV
 
-    carried_obj = s.objects.get(carried) if carried else None
-    try:
-        path = NAV.plan_path(s.kit, init, manip, carried=carried, carried_obj=carried_obj, carried_arm=arm, rooms=s.gp.rooms(s.scene) or s.world.rooms,
-                             blocked=blocked, max_length_m=path_max_m, trunk=(init.translate, init.tilt))
-    except NAV.NavigationError as e:
-        raise Reject(e.reason, str(e))
-    s.sidecar.add_path(path)
-    tr = s.record_transition(init, manip, carried=carried, arm=arm)
-    return path, tr
+    carried_obj, arm, eef_in_object = s.carried_attachment(carried or manip.carried or init.carried, arm)
+    tf, tt = (init.translate, init.tilt), (manip.translate, manip.tilt)
+    s_val = float(manip.stand_off if manip.stand_off is not None else 0.0)
+    inward = manip.inward
+    x0, y0, yaw = (float(v) for v in manip.base_pose2d)
+    right_arm, left_arm, fingers = IK.stance_arm_vectors(s.kit, manip)
+    arm_q_to = {"right": right_arm, "left": left_arm}
+    sweep = NAV.trunk_sweep(tf, tt, NAV.TRANSITION_SAMPLES)
+    same_trunk = abs(tf[0] - tt[0]) < 1e-6 and abs(tf[1] - tt[1]) < 1e-6
+    rooms = s.gp.rooms(s.scene) or s.world.rooms
+    why: List[str] = []
+    path_err: Optional[NAV.NavigationError] = None
+    for s_T in NAV.transition_standoffs(s_val):
+        back = s_T - s_val
+        bx, by = x0 - float(inward[0]) * back, y0 - float(inward[1]) * back
+        if back > 0 and not s.kit.trav_free((bx, by)):
+            why.append(f"s_T {s_T:.2f}: drive-back pose off the free floor")
+            continue
+        with NAV.attached(s.kit, arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
+            if not same_trunk:  # (a) the trunk sweep at s_T with the arriving arms
+                qs = th.stack([s.kit.q_at_base_pose(s.kit.q_config(arms="untucked", translate=tr, tilt=ti, right_arm=right_arm, left_arm=left_arm, fingers=fingers),
+                                                    bx, by, yaw) for tr, ti in sweep])
+                if not bool(s.kit.collision_free(qs, margin=COLLISION_MARGIN).all()):
+                    why.append(f"s_T {s_T:.2f}: trunk sweep collides")
+                    continue
+            if back > 0:  # (b) the drive-in s_T → s at the arriving trunk and arms
+                drive = NAV.stride_poses([(bx, by, yaw), (x0, y0, yaw)], NAV.STRIDE_M)
+                ok, bad = NAV.path_collision_free(s.kit, drive, tt, "untucked", margin=COLLISION_MARGIN, q_arms=arm_q_to)
+                if not ok:
+                    why.append(f"s_T {s_T:.2f}: drive-in collides at stride {bad}/{len(drive)}")
+                    continue
+        # (c) the path init → drive-back pose at the departing trunk and arms (§3.7)
+        back_stance = Stance(manip.name, (bx, by, yaw), manip.translate, manip.tilt, s_T, manip.edge, manip.face, manip.lateral, manip.focus, manip.arms,
+                             list(manip.contacts), None, manip.carried, dict(manip.extras), manip.fingers)
+        try:
+            path = NAV.plan_path(s.kit, init, back_stance, carried=carried, carried_obj=carried_obj, carried_arm=arm, rooms=rooms, blocked=blocked,
+                                 max_length_m=path_max_m, trunk=tf, eef_in_object=eef_in_object)
+        except NAV.NavigationError as e:
+            why.append(f"s_T {s_T:.2f}: {e.reason}")
+            path_err = e
+            continue
+        s.sidecar.add_path(path)
+        tr = Transition(init.name, manip.name, s_T, trunk_from=tf, trunk_to=tt, n_samples=0 if same_trunk else NAV.TRANSITION_SAMPLES)
+        s.sidecar.add_transition(tr)
+        log.info("step 6: path %s -> %s %.2f m (%s) to the drive-back pose at s_T %.2f, drive-in %.2f m with the arriving arms", init.name, manip.name,
+                 path.length_m, path.mode, s_T, back)
+        return path, tr
+    if path_err is not None:
+        raise Reject(path_err.reason, f"{init.name} -> {manip.name}: {path_err} ({'; '.join(why[-3:])})")
+    raise Reject("no_transition", f"{init.name} -> {manip.name}: no s_T in {NAV.transition_standoffs(s_val)} passes the trunk sweep + drive-in with the arriving arms "
+                                  f"({'; '.join(why[-4:])})")
 
 
 def summarize_stance(st: Stance) -> Dict[str, Any]:

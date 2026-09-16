@@ -51,6 +51,9 @@ SUBTASKS = ("alignment-world_vertical", "alignment-world_horizontal")
 V1_DEFINITION_ID = {"alignment-world_vertical": 1, "alignment-world_horizontal": 2}
 #: §5.5 brace candidates in order (first reachable wins)
 BRACE_KINDS = ("below_high", "above_low", "side_high")
+#: A8 (owner decision 2026‑09‑16): |δ| ≤ 25° until the two-stroke push for larger tilts exists (TODO: two strokes with a
+#: re-grasp of the push point between them, each within the arm's arc reach; the ±30° template filter then returns)
+MAX_DEVIATION_DEG = 25.0
 PUSH_CLASSES = ("push_up", "push_down", "push_left", "push_right")
 AXES = {"+x": (1, 0, 0), "-x": (-1, 0, 0), "+y": (0, 1, 0), "-y": (0, -1, 0), "+z": (0, 0, 1), "-z": (0, 0, -1)}
 STRUCTURE = ("walls", "floors", "ceilings")
@@ -239,8 +242,23 @@ class AlignmentWall(SamplerV2):
         return float(self.param("hang_height_m", 1.45, "height"))
 
     def deviation_range(self) -> Tuple[float, float]:
-        lo, hi = self.param("deviation_range_deg", [15.0, 45.0])
-        return math.radians(float(lo)), math.radians(float(hi))
+        """§5.5 δ = sign·U(lo, hi). Owner decision A8 (2026‑09‑16): |δ| ≤ ``max_deviation_deg`` (25°) until the two-stroke
+        push for larger tilts exists (TODO, D list) — a wider customs range is capped here and the applied range is
+        recorded in ``template_facts.deviation_range_applied_deg``."""
+        lo, hi = (float(v) for v in self.param("deviation_range_deg", [15.0, 25.0]))
+        cap = float(self.param("max_deviation_deg", MAX_DEVIATION_DEG))
+        hi_applied = min(hi, cap)
+        lo_applied = min(lo, hi_applied)
+        self.template_facts["deviation_range_applied_deg"] = [lo_applied, hi_applied]
+        if hi_applied < hi:
+            self.template_facts["deviation_range_customs_deg"] = [lo, hi]
+        return math.radians(lo_applied), math.radians(hi_applied)
+
+    def stance_posture(self) -> Tuple[str, float]:
+        """A6: the arm posture the two-arm manipulation stance records and drives in with (``generation.
+        stance_arm_posture``, default ``tucked`` — hanging arms clear a wall 0.5 m ahead where untucked / ready hands do
+        not) and its gripper opening (closed pads: the oracle closes the grippers before a push / brace)."""
+        return str(self.param("stance_arm_posture", "tucked")), float(C.FINGER_CLOSED)
 
     def symmetric_180(self) -> bool:
         return bool(self.target_param("symmetric_180", False))
@@ -575,30 +593,36 @@ class AlignmentWall(SamplerV2):
             self.template_meta["template_facts"] = _jsonable(self.template_facts)
 
     def _sample_template(self):
-        """Step-1 survivors per spot (cached), the ±30° template filter, the scale_hint diagnostic when nothing survives."""
+        """Step-1 survivors per spot (cached; A6: checked in the posture the stance records), the template filter at
+        ±max|δ| of the applied range (30° in the spec; 25° under A8), the scale_hint diagnostic when nothing survives."""
         lam = tuple(self.param("lateral_range_m", [-0.40, 0.40]))
-        filt = math.radians(float(self.param("template_filter_deviation_deg", 30.0)))
+        _, hi = self.deviation_range()
+        filt = min(math.radians(float(self.param("template_filter_deviation_deg", 30.0))), hi)
+        filt_deg = round(math.degrees(filt))
+        self.template_facts["template_filter_deg"] = filt_deg
+        posture, fingers = self.stance_posture()
+        self.template_facts["stance_arm_posture"] = posture
         kept = []
         for s in self.spots:
             face = self.face_of(s)
             scope = {"scene": self.world.scene_model, "spot": [round(float(v), 3) for v in s["point"].tolist()], "normal": [round(float(v), 3) for v in s["normal"].tolist()],
                      "sampler": "alignment_wall"}
-            self.step1[s["id"]] = P0.phase2_step1(self, face, P0.D_RANGE_DEFAULT, lam, arms_excluded=True, cache_scope=scope)
+            self.step1[s["id"]] = P0.phase2_step1(self, face, P0.D_RANGE_DEFAULT, lam, arms_excluded=True, cache_scope=scope, posture=posture, fingers=fingers)
             n_ok = {}
             for sign in (1.0, -1.0):
                 geo = self.contacts_for(s, sign * filt)
-                n_ok[f"{sign * 30:+.0f}"] = len(self.screen(self.step1[s["id"]], geo))
+                n_ok[f"{sign * filt_deg:+.0f}"] = len(self.screen(self.step1[s["id"]], geo))
             s["n_survivors"] = n_ok
             s["weight"] = sum(n_ok.values())
             if all(v > 0 for v in n_ok.values()):
                 kept.append(s)
         self.template_facts["spots"] = [{"id": s["id"], "point": s["point"].tolist(), "normal": s["normal"].tolist(), "n_step1": len(self.step1[s["id"]]),
-                                         "survivors_pm30": s.get("n_survivors")} for s in self.spots]
+                                         "survivors_pm_filter": s.get("n_survivors")} for s in self.spots]
         if not kept:
             hint = self.scale_hint(filt)
             self.template_meta["scale_hint"] = hint
-            raise Reject("no_stance", f"{self.gp.alias}: no wall spot passes Phase 2 steps 1–3 for δ = ±30° at scale {self.choice.models['target'].scale} "
-                                      f"({[s.get('n_survivors') for s in self.spots]}); scale_hint = {hint}")
+            raise Reject("no_stance", f"{self.gp.alias}: no wall spot passes Phase 2 steps 1–3 for δ = ±{filt_deg}° at scale {self.choice.models['target'].scale} "
+                                      f"(arms {posture}; {[s.get('n_survivors') for s in self.spots]}); scale_hint = {hint}")
         self.spots = kept
 
     def scale_hint(self, filt: float) -> Optional[float]:
@@ -654,8 +678,9 @@ class AlignmentWall(SamplerV2):
         def extra_vis(cam, _geo=geo) -> bool:
             return P0.in_frame(self, cam, th.stack([_geo["C"], _geo["E_low"]]))
 
+        posture, fingers = self.stance_posture()
         for _ in range(min(len(pool), 8)):
-            i, manip = P0.draw_manipulation(self, pool, rng, arms, focus=geo["C"], extra_visibility=extra_vis, arms_excluded=True)
+            i, manip = P0.draw_manipulation(self, pool, rng, arms, focus=geo["C"], extra_visibility=extra_vis, posture=posture, fingers=fingers)
             kinds = pool[i].extras.get("brace_kinds", [])
             pool.pop(i)
             if manip is None:
@@ -707,8 +732,9 @@ class AlignmentWall(SamplerV2):
         wall = self.support_objects()
         push, brace_arm = geo["push"], geo["brace_arm"]
         manip.arms = [push["arm"], brace_arm]
-        # the oracle closes the gripper before a push / brace (oracle doc §3.6): the IK seed / locked joints carry closed fingers
-        q0 = self.kit.q_at_base_pose(self.kit.q_config(arms="untucked", translate=manip.translate, tilt=manip.tilt, fingers=C.FINGER_CLOSED), *manip.base_pose2d)
+        # the oracle closes the gripper before a push / brace (oracle doc §3.6): the IK seed / locked joints carry closed
+        # fingers; the idle arm of each solve sits in the stance's recorded A6 posture (``manip.q``, set by the draw)
+        q0 = self.ikc.q_locked(manip, fingers=C.FINGER_CLOSED)
         # brace candidates in order (first whose pre-contact and contact pass), then the push arm with the brace arm
         # locked at its solution; when the push chain fails with that brace, the next brace candidate is tried before
         # the caller moves to the next survivor (extension of §5.5 step 5: the brace kind changes the arm interaction)
