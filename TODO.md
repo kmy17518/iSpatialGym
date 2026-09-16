@@ -118,14 +118,14 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 07:26 PDT — 1/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 08:13 PDT — 4/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
-| camera_relocalization-standard | demo run (pre-fix success) | - | - |
+| camera_relocalization-standard | valid demo | - | - |
 | camera_relocalization-obstructed | valid demo | tracker corner fix d4a1745 not yet re-demoed | oracle |
-| object_scaling | demo run (pre-fix success) | - | - |
-| mental_rotation | demo run (pre-fix success) | - | - |
+| object_scaling | valid demo | - | - |
+| mental_rotation | valid demo | - | - |
 | disembedding | no instance | 4a distractor budget (D1), 4b tray 1.25 (D1+tabletop), 9 band keying (bands) | D1 / tabletop / bands |
 | CM block_design | no instance | pick spacing 10.1 cm smoke; left band + A1 placement | tabletop |
 | CM attachment | no instance | left band + A1 placement (skateboard edge_too_short = yield) | tabletop |
@@ -137,9 +137,9 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | alignment-world_horizontal | no instance | same as vertical | core / D1 |
 | alignment-axial | no instance | two-arm stop at the robot's limit (decision), blade stand-off landed | tabletop / owner |
 | IORS ontop_small_scale | demo run (pre-fix success) | - | - |
-| IORS under_small_scale | no instance | re-run after e4a1b5c (stalled approach finish) | oracle |
-| IORS inside | no instance | re-sample after 160c518 (release height) + drop executor | core / oracle |
-| IORS nextto | demo run (pre-fix success) | near-side goal 160c518 (future sampling) | - |
+| IORS under_small_scale | demo run | re-run after e4a1b5c (stalled approach finish) | oracle |
+| IORS inside | demo run (pre-fix success) | re-sample after 160c518 (release height) + drop executor | core / oracle |
+| IORS nextto | demo run | near-side goal 160c518 (future sampling) | - |
 | IORS touching | no instance | left band + joint gate (core landed), blade stand-off | core / tabletop |
 | IORS ontop_large_scale | no instance | T2/T3 supports or floor class (new machinery) | large-scale |
 | IORS under_large_scale | no instance | item 7 push-under (sampler + program + oracle) | large-scale / oracle |
