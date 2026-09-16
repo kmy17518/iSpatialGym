@@ -314,15 +314,24 @@ class attached:
             self.obj.keep_still()
         # the sphere fit of ``attach_object`` samples the mesh at random (5–7 spheres for a small object, a different set
         # per call): seed torch around it so every check of one attempt sees the same attached geometry
+        import random
+
+        import numpy as np
+
         cpu_state = th.get_rng_state()
         cuda_state = th.cuda.get_rng_state_all() if th.cuda.is_available() else None
+        np_state, py_state = np.random.get_state(), random.getstate()
         th.manual_seed(ATTACH_FIT_SEED)
+        np.random.seed(ATTACH_FIT_SEED)
+        random.seed(ATTACH_FIT_SEED)
         try:
             self.kit.backend.attach_object(self.arm, self.obj)
         finally:
             th.set_rng_state(cpu_state)
             if cuda_state is not None:
                 th.cuda.set_rng_state_all(cuda_state)
+            np.random.set_state(np_state)
+            random.setstate(py_state)
         return self
 
     def __exit__(self, *exc):
