@@ -181,9 +181,11 @@ class IKResult:
 class IKChecker:
     """§3.6 / §3.9 IK checks over a ``RobotKit``. Stateless apart from the kit and the cache namespace."""
 
-    def __init__(self, kit, cache_scope: Optional[Dict[str, Any]] = None):
+    def __init__(self, kit, cache_scope: Optional[Dict[str, Any]] = None, default_working_arms: Sequence[str] = ("right",)):
         self.kit = kit
         self.cache_scope = dict(cache_scope or {})  # scene / rooms / placed objects: part of every cache key
+        #: the task's working arm(s) (``generation.arm``; core sets it) for stances the search checks before the module names them
+        self.default_working_arms = list(default_working_arms)
         #: (arm, rounded pose) -> 28-D solution of a successful exact solve; cuRobo's remaining seeds are random, so a
         #: marginal pose can pass once and fail when re-solved (the program check re-solves every recorded pose): the
         #: sampler's own solution is used as the seed configuration then. Cleared per attempt (``core``).
@@ -276,7 +278,16 @@ class IKChecker:
         free = self.kit.collision_free(th.stack([self.q_locked(s) for s in stances]), margin=margin).clone()
         if not try_idle_postures:
             return free
-        retry = [i for i, s in enumerate(stances) if not bool(free[i]) and s.working_arms and len(s.working_arms) < 2 and s.q is None]
+
+        def idle_of(s: Stance) -> Optional[str]:
+            # the stance search (tabletop Phase 2 / prompt0) checks candidates before the task module names the working
+            # arm: a non-init stance without one uses the task's default working arm (``default_working_arms``)
+            working = s.working_arms or (list(self.default_working_arms) if s.name not in ("init", "goal") and s.posture == "untucked" else [])
+            if len(working) != 1:
+                return None
+            return "left" if working[0] == "right" else "right"
+
+        retry = [i for i, s in enumerate(stances) if not bool(free[i]) and s.q is None and idle_of(s) is not None]
         for name in self.IDLE_POSTURES:
             if not retry:
                 break
@@ -286,13 +297,15 @@ class IKChecker:
             qs = []
             for i in todo:
                 s = stances[i]
-                idle = "left" if s.working_arms == ["right"] else "right"
+                idle = idle_of(s)
                 vec = self.kit.arm_q(self.POSTURES[name], idle)
                 qs.append(self.q_locked(s, right_arm=vec if idle == "right" else None, left_arm=vec if idle == "left" else None))
             ok = self.kit.collision_free(th.stack(qs), margin=margin)
             for i, f in zip(todo, ok.tolist()):
                 if f:
                     stances[i].idle_posture = name
+                    if not stances[i].working_arms:  # record which arm the posture belongs to
+                        stances[i].arms = list(self.default_working_arms)
                     free[i] = True
             retry = [i for i in retry if not bool(free[i])]
         return free

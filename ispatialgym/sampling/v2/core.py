@@ -153,7 +153,10 @@ class SamplerV2(TaskSampler):
         self.activity = self.gp.activity
         self.definition_id = self.gp.definition_id
         self.sidecar = SidecarDraft(self.gp.alias, self.gp.family)
-        self.ikc = IKChecker(self.kit, {"scene": self.world.scene_model, "rooms": sorted(self.world.loaded_rooms or []), "floor_z": self.kit.floor_z})
+        arm = self.gp.gen("arm", "right")
+        default_arms = ["right"] if arm in (None, "auto", "right") else (["left"] if arm == "left" else ["right", "left"])
+        self.ikc = IKChecker(self.kit, {"scene": self.world.scene_model, "rooms": sorted(self.world.loaded_rooms or []), "floor_z": self.kit.floor_z},
+                             default_working_arms=default_arms)
         self.rejection_log = RejectionLog(keep=3)
         self.counters: Dict[str, int] = {}  # scene_reset, attempts, ... (not rejections)
         self.instance_seeds: List[int] = []
