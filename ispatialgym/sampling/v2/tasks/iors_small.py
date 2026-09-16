@@ -140,6 +140,7 @@ class IORSSmall(SamplerV2):
         self.goal_side: Optional[str] = None  # nextto / touching: partner side the target goes to ("left" / "right", robot frame)
         self.release: Optional[Dict[str, Any]] = None  # inside: release-height facts of :meth:`release_pose`
         self.release_surface_z: Optional[float] = None  # ontop / under: the raycast surface under the goal footprint centre
+        self._touching_place_pos: Optional[th.Tensor] = None  # touching: the nextto position the program places at
 
     # ------------------------------------------------------------------ numbers (customs generation)
 
@@ -364,6 +365,17 @@ class IORSSmall(SamplerV2):
                 raise Reject("pair_gap", f"D_p {D_p:.2f} < g_NT + {self.partner_gap_extra:.2f} = {g_lo:.2f}")
         return g_lo, max(g_lo, D_p)
 
+    def place_gap(self) -> float:
+        """AABB gap between target and partner at the *place* position: nextto ``g_NT - 0.01`` (the predicate holds below
+        g_NT); touching = the same nextto position — the oracle program places there and the push closes the gap to
+        contact (``push_distance``)."""
+        return max(0.0, float(self.pair.get("g_NT", 0.03)) - 0.01)
+
+    def push_distance(self) -> float:
+        """Touching: the push from the place (nextto) position to contact plus 5 mm so that the pads keep pressing
+        (``touching_contacts``: ``push_goal = push_init + direction * push_distance``)."""
+        return self.place_gap() + 0.005
+
     def place_partner(self, rng: np.random.Generator, t_pose: G.Pose, manip: Stance, cam: G.Pose) -> G.Pose:
         """§4.6 step 2 with the gap range per side cut to the reach band of the manipulation trunk (§4.1 / principle 3:
         placements come from the cached reachability sets): the goal position of the target — the partner's centre for
@@ -392,6 +404,27 @@ class IORSSmall(SamplerV2):
             if not ranges:
                 raise Reject("partner_placement", f"no side admits a partner centre inside the band (λ ∈ [{lam_min:.2f}, {lam_max:.2f}] at depth "
                                                   f"{depth_t:.2f}) with g ∈ [{g_lo:.2f}, {g_hi:.2f}]" if len(near) else "band has no cell at the target's depth")
+        elif getattr(self, "bands", None) is not None:
+            # nextto / touching: the target's *place* position (its origin at the goal gap — touching: the nextto position
+            # the push starts from) must be a band lateral at the target's depth, else the place IK of §6.11 fails
+            # (touching box_of_sanitary_napkins: every attempt place_unreachable with the goal 4-9 cm left of centre)
+            cells = self.bands.band(manip.translate, manip.tilt)
+            depth_t, lat_t = manip.local(t_pose[0])
+            near = cells[np.abs(cells[:, 0] - depth_t) <= 0.12] if len(cells) else cells
+            gap_goal = self.place_gap()
+            if len(near):
+                lam_min, lam_max = float(near[:, 1].min()), float(near[:, 1].max())
+                for sd in sides:
+                    if sd > 0:  # partner on the robot's left: the target moves left by g - gap_goal
+                        lo, hi = lam_min - lat_t + gap_goal, lam_max - lat_t + gap_goal
+                    else:
+                        lo, hi = lat_t + gap_goal - lam_max, lat_t + gap_goal - lam_min
+                    lo, hi = max(lo, g_lo), min(hi, g_hi)
+                    if lo <= hi:
+                        ranges[sd] = (lo, hi)
+            if not ranges:
+                raise Reject("partner_placement", f"no side keeps the target's place position inside the band (λ ∈ [{lam_min:.2f}, {lam_max:.2f}] at depth "
+                                                  f"{depth_t:.2f}, target at {lat_t:+.2f}) with g ∈ [{g_lo:.2f}, {g_hi:.2f}]" if len(near) else "band has no cell at the target's depth")
         else:
             ranges = {sd: (g_lo, g_hi) for sd in sides}
         side = list(ranges)[int(rng.integers(len(ranges)))]
@@ -626,7 +659,15 @@ class IORSSmall(SamplerV2):
             grasp.extras["place_lowest_finger_z"] = round(low, 4)
             draft.summary["release"] = dict(self.release or {}, place_lowest_finger_z=round(low, 4), settled_goal_z=round(float(goal_pos[2]), 4))
         else:
-            place = IK.grasp_pose((goal_pos, goal_quat), grasp.eef_in_object)
+            place_pos = goal_pos
+            if self.relation == "touching":
+                # the oracle program places at the *nextto* position and pushes the target into contact from there: the
+                # place is the settled contact position moved back (away from the partner, robot's right) by the push distance
+                tangent = manip.tangent
+                place_pos = goal_pos - th.tensor([float(tangent[0]), float(tangent[1]), 0.0]) * self.push_distance()
+                self._touching_place_pos = place_pos
+                draft.summary["touching"] = {"place_gap_m": round(self.place_gap(), 4), "push_distance_m": round(self.push_distance(), 4)}
+            place = IK.grasp_pose((place_pos, goal_quat), grasp.eef_in_object)
             pre_place = IK.pre_pose(place)
             ignore = self.support_objects() + [self.obj("partner")]
             if self.relation in ("ontop", "under"):
@@ -686,13 +727,19 @@ class IORSSmall(SamplerV2):
         """§6.11 touching: push contact on the target's right face (right arm) toward the partner, brace pre-contact +
         contact of the closed left gripper on the partner's far (left) side; both IK-checked (§4.6 step 6)."""
         tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
-        t_pose = draft.goal_poses[tname]
+        # the push starts at the *place* (nextto) position the program sets the target down at and ends at the settled
+        # contact position (+5 mm of pressing): ``push_distance`` (the old code pushed from the contact position onward)
+        goal_quat = draft.goal_poses[tname][1]
+        place_pos = getattr(self, "_touching_place_pos", None)
+        if place_pos is None:
+            place_pos = th.tensor(draft.pose_targets[tname]["position"])
+        t_pose = (G.t(place_pos), G.t(goal_quat))
         p_now = self.obj("partner").get_position_orientation()
         p_pose = (p_now[0].clone().float(), p_now[1].clone().float())
         tangent = manip.tangent
         direction = th.tensor([float(tangent[0]), float(tangent[1]), 0.0])  # toward the partner = robot's left
         p_init, b_point = self.touching_points(t_pose, p_pose, manip)
-        dist = float(self.pair.get("g_NT", 0.02)) + 0.01
+        dist = self.push_distance()
         push_init = IK.contact_eef(p_init, direction)
         push_goal = (push_init[0] + direction * dist, push_init[1])
         push_pre = IK.pre_pose(push_init)
