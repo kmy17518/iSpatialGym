@@ -163,6 +163,21 @@ class IKChecker:
     SEED_POS_TOL = 0.03
     SEED_ANG_TOL = 0.15
 
+    WITNESS_POS_TOL = 0.002
+    WITNESS_ANG_TOL = 0.02
+
+    def _witness_ok(self, q: th.Tensor, pose: Pose, arm: str) -> bool:
+        """``q`` reaches ``pose`` (FK within 2 mm / 0.02 rad) and is whole-body collision-free in the current world."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        try:
+            eef = self.kit.fk([M.EEF_LINK[arm]], q)[M.EEF_LINK[arm]]
+        except Exception:
+            return False
+        if float(th.linalg.norm(G.t(eef[0]) - G.t(pose[0]))) > self.WITNESS_POS_TOL or G.quat_angle(eef[1], G.t(pose[1])) > self.WITNESS_ANG_TOL:
+            return False
+        return bool(self.kit.collision_free(q, margin=0.01)[0])
+
     def _seeded(self, q0: th.Tensor, pose: Pose, arm: str) -> th.Tensor:
         """``q0`` with the working arm set to the remembered solution of the nearest recorded pose of ``arm`` within
         (3 cm, 0.15 rad) — the same pose, or the same pose after the settle moved the object by a few mm (the other
@@ -236,8 +251,6 @@ class IKChecker:
         if len(poses) == 0:
             return IKResult(True, None, "no poses", 0)
         q0 = self.q_locked(stance) if q_seed is None else q_seed
-        if q_seed is None:
-            q0 = self._seeded(q0, poses[-1], arm)
         key = None
         if cache:
             key = cache_key("exact_ik_v2", {**self.cache_scope, "base": list(stance.base_pose2d), "trunk": [stance.translate, stance.tilt], "arm": arm,
@@ -253,18 +266,21 @@ class IKChecker:
         q = None
         n = len(poses)
         for i, p in enumerate(poses):
-            if i == n - 1 and ignore_for_last:
-                with self.ignoring(ignore_for_last):
-                    q = self.kit.ik(p, q0, arm=arm)
-            else:
-                q = self.kit.ik(p, q0, arm=arm)
+            ign = list(ignore_for_last) if i == n - 1 else []
+            with self.ignoring(ign):
+                # a remembered solution of this very pose is verified as a witness (FK + collision) before the solver
+                # is asked again (cuRobo's IK is randomised, a witness check is not); otherwise it seeds the solver
+                q_near = self._seeded(q0, p, arm) if q_seed is None else q0
+                if q_seed is None and not th.equal(q_near, q0) and self._witness_ok(q_near, p, arm):
+                    q = q_near
+                else:
+                    q = self.kit.ik(p, q_near, arm=arm)
             if q is None:
                 break
+            self.solutions[(arm, self._pose_key(p))] = q.clone()
         res = IKResult(q is not None, q, "" if q is not None else "exact IK failed", len(poses))
-        if q is not None:
-            self.solutions[(arm, self._pose_key(poses[-1]))] = q.clone()
-        if key is not None:
-            cache_put(key, {"ok": res.ok, "q": None if q is None else q.tolist()})
+        if key is not None and res.ok:  # a failure may be a random miss of the solver: only witnesses are cached
+            cache_put(key, {"ok": True, "q": q.tolist()})
         return res
 
     def exact_both_arms(self, work: Tuple[str, Sequence[Pose]], other: Tuple[str, Sequence[Pose]], stance: Stance, ignore_for_last: Sequence[Any] = (),
