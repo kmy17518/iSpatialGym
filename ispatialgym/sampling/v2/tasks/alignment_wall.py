@@ -472,7 +472,17 @@ class AlignmentWall(SamplerV2):
             st.extras.update({"axis_angle_deg": math.degrees(ang), "angle_class": k, "brace_kinds": [b["kind"] for b in ok]})
             classed.append((st, k))
         st_["step3_visible"] = len(classed)
-        return P0.best_class(classed)
+        best = P0.best_class(classed)
+        # the best angle class first (§5.2 step 4); the other class is kept behind it as the fall-back pool of step 5 — with
+        # two survivors in the tight class the brace kinds those two reach decided everything (first-demo loop 13:44)
+        best_ids = {id(st) for st in best}
+        rest = [st for st, _ in classed if id(st) not in best_ids]
+        for st in best:
+            st.extras["class_pool"] = "best"
+        for st in rest:
+            st.extras["class_pool"] = "fallback"
+        st_["step3_best_class"] = len(best)
+        return best + rest
 
     # ------------------------------------------------------------------ wall spots (kept from v1)
 
@@ -709,31 +719,36 @@ class AlignmentWall(SamplerV2):
             raise Reject("no_manipulation_stance", f"spot {spot['id']} δ {math.degrees(delta):.1f}°: no Phase-2 survivor ({stats})")
         spec_p, braces = self.contact_specs(geo)
         arms = [geo["push"]["arm"], geo["brace_arm"]]
-        pool = list(survivors)
+        pools = [[st for st in survivors if st.extras.get("class_pool", "best") == "best"], [st for st in survivors if st.extras.get("class_pool") == "fallback"]]
         errors: List[str] = []
 
         def extra_vis(cam, _geo=geo) -> bool:
             return P0.in_frame(self, cam, th.stack([_geo["C"], _geo["E_low"]]))
 
         posture, fingers = self.stance_posture()
-        for _ in range(min(len(pool), 8)):
-            i, manip = P0.draw_manipulation(self, pool, rng, arms, focus=geo["C"], extra_visibility=extra_vis, posture=posture, fingers=fingers)
-            kinds = pool[i].extras.get("brace_kinds", [])
-            pool.pop(i)
-            if manip is None:
-                errors.append("drawn tilt fails the re-check")
-                continue
-            try:
-                self._solve_from(manip, init, geo, spec_p, [(b, sp) for b, sp in braces if b["kind"] in kinds])
-            except Reject as e:
-                errors.append(f"{e.reason}: {e}")
-                self.sidecar.stances.pop("manipulation", None)
-                self.sidecar.transitions.clear()
-                self.sidecar.paths.clear()
-                self.sidecar.contacts.clear()
-                continue
-            break
-        else:
+        done = False
+        for pool in pools:
+            for _ in range(min(len(pool), 8)):
+                i, manip = P0.draw_manipulation(self, pool, rng, arms, focus=geo["C"], extra_visibility=extra_vis, posture=posture, fingers=fingers)
+                kinds = pool[i].extras.get("brace_kinds", [])
+                pool.pop(i)
+                if manip is None:
+                    errors.append("drawn tilt fails the re-check")
+                    continue
+                try:
+                    self._solve_from(manip, init, geo, spec_p, [(b, sp) for b, sp in braces if b["kind"] in kinds])
+                except Reject as e:
+                    errors.append(f"{e.reason}: {e}")
+                    self.sidecar.stances.pop("manipulation", None)
+                    self.sidecar.transitions.clear()
+                    self.sidecar.paths.clear()
+                    self.sidecar.contacts.clear()
+                    continue
+                done = True
+                break
+            if done:
+                break
+        if not done:
             raise Reject("push_unreachable", f"{len(survivors)} Phase-2 survivors (δ {math.degrees(delta):+.1f}°, {stats}), none passes step 5 / step 6: " + "; ".join(errors[-4:]))
         manip = self.sidecar.stance("manipulation")
         d = Draft()
