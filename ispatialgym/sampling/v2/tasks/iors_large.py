@@ -1154,7 +1154,10 @@ class IORSLarge(SamplerV2):
                              th.cat([c_d + d2 * half, th.tensor([self.floor_z])]), th.cat([c_d - d2 * half, th.tensor([self.floor_z])])])
             e0 = mid + tangent * float(st.lateral)
             lane = th.cat([e0, th.tensor([z_bottom])]).reshape(1, 3)  # the edge's bottom point at the push lane
-            if not P0.in_frame(self, cam, th.cat([disc, lane])):
+            # a side stance looks along the edge: the lane point sits at the frame's lateral border (45–49° off-axis at
+            # b = 0.35–0.40 m); the drop footprint in frame is what it needs (the partner's side fills that half of the image)
+            pts = disc if st.extras.get("stance_kind") == "side" else th.cat([disc, lane])
+            if not P0.in_frame(self, cam, pts):
                 continue
             ang = P0.axis_angle(self, cam, st.focus)
             if ang > math.radians(P0.AXIS_LOOSE_DEG):
