@@ -248,7 +248,9 @@ class _Tracker:
 
     def __init__(self, sidecar: SidecarDraft):
         self.stance = "init"
-        self.carried: Optional[str] = None
+        init = sidecar.stances.get("init")
+        # the held-object tasks start with the object in the hand (§6.3): the init stance records ``carried``
+        self.carried: Optional[str] = init.carried if init is not None else None
         self.sidecar = sidecar
 
     def before(self, action) -> Tuple[str, Optional[str]]:
@@ -333,16 +335,25 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     carried_obj = sampler.objects.get(carried) if carried else None
     g = sidecar.grasp_of(carried) if carried else None
     eef_in_object = g.eef_in_object if g is not None else None
-    if carried_obj is not None and g is not None and g.arm:
+    if carried_obj is not None and g is not None and g.arm and name in ("lift", "reorient", "place", "navigate", "transition", "set_torso"):
         arm = g.arm
     ignore_last, ignore_all = _ignore_for(action, sampler, carried)
+    # push / brace contacts are made with closed pads (§3.6 contact eef poses; the gripper closes before the pre-contact)
+    fingers = 0.0 if name in ("push", "brace") else None
+    # base-follow in base mode: the handle poses h(q_k) are reached by driving the base, not by the arm from the stance
+    skip_keys = set()
+    if name == "base_follow" and isinstance(targets, dict) and targets.get("mode") == "base":
+        skip_keys.add("handle_poses")
     n = 0
-    with attached(sampler.kit, arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
+    attach_arm = (g.arm if g is not None and g.arm else arm) if carried_obj is not None else None
+    with attached(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object):
         for key, poses in iter_pose_targets(targets):
+            if key.split(".")[0] in skip_keys:
+                continue
             if len(poses) == 1:
-                res = sampler.ikc.exact(poses, stance, arm, ignore_for_last=ignore_last + ignore_all, cache=False)
+                res = sampler.ikc.exact(poses, stance, arm, ignore_for_last=ignore_last + ignore_all, cache=False, fingers=fingers)
             else:
-                res = sampler.ikc.waypoints_ok(poses, stance, arm, ignore_for_last=ignore_last, ignore_all=ignore_all)
+                res = sampler.ikc.waypoints_ok(poses, stance, arm, ignore_for_last=ignore_last, ignore_all=ignore_all, cache=False, fingers=fingers)
             n += len(poses)
             if not res.ok:
                 raise Reject("program_check_failed", f"{key}: {res.reason} (stance {stance_name}, arm {arm}, carried {carried})", action=name)

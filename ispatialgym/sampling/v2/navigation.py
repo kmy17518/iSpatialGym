@@ -360,12 +360,19 @@ class attached:
 
 def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: str = "untucked", carried: Optional[str] = None,
               carried_obj: Any = None, carried_arm: str = "right", rooms: Optional[Sequence[str]] = None, blocked: Sequence[Any] = (),
-              max_length_m: Optional[float] = None, stride: float = STRIDE_M, trunk: Optional[Tuple[float, float]] = None) -> PathRecord:
+              max_length_m: Optional[float] = None, stride: float = STRIDE_M, trunk: Optional[Tuple[float, float]] = None,
+              eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None, force_global: bool = False, arm_q: Optional[Dict[str, th.Tensor]] = None) -> PathRecord:
     """§3.7: the base path from ``stance_from`` to ``stance_to`` (world (x, y, yaw) waypoints), ``mode`` ``local`` or
-    ``global``, validated with whole-body checks every ``stride`` m at the navigation posture (``trunk`` defaults to
-    the arriving stance's trunk) with ``carried_obj`` attached to ``carried_arm``. Raises ``NavigationError`` with
-    reason ``no_path`` / ``path_collision`` / ``path_too_long``."""
-    trunk = (stance_to.translate, stance_to.tilt) if trunk is None else trunk
+    ``global``, validated with whole-body checks every ``stride`` m at the navigation posture with ``carried_obj``
+    attached to ``carried_arm`` (posed in the hand per ``eef_in_object``, the grasp record's T_obj→eef). ``trunk``
+    defaults to the **departing** stance's trunk: the trunk changes at the transition stand-off after the drive (§3.8),
+    so the path is driven at the trunk the robot leaves with. ``arm_q`` (per arm) fixes the arm posture of the drive
+    (default: the departing stance's recorded arms when it has a configuration, else ``posture``). ``force_global``
+    plans on the eroded map end to end (camera relocalization). Raises ``NavigationError`` with reason ``no_path`` /
+    ``path_collision`` / ``path_too_long``."""
+    trunk = (stance_from.translate, stance_from.tilt) if trunk is None else trunk
+    if arm_q is None and stance_from.q is not None:
+        arm_q = {a: stance_from.q[kit.robot.arm_control_idx[a]].clone() for a in ("left", "right")}
     a_xy, b_xy = stance_from.base_xy, stance_to.base_xy
     if float(th.linalg.norm(a_xy - b_xy)) < 1e-3 and abs(stance_from.yaw - stance_to.yaw) < 1e-3:
         return PathRecord(stance_from.name, stance_to.name, "local", [tuple(stance_to.base_pose2d)], 0.0, posture, carried, trunk, stride, 0)
@@ -374,7 +381,7 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
     a_free, b_free = nearest_free_cell(free_local, a, 3), nearest_free_cell(free_local, b, 3)
     waypoints: Optional[List[Tuple[float, float, float]]] = None
     mode = "local"
-    if a_free is not None and b_free is not None and same_region(free_local, a_free, b_free):
+    if not force_global and a_free is not None and b_free is not None and same_region(free_local, a_free, b_free):
         cells = grid_shortest_path(free_local, a_free, b_free)
         if cells is not None:
             cells = simplify_path(cells, free_local)
@@ -404,10 +411,10 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
     if max_length_m is not None and length > max_length_m:
         raise NavigationError("path_too_long", f"{length:.2f} m > {max_length_m:.2f} m")
     poses = stride_poses(filled, stride)
-    with attached(kit, carried_arm if carried_obj is not None else None, carried_obj):
-        ok, bad = path_collision_free(kit, poses, trunk, posture)
+    with attached(kit, carried_arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
+        ok, bad = path_collision_free(kit, poses, trunk, posture, q_arms=arm_q)
     if not ok:
-        raise NavigationError("path_collision", f"{mode} path {stance_from.name} -> {stance_to.name} collides at stride {bad}/{len(poses)} ({poses[bad]})")
+        raise NavigationError("path_collision", f"{mode} path {stance_from.name} -> {stance_to.name} collides at stride {bad}/{len(poses)} ({poses[bad]}) at trunk {trunk}")
     return PathRecord(stance_from.name, stance_to.name, mode, filled, length, posture, carried, trunk, stride, len(poses))
 
 
@@ -417,10 +424,12 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
 
 
 def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_obj: Any = None, carried_arm: str = "right",
-               posture: str = "untucked", margin: float = 0.01, n_samples: int = TRANSITION_SAMPLES) -> Optional[Transition]:
+               posture: Optional[str] = None, margin: float = 0.01, n_samples: int = TRANSITION_SAMPLES,
+               eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None) -> Optional[Transition]:
     """§3.8: the smallest ``s_T ∈ transition_standoffs(s)`` (``s`` = the arriving stance's stand-off, driven back along
-    -inward) at which the swept trunk motion (``n_samples`` trunks between the two stances' values, arms untucked,
-    carried object attached) is whole-body collision-free. Returns the ``Transition`` or None (caller: ``Reject
+    -inward) at which the swept trunk motion (``n_samples`` trunks between the two stances' values, both endpoints
+    included, the arriving stance's arm posture / recorded arms, carried object attached and posed in the hand per
+    ``eef_in_object``) is whole-body collision-free. Returns the ``Transition`` or None (caller: ``Reject
     ("no_transition")``). Stances with equal trunks need no transition (returns one with ``stand_off = s``)."""
     tf, tt = (stance_from.translate, stance_from.tilt), (stance_to.translate, stance_to.tilt)
     s = float(stance_to.stand_off if stance_to.stand_off is not None else 0.0)
@@ -429,13 +438,18 @@ def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_
     inward = stance_to.inward
     x0, y0, yaw = stance_to.base_pose2d
     sweep = trunk_sweep(tf, tt, n_samples)
-    with attached(kit, carried_arm if carried_obj is not None else None, carried_obj):
+    postures = {"untucked": "untucked", "tucked": "tucked", "reset": "tucked", "ready": "ready"}
+    arms = postures.get(posture or stance_to.posture, "untucked")
+    arm_q = {a: stance_to.q[kit.robot.arm_control_idx[a]].clone() for a in ("left", "right")} if stance_to.q is not None else {}
+    fingers = stance_to.fingers if stance_to.fingers is not None else 0.05
+    with attached(kit, carried_arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
         for s_T in transition_standoffs(s):
             back = s_T - s
             bx, by = x0 - float(inward[0]) * back, y0 - float(inward[1]) * back
             if not kit.trav_free((bx, by)):
                 continue
-            qs = th.stack([kit.q_at_base_pose(kit.q_config(arms=posture, translate=tr, tilt=ti), bx, by, yaw) for tr, ti in sweep])
+            qs = th.stack([kit.q_at_base_pose(kit.q_config(arms=arms, translate=tr, tilt=ti, right_arm=arm_q.get("right"), left_arm=arm_q.get("left"),
+                                                            fingers=float(fingers)), bx, by, yaw) for tr, ti in sweep])
             if bool(kit.collision_free(qs, margin=margin).all()):
                 return Transition(stance_from.name, stance_to.name, s_T, trunk_from=tf, trunk_to=tt, n_samples=n_samples)
     return None

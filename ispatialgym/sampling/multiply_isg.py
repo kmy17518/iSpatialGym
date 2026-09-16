@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional
 os.environ.setdefault("OMNIGIBSON_HEADLESS", "1")
 os.environ.setdefault("OMNI_KIT_ACCEPT_EULA", "YES")
 
+from ispatialgym.sampling.sample_isg import FLEET_BANDS  # noqa: E402,F401  (sets ISPATIALGYM_REACH_BANDS to the fleet bands when present)
 from ispatialgym.sampling.v2 import SAMPLER_VERSION  # noqa: E402
 from ispatialgym.sampling.v2.problem import GroundedProblem, TemplateChoice, new_run_summary  # noqa: E402
 

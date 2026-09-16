@@ -54,6 +54,12 @@ SUBTASK_FAMILY = {
     "mental_rotation": ("mental_rotation", "mental_rotation"),
     "disembedding": ("disembedding", "disembedding"),
     "configuration_matching-block_design": ("configuration_matching", "configuration_matching"),
+    # the iddl / D1 / F6 ids of the four articulation subtasks (``<direction>_<scale>_scale``) ...
+    "configuration_matching-articulation_open_large_scale": ("configuration_matching", "configuration_matching"),
+    "configuration_matching-articulation_close_large_scale": ("configuration_matching", "configuration_matching"),
+    "configuration_matching-articulation_open_small_scale": ("configuration_matching", "configuration_matching"),
+    "configuration_matching-articulation_close_small_scale": ("configuration_matching", "configuration_matching"),
+    # ... and the spelling the first task modules registered under (kept as aliases)
     "configuration_matching-articulation_large_scale-open": ("configuration_matching", "configuration_matching"),
     "configuration_matching-articulation_large_scale-close": ("configuration_matching", "configuration_matching"),
     "configuration_matching-articulation_small_scale-open": ("configuration_matching", "configuration_matching"),
@@ -631,19 +637,14 @@ def draw_group(problem: GroundedProblem, role: str, scene: str, rng, taken: Set[
                pools: Optional[Dict[str, List[str]]] = None) -> Optional[List[ModelChoice]]:
     """Members of group ``role`` per ``generation.groups.<role>``: ``size`` drawn, ``draw = same_model`` (one model, N
     copies) or ``unique`` (pairwise distinct, at most one model per look-alike group, none a look-alike of the target,
-    none in ``taken``). ``pools`` overrides the whitelist (disembedding distractor pools). None when the pool is short."""
+    none in ``taken``). ``members`` (D1: ``{category: count}`` in alias order, mixed-category distractor / obstacle
+    aliases) fixes how many members each category contributes — the grounded BDDL declares exactly those instances.
+    ``pools`` overrides the whitelist (disembedding distractor pools). None when a pool is short."""
     spec = problem.group_spec(role)
-    size = _draw_size(spec["size"], rng)
     wl = pools if pools is not None else problem.whitelist(scene, role)
     entry = problem.roles[role]
     grasp_keys = entry.grasp_keys
-    cands = [(c, m) for c, ms in wl.items() for m in ms]
     la = problem.lookalikes
-    if target is not None:
-        cands = [cm for cm in cands if not la.lookalikes(cm, (target.category, target.model))]
-    cands = [cm for cm in cands if cm not in taken]
-    if not cands:
-        return None
 
     def mk(c, m):
         scale = entry.scale_of(c, m)
@@ -651,20 +652,42 @@ def draw_group(problem: GroundedProblem, role: str, scene: str, rng, taken: Set[
             scale = [float(scale)] * 3
         return ModelChoice(c, m, entry.dataset, grasp_keys.get(f"{c}/{m}"), scale)
 
-    if spec["draw"] == "same_model":
-        c, m = cands[int(rng.integers(len(cands)))]
-        return [mk(c, m) for _ in range(size)]
-    members: List[Tuple[str, str]] = []
-    order = [cands[int(i)] for i in rng.permutation(len(cands))]
-    for cm in order:
-        if len(members) >= size:
-            break
-        if any(la.lookalikes(cm, other) for other in members):
-            continue
-        members.append(cm)
-    if len(members) < size:
-        return None
-    return [mk(c, m) for c, m in members]
+    def admissible(cats: Optional[Sequence[str]]) -> List[Tuple[str, str]]:
+        out = [(c, m) for c, ms in wl.items() if cats is None or c in cats for m in ms]
+        if target is not None:
+            out = [cm for cm in out if not la.lookalikes(cm, (target.category, target.model))]
+        return [cm for cm in out if cm not in taken]
+
+    def draw(cands: List[Tuple[str, str]], n: int, chosen: List[Tuple[str, str]]) -> Optional[List[Tuple[str, str]]]:
+        if not cands:
+            return None
+        if spec["draw"] == "same_model":
+            c, m = cands[int(rng.integers(len(cands)))]
+            return [(c, m)] * n
+        out: List[Tuple[str, str]] = []
+        for cm in (cands[int(i)] for i in rng.permutation(len(cands))):
+            if len(out) >= n:
+                break
+            if cm in chosen or cm in out or any(la.lookalikes(cm, other) for other in chosen + out):
+                continue
+            out.append(cm)
+        return out if len(out) == n else None
+
+    members_spec = spec.get("members")
+    chosen: List[Tuple[str, str]] = []
+    if isinstance(members_spec, dict) and members_spec:
+        for cat, n in members_spec.items():  # alias order = BDDL instance order
+            part = draw(admissible([cat]), int(n), chosen)
+            if part is None:
+                return None
+            chosen += part
+    else:
+        size = _draw_size(spec["size"], rng)
+        part = draw(admissible(None), size, chosen)
+        if part is None:
+            return None
+        chosen = part
+    return [mk(c, m) for c, m in chosen]
 
 
 def iter_template_choices(problem: GroundedProblem, scene: str, rng, constraints: Optional[Sequence[Dict[str, Any]]] = None,

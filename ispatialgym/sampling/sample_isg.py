@@ -48,6 +48,11 @@ from ispatialgym.sampling.v2.problem import (  # noqa: E402
 )
 
 DEFAULT_OUT = os.path.join(REPO_ROOT, "datasets", "ispatialgym-task-instances-v2")
+#: the reach bands B3's fleet writes (``ReachBands.load`` searches ``ISPATIALGYM_REACH_BANDS`` first, then the runlog root
+#: and ``~/.cache``); a hit there skips the 5–11 min in-process band computation per (support, object)
+FLEET_BANDS = os.path.join(REPO_ROOT, "runlogs", "reach_bands_20260915", "bands")
+if os.path.isdir(FLEET_BANDS):
+    os.environ.setdefault("ISPATIALGYM_REACH_BANDS", FLEET_BANDS)
 
 log = logging.getLogger("ispatialgym.sampling.v2")
 

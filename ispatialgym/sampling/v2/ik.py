@@ -37,6 +37,8 @@ EXACT_SEEDS = 32
 PRE_DIST = C.PRE_DIST
 HANDLE_OFFSET = C.HANDLE_EEF_OFFSET
 IN_FRAME_MARGIN = 0.05
+FINGER_OPEN_DEFAULT = C.FINGER_OPEN
+FINGER_CLOSED = C.FINGER_CLOSED
 
 # ----------------------------------------------------------------------------------------------------------------
 # conventions (F5) — argument-shape wrappers
@@ -168,8 +170,9 @@ class IKChecker:
     WITNESS_ANG_TOL = 0.05
 
     def _witness_ok(self, q: th.Tensor, pose: Pose, arm: str) -> bool:
-        """``q`` reaches ``pose`` within the IK solver's acceptance (5 mm / 0.05 rad) and is whole-body collision-free in
-        the current world — the same criterion the solver applies to its own solutions."""
+        """``q`` reaches ``pose`` within the IK solver's acceptance (5 mm / 0.05 rad) and is collision-free in the current
+        world at the solver's own margin (0: the IK's collision term has no extra clearance) — the same criterion the
+        solver applies to its own solutions, evaluated deterministically."""
         from ispatialgym.oracle import r1pro_model as M
 
         try:
@@ -178,7 +181,7 @@ class IKChecker:
             return False
         if float(th.linalg.norm(G.t(eef[0]) - G.t(pose[0]))) > self.WITNESS_POS_TOL or G.quat_angle(eef[1], G.t(pose[1])) > self.WITNESS_ANG_TOL:
             return False
-        return bool(self.kit.collision_free(q, margin=0.01)[0])
+        return bool(self.kit.collision_free(q, margin=0.0)[0])
 
     def _seeded(self, q0: th.Tensor, pose: Pose, arm: str) -> th.Tensor:
         """``q0`` with the working arm set to the remembered solution of the nearest recorded pose of ``arm`` within
@@ -203,13 +206,31 @@ class IKChecker:
         return out
 
     # -- configurations -----------------------------------------------------------------------------------------
-    def q_locked(self, stance: Stance, arms: str = "untucked", right_arm: Optional[th.Tensor] = None, left_arm: Optional[th.Tensor] = None) -> th.Tensor:
-        """28-D configuration at the stance (base pose + trunk), arms untucked (or the given arm vectors), grippers open —
-        the locked-joint source and IK seed of every check from this stance."""
-        q = self.kit.q_config(arms=arms, translate=stance.translate, tilt=stance.tilt, right_arm=right_arm, left_arm=left_arm)
+    POSTURES = {"untucked": "untucked", "tucked": "tucked", "reset": "tucked", "ready": "ready"}
+
+    def q_locked(self, stance: Stance, arms: Optional[str] = None, right_arm: Optional[th.Tensor] = None, left_arm: Optional[th.Tensor] = None,
+                 fingers: Optional[float] = None) -> th.Tensor:
+        """28-D configuration at the stance (base pose + trunk) — the locked-joint source and IK seed of every check from
+        it. The arm joints and finger openings are, in this order: the explicit ``right_arm`` / ``left_arm`` / ``fingers``
+        arguments, the stance's **recorded configuration** ``stance.q`` (§3.3 exceptions: the held-object hold, the
+        camera-relocalization reset arms) and ``stance.fingers``, the posture ``arms`` (default ``stance.posture``:
+        untucked / tucked = reset / ready) with open grippers. The base virtual joints are always re-derived for the
+        robot's current root."""
+        robot = self.kit.robot
+        if stance.q is not None:
+            if right_arm is None:
+                right_arm = stance.q[robot.arm_control_idx["right"]].clone()
+            if left_arm is None:
+                left_arm = stance.q[robot.arm_control_idx["left"]].clone()
+            if fingers is None and stance.fingers is None:
+                fingers = float(stance.q[robot.gripper_control_idx["right"]][0])
+        if fingers is None:
+            fingers = stance.fingers if stance.fingers is not None else FINGER_OPEN_DEFAULT
+        posture = self.POSTURES.get(arms or stance.posture, "untucked")
+        q = self.kit.q_config(arms=posture, translate=stance.translate, tilt=stance.tilt, right_arm=right_arm, left_arm=left_arm, fingers=float(fingers))
         return self.kit.q_at_base_pose(q, *stance.base_pose2d)
 
-    def stance_collision_free(self, stance: Stance, margin: float = 0.01, arms: str = "untucked", **arm_q) -> bool:
+    def stance_collision_free(self, stance: Stance, margin: float = 0.01, arms: Optional[str] = None, **arm_q) -> bool:
         return bool(self.kit.collision_free(self.q_locked(stance, arms, **arm_q), margin=margin)[0])
 
     def stances_collision_free(self, stances: Sequence[Stance], margin: float = 0.01) -> th.Tensor:
@@ -218,21 +239,23 @@ class IKChecker:
         return self.kit.collision_free(th.stack([self.q_locked(s) for s in stances]), margin=margin)
 
     # -- screening / exact --------------------------------------------------------------------------------------
-    def screen(self, poses: Sequence[Pose], stance: Stance, arm: str = "right", ignore: Sequence[Any] = (), q_seed: Optional[th.Tensor] = None) -> th.Tensor:
-        """12-seed batched IK per pose from the stance (locked joints = untucked at the stance trunk); ``ignore``
-        objects are removed from the world for *these* poses (callers pass the support for grasp poses only)."""
+    def screen(self, poses: Sequence[Pose], stance: Stance, arm: str = "right", ignore: Sequence[Any] = (), q_seed: Optional[th.Tensor] = None,
+               fingers: Optional[float] = None) -> th.Tensor:
+        """12-seed batched IK per pose from the stance (locked joints = the stance's recorded configuration / posture at
+        its trunk, ``fingers`` overrides the opening: closed for push / brace contacts); ``ignore`` objects are removed
+        from the world for *these* poses (callers pass the support for grasp poses only)."""
         if len(poses) == 0:
             return th.zeros(0, dtype=th.bool)
-        q0 = self.q_locked(stance) if q_seed is None else q_seed
+        q0 = self.q_locked(stance, fingers=fingers) if q_seed is None else q_seed
         with self.ignoring(ignore):
             return self.kit.ik_batch(list(poses), q0, arm=arm)
 
     def screen_pairs(self, pairs: Sequence[Sequence[Pose]], stance: Stance, arm: str = "right", ignore_for_last: Sequence[Any] = (),
-                     q_seed: Optional[th.Tensor] = None) -> th.Tensor:
+                     q_seed: Optional[th.Tensor] = None, fingers: Optional[float] = None) -> th.Tensor:
         """Batched screening of [pre, final] pose pairs: pre against the full world, final with ``ignore_for_last`` removed."""
         if len(pairs) == 0:
             return th.zeros(0, dtype=th.bool)
-        q0 = self.q_locked(stance) if q_seed is None else q_seed
+        q0 = self.q_locked(stance, fingers=fingers) if q_seed is None else q_seed
         pres = [p[0] for p in pairs]
         finals = [p[-1] for p in pairs]
         ok_pre = self.kit.ik_batch(pres, q0, arm=arm)
@@ -246,19 +269,21 @@ class IKChecker:
         return out
 
     def exact(self, poses: Sequence[Pose], stance: Stance, arm: str = "right", ignore_for_last: Sequence[Any] = (),
-              q_seed: Optional[th.Tensor] = None, scale_key: Any = None, cache: bool = True) -> IKResult:
-        """32-seed IK of every pose in order from the stance; the last pose with ``ignore_for_last`` removed (the support
+              q_seed: Optional[th.Tensor] = None, scale_key: Any = None, cache: bool = True, fingers: Optional[float] = None) -> IKResult:
+        """32-seed IK of every pose in order from the stance (locked joints = the stance's recorded configuration /
+        posture, ``fingers`` overrides the gripper opening); the last pose with ``ignore_for_last`` removed (the support
         under a grasp). Returns the configuration at the last pose. ``scale_key`` (the spawn scale vector of the object
         the poses belong to) is part of the cache key (§3.10)."""
         if len(poses) == 0:
             return IKResult(True, None, "no poses", 0)
-        q0 = self.q_locked(stance) if q_seed is None else q_seed
+        q0 = self.q_locked(stance, fingers=fingers) if q_seed is None else q_seed
         key = None
         if cache:
             key = cache_key("exact_ik_v2", {**self.cache_scope, "base": list(stance.base_pose2d), "trunk": [stance.translate, stance.tilt], "arm": arm,
                                             "poses": [list(G.t(p[0]).tolist()) + list(G.t(p[1]).tolist()) for p in poses],
                                             "ignore": sorted(getattr(o, "name", str(o)) for o in ignore_for_last), "scale": scale_key,
-                                            "seeds": EXACT_SEEDS, "seed_arms": q0[self.kit.robot.arm_control_idx[arm]]})
+                                            "seeds": EXACT_SEEDS, "seed_arms": q0[self.kit.robot.arm_control_idx[arm]],
+                                            "locked": q0[[i for a in ("left", "right") for i in self.kit.robot.arm_control_idx[a].tolist()] + self.kit.robot.gripper_control_idx["right"].tolist()]})
             hit = cache_get(key)
             if hit is not None:
                 q_hit = None if hit.get("q") is None else th.tensor(hit["q"])
@@ -305,23 +330,24 @@ class IKChecker:
     # -- waypoints ----------------------------------------------------------------------------------------------
     def waypoints_ok(self, waypoints: Sequence[Pose], stance: Stance, arm: str = "right", policy: str = "screen_mid_exact_ends",
                      ignore_for_last: Sequence[Any] = (), ignore_all: Sequence[Any] = (), q_seed: Optional[th.Tensor] = None,
-                     scale_key: Any = None) -> IKResult:
+                     scale_key: Any = None, cache: bool = True, fingers: Optional[float] = None) -> IKResult:
         """§3.9: screening IK at the intermediate waypoints, exact IK at the two endpoints (``policy`` names what was
         checked and is recorded as ``waypoint_policy``). ``ignore_all`` objects are removed for every waypoint (the
-        carried object's own support along a lift), ``ignore_for_last`` for the final pose only."""
+        carried object's own support along a lift), ``ignore_for_last`` for the final pose only. ``cache=False`` for
+        re-checks that must not hit a cached verdict (program check, ``validate_instances``)."""
         wps = list(waypoints)
         if len(wps) < 2:
-            return self.exact(wps, stance, arm, ignore_for_last, q_seed=q_seed, scale_key=scale_key)
+            return self.exact(wps, stance, arm, ignore_for_last, q_seed=q_seed, scale_key=scale_key, cache=cache, fingers=fingers)
         mids = wps[1:-1]
         if mids:
-            ok = self.screen(mids, stance, arm, ignore=list(ignore_all), q_seed=q_seed)
+            ok = self.screen(mids, stance, arm, ignore=list(ignore_all), q_seed=q_seed, fingers=fingers)
             if not bool(ok.all()):
                 bad = [i + 1 for i, s in enumerate(ok.tolist()) if not s]
                 return IKResult(False, None, f"waypoints {bad} of {len(wps)} fail the screening IK", len(wps))
-        r0 = self.exact([wps[0]], stance, arm, list(ignore_all), q_seed=q_seed, scale_key=scale_key)
+        r0 = self.exact([wps[0]], stance, arm, list(ignore_all), q_seed=q_seed, scale_key=scale_key, cache=cache, fingers=fingers)
         if not r0.ok:
             return IKResult(False, None, "first waypoint fails the exact IK", len(wps))
-        r1 = self.exact([wps[-1]], stance, arm, list(ignore_for_last) + list(ignore_all), q_seed=q_seed, scale_key=scale_key)
+        r1 = self.exact([wps[-1]], stance, arm, list(ignore_for_last) + list(ignore_all), q_seed=q_seed, scale_key=scale_key, cache=cache, fingers=fingers)
         if not r1.ok:
             return IKResult(False, None, "last waypoint fails the exact IK", len(wps))
         return IKResult(True, r1.q, policy, len(wps))

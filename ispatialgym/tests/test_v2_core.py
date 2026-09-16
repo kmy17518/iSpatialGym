@@ -142,6 +142,35 @@ def test_group_draw_same_model_and_unique():
     assert "targets[0]" in t.choices
 
 
+def test_group_members_per_category_follow_the_alias():
+    # D1 mixed-category groups: ``members`` fixes the count per category (the grounded BDDL declares exactly those)
+    entry = _entry(["a"], ["p"], groups={"distractors": {"size": 3, "draw": "unique", "members": {"bottle_of_beer": 2, "bottle_of_sake": 1}}})
+    entry["roles"]["distractors"] = {"category": ["bottle_of_beer", "bottle_of_sake"], "sampleable": True}
+    entry["scenes"]["house_single_floor"]["whitelist"]["distractors"] = {"bottle_of_beer": ["b1", "b2", "b3"], "bottle_of_sake": ["s1", "s2"]}
+    gp = _problem(entry)
+    assert gp.roles["distractors"].categories == ["bottle_of_beer", "bottle_of_sake"]
+    rng = np.random.default_rng(4)
+    for _ in range(10):
+        members = draw_group(gp, "distractors", "house_single_floor", rng, set())
+        assert [m.category for m in members] == ["bottle_of_beer", "bottle_of_beer", "bottle_of_sake"]
+        assert len({m.model for m in members}) == 3
+    t = next(iter_template_choices(gp, "house_single_floor", rng))
+    assert "distractors-bottle_of_beer_2-bottle_of_sake_1" in t.template_id
+    assert subtask_of_alias("configuration_matching-articulation_open_large_scale-bottom_cabinet") == "configuration_matching-articulation_open_large_scale"
+
+
+def test_stance_sidecar_keeps_extras_and_recorded_configuration():
+    edge = EdgeFrame.from_edge("+u", [1.0, 0.0], [1.0, 0.0], 1.6)
+    st = Stance("init", (1.45, 0.0, math.pi), 0.5, 0.0, 0.45, edge, arms="reset", carried="bowl.n.01_1",
+                extras={"goal_cell": [0.3, -0.1], "bearing_deg": 12.0, "_private": 1})
+    d = st.to_sidecar()
+    assert d["goal_cell"] == [0.3, -0.1] and d["bearing_deg"] == 12.0 and "_private" not in d
+    assert d["arms"] == "reset" and d["carried"] == "bowl.n.01_1" and d["edge"] == "+u"
+    assert st.posture == "tucked" or st.posture == "reset"  # the reset arms map to the hanging (zero) posture
+    st2 = st.with_trunk(0.75, -0.3)
+    assert st2.carried == "bowl.n.01_1" and st2.fingers is None and st2.extras["goal_cell"] == [0.3, -0.1]
+
+
 def test_constraint_records_and_scope_query():
     gp = _problem(_entry(["a"], ["p"]))
     rec = gp.add_constraint({"type": "stance", "scope": {"scene": "house_single_floor", "support": "breakfast_table_rhjoby_0"}, "edges": ["+u"]},

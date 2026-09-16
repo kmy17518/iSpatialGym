@@ -307,8 +307,11 @@ class SamplerV2(TaskSampler):
         """Template facts once: bands, caches, representative test (``sample_template``); recorded in ``template_meta``."""
         self.park_robot()
         self.adopt_existing_template()
-        self.sample_template()
-        self.template_meta["template_facts"] = _jsonable(self.template_facts)
+        try:
+            self.sample_template()
+        finally:
+            # the facts gathered so far stay in template_meta (a rejected template documents where it failed)
+            self.template_meta["template_facts"] = _jsonable(self.template_facts)
 
     def adopt_existing_template(self) -> bool:
         """``multiply_isg``: when ``<out_dir>/template.json`` exists (written by ``sample_isg`` with instance 0), keep it —
@@ -387,8 +390,14 @@ class SamplerV2(TaskSampler):
         if not stances:
             return
         self.kit.sync_world()
-        free = self.ikc.stances_collision_free(stances)
-        bad = [s.name for s, f in zip(stances, free.tolist()) if not f]
+        bad = []
+        for st in stances:
+            # a stance that carries an object is checked with it attached (posed in the hand) and its support ignored
+            obj, arm, eef_in_object = self.carried_attachment(st.carried)
+            with NAV.attached(self.kit, arm if obj is not None else None, obj, eef_in_object=eef_in_object):
+                with self.ikc.ignoring([obj] if obj is not None else []):
+                    if not self.ikc.stance_collision_free(st):
+                        bad.append(st.name)
         if bad:
             raise Reject("stance_collision_with_objects", f"stances {bad} collide with the objects placed (trunks {[(s.translate, round(s.tilt, 2)) for s in stances if s.name in bad]})")
         # §3.8 with the objects placed: the recorded transitions are swept again (the smallest free s_T may change)
@@ -396,8 +405,9 @@ class SamplerV2(TaskSampler):
             frm, to = self.sidecar.stances.get(tr.frm), self.sidecar.stances.get(tr.to)
             if frm is None or to is None:
                 continue
-            carried = to.carried
-            new = NAV.transition(self.kit, frm, to, carried_obj=self.objects.get(carried) if carried else None)
+            obj, arm, eef_in_object = self.carried_attachment(to.carried)
+            with self.ikc.ignoring([obj] if obj is not None else []):
+                new = NAV.transition(self.kit, frm, to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object)
             if new is None:
                 raise Reject("no_transition", f"{tr.frm} -> {tr.to}: no swept-free s_T with the objects placed")
             self.sidecar.transitions[i] = new
@@ -409,19 +419,38 @@ class SamplerV2(TaskSampler):
         articulation root at call time (``RobotKit.q_at_base_pose``), so a configuration must not outlive a teleport."""
         return self.ikc.q_locked(stance, **arm_q)
 
-    def record_transition(self, frm: Stance, to: Stance, carried: Optional[str] = None, arm: str = "right") -> Transition:
-        """§3.8 transition between two recorded stances (carried object attached); ``Reject("no_transition")``."""
-        tr = NAV.transition(self.kit, frm, to, carried_obj=self.objects.get(carried) if carried else None, carried_arm=arm)
+    def carried_attachment(self, carried: Optional[str], arm: Optional[str] = None) -> Tuple[Any, str, Optional[Any]]:
+        """``(object, arm, T_obj→eef)`` of a carried bddl instance from its grasp record (``sidecar.grasps``) — what the
+        checks attach and pose in the hand; ``(None, arm, None)`` when nothing is carried."""
+        if not carried:
+            return None, arm or "right", None
+        g = self.sidecar.grasp_of(carried)
+        obj = self.objects.get(carried)
+        if g is None or g.eef_in_object is None:
+            log.warning("%s: carried %s has no grasp record with eef_in_object; attached at its current pose", self.gp.alias, carried)
+            return obj, arm or (g.arm if g else "right"), None
+        return obj, arm or g.arm, g.eef_in_object
+
+    def record_transition(self, frm: Stance, to: Stance, carried: Optional[str] = None, arm: Optional[str] = None) -> Transition:
+        """§3.8 transition between two recorded stances (carried object attached, posed in the hand per its grasp record);
+        ``Reject("no_transition")``."""
+        carried = carried or to.carried
+        obj, arm, eef_in_object = self.carried_attachment(carried, arm)
+        tr = NAV.transition(self.kit, frm, to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object)
         if tr is None:
             raise Reject("no_transition", f"{frm.name} -> {to.name}: no s_T in {NAV.transition_standoffs(to.stand_off or 0.0)} is swept collision-free")
         return self.sidecar.add_transition(tr)
 
-    def record_path(self, frm: Stance, to: Stance, carried: Optional[str] = None, arm: str = "right", max_length_m: Optional[float] = None,
-                    blocked: Sequence[Any] = ()) -> PathRecord:
-        """§3.7 path between two recorded stances; ``Reject(no_path | path_collision | path_too_long)``."""
+    def record_path(self, frm: Stance, to: Stance, carried: Optional[str] = None, arm: Optional[str] = None, max_length_m: Optional[float] = None,
+                    blocked: Sequence[Any] = (), force_global: bool = False, trunk: Optional[Tuple[float, float]] = None) -> PathRecord:
+        """§3.7 path between two recorded stances, checked at the departing stance's trunk (``trunk`` overrides) with the
+        carried object attached (posed in the hand per its grasp record); ``force_global`` plans on the eroded map end to
+        end; ``Reject(no_path | path_collision | path_too_long)``."""
+        carried = carried or to.carried or frm.carried
+        obj, arm, eef_in_object = self.carried_attachment(carried, arm)
         try:
-            p = NAV.plan_path(self.kit, frm, to, carried=carried, carried_obj=self.objects.get(carried) if carried else None, carried_arm=arm,
-                              rooms=self.gp.rooms(self.scene) or self.world.rooms, blocked=blocked, max_length_m=max_length_m)
+            p = NAV.plan_path(self.kit, frm, to, carried=carried, carried_obj=obj, carried_arm=arm, rooms=self.gp.rooms(self.scene) or self.world.rooms,
+                              blocked=blocked, max_length_m=max_length_m, trunk=trunk, eef_in_object=eef_in_object, force_global=force_global)
         except NAV.NavigationError as e:
             raise Reject(e.reason, str(e))
         return self.sidecar.add_path(p)

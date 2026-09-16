@@ -140,10 +140,14 @@ class Stance:
 
     ``base_pose2d`` = (x, y, yaw) world; ``translate`` / ``tilt`` = JoyLo trunk; ``stand_off`` s (m from the edge / face);
     ``edge`` (tabletop) or ``face`` (large-scale) frame; ``lateral`` = offset along the edge from its midpoint (m,
-    + = robot's left); ``focus`` = the world point the manipulation stance looks at (x, y, z); ``arms`` = ``"untucked"``
-    or the list of working arms; ``contacts`` = names of the contact records made from this stance; ``q`` = the 28-D
-    configuration (base virtual joints encode ``base_pose2d`` in the root frame, as ``RobotKit.q_at_base_pose`` builds
-    it) when it has been computed; ``carried`` = bddl instance carried at this stance (None = hands empty).
+    + = robot's left); ``focus`` = the world point the manipulation stance looks at (x, y, z); ``arms`` = the idle
+    posture name (``"untucked"`` default; ``"tucked"`` / ``"reset"`` = JoyLo reset arms, ``"ready"``) or the list of
+    working arms; ``contacts`` = names of the contact records made from this stance; ``q`` = the **recorded
+    configuration** of the stance (28-D): its arm joints and finger openings are what ``IKChecker.q_locked`` locks and
+    seeds with (§3.3 exceptions — the held-object hold, the camera-relocalization reset arms), the base virtual joints
+    are re-derived at every use (they belong to the robot root at the time ``q`` was built); ``fingers`` = gripper
+    opening when it is not the default open 0.05 (closed pads for push / brace stances); ``carried`` = bddl instance
+    carried at this stance (None = hands empty) — attached (posed in the hand per its grasp record) for the checks.
     """
 
     name: str
@@ -160,6 +164,12 @@ class Stance:
     q: Optional[th.Tensor] = None
     carried: Optional[str] = None
     extras: Dict[str, Any] = field(default_factory=dict)
+    fingers: Optional[float] = None
+
+    @property
+    def posture(self) -> str:
+        """The idle-arm posture name (``arms`` when it is a posture string, else ``"untucked"``)."""
+        return self.arms if isinstance(self.arms, str) and self.arms in ("untucked", "tucked", "reset", "ready") else "untucked"
 
     # -- frame helpers ------------------------------------------------------------------------------------------
     @property
@@ -216,7 +226,7 @@ class Stance:
     def with_trunk(self, translate: float, tilt: float, name: Optional[str] = None) -> "Stance":
         """Copy with another trunk (``q`` dropped: it must be recomputed)."""
         return Stance(name or self.name, tuple(self.base_pose2d), float(translate), float(tilt), self.stand_off, self.edge, self.face,
-                      self.lateral, self.focus, self.arms, list(self.contacts), None, self.carried, dict(self.extras))
+                      self.lateral, self.focus, self.arms, list(self.contacts), None, self.carried, dict(self.extras), self.fingers)
 
     def shifted(self, stand_off: Optional[float] = None, lateral: Optional[float] = None, name: Optional[str] = None) -> "Stance":
         """Copy moved along the edge frame to another (stand_off, lateral); ``q`` dropped."""
@@ -226,11 +236,13 @@ class Stance:
         lat = self.lateral if lateral is None else float(lateral)
         xy = self.edge.base_xy(s, lat)
         return Stance(name or self.name, (float(xy[0]), float(xy[1]), self.edge.yaw), self.translate, self.tilt, s, self.edge, self.face, lat,
-                      self.focus, self.arms, list(self.contacts), None, self.carried, dict(self.extras))
+                      self.focus, self.arms, list(self.contacts), None, self.carried, dict(self.extras), self.fingers)
 
     # -- serialisation ------------------------------------------------------------------------------------------
     def to_sidecar(self) -> Dict[str, Any]:
-        """The ``stances.<name>`` block of spec §7 (only the keys a stance has)."""
+        """The ``stances.<name>`` block of spec §7 (only the keys a stance has) plus the task's ``extras`` (``goal_cell``,
+        ``init_surface``, ``path_length_m``, ``bearing_deg``, ``deviation_deg``, ...; the F6 ``Sidecar`` keeps unknown keys
+        in ``extra``). A known key is never overridden by an extra."""
         d: Dict[str, Any] = {"base_pose2d": [float(v) for v in self.base_pose2d], "translate": float(self.translate), "tilt": float(self.tilt),
                              "arms": self.arms}
         if self.stand_off is not None:
@@ -248,7 +260,16 @@ class Stance:
             d["contacts"] = list(self.contacts)
         if self.carried is not None:
             d["carried"] = self.carried
+        for k, v in self.extras.items():
+            if k not in d and not str(k).startswith("_"):
+                d[k] = _jsonable(v)
         return d
+
+    def arm_joints(self, arm: str, arm_control_idx) -> Optional[th.Tensor]:
+        """The recorded joint vector of ``arm`` when the stance carries a configuration (``q``), else None."""
+        if self.q is None:
+            return None
+        return G_index(self.q, arm_control_idx[arm])
 
     def to_meta(self) -> Dict[str, Any]:
         """Everything (for ``template_meta.json`` / summaries): the sidecar block plus the frames."""
@@ -530,6 +551,10 @@ class SidecarDraft:
         self.checked_waypoints = []
         self.path_bucket_m = None
         self.tro_sha256 = None
+
+
+def G_index(q: th.Tensor, idx) -> th.Tensor:
+    return q[idx].clone()
 
 
 def _jsonable(x):

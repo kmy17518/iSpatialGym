@@ -126,6 +126,31 @@ it also calls `tabletop.edge_candidates` (per-edge retry when Phase 1c rejects a
 `brace_second_arm`, `in_frame` / `hull_corners_world` / `height_of` / `half_extent` / `hull_extents`. The TEMP stand-in is gone
 (tabletop landed in `957c767`); `iors_small._tabletop()` remains as the accessor `iors_large` imports.
 
+### Stance configuration contract (what the checks lock, seed and attach) — 2026-09-15 evening
+
+- `Stance.q` is the **recorded configuration**: `IKChecker.q_locked(stance)` takes the arm joints and the finger opening
+  from it (the base virtual joints are always re-derived for the current robot root); without `q`, the posture named by
+  `stance.arms` (`"untucked"` default, `"tucked"` / `"reset"` = JoyLo reset arms, `"ready"`) with open grippers, or
+  `stance.fingers`. So the §3.3 exceptions are expressed by the task module setting `q` (held-object hold) or
+  `arms="reset"` (camera relocalization) on the stance — no overrides in the modules are needed any more (the held-object
+  module's TEMP overrides can go).
+- `Stance.carried` names the bddl instance in the hand at that stance; `core.check_stances_with_objects`, the
+  transition re-sweep and the program check attach it **posed in the hand** per its grasp record's `eef_in_object`
+  (`navigation.attached(kit, arm, obj, eef_in_object=...)` — never at the object's current pose), with its own meshes
+  ignored. `program_check._Tracker` starts with `stances["init"].carried`.
+- `core.record_path` / `record_transition` look the carried object up in `sidecar.grasps` (`carried` defaults to the
+  stances' `carried`) and attach it the same way; `record_path(..., force_global=True)` plans on the eroded map end to
+  end; paths are checked at the **departing** stance's trunk (the trunk changes at s_T after the drive) with the
+  departing stance's arms; `trunk=` overrides.
+- Push / brace contacts are IK-checked with **closed** pads (`fingers=0.0` in `exact` / `waypoints_ok` / `screen`; the
+  program check does this for `push` / `brace` actions); `base_follow` in base mode skips the handle poses (reached by
+  the base, not from the stance); every program-check solve runs with `cache=False`.
+- "Arms excluded" collision checks (§4.4 step 3, prompt0): cuRobo checks the whole sphere model and cannot mask links;
+  the accepted stand-in is *arms hanging (tucked, inside the base column) with the self-collision term off*
+  (`tabletop.trunk_sweep_free`) — documented here as the approximation everyone uses.
+- `Stance.to_sidecar()` writes the task's `extras` next to the §7 keys (`goal_cell`, `init_surface`, `path_length_m`,
+  `bearing_deg`, `deviation_deg`, ...); the F6 `Sidecar` keeps them in `extra`. Keys starting with `_` stay private.
+
 ### Sidecar semantics the task modules must keep (F6 programs read them)
 
 - `grasps[].yaw` is the drawn **object** yaw about world z relative to the rest orientation (§4.6); the recorded `grasp` /
