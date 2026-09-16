@@ -265,12 +265,24 @@ class SimState:
         return out
 
     def _supports_of(self, name: str, margin: float) -> List[Any]:
-        out = list(self.touching(name))
+        """Objects that carry ``name``: touching objects whose footprint contains the object's centre (a table, tray,
+        bowl, saucer — not a neighbour lying next to it: the nextto partner touched the marker end to end and was
+        swept aside by a pre-place plan that ignored it), plus structural objects within ``margin``."""
         try:
             obj = self.object(name)
             lo, hi = obj.aabb
         except Exception:  # noqa: BLE001
-            return out
+            return list(self.touching(name))
+        centre = 0.5 * (th.as_tensor(lo).float() + th.as_tensor(hi).float())
+        out: List[Any] = []
+        for ent in self.touching(name):
+            try:
+                lo2, hi2 = ent.aabb
+                inside = bool(th.all(centre[:2] >= th.as_tensor(lo2).float()[:2] - 0.01)) and bool(th.all(centre[:2] <= th.as_tensor(hi2).float()[:2] + 0.01))
+            except Exception:  # noqa: BLE001
+                inside = True
+            if inside or str(getattr(ent, "category", "")) in self.STRUCTURE_CATEGORIES:
+                out.append(ent)
         for inst, ent in (getattr(self.task, "object_scope", None) or {}).items():
             if ent is obj or ent is self.robot or any(ent is o for o in out) or str(getattr(ent, "category", "")) not in self.STRUCTURE_CATEGORIES:
                 continue

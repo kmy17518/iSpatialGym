@@ -493,7 +493,10 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     _hook(ctx, "fov")(False)  # the transit to the pre-place (10 cm back along a tilted approach) may leave the margin
     on = []
     if getattr(action, "on", None) and not drop:  # a drop keeps its container in the collision world: it must not be touched
-        on = contact_ignores(state, action.on, extra=(action.on,))  # the destination container / support and what it rests on
+        if action.relation in ("on", "into", "under") or action.kind == "attach":
+            on = contact_ignores(state, action.on, extra=(action.on,))  # the destination support / container and what it rests on
+        else:
+            on = contact_ignores(state, action.on)  # next to / touching: the partner stays an obstacle, only the shared support leaves
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in on]
     yield from motions.arm_to(arm, pose=targets["pre_place"], q_hint=_witness(ctx, "pre_place"), ignore_objects=on)
     _hook(ctx, "fov")(True)  # the descent ends at the recorded (in-frame) place pose
