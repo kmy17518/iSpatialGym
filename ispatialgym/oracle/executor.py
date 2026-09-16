@@ -95,6 +95,9 @@ class ExecutorConfig:
     #: own error) — the TRO target keeps ``gating: false`` for the policy evaluation, position stays non-gating
     demo_gating: Tuple[str, ...] = ()
     demo_orientation_tolerance_default: float = 0.2
+    #: ``placed_tilt``: the tilt of a placed object's up axis against the recorded goal's up axis (rad; yaw / roll of a
+    #: symmetric or cylindrical object about its own axis does not fail a demo, a fallen cup does)
+    demo_tilt_tolerance: float = math.radians(15.0)
     #: renders after a checkpoint restore before the (recorded) hold step, so no frame of the rolled-back attempt
     #: survives in the video / dataset (the renderer trails ``load_state`` by 1-2 frames)
     restore_renders: int = 3
@@ -864,6 +867,34 @@ class Executor:
                         "target_gating": bool(rep.get("gating", False))}
         return out
 
+    def placed_tilt_report(self) -> Dict[str, Dict[str, Any]]:
+        """Per placed object: the angle between its current up axis (object frame +z in world) and the recorded goal's
+        up axis, minimised over the target's orientation equivalences; ``within`` against ``demo_tilt_tolerance``
+        (None without an orientation target). The sampler's ``goal_tipped`` guard in oracle terms."""
+        out: Dict[str, Dict[str, Any]] = {}
+        for obj in self.placed_objects():
+            tgt = self.state.pose_target(obj) if hasattr(self.state, "pose_target") else None
+            goal_q = getattr(tgt, "orientation", None) if tgt is not None else None
+            if goal_q is None or str(getattr(tgt, "frame", "world")) != "world":
+                out[obj] = {"tilt_rad": None, "tolerance_rad": None, "within": None, "note": "no world orientation target"}
+                continue
+            try:
+                _, q_cur = self.state.object_pose(obj)
+            except Exception:  # noqa: BLE001
+                out[obj] = {"tilt_rad": None, "tolerance_rad": None, "within": None, "note": "no object pose"}
+                continue
+            goal_q = C.as_tensor(goal_q).float()
+            up_goal = C.quat_rotate(goal_q, th.tensor([0.0, 0.0, 1.0]))
+            best = None
+            for e in [None] + list(getattr(tgt, "orientation_equivalences", None) or []):
+                q = q_cur if e is None else C.qmul(q_cur, C.as_tensor(e).float())
+                up = C.quat_rotate(q, th.tensor([0.0, 0.0, 1.0]))
+                ang = math.acos(max(-1.0, min(1.0, float(th.dot(up, up_goal)))))
+                best = ang if best is None or ang < best else best
+            tol = float(self.cfg.demo_tilt_tolerance)
+            out[obj] = {"tilt_rad": float(best), "tilt_deg": math.degrees(best), "tolerance_rad": tol, "tolerance_deg": math.degrees(tol), "within": float(best) <= tol}
+        return out
+
     def orientation_targets(self, isg: Optional[Dict[str, Any]] = None) -> set:
         """Instances whose goal has an orientation target: the evaluator's report says so (``pose_errors[inst]
         .orientation_error`` is a number, None for a position-only / relation-only target), else the TRO meta."""
@@ -964,9 +995,19 @@ class Executor:
         # -- demo-collection gates (owner decision 2026-09-16 10:15): the placed objects' orientation against their
         #    recorded (non-gating) targets decides the *demo* verdict; the TRO / policy evaluation is untouched
         demo_gating: Dict[str, Any] = {"enabled": list(self.cfg.demo_gating)}
+        if self.program_actions and ("placed_orientation" in self.cfg.demo_gating or "placed_tilt" in self.cfg.demo_gating):
+            # both reports are always written when a gate is on, so the strict and the tilt reading can be compared
+            demo_gating["placed_orientation"] = self.placed_orientation_report(isg)
+            demo_gating["placed_tilt"] = self.placed_tilt_report()
+        if "placed_tilt" in self.cfg.demo_gating:
+            rep = demo_gating["placed_tilt"]
+            failed = [o for o, r in rep.items() if r.get("within") is False]
+            if verdict is None and failed:
+                msg = ", ".join(f"{o} tilted {rep[o]['tilt_deg']:.1f} deg > {rep[o]['tolerance_deg']:.0f}" for o in failed)
+                verdict = Verdict("placed_tilt", "placed object tipped off its recorded up axis: " + msg, step=self.n, details={"targets": failed, "errors": {o: rep[o] for o in failed}})
+                self.stats.record(verdict)
         if "placed_orientation" in self.cfg.demo_gating:
-            rep = self.placed_orientation_report(isg)
-            demo_gating["placed_orientation"] = rep
+            rep = demo_gating["placed_orientation"]
             failed = [o for o, r in rep.items() if r.get("within") is False]
             if verdict is None and failed:
                 msg = ", ".join(f"{o} {rep[o]['orientation_error']:.3f} rad > {rep[o]['tolerance']:.2f}" for o in failed)

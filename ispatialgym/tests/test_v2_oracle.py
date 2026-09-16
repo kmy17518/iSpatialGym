@@ -982,6 +982,47 @@ def test_placed_orientation_gates_the_demo_verdict_only(tmp_path):
     ex, *_ = make_executor(env, sc, tmp_path / "d", exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("placed_orientation",)))
     result = ex.run_program(expand(sc.alias, sc))
     assert result["success"] and result["demo_gating"]["placed_orientation"]["apple.n.01_1"]["within"] is None
+    # (e) placed_tilt (the oracle default): a roll about the object's own up axis passes, a tipped object fails
+    tilt_cfg = ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("placed_tilt",))
+    sc, env = world(0.46)
+    apple = env.objects["apple.n.01_1"]
+    yaw = 0.5 + 0.46  # the apple rolled 0.46 rad about its own (vertical) axis relative to the goal yaw 0.5
+
+    def roll(step_action):
+        if env.robot._ag_obj_in_hand["right"] is None and float(th.linalg.norm(apple.pos - th.tensor(_place_goal(sc)))) < 0.08:
+            apple.quat = th.tensor([0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)])
+
+    env.after_step = roll
+    ex, *_ = make_executor(env, sc, tmp_path / "e", exec_cfg=tilt_cfg)
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["success"], result["verdict"]
+    rep = result["demo_gating"]
+    assert rep["placed_tilt"]["apple.n.01_1"]["within"] is True and rep["placed_tilt"]["apple.n.01_1"]["tilt_deg"] < 1.0
+    assert rep["placed_orientation"]["apple.n.01_1"]["within"] is False  # the strict reading is reported alongside
+    sc, env = world(0.46)
+    apple = env.objects["apple.n.01_1"]
+
+    def tip(step_action):
+        if env.robot._ag_obj_in_hand["right"] is None and float(th.linalg.norm(apple.pos - th.tensor(_place_goal(sc)))) < 0.08:
+            apple.quat = th.tensor([math.sin(0.25), 0.0, 0.0, math.cos(0.25)])  # 0.5 rad = 28.6 deg about x: the up axis tips
+
+    env.after_step = tip
+    ex, *_ = make_executor(env, sc, tmp_path / "f", exec_cfg=tilt_cfg)
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["reason"] == "placed_tilt" and abs(result["demo_gating"]["placed_tilt"]["apple.n.01_1"]["tilt_deg"] - 28.6) < 0.5
+    # an equivalence that flips the object (180 deg about x) makes an upside-down placement acceptable for the tilt
+    sc, env = world(0.46)
+    env.task._tro.meta.pose_targets["apple.n.01_1"].orientation_equivalences = [th.tensor([1.0, 0.0, 0.0, 0.0])]
+    apple = env.objects["apple.n.01_1"]
+
+    def flip(step_action):
+        if env.robot._ag_obj_in_hand["right"] is None and float(th.linalg.norm(apple.pos - th.tensor(_place_goal(sc)))) < 0.08:
+            apple.quat = th.tensor([1.0, 0.0, 0.0, 0.0])
+
+    env.after_step = flip
+    ex, *_ = make_executor(env, sc, tmp_path / "g", exec_cfg=tilt_cfg)
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["success"] and result["demo_gating"]["placed_tilt"]["apple.n.01_1"]["tilt_deg"] < 1.0
 
 
 def test_epilogue_motion_rule_ignores_rotation_without_an_orientation_target(tmp_path):
