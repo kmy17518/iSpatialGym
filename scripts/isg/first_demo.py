@@ -241,7 +241,9 @@ def build_board():
         best, best_rank = None, -1
         for r in recs:
             d = r.get("demo") or {}
-            valid_code = all(commit_contains(r.get("code_commit"), f["commit"]) for f in req) and not (r.get("dirty") and req)
+            # validity = the run's commit contains every fix affecting the subtask; the ``dirty`` flag is provenance (the pool syncs
+            # the working tree, which is always dirty while several agents edit) and is shown, not used to invalidate
+            valid_code = all(commit_contains(r.get("code_commit"), f["commit"]) for f in req)
             has_inst = bool(r.get("tro")) or (r.get("sampling") or {}).get("n_written", 0) > 0
             if d.get("success") and valid_code:
                 rank, state = 4, "valid demo"
@@ -265,6 +267,8 @@ def build_board():
         art = (best.get("demo") or {}).get("meta") if best else m.get("artefact", "")
         last = best["time"] if best else m.get("last_change", "")
         fixc = ", ".join(sorted({f["commit"][:7] for f in req})) or "-"
+        if best and best.get("code_commit"):
+            fixc += f" (run @ {best['code_commit'][:7]}{'+dirty' if best.get('dirty') else ''})"
         verdict = ""
         if best and best.get("demo"):
             d = best["demo"]

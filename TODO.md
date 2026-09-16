@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 09:00 PDT — 4/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 09:07 PDT — 7/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -135,11 +135,11 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | CM articulation_close_large_scale | no instance | same as open | large-scale |
 | alignment-world_vertical | demo run | first instance written (4074359); demo loop running (painting_s080) | core / loop |
 | alignment-world_horizontal | no instance | demo loop running (picture_s070) | loop |
-| alignment-axial | demo run (pre-fix success) | push-only axial (owner 08:10): tabletop brace-optional + oracle program; then loop | tabletop / oracle |
-| IORS ontop_small_scale | demo run (pre-fix success) | - | - |
+| alignment-axial | valid demo | push-only axial (owner 08:10): tabletop brace-optional + oracle program; then loop | tabletop / oracle |
+| IORS ontop_small_scale | valid demo | - | - |
 | IORS under_small_scale | demo run | approach witnesses in different IK branches → core branch-consistent solve (approach_untrackable) | core |
 | IORS inside | demo run (pre-fix success) | re-sample after 160c518 (release height) + drop executor | core / oracle |
-| IORS nextto | demo run (pre-fix success) | near-side goal 160c518 (future sampling) | - |
+| IORS nextto | valid demo | near-side goal 160c518 (future sampling) | - |
 | IORS touching | no instance | left bands available; joint gate + blade record (core item 3 pending); loop running (carton_of_milk) | loop / core |
 | IORS ontop_large_scale | no instance | floor-class alias running on the local GPU (owner 08:19); floor cells in-process if the band is empty | coordinator (local) |
 | IORS under_large_scale | no instance | push-under: sampler landed (25e94d3/8140025/032d849), program + executor (oracle) pending | large-scale / oracle |
