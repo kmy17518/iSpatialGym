@@ -1000,8 +1000,10 @@ the partner as the support (the partner-visibility redraw does not apply), C at 
 candidate of the grounded class is drawn uniformly; if A–C cannot be built on it, the remaining candidates *of the
 same class* are tried in random order; none → reject the template.
 
-**Stance A** — tabletop Phase 1 at the support, target the only object on it, plus partner visible: ≥ 4 of the
-partner's 8 AABB corners in frame (0 margin) and its AABB centre in frame. If the lateral draw fails this, redraw the
+**Stance A** — tabletop Phase 1 at the support, target the only object on it, plus the **goal region visible** (owner
+decision 2026‑09‑16 10:47, ontop): the partner's top‑face patch around the goal cell and the partner's nearest bottom
+edge in frame (≥ 5 %), together with the init surface and the target — this replaces "≥ 4 of the partner's 8 AABB
+corners + centre" (which no countertop pair could satisfy). If the lateral draw fails this, redraw the
 lateral position (≤ 6), then the next edge, then the next candidate surface. Record `init_stance`.
 
 **Stance B** — tabletop Phase 2 at the support, same edge as A; band from the reach-band script for (support,
@@ -1036,6 +1038,14 @@ uniform along the edge minus margins, trunk from the band, uniform draw among su
   cell (the cell itself is hidden; the earlier "two bottom AABB corners" rule is unsatisfiable for bed / sofa edges of
   ± 1 m at s = 0.45 — 65° off-axis). **Goal cell** = the band
   cell nearest the init pose.
+
+**Visibility per stance (owner decision 2026‑09‑16 10:47, ontop):** A must see the goal region, the init surface and
+the target (above); **B** (the grasp stance at the init surface) needs neither the goal nor the partner — no
+partner‑visibility redraw at B, its target‑in‑frame rule stays, A → B stays a recorded path / transition; **C** keeps a
+goal‑visibility rule (the place happens in frame): for `ontop` the goal cell must be in frame (5 %); the "optical axis
+within 20° of the goal cell" cone stays for `under`, where the target hides beneath the partner. The camera has no
+independent tilt (rigid on the torso; pitch follows the trunk keyframe) and C cannot stand further back than the
+reach band, so visibility failures at C are edge‑selection or yield questions, not tilt questions.
 
 Record `placement_stance = {stand_off, lateral, translate, tilt, focus / goal_cell, base_pose2d, grasp}`. B → C path
 per 3.7 (≤ `max_partner_geodesic` + 1 m) with the object attached; transition per 3.8 (with the partner as init

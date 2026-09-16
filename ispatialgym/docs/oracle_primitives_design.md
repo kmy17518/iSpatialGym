@@ -443,6 +443,23 @@ Categories, as the executor's verdict / `SkillError.reason` (F3 fixes the final 
 statistics are reported per category and per action name, so a sampler-side cause and a planner-side cause of the
 same symptom stay distinguishable.
 
+Owner decisions 2026‑09‑16: **`gripper_out_of_fov` is armed unconditionally** from the pre‑pose of every manipulation
+action (grasp, lift, place, push, brace) to the end of the action — a leg whose fingertips never enter the frame is
+itself a verdict (`fov_first_entry_step: null`); the transit to the pre‑pose and the retreat legs stay unmonitored, and
+a recorded pre‑pose on the 5 % margin is a sampler defect (the sampler's frame check includes the pre‑poses).
+**Placed‑object orientation gates demo collection only**: `run_isg --mode oracle` (`--demo-gating placed_orientation`,
+default on for oracle runs, off for replay / policy) fails a demo whose placed object ends outside its recorded
+orientation tolerance (`placed_orientation`); the TRO targets keep `gating: false`, so policy evaluation is unchanged;
+position stays non‑gating. **Brush warning (conditional, wall alignment)**: if, with the recorded drive‑in posture
+applied to every free arm, an idle hand (no acting arm, nothing held) still touches the task support (wall / table)
+during `transition` / `set_torso` briefly (< 3 × the monitor's consecutive‑step threshold) with no penetration and no
+displacement of the support, that contact is a *brush warning* in `meta.json` / `annotations.json`, not a failure;
+every other contact (held object, non‑support objects, acting‑arm contacts outside the finger exemption) stays a
+`collision` verdict. **Brace retry ladder**: a braced push that ends outside tolerance restores the checkpoint before
+the brace and re‑braces at +5 / +10 mm outward (target touched the brace before the goal: `short`) or −5 / −10 mm
+inward (residual sign flipped: `overshoot`), re‑pushes the residual, records `meta.brace_retry`; two retries, then
+`tolerance`.
+
 ### 6.5 `run_isg` modes and recording
 
 One script loads an instance (TRO + sidecar + scene variant), then either (i) feeds actions from a policy, (ii)
