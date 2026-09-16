@@ -138,6 +138,9 @@ class ExecuteConfig:
     #: free-space legs (lift / retreat) are finished by ``arm_to`` to their end pose from any stall (no contact made)
     free_leg_finish_max_stall: float = 0.03
     free_leg_finish_max_remaining: float = 0.6
+    #: a contact pre-pose next to an ignored support (wall, table) is reached via a standoff this far away from the
+    #: support, planned with the support present, then a straight leg (``reach_pre_pose``)
+    pre_pose_standoff_m: float = 0.08
 
 
 CONFIG = ExecuteConfig()
@@ -177,6 +180,49 @@ def contact_ignores(state, name: str, extra: Sequence[str] = ()) -> List[Any]:
         if not any(o is x for x in out):
             out.append(o)
     return out
+
+
+def escape_direction(state, pose, objects: Sequence[Any]) -> Optional[th.Tensor]:
+    """Unit direction from the ignored supports to ``pose`` (the sum of the vectors from the nearest point of each
+    object's AABB to the pose position): away from a wall horizontally, up from a table; None when there is none."""
+    p = as_world_pose(pose)[0]
+    total = th.zeros(3)
+    for o in objects:
+        try:
+            lo, hi = o.aabb
+        except Exception:  # noqa: BLE001
+            continue
+        lo, hi = C.as_tensor(lo).float(), C.as_tensor(hi).float()
+        nearest = th.minimum(th.maximum(p, lo), hi)
+        v = p - nearest
+        if float(th.linalg.norm(v)) < 1e-4:  # the pose sits inside the AABB: leave through the nearest face
+            gaps = th.cat([p - lo, hi - p])
+            k = int(th.argmin(gaps))
+            v = th.zeros(3)
+            v[k % 3] = -1.0 if k < 3 else 1.0
+        total = total + v / max(float(th.linalg.norm(v)), 1e-9)
+    n = float(th.linalg.norm(total))
+    return None if n < 1e-6 else total / n
+
+
+def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[Any], through: Sequence[Any], q_hint, ctx: Dict[str, Any], cfg: "ExecuteConfig") -> Iterator[th.Tensor]:
+    """Reach a contact pre-pose that the sampler checked with its supports ignored (a wall / table 2 cm from the
+    pads). The supports leave the collision world only for the **last straight leg**: the trajopt goes to a standoff
+    ``pre + standoff · n`` (``n`` away from the supports) with the supports present — a trajopt with the wall ignored
+    planned the hand *through* the wall region and the arm jammed against it (1.39 rad joint error on the painting
+    push) — then a straight ``arm_along`` closes the standoff. ``through`` (the pushed target) is ignored for both."""
+    if not supports:
+        yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(through))
+        return
+    n = escape_direction(state, pre, supports)
+    if n is None:
+        yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(supports) + list(through))
+        return
+    p, q = as_world_pose(pre)
+    standoff = (p + n * cfg.pre_pose_standoff_m, q)
+    ctx["pre_pose_standoff"] = {"direction": [round(float(v), 3) for v in n.tolist()], "distance_m": cfg.pre_pose_standoff_m}
+    yield from motions.arm_to(arm, pose=standoff, ignore_objects=list(through))
+    yield from motions.arm_along(arm, [pre], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
 
 
 def _hook(ctx: Dict[str, Any], name: str):
@@ -704,9 +750,13 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     obj = action.contact.object
     _hook(ctx, "fov")(False)
     yield from motions.gripper(arm, close=True)
-    supports = contact_ignores(state, obj)  # the wall / table the target rests against: ignored along the contact chain (sampler rule)
-    ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in supports]
-    yield from motions.arm_to(arm, pose=targets["pre"], q_hint=_witness(ctx, "pre"), ignore_objects=supports)
+    supports = contact_ignores(state, obj)  # the wall / table the target rests against (sampler rule: ignored along the chain)
+    try:
+        through = [state.object(obj)]  # the pushed object leaves the collision world for the push plan (program_check._ignore_for)
+    except Exception:  # noqa: BLE001
+        through = []
+    ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in list(supports) + through]
+    yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, through, _witness(ctx, "pre"), ctx, cfg)
     _hook(ctx, "fov")(True)
     pose0 = tuple(x.clone() for x in state.object_pose(obj))
     ctx["object_pose0"] = pose0
@@ -761,12 +811,13 @@ def post_push(action: Push, state, targets, ctx) -> Optional[str]:
 
 
 def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
+    cfg = _cfg(ctx)
     arm = action.contact.arm
     _hook(ctx, "fov")(False)
     yield from motions.gripper(arm, close=True)
     supports = contact_ignores(state, action.contact.object)  # the wall / table the braced object rests against
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in supports]
-    yield from motions.arm_to(arm, pose=targets["pre"], q_hint=_witness(ctx, "pre"), ignore_objects=supports)
+    yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, [], _witness(ctx, "pre"), ctx, cfg)
     _hook(ctx, "fov")(True)
     yield from motions.arm_along(arm, targets["approach"])
 
@@ -872,6 +923,6 @@ def coverage() -> Dict[str, bool]:
 __all__ = [
     "PrivilegedState", "ExecuteConfig", "CONFIG", "EXECUTORS", "MANIPULATION_ACTIONS", "FOV_EXEMPT_ACTIONS", "executor_for",
     "is_manipulation", "fov_monitored", "run_action", "check_postcondition", "coverage", "camera_goal", "joint_tolerance",
-    "idle_arm_targets", "stance_arm_targets", "move_idle_arms", "stance_fingers", "posture_q", "contact_ignores", "IDLE_POSTURES", "IDLE_ARM_TOL", "intended_contacts", "forbidden_contacts", "offset_brace",
+    "idle_arm_targets", "stance_arm_targets", "move_idle_arms", "stance_fingers", "posture_q", "contact_ignores", "escape_direction", "reach_pre_pose", "IDLE_POSTURES", "IDLE_ARM_TOL", "intended_contacts", "forbidden_contacts", "offset_brace",
     "push_geometry", "push_residual", "extend_push", "push_tangent", "PushGeometry",
 ]
