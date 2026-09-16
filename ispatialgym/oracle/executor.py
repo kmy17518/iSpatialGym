@@ -236,11 +236,35 @@ class SimState:
     #: structural categories a target rests against without a contact report (a painting attached to its wall)
     STRUCTURE_CATEGORIES = ("walls", "floors", "ceilings", "window", "door")
 
-    def contact_supports(self, name: str, margin: float = 0.10) -> List[Any]:
+    def contact_supports(self, name: str, margin: float = 0.10, depth: int = 2) -> List[Any]:
         """The objects ``name`` rests in / on / against — what the sampler ignores for that object's contact poses
-        (spec §3.6 "support ignored for the grasp pose", the source tray of disembedding, the wall along the whole
-        brace chain of wall alignment): the ``touching`` objects plus the structural task-scope objects (walls,
-        floors, ...) whose AABB lies within ``margin`` of the object's. ``[]`` without the simulator."""
+        (spec §3.6 "support ignored for the grasp pose", disembedding's ``[support, src]`` = the table and the source
+        tray, the wall along the whole brace chain of wall alignment): the ``touching`` objects plus the structural
+        task-scope objects (walls, floors, ...) whose AABB lies within ``margin`` of the object's, followed
+        transitively for ``depth`` levels (the tray's own support, the table, is within cuRobo's activation distance
+        of fingertips on the tray floor). Held objects and the robot are never included. ``[]`` without the simulator."""
+        held = [o for o in self.held_objects()]
+        out: List[Any] = []
+        frontier = [name]
+        for _ in range(max(1, int(depth))):
+            nxt: List[str] = []
+            for n in frontier:
+                for ent in self._supports_of(n, margin):
+                    if any(ent is o for o in out) or any(ent is h for h in held):
+                        continue
+                    try:
+                        if ent is self.object(name):
+                            continue
+                    except KeyError:
+                        pass
+                    out.append(ent)
+                    nxt.append(ent.name)
+            frontier = nxt
+            if not frontier:
+                break
+        return out
+
+    def _supports_of(self, name: str, margin: float) -> List[Any]:
         out = list(self.touching(name))
         try:
             obj = self.object(name)
