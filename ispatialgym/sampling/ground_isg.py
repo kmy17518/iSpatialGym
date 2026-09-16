@@ -1660,6 +1660,13 @@ class Grounder:
                         outcome = run_representative_test(gp, self.customs, sc)
                         if outcome:
                             self.report.tests.append(f"{gp.alias} @ {sc}: {outcome}")
+            if self.opt.reseed_generation:
+                # entries of the subtask this run did not produce (superseded fallbacks) follow the spec number too
+                produced = {gp.alias for gp in self.grounded if gp.subtask == subtask}
+                iddl_rel = I.relative_path(self.iddls[subtask].path, self.iddl_root) if self.iddls[subtask].path else None
+                for alias, entry in self.customs.entries.items():
+                    if alias not in produced and entry.iddl == iddl_rel:
+                        entry.generation = G.seed_generation(subtask, entry.to_dict(), reseed=self.opt.reseed_generation)
             if not self.opt.dry_run:
                 self.customs.save()
         return self.report
