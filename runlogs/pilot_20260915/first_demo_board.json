@@ -32,20 +32,20 @@
   "owner": "loop"
  },
  "configuration_matching-block_design": {
-  "blocking": "0/8 at 10.1 cm: picks/places marginal at \u03bb\u22480 (left-band anchor rule) \u2014 owner ladder (pitched primary, region 0.5\u20130.6 m, 1 mm tip) in progress; question: brace optional for blocks too?",
-  "owner": "tabletop / owner"
+  "blocking": "braces optional + ladder landed (561f343); still no instance: single-cube probe shows 14\u201330/56 pick classes feasible at every cell \u2192 the failure is the multi-block configuration (yaw jitter / neighbours / \u03bb \u22120.4\u2026\u22120.56 cells) \u2192 replay the failing block in the probe",
+  "owner": "tabletop"
  },
  "configuration_matching-attachment": {
-  "blocking": "one attempt took 1457 s (brace candidates) \u2192 remote_run timeout; needs the attempt budget cut",
+  "blocking": "attempts 260\u2013320 s now (094cfe3) but no instance: reorientation_unreachable (SLERP to pre-attach), empty F, time_budget, contact_unreachable, partner_placement",
   "owner": "tabletop"
  },
  "configuration_matching-articulation_open_small_scale": {
-  "blocking": "left-band body-face brace wired (c0bbe0f); toolbox lid handle at 85\u00b0 out of reach (no_workspace); hinged_jar rerun in progress",
-  "owner": "tabletop"
+  "blocking": "hinged_jar: handle band only at tall trunks (translate 0/0.25) and Phase 2 finds 0 (stance, focus) pairs within the 20\u00b0 cone from them (no independent camera tilt) \u2192 decision: focus-in-frame instead of the 20\u00b0 cone for small articulation? toolbox: lid handle at 85\u00b0 out of reach; laptop: target_placement",
+  "owner": "tabletop / owner"
  },
  "configuration_matching-articulation_close_small_scale": {
   "blocking": "same as open",
-  "owner": "tabletop"
+  "owner": "tabletop / owner"
  },
  "configuration_matching-articulation_open_large_scale": {
   "blocking": "floor fixed (7 Phase-2 survivors/attempt); step 5: handle [pre, final] exact IK fails (pinch -1) x15, arm reaches j_link_2 only to fraction \u2264 0.11 from d 0.75\u20130.80 x8 \u2192 large-scale (stance distance / opening reach); no blacklist before the verdict (owner)",
