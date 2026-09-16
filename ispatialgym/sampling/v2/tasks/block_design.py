@@ -184,7 +184,11 @@ class BlockDesign(SamplerV2):
         """§4.5: regions of >= n_blocks + 2 band cells at spacing edge·√2 + 0.03 within ``REGION_RADIUS`` of a centre cell;
         the 2 x 2 goal grid (pitch = edge + 1 mm) at the region centre still on the top."""
         n_need = self.n_blocks() + int(self.g("region_extra_cells"))
-        spacing = self.edge * math.sqrt(2) + float(self.g("region_spacing_extra_m"))
+        # §4.5 spacing edge·√2 + 0.03 (6.5 cm for the 2.5 cm cube) puts the neighbouring cubes under the open fingers of a
+        # top-down pinch (pads ±5 cm from the centre + the finger): the spacing is at least half the opening + a finger
+        # + half an edge + 5 mm (7.95 cm → adjacent 8 cm lattice cells) so that every block can be pinched with the
+        # others still at their cells
+        spacing = max(self.edge * math.sqrt(2) + float(self.g("region_spacing_extra_m")), 0.5 * C.GRIPPER_OPEN_M + FINGER_HALF_THICKNESS + 0.5 * self.edge + 0.005)
         right, toward, _ = self._table_axes(stance)
         pitch = self._pitch()
         out, seen = [], set()
