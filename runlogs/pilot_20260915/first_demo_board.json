@@ -64,8 +64,8 @@
   "owner": "large-scale"
  },
  "alignment-axial": {
-  "blocking": "-",
-  "owner": "-"
+  "blocking": "sweep-1 program check rejected push-only instances (core PROGRAM_BLOCKS still required the brace) \u2192 fixed 6c3d967, re-running",
+  "owner": "loop"
  },
  "inter_object_relation_satisfaction-ontop_small_scale": {
   "pre_fix_demo": true,
@@ -79,15 +79,12 @@
   "owner": "core"
  },
  "inter_object_relation_satisfaction-inside": {
-  "blocking": "re-sample after 160c518 (release height) + drop executor",
-  "owner": "core / oracle"
+  "blocking": "sweep-1 regression: grasp_unreachable x6 'exact IK failed at pose 1 of 2' (the pre-grasp) after the 12:00\u201314:00 core changes (11:01 run sampled at attempt 0) \u2192 core to bisect",
+  "owner": "core"
  },
  "inter_object_relation_satisfaction-nextto": {
-  "pre_fix_demo": true,
-  "blocking": "near-side goal 160c518 (future sampling)",
-  "owner": "-",
-  "artefact": "runlogs/pilot_20260915/demos/inter_object_relation_satisfaction-nextto-jar_of_spaghetti_sauce-\u2026__0000/\u2026/meta.json",
-  "last_change": "2026-09-16 04:37 PDT"
+  "blocking": "sampled; demo lift stalled (diff-IK 5.2 mm at waypoint 7/31, no joint limit) \u2192 oracle DLS item, demo-only re-run",
+  "owner": "oracle"
  },
  "inter_object_relation_satisfaction-touching": {
   "blocking": "approach_untrackable (intermediate waypoint collides with the target itself) + place_unreachable \u2192 core: ignore the target along the approach segment",
