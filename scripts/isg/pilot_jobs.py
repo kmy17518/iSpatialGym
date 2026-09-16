@@ -159,7 +159,7 @@ def cmd_chunks(args):
     progress = json.load(open(args.progress))["aliases"] if args.progress else {}
     requested = args.instances
     complete = {a for a, r in progress.items() if r.get("n_written", 0) >= requested}
-    fallback_ids = {a for a, (st, e) in entries.items() if e.get("fallback_of")}
+    fallback_ids = {a for a, (st, e) in entries.items() if e.get("fallback_of") or (e.get("fallback_params") or {}).get("superseded_by")}
     import re as _re
 
     excl = _re.compile(args.exclude_alias_regex) if args.exclude_alias_regex else None
@@ -230,13 +230,21 @@ def cmd_fallbacks(args):
     """Fallback aliases (customs ``fallback_of``) whose primary yielded nothing so far -> one chunk manifest."""
     entries = load_entries(args.customs)
     progress = json.load(open(args.progress))["aliases"]
+    # the primary's ``fallbacks`` list is authoritative (D1: an entry with ``fallback_params.superseded_by`` is dormant)
     ranks = collections.defaultdict(list)
     for a, (st, e) in entries.items():
-        if e.get("fallback_of"):
+        live = e.get("fallbacks")
+        if live:
+            for r, fb in enumerate(live, 1):
+                if fb in entries and not (entries[fb][1].get("fallback_params") or {}).get("superseded_by"):
+                    ranks[a].append((r, fb))
+    for a, (st, e) in entries.items():  # entries without a ``fallbacks`` list: fall back to fallback_of / fallback_rank
+        if e.get("fallback_of") and e["fallback_of"] in entries and not entries[e["fallback_of"]][1].get("fallbacks") \
+                and not (e.get("fallback_params") or {}).get("superseded_by"):
             ranks[e["fallback_of"]].append((int(e.get("fallback_rank", 1)), a))
     todo = []
     for primary, fbs in ranks.items():
-        chain = [primary] + [a for _, a in sorted(fbs)]
+        chain = [primary] + [a for _, a in sorted(set(fbs))]
         # the first alias of the chain without a result that has not yielded yet
         for prev, nxt in zip(chain, chain[1:]):
             r = progress.get(prev)
