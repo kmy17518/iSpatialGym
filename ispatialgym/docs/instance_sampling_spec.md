@@ -538,6 +538,15 @@ h = top height, s = stand-off.
 
 ### 4.1 Reach-band script
 
+**Band scope (owner decision 2026‑09‑16, A1).** Bands are per arm. Besides the right‑arm grasp / generic‑pinch bands,
+a **left‑arm generic contact band** is computed per support and 2 cm object‑height class: closed gripper, pads on the
+near / far / left / right face at ¾ h or a top press, two closing axes, eef = point − CONTACT_CENTER_Z·a (the contact
+set depends on the contact height and approach, not on the object's grasps, so one band serves a height class). The
+generic push / pinch set has the approach pitches {0, 30, 45, 60}° (the pitched classes keep an IK‑feasible push arc
+at far cells, 0.9–1.0 m). Every generic / contact band records a per‑cell class bitmask (`meta.classes`). When a
+trunk self‑collides with untucked arms the script retries it with the alternative idle posture (A6) and records the
+posture used.
+
 ```
 python -m ispatialgym.sampling.reach_bands --scene S --support T --target CATEGORY/MODEL [--grasp-key K]
 ```
@@ -585,7 +594,10 @@ border at the source-tray depth) and R_img (surface distance from the target to 
 ### 4.4 Phase 1c — lateral position
 
 1. Margins. w_x = half the larger horizontal bbox side of object x (random yaw); [λ_min, λ_max] = band union extent
-   (λ_min ≤ 0 right end, λ_max left end); W_p = the partner's top-down AABB extent along the edge (canonical
+   (λ_min ≤ 0 right end, λ_max left end) — for two‑arm tasks the union of the working arm's band and the left contact
+   band (A1; `[pilot]` on `breakfast_table_rhjoby_0` this makes block design 1.21 m and axial 1.46 m, so only the
+   2.9 m edge admits them; the implementation keeps the working‑arm band as the default and the union behind
+   `ISG_MARGIN_UNION=1` until the owner confirms); W_p = the partner's top-down AABB extent along the edge (canonical
    orientation); D_p = maximum edge-to-edge gap target–partner (the partner's side is random, so both margins carry
    it); safety 0.02.
 
@@ -629,6 +641,19 @@ limit (same edge and lateral as the init stance):
 5. Transition check init → manipulation (3.8); on failure take the next survivor.
 
 ### 4.6 Phase 3 — sample objects
+
+**Joint two‑arm placement (A1).** For a two‑arm task (axial stop edge, attachment partner brace, block row / column
+braces, touching partner brace) the working point must lie in a right‑band cell and the brace point in a left contact
+band cell **of the same trunk**, the brace's contact class passing where the band records classes; then the exact
+two‑arm IK of step 6, the touched objects ignored only for the contact poses and the combined check. The push / stop
+approach pitch follows the cell's passing classes (shallowest first); 45° / 60° are tried before rejecting. A stop
+blade stands `finger_profile(h above the fingertips) + 5 mm` outside the goal face — the closed R1Pro finger is a
+wedge: outer face 8.4 mm from the closing plane over the last 3 cm of the tip, 18 mm above, palm beyond ≈ 7 cm — on
+the part of the face the turning object does not sweep before the goal, and is checked against the target at its
+goal pose (3 mm margin); the push contact keeps its ignore. `[pilot]` finding: on `breakfast_table_rhjoby_0` the
+right band ends at λ ≤ 0.0 and the left contact band starts at λ ≥ 0.08 at the manipulation trunks, and the sweep‑clear
+part of a stop face lies within ≈ 7 cm of the pushed end, so push and stop points share one lateral — the two‑arm
+axial stop is at the robot's limit there (0 / 8 with both bands).
 
 1. **Target init pose.** Screen the 8 fixed yaws (45° steps) × library grasps at the focus cell with the 12-seed IK
    from the manipulation stance → feasible set F; store F in the band cache under (trunk, cell) (empty F removes the
