@@ -486,6 +486,25 @@ class IORSLarge(SamplerV2):
         """The under goal is reached by drop + straight floor push (``generation.under_mode`` = ``"push"`` default)."""
         return self.relation == "under" and str(self.gp.gen("under_mode", "push")) == "push"
 
+    #: ground-like scene categories whose AABB spans rooms (the garden lawn's AABB covers the child's room floor strip)
+    GROUND_CATEGORIES = ("floors", "ceilings", "walls", "lawn", "driveway", "roof", "pool", "carpet", "rug", "mat", "doormat", "fence", "rail_fence")
+    GROUND_FOOTPRINT_M2 = 15.0
+
+    def floor_blocking_objects(self) -> List[Any]:
+        """Scene objects whose AABB blocks a floor cell for the target / the drop: not ground-like (categories above, or a
+        footprint > 15 m²), not the robot, not spawned, ≥ 5 cm tall (flat floor coverings are part of the floor)."""
+        out = []
+        for o in self.world.scene.objects:
+            if o.category in self.GROUND_CATEGORIES or o is self.robot or o.name in self.world.spawned:
+                continue
+            lo, hi = o.aabb
+            if float(hi[2] - lo[2]) < 0.05:
+                continue
+            if float((hi[0] - lo[0]) * (hi[1] - lo[1])) > self.GROUND_FOOTPRINT_M2:
+                continue
+            out.append(o)
+        return out
+
     def _free_floor_cell(self, xy, why: Optional[Dict[str, int]] = None) -> bool:
         """Free floor for the drop: un-eroded traversable, in the task rooms, ≥ 2 cm outside every object AABB (flat
         floor coverings < 5 cm ignored; the AABB list is built once per template). ``why`` counts the failing filter."""
@@ -500,9 +519,7 @@ class IORSLarge(SamplerV2):
             return False
         aabbs = self.__dict__.get("_floor_aabbs")
         if aabbs is None:
-            objs = [o for o in self.world.scene.objects if o.category not in ("floors", "ceilings", "walls") and o is not self.robot and o.name not in self.world.spawned]
-            objs = [o for o in objs if float(o.aabb[1][2] - o.aabb[0][2]) >= 0.05]
-            aabbs = [(o.name, o.aabb[0][:2].float() - 0.02, o.aabb[1][:2].float() + 0.02) for o in objs]
+            aabbs = [(o.name, o.aabb[0][:2].float() - 0.02, o.aabb[1][:2].float() + 0.02) for o in self.floor_blocking_objects()]
             self._floor_aabbs = aabbs
         hit = [n for n, a, b in aabbs if bool((p >= a).all() and (p <= b).all())]
         if hit:
@@ -795,9 +812,7 @@ class IORSLarge(SamplerV2):
         rb = self.band("floor")
         self.surface["band"] = rb
         half, height = self.target_dims()
-        objs = [o for o in self.world.scene.objects if o.category not in ("floors", "ceilings", "walls") and o is not self.robot and o.name not in self.world.spawned]
-        # flat floor coverings (carpets, rugs, mats: < 5 cm tall) are part of the floor the robot and the target stand on
-        objs = [o for o in objs if float(o.aabb[1][2] - o.aabb[0][2]) >= 0.05]
+        objs = self.floor_blocking_objects()
         aabbs = [(o.aabb[0][:2].float() - clearance, o.aabb[1][:2].float() + clearance) for o in objs]
         # candidate anchors: free floor cells within max_geo of the partner's near side, outside every AABB and the partner footprint
         xs = th.arange(float(lo[0]) + cell / 2, float(hi[0]), cell * 4)  # 8 cm search grid (the 2 cm raster is the draw's resolution)
