@@ -41,7 +41,7 @@ PROGRAM_BLOCKS: Dict[str, Tuple[str, ...]] = {
     "configuration_matching-attachment": ("stances.init", "stances.manipulation", "transitions", "grasps", "contacts.brace"),
     "alignment-world_vertical": ("stances.init", "stances.manipulation", "contacts.push", "contacts.brace"),
     "alignment-world_horizontal": ("stances.init", "stances.manipulation", "contacts.push", "contacts.brace"),
-    "alignment-axial": ("stances.init", "stances.manipulation", "transitions", "contacts.push", "contacts.brace"),
+    "alignment-axial": ("stances.init", "stances.manipulation", "transitions", "contacts.push"),  # brace optional (owner 2026-09-16 08:10; F6 9b03aa4)
     "inter_object_relation_satisfaction-ontop_small_scale": ("stances.init", "stances.manipulation", "transitions", "grasps"),
     "inter_object_relation_satisfaction-under_small_scale": ("stances.init", "stances.manipulation", "transitions", "grasps"),
     "inter_object_relation_satisfaction-inside": ("stances.init", "stances.manipulation", "transitions", "grasps"),
