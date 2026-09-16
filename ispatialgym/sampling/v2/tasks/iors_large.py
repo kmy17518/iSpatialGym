@@ -26,6 +26,20 @@ turns the compute-on-miss into ``Reject("missing_band")``).
 Tabletop phases 1a / 1b / 1c / 2 are ``v2/tabletop.py``'s (edge candidates, init trunk, lateral draw, Phase-2 survivors
 with the (support, target) band). Floor init: Stance A's trunk is the translate whose optical axis is closest to the
 floor cell with the target and the partner in frame (the §4.3 Δ solve has no edge on the floor; documented stand-in).
+
+**Push-under (owner decision 2026‑09‑16 06:50, item 7; ``generation.under_mode`` = ``"push"`` default).** The floor under
+a bed / sofa is out of the arm's reach (B3: 0.24–0.64 m ahead at the deep trunks only), so the under goal is reached in
+two strokes from stance C (base square to the near footprint edge, facing inward = the push direction, stand-off
+0.5–0.7 m, floor trunks): (1) a **drop** of the carried target on a free floor cell ``half + 0.10`` m outside the edge
+(object bottom 3 cm above the floor; ``grasps[0].place`` / ``pre_place`` = the release, ``place_kind: "drop"``,
+``place_on`` = the floor), (2) a **straight floor-level push** of the closed gripper from behind the target to the
+**goal cell** 7 cm inside the footprint edge (the ``under`` predicate needs the centre column only; the cell must clear
+target height + 3 cm) — ``contacts.push`` with ``kind: "push_under"``, ``pre`` / ``init`` (start) / ``mid`` / ``goal`` blade
+poses (blade stand-off from ``tabletop.blade_standoff`` over the target's face height, approach pitched 0–60° toward
+the push), ``direction``, ``distance_m``, ``push_height_m``, ``drop_cell`` / ``goal_cell``. Exact IK on the fly from C for
+the drop (floor ignored, object attached) and the push chain (floor + target ignored, partner present). The program
+appends ``push → retreat`` after ``place(drop) → retreat``; ``under`` is read in the epilogue; the goal-feasibility check
+teleports the target to the goal cell as before.
 """
 
 from __future__ import annotations
@@ -50,8 +64,9 @@ from ispatialgym.sampling.v2 import ik as IK
 from ispatialgym.sampling.v2 import prompt0 as P0
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, register
+from ispatialgym.robot import conventions as C
 from ispatialgym.sampling.v2.navigation import attached
-from ispatialgym.sampling.v2.stances import EdgeFrame, GraspRecord, Stance
+from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Stance
 
 log = logging.getLogger("ispatialgym.sampling.v2")
 
@@ -68,6 +83,35 @@ INIT_SURFACE_CLASSES = ("support", "partner", "floor")
 SCENE_INVENTORY_ROOT = os.path.join(REPO_ROOT, "runlogs", "scene_inventory_20260915")
 STAND_OFFS = (0.35, 0.45, 0.55)
 SUPPORT_MARGIN = 0.02
+# ---- push-under (owner decision 2026‑09‑16 06:50, item 7): the under goal is reached by a drop just outside the partner's
+# footprint edge and a straight floor-level push of the target under the edge ------------------------------------------------
+PUSH_UNDER_INSIDE_M = 0.07          # goal = the target centre this far inside the footprint edge (5–10 cm; ``under`` needs the centre column)
+PUSH_UNDER_DROP_EXTRA_M = 0.10      # drop centre = half extent along the push + this outside the edge
+PUSH_UNDER_DROP_HEIGHT_M = 0.03     # object bottom above the floor at the release (≥ 2 cm)
+PUSH_UNDER_STAND_OFFS = (0.5, 0.55, 0.6, 0.65, 0.7)  # base stand-off from the edge: the drop cell 0.25–0.6 m ahead (B3: the floor is reachable 0.24–0.64 m ahead)
+PUSH_UNDER_DROP_AHEAD_M = (0.25, 0.60)
+PUSH_UNDER_CLEARANCE_M = 0.005      # blade clearance to the target's back face at the push start
+#: trunks that reach the floor (B3 floor bands, A6 recompute: cells only at translate ≥ 0.75, tilt ≤ −0.9)
+FLOOR_TRUNKS = ((0.75, -0.9), (0.75, -1.2), (0.95, -0.9), (0.95, -1.2))
+
+
+class PushUnderRecord(ContactRecord):
+    """``contacts.push`` of the push-under (F6 ``PushContact`` + extras): ``kind: "push_under"``, straight floor-level
+    push ``init → mid → goal`` of the closed gripper (blade behind the target along the push direction), from the
+    placement stance; ``push_height_m``, ``pitch_deg``, ``blade_standoff_m``, ``half_extent_m`` (target half extent along
+    the push), ``drop_cell`` / ``goal_cell`` (target centres, world xy)."""
+
+    def __init__(self, arm: str, pre, start, mid, goal, direction, distance_m: float, object: str, stance: str = "placement", **extras):
+        super().__init__("push", arm, pre, start, mid, goal, direction, distance_m, None, object, stance)
+        self.extras: Dict[str, Any] = dict(extras)
+
+    def to_sidecar(self) -> Dict[str, Any]:
+        d = super().to_sidecar()
+        d["kind"] = "push_under"
+        for k, v in self.extras.items():
+            if k not in d:
+                d[k] = _jsonable(v)
+        return d
 TARGET_JITTER = math.radians(22.5)
 FOCUS_RADIUS = 0.05
 YAWS = [k * math.pi / 4 for k in range(8)]
@@ -391,15 +435,26 @@ class IORSLarge(SamplerV2):
                 clear_map = rec["under_clearance"]
             else:
                 cells, clear_map = self._under_raycast(partner, need), None
-            # inside the footprint shrunk by half-extent + 0.05 and within 0.45 m of a near AABB edge
-            fp_lo, fp_hi = lo[:2].float() + margin, hi[:2].float() - margin
-            if len(cells):
-                inside = ((cells >= fp_lo) & (cells <= fp_hi)).all(dim=1)
-                cells = cells[inside]
             edges = aabb_edges(lo, hi)
-            self.place = {"cells": cells, "edges": edges, "z": self.floor_z, "height": height, "half": half, "clearance": clear_map}
-            if len(cells) == 0:
-                raise Reject("under_clearance", f"{partner.name}: no floor cell under it clears {need:.2f} m inside the footprint eroded by {margin:.2f} m")
+            if self.push_under:
+                # push-under: goal cells sit at the footprint edge (centre 5–10 cm inside; the target's outer part may stick
+                # out) — keep the clear cells within 0.12 m inside any AABB edge
+                if len(cells):
+                    depth = th.stack([th.minimum(cells[:, 0] - lo[0].float(), hi[0].float() - cells[:, 0]),
+                                      th.minimum(cells[:, 1] - lo[1].float(), hi[1].float() - cells[:, 1])], dim=1).min(dim=1).values
+                    cells = cells[(depth >= 0.0) & (depth <= PUSH_UNDER_INSIDE_M + 0.05)]
+                self.place = {"cells": cells, "edges": edges, "z": self.floor_z, "height": height, "half": half, "clearance": clear_map, "need": need}
+                if len(cells) == 0:
+                    raise Reject("under_clearance", f"{partner.name}: no floor cell within {PUSH_UNDER_INSIDE_M + 0.05:.2f} m of its footprint edge clears {need:.2f} m")
+            else:
+                # inside the footprint shrunk by half-extent + 0.05 and within 0.45 m of a near AABB edge
+                fp_lo, fp_hi = lo[:2].float() + margin, hi[:2].float() - margin
+                if len(cells):
+                    inside = ((cells >= fp_lo) & (cells <= fp_hi)).all(dim=1)
+                    cells = cells[inside]
+                self.place = {"cells": cells, "edges": edges, "z": self.floor_z, "height": height, "half": half, "clearance": clear_map, "need": need}
+                if len(cells) == 0:
+                    raise Reject("under_clearance", f"{partner.name}: no floor cell under it clears {need:.2f} m inside the footprint eroded by {margin:.2f} m")
         self.template_facts["partner"] = {"name": partner.name, "n_goal_cells": int(len(self.place["cells"])), "edges": [e.to_json() for e in self.place["edges"]]}
 
     def _raster_rim(self, top: SupportTop) -> th.Tensor:
@@ -423,6 +478,90 @@ class IORSLarge(SamplerV2):
         prims = {l.prim_path for l in partner.links.values()}
         keep = [k for k, h in enumerate(hits) if h["hit"] and h["rigidBody"] in prims and float(h["position"][2]) - self.floor_z >= need]
         return pts[keep] if keep else th.zeros(0, 2)
+
+    # ------------------------------------------------------------------ push-under helpers (owner decision 2026‑09‑16 item 7)
+
+    @property
+    def push_under(self) -> bool:
+        """The under goal is reached by drop + straight floor push (``generation.under_mode`` = ``"push"`` default)."""
+        return self.relation == "under" and str(self.gp.gen("under_mode", "push")) == "push"
+
+    def _free_floor_cell(self, xy) -> bool:
+        """Free floor for the drop: un-eroded traversable, in the task rooms, ≥ 2 cm outside every object AABB (flat
+        floor coverings < 5 cm ignored; the AABB list is built once per template)."""
+        if not self.kit.trav_free(xy) or not P0.in_task_rooms(self, xy):
+            return False
+        aabbs = self.__dict__.get("_floor_aabbs")
+        if aabbs is None:
+            objs = [o for o in self.world.scene.objects if o.category not in ("floors", "ceilings", "walls") and o is not self.robot and o.name not in self.world.spawned]
+            objs = [o for o in objs if float(o.aabb[1][2] - o.aabb[0][2]) >= 0.05]
+            aabbs = [(o.aabb[0][:2].float() - 0.02, o.aabb[1][:2].float() + 0.02) for o in objs]
+            self._floor_aabbs = aabbs
+        p = th.as_tensor([float(xy[0]), float(xy[1])])
+        return not any(bool((p >= a).all() and (p <= b).all()) for a, b in aabbs)
+
+    def drop_pose_at(self, xy, quat) -> G.Pose:
+        """Release pose of the push-under drop: the target's bottom ``PUSH_UNDER_DROP_HEIGHT_M`` above the floor at ``xy``."""
+        z = self.floor_z + self.world.bottom_offset(self.hull, quat) + float(self.num("drop_height_m", PUSH_UNDER_DROP_HEIGHT_M))
+        return th.tensor([float(xy[0]), float(xy[1]), z]), quat
+
+    def half_extent_along(self, quat, direction_xy) -> float:
+        """Half extent of the target's footprint along a horizontal direction at orientation ``quat``."""
+        pts = G.local_points_world(self.hull, (th.zeros(3), quat))[:, :2]
+        d = th.as_tensor([float(direction_xy[0]), float(direction_xy[1])])
+        d = d / th.linalg.norm(d)
+        proj = pts @ d
+        return float(proj.max() - proj.min()) / 2
+
+    def push_height(self, pitch_deg: float) -> Tuple[float, float]:
+        """``(z_push, z_tip)`` of the floor blade: the eef origin at half the target height (clamped to 4.5–8 cm above the
+        floor) with the fingertips ≥ 5 mm above the floor."""
+        height = float(self.place["height"])
+        z_push = self.floor_z + min(max(0.5 * height, 0.045), 0.08)
+        drop = C.FINGERTIP_LENGTH * math.cos(math.radians(float(pitch_deg)))
+        z_push = max(z_push, self.floor_z + 0.005 + drop)
+        return z_push, z_push - drop
+
+    def _push_under_chain(self, place: Stance, quat, drop_xy, goal_xy, d2) -> Optional[Dict[str, Any]]:
+        """The straight floor-level push from the drop position to the goal cell, exact IK from stance C (closed gripper,
+        floor and target ignored, partner present): blade behind the target along the push direction (stand-off from
+        ``tabletop.blade_standoff`` over the target's face height), approach pitched toward the push direction (0 / 30 /
+        45 / 60°, either wrist turn), poses ``[pre, start, mid, goal]``. Returns the record fields or None."""
+        floor, target = self.obj("floor"), self.target
+        d2 = th.as_tensor([float(d2[0]), float(d2[1])])
+        d2 = d2 / th.linalg.norm(d2)
+        d3 = th.tensor([float(d2[0]), float(d2[1]), 0.0])
+        half_d = self.half_extent_along(quat, d2)
+        height = float(self.place["height"])
+        cd = th.as_tensor([float(drop_xy[0]), float(drop_xy[1])])
+        gc = th.as_tensor([float(goal_xy[0]), float(goal_xy[1])])
+        distance = float(th.linalg.norm(gc - cd))
+        why: List[str] = []
+        for pitch in TT.approach_pitch_order(None):
+            z_push, z_tip = self.push_height(pitch)
+            so = TT.blade_standoff((self.floor_z, self.floor_z + height), z_tip, pitch, PUSH_UNDER_CLEARANCE_M)
+            if so is None:
+                why.append(f"pitch {pitch:.0f}: face reaches the palm")
+                continue
+            standoff = so[0]
+            a_vec = TT.pitched_approach(pitch, place.forward)
+            start = th.tensor([float(cd[0]), float(cd[1]), z_push]) - d3 * (half_d + standoff)
+            goal = th.tensor([float(gc[0]), float(gc[1]), z_push]) - d3 * (half_d + standoff)
+            mid = 0.5 * (start + goal)
+            for c_sign in (1.0, -1.0):
+                q = C.eef_quat(a_vec, c_sign * d3)
+                poses = [(start, q), (mid, q), (goal, q)]
+                pre = C.pre_pose(poses[0])
+                with self.ikc.ignoring([floor, target]):
+                    res = self.ikc.exact([pre] + poses, place, "right", cache=False, fingers=C.FINGER_CLOSED)
+                if res.ok:
+                    return {"pre": pre, "start": poses[0], "mid": poses[1], "goal": poses[2], "direction": d3, "distance_m": distance, "pitch_deg": float(pitch),
+                            "blade_standoff_m": float(standoff), "push_height_m": float(z_push - self.floor_z), "half_extent_m": half_d, "wrist_sign": c_sign,
+                            "fingertip_z_m": float(z_tip - self.floor_z)}
+                why.append(f"pitch {pitch:.0f}{'' if c_sign > 0 else '-'}: {res.reason}")
+        log.info("%s: push-under chain unreachable from stance C (d %.2f λ %+.2f trunk %s): %s", self.gp.alias, place.stand_off or 0.0, place.lateral,
+                 (place.translate, round(place.tilt, 2)), "; ".join(why[-4:]))
+        return None
 
     def clearance_at(self, xy) -> Optional[float]:
         cm = self.place.get("clearance")
@@ -788,6 +927,8 @@ class IORSLarge(SamplerV2):
         partner = self.partner
         half = self.place["half"]
         edge = nearest_edge(self.place["edges"], init_xy)
+        if self.push_under:
+            return self.push_under_candidates(edge, init_xy)
         rb = self.band("tabletop", partner) if self.relation == "ontop" else self.band("floor", None, partner)
         self.place["band"] = rb
         trunks = rb.trunks() if rb is not None else [(t, k) for t in RB.TRANSLATES for k in RB.TILTS]
@@ -868,6 +1009,92 @@ class IORSLarge(SamplerV2):
         log.info("%s: stance C at %s edge %s: %d survivors (%s)", self.gp.alias, partner.name, edge.name, len(out), stats)
         return out
 
+    def push_under_candidates(self, edge: EdgeFrame, init_xy) -> List[Stance]:
+        """Stance C of the push-under (owner decision 2026‑09‑16 item 7): base square to the partner's near AABB edge,
+        facing inward (= the push direction); per lateral position λ the **goal cell** g = edge point + inward·0.07
+        (target centre 5–10 cm inside the footprint, clear under: ray ≥ height + 3 cm) and the **drop cell** c_d = edge
+        point − inward·(half + 0.10) on free floor; stand-off s ∈ {0.5…0.7} so that c_d lies 0.25–0.6 m ahead of the
+        base (B3: the floor is reachable 0.24–0.64 m ahead at the deep trunks); trunks = the floor trunks (translate ≥
+        0.75, tilt ≤ −0.9); whole-body collision-free (A6 idle-arm retry), the drop footprint and the edge's bottom line
+        at λ ± (half + 0.10) in frame, optical axis within 20° of the drop cell. Each survivor carries ``goal_cell``,
+        ``drop_cell``, ``push_dir``, ``drop_ahead_m``."""
+        partner = self.partner
+        half, height = float(self.place["half"]), float(self.place["height"])
+        need = float(self.place.get("need", height + 0.03))
+        d2 = th.as_tensor([float(edge.inward[0]), float(edge.inward[1])])
+        tangent = th.tensor([-float(d2[1]), float(d2[0])])
+        inside = float(self.num("push_under_inside_m", PUSH_UNDER_INSIDE_M))
+        out = half + float(self.num("push_under_drop_extra_m", PUSH_UNDER_DROP_EXTRA_M))
+        margin = half + 0.10
+        half_run = edge.length / 2 - margin
+        laterals = P0.lattice_values(-half_run, half_run, 0.10) if half_run > 0 else [0.0]
+        stand_offs = [float(v) for v in (self.gp.gen("push_under_stand_offs_m") or PUSH_UNDER_STAND_OFFS)]
+        trunks = [tuple(t) for t in (self.gp.gen("floor_trunks") or FLOOR_TRUNKS)]
+        lo_ahead, hi_ahead = PUSH_UNDER_DROP_AHEAD_M
+        cells = self.place["cells"]
+        mid = th.as_tensor([float(edge.mid[0]), float(edge.mid[1])])
+        stats: Dict[str, int] = {"laterals": len(laterals), "goal_clear": 0, "drop_free": 0, "base_ok": 0, "candidates": 0}
+        cands: List[Stance] = []
+        for lat in laterals:
+            g = mid + tangent * float(lat) + d2 * inside
+            cl = self.clearance_at(g)
+            clear = (cl is not None and cl >= need) or (cl is None and len(cells) > 0 and float(th.linalg.norm(cells - g, dim=1).min()) <= 0.03)
+            if not clear:
+                continue
+            stats["goal_clear"] += 1
+            c_d = mid + tangent * float(lat) - d2 * out
+            if not self._free_floor_cell(c_d):
+                continue
+            stats["drop_free"] += 1
+            for so in stand_offs:
+                ahead = so - out
+                if ahead < lo_ahead or ahead > hi_ahead:
+                    continue
+                xy = edge.base_xy(so, float(lat))
+                if not P0.base_ok(self, xy):
+                    continue
+                stats["base_ok"] += 1
+                for tr, ti in trunks:
+                    st = Stance("placement", (float(xy[0]), float(xy[1]), edge.yaw), float(tr), float(ti), so, edge, None, float(lat), None, ["right"])
+                    st.focus = th.tensor([float(c_d[0]), float(c_d[1]), self.floor_z + height / 2])
+                    st.extras.update({"goal_cell": [float(g[0]), float(g[1])], "drop_cell": [float(c_d[0]), float(c_d[1])], "push_dir": [float(d2[0]), float(d2[1])],
+                                      "drop_ahead_m": float(ahead), "inside_m": inside})
+                    cands.append(st)
+                    stats["candidates"] += 1
+        self.template_facts["placement_stats"] = stats
+        if not cands:
+            log.info("%s: push-under stance C at %s edge %s: no candidate (%s)", self.gp.alias, partner.name, edge.name, stats)
+            return []
+        free = P0.body_free(self, cands)
+        cands = [st for st, f in zip(cands, free.tolist()) if f]
+        stats["collision_free"] = len(cands)
+        if not cands:
+            log.info("%s: push-under stance C at %s edge %s: every candidate collides (%s)", self.gp.alias, partner.name, edge.name, stats)
+            return []
+        cams = P0.camera_poses(self, cands)
+        lo, hi = partner.aabb
+        z_bottom = float(lo[2])
+        classed = []
+        for st, cam in zip(cands, cams):
+            c_d = th.as_tensor(st.extras["drop_cell"])
+            # the drop footprint (a disc of the half extent around the drop cell, on the floor) and the edge's bottom line at
+            # the push lane in frame (5 %); the optical axis within 20° of the drop cell
+            disc = th.stack([th.cat([c_d + tangent * half, th.tensor([self.floor_z])]), th.cat([c_d - tangent * half, th.tensor([self.floor_z])]),
+                             th.cat([c_d + d2 * half, th.tensor([self.floor_z])]), th.cat([c_d - d2 * half, th.tensor([self.floor_z])])])
+            e0 = mid + tangent * float(st.lateral)
+            line = th.stack([th.cat([e0 - tangent * margin, th.tensor([z_bottom])]), th.cat([e0 + tangent * margin, th.tensor([z_bottom])])])
+            if not P0.in_frame(self, cam, th.cat([disc, line])):
+                continue
+            ang = P0.axis_angle(self, cam, st.focus)
+            if ang > math.radians(P0.AXIS_LOOSE_DEG):
+                continue
+            st.extras["angle_class"] = 1
+            classed.append((st, 1))
+        stats["visible"] = len(classed)
+        out_ = P0.best_class(classed)
+        log.info("%s: push-under stance C at %s edge %s: %d survivors (%s)", self.gp.alias, partner.name, edge.name, len(out_), stats)
+        return out_
+
     @staticmethod
     def _snap(band_world: th.Tensor, goal_cells: th.Tensor, lattice: float) -> th.Tensor:
         """Goal cells within half a lattice step of a band cell (the band admits them)."""
@@ -944,18 +1171,23 @@ class IORSLarge(SamplerV2):
             place.focus, place.arms = c_pool[int(kc)].focus, ["right"]
             place.extras = dict(c_pool[int(kc)].extras)
             gc = place.extras["goal_cell"]
-            if self.relation == "under":
+            push = self.push_under
+            cd = place.extras.get("drop_cell") if push else None
+            if self.relation == "under" and not push:
                 cl = self.clearance_at(gc)
                 if cl is not None and not under_admissible(cl, self.place["height"], self.num("under_clearance_extra_m", 0.17)):
                     errors.append(f"C: under clearance {cl:.2f} m at the goal cell < height + 0.17")
                     continue
             yaws = sorted({float(y) for y, _ in F_init})
             ignore_place = [partner] if self.relation == "ontop" else [self.obj("floor")]
-            F_goal = self.ikc.feasible_sets([gc], yaws, self.grasps, lambda xy, yaw: self.goal_pose_at(xy, G.qmul(G.quat_from_yaw(yaw), self.rest)), place, "right",
+            # the release pose: the goal cell (ontop / under by placement) or the drop cell outside the edge (push-under)
+            release_xy = cd if push else gc
+            release_pose = (lambda xy, quat: self.drop_pose_at(xy, quat)) if push else (lambda xy, quat: self.goal_pose_at(xy, quat))
+            F_goal = self.ikc.feasible_sets([release_xy], yaws, self.grasps, lambda xy, yaw: release_pose(xy, G.qmul(G.quat_from_yaw(yaw), self.rest)), place, "right",
                                             ignore_place).get(0, [])
             F = intersect_feasible(F_init, F_goal)
             if not F:
-                errors.append(f"C: F_init ({len(F_init)}) ∩ F_goal ({len(F_goal)}) empty at goal cell {[round(v, 2) for v in gc]}")
+                errors.append(f"C: F_init ({len(F_init)}) ∩ F_goal ({len(F_goal)}) empty at {'drop' if push else 'goal'} cell {[round(v, 2) for v in release_xy]}")
                 continue
             for i in rng.permutation(len(F))[:4]:
                 yaw0, g = F[int(i)]
@@ -978,13 +1210,19 @@ class IORSLarge(SamplerV2):
                 res = self.ikc.exact([pre, eef], manip, "right", ignore_for_last=self.grasp_ignore_objects(), scale_key=self.choice.models["target"].scale, cache=False)
                 if not res.ok:
                     continue
-                goal = self.goal_pose_at(gc, t_pose[1])
+                goal = release_pose(release_xy, t_pose[1])
                 place_eef = IK.grasp_pose(goal, g.pose)
                 pre_place = IK.pre_pose(place_eef)
                 with attached(self.kit, "right", target, eef_in_object=g.pose):
                     r2 = self.ikc.exact([pre_place, place_eef], place, "right", ignore_for_last=ignore_place, cache=False)
                 if not r2.ok:
                     continue
+                chain = None
+                if push:  # the straight floor push drop → goal from the same stance (closed gripper, floor + target ignored)
+                    chain = self._push_under_chain(place, t_pose[1], cd, gc, place.extras["push_dir"])
+                    if chain is None:
+                        errors.append("C: push chain unreachable")
+                        continue
                 # B -> C with the object attached (§3.7 ≤ max_partner_geodesic + 1 m; §3.8 transition)
                 self.sidecar.add_stance(manip)
                 self.sidecar.add_stance(place)
@@ -998,8 +1236,18 @@ class IORSLarge(SamplerV2):
                     self.sidecar.paths = [p for p in self.sidecar.paths if p.to != "placement"]
                     self.sidecar.transitions = [t for t in self.sidecar.transitions if t.to != "placement"]
                     break
-                grasp = GraspRecord(tname, "right", g.key, g.name, yaw, pre, eef, pre_place, place_eef, finger_q=list(g.finger_q), eef_in_object=g.pose, place_on=pname)
+                floor_name = self.bindings.one("floor").name if self.bindings.has("floor") else None
+                grasp = GraspRecord(tname, "right", g.key, g.name, yaw, pre, eef, pre_place, place_eef, finger_q=list(g.finger_q), eef_in_object=g.pose,
+                                    place_on=(floor_name or pname) if push else pname)
+                if push:  # the release is a drop on the floor outside the edge (like the inside rule's ``place_kind: drop``)
+                    grasp.extras.update({"place_kind": "drop", "drop_height_m": float(self.num("drop_height_m", PUSH_UNDER_DROP_HEIGHT_M)),
+                                         "drop_cell": [float(v) for v in cd], "goal_cell": [float(v) for v in gc], "then": "push_under"})
                 self.sidecar.add_grasp(grasp)
+                if push:
+                    self.sidecar.add_contact(PushUnderRecord("right", chain["pre"], chain["start"], chain["mid"], chain["goal"], chain["direction"], chain["distance_m"],
+                                                             tname, stance="placement", pitch_deg=chain["pitch_deg"], blade_standoff_m=chain["blade_standoff_m"],
+                                                             push_height_m=chain["push_height_m"], half_extent_m=chain["half_extent_m"], fingertip_z_m=chain["fingertip_z_m"],
+                                                             drop_cell=[float(v) for v in cd], goal_cell=[float(v) for v in gc], partner=pname))
                 cam = self.camera_pose_at(init)
                 if not self.frustum_ok(cam, self.hull_corners_world(self.hull, t_pose), 0.05):
                     raise Reject("not_in_frame", "target not in the init image (5 %)")
@@ -1012,6 +1260,10 @@ class IORSLarge(SamplerV2):
                 d.base_pose2d = tuple(init.base_pose2d)
                 d.summary.update({"goal_cell": gc, "grasp": {"key": g.key, "name": g.name, "yaw": yaw}, "placement_stance": P0.summarize_stance(place),
                                   "path_length_m": place.extras["path_length_m"], "F_init": len(F_init), "F_goal": len(F_goal), "F": len(F)})
+                if push:
+                    d.summary["push_under"] = {"drop_cell": [float(v) for v in cd], "distance_m": chain["distance_m"], "pitch_deg": chain["pitch_deg"],
+                                               "blade_standoff_m": chain["blade_standoff_m"], "push_height_m": chain["push_height_m"], "half_extent_m": chain["half_extent_m"],
+                                               "drop_ahead_m": place.extras.get("drop_ahead_m")}
                 pp, pq = partner.get_position_orientation()
                 d.pose_targets[pname] = full_pose_target(pp, pq, self.tol("position", 0.03), self.tol("orientation", 0.20))
                 d.pose_targets[tname] = full_pose_target(t_pose[0], t_pose[1], self.tol("position", 0.03), self.tol("orientation", 0.20))
@@ -1054,14 +1306,38 @@ class IORSLarge(SamplerV2):
         place = self.sidecar.stance("placement")
         goal_pos = th.tensor(draft.pose_targets[tname]["position"])
         goal_quat = th.tensor(draft.pose_targets[tname]["orientation"])
-        place_eef = IK.grasp_pose((goal_pos, goal_quat), grasp.eef_in_object)
-        pre_place = IK.pre_pose(place_eef)
         ignore = [self.partner] if self.relation == "ontop" else [self.obj("floor")]
-        with attached(self.kit, "right", self.target, eef_in_object=grasp.eef_in_object):
-            res = self.ikc.exact([pre_place, place_eef], place, "right", ignore_for_last=ignore, cache=False)
-        if not res.ok:
-            raise Reject("place_unreachable", f"pre-place / place at the settled goal fail the exact IK from stance C: {res.reason}")
-        grasp.pre_place, grasp.place = pre_place, place_eef
+        if self.push_under:
+            # the release is the drop outside the edge (unchanged by the settle): re-check it as recorded; the push goal blade
+            # follows the settled goal centre (a few mm), the chain start → mid → goal is re-solved (closed gripper)
+            with attached(self.kit, "right", self.target, eef_in_object=grasp.eef_in_object):
+                res = self.ikc.exact([grasp.pre_place, grasp.place], place, "right", ignore_for_last=ignore, cache=False)
+            if not res.ok:
+                raise Reject("place_unreachable", f"pre-place / drop fail the exact IK from stance C at the goal check: {res.reason}")
+            push = self.sidecar.contacts.get("push")
+            if push is not None:
+                d3 = th.as_tensor(push.direction, dtype=th.float32)
+                off = float(push.extras["half_extent_m"]) + float(push.extras["blade_standoff_m"])
+                z_push = float(push.contact[0][2])
+                goal_b = th.tensor([float(goal_pos[0]), float(goal_pos[1]), z_push]) - d3 * off
+                start_b = push.contact[0]
+                mid_b = 0.5 * (start_b + goal_b)
+                q = push.contact[1]
+                with self.ikc.ignoring([self.obj("floor"), self.target]):
+                    r3 = self.ikc.exact([push.pre, (start_b, q), (mid_b, q), (goal_b, q)], place, "right", cache=False, fingers=C.FINGER_CLOSED)
+                if not r3.ok:
+                    raise Reject("push_unreachable", f"push-under chain to the settled goal fails the exact IK from stance C: {r3.reason}")
+                push.mid, push.goal = (mid_b, q), (goal_b, q)
+                push.distance_m = float(th.linalg.norm(goal_pos[:2].float() - th.as_tensor(push.extras["drop_cell"], dtype=th.float32)))
+                push.extras["goal_cell"] = [float(goal_pos[0]), float(goal_pos[1])]
+        else:
+            place_eef = IK.grasp_pose((goal_pos, goal_quat), grasp.eef_in_object)
+            pre_place = IK.pre_pose(place_eef)
+            with attached(self.kit, "right", self.target, eef_in_object=grasp.eef_in_object):
+                res = self.ikc.exact([pre_place, place_eef], place, "right", ignore_for_last=ignore, cache=False)
+            if not res.ok:
+                raise Reject("place_unreachable", f"pre-place / place at the settled goal fail the exact IK from stance C: {res.reason}")
+            grasp.pre_place, grasp.place = pre_place, place_eef
         cam_b = self.camera_pose_at(self.sidecar.stance("manipulation"))
         if not self.ikc.eef_in_frame(grasp.grasp, cam_b):
             raise Reject("gripper_not_in_frame", "grasp eef pose outside the manipulation image (5 %)")

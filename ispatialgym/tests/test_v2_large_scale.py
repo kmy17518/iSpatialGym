@@ -409,6 +409,29 @@ def test_init_surface_class_enumeration():
     assert IL.alias_tokens(f"{st}-sandal-bed-desk", st) == ["sandal", "bed", "desk"] and IL.alias_tokens(st, st) == []
 
 
+def test_push_under_record_and_geometry_constants():
+    # owner decision 2026-09-16 item 7: the drop + straight floor push of the large-scale under relation
+    q = th.tensor([0.0, 0.0, 0.0, 1.0])
+    start, mid, goal = th.tensor([1.0, 0.0, 0.05]), th.tensor([1.1, 0.0, 0.05]), th.tensor([1.2, 0.0, 0.05])
+    pre = (th.tensor([0.95, 0.0, 0.12]), q)
+    rec = IL.PushUnderRecord("right", pre, (start, q), (mid, q), (goal, q), th.tensor([1.0, 0.0, 0.0]), 0.2, "sandal.n.01_1", stance="placement",
+                             pitch_deg=45.0, blade_standoff_m=0.0134, push_height_m=0.045, half_extent_m=0.05, drop_cell=[0.9, 0.0], goal_cell=[1.1, 0.0])
+    d = rec.to_sidecar()
+    assert rec.kind == "push" and d["kind"] == "push_under" and d["arm"] == "right" and d["object"] == "sandal.n.01_1" and d["stance"] == "placement"
+    assert set(("pre", "init", "mid", "goal", "direction", "distance_m")) <= set(d)
+    assert d["distance_m"] == pytest.approx(0.2) and d["direction"] == [1.0, 0.0, 0.0]
+    assert d["pitch_deg"] == 45.0 and d["blade_standoff_m"] == pytest.approx(0.0134) and d["drop_cell"] == [0.9, 0.0] and d["goal_cell"] == [1.1, 0.0]
+    # the F6 PushContact accepts the block (unknown keys land in ``extra``)
+    from ispatialgym.oracle import sidecar as SC
+    pc = SC.PushContact.from_dict(d, "contacts.push")
+    assert pc.extra["kind"] == "push_under" and pc.mid is not None and len(pc.waypoints) == 3
+    # geometry: the goal centre 5-10 cm inside the edge, the drop half + 10 cm outside, the drop cell 0.25-0.6 m ahead of the base
+    assert 0.05 <= IL.PUSH_UNDER_INSIDE_M <= 0.10 and IL.PUSH_UNDER_DROP_EXTRA_M == pytest.approx(0.10) and IL.PUSH_UNDER_DROP_HEIGHT_M >= 0.02
+    for so in IL.PUSH_UNDER_STAND_OFFS:
+        assert IL.PUSH_UNDER_DROP_AHEAD_M[0] <= so - (0.05 + 0.10) or so - (0.12 + 0.10) <= IL.PUSH_UNDER_DROP_AHEAD_M[1]
+    assert all(t >= 0.75 and k <= -0.9 for t, k in IL.FLOOR_TRUNKS)
+
+
 def test_a8_deviation_cap_constant():
     # A8: |δ| ≤ 25° until the two-stroke push exists (the module caps a wider customs range at MAX_DEVIATION_DEG)
     assert AW.MAX_DEVIATION_DEG == 25.0
