@@ -182,9 +182,10 @@ def contact_ignores(state, name: str, extra: Sequence[str] = ()) -> List[Any]:
     return out
 
 
-def escape_direction(state, pose, objects: Sequence[Any]) -> Optional[th.Tensor]:
-    """Unit direction from the ignored supports to ``pose`` (the sum of the vectors from the nearest point of each
-    object's AABB to the pose position): away from a wall horizontally, up from a table; None when there is none."""
+def escape_direction(state, pose, objects: Sequence[Any], near: float = 0.15) -> Optional[th.Tensor]:
+    """Unit direction from the ignored supports **near** ``pose`` (within ``near`` of its position; a floor 1.6 m below
+    a wall brace does not count) to the pose: the sum of the vectors from the nearest point of each object's AABB to
+    the pose position — away from a wall horizontally, up from a table; None when no support is near."""
     p = as_world_pose(pose)[0]
     total = th.zeros(3)
     for o in objects:
@@ -195,7 +196,10 @@ def escape_direction(state, pose, objects: Sequence[Any]) -> Optional[th.Tensor]
         lo, hi = C.as_tensor(lo).float(), C.as_tensor(hi).float()
         nearest = th.minimum(th.maximum(p, lo), hi)
         v = p - nearest
-        if float(th.linalg.norm(v)) < 1e-4:  # the pose sits inside the AABB: leave through the nearest face
+        dist = float(th.linalg.norm(v))
+        if dist > near:
+            continue
+        if dist < 1e-4:  # the pose sits inside the AABB: leave through the nearest face
             gaps = th.cat([p - lo, hi - p])
             k = int(th.argmin(gaps))
             v = th.zeros(3)
