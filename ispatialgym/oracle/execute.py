@@ -322,7 +322,9 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     _hook(ctx, "fov")(True)  # from the pre-grasp on the fingertips enter the frame and must stay (recorded grasp pose in frame)
     obj = state.object(action.object)
     cfg = _cfg(ctx)
-    finish = ApproachFinish(targets["grasp"], q_hint=_witness(ctx, "grasp"), ignore_objects=[obj], max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
+    touching = getattr(state, "touching", lambda name: [])(action.object)  # the support / partner it rests on
+    finish = ApproachFinish(targets["grasp"], q_hint=_witness(ctx, "grasp"), ignore_objects=[obj] + list(touching), max_stall=cfg.approach_finish_max_stall,
+                            max_remaining=cfg.approach_finish_max_remaining)
     yield from motions.arm_along(arm, targets["approach"], finish=finish)
     if finish.used:
         ctx["approach_finish"] = finish.info
@@ -375,7 +377,7 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     on = []
     if getattr(action, "on", None):
         try:
-            on = [state.object(action.on)]
+            on = [state.object(action.on)] + list(getattr(state, "touching", lambda name: [])(action.on))
         except KeyError:
             on = []
     finish = ApproachFinish(targets["place"], q_hint=_witness(ctx, "place"), ignore_objects=on, max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)

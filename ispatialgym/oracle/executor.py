@@ -196,6 +196,29 @@ class SimState:
         meta = getattr(tro, "meta", None)
         return (getattr(meta, "pose_targets", None) or {}).get(name)
 
+    def touching(self, name: str) -> List[Any]:
+        """Scene objects of the task scope in contact with ``name`` (its support / partner; OmniGibson ``Touching``).
+        What a finishing ``arm_to`` of a grasp approach leaves out of the collision world next to the object itself
+        (the sampler's "support ignored for the grasp pose"). ``[]`` without the simulator."""
+        try:
+            from omnigibson.object_states import Touching
+        except Exception:  # noqa: BLE001
+            return []
+        try:
+            obj = self.object(name)
+        except KeyError:
+            return []
+        out: List[Any] = []
+        for inst, ent in (getattr(self.task, "object_scope", None) or {}).items():
+            if ent is obj or ent is self.robot or not hasattr(ent, "states") or Touching not in getattr(ent, "states", {}):
+                continue
+            try:
+                if bool(obj.states[Touching].get_value(ent)):
+                    out.append(ent)
+            except Exception:  # noqa: BLE001
+                continue
+        return out
+
     def held_object(self, arm: str):
         return getattr(self.robot, "_ag_obj_in_hand", {}).get(arm)
 
