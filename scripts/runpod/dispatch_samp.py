@@ -195,8 +195,9 @@ def main():
                 continue
             stop = "test -f /root/samp/runner.pid && kill $(cat /root/samp/runner.pid) 2>/dev/null; sleep 1; "
             if busy:  # kill the current job's process tree and put its job file back into the queue (re-run from scratch)
-                stop += ("pkill -f 'ispatialgym.sampling.sample_instances' ; pkill -f 'ispatialgym.sampling.sample_isg' ; pkill -f 'ispatialgym.sampling.multiply_isg' ; "
-                         "pkill -f 'ispatialgym.oracle.run_isg' ; sleep 3; "
+                # the [x] bracket keeps pkill from matching this very command line (which contains the pattern)
+                stop += ("pkill -f 'ispatialgym.sampling.sample_instance[s]' ; pkill -f 'ispatialgym.sampling.sample_is[g]' ; pkill -f 'ispatialgym.sampling.multiply_is[g]' ; "
+                         "pkill -f 'ispatialgym.oracle.run_is[g]' ; sleep 3; "
                          "for f in /root/samp/running/*.job; do [ -f \"$f\" ] && mv \"$f\" /root/samp/queue/; done; rm -f /root/samp/current.txt; ")
             stop += ("rm -f /tmp/seen_jids; for f in $(ls /root/samp/queue/*.job 2>/dev/null | sort); do jid=$(cut -f1 \"$f\"); "
                      "if grep -qsx \"$jid\" /tmp/seen_jids; then rm -f \"$f\"; else echo \"$jid\" >> /tmp/seen_jids; fi; done; rm -f /tmp/seen_jids; ")
