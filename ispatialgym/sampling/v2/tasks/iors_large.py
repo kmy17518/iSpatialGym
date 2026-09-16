@@ -89,7 +89,7 @@ PUSH_UNDER_INSIDE_M = 0.07          # goal = the target centre this far inside t
 PUSH_UNDER_DROP_EXTRA_M = 0.10      # drop centre = half extent along the push + this outside the edge
 PUSH_UNDER_DROP_HEIGHT_M = 0.10     # object bottom above the floor at the release (≥ 2 cm; 10 cm keeps the release eef ≈ 0.1 m above the floor —
                                     # the sandal's side pinches sit 1 cm above its sole, and z < 0.08 m is out of the arm's reach even at translate 0.95)
-PUSH_UNDER_STAND_OFFS = (0.5, 0.55, 0.6, 0.65, 0.7)  # base stand-off from the edge: the drop cell 0.25–0.6 m ahead (B3: the floor is reachable 0.24–0.64 m ahead)
+PUSH_UNDER_STAND_OFFS = (0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8)  # base stand-off from the edge: the drop cell 0.25–0.6 m ahead (B3: the floor is reachable 0.24–0.64 m ahead)
 PUSH_UNDER_DROP_AHEAD_M = (0.25, 0.60)
 PUSH_UNDER_CLEARANCE_M = 0.005      # blade clearance to the target's back face at the push start
 #: trunks that reach the floor (B3 floor bands, A6 recompute: cells only at translate ≥ 0.75, tilt ≤ −0.9)
@@ -596,8 +596,11 @@ class IORSLarge(SamplerV2):
                             "blade_standoff_m": float(standoff), "push_height_m": float(z_push - self.floor_z), "half_extent_m": half_d, "wrist_sign": c_sign,
                             "fingertip_z_m": float(z_tip - self.floor_z)}
                 why.append(f"pitch {pitch:.0f}{'' if c_sign > 0 else '-'}: {res.reason}")
-        log.info("%s: push-under chain unreachable from stance C (d %.2f λ %+.2f trunk %s): %s", self.gp.alias, place.stand_off or 0.0, place.lateral,
-                 (place.translate, round(place.tilt, 2)), "; ".join(why[-4:]))
+        log.info("%s: push-under chain unreachable from stance C (d %.2f λ %+.2f trunk %s; start %s, goal %s in base): %s", self.gp.alias, place.stand_off or 0.0,
+                 place.lateral, (place.translate, round(place.tilt, 2)),
+                 [round(float(v), 2) for v in P0.to_base_frame(th.tensor([float(cd[0]), float(cd[1]), 0.0]) - d3 * half_d, place.base_pose2d, P0.base_z(self)).tolist()],
+                 [round(float(v), 2) for v in P0.to_base_frame(th.tensor([float(gc[0]), float(gc[1]), 0.0]) - d3 * half_d, place.base_pose2d, P0.base_z(self)).tolist()],
+                 "; ".join(why))
         return None
 
     def clearance_at(self, xy) -> Optional[float]:
@@ -1107,8 +1110,14 @@ class IORSLarge(SamplerV2):
         # (which stays) keeps the robot from penetrating the floor. Documented relaxation for the push-under stance.
         with self.ikc.ignoring([self.obj("floor")]):
             free = P0.body_free(self, cands)
+        deep_fail = [st for st, f in zip(cands, free.tolist()) if not f and st.translate >= 0.95]
         cands = [st for st, f in zip(cands, free.tolist()) if f]
         stats["collision_free"] = len(cands)
+        if deep_fail and not any(st.translate >= 0.95 for st in cands) and not getattr(self, "_deep_debugged", False):
+            # which spheres / postures fail at the floor-reaching trunks (B3: "torso / head within 1 cm of the floor")
+            self._deep_debugged = True
+            with self.ikc.ignoring([self.obj("floor")]):
+                P0.debug_collisions(self, deep_fail[len(deep_fail) // 2:len(deep_fail) // 2 + 2], arms_excluded=False)
         if not cands:
             log.info("%s: push-under stance C at %s edge %s: every candidate collides (%s)", self.gp.alias, partner.name, edge.name, stats)
             return []
