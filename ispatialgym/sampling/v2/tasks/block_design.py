@@ -265,7 +265,15 @@ class BlockDesign(SamplerV2):
         init = self.init_stance
         errors = []
         order = [int(k) for k in rng.permutation(len(self.manip_candidates))]
-        order.sort(key=lambda k: abs(float(self.manip_candidates[k].extras.get("focus_info", {}).get("depth", REGION_DEPTH_PREFERRED)) - REGION_DEPTH_PREFERRED))
+
+        def score(k: int) -> float:
+            c = self.manip_candidates[k]
+            depth = float(c.extras.get("focus_info", {}).get("depth", REGION_DEPTH_PREFERRED))
+            # regions 0.5–0.6 m ahead first; among them the arm-friendly trunks (translate 0.5, small tilt: the probe's
+            # (0.5, 0) / (0.75, −0.3) pass every pick class, the tall bent trunk (0, −0.61) fails the tilted pre-places)
+            return abs(depth - REGION_DEPTH_PREFERRED) + 0.5 * (abs(float(c.translate) - 0.5) + abs(float(c.tilt)))
+
+        order.sort(key=score)
         for k in order[:6]:
             cand = self.manip_candidates[k]
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
