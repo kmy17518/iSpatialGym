@@ -565,6 +565,8 @@ def parse_args(argv=None):
     p.add_argument("--video-size", type=int, default=None, help="downscale video frames to this square size")
     p.add_argument("--goal-image", action="store_true", help="capture the goal image after the settled check (>= 3 renders) and write goal_observation into the TRO")
     p.add_argument("--no-goal-override", action="store_true", help="do not write the settled values back into the TRO goal poses")
+    p.add_argument("--demo-gating", default="auto", choices=["auto", "placed_orientation", "none"],
+                   help="demo-collection gates after the epilogue: placed objects within their recorded orientation tolerance (auto = on for --mode oracle, off for replay / policy)")
     p.add_argument("--max-steps", type=int, default=6000, help="episode step budget (30 Hz control steps)")
     p.add_argument("--settle-steps", type=int, default=50, help="no-op window after the program: max(this, 20%% of the action steps)")
     p.add_argument("--retries", type=int, default=1, help="retries per action from its checkpoint")
@@ -733,8 +735,10 @@ def main(argv=None) -> int:
                             task_name=loader.activity.replace("_", " "), instance_id=iid)
         if sidecar is not None:
             recorder.episode = episode_annotations(sidecar)
+        gating = ("placed_orientation",) if (args.demo_gating == "placed_orientation" or (args.demo_gating == "auto" and args.mode == "oracle")) else ()
         ex_cfg = ExecutorConfig(max_steps=args.max_steps, retries=args.retries, settle_min_steps=args.settle_steps, goal_image=args.goal_image,
-                                record_state=rec_cfg.hdf5)
+                                record_state=rec_cfg.hdf5, demo_gating=gating)
+        meta["demo_gating_enabled"] = list(gating)
         executor = Executor(env, task, sidecar, recorder=recorder, motions=motions, monitors=monitors, cfg=ex_cfg, sim=og.sim, state=state,
                             tracked_objects=tracked, cam_key=cam_key)
         executor.last_obs, executor.last_info = obs, info

@@ -48,7 +48,7 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tupl
 import torch as th
 
 from ispatialgym.oracle import r1pro_model as M
-from ispatialgym.oracle.actions import Action, Brace, Push
+from ispatialgym.oracle.actions import Action, Brace, Place, Push
 from ispatialgym.oracle.execute import check_postcondition, forbidden_contacts, fov_monitored, intended_contacts, is_manipulation, offset_brace, run_action
 from ispatialgym.oracle.motions import Motions, SkillError
 from ispatialgym.oracle.qa import CameraModel, Monitors, QAStats, Verdict, category_of
@@ -89,6 +89,12 @@ class ExecutorConfig:
     #: with the brace moved by these offsets (m) outward (short) / inward (overshoot) along its recorded direction
     brace_retries: int = 2
     brace_retry_offsets_m: Tuple[float, ...] = (0.005, 0.010)
+    #: demo-collection gates applied after the epilogue (``run_isg --demo-gating``; oracle mode: ``placed_orientation``):
+    #: ``placed_orientation`` = every placed object (place / drop / attach, not pushes) must end within its recorded
+    #: orientation target's tolerance (``orientation_tolerance``, 0.2 rad default; nearest equivalence, the evaluator's
+    #: own error) — the TRO target keeps ``gating: false`` for the policy evaluation, position stays non-gating
+    demo_gating: Tuple[str, ...] = ()
+    demo_orientation_tolerance_default: float = 0.2
     #: renders after a checkpoint restore before the (recorded) hold step, so no frame of the rolled-back attempt
     #: survives in the video / dataset (the renderer trails ``load_state`` by 1-2 frames)
     restore_renders: int = 3
@@ -315,6 +321,7 @@ class Executor:
         self.last_ctx: Dict[str, Any] = {}
         self._defer_commit = False
         self.brace_retries: List[Dict[str, Any]] = []
+        self.program_actions: List[Action] = []
         self.checkpoint_reports: List[Dict[str, Any]] = []
         self.timings: Dict[str, float] = {}
         self.result: Dict[str, Any] = {}
@@ -624,6 +631,7 @@ class Executor:
     def run_program(self, actions: Sequence[Action]) -> Dict[str, Any]:
         t0 = time.time()
         actions = list(actions)
+        self.program_actions = actions
         verdict: Optional[Verdict] = None
         i = 0
         while i < len(actions):
@@ -765,6 +773,35 @@ class Executor:
 
     # ------------------------------------------------------------------ epilogue (§3.8 / §6.2)
 
+    def placed_objects(self) -> List[str]:
+        """The bddl instances the program places (``Place`` of any kind: set down, drop, attach), in program order."""
+        out: List[str] = []
+        for a in self.program_actions:
+            if isinstance(a, Place) and a.object not in out:
+                out.append(a.object)
+        return out
+
+    def placed_orientation_report(self, isg: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+        """Per placed object: the evaluator's final orientation error (its metric and equivalences) against the
+        recorded TRO orientation target and tolerance (``demo_orientation_tolerance_default`` when the target has
+        none); ``within`` is None when the object has no orientation target or no error report."""
+        errs = (isg.get("errors") or {}).get("pose_errors") or {}
+        out: Dict[str, Dict[str, Any]] = {}
+        for obj in self.placed_objects():
+            tgt = self.state.pose_target(obj) if hasattr(self.state, "pose_target") else None
+            rep = errs.get(obj) if isinstance(errs.get(obj), dict) else {}
+            err = rep.get("orientation_error")
+            has_target = tgt is not None and getattr(tgt, "orientation", None) is not None
+            if not has_target or err is None:
+                out[obj] = {"orientation_error": None if err is None else float(err), "tolerance": None, "within": None,
+                            "note": "no orientation target" if not has_target else "no orientation error reported"}
+                continue
+            tol = getattr(tgt, "orientation_tolerance", None)
+            tol = float(self.cfg.demo_orientation_tolerance_default if tol is None else tol)
+            out[obj] = {"orientation_error": float(err), "tolerance": tol, "within": float(err) <= tol, "metric": getattr(tgt, "orientation_metric", None),
+                        "target_gating": bool(rep.get("gating", False))}
+        return out
+
     def orientation_targets(self, isg: Optional[Dict[str, Any]] = None) -> set:
         """Instances whose goal has an orientation target: the evaluator's report says so (``pose_errors[inst]
         .orientation_error`` is a number, None for a position-only / relation-only target), else the TRO meta."""
@@ -862,6 +899,18 @@ class Executor:
                 msg = "the evaluator's pose_settled atoms do not hold at the last step"
             verdict = Verdict("not_settled", msg, step=self.n, details={"motion": motion, "task_settled_success": settled_task})
             self.stats.record(verdict)
+        # -- demo-collection gates (owner decision 2026-09-16 10:15): the placed objects' orientation against their
+        #    recorded (non-gating) targets decides the *demo* verdict; the TRO / policy evaluation is untouched
+        demo_gating: Dict[str, Any] = {"enabled": list(self.cfg.demo_gating)}
+        if "placed_orientation" in self.cfg.demo_gating:
+            rep = self.placed_orientation_report(isg)
+            demo_gating["placed_orientation"] = rep
+            failed = [o for o, r in rep.items() if r.get("within") is False]
+            if verdict is None and failed:
+                msg = ", ".join(f"{o} {rep[o]['orientation_error']:.3f} rad > {rep[o]['tolerance']:.2f}" for o in failed)
+                verdict = Verdict("placed_orientation", "placed object orientation outside its recorded target tolerance: " + msg, step=self.n,
+                                  details={"targets": failed, "errors": {o: rep[o] for o in failed}})
+                self.stats.record(verdict)
         self.timings["settle_s"] = time.time() - t0
         goal_obs = None
         if verdict is None and self.cfg.goal_image:
@@ -897,6 +946,7 @@ class Executor:
             "n_settle_steps": self.phase_steps.get(PHASE_SETTLE, 0),
             "settle_window": window,
             "settle_windows": windows,
+            "demo_gating": demo_gating,
             "motion_delta": motion,
             "actions": [r.to_dict() for r in self.action_records],
             "qa": self.monitors.report() if self.monitors is not None else {"stats": self.stats.to_dict()},

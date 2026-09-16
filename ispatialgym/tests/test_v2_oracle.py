@@ -934,6 +934,56 @@ def test_failed_attempt_leaves_no_frame_in_the_committed_episode(tmp_path, monke
     assert not env.frame_matches_state(frames[b], failed_state) and not env.frame_matches_state(frames[b + 1], failed_state)
 
 
+def test_placed_orientation_gates_the_demo_verdict_only(tmp_path):
+    """Owner decision 2026-09-16 10:15 item 2: with ``demo_gating=("placed_orientation",)`` (run_isg oracle default) a
+    placed object whose final orientation error exceeds its recorded target tolerance fails the demo with
+    ``placed_orientation`` (errors in ``demo_gating``); the TRO target stays non-gating for the evaluation, and
+    without the gate the same run is a success."""
+    goal_q = th.tensor([0.0, 0.0, math.sin(0.25), math.cos(0.25)])  # the apple's recorded orientation target (0.5 rad yaw)
+
+    def world(err_rad):
+        sc, env = iors_world()
+        goal = _place_goal(sc)
+        apple = env.objects["apple.n.01_1"]
+        env.task._tro = SimpleNamespace(meta=SimpleNamespace(pose_targets={"apple.n.01_1": SimpleNamespace(frame="world", orientation=goal_q, orientation_tolerance=0.2,
+                                                                                                                 orientation_metric="full", position=None, position_tolerance=None,
+                                                                                                                 orientation_equivalences=[])}))
+
+        def evaluate(env_):
+            d = success_eval("apple.n.01_1", goal, tol=0.08)(env_)
+            # the evaluator reports the (non-gating) IORS pose target: orientation error as measured, never gating
+            d["errors"]["pose_errors"]["apple.n.01_1"].update({"orientation_error": err_rad, "gating": False, "within_tolerance": err_rad <= 0.2})
+            return d
+
+        env.evaluate = evaluate
+        return sc, env
+
+    # (a) the cup fell at release: 0.46 rad -> placed_orientation, the position-only success notwithstanding
+    sc, env = world(0.46)
+    ex, *_ = make_executor(env, sc, tmp_path, exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("placed_orientation",)))
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["reason"] == "placed_orientation" and result["binary_success_final"] and result["verdict"]["details"]["targets"] == ["apple.n.01_1"]
+    dg = result["demo_gating"]
+    assert dg["enabled"] == ["placed_orientation"] and dg["placed_orientation"]["apple.n.01_1"] == {"orientation_error": 0.46, "tolerance": 0.2, "within": False, "metric": "full", "target_gating": False}
+    assert "plate.n.04_1" not in dg["placed_orientation"]  # only the placed objects, not the partner
+    # (b) within tolerance -> success, the report kept
+    sc, env = world(0.12)
+    ex, *_ = make_executor(env, sc, tmp_path / "b", exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("placed_orientation",)))
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["success"] and result["demo_gating"]["placed_orientation"]["apple.n.01_1"]["within"] is True
+    # (c) the gate off (replay / policy modes): the 0.46 rad run passes, the evaluation is unchanged
+    sc, env = world(0.46)
+    ex, *_ = make_executor(env, sc, tmp_path / "c")
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["success"] and result["demo_gating"] == {"enabled": []}
+    # (d) no orientation target on the placed object: nothing to gate
+    sc, env = iors_world()
+    env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
+    ex, *_ = make_executor(env, sc, tmp_path / "d", exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("placed_orientation",)))
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["success"] and result["demo_gating"]["placed_orientation"]["apple.n.01_1"]["within"] is None
+
+
 def test_epilogue_motion_rule_ignores_rotation_without_an_orientation_target(tmp_path):
     """Owner rule 2026-09-16: in the epilogue motion window an object's rotation counts only when the goal has an
     orientation target for it; a spinning near-spherical object with a stable position passes; a second, 2x

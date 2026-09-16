@@ -85,11 +85,13 @@ CATEGORIES: Tuple[str, ...] = (
     "timeout",
     "targets_failed",
     "error",
+    "placed_orientation",
 )
 #: categories the per-step monitors can raise
 STEP_CATEGORIES: Tuple[str, ...] = ("collision", "ghost_hand", "paused", "gripper_out_of_fov", "timeout")
-#: categories of the epilogue
-EPILOGUE_CATEGORIES: Tuple[str, ...] = ("not_reached", "tolerance", "not_settled")
+#: categories of the epilogue (``placed_orientation`` = the demo-collection gate on a placed object's orientation
+#: against its recorded, non-gating TRO target — owner decision 2026-09-16 10:15; policy evaluation is unchanged)
+EPILOGUE_CATEGORIES: Tuple[str, ...] = ("not_reached", "tolerance", "not_settled", "placed_orientation")
 
 #: contacts with these object categories never count (the robot stands / drives on them)
 GROUND_CATEGORIES = frozenset({"floors", "carpet", "rug", "mat", "gym_mat", "yoga_mat", "lawn", "driveway", "ceramic_tile"})
