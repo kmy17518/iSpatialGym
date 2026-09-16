@@ -423,7 +423,7 @@ class IKChecker:
         q0 = self.q_locked(stance, fingers=fingers) if q_seed is None else q_seed
         key = None
         if cache:
-            key = cache_key("exact_ik_v2", {**self.cache_scope, "base": list(stance.base_pose2d), "trunk": [stance.translate, stance.tilt], "arm": arm,
+            key = cache_key("exact_ik_v3", {**self.cache_scope, "base": list(stance.base_pose2d), "trunk": [stance.translate, stance.tilt], "arm": arm,
                                             "poses": [list(G.t(p[0]).tolist()) + list(G.t(p[1]).tolist()) for p in poses],
                                             "ignore": sorted(getattr(o, "name", str(o)) for o in ignore_for_last), "scale": scale_key,
                                             "seeds": EXACT_SEEDS, "seed_arms": q0[self.kit.robot.arm_control_idx[arm]],
