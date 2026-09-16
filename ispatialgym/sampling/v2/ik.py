@@ -413,11 +413,18 @@ class IKChecker:
         return out
 
     def exact(self, poses: Sequence[Pose], stance: Stance, arm: str = "right", ignore_for_last: Sequence[Any] = (),
-              q_seed: Optional[th.Tensor] = None, scale_key: Any = None, cache: bool = True, fingers: Optional[float] = None) -> IKResult:
+              q_seed: Optional[th.Tensor] = None, scale_key: Any = None, cache: bool = True, fingers: Optional[float] = None,
+              approached: Optional[Sequence[Any]] = None) -> IKResult:
         """32-seed IK of every pose in order from the stance (locked joints = the stance's recorded configuration /
         posture, ``fingers`` overrides the gripper opening); the last pose with ``ignore_for_last`` removed (the support
         under a grasp). Returns the configuration at the last pose. ``scale_key`` (the spawn scale vector of the object
-        the poses belong to) is part of the cache key (§3.10)."""
+        the poses belong to) is part of the cache key (§3.10).
+
+        ``approached`` (owner decision 2026-09-16 10:15, A): the object the tracked approach segments close in on — the
+        grasped target, the placed-on partner, the touched object — is removed from the world along the **whole** segment
+        (side / top grasps straddle it over the last 10 cm by construction); the supports of ``ignore_for_last`` stay
+        removed for the last waypoint only, the pre pose itself keeps the full world. ``None`` infers it from the end
+        pose (``approached_objects``: the spawned objects whose expanded AABB holds the pad centre / fingertip)."""
         if len(poses) == 0:
             return IKResult(True, None, "no poses", 0)
         q0 = self.q_locked(stance, fingers=fingers) if q_seed is None else q_seed
@@ -444,7 +451,8 @@ class IKChecker:
                 # pre-contact -> contact): the end pose is *tracked* from the previous solution so both witnesses lie in
                 # one IK branch and the oracle's straight approach is executable (oracle finding: the french-fries pre_grasp
                 # / grasp witnesses 3.16 rad apart -> plan_failed); an untrackable approach fails the chain
-                q, why = self.track_approach(q, poses[i - 1], p, arm, ignore_end=ign, q_hint=q0)
+                near = list(approached) if approached is not None else self.approached_objects(p)
+                q, why = self.track_approach(q, poses[i - 1], p, arm, ignore_end=ign, ignore_mid=near, q_hint=q0)
                 if q is None:
                     break
                 self.solutions[(arm, self._pose_key(poses[i - 1]))] = self._last_track_start.clone()
@@ -474,6 +482,32 @@ class IKChecker:
     APPROACH_MAX_STEP = 0.2
     APPROACH_MAX_EXCURSION = 0.6
     APPROACH_WAYPOINT_M = 0.1 / 3
+
+    #: an object counts as approached by an end pose when its AABB, grown by this, holds the pad centre or the fingertip
+    APPROACHED_AABB_PAD = 0.03
+
+    def approached_objects(self, end_pose: Pose) -> List[Any]:
+        """Spawned objects an approach ending at ``end_pose`` closes in on: those whose AABB (hull at the PhysX pose when
+        the world caches it, else ``obj.aabb``) grown by ``APPROACHED_AABB_PAD`` contains the pad centre or the fingertip
+        point of the end pose. A grasp straddles the target, a place hovers 1 cm over the partner, a contact sits 5 mm
+        off the touched face: all three land inside. Objects attached to the planner are already out of the world."""
+        world = getattr(self.kit, "world", None)
+        spawned = list(getattr(world, "spawned", {}).values()) if world is not None else []
+        if not spawned:
+            return []
+        if hasattr(world, "sync_render_transforms"):
+            world.sync_render_transforms()  # ``obj.aabb`` reads the render-side transform (stale after physics-only steps)
+        pts = th.stack([C.pad_center((G.t(end_pose[0]), G.t(end_pose[1]))), C.fingertip((G.t(end_pose[0]), G.t(end_pose[1])))])
+        out = []
+        for o in spawned:
+            try:
+                lo, hi = o.aabb
+            except Exception:  # noqa: BLE001
+                continue
+            lo, hi = G.t(lo) - self.APPROACHED_AABB_PAD, G.t(hi) + self.APPROACHED_AABB_PAD
+            if bool(((pts >= lo) & (pts <= hi)).all(dim=1).any()):
+                out.append(o)
+        return out
 
     def track_segment(self, q_from: th.Tensor, pose_from: Pose, pose_to: Pose, arm: str, ignore_mid: Sequence[Any] = (),
                       ignore_end: Sequence[Any] = (), ignore_start: Sequence[Any] = ()) -> Tuple[Optional[th.Tensor], str]:
@@ -607,20 +641,20 @@ class IKChecker:
     # -- waypoints ----------------------------------------------------------------------------------------------
     def waypoints_ok(self, waypoints: Sequence[Pose], stance: Stance, arm: str = "right", policy: str = "screen_mid_exact_ends",
                      ignore_for_last: Sequence[Any] = (), ignore_all: Sequence[Any] = (), q_seed: Optional[th.Tensor] = None,
-                     scale_key: Any = None, cache: bool = True, fingers: Optional[float] = None) -> IKResult:
+                     scale_key: Any = None, cache: bool = True, fingers: Optional[float] = None, approached: Optional[Sequence[Any]] = None) -> IKResult:
         """§3.9: screening IK at the intermediate waypoints, exact IK at the two endpoints (``policy`` names what was
         checked and is recorded as ``waypoint_policy``). ``ignore_all`` objects are removed for every waypoint (the
         carried object's own support along a lift), ``ignore_for_last`` for the final pose only. ``cache=False`` for
         re-checks that must not hit a cached verdict (program check, ``validate_instances``)."""
         wps = list(waypoints)
         if len(wps) < 2:
-            return self.exact(wps, stance, arm, ignore_for_last, q_seed=q_seed, scale_key=scale_key, cache=cache, fingers=fingers)
+            return self.exact(wps, stance, arm, ignore_for_last, q_seed=q_seed, scale_key=scale_key, cache=cache, fingers=fingers, approached=approached)
         if all(is_approach(a, b) for a, b in zip(wps[:-1], wps[1:])):
             # a straight same-orientation chain (approach, lift, descent, retreat, the wall brace chain): solved by
             # ``exact`` as one tracked motion from the first pose's solution (branch-consistent witnesses at every
             # waypoint; ``approach_untrackable`` otherwise) with ``ignore_all`` removed throughout
             with self.ignoring(list(ignore_all)):
-                res = self.exact(wps, stance, arm, list(ignore_for_last), q_seed=q_seed, scale_key=scale_key, cache=False, fingers=fingers)
+                res = self.exact(wps, stance, arm, list(ignore_for_last), q_seed=q_seed, scale_key=scale_key, cache=False, fingers=fingers, approached=approached)
             return IKResult(res.ok, res.q, policy if res.ok else res.reason, len(wps))
         # endpoints first (exact): their solutions seed the screening of the intermediate waypoints, which otherwise
         # misses poses near the ends that the 32-seed solver finds (the wall brace chain)

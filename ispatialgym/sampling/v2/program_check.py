@@ -335,6 +335,24 @@ def _ignore_for(action, sampler, carried: Optional[str]) -> Tuple[List[Any], Lis
     return last, every
 
 
+def _approached_for(action, sampler) -> Optional[List[Any]]:
+    """The object an action's approach closes in on (removed along the whole tracked segment, owner 2026-09-16 10:15 A):
+    the grasped / lifted / released object, the placed-on partner, the pushed / braced object. None = let ``IKChecker``
+    infer it from the end pose."""
+    name = getattr(action, "name", "")
+    objs = sampler.objects
+    cand = None
+    if name in ("grasp", "lift", "retreat", "reorient"):
+        cand = getattr(action, "object", None) or getattr(getattr(action, "grasp", None), "object", None)
+    elif name == "place":
+        cand = getattr(action, "on", None) or getattr(getattr(action, "grasp", None), "place_on", None)
+    elif name in ("push", "brace"):
+        cand = getattr(getattr(action, "contact", None), "object", None)
+    if cand is None:
+        return None
+    return [objs[cand]] if cand in objs else []
+
+
 def _explicit_ignores(rec, sampler) -> Optional[Tuple[List[Any], List[Any]]]:
     """``(last, every)`` from a record's explicit ``ignore_last`` / ``ignore_every`` lists (bddl instance names, or the
     token ``"supports"``), when the module recorded them; None otherwise."""
@@ -378,6 +396,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     if carried_obj is not None and g is not None and g.arm and name in ("lift", "reorient", "place", "navigate", "transition", "set_torso"):
         arm = g.arm
     ignore_last, ignore_all = _ignore_for(action, sampler, carried)
+    approached = _approached_for(action, sampler)
     # push / brace contacts are made with closed pads (§3.6 contact eef poses; the gripper closes before the pre-contact)
     fingers = 0.0 if name in ("push", "brace") else None
     # base-follow in base mode: the handle poses h(q_k) are reached by driving the base, not by the arm from the stance
@@ -392,9 +411,9 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
             if key.split(".")[0] in skip_keys:
                 continue
             if len(poses) == 1:
-                res = sampler.ikc.exact(poses, stance, arm, ignore_for_last=ignore_last + ignore_all, cache=False, fingers=fingers)
+                res = sampler.ikc.exact(poses, stance, arm, ignore_for_last=ignore_last + ignore_all, cache=False, fingers=fingers, approached=approached)
             else:
-                res = sampler.ikc.waypoints_ok(poses, stance, arm, ignore_for_last=ignore_last, ignore_all=ignore_all, cache=False, fingers=fingers)
+                res = sampler.ikc.waypoints_ok(poses, stance, arm, ignore_for_last=ignore_last, ignore_all=ignore_all, cache=False, fingers=fingers, approached=approached)
             n += len(poses)
             if not res.ok:
                 # a straight approach without a configuration in the pre pose's IK branch is its own reason (the oracle
