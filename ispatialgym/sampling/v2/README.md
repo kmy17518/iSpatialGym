@@ -207,6 +207,17 @@ reach band of a (support, object) pair is computed in-process on a cache miss (~
 - Every `q_at_base_pose` configuration is relative to the robot's articulation root at call time: a stance's 28-D vector
   must not be cached across a teleport (`SamplerV2.stance_q` recomputes).
 
+## Smoke (2026-09-15, pool pod L40S, run `194648-593f2d`)
+
+`sample_isg --alias inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table --templates 1
+--instances-per-template 1` → template + instance 0000 in 191 s (4 attempts: `place_unreachable`, `stance_collision_with_objects`,
+`grasp_unreachable` once each), full checks (`checks.attached_object = true`, program check `expand` over `transition, grasp, lift,
+place, retreat`); `multiply_isg --instances 1` continued the template (same `template.json` sha, band cache hit) and wrote 0001 at
+its first attempt (80 s); D5's `validate_instances` reloaded both in a fresh process: `n_ok 2, n_fail 0, reload_failed 0`. Sidecar
+`tro_sha256` verified against the TRO. The earlier runs of the day (0 of 30–40 attempts) fell to the backend facts below and to the
+partner gap rule: cutting the §4.6 step-2 gap range per side to the manipulation trunk's reach band (the goal cell must be
+reachable) took `place_unreachable` from 15–21 to ≤ 5 per 40 attempts.
+
 ## Status (D2 / D4, 2026-09-15) and gaps
 
 Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,

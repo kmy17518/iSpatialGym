@@ -116,10 +116,10 @@ def main(argv=None):
         report["problems"].setdefault(gp.alias, {})[choice.template_id] = entry
         pool.cleanup_template()
         if not args.no_write_back and gp.customs_path:
-            gp.save_customs()
-            copy = os.path.join(out_root, "task_custom_lists.json")
-            if os.path.abspath(copy) != os.path.abspath(gp.customs_path):
-                shutil.copy(gp.customs_path, copy)
+            gp.save_customs()  # §9: every successful instance appends its constraints to the source customs list
+        copy = os.path.join(out_root, "task_custom_lists.json")
+        if not gp.customs_path or os.path.abspath(copy) != os.path.abspath(gp.customs_path):
+            gp.save_customs(copy)  # the copy under <root> always carries what this run learned
     except BaseException:
         log.error("traceback", exc_info=True)
         raise
