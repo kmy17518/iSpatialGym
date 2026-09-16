@@ -321,10 +321,21 @@ class IORSSmall(SamplerV2):
                     if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull[role], pose)):
                         raise Reject("not_in_frame", f"{role} not in the init image (5 %)")
                 grasp.place_on = pname
+                self.sidecar.add_stance(manip)
+                self.sidecar.add_grasp(grasp)  # (popped again by the except below when this candidate is rejected)
+                # the place / pre-place of this candidate must project into its manipulation image (owner 1b: the FOV
+                # monitor arms from the pre-pose): checked here, before the settle, so the next candidate is tried instead of
+                # the attempt dying in the goal check (inside: release rim + 4-5 cm and the pre-place 10 cm above it)
+                if self.relation != "touching":
+                    cam_manip = self.camera_pose_at(manip)
+                    goal_guess = self.goal_pose(t_pose, p_pose)
+                    place_guess = IK.grasp_pose(goal_guess, grasp.eef_in_object)
+                    for what, pose in (("place", place_guess), ("pre-place", IK.pre_pose(place_guess))):
+                        if not self.ikc.eef_in_frame(pose, cam_manip):
+                            raise Reject("gripper_not_in_frame", f"{what} eef pose outside the manipulation image (5 %) for candidate {int(k)} "
+                                                                 f"(trunk {manip.translate}, {manip.tilt:.2f})")
                 # carry height: the target (bottom at the table at init) clears the partner's top by 3 cm on the way
                 grasp.carry_height = max(float(self.gen("carry_clearance_m", 0.03)), TT.height_of(self.hull["partner"], self.rest["partner"]) + float(self.gen("carry_clearance_m", 0.03)))
-                self.sidecar.add_stance(manip)
-                self.sidecar.add_grasp(grasp)
                 d.object_poses[tname] = t_pose
                 d.object_poses[pname] = p_pose
                 d.robot_q = self.stance_q(init)
