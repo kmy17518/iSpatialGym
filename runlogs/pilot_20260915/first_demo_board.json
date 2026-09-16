@@ -94,11 +94,11 @@
   "owner": "core"
  },
  "inter_object_relation_satisfaction-ontop_large_scale": {
-  "blocking": "owner 10:47: A goal-region visibility (relaxed partner rule), B no partner redraw, C sofa diagnosis (13 free / 0 visible) \u2192 then local runs countertop pair first",
-  "owner": "large-scale / coordinator (local)"
+  "blocking": "(a)(d) A goal-region rule + (c) C in-frame rule landed \u2192 countertop pair running on the local GPU; sofa-bar next",
+  "owner": "coordinator (local) / large-scale"
  },
  "inter_object_relation_satisfaction-under_large_scale": {
-  "blocking": "push-under: sampler landed (25e94d3/8140025/032d849), program + executor (oracle) pending",
-  "owner": "large-scale / oracle"
+  "blocking": "push-under sampler + program landed; no instance yet (floor reach at the envelope edge; side stances, deepest trunk first untested) \u2192 loop run on the pool now",
+  "owner": "large-scale / loop"
  }
 }
