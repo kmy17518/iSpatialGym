@@ -351,6 +351,19 @@ horizontal, either wrist turn), then the top-down blade beside the face with `ta
 height (pitches per `approach_pitch_order`); thin partners (< 4 cm) try the blade first. The record is a `tabletop.BraceRecord`
 with `blade_half_thickness_m`, `stop_clearance_m`, `blade_standoff_m`, `pose_class` (`summary.brace` mirrors it).
 
+### Floor height per task room (2026-09-16, large-articulation diagnosis)
+
+`trav_map.floor_heights[0]` is OmniGibson's default 0.0 in every scene, but a room's slab may top out elsewhere
+(`office_cubicles_right` / `shared_office_0`: `floors_ovpbsn_0` collision top at **z +0.0071**; the parked robot settles at
+base z 0.012). Every check stood `base_link` at `0.0 + NOMINAL_BASE_Z`, so the wheel spheres sank 5 mm into the slab and
+cuRobo's penetration query (no ground-like exemption, unlike the proximity margin) failed **every** configuration in the
+room. `SimWorld.measure_floor_z(xy)` now measures the walkable surface: downward raycast at the park cell (robot bodies
+ignored, hit within 0.3 m of the nominal height) → the room's `floors` collision-hull top → its AABB top → the nominal
+value; cached in `floor_z_by_room`, logged with the delta, and `floor_probe` checks the settled base z − `NOMINAL_BASE_Z`
+against it (2 mm; written to the template meta under `floor`). `SimWorld.floor_z`, `RobotKit.floor_z` (`q_config` /
+`q_at_base_pose`), `teleport_robot`, `park_robot`, `prompt0.base_z` and the band script follow; `SamplerV2.park_robot_v2`
+re-measures at the task room's park cell.
+
 ## Status (D2 / D4, 2026-09-15) and gaps
 
 Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,
