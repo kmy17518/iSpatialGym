@@ -410,8 +410,10 @@ class IORSSmall(SamplerV2):
             if brace_placement_admissible(manip.world_to_base(work[:2]), manip.world_to_base(brace[:2]), right_cells, left_cells):
                 return p_pose
             errors.append(f"work {manip.world_to_base(work[:2]).tolist()} / brace {manip.world_to_base(brace[:2]).tolist()}")
-        raise Reject("brace_out_of_band", f"no partner position puts the push point in the right band and the brace point in the left band "
-                                          f"at trunk ({manip.translate}, {manip.tilt:.2f}); tried {errors[-2:]}")
+        # distinct reason for the board (owner: touching may get axial's optional-brace rule later; until then the joint
+        # band gate rejects as ``brace_off_band``)
+        raise Reject("brace_off_band", f"no partner position puts the push point in the right band and the brace point in the left band "
+                                       f"at trunk ({manip.translate}, {manip.tilt:.2f}); tried {errors[-2:]}")
 
     def touching_points(self, t_pose: G.Pose, p_pose: G.Pose, manip: Stance) -> Tuple[th.Tensor, th.Tensor]:
         """§6.11 touching: the push contact on the target's right face (mid height) and the brace point on the partner's far
