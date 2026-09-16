@@ -172,10 +172,10 @@ def cmd_run(args):
            f"--seed {args.seed} --no-write-back --out $SMOKE_OUT/inst --log-level INFO; echo SAMPLE_EXIT $?; "
            f"tro=$(ls $SMOKE_OUT/inst/*/*/instances/*-tro_state.json 2>/dev/null | head -1); "
            f"if [ -n \"$tro\" ]; then echo TRO=$tro; python -m ispatialgym.oracle.run_isg --instance \"$tro\" --mode oracle --out $SMOKE_OUT/demo --video --video-size 540; echo DEMO_EXIT $?; fi")
-    rc = run_remote(cmd, out_dir, args.timeout)
+    rc = run_local(cmd, out_dir, args.timeout) if args.local else run_remote(cmd, out_dir, args.timeout)
     samp = parse_sampling(os.path.join(out_dir, "inst"))
     demo = parse_meta(os.path.join(out_dir, "demo"))
-    rec = {"time": now(), "kind": "sample+demo", "subtask": st, "alias": args.alias, "run_id": run_id, "out": os.path.relpath(out_dir, REPO), "rc": rc,
+    rec = {"time": now(), "kind": "sample+demo" + (" (local)" if args.local else ""), "subtask": st, "alias": args.alias, "run_id": run_id, "out": os.path.relpath(out_dir, REPO), "rc": rc,
            "wall_s": round(time.time() - t0), "code_commit": commit, "dirty": dirty, "sampler_version": samp["sampler_version"],
            "sampling": {k: samp[k] for k in ("n_written", "rejections", "error", "time_s")}, "tro": samp["tro"] and os.path.relpath(samp["tro"], REPO),
            "demo": demo and {**demo, "meta": os.path.relpath(demo["meta"], REPO)}, "note": args.note}
@@ -303,6 +303,38 @@ def build_board():
     print(f"board: {n_valid}/{len(SUBTASKS)} valid -> {BOARD}")
 
 
+LOCAL_LOCK = os.path.join(FD, "local_gpu.lock")
+
+
+def gpu_free_mb():
+    try:
+        out = subprocess.run(["nvidia-smi", "--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"], capture_output=True, text=True).stdout
+        used, total = [int(x) for x in out.strip().split("\n")[0].split(",")]
+        return total - used
+    except Exception:
+        return 0
+
+
+def run_local(cmd, out_dir, timeout, min_free_mb=12000):
+    """Run the chain on this machine (owner decision 2026-09-16 08:19: one local simulator process at a time, >= 12 GB free)."""
+    import fcntl
+
+    os.makedirs(out_dir, exist_ok=True)
+    lock = open(LOCAL_LOCK, "w")
+    fcntl.flock(lock, fcntl.LOCK_EX)  # one local simulator at a time
+    try:
+        free = gpu_free_mb()
+        if free < min_free_mb:
+            raise SystemExit(f"first_demo --local: only {free} MB free on the local GPU (< {min_free_mb}); not launching")
+        env = dict(os.environ, OMNIGIBSON_HEADLESS="1", OMNI_KIT_ACCEPT_EULA="YES", SMOKE_OUT=out_dir)
+        with open(os.path.join(out_dir, "local.log"), "w") as log:
+            r = subprocess.run(["bash", "-lc", cmd], stdout=log, stderr=subprocess.STDOUT, text=True, cwd=REPO, env=env, timeout=timeout)
+        return r.returncode
+    finally:
+        fcntl.flock(lock, fcntl.LOCK_UN)
+        lock.close()
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -310,6 +342,7 @@ def main():
     s.add_argument("--alias", required=True)
     s.add_argument("--max-attempts", type=int, default=8)
     s.add_argument("--scene", default=None, help="restrict sample_isg to one candidate scene")
+    s.add_argument("--local", action="store_true", help="run on this machine's GPU instead of the pool (one at a time, >= 12 GB free)")
     s.add_argument("--seed", type=int, default=0)
     s.add_argument("--timeout", type=int, default=5400)
     s.add_argument("--note", default="")
