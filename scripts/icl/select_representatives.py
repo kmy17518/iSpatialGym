@@ -176,7 +176,49 @@ SUPPORT_TRIPLETS: List[dict] = [
 ]
 SUPPORT_SLOTS = ("representative", "variation_geometry", "heldout")
 FLOOR = "floor"
-PATCH_KINDS = ("under_large_scale", "support_triplets")
+PATCH_KINDS = ("under_large_scale", "support_triplets", "articulation_large_scale")
+
+#: large-scale articulation (owner decision 2026-09-16 06:50, item 6): the crowded kitchen picks are replaced by roomy B4
+#: units, one pick per door class, shared by the open / close subtasks. Per slot a preference list of (scene, instance,
+#: joint); the first candidate that passes :meth:`Selector.artic_check` takes the slot, every candidate is reported.
+ARTIC_FREE_MIN_M = 3.0          # free run in front (B4 ``front_free_m``: base centre on free floor, Prompt-1 Phase 1 rule 1)
+ARTIC_FREE_ERODED_MIN_M = 2.0   # robot-eroded run (proxy for the whole-body check; view stances scan d up to 2.5 m)
+ARTIC_HANDLE_Z = (0.30, 1.70)   # world height of the pinch (build_icl HANDLE_Z)
+ARTIC_PINCH_MM = (15.0, 80.0)   # pinch width after the instance scale (build_icl PINCH_MM, ground_isg PINCH_RANGE_M)
+ARTIC_LARGE_PICKS: List[dict] = [
+    {"class": "cabinet doors", "category": "bottom_cabinet",
+     "representative": [("office_cubicles_right", "bottom_cabinet_rvunhj_0", "j_link_2")],
+     "variation_geometry": [("office_cubicles_right", "bottom_cabinet_rvunhj_5", "j_link_2")],
+     "heldout": [("office_cubicles_right", "bottom_cabinet_rvunhj_3", "j_link_2")]},
+    {"class": "fridge door", "category": "fridge",
+     "representative": [("restaurant_diner", "fridge_jtqazu_1", "j_link_0")],
+     "variation_geometry": [("house_double_floor_lower", "fridge_petcxr_0", "j_left_door")],
+     "heldout": [("restaurant_diner", "fridge_jtqazu_0", "j_link_0")]},
+    {"class": "top cabinet doors", "category": "top_cabinet",
+     "representative": [("house_double_floor_lower", "top_cabinet_tynnnw_1", "j_rightdoor")],
+     "variation_geometry": [("Rs_int", "top_cabinet_lsyzkh_0", "j_link_1")],
+     "heldout": []},
+    {"class": "oven door", "category": "oven",
+     "representative": [("restaurant_diner", "oven_amblrk_0", "j_door_leaf1")],
+     "variation_geometry": [("house_double_floor_lower", "oven_ffitak_0", "j_door")],
+     "heldout": [("Rs_int", "oven_wuinhm_0", "j_link_1")]},
+    {"class": "drawers", "category": "bottom_cabinet",
+     "representative": [("Rs_int", "bottom_cabinet_bamfsz_0", "j_link_4")],
+     "variation_geometry": [("Rs_int", "bottom_cabinet_bamfsz_1", "j_link_4")],
+     "heldout": [("Rs_int", "bottom_cabinet_jhymlr_0", "j_link_2")]},
+]
+ARTIC_LARGE_SUBTASKS = (f"{CM}-articulation_open_large_scale", f"{CM}-articulation_close_large_scale")
+HANDLE_ADMISSIBLE_VERDICTS = ("handle", "edge", "manual")
+
+
+def follow_class(category: str, joint_kind: str) -> str:
+    """Owner decision A4: cabinets / fridge / dishwasher / oven doors and flaps -> manipulation stance on the hinge side,
+    arm-only follow; drawers stay base mode; room doors -> hybrid follow."""
+    if joint_kind == "drawer":
+        return "base"
+    if category == "door":
+        return "hybrid"
+    return "arm_only"
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -265,7 +307,13 @@ class Selector:
         self.compat = read_csv(os.path.join(icl_dir, "roles", "constraints_compatible.csv"))
         self.conflict = read_csv(os.path.join(icl_dir, "roles", "constraints_conflicting.csv"))
         self.grasps = admissible_grasps(read_csv(os.path.join(icl_dir, "require", "grasps.csv")))
-        self.handles = admissible_handles(read_csv(os.path.join(icl_dir, "require", "handles.csv")))
+        handle_rows = read_csv(os.path.join(icl_dir, "require", "handles.csv"))
+        self.handles = admissible_handles(handle_rows)
+        # B4 scene-instance handle rows: (scene, instance, joint) -> rows (every verdict; artic_check filters them)
+        self.handle_instance_rows: Dict[Tuple[str, str, str], List[dict]] = collections.defaultdict(list)
+        for r in handle_rows:
+            if r.get("scene"):
+                self.handle_instance_rows[(r["scene"], r["instance"], r["joint"])].append(r)
         self.exact, self.geom = load_duplicates()
         with open(SCENE_INVENTORY) as f:
             self.inventory = json.load(f)["scenes"]
@@ -278,6 +326,7 @@ class Selector:
         self.extra: List[dict] = []
         self.report: Dict[str, List[str]] = collections.defaultdict(list)
         self._admission: Dict[Tuple[str, str], dict] = {}   # (scene, name) -> support_admission record (cached)
+        self._artic_checks: Dict[Tuple[str, str, str], dict] = {}  # (scene, name, joint) -> artic_check record (cached)
         self._triplets: Optional[List[dict]] = None          # support_triplets() cache
         self.support_notes: List[str] = []                    # triplet / own-top notes for the report
         self.patch_log: Dict[str, List[str]] = collections.defaultdict(list)  # --patch-only: what changed
@@ -1065,7 +1114,138 @@ class Selector:
         for line in self.fix_heldout_support_collisions(subtask):
             self.report[subtask].append(line)
 
+    # -- large-scale articulation: pinned roomy units (owner decision 2026-09-16 06:50, item 6) ------------------------
+    def artic_check(self, scene: str, name: str, joint: str) -> dict:
+        """Verify one (scene, instance, joint) against the B4 inventory and ``require/handles.csv``: the joint exists (door /
+        drawer / flap, B4 status handle / edge), the free run in front is >= ARTIC_FREE_MIN_M (``front_free_m``) with the
+        robot-eroded run >= ARTIC_FREE_ERODED_MIN_M (flag ``eroded<3.0`` below ARTIC_FREE_MIN_M), and an admissible handle
+        row exists for the joint (verdict handle / edge / manual, not reviewed ungraspable, pinch width 15-80 mm after the
+        instance scale, world height 0.30-1.70 m). The pinch = the reviewer's ``chosen`` row, else handle before edge rows.
+        Nothing is guessed: a joint without an admissible row is reported as such."""
+        key = (scene, name, joint)
+        if key in self._artic_checks:
+            return self._artic_checks[key]
+        a = (self.inventory.get(scene) or {}).get("artic", {}).get(name)
+        out: dict = {"scene": scene, "name": name, "joint": joint, "ok": False, "reasons": [], "flags": [], "pinch": None,
+                     "category": (a or {}).get("category", name.rsplit("_", 2)[0]), "model": (a or {}).get("model", ""),
+                     "scale": (a or {}).get("scale"), "annotated": bool((a or {}).get("canonical_annotation")), "rooms": list((a or {}).get("rooms") or []),
+                     "kind": "", "b4_status": "", "free": None, "free_eroded": None, "prior": None, "rows": [], "class": ""}
+        if a is None:
+            out["reasons"].append("instance not in the B4 artic inventory")
+            self._artic_checks[key] = out
+            return out
+        j = next((x for x in a.get("joints") or [] if x.get("joint") == joint), None)
+        if j is None:
+            out["reasons"].append(f"joint {joint} not in the B4 record (joints: {', '.join(x.get('joint', '?') for x in a.get('joints') or [])})")
+            self._artic_checks[key] = out
+            return out
+        out.update({"kind": j.get("kind", ""), "b4_status": j.get("status", ""), "free": j.get("front_free_m"), "free_eroded": j.get("front_free_eroded_m"),
+                    "prior": j.get("prior_review"), "class": follow_class(out["category"], j.get("kind", ""))})
+        if j.get("kind") not in ("door", "drawer", "flap"):
+            out["reasons"].append(f"joint kind {j.get('kind')} (door / drawer / flap only)")
+        if j.get("status") not in ("handle", "edge"):
+            out["reasons"].append(f"B4 status {j.get('status')} (not graspable)")
+        free, eroded = out["free"], out["free_eroded"]
+        if free is None or float(free) < ARTIC_FREE_MIN_M:
+            out["reasons"].append(f"free run in front {free if free is None else f'{float(free):.2f}'} m < {ARTIC_FREE_MIN_M:.1f} m")
+        if eroded is None or float(eroded) < ARTIC_FREE_ERODED_MIN_M:
+            out["reasons"].append(f"robot-eroded free run {eroded if eroded is None else f'{float(eroded):.2f}'} m < {ARTIC_FREE_ERODED_MIN_M:.1f} m (no view stance)")
+        elif float(eroded) < ARTIC_FREE_MIN_M:
+            out["flags"].append(f"eroded={float(eroded):.2f}")
+        rows = self.handle_instance_rows.get(key, [])
+        out["rows"] = rows
+        if not rows:
+            out["reasons"].append("no handles.csv row for the instance / joint (missing handle annotation)")
+        admissible = []
+        for h in rows:
+            why = []
+            if h.get("verdict") not in HANDLE_ADMISSIBLE_VERDICTS:
+                why.append(f"verdict {h.get('verdict')}")
+            if (h.get("review_graspable") or "") in ("False", "false", "0"):
+                why.append("reviewed ungraspable")
+            try:
+                w = float(h.get("width_m") or "nan") * 1000
+            except ValueError:
+                w = float("nan")
+            if not (ARTIC_PINCH_MM[0] <= w <= ARTIC_PINCH_MM[1]):
+                why.append(f"pinch {w:.0f} mm" if w == w else "pinch width unknown")
+            try:
+                z = float(h.get("height_world_m") or "nan")
+            except ValueError:
+                z = float("nan")
+            if not (ARTIC_HANDLE_Z[0] <= z <= ARTIC_HANDLE_Z[1]):
+                why.append(f"height {z:.2f} m" if z == z else "height unknown")
+            if not why:
+                admissible.append((h, w, z))
+        if rows and not admissible:
+            seen = sorted({f"{h.get('kind')} {float(h['width_m']) * 1000:.0f}mm@{float(h['height_world_m']):.2f}m/{h.get('verdict')}"
+                           for h in rows if h.get("width_m") and h.get("height_world_m")})
+            out["reasons"].append("no admissible handle row: " + ", ".join(seen))
+        if admissible:
+            order = {"handle": 0, "manual": 1, "edge": 2}
+            h, w, z = sorted(admissible, key=lambda t: ((t[0].get("chosen") or "") not in ("1", "True", "true"), order.get(t[0].get("verdict"), 9), t[0].get("name") or ""))[0]
+            out["pinch"] = {"kind": h.get("kind", ""), "width_mm": w, "height": z, "verdict": h.get("verdict", ""), "row": h.get("name", ""),
+                            "chosen": (h.get("chosen") or "") in ("1", "True", "true"), "n_rows": len(rows), "n_admissible": len(admissible)}
+            if h.get("verdict") == "edge":
+                out["flags"].append("edge pinch (the protruding handles fail the 15 mm pinch filter)")
+        out["ok"] = not out["reasons"]
+        self._artic_checks[key] = out
+        return out
+
+    def artic_row(self, subtask: str, pick: str, slot: str, c: dict) -> dict:
+        p = c["pinch"] or {}
+        note = (f"{c['kind']} {p.get('kind', '-')} h={p.get('height', 0.0):.2f} w={p.get('width_mm', 0.0):.0f}mm "
+                f"front_free={float(c['free']):.2f}({float(c['free_eroded']):.2f}) prior={c['prior'] or '-'} pinch_row={p.get('row', '-')}({p.get('verdict', '-')}) "
+                f"class={c['class']} rooms={','.join(c['rooms']) or '-'}")
+        if c["flags"]:
+            note += " flags=" + ";".join(c["flags"])
+        return {"family": CM, "subtask": subtask, "pick": pick, "role": "target", "slot": slot, "category": c["category"], "model": c["model"],
+                "scene": c["scene"], "name": c["name"], "joint": c["joint"], "kind": "scene", "grasp_key": "", "scale": "", "geometry_group": "",
+                "exact_group": "", "status": "geometric_ok" if c["annotated"] else "incomplete:handle_from_B4_heuristic", "note": note, "triplet": ""}
+
+    def select_scene_artic_pinned(self, subtask: str, n: int) -> None:
+        """The owner's pinned large-scale articulation picks (:data:`ARTIC_LARGE_PICKS`): one pick per door class; per slot
+        the first candidate that passes :meth:`artic_check`; failing candidates are reported, never replaced by a guess."""
+        chosen = 0
+        for pin in ARTIC_LARGE_PICKS:
+            pick = f"{subtask}#{chosen + 1:02d}"
+            slots: Dict[str, dict] = {}
+            notes: List[str] = []
+            for slot in SUPPORT_SLOTS:
+                for scene, name, joint in pin.get(slot) or []:
+                    c = self.artic_check(scene, name, joint)
+                    if c["ok"]:
+                        slots[slot] = c
+                        break
+                    notes.append(f"{slot} candidate {scene}/{name}:{joint} rejected - " + "; ".join(c["reasons"]))
+            rep = slots.get("representative")
+            if rep is None:
+                self.report[subtask].append(f"{pin['class']} ({pin['category']}): no representative passed the checks - " + "; ".join(notes))
+                continue
+            var, held = slots.get("variation_geometry"), slots.get("heldout")
+            if var is None:
+                notes.append("VB-MOBJ target model change: no roomy second unit of the class" if not pin.get("variation_geometry")
+                             else "VB-MOBJ target model change unavailable (candidates rejected)")
+            elif var["model"] == rep["model"]:
+                notes.append("VB-MOBJ: only same-model instances available for variation")
+            if held is None:
+                notes.append("held-out target: no roomy third unit" if not pin.get("heldout") else "held-out target unavailable (candidates rejected)")
+            for slot, c in slots.items():
+                self.rows.append(self.artic_row(subtask, pick, slot, c))
+            p = rep["pinch"]
+            self.report[subtask].append(
+                f"{pick}: target **{rep['category']} {rep['name']}:{rep['joint']}@{rep['scene']}** ({rep['kind']}, {p['kind']} {p['width_mm']:.0f} mm at "
+                f"{p['height']:.2f} m, free {float(rep['free']):.2f}({float(rep['free_eroded']):.2f}) m, {pin['class']}, follow {rep['class']}) "
+                f"{self.slots_str(pick, 'target')}; {'; '.join(notes) or 'all axes available'}")
+            chosen += 1
+        if chosen < n:
+            self.report[subtask].append(f"{chosen} of {n} picks: the owner's class list (2026-09-16 item 6: cabinets, a fridge, top cabinets, the oven, drawers) "
+                                        "has five classes; the heuristic fill is off for the pinned subtasks")
+
     def select_scene_artic(self, subtask: str, n: int) -> None:
+        if ARTIC_LARGE_PICKS:
+            self.select_scene_artic_pinned(subtask, n)
+            return
         arts = self.artic_admitted()
         # one pick per (category, joint kind) preferring the test scene, handle over edge, canonical annotation, reviewer-neutral
         arts.sort(key=lambda a: (a["scene"] != TEST_SCENE, a["handle_kind"] not in ("bar", "knob"), not a["annotated"], -(a["front_free"] or 0)))
@@ -1155,14 +1335,39 @@ class Selector:
                 picks[-1][1].append(r)
             else:
                 picks.append((r["pick"], [r]))
+        artic_new: Dict[str, List[dict]] = {}
+        if "articulation_large_scale" in what:
+            # re-select the two subtasks from the pins (self-contained: no global selection state involved)
+            saved = self.rows
+            for st in ARTIC_LARGE_SUBTASKS:
+                self.rows = []
+                self.report[st] = []
+                self.select_scene_artic(st, self.n_for(st, 5))
+                artic_new[st] = self.rows
+            self.rows = saved
         out: List[dict] = []
+        artic_done: Set[str] = set()
         for pick, prs in picks:
             subtask = prs[0]["subtask"]
+            if subtask in artic_new:
+                if subtask not in artic_done:  # the new picks take the place of the old block (in order)
+                    artic_done.add(subtask)
+                    old = [f"{r['pick']}/{r['slot']} {r['name']}:{r['joint']}" for p2, rs in picks if p2.split('#')[0] == subtask for r in rs]
+                    new = [f"{r['pick']}/{r['slot']} {r['name']}:{r['joint']}" for r in artic_new[subtask]]
+                    self.patch_log["articulation_large_scale"].append(
+                        f"{subtask}: {len({r['pick'] for p2, rs in picks if p2.split('#')[0] == subtask for r in rs})} picks / {len(old)} rows -> "
+                        f"{len({r['pick'] for r in artic_new[subtask]})} picks / {len(new)} rows; removed: " + ", ".join(old) + "; added: " + ", ".join(new))
+                    out.extend(artic_new[subtask])
+                continue
             if "under_large_scale" in what and subtask == f"{IORS}-under_large_scale":
                 prs = self.patch_own_top(pick, prs)
             if "support_triplets" in what and subtask in TABLETOP_SUPPORT_SUBTASKS:
                 prs = self.patch_triplets(pick, prs)
             out.extend(prs)
+        for st, rows in artic_new.items():
+            if st not in artic_done:
+                out.extend(rows)
+                self.patch_log["articulation_large_scale"].append(f"{st}: {len(rows)} rows appended (the sheet had none)")
         self.rows = out
         if "under_large_scale" in what:
             for line in self.fix_heldout_support_collisions(f"{IORS}-under_large_scale"):
@@ -1380,8 +1585,54 @@ class Selector:
                          f"{', '.join(tags)} |")
         return lines
 
+    def artic_report_lines(self) -> List[str]:
+        """The large-scale articulation section: the pinned units with the free-run and handle checks (item 6)."""
+        if not ARTIC_LARGE_PICKS:
+            return []
+        lines = ["## Large-scale articulation picks (owner decision 2026-09-16 06:50, item 6)", "",
+                 "The crowded kitchen picks (`bottom_cabinet_fancyy_0`: 1.50 m handle next to `oven_ffitak_0`, 0.95 m robot-eroded free run; "
+                 "`fridge_dszchb_0` 1.0 m; `dishwasher_ynrhuk_0` 1.0 m) are replaced by roomy B4 units, one pick per door class, shared by the open / "
+                 f"close subtasks. Checks per (scene, instance, joint): B4 free run in front >= {ARTIC_FREE_MIN_M:.1f} m (`front_free_m`, the un-eroded map "
+                 f"Prompt-1 Phase 1 rule 1 uses) with the robot-eroded run >= {ARTIC_FREE_ERODED_MIN_M:.1f} m (proxy for the whole-body check at the view "
+                 f"stance; flagged below {ARTIC_FREE_MIN_M:.1f} m); a `require/handles.csv` row for the instance / joint with verdict handle / edge / manual, "
+                 f"not reviewed ungraspable, pinch width {ARTIC_PINCH_MM[0]:.0f}-{ARTIC_PINCH_MM[1]:.0f} mm after the instance scale and world height "
+                 f"{ARTIC_HANDLE_Z[0]:.2f}-{ARTIC_HANDLE_Z[1]:.2f} m (the reviewer's `chosen` row, else handle before edge rows). Units that fail are "
+                 "reported, not replaced by guesses. Follow class per owner decision A4 (doors / flaps of cabinets and appliances: arm-only from the "
+                 "hinge side; drawers: base mode; room doors: hybrid). Room doors (A4: hybrid follow after the pilot), `bottom_cabinet_no_top_gjrero_*` "
+                 "(same-model copies, 1.7 m) and the dishwashers (kitchen, 1.0 / 2.35 m) are no longer picked in these two subtasks.", "",
+                 "| class | slot | scene / instance | joint | kind | follow | free m (eroded) | handle row (kind, width, height, verdict) | canonical annotation | verdict |",
+                 "|---|---|---|---|---|---|---|---|---|---|"]
+        for pin in ARTIC_LARGE_PICKS:
+            for slot in SUPPORT_SLOTS:
+                cands = pin.get(slot) or []
+                if not cands:
+                    lines.append(f"| {pin['class']} | {slot} | - | | | | | | | no roomy candidate in the inventory |")
+                taken = False
+                for scene, name, joint in cands:
+                    c = self.artic_check(scene, name, joint)
+                    p = c["pinch"]
+                    free = (f"{float(c['free']):.2f} ({float(c['free_eroded']):.2f})" if c["free"] is not None and c["free_eroded"] is not None else "-")
+                    hrow = (f"{p['row']}: {p['kind']} {p['width_mm']:.0f} mm @ {p['height']:.2f} m, {p['verdict']}" + (" (chosen)" if p["chosen"] else "")
+                            if p else ("none admissible" if c["rows"] else "no row"))
+                    if c["ok"] and not taken:
+                        verdict, taken = "ok" + (" [" + "; ".join(c["flags"]) + "]" if c["flags"] else ""), True
+                    elif c["ok"]:
+                        verdict = "ok, not needed"
+                    else:
+                        verdict = "rejected: " + "; ".join(c["reasons"])
+                    lines.append(f"| {pin['class']} | {slot} | `{scene}/{name}` | {joint} | {c['kind'] or '-'} | {c['class'] or '-'} | {free} | {hrow} | "
+                                 f"{'yes' if c['annotated'] else 'B4 heuristic'} | {verdict} |")
+        lines += ["", "- The two `bottom_cabinet` picks (cabinet doors / drawers) share the category-based alias token; the follow class differs per joint "
+                  "kind (A4), so the grounder / sampler must keep the class per bound object (or split the alias by joint kind).",
+                  "- `bottom_cabinet_rvunhj_*`: the protruding handles are 7-8 mm wide after the 1.6x instance scale (below the 15 mm pinch filter); the "
+                  "admissible pinch is the exposed door-leaf edge (`j_link_2#F`, 39 mm, verdict `edge`); the other three doors of each unit have no "
+                  "exposed edge (`edge_blocked`) and `rvunhj_0` j_link_0 / j_link_1 have 0.0 m eroded free run.",
+                  "- Drawers: no drawer unit in the inventory reaches 3.0 m robot-eroded free run; `bottom_cabinet_bamfsz_0` (3.00 / 2.30 m, canonical "
+                  "annotation, 19-20 mm rail pulls) is the best; `j_link_4` is its top drawer (0.82 m; j_link_1-3 at 0.38 / 0.60 / 0.71 m are alternatives)."]
+        return lines
+
     def patch_report(self, text: str) -> str:
-        """Splice the support sections and the patched per-subtask lines into an existing report (``--patch-only``)."""
+        """Splice the support / articulation sections and the patched per-subtask lines into an existing report (``--patch-only``)."""
         lines = text.rstrip("\n").split("\n")
         out: List[str] = []
         for line in lines:
@@ -1390,9 +1641,22 @@ class Selector:
                     line = line.rsplit("; no admitted support within 3 m of the partner", 1)[0] + "; " + val[0]
             if line.startswith("- **Supports** (`geometric_ok` only)"):
                 line = self.supports_validation_line()
+            if line.startswith("- **Scene articulated targets without a canonical handle annotation**") and self.patch_log.get("articulation_large_scale"):
+                line = self.artic_validation_line()
             out.append(line)
-        # drop a previous version of the support sections, then insert the fresh ones before the held-out list
-        for head in ("## Support triplets", "## Support admission"):
+        # re-selected subtasks (articulation_large_scale): their per-subtask blocks are regenerated
+        if self.patch_log.get("articulation_large_scale"):
+            for st in ARTIC_LARGE_SUBTASKS:
+                head = f"### {st}  ("
+                if not any(l.startswith(head) for l in out):
+                    continue
+                i = next(i for i, l in enumerate(out) if l.startswith(head))
+                j = next((k for k in range(i + 1, len(out)) if out[k].startswith("### ") or out[k].startswith("## ")), len(out))
+                n = len({r["pick"] for r in self.rows if r["subtask"] == st and r["role"] == "target" and r["slot"] == "representative"})
+                block = [f"### {st}  ({n} picks)", ""] + [f"- {l}" for l in self.report.get(st, [])] + [""]
+                out = out[:i] + block + out[j:]
+        # drop a previous version of the support / articulation sections, then insert the fresh ones before the held-out list
+        for head in ("## Support triplets", "## Support admission", "## Large-scale articulation picks"):
             if any(l.startswith(head) for l in out):
                 i = next(i for i, l in enumerate(out) if l.startswith(head))
                 j = next((k for k in range(i + 1, len(out)) if out[k].startswith("## ")), len(out))
@@ -1419,8 +1683,16 @@ class Selector:
             j = next((k for k in range(i + 1, len(out)) if out[k].startswith("## ")), len(out))
             out = out[:i] + out[j:]
             anchor = next((i for i, l in enumerate(out) if l.startswith("## Held-out models (global)")), len(out))
-        out = out[:anchor] + self.support_report_lines() + patched + [""] + out[anchor:]
+        artic = self.artic_report_lines()
+        out = out[:anchor] + self.support_report_lines() + ([""] + artic if artic else []) + patched + [""] + out[anchor:]
         return "\n".join(out) + "\n"
+
+    @staticmethod
+    def artic_validation_line() -> str:
+        return ("- **Scene articulated targets without a canonical handle annotation** (`incomplete:handle_from_B4_heuristic`, e.g. bottom_cabinet_rvunhj_0 / _5 "
+                "(exposed door-edge pinch), top_cabinet_tynnnw_1, oven_amblrk_0): the B4 geometric handle proposal is used through the `handle_file` role option; "
+                "validate with the C3 review round on `runlogs/scene_inventory_20260915/<scene>/artic/strips/` (verdicts -> `require/handles.csv`), then the "
+                "representative test.")
 
     @staticmethod
     def supports_validation_line() -> str:
@@ -1461,6 +1733,9 @@ class Selector:
                 lines.append(f"- {l}")
             lines.append("")
         lines += self.support_report_lines()
+        artic = self.artic_report_lines()
+        if artic:
+            lines += [""] + artic
         lines += ["", "## Held-out models (global)", ""]
         for cat in sorted(self.heldout):
             lines.append(f"- {cat}: `{self.heldout[cat]}`")
@@ -1483,9 +1758,7 @@ class Selector:
                   "- **Large-scale IORS targets** (`incomplete:filled_from_*`): tabletop-grasp models of the other IORS / disembedding pools, filtered by height "
                   "(ontop <= 0.35 m, under <= 0.20 m). Validate: the representative test of `ground_isg` (place on the partner face / under the partner, "
                   "whole-body IK at the placement stance; spec 5.6) and the B3 reach bands with `--support floor --under <partner>`; failures go to the customs blacklist.",
-                  "- **Scene articulated targets without a canonical handle annotation** (`incomplete:handle_from_B4_heuristic`, e.g. bottom_cabinet_fancyy_0, "
-                  "bottom_cabinet_no_top_gjrero_*): the B4 geometric handle proposal is used through the `handle_file` role option; validate with the C3 review round "
-                  "on `runlogs/scene_inventory_20260915/<scene>/artic/strips/` (verdicts -> `require/handles.csv`), then the representative test.",
+                  self.artic_validation_line(),
                   self.supports_validation_line(),
                   "- **Alignment targets**: `(contacts target)` cannot be checked until B6 writes `require/contacts.csv`; the v1 geometric push / brace contacts are used meanwhile; "
                   "wall regions stay the 2026-09-11 survey until B5.",
