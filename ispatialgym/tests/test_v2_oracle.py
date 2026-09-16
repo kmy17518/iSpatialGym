@@ -602,6 +602,46 @@ def test_track_path_reaches_the_recorded_waypoints():
     assert exported["tracker_index"] is not None and exported["trunk"] == pytest.approx((0.5, 0.0), abs=1e-6)
 
 
+def test_track_path_stays_in_the_corridor_at_corners():
+    """Pilot red flag 2: the constant-speed reference + base-frame smoothing cut 45–63° corners by 5–8 cm and drifted
+    25 cm after a 90° turn. The corner-aware profile and the world-frame filter must keep the base within ~2 cm of a
+    recorded polyline with sharp corners, with the yaw within a few degrees of the recorded headings."""
+    wps = [[0.2, 0.0, 0.0], [0.4, 0.0, 0.0], [0.6, 0.0, -0.785], [0.8, -0.2, -0.785], [1.0, -0.4, -1.571], [1.0, -0.6, -1.571],
+           [1.0, -0.8, -1.571], [1.0, -1.0, 3.142], [0.8, -1.0, 3.142], [0.6, -1.0, 3.142], [0.4, -1.0, 2.356]]
+    robot = FakeRobot(base=(0.0, 0.0, 0.0))
+    env = FakeEnv(robot, {})
+    m = Motions(env, FakeBackend(robot))
+
+    poly = [[0.0, 0.0, 0.0]] + wps  # the tracked polyline starts at the current base pose
+
+    def cross_track(pt):
+        best = 1e9
+        for a, b in zip(poly[:-1], poly[1:]):
+            a, b = th.tensor(a[:2]), th.tensor(b[:2])
+            ab = b - a
+            t = float(th.clamp(th.dot(pt - a, ab) / max(float(th.dot(ab, ab)), 1e-9), 0.0, 1.0))
+            best = min(best, float(th.linalg.norm(pt - (a + ab * t))))
+        return best
+
+    errs, yaw_errs, speeds = [], [], []
+    for a in m.track_path(wps):
+        env.step(a)
+        p, q = robot.get_position_orientation()
+        errs.append(cross_track(p[:2]))
+        r = m.tracker.ref[min(m.tracker.k, len(m.tracker.ref) - 1)]
+        yaw_errs.append(abs(C.wrap_angle(C.yaw_of(q) - float(r[2]))))
+        speeds.append(float(th.linalg.norm(a[:2] * th.tensor(M.BASE_VEL_LIMITS[:2]))))
+    assert max(errs) < 0.02, max(errs)
+    assert max(yaw_errs) < math.radians(10.0), math.degrees(max(yaw_errs))
+    assert max(speeds) > 0.3  # the straights still run near the path speed
+    x, y, yaw = m.base_pose2d()
+    assert math.hypot(x - 0.4, y + 1.0) < 0.03 and abs(C.wrap_angle(yaw - 2.356)) < 0.05
+    # the reference slows down through the 90° corners: min speed along the reference well below the straights
+    ref = m.tracker.ref
+    v_ref = th.linalg.norm(ref[1:, :2] - ref[:-1, :2], dim=1) * 30
+    assert float(v_ref[len(ref) // 2 :].min()) < 0.2 < float(v_ref.max())
+
+
 def test_trunk_to_moves_both_scalars_jointly_at_bounded_rates():
     robot = FakeRobot()
     env = FakeEnv(robot, {})
@@ -956,15 +996,33 @@ def test_fov_pause_and_ghost_hand_monitors():
     mon = QA.Monitors(env, robot, cfg=QA.QAConfig(fov_min_steps=3, pause_steps=4), camera=QA.CameraModel.from_hfov())
     mon._contact_api = FakeContacts(lambda s, q: [])
     sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-ontop_small_scale.json"))
-    grasp = expand(sc.alias, sc)[1]
-    # the right eef far behind the robot: out of the head camera's frame
-    robot.q[robot.arm_control_idx["right"]] = th.tensor([-3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
+    actions = expand(sc.alias, sc)
+    grasp, retreat = actions[1], actions[-1]
+    assert EX.fov_monitored(grasp) and not EX.fov_monitored(retreat) and EX.is_manipulation(retreat)
+    out_q = th.tensor([-3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])  # the right eef far behind the robot: outside the frame
+    in_q = th.tensor([0.4, 0.0, 0.4, 0.0, 0.0, 0.0, 1.0])  # in front of the robot: in frame
     robot.dq = th.ones(28)
-    mon.begin_action(grasp, 1, 0, intended={"apple_omzprq_0"}, held=[], manipulation=True)
-    verdicts = [mon.check(i) for i in range(1, 4)]
+    # (a) the idle posture is out of frame before the arm moved: no verdict (the sampler does not guarantee it)
+    robot.q[robot.arm_control_idx["right"]] = out_q
+    mon.begin_action(grasp, 1, 0, intended={"apple_omzprq_0"}, held=[])
+    assert [mon.check(i) for i in range(1, 8)] == [None] * 7
+    assert mon.stats.events["fov_idle_out"] == 7 and mon.stats.by_category == {}
+    # (b) the fingertips enter the frame (the pre-pose), then leave it: armed -> verdict after fov_min_steps
+    robot.q[robot.arm_control_idx["right"]] = in_q
+    assert mon.check(8) is None and mon._fov_armed["right"]
+    robot.q[robot.arm_control_idx["right"]] = out_q
+    verdicts = [mon.check(i) for i in range(9, 12)]
     assert verdicts[:2] == [None, None] and verdicts[2].category == "gripper_out_of_fov" and verdicts[2].details["arm"] == "right"
+    mon.end_action()
+    # (c) a retreat is exempt even when the hand leaves the frame
+    mon.begin_action(retreat, 4, 0, intended=set(), held=[])
+    robot.q[robot.arm_control_idx["right"]] = in_q
+    mon.check(20)
+    robot.q[robot.arm_control_idx["right"]] = out_q
+    assert [mon.check(i) for i in range(21, 30)] == [None] * 9 and not mon.fov_active
+    mon.end_action()
     # in frame: the eef in front of the robot -> the pause monitor fires after 4 stationary steps
-    robot.q[robot.arm_control_idx["right"]] = th.tensor([0.4, 0.0, 0.4, 0.0, 0.0, 0.0, 1.0])
+    robot.q[robot.arm_control_idx["right"]] = in_q
     robot.dq = th.zeros(28)
     mon.begin_action(grasp, 1, 1, intended=set(), held=[], manipulation=True)
     verdicts = [mon.check(i) for i in range(1, 5)]

@@ -48,7 +48,7 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tupl
 import torch as th
 
 from ispatialgym.oracle.actions import Action
-from ispatialgym.oracle.execute import check_postcondition, is_manipulation, run_action
+from ispatialgym.oracle.execute import check_postcondition, fov_monitored, is_manipulation, run_action
 from ispatialgym.oracle.motions import Motions, SkillError
 from ispatialgym.oracle.qa import CameraModel, Monitors, QAStats, Verdict, category_of
 from ispatialgym.oracle.recorder import PHASE_GOAL, PHASE_ORACLE, PHASE_SETTLE, Recorder, to_uint8_rgb
@@ -454,7 +454,8 @@ class Executor:
             return v, ctx
         ctx["targets_keys"] = sorted(targets.keys())
         if self.monitors is not None:
-            self.monitors.begin_action(action, index, attempt, intended=self._scene_names(action.objects), held=self.state.held_objects(), manipulation=is_manipulation(action))
+            self.monitors.begin_action(action, index, attempt, intended=self._scene_names(action.objects), held=self.state.held_objects(), manipulation=is_manipulation(action),
+                                       fov=fov_monitored(action))
         try:
             gen = run_action(action, self.motions, self.state, targets, ctx)
             v = self.run_generator(gen, PHASE_ORACLE, index, attempt)

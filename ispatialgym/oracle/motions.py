@@ -93,6 +93,15 @@ class MotionsConfig:
     base_follow_yaw_rate: float = 0.4  # rad/s
     #: fraction of the tracker's v_max used to time-parameterise a recorded path
     path_speed_fraction: float = 0.8
+    #: corner cutting the reference allows at a heading change (m): the speed through a corner of angle θ is
+    #: sqrt(2·a_max·path_corner_cut) / sin(θ/2), so the velocity-vector change fits the tracker's acceleration limit
+    #: without leaving the path by more than this (a 90° corner at a_max 0.6 → 0.16 m/s; straights at v_max)
+    path_corner_cut: float = 0.01
+    #: the reference index never runs more than this ahead of the base (m): a lagging base is waited for instead of
+    #: chased toward a point past the corner (the corridor of an obstructed path leaves a few cm per side)
+    path_max_lag: float = 0.04
+    #: arc-length resolution of the speed profile (m)
+    path_profile_ds: float = 0.005
     #: JoyLo trunk rates (translate units / s, rad / s); JoyLo defaults are 0.1 / 0.05, faster here for shorter demos
     trunk_translate_rate: float = 0.25
     trunk_tilt_rate: float = 0.15
@@ -138,6 +147,73 @@ def as_pose2d(x: Any) -> Tuple[float, float, float]:
     if len(v) != 3:
         raise TypeError(f"expected [x, y, yaw], got {len(v)} values")
     return v[0], v[1], v[2]
+
+
+class PathTracker(BaseTrajectoryTracker):
+    """The v1 joystick-like tracker (feed-forward + pose feedback, velocity / acceleration limits, exponential
+    smoothing, simultaneous translation and rotation) with three changes found necessary on the pilot's obstructed
+    paths (5 / 12 demos touched the obstacle while the recorded path itself cleared it by 3–6 cm):
+
+    * **lag guard** — the reference index never runs more than ``max_lag`` metres ahead of the base; v1 advanced one
+      sample per step whatever the base did, so a base that fell behind at a corner was pulled toward a target
+      already past it and cut the corner;
+    * **world-frame smoothing** — v1 smoothed and acceleration-limited the command in the *base* frame, so while the
+      base turned (0.8 rad/s) a stale command kept rotating with it and drove the base sideways in the world (the
+      25 cm drift after the 90° turns); the filter state lives in the world frame here, the per-axis velocity limits
+      stay in the base frame;
+    * the smoothing is applied **before** the acceleration clamp, so the effective acceleration is ``a_max`` (v1's
+      order made it ``alpha · a_max`` = 0.21 m/s², far below what its constant-speed reference asked at corners).
+    """
+
+    def __init__(self, ref: th.Tensor, dt: float, cfg: Optional[BaseTrackerConfig] = None, max_lag: float = 0.04):
+        super().__init__(ref, dt, cfg)
+        self.max_lag = float(max_lag)
+        self.max_steps = int(self.cfg.timeout_factor * len(self.ref) + self.cfg.timeout_extra)
+        self.last_w = th.zeros(3)  # filter state: the last command in the world frame (vx, vy, wz)
+
+    def _advance(self, cur: Tuple[float, float, float]):
+        T = len(self.ref)
+        if self.k >= T - 1:
+            return
+        window = self.ref[self.k : min(T, self.k + 30), :2]
+        d = th.linalg.norm(window - th.tensor(cur[:2], dtype=window.dtype), dim=1)
+        k_near = self.k + int(th.argmin(d))
+        if k_near > self.k:
+            self.k = min(k_near, T - 1)  # the base is nearer a later sample: catch up
+        elif float(d[0]) <= self.max_lag:
+            self.k = min(self.k + 1, T - 1)  # on the reference: one sample per step
+        # else: the base lags the current sample by more than max_lag -> hold the reference
+
+    def step(self, cur: Tuple[float, float, float]) -> Tuple[th.Tensor, bool]:
+        self.steps += 1
+        self._advance(cur)
+        T = len(self.ref)
+        k = self.k
+        cfg = self.cfg
+        tgt = self.ref[min(k + cfg.lookahead_steps, T - 1)]
+        v_ff_w = (self.ref[k + 1] - self.ref[k]) / self.dt if k < T - 1 else th.zeros(3)
+        ex, ey = float(tgt[0]) - cur[0], float(tgt[1]) - cur[1]
+        eyaw = C.wrap_angle(float(tgt[2]) - cur[2])
+        v_w = th.tensor([float(v_ff_w[0]) + cfg.kp_pos * ex, float(v_ff_w[1]) + cfg.kp_pos * ey, float(v_ff_w[2]) + cfg.kp_yaw * eyaw])
+        # smoothing (JoyLo stick filter) and acceleration limit in the world frame
+        v_w = cfg.alpha * v_w + (1.0 - cfg.alpha) * self.last_w
+        a_max = th.tensor(cfg.a_max) * self.dt
+        v_w = self.last_w + th.clamp(v_w - self.last_w, -a_max, a_max)
+        # per-axis velocity limits in the base frame
+        c, s = math.cos(cur[2]), math.sin(cur[2])
+        v_b = th.tensor([c * float(v_w[0]) + s * float(v_w[1]), -s * float(v_w[0]) + c * float(v_w[1]), float(v_w[2])])
+        v_max = th.tensor(cfg.v_max)
+        v_b = th.clamp(v_b, -v_max, v_max)
+        # termination
+        d_goal, dyaw_goal = self.error(cur)
+        at_goal = k >= T - 1 and d_goal < cfg.pos_tol and dyaw_goal < cfg.yaw_tol
+        self.settled = self.settled + 1 if at_goal else 0
+        done = self.settled >= cfg.settle_steps
+        if done:
+            v_b = th.zeros(3)
+        self.last_w = th.tensor([c * float(v_b[0]) - s * float(v_b[1]), s * float(v_b[0]) + c * float(v_b[1]), float(v_b[2])])
+        self.last_cmd = v_b
+        return v_b, done
 
 
 # ==========================================================================================
@@ -415,30 +491,123 @@ class Motions:
 
     # ------------------------------------------------------------------ base
 
-    def _base_reference(self, waypoints: Sequence[Any], v_lin: float, v_ang: float) -> th.Tensor:
-        """Time-parameterise the polyline current pose → waypoints at ``v_lin`` (arc length) with the yaw blended
-        linearly along every segment toward that waypoint's recorded yaw (``v_ang`` bounds pure rotations)."""
+    def _base_reference(self, waypoints: Sequence[Any], v_lin: float, v_ang: float, a_max: Optional[float] = None) -> th.Tensor:
+        """Time-parameterise the polyline current pose → waypoints with a **corner-aware trapezoidal speed profile**:
+        ``v_lin`` on the straights, ``sqrt(2·a_max·path_corner_cut) / sin(θ/2)`` through a heading change θ, zero at
+        the end, ramps at ``a_max`` (the tracker's own limit), every segment slow enough for the yaw change toward the
+        waypoint's recorded heading to stay within ``v_ang``; the yaw is blended linearly along each segment. A
+        reference the tracker can follow within its acceleration limit is what keeps the base inside the corridor of
+        a recorded path (the pilot's obstructed demos cut 45–63° corners by 5–8 cm at constant speed and touched the
+        obstacle; 25 cm off after a 90° turn)."""
+        a_max = float(self.cfg.base_tracker.a_max[0] if a_max is None else a_max)
         pts = [self.base_pose2d()] + [as_pose2d(w) for w in waypoints]
-        xy = th.tensor([[p[0], p[1]] for p in pts], dtype=th.float32)
+        xy = th.tensor([[p[0], p[1]] for p in pts], dtype=th.float64)
         yaws = [pts[0][2]]
         for p in pts[1:]:
             yaws.append(yaws[-1] + C.wrap_angle(p[2] - yaws[-1]))
         seg = th.linalg.norm(xy[1:] - xy[:-1], dim=1)
-        dyaw = th.tensor([abs(yaws[i + 1] - yaws[i]) for i in range(len(seg))], dtype=th.float32)
-        # per-segment duration: the slower of translation and rotation
-        dur = th.maximum(seg / v_lin, dyaw / v_ang)
-        total = float(dur.sum())
-        n = max(2, int(math.ceil(total / self.dt)) + 1)
-        cum = th.cat([th.zeros(1), th.cumsum(dur, 0)])
-        out = []
-        for ti in th.linspace(0.0, total, n).tolist():
-            k = int(th.searchsorted(cum, th.tensor(ti), right=True)) - 1
-            k = min(max(k, 0), len(seg) - 1)
-            f = 0.0 if float(dur[k]) < 1e-9 else min(1.0, (ti - float(cum[k])) / float(dur[k]))
+        n_seg = len(seg)
+        # -- speed caps: per segment (the yaw change toward the waypoint's heading needs time: smooth-step blend, peak
+        # rate 1.5 × mean ≤ v_ang, peak acceleration 6·Δyaw/T² ≤ the tracker's yaw acceleration) and per interior
+        # corner (heading change)
+        a_yaw = float(self.cfg.base_tracker.a_max[2])
+        v_seg = []
+        for i in range(n_seg):
+            dy = abs(yaws[i + 1] - yaws[i])
+            if dy < 1e-6:
+                cap = v_lin
+            else:
+                t_yaw = max(1.5 * dy / v_ang, math.sqrt(6.0 * dy / a_yaw))
+                cap = min(v_lin, float(seg[i]) / t_yaw)
+            v_seg.append(max(cap, 1e-3))
+        v_corner = [v_lin] * (n_seg + 1)
+        v_corner[-1] = 0.0
+        heads = []
+        for i in range(n_seg):
+            d = xy[i + 1] - xy[i]
+            heads.append(None if float(seg[i]) < 1e-6 else math.atan2(float(d[1]), float(d[0])))
+        v_turn = math.sqrt(2.0 * a_max * self.cfg.path_corner_cut)
+        for i in range(1, n_seg):
+            if heads[i - 1] is None or heads[i] is None:
+                v_corner[i] = 0.0  # a pure rotation at this node: stop, turn, go on
+                continue
+            theta = abs(C.wrap_angle(heads[i] - heads[i - 1]))
+            if theta > math.radians(5.0):
+                v_corner[i] = min(v_lin, v_turn / math.sin(theta / 2.0))
+        # -- arc-length grid, forward / backward passes (v² = v0² + 2 a s)
+        ds = float(self.cfg.path_profile_ds)
+        s_nodes = [0.0]
+        for i in range(n_seg):
+            s_nodes.append(s_nodes[-1] + float(seg[i]))
+        total_len = s_nodes[-1]
+        grid = [0.0]
+        while grid[-1] < total_len - 1e-9:
+            grid.append(min(total_len, grid[-1] + ds))
+        grid_t = th.tensor(grid, dtype=th.float64)
+        nodes_t = th.tensor(s_nodes, dtype=th.float64)
+
+        def seg_of(s: float) -> int:
+            """Segment index of arc length ``s`` (zero-length segments are skipped: the later segment wins)."""
+            k = int(th.searchsorted(nodes_t, th.tensor(s, dtype=th.float64), right=True)) - 1
+            return min(max(k, 0), n_seg - 1)
+
+        v_max_at = th.tensor([v_seg[seg_of(s)] for s in grid], dtype=th.float64)
+        for i, s_node in enumerate(s_nodes):
+            j = int(th.argmin(th.abs(grid_t - s_node)))
+            v_max_at[j] = min(float(v_max_at[j]), v_corner[i])
+        v = v_max_at.clone()
+        v[0] = min(float(v[0]), 0.05)  # start from (nearly) rest
+        for j in range(1, len(grid)):
+            v[j] = min(float(v[j]), math.sqrt(float(v[j - 1]) ** 2 + 2.0 * a_max * (grid[j] - grid[j - 1])))
+        for j in range(len(grid) - 2, -1, -1):
+            v[j] = min(float(v[j]), math.sqrt(float(v[j + 1]) ** 2 + 2.0 * a_max * (grid[j + 1] - grid[j])))
+        # -- time along the grid (trapezoid on 1/v)
+        t_grid = [0.0]
+        for j in range(1, len(grid)):
+            vm = max(0.5 * (float(v[j]) + float(v[j - 1])), 0.02)
+            t_grid.append(t_grid[-1] + (grid[j] - grid[j - 1]) / vm)
+        tg = th.tensor(t_grid, dtype=th.float64)
+
+        def smooth(f: float) -> float:
+            return f * f * (3.0 - 2.0 * f)
+
+        def pose_at_s(s: float) -> List[float]:
+            k = seg_of(s)
+            L = float(seg[k])
+            f = 0.0 if L < 1e-9 else min(1.0, max(0.0, (s - s_nodes[k]) / L))
             p = xy[k] + (xy[k + 1] - xy[k]) * f
-            out.append([float(p[0]), float(p[1]), yaws[k] + (yaws[k + 1] - yaws[k]) * f])
-        out[-1] = [float(xy[-1][0]), float(xy[-1][1]), yaws[-1]]
-        return th.tensor(out, dtype=th.float32)
+            return [float(p[0]), float(p[1]), yaws[k] + (yaws[k + 1] - yaws[k]) * smooth(f)]
+
+        def dwell(k: int) -> List[List[float]]:
+            """Samples of a pure rotation at node ``k`` (segment ``k`` has zero length): a smooth-step yaw blend whose
+            peak rate stays within ``v_ang`` and peak acceleration within the tracker's, position fixed."""
+            dy = abs(yaws[k + 1] - yaws[k])
+            t_yaw = max(1.5 * dy / v_ang, math.sqrt(6.0 * dy / a_yaw))
+            n_d = max(1, int(math.ceil(t_yaw / self.dt)))
+            return [[float(xy[k][0]), float(xy[k][1]), yaws[k] + (yaws[k + 1] - yaws[k]) * smooth(m / n_d)] for m in range(1, n_d + 1)]
+
+        # -- sample at dt; the pure-rotation segments are inserted as dwell time where the arc length passes them
+        samples: List[List[float]] = []
+        total_t = t_grid[-1]
+        n = max(1, int(math.ceil(total_t / self.dt))) if total_len > 1e-9 else 0
+        k_prev = -1
+        for i in range(1, n + 1):
+            ti = min(total_t, i * self.dt)
+            jj = int(th.searchsorted(tg, th.tensor(ti, dtype=th.float64), right=True)) - 1
+            jj = min(max(jj, 0), len(grid) - 2)
+            f = 0.0 if tg[jj + 1] - tg[jj] < 1e-12 else float((ti - tg[jj]) / (tg[jj + 1] - tg[jj]))
+            s = grid[jj] + (grid[jj + 1] - grid[jj]) * f
+            k_new = seg_of(s)
+            for m in range(k_prev + 1, k_new):
+                if float(seg[m]) < 1e-6:
+                    samples.extend(dwell(m))
+            k_prev = max(k_prev, k_new)
+            samples.append(pose_at_s(s))
+        for m in range(k_prev + 1, n_seg):
+            if float(seg[m]) < 1e-6:
+                samples.extend(dwell(m))
+        samples.append([float(xy[-1][0]), float(xy[-1][1]), yaws[-1]])
+        return th.tensor(samples, dtype=th.float32)
 
     def track_path(self, waypoints: Sequence[Any], posture: Optional[str] = None, tracker_cfg: Optional[BaseTrackerConfig] = None) -> Iterator[th.Tensor]:
         """Follow a recorded ``[x, y, yaw]`` waypoint list with the joystick-like tracker (feed-forward + pose
@@ -451,8 +620,8 @@ class Motions:
         cfg = tracker_cfg or self.cfg.base_tracker
         v_lin = self.cfg.path_speed_fraction * min(cfg.v_max[0], cfg.v_max[1])
         v_ang = self.cfg.path_speed_fraction * cfg.v_max[2]
-        ref = self._base_reference(waypoints, v_lin, v_ang)
-        tracker = BaseTrajectoryTracker(ref, self.dt, cfg)
+        ref = self._base_reference(waypoints, v_lin, v_ang, a_max=min(cfg.a_max[0], cfg.a_max[1]))
+        tracker = PathTracker(ref, self.dt, cfg, max_lag=self.cfg.path_max_lag)
         self.tracker = tracker
         try:
             while True:

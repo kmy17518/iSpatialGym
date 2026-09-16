@@ -403,8 +403,10 @@ EXECUTORS: Dict[type, Tuple[ExecuteFn, PostconditionFn]] = {
     Retreat: (execute_retreat, post_retreat),
 }
 
-#: actions during which the gripper-in-FOV monitor is active and the failed-grasp / contact rules apply (§6.4)
+#: actions during which the failed-grasp / contact rules of §6.4 apply (finger contacts are what manipulation is)
 MANIPULATION_ACTIONS: Tuple[type, ...] = (Grasp, Lift, Reorient, Place, Push, Brace, BaseFollow, Retreat)
+#: manipulation actions the gripper-in-FOV monitor does not watch: the hand backing off may leave the frame
+FOV_EXEMPT_ACTIONS: Tuple[type, ...] = (Retreat,)
 
 
 def executor_for(action: Action) -> Tuple[ExecuteFn, PostconditionFn]:
@@ -417,6 +419,12 @@ def executor_for(action: Action) -> Tuple[ExecuteFn, PostconditionFn]:
 
 def is_manipulation(action: Action) -> bool:
     return isinstance(action, MANIPULATION_ACTIONS)
+
+
+def fov_monitored(action: Action) -> bool:
+    """Whether the gripper-in-FOV monitor watches ``action`` (manipulation actions except the retreats; the monitor
+    itself arms once the fingertips first enter the frame, ``qa.Monitors``)."""
+    return isinstance(action, MANIPULATION_ACTIONS) and not isinstance(action, FOV_EXEMPT_ACTIONS)
 
 
 def run_action(action: Action, motions: Motions, state, targets: Dict[str, Any], ctx: Optional[Dict[str, Any]] = None) -> Iterator[th.Tensor]:
@@ -437,6 +445,6 @@ def coverage() -> Dict[str, bool]:
 
 
 __all__ = [
-    "PrivilegedState", "ExecuteConfig", "CONFIG", "EXECUTORS", "MANIPULATION_ACTIONS", "executor_for", "is_manipulation",
-    "run_action", "check_postcondition", "coverage", "camera_goal", "joint_tolerance",
+    "PrivilegedState", "ExecuteConfig", "CONFIG", "EXECUTORS", "MANIPULATION_ACTIONS", "FOV_EXEMPT_ACTIONS", "executor_for",
+    "is_manipulation", "fov_monitored", "run_action", "check_postcondition", "coverage", "camera_goal", "joint_tolerance",
 ]

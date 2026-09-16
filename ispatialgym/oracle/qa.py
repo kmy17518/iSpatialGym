@@ -33,6 +33,15 @@ pinhole model of spec §3.4, only during manipulation actions, ``fov_min_steps``
 budgets. ``QAStats`` counts verdicts per category × action name (§6.4: a sampler-side and a planner-side cause of the
 same symptom stay distinguishable).
 
+**Gripper-in-FOV arming rule** (pilot red flag 1, 2026-09-16): the sampler guarantees the *recorded* pre-grasp /
+grasp / contact / place poses in frame (spec §3.9), not the idle posture the acting hand starts from — at the
+manipulation stance the idle right hand sits just outside the right image border (u ≈ 1108 of 1080), so a monitor
+that judges from the first step fails every tabletop demo five steps into ``grasp``. The monitor therefore **arms per
+acting arm when its fingertips first enter the frame within the action** (equivalently once the pre-pose is reached)
+and stays armed until the action ends; frames before the arming are counted as ``fov_idle_out`` events, not verdicts.
+``Retreat`` is exempt (the hand leaving the frame while backing off is the expected end of a manipulation; nothing
+about its end pose is recorded or checked by the sampler) — the executor passes ``fov=False`` for it.
+
 Simulator-free: ``env`` / ``robot`` are duck-typed; the contact API is imported lazily.
 """
 
@@ -265,26 +274,34 @@ class Monitors:
         self.action_steps = 0
         self.episode_steps = 0
         self.epilogue = False
+        self.fov_active = False
         self._contact_streak: Counter = Counter()
         self._pause_streak = 0
         self._fov_streak: Counter = Counter()
+        self._fov_armed: Dict[str, bool] = {}
         self._ag_ref: Dict[str, Tuple[Any, Tuple[th.Tensor, th.Tensor]]] = {}
 
     # ------------------------------------------------------------------ lifecycle
 
-    def begin_action(self, action, index: int, attempt: int, intended: Iterable[str] = (), held: Sequence[Any] = (), manipulation: Optional[bool] = None) -> None:
+    def begin_action(self, action, index: int, attempt: int, intended: Iterable[str] = (), held: Sequence[Any] = (), manipulation: Optional[bool] = None,
+                     fov: Optional[bool] = None) -> None:
         """``intended``: scene object names the action may touch (its ``objects`` resolved to scene names);
-        ``held``: scene objects currently in hand (their contacts are the robot's own)."""
+        ``held``: scene objects currently in hand (their contacts are the robot's own); ``fov``: whether the
+        gripper-in-FOV monitor watches this action (default: every manipulation action except ``Retreat``)."""
         self.action = action
         self.action_index = index
         self.attempt = attempt
         self.epilogue = False
         self.arms = tuple(getattr(action, "arms", ()) or ())
-        if manipulation is None:
-            from ispatialgym.oracle.execute import is_manipulation  # lazy: execute imports actions (pure) only
+        if manipulation is None or fov is None:
+            from ispatialgym.oracle.execute import fov_monitored, is_manipulation  # lazy: execute imports actions (pure) only
 
-            manipulation = is_manipulation(action)
+            if manipulation is None:
+                manipulation = is_manipulation(action)
+            if fov is None:
+                fov = fov_monitored(action)
         self.manipulation = bool(manipulation)
+        self.fov_active = bool(fov)
         self.intended = set(intended)
         self.held = list(held)
         self.exempt_links = set()
@@ -296,21 +313,30 @@ class Monitors:
         self._contact_streak = Counter()
         self._pause_streak = 0
         self._fov_streak = Counter()
+        self._fov_armed = {arm: False for arm in self.arms}
 
     def end_action(self) -> None:
         self.action = None
         self.action_index = None
         self.manipulation = False
+        self.fov_active = False
         self.intended = set()
         self.exempt_links = set()
         self.held = []
         self.arms = ()
+        self._fov_armed = {}
+
+    def arm_fov(self, arm: Optional[str] = None) -> None:
+        """Arm the gripper-in-FOV monitor explicitly (the executor may call it once a pre-pose is reached)."""
+        for a in (self.arms if arm is None else (arm,)):
+            self._fov_armed[a] = True
 
     def begin_epilogue(self, held: Sequence[Any] = ()) -> None:
         """The final no-op window: pause / FOV monitors off; objects still in hand (held-object tasks) stay the
         robot's own for the collision monitor."""
         self.epilogue = True
         self.manipulation = False
+        self.fov_active = False
         self.action = None
         self.action_index = None
         self.held = list(held)
@@ -453,7 +479,7 @@ class Monitors:
         return C.camera_pose(torso, base_pose=(bp.float(), bq.float()), cam_in_zed=self.cam_in_zed)
 
     def _check_fov(self) -> Optional[Verdict]:
-        if not self.manipulation or self.camera is None or not self.arms:
+        if not self.fov_active or self.camera is None or not self.arms:
             return None
         cam = self.head_camera_pose()
         for arm in self.arms:
@@ -461,6 +487,12 @@ class Monitors:
             tip = C.fingertip((ep.float(), eq.float()))
             if self.camera.in_frame(cam, tip, self.cfg.fov_margin):
                 self._fov_streak[arm] = 0
+                if not self._fov_armed.get(arm, False):
+                    self._fov_armed[arm] = True  # the fingertips entered the frame: from here on they must stay
+                    self.stats.event("fov_armed")
+                continue
+            if not self._fov_armed.get(arm, False):
+                self.stats.event("fov_idle_out")  # the idle posture before the pre-pose is not the sampler's to guarantee
                 continue
             self._fov_streak[arm] += 1
             self.stats.event("fov_out")
