@@ -238,12 +238,22 @@ blade), idle arm tucked (`--posture` = the posture order to try; recorded per tr
 *Measured (local, `sandal/chgcrm` under `bed_rrcvaq_0`, the pilot's under-large pick, 8 cm, trunks (0.5/0.75/0.95,
 −0.9/−1.2))*: at s = 0.45 the band is **empty** — (0.95, ·) collide with the bed at every posture, (0.75, −0.9) and
 (0.5, −1.2) have every push pose farther than arm length + 3 cm from the shoulder (eef 4.3 cm above the floor), (0.75,
-−1.2) screens 152 poses on 84 cells and none is IK-feasible (the crouched torso over the 0.49 m bed edge). The s = 0.65
-run (the large-scale agent's stance range 0.5–0.7, all postures) is reported below this table when it finishes. The
-push-under record's blade poses (`iors_large._push_under_chain`: eef at `floor + clamp(h/2, 4.5, 8 cm)`, approach pitched
-0–60° toward the push, ±wrist) have the same eef height as the band's push classes, so the band is the right screen once
-a stance with reachable floor cells exists; the finding matches §5.6's note (floor init / under placement need a bent
-posture or a closer stand-off) — for the demo the large-scale agent's exact-IK chain per candidate stance stays the path.
+−1.2) screens 152 poses on 84 cells and none is IK-feasible (the crouched torso over the 0.49 m bed edge). At s = 0.65
+(the large-scale agent's stance range 0.5–0.7, all postures) `stance_under` picked the **opposite** AABB edge (its
+(0.5, 0) probe was free there and the edge is as long) where every crouched trunk collides → the under-edge mode now
+ranks the partner's edges by the number of collision-free deep trunks ((0.75 / 0.95, −0.9 / −1.2), `stance["aabb_edge"]`,
+`probe_trunks_free`). The runs were local; per the owner's rule (08:19 PDT, local GPU reserved) the follow-ups run on the
+band fleet as CMD jobs: `jobs_under_edge_probe.json` (sandal / briefcase under `bed_rrcvaq_0` at s = 0.45 and 0.60, all
+postures, full floor grid) dispatched to 4 A40 pods behind their current job (`assignment_w12_under_edge_probe.json`);
+results land in `bands/floor__…floor-under-edge-…` through the pull / collect loops. The push-under record's blade poses
+(`iors_large._push_under_chain`: eef at `floor + clamp(h/2, 4.5, 8 cm)`, approach pitched 0–60° toward the push, ±wrist)
+have the same eef height as the band's push classes, so the band is the right screen once a stance with reachable floor
+cells exists; the finding matches §5.6's note (floor init / under placement need a bent posture or a closer stand-off) —
+for the demo the large-scale agent's exact-IK chain per candidate stance stays the path.
+
+*First fleet result of the disembedding recompute (15:41 UTC, `bottle_of_milk/mrejrs`, L40S, 1612 s)*: 536 cells over
+17 of 20 trunks (13 untucked, 3 `ready`, 1 `tucked`; (0.75, −0.9), (0.95, −0.6), (0.95, −0.9) collide), λ ∈ [−0.56, 0] —
+vs 100 cells in the legacy fixed-tray band of the same object.
 
 ## Smoke (local RTX 4090, `--smoke`: 16 cm lattice, trunks (0.5, 0) and (0.25, −0.3))
 
