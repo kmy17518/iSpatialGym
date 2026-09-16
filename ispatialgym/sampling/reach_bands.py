@@ -49,9 +49,14 @@ runs the manifest jobs (``scripts/reach_bands/make_jobs.py`` format; ``--ids`` d
 loaded rooms, removed chairs) on one loaded world per key, writing ``ROOT/<id>/<band>.npz|.json`` + ``run.log`` and a
 ``ROOT/done.txt`` line per job like the pod runner (``collect_bands.py`` reads the tree unchanged). Bands are isolated (the
 previous band's objects removed, the collision world re-synced, the cuRobo seed streams reset), so every band is
-byte-identical to its one-process run; a failing job prints ``REACH_BANDS_FAILED <id>`` and the others continue. The
-world is camera-less and the motion planners are not built (``--cameras`` / ``--prebuild-planner`` restore the old
-setup; neither changes a band).
+byte-identical to its one-process run; a failing job prints ``REACH_BANDS_FAILED <id>`` and the others continue.
+
+Setup defaults since 2026-09-16 (single-band and worker mode alike; each verified byte-identical on three two-trunk
+bands): the world is camera-less (``SimWorld(cameras=False)``), the arms' motion planners are not built (bands use the
+kinematics entries and the batched IK solvers only) and the neighbouring rooms' objects that can never pass
+``SimWorld.obstacle_filter`` are not loaded (``_slim_drop_list``: same obstacle set and cuRobo meshes, 421 -> 108
+objects, scene load 117 s -> 54 s on house_single_floor). ``--cameras`` / ``--prebuild-planner`` / ``--full-load``
+restore the old setup; none changes a band.
 
 Reading a band (the sampler)::
 
@@ -1606,9 +1611,10 @@ def build_parser() -> argparse.ArgumentParser:
                     "only use the kinematics and the batched IK solvers, which are independent of the planners, so this costs ~25 s per process for nothing)")
     ap.add_argument("--cameras", action="store_true", help="give the robot the sampler's 1080^2 rgb + seg_instance head camera (the pre-2026-09-16 behaviour); "
                     "bands never read pixels, so the default world is camera-less (SimWorld(cameras=False): faster launch, less GPU memory, same bands)")
-    ap.add_argument("--slim-load", action="store_true", help="do not load the neighbouring rooms' objects that can never pass SimWorld.obstacle_filter "
-                    "(their stable-scene bounding box, grown by SLIM_MARGIN_M, misses the task rooms' floor extent + ISG_OBSTACLE_MARGIN_M); the collision "
-                    "world is identical, the scene load shorter")
+    ap.add_argument("--full-load", action="store_true", help="load every object of the task + neighbouring rooms (the pre-2026-09-16 behaviour). Default: "
+                    "the neighbouring rooms' (and the always-loaded structures') objects that can never pass SimWorld.obstacle_filter are left out - their "
+                    "stable-scene bounding box, grown by SLIM_MARGIN_M (+ extent when articulated), misses the task rooms' floor extent + ISG_OBSTACLE_MARGIN_M; "
+                    "the collision world (obstacle set, cuRobo mesh names, bands) is identical, the scene load 117 s -> 54 s, 421 -> 108 objects (house_single_floor)")
     ap.add_argument("--ik-tail-sizes", default=None, help="SAME-ALGORITHM OPT-IN (default: the committed 16,32,64,128): batched IK solver sizes for the last "
                     "chunk of a screening call, e.g. 8,16,24,32,48,64,96,128 - fewer padded slots (73 real poses per 128-slot call in the pilot), but every "
                     "solver size draws its own cuRobo seed stream, so marginal cells can differ from the default schedule; recorded as schedule.ik_sizes")
@@ -1649,7 +1655,7 @@ def load_world(args, rooms: List[str], variant: Optional[dict], removed: List[st
     if dump:  # diagnostic: the loaded objects, the obstacle-filter verdicts and the cuRobo mesh names (to diff a --slim-load world against a full one)
         rec = {"n_objects": len(world.scene.objects), "loaded_rooms": world.loaded_rooms, "n_curobo_meshes": len(kit.backend._world_mesh_names),
                "curobo_meshes": sorted(kit.backend._world_mesh_names), "obstacles": sorted(o.name for o in world.scene.objects if o is not world.robot and world.obstacle_filter(o)),
-               "objects": {o.name: {"category": o.category, "in_rooms": list(o.in_rooms or []), "aabb": [[round(float(v), 4) for v in b] for b in o.aabb],
+               "objects": {o.name: {"category": o.category, "in_rooms": list(o.in_rooms or []), "aabb": [[float(v) for v in b] for b in o.aabb],
                                     "obstacle": bool(world.obstacle_filter(o))} for o in world.scene.objects if o is not world.robot}}
         with open(dump, "w") as f:
             json.dump(rec, f, indent=1)
@@ -2104,9 +2110,9 @@ def run_single(args):
     floor_mode, rooms = band_rooms(args)
     arms = band_arms(args)
     variant, removed = (None, [])
-    if not floor_mode or args.slim_load:
+    if not floor_mode or not args.full_load:
         variant, removed = _chairs_variant(args.scene, args.support, rooms, os.path.join(out_dir, "scene_variants"), removed=[] if floor_mode else None,
-                                           slim=args.slim_load)
+                                           slim=not args.full_load)
     t_load = time.time()
     world, kit = load_world(args, rooms, variant, removed, arms)
     setup_s = time.time() - t_load
@@ -2153,7 +2159,7 @@ def run_jobs(args):
                 raise ValueError("a job's args cannot contain --jobs")
             jargs.out = os.path.join(root, job["id"])
             jargs.log_level, jargs.prebuild_planner = args.log_level, args.prebuild_planner
-            jargs.cameras, jargs.slim_load = args.cameras or jargs.cameras, args.slim_load or jargs.slim_load
+            jargs.cameras, jargs.full_load = args.cameras or jargs.cameras, args.full_load or jargs.full_load
             jargs.ik_tail_sizes = args.ik_tail_sizes or jargs.ik_tail_sizes
             key = band_world_key(jargs)
             floor_mode, rooms = band_rooms(jargs)
@@ -2191,8 +2197,8 @@ def run_jobs(args):
                     world = kit = None
                     cur_key = None
                 variant = None
-                if removed or jargs.slim_load:
-                    variant, _ = _chairs_variant(jargs.scene, jargs.support, rooms, os.path.join(root, "scene_variants"), removed, slim=jargs.slim_load)
+                if removed or not jargs.full_load:
+                    variant, _ = _chairs_variant(jargs.scene, jargs.support, rooms, os.path.join(root, "scene_variants"), removed, slim=not jargs.full_load)
                 world, kit = load_world(jargs, rooms, variant, removed, arms)
                 cur_key = key
                 n_bands = 0
