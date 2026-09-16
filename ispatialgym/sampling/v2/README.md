@@ -262,6 +262,14 @@ its first attempt (80 s); D5's `validate_instances` reloaded both in a fresh pro
 partner gap rule: cutting the §4.6 step-2 gap range per side to the manipulation trunk's reach band (the goal cell must be
 reachable) took `place_unreachable` from 15–21 to ≤ 5 per 40 attempts.
 
+### Multi-alias chunk smoke (2026-09-16, pool pod `htvfrubebp6tnj`, run `021545-064eb8`)
+
+`sample_isg --alias …ontop_small_scale-apple-plate-breakfast_table --alias …nextto-marker-colored_pencil-breakfast_table --alias
+mental_rotation-banana --templates 1 --instances-per-template 1 --max-attempts 6`: 3 / 3 aliases wrote their instance, wall 2090 s,
+two world loads (1096 s: 562 + 534 s on a cold pod — dining room vs living room are different world keys), the second alias
+**reused** the first world (134 s for the whole alias vs 961 / 984 s for the loading ones; template + instance 122 s); fleet
+reach-band cache hits for apple and marker. Sidecars carry `idle_posture` / `arms_q` per stance and `ik_witnesses` per action.
+
 ## Status (D2 / D4, 2026-09-15) and gaps
 
 Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,
