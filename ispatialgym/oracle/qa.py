@@ -33,20 +33,22 @@ pinhole model of spec §3.4, only during manipulation actions, ``fov_min_steps``
 budgets. ``QAStats`` counts verdicts per category × action name (§6.4: a sampler-side and a planner-side cause of the
 same symptom stay distinguishable).
 
-**Gripper-in-FOV arming rule** (pilot red flag 1, 2026-09-16): the sampler guarantees the *recorded final* grasp /
-contact / place poses in frame (spec §3.9, 5 % margin) — not the idle posture the acting hand starts from (at the
-manipulation stance the idle right hand sits just outside the right image border, u ≈ 1108 of 1080, so a monitor
-judging from the first step failed every tabletop demo five steps into ``grasp``), and not the pre-poses either (a
-recorded ``pre_place`` 10 cm back along a tilted approach projected its fingertips to u = 1038, 12 px into the
-margin, and a monitor armed during the transit failed the ``place``). The rule is therefore:
+**Gripper-in-FOV rule** (pilot red flag 1 + owner decision 2026-09-16 10:15): the sampler guarantees the recorded
+pre-grasp / grasp / pre-place / place / pre-contact / contact poses in frame (spec §3.9, 5 % margin, the shared camera
+FK) — not the idle posture the acting hand starts from (at the manipulation stance the idle right hand sits just
+outside the right image border, u ≈ 1108 of 1080). The rule is therefore:
 
 * the monitor is **enabled** by the action's execute function once the pre-pose is reached (``ctx["hooks"]["fov"]
   (True)`` after ``arm_to(pre_*)`` in Grasp / Place / Push / Brace; actions without a pre-pose — Lift, Reorient,
   BaseFollow — are enabled from their first step), and **disabled** again once the object is released before a
   retreat leg (Place);
-* while enabled it **arms per acting arm at the first step whose fingertips are in frame**, and from then on a
-  fingertip leaving the frame for ``fov_min_steps`` consecutive frames is the ``gripper_out_of_fov`` verdict;
-* frames before the arming / while disabled are counted as ``fov_idle_out`` events, never verdicts;
+* while enabled it is **armed unconditionally**: from the pre-pose to the end of the action the acting arm's
+  fingertips must be in the frame; ``fov_min_steps`` consecutive out-of-frame steps are the ``gripper_out_of_fov``
+  verdict, whether the fingertips left the frame or never entered it (a leg that never entered the frame is a
+  verdict too: ``fov_first_entry_step: null`` and ``fov_out_steps`` in the details). A recorded pre-pose on the
+  margin is a sampler defect, not a reason to soften the monitor;
+* frames while disabled (the transit to the pre-pose, the retreat leg) are counted as ``fov_idle_out`` events, never
+  verdicts;
 * ``Retreat`` is exempt (the hand backing off may leave the frame; nothing about its end pose is recorded or
   checked) — the executor passes ``fov=False`` for it.
 
@@ -289,7 +291,8 @@ class Monitors:
         self._contact_streak: Counter = Counter()
         self._pause_streak = 0
         self._fov_streak: Counter = Counter()
-        self._fov_armed: Dict[str, bool] = {}
+        self._fov_first_entry: Dict[str, Optional[int]] = {}
+        self._fov_out_steps: Counter = Counter()
         self._ag_ref: Dict[str, Tuple[Any, Tuple[th.Tensor, th.Tensor]]] = {}
 
     # ------------------------------------------------------------------ lifecycle
@@ -333,7 +336,8 @@ class Monitors:
         self._contact_streak = Counter()
         self._pause_streak = 0
         self._fov_streak = Counter()
-        self._fov_armed = {arm: False for arm in self.arms}
+        self._fov_first_entry = {arm: None for arm in self.arms}
+        self._fov_out_steps = Counter()
         self.fov_enabled = True
 
     def end_action(self) -> None:
@@ -348,21 +352,21 @@ class Monitors:
         self.exempt_links = set()
         self.held = []
         self.arms = ()
-        self._fov_armed = {}
+        self._fov_first_entry = {}
+        self._fov_out_steps = Counter()
 
     def set_fov_enabled(self, enabled: bool = True) -> None:
-        """The execute functions' hook: enable the gripper-in-FOV monitor once the pre-pose is reached (arming then
-        happens at the first in-frame step), disable it before a retreat leg. Disabling also disarms."""
+        """The execute functions' hook: enable the gripper-in-FOV monitor once the pre-pose is reached (armed from
+        that step on), disable it before a retreat leg. Enabling starts a fresh monitored leg (entry step, streaks)."""
         self.fov_enabled = bool(enabled)
-        if not self.fov_enabled:
-            self._fov_armed = {arm: False for arm in self.arms}
-            self._fov_streak = Counter()
+        self._fov_streak = Counter()
+        self._fov_first_entry = {arm: None for arm in self.arms}
+        self._fov_out_steps = Counter()
 
     def arm_fov(self, arm: Optional[str] = None) -> None:
-        """Arm the gripper-in-FOV monitor explicitly for ``arm`` (default: every acting arm)."""
-        self.fov_enabled = True
-        for a in (self.arms if arm is None else (arm,)):
-            self._fov_armed[a] = True
+        """Enable the gripper-in-FOV monitor (kept for callers of the former explicit arming; the monitor is armed
+        whenever it is enabled)."""
+        self.set_fov_enabled(True)
 
     def begin_epilogue(self, held: Sequence[Any] = ()) -> None:
         """The final no-op window: pause / FOV monitors off; objects still in hand (held-object tasks) stay the
@@ -523,20 +527,26 @@ class Monitors:
         for arm in self.arms:
             ep, eq = self.robot.eef_links[arm].get_position_orientation()
             tip = C.fingertip((ep.float(), eq.float()))
-            if self.camera.in_frame(cam, tip, self.cfg.fov_margin):
-                self._fov_streak[arm] = 0
-                if self.fov_enabled and not self._fov_armed.get(arm, False):
-                    self._fov_armed[arm] = True  # the fingertips entered the frame: from here on they must stay
-                    self.stats.event("fov_armed")
+            inside = self.camera.in_frame(cam, tip, self.cfg.fov_margin)
+            if not self.fov_enabled:
+                if not inside:
+                    self.stats.event("fov_idle_out")  # the transit to the pre-pose / the retreat leg: not monitored
                 continue
-            if not self.fov_enabled or not self._fov_armed.get(arm, False):
-                self.stats.event("fov_idle_out")  # the idle posture / the transit to a pre-pose is not the sampler's to guarantee
+            if inside:
+                self._fov_streak[arm] = 0
+                if self._fov_first_entry.get(arm) is None:
+                    self._fov_first_entry[arm] = self.action_steps
+                    self.stats.event("fov_in_frame")
                 continue
             self._fov_streak[arm] += 1
+            self._fov_out_steps[arm] += 1
             self.stats.event("fov_out")
             if self._fov_streak[arm] >= self.cfg.fov_min_steps:
                 u, v, d = self.camera.project(cam, tip)
-                return self._verdict("gripper_out_of_fov", f"{arm} fingertips out of the head camera frame for {self._fov_streak[arm]} steps (u={u:.0f}, v={v:.0f}, depth={d:.2f})", arm=arm, u=u, v=v, depth=d)
+                first = self._fov_first_entry.get(arm)
+                what = "never in the head camera frame on this leg" if first is None else f"out of the head camera frame for {self._fov_streak[arm]} steps"
+                return self._verdict("gripper_out_of_fov", f"{arm} fingertips {what} (u={u:.0f}, v={v:.0f}, depth={d:.2f})", arm=arm, u=u, v=v, depth=d,
+                                     fov_first_entry_step=first, fov_out_steps=int(self._fov_out_steps[arm]))
         return None
 
     # -- budgets ---------------------------------------------------------------------------------------------------

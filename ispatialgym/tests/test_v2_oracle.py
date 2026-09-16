@@ -1602,38 +1602,41 @@ def test_fov_pause_and_ghost_hand_monitors():
     out_q = th.tensor([-3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])  # the right eef far behind the robot: outside the frame
     in_q = th.tensor([0.4, 0.0, 0.4, 0.0, 0.0, 0.0, 1.0])  # in front of the robot: in frame
     robot.dq = th.ones(28)
-    # (a) the idle posture is out of frame before the arm moved: no verdict (the sampler does not guarantee it)
+    # (a) the transit to the pre-pose (the execute hook keeps the monitor disabled): the idle posture out of frame is
+    # not a verdict, only fov_idle_out events
     robot.q[robot.arm_control_idx["right"]] = out_q
     mon.begin_action(grasp, 1, 0, intended={"apple_omzprq_0"}, held=[])
+    mon.set_fov_enabled(False)
     assert [mon.check(i) for i in range(1, 8)] == [None] * 7
     assert mon.stats.events["fov_idle_out"] == 7 and mon.stats.by_category == {}
-    # (b) the fingertips enter the frame (the pre-pose), then leave it: armed -> verdict after fov_min_steps
-    robot.q[robot.arm_control_idx["right"]] = in_q
-    assert mon.check(8) is None and mon._fov_armed["right"]
-    robot.q[robot.arm_control_idx["right"]] = out_q
-    verdicts = [mon.check(i) for i in range(9, 12)]
-    assert verdicts[:2] == [None, None] and verdicts[2].category == "gripper_out_of_fov" and verdicts[2].details["arm"] == "right"
-    mon.end_action()
-    # (b') the execute hook: disabled while the hand transits to a pre-pose that sits in the margin, enabled from the
-    # pre-pose on; disabling disarms (a place's retreat leg after the release)
-    mon.begin_action(grasp, 1, 0, intended=set(), held=[])
-    mon.set_fov_enabled(False)
-    robot.q[robot.arm_control_idx["right"]] = in_q
-    mon.check(1)
-    robot.q[robot.arm_control_idx["right"]] = out_q
-    assert [mon.check(i) for i in range(2, 10)] == [None] * 8 and not mon._fov_armed["right"]
+    # (b) from the pre-pose on the monitor is armed unconditionally (owner 10:15): a leg whose fingertips never enter
+    # the frame is a verdict after fov_min_steps, with fov_first_entry_step null and the out-of-frame step count
     mon.set_fov_enabled(True)
-    assert [mon.check(i) for i in range(10, 14)] == [None] * 4  # still not armed: never in frame since enabling
+    verdicts = [mon.check(i) for i in range(8, 11)]
+    assert verdicts[:2] == [None, None] and verdicts[2].category == "gripper_out_of_fov"
+    assert verdicts[2].details["fov_first_entry_step"] is None and verdicts[2].details["fov_out_steps"] == 3 and "never in the head camera frame" in verdicts[2].message
+    mon.end_action()
+    # (b') in frame at the pre-pose, then leaving it: verdict after fov_min_steps with the entry step recorded
+    mon.begin_action(grasp, 1, 1, intended=set(), held=[])
     robot.q[robot.arm_control_idx["right"]] = in_q
-    assert mon.check(14) is None and mon._fov_armed["right"]
+    assert mon.check(1) is None and mon._fov_first_entry["right"] == 1
     robot.q[robot.arm_control_idx["right"]] = out_q
-    assert [mon.check(i) for i in range(15, 17)] == [None, None] and mon.check(17).category == "gripper_out_of_fov"
+    verdicts = [mon.check(i) for i in range(2, 5)]
+    assert verdicts[:2] == [None, None] and verdicts[2].category == "gripper_out_of_fov" and verdicts[2].details["arm"] == "right"
+    assert verdicts[2].details["fov_first_entry_step"] == 1 and verdicts[2].details["fov_out_steps"] == 3
+    mon.end_action()
+    # (b'') disabling before the retreat leg (after the release) stops the monitoring; a brief excursion while enabled
+    # that returns within fov_min_steps is no verdict
     mon.begin_action(grasp, 1, 1, intended=set(), held=[])
     robot.q[robot.arm_control_idx["right"]] = in_q
     mon.check(1)
+    robot.q[robot.arm_control_idx["right"]] = out_q
+    assert [mon.check(i) for i in range(2, 4)] == [None, None]
+    robot.q[robot.arm_control_idx["right"]] = in_q
+    assert mon.check(4) is None and mon._fov_streak["right"] == 0
     mon.set_fov_enabled(False)  # e.g. after the release, before the retreat leg
     robot.q[robot.arm_control_idx["right"]] = out_q
-    assert [mon.check(i) for i in range(2, 12)] == [None] * 10
+    assert [mon.check(i) for i in range(5, 15)] == [None] * 10
     mon.end_action()
     # (c) a retreat is exempt even when the hand leaves the frame
     mon.begin_action(retreat, 4, 0, intended=set(), held=[])
