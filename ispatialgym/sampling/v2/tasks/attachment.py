@@ -334,7 +334,7 @@ class Attachment(SamplerV2):
             raise Reject("partner_placement", f"no partner cell with a reachable attach pose ({fails})")
         goal = self._attached_pose(f_pose)
         # in-hand reorientation: lifted grasp -> pre-attach at 3 SLERP waypoints (male attached)
-        carry = max(0.12, self.height[self.p_role] + 0.03)
+        carry = 0.12  # the lift clears the table; the SLERP waypoints carry the male up to the pre-attach pose above the partner
         lift = (grasp.grasp[0] + th.tensor([0.0, 0.0, carry]), grasp.grasp[1])
         wps = [(TT._t(p[0]), TT._t(p[1])) for p in C.line_waypoints(lift, pre_attach, int(self.g("reorientation_waypoints")) + 1)]
         with TT.posed_in_hand(self, "right", male, grasp.eef_in_object):
