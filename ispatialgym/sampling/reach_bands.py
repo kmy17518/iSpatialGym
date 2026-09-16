@@ -55,8 +55,10 @@ Setup defaults since 2026-09-16 (single-band and worker mode alike; each verifie
 bands): the world is camera-less (``SimWorld(cameras=False)``), the arms' motion planners are not built (bands use the
 kinematics entries and the batched IK solvers only) and the neighbouring rooms' objects that can never pass
 ``SimWorld.obstacle_filter`` are not loaded (``_slim_drop_list``: same obstacle set and cuRobo meshes, 421 -> 108
-objects, scene load 117 s -> 54 s on house_single_floor). ``--cameras`` / ``--prebuild-planner`` / ``--full-load``
-restore the old setup; none changes a band.
+objects, scene load 117 s -> 54 s on house_single_floor); per trunk, the near meshes no robot sphere can reach are
+disabled during that trunk's IK passes (:class:`TrunkBound`). ``--cameras`` / ``--prebuild-planner`` / ``--full-load`` /
+``--no-trunk-bound`` restore the old setup; none changes a band. Same-algorithm opt-ins (marginal cells may differ,
+default off): ``--mesh-cache auto`` (2.5x faster IK), ``--ik-tail-sizes``.
 
 Reading a band (the sampler)::
 
@@ -623,6 +625,26 @@ class ObstacleScope:
     def __exit__(self, *exc):
         self._enable(self.far, True)
 
+    def trunk_prune(self, q: th.Tensor, shoulder_world, arm: str, protect=()) -> List[str]:
+        """Disable, for one trunk configuration ``q``, the meshes of the kept scene objects that :class:`TrunkBound` proves
+        no robot sphere can touch (exact, see there); ``protect`` (the support ignored at the grasp pose) and every spawned
+        object are never pruned. Returns the disabled mesh names - the caller re-enables them with ``_enable(names, True)``
+        after the trunk."""
+        bounds = getattr(self, "_bounds", None)
+        if bounds is None:
+            bounds = self._bounds = {}
+        if arm not in bounds:
+            bounds[arm] = TrunkBound(self.kit, arm)
+        bound = bounds[arm]
+        protect_names = {getattr(o, "name", o) for o in protect} | set(self.world.spawned)
+        objs = [o for o in self.world.scene.objects if o.name in self.kept and o.name not in protect_names]
+        names = bound.prunable(q, shoulder_world, objs)
+        meshes = [m for n in names for m in self.names_of.get(n, [])]
+        self._enable(meshes, False)
+        bound.n_pruned.append(len(meshes))
+        log.info("trunk bound: %d of %d near meshes out of reach at this trunk and disabled (%s)", len(meshes), self.n_near, ", ".join(sorted(names)) or "-")
+        return meshes
+
     def ignoring(self, objs):
         scope = self
 
@@ -635,6 +657,122 @@ class ObstacleScope:
                 scope._enable(self_inner.names, True)
 
         return _Ctx()
+
+
+class TrunkBound:
+    """Per-trunk conservative pruning of the near obstacles - **exact**: a mesh that can never come within the collision
+    activation distance of any robot sphere during a trunk's IK solves never contributes to cuRobo's collision cost or
+    gradient (its kernel threads find no penetration and add nothing), so disabling it for that trunk leaves every sum
+    bit-identical - unlike a smaller mesh store, which changes the thread layout of the sums that do happen.
+
+    Bound, per trunk configuration ``q`` (base pose, torso, idle arm and fingers locked; only the band arm moves):
+
+    * fixed spheres (every robot sphere not on a link below ``<arm>_arm_link1``) are where the whole-body FK puts them
+      at ``q``; a mesh is out of their reach when its AABB is farther than ``radius + eta + MARGIN`` from each centre;
+    * moving spheres (links below the shoulder joint) stay inside a ball around the shoulder: for a serial chain of
+      revolute joints ``|T(x)| <= |t| + |x|`` link by link, so every point of a link below the shoulder is within
+      ``sum(|joint origin translations| along the chain) + |sphere centre in its link| + radius`` of the shoulder
+      (prismatic finger joints add their travel); ``r_arm`` = the maximum over the moving spheres (URDF origins,
+      cuRobo's link-local spheres). A mesh is out of the arm's reach when its AABB is farther than
+      ``r_arm + eta + MARGIN`` from the shoulder (``BandComputer.shoulder_and_reach``: cuRobo FK of ``torso_link4`` +
+      the measured shoulder offset; its error vs the simulated robot is millimetres, covered by MARGIN).
+
+    ``eta`` = the optimizers' ``collision_activation_distance`` (0.01 m; the metrics rollout uses 0). Object AABBs come
+    from the simulator (``obj.aabb`` = the collision points, a superset of every one of its cuRobo meshes). The support,
+    the placed objects and every spawned object are never pruned. Fail-safe: when the moving spheres of the seed
+    configuration itself are not inside the ball (a wrong frame assumption), pruning is switched off with a warning."""
+
+    #: safety margin (m) on top of the activation distance: shoulder FK vs simulated robot (~3 mm), AABB / mesh reads
+    MARGIN = 0.05
+
+    def __init__(self, kit, arm: str):
+        import xml.etree.ElementTree as ET
+
+        from ispatialgym.oracle import r1pro_model as M
+
+        be = kit.backend
+        self.kit, self.arm, self.be = kit, arm, be
+        self.eta = float(be.collision_activation_distance)
+        root = ET.parse(be.urdf_path).getroot()
+        joint_of_child: Dict[str, Tuple[str, str, float, float]] = {}  # child link -> (parent link, type, |origin xyz|, prismatic travel)
+        for j in root.findall("joint"):
+            o = j.find("origin")
+            xyz = [float(v) for v in (o.get("xyz", "0 0 0") if o is not None else "0 0 0").split()]
+            lim = j.find("limit")
+            travel = (float(lim.get("upper", 0.0)) - float(lim.get("lower", 0.0))) if (j.get("type") == "prismatic" and lim is not None) else 0.0
+            joint_of_child[j.find("child").get("link")] = (j.find("parent").get("link"), j.get("type"), math.sqrt(sum(v * v for v in xyz)), abs(travel))
+        shoulder_link = f"{arm}_arm_link1"
+
+        def chain_length(link: str) -> Optional[float]:
+            """Sum of the joint-origin translations (+ prismatic travel) from the shoulder link down to ``link``; None when ``link`` is not below it."""
+            total, cur = 0.0, link
+            while cur != shoulder_link:
+                if cur not in joint_of_child:
+                    return None
+                parent, _, t, travel = joint_of_child[cur]
+                total += t + travel
+                cur = parent
+            return total
+
+        self.entry = be.kin_entry("whole_body")
+        kc = self.entry.fk.kinematics_config
+        inv = {v: k for k, v in kc.link_name_to_idx_map.items()}
+        link_of_sphere = [inv.get(int(i), "") for i in kc.link_sphere_idx_map.cpu().tolist()]
+        local = kc.link_spheres.reshape(-1, len(link_of_sphere), 4)[0].detach().cpu().float()  # link-local (x, y, z, radius)
+        chain = [chain_length(l) for l in link_of_sphere]
+        self.moving = th.tensor([c is not None for c in chain])
+        self.valid = local[:, 3] > 0  # negative radius = unused (attached-object placeholders)
+        r_arm = 0.0
+        for k, c in enumerate(chain):
+            if c is not None and bool(self.valid[k]):
+                r_arm = max(r_arm, c + float(th.linalg.norm(local[k, :3])) + float(local[k, 3]))
+        self.r_arm = r_arm
+        self.enabled = True
+        self.n_pruned: List[int] = []
+        log.info("trunk bound (%s arm): %d moving / %d fixed spheres, ball radius %.3f m around the shoulder, activation %.3f m + margin %.2f m", arm,
+                 int((self.moving & self.valid).sum()), int((~self.moving & self.valid).sum()), r_arm, self.eta, self.MARGIN)
+
+    def spheres_world(self, q: th.Tensor) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
+        """``(centres (n, 3) world, radii (n,), moving mask (n,))`` of the valid robot spheres at the full configuration ``q``."""
+        import omnigibson.utils.transform_utils as T
+
+        be = self.be
+        be.refresh_locked_joints("whole_body", q)
+        st = be._kin_state(self.entry, th.as_tensor(q).float().unsqueeze(0))
+        sph = st.robot_spheres.reshape(-1, 4).detach().cpu().float()
+        rp, rq = be.root_pose()
+        centres = rp.unsqueeze(0) + sph[:, :3] @ T.quat2mat(rq).T
+        return centres[self.valid], sph[self.valid, 3], self.moving[self.valid]
+
+    @staticmethod
+    def _aabb_distance(lo: th.Tensor, hi: th.Tensor, pts: th.Tensor) -> th.Tensor:
+        return th.linalg.norm(th.clamp(lo - pts, min=0.0) + th.clamp(pts - hi, min=0.0), dim=1)
+
+    def prunable(self, q: th.Tensor, shoulder_world, objects: Sequence[Any]) -> List[str]:
+        """Names of ``objects`` (scene objects with ``.aabb``) no robot sphere can touch during the solves of trunk ``q``."""
+        if not self.enabled:
+            return []
+        centres, radii, moving = self.spheres_world(q)
+        sh = th.as_tensor(shoulder_world).float()
+        slack = self.eta + self.MARGIN
+        # fail-safe: the arm's spheres at q must lie inside the ball the bound claims for them
+        d_move = th.linalg.norm(centres[moving] - sh, dim=1) + radii[moving]
+        if bool((d_move > self.r_arm + self.MARGIN).any()):
+            log.warning("trunk bound: a moving sphere lies %.3f m from the shoulder, outside the %.3f m ball - the bound is not trusted, no pruning", float(d_move.max()),
+                        self.r_arm)
+            self.enabled = False
+            return []
+        fixed_c, fixed_r = centres[~moving], radii[~moving]
+        out = []
+        for o in objects:
+            lo, hi = o.aabb
+            lo, hi = lo.float(), hi.float()
+            if float(self._aabb_distance(lo, hi, sh.unsqueeze(0))[0]) <= self.r_arm + slack:
+                continue
+            if bool((self._aabb_distance(lo, hi, fixed_c) <= fixed_r + slack).any()):
+                continue
+            out.append(o.name)
+        return out
 
 
 class MovingPlaced:
@@ -746,6 +884,9 @@ class BandComputer:
     #: coarse cell and its 8 neighbours). Measured 2026-09-15 on the smoke job: 54 s vs 45 s exhaustive per trunk and one
     #: isolated cell lost - the IK cost is per pose, not per cell, so the coarse pass does not pay for itself; off (0).
     COARSE = 0.0
+    #: per-trunk pruning of the near obstacles no robot sphere can reach at that trunk (:class:`TrunkBound`, exact:
+    #: an unreachable mesh contributes nothing to cuRobo's collision sums). ``--no-trunk-bound`` switches it off.
+    TRUNK_BOUND = True
 
     def __init__(self, world, kit, arms: Sequence[str] = ("right",), lattice: float = LATTICE, seeds: int = 12):
         from ispatialgym.oracle import r1pro_model as M
@@ -1011,6 +1152,7 @@ class BandComputer:
                 results.append(self._trunk(tr, ti, base_cells, world_cells, *common))
         finally:
             self.scope.__exit__(None, None, None)
+            self._last_bounds = getattr(self.scope, "_bounds", None)  # TrunkBound diagnostics for the meta
             self.scope = None
             if self.cell_obstacle is not None:
                 self.cell_obstacle.show()
@@ -1066,6 +1208,8 @@ class BandComputer:
             entry["shoulder_world"] = [round(float(v), 4) for v in shoulder.tolist()]
             entry["arm_len"] = round(arm_len, 4)
             entry["reach"] = round(reach, 4)
+            # near meshes no sphere can reach at this trunk (exact, TrunkBound); re-enabled after the trunk's IK passes
+            pruned = self.scope.trunk_prune(q, shoulder, arm, protect=ignore_for_grasp) if (self.scope is not None and self.TRUNK_BOUND) else []
             pts = th.cat([world_cells, th.full((len(world_cells), 1), z_support)], dim=1)
             near = th.linalg.norm(pts - shoulder, dim=1) <= reach
             todo = [i for i in range(len(base_cells)) if bool(near[i])]
@@ -1081,51 +1225,55 @@ class BandComputer:
                 pair_specs = [(g.name, g, y) for g in grasp_sets for y in yaw_order]
             chunk = self.CHUNK if grasp_sets is not None else 1
             pose_reach = arm_len + 0.03  # the eef origin can never be farther from the shoulder than the stretched arm
-            for r0 in range(0, len(pair_specs), chunk):
-                if not todo:
-                    break
-                specs = pair_specs[r0:r0 + chunk]
-                pairs, index, spec_of = [], [], []
-                for i in todo:
-                    if grasp_sets is None and self.contact_height is not None:
-                        # generic CONTACT set: the cell is the contact point; z_support = the top the object stands on
-                        cands = [((-1, ci), pair) for ci, pair in self.contact_candidates_at(world_cells[i], z_support, self.contact_height, fwd, left)]
-                    elif grasp_sets is None:
-                        centre = th.tensor([float(world_cells[i][0]), float(world_cells[i][1]), z_support])
-                        cands = [((-1, ci), pair) for ci, pair in enumerate(kit.grasp_candidates_at(centre, [yaw0, yaw0 + math.pi / 2][:N_YAWS_GENERIC], TILTS_GENERIC, fwd))]
-                    else:
-                        cands = [((yaw_index[y], grasp_index[name]), self.grasp_eef_pair(pose_fn(world_cells[i], y + yaw0), g)) for name, g, y in specs]
-                    for spec, pair in cands:
-                        if float(th.linalg.norm(pair[1][0] - shoulder)) > pose_reach or float(th.linalg.norm(pair[0][0] - shoulder)) > pose_reach:
-                            n_pose_pruned += 1
-                            continue
-                        pairs.append(pair)
-                        index.append(i)
-                        spec_of.append(spec)
-                if pairs:
-                    pres = [p[0] for p in pairs]
-                    ok_pre = self.ik_screen(pres, q, arm)
-                    sel = [k for k, s in enumerate(ok_pre.tolist()) if s]
-                    for k in sel:
-                        pre_seen[index[k]] = True
-                    hits: List[int] = []  # indices into ``pairs`` feasible at pre-grasp and grasp this round
-                    if sel:
-                        with self.ignoring(ignore_for_grasp):
-                            ok_g = self.ik_screen([pairs[k][1] for k in sel], q, arm)
-                        hits = [k for k, s in zip(sel, ok_g.tolist()) if s]
-                    if hits and self.cell_obstacle is not None:
-                        # stance-relative placed object: the batched passes ran without it; verify the pre-grasps of every
-                        # passing cell with the object placed at that cell (the grasp pose ignores it, spec 3.6)
-                        hits = self._verify_with_placed(hits, pairs, index, q, arm, world_cells, entry)
-                    for k in hits:
-                        ok[index[k]] = True
-                        found.append((index[k], spec_of[k][0], spec_of[k][1]))
-                entry["rounds"] += 1
-                todo = [i for i in todo if not bool(ok[i])]
-                if self.MAX_ROUNDS_WITHOUT_PRE and entry["rounds"] >= self.MAX_ROUNDS_WITHOUT_PRE:
-                    n_before = len(todo)
-                    todo = [i for i in todo if bool(pre_seen[i])]
-                    entry["n_dropped_no_pre"] = entry.get("n_dropped_no_pre", 0) + (n_before - len(todo))
+            try:
+                for r0 in range(0, len(pair_specs), chunk):
+                    if not todo:
+                        break
+                    specs = pair_specs[r0:r0 + chunk]
+                    pairs, index, spec_of = [], [], []
+                    for i in todo:
+                        if grasp_sets is None and self.contact_height is not None:
+                            # generic CONTACT set: the cell is the contact point; z_support = the top the object stands on
+                            cands = [((-1, ci), pair) for ci, pair in self.contact_candidates_at(world_cells[i], z_support, self.contact_height, fwd, left)]
+                        elif grasp_sets is None:
+                            centre = th.tensor([float(world_cells[i][0]), float(world_cells[i][1]), z_support])
+                            cands = [((-1, ci), pair) for ci, pair in enumerate(kit.grasp_candidates_at(centre, [yaw0, yaw0 + math.pi / 2][:N_YAWS_GENERIC], TILTS_GENERIC, fwd))]
+                        else:
+                            cands = [((yaw_index[y], grasp_index[name]), self.grasp_eef_pair(pose_fn(world_cells[i], y + yaw0), g)) for name, g, y in specs]
+                        for spec, pair in cands:
+                            if float(th.linalg.norm(pair[1][0] - shoulder)) > pose_reach or float(th.linalg.norm(pair[0][0] - shoulder)) > pose_reach:
+                                n_pose_pruned += 1
+                                continue
+                            pairs.append(pair)
+                            index.append(i)
+                            spec_of.append(spec)
+                    if pairs:
+                        pres = [p[0] for p in pairs]
+                        ok_pre = self.ik_screen(pres, q, arm)
+                        sel = [k for k, s in enumerate(ok_pre.tolist()) if s]
+                        for k in sel:
+                            pre_seen[index[k]] = True
+                        hits: List[int] = []  # indices into ``pairs`` feasible at pre-grasp and grasp this round
+                        if sel:
+                            with self.ignoring(ignore_for_grasp):
+                                ok_g = self.ik_screen([pairs[k][1] for k in sel], q, arm)
+                            hits = [k for k, s in zip(sel, ok_g.tolist()) if s]
+                        if hits and self.cell_obstacle is not None:
+                            # stance-relative placed object: the batched passes ran without it; verify the pre-grasps of every
+                            # passing cell with the object placed at that cell (the grasp pose ignores it, spec 3.6)
+                            hits = self._verify_with_placed(hits, pairs, index, q, arm, world_cells, entry)
+                        for k in hits:
+                            ok[index[k]] = True
+                            found.append((index[k], spec_of[k][0], spec_of[k][1]))
+                    entry["rounds"] += 1
+                    todo = [i for i in todo if not bool(ok[i])]
+                    if self.MAX_ROUNDS_WITHOUT_PRE and entry["rounds"] >= self.MAX_ROUNDS_WITHOUT_PRE:
+                        n_before = len(todo)
+                        todo = [i for i in todo if bool(pre_seen[i])]
+                        entry["n_dropped_no_pre"] = entry.get("n_dropped_no_pre", 0) + (n_before - len(todo))
+            finally:
+                if pruned:  # the trunk's unreachable meshes are obstacles again for the next trunk / the scope's exit
+                    self.scope._enable(pruned, True)
             entry["n_pose_pruned"] = n_pose_pruned
             sel_cells = [i for i in range(len(base_cells)) if bool(ok[i])]
             remap = {i: n for n, i in enumerate(sel_cells)}
@@ -1622,6 +1770,9 @@ def build_parser() -> argparse.ArgumentParser:
                     "the neighbouring rooms' (and the always-loaded structures') objects that can never pass SimWorld.obstacle_filter are left out - their "
                     "stable-scene bounding box, grown by SLIM_MARGIN_M (+ extent when articulated), misses the task rooms' floor extent + ISG_OBSTACLE_MARGIN_M; "
                     "the collision world (obstacle set, cuRobo mesh names, bands) is identical, the scene load 117 s -> 54 s, 421 -> 108 objects (house_single_floor)")
+    ap.add_argument("--no-trunk-bound", action="store_true", help="keep every near mesh enabled at every trunk (the pre-2026-09-16 behaviour). Default: the meshes "
+                    "no robot sphere can reach at a trunk (TrunkBound: fixed spheres + a ball around the shoulder for the arm) are disabled for that trunk - exact, "
+                    "they never contribute to cuRobo's collision sums")
     ap.add_argument("--mesh-cache", default=None, help="SAME-ALGORITHM OPT-IN (default: cuRobo's 8192, unchanged): capacity of the cuRobo mesh store, a number "
                     "or 'auto' (= the loaded collision meshes + %d, at least %d). cuRobo launches spheres x capacity collision threads per evaluation, so "
                     "'auto' made every batched IK call ~2.5x faster (trunk 65 s -> 25 s), but the thread layout changes the order of its atomic float "
@@ -1755,6 +1906,8 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
             meta["schedule"]["ik_sizes"] = list(sizes)
     if args.mesh_cache:  # same-algorithm opt-in (see load_world): record the capacity the bands were computed with
         meta["schedule"]["mesh_cache"] = int(kit.backend.mesh_cache_size)
+    if args.no_trunk_bound:
+        bc.TRUNK_BOUND = False
     if args.smoke:
         t_fk = time.time()
         meta["shoulder_fk_check"] = verify_shoulder_fk(world, kit, bc, SMOKE_FK_TRUNKS, arm="right")
@@ -2100,6 +2253,11 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
     meta.update({"trunks": result["trunks"], "union_extent": [float(lat_all.min()), float(lat_all.max())] if len(lat_all) else None,
                  "n_reachable_total": int(sum(len(c) for c in result["cells"].values())), "key": key, "time_s": round(time.time() - t_load, 1),
                  "setup_s": round(setup_s, 1), "kit_stats": {k: stats1[k] - stats0.get(k, 0) for k in stats1}})
+    bounds = getattr(bc.scope, "_bounds", None) if bc.scope is not None else None  # (compute() clears the scope; the brace loop keeps none)
+    if bounds is None:
+        bounds = getattr(bc, "_last_bounds", None)
+    if bounds:  # diagnostic (volatile): how many near meshes the per-trunk bound disabled
+        meta["trunk_bound"] = {arm: {"r_arm": round(b.r_arm, 4), "margin": b.MARGIN, "enabled": b.enabled, "n_pruned_per_trunk": list(b.n_pruned)} for arm, b in bounds.items()}
     arrays = {trunk_key(tr, ti): np.asarray(c, dtype=np.float32).reshape(-1, 2) for (tr, ti), c in result["cells"].items()}
     for (tr, ti), p in result.get("pairs", {}).items():
         arrays[trunk_key(tr, ti) + "__pairs"] = np.asarray(p, dtype=np.int32).reshape(-1, 3)
