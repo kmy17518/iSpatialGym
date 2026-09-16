@@ -581,7 +581,7 @@ class IORSLarge(SamplerV2):
                 why.append(f"pitch {pitch:.0f}: face reaches the palm")
                 continue
             standoff = so[0]
-            a_vec = TT.pitched_approach(pitch, place.forward)
+            a_vec = TT.pitched_approach(pitch, d2)  # pitched toward the push direction (= the robot's forward for a frontal stance, its right for a side stance)
             start = th.tensor([float(cd[0]), float(cd[1]), z_push]) - d3 * (half_d + standoff)
             goal = th.tensor([float(gc[0]), float(gc[1]), z_push]) - d3 * (half_d + standoff)
             mid = 0.5 * (start + goal)
@@ -1071,8 +1071,16 @@ class IORSLarge(SamplerV2):
         lo_ahead, hi_ahead = PUSH_UNDER_DROP_AHEAD_M
         cells = self.place["cells"]
         mid = th.as_tensor([float(edge.mid[0]), float(edge.mid[1])])
-        stats: Dict[str, Any] = {"laterals": len(laterals), "goal_clear": 0, "drop_free": 0, "base_ok": 0, "candidates": 0, "drop_blocked": {},
+        stats: Dict[str, Any] = {"laterals": len(laterals), "goal_clear": 0, "drop_free": 0, "base_ok": 0, "candidates": 0, "side_candidates": 0, "drop_blocked": {},
                                  "drop_out_m": round(out, 3), "edge_mid": [round(float(v), 2) for v in mid.tolist()], "inward": [round(float(v), 2) for v in d2.tolist()]}
+        # side stances: the base stands BESIDE the push lane, facing along the edge with the partner on its right (the
+        # right arm pushes sideways, toward the partner); the lane lies ``x_ahead`` ahead of the base and the base centre
+        # ``b`` outside the edge — the whole lane (drop 0.22 m outside → goal 0.07 m inside) stays 0.35–0.45 m ahead, inside
+        # the floor reach, and the crouched torso bends along the edge, not into the partner (the frontal stances need
+        # s ≥ 0.75 m to keep the deep trunk clear of a bed, which puts the lane 0.46–0.82 m ahead: out of reach)
+        side_ahead = [float(v) for v in (self.gp.gen("push_under_side_ahead_m") or (0.35, 0.45))]
+        side_b = [float(v) for v in (self.gp.gen("push_under_side_standoff_m") or (0.35, 0.40))]
+        yaw_side = math.atan2(float(tangent[1]), float(tangent[0]))  # facing +tangent: the robot's right = inward (the partner side)
         cands: List[Stance] = []
         for lat in laterals:
             g = mid + tangent * float(lat) + d2 * inside
@@ -1085,6 +1093,8 @@ class IORSLarge(SamplerV2):
             if not self._free_floor_cell(c_d, stats["drop_blocked"]):
                 continue
             stats["drop_free"] += 1
+            common = {"goal_cell": [float(g[0]), float(g[1])], "drop_cell": [float(c_d[0]), float(c_d[1])], "push_dir": [float(d2[0]), float(d2[1])], "inside_m": inside,
+                      "edge": edge.name}
             for so in stand_offs:
                 ahead = so - out
                 if ahead < lo_ahead or ahead > hi_ahead:
@@ -1096,10 +1106,21 @@ class IORSLarge(SamplerV2):
                 for tr, ti in trunks:
                     st = Stance("placement", (float(xy[0]), float(xy[1]), edge.yaw), float(tr), float(ti), so, edge, None, float(lat), None, ["right"])
                     st.focus = th.tensor([float(c_d[0]), float(c_d[1]), self.floor_z + height / 2])
-                    st.extras.update({"goal_cell": [float(g[0]), float(g[1])], "drop_cell": [float(c_d[0]), float(c_d[1])], "push_dir": [float(d2[0]), float(d2[1])],
-                                      "drop_ahead_m": float(ahead), "inside_m": inside})
+                    st.extras.update(common, drop_ahead_m=float(ahead), stance_kind="frontal")
                     cands.append(st)
                     stats["candidates"] += 1
+            for x_ahead in side_ahead:
+                for b in side_b:
+                    xy = mid + tangent * (float(lat) - x_ahead) - d2 * b
+                    if not P0.base_ok(self, xy):
+                        continue
+                    stats["base_ok"] += 1
+                    for tr, ti in trunks:
+                        st = Stance("placement", (float(xy[0]), float(xy[1]), yaw_side), float(tr), float(ti), b, None, None, float(lat), None, ["right"])
+                        st.focus = th.tensor([float(c_d[0]), float(c_d[1]), self.floor_z + height / 2])
+                        st.extras.update(common, drop_ahead_m=float(x_ahead), stance_kind="side", side_standoff_m=b)
+                        cands.append(st)
+                        stats["side_candidates"] += 1
         self.template_facts["placement_stats"] = stats
         if not cands:
             log.info("%s: push-under stance C at %s edge %s: no candidate (%s)", self.gp.alias, partner.name, edge.name, stats)
@@ -1144,6 +1165,7 @@ class IORSLarge(SamplerV2):
         out_ = P0.best_class(classed)
         stats["survivor_trunks"] = sorted({(float(st.translate), round(float(st.tilt), 2)) for st in out_})
         stats["survivor_stand_offs"] = sorted({round(float(st.stand_off), 2) for st in out_})
+        stats["survivor_kinds"] = {k: sum(1 for st in out_ if st.extras.get("stance_kind") == k) for k in ("side", "frontal")}
         stats["collision_free_trunks"] = sorted({(float(st.translate), round(float(st.tilt), 2)) for st in cands})
         log.info("%s: push-under stance C at %s edge %s: %d survivors (%s)", self.gp.alias, partner.name, edge.name, len(out_), stats)
         return out_
@@ -1239,9 +1261,13 @@ class IORSLarge(SamplerV2):
         tname, pname = self.tname, self.pname
         partner, target = self.partner, self.target
         max_len = self.num("max_partner_geodesic_m", 3.0) + self.num("path_max_extra_m", 1.0)
-        order = rng.permutation(len(c_pool))
+        order = list(rng.permutation(len(c_pool)))
+        n_try = 6
+        if self.push_under:  # side stances first (the frontal ones put the lane out of the floor reach — see push_under_candidates)
+            order = [k for k in order if c_pool[k].extras.get("stance_kind") == "side"] + [k for k in order if c_pool[k].extras.get("stance_kind") != "side"]
+            n_try = 12
         errors = []
-        for kc in order[:6]:
+        for kc in order[:n_try]:
             place = c_pool[int(kc)].with_trunk(c_pool[int(kc)].translate, c_pool[int(kc)].tilt, "placement")
             place.focus, place.arms = c_pool[int(kc)].focus, ["right"]
             place.extras = dict(c_pool[int(kc)].extras)
