@@ -1054,7 +1054,15 @@ class IORSLarge(SamplerV2):
                 if not P0.in_frame(self, cam, self.hull_corners_world(self.hull, pose)):
                     continue
                 focus = th.tensor([gc[0], gc[1], self.place["z"] + self.place["height"] / 2])
-                k = P0.angle_class(P0.axis_angle(self, cam, focus))
+                # owner decision 2026‑09‑16 (c): the ontop goal-visibility rule is "goal cell (the target at the goal) in frame
+                # (5 %)" — the 20° optical-axis cone stays for under only (the target hides beneath the partner). Diagnosed
+                # on box_of_shampoo-sofa-bar: 13/13 collision-free C candidates had the goal in frame, unoccluded, at 30–31° off
+                # the axis (camera rigid on the torso, trunk (0, −1.2) from the band, stand-off 0.35 m); an optional cone
+                # (``ontop_axis_cone_deg``) is kept for experiments.
+                cone = self.gp.gen("ontop_axis_cone_deg")
+                ang = P0.axis_angle(self, cam, focus)
+                st.extras["axis_angle_deg"] = math.degrees(ang)
+                k = (1 if ang <= math.radians(float(cone)) else None) if cone is not None else 1
             else:
                 # the near edge's bottom line where the target passes under it — the two bottom points of the edge at the
                 # goal cell's lateral position ± (half extent + 0.10) — in frame; the optical axis within 20° of the
