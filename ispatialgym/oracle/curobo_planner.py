@@ -1079,9 +1079,15 @@ class R1ProCuRobo:
         max_joint_step: float = 0.2,
         check_collisions: bool = True,
         sync_world: bool = True,
+        soft_pos_tol: Optional[float] = None,
+        soft_rot_tol: Optional[float] = None,
     ) -> PlanResult:
         """Track dense Cartesian ``waypoints`` (each ``{frame: (pos, quat_xyzw)}`` in world) with
         damped-least-squares differential IK on the embodiment's active joints.
+
+        ``soft_pos_tol`` / ``soft_rot_tol``: a waypoint the iterations leave within these (but outside ``pos_tol`` /
+        ``rot_tol``) is accepted with its residual instead of failing the path (``diagnostics["soft_waypoints"]`` lists
+        them) — a straight approach that stalls 2 mm short of a 2 mm tolerance is not a failed approach.
 
         Successive waypoints are solved from the previous solution, which yields a continuous
         joint-space path for straight-line / arc end-effector motions (something trajopt does not
@@ -1141,6 +1147,7 @@ class R1ProCuRobo:
 
         path = [q_full.clone()]
         q_cur = q_full.clone()
+        soft: List[Dict[str, float]] = []
         for wi, wp in enumerate(waypoints):
             tgt = targets_root(wp)
             converged = False
@@ -1173,11 +1180,15 @@ class R1ProCuRobo:
                     dq = dq * (0.15 / step)
                 q_cur[aidx] = th.clamp(q_act + dq, lo, hi)
             if not converged:
-                at_lo = [active[k] for k in range(n) if abs(float(q_cur[aidx[k]] - lo[k])) < 1e-4]
-                at_hi = [active[k] for k in range(n) if abs(float(q_cur[aidx[k]] - hi[k])) < 1e-4]
                 err_f = err.reshape(len(frames), 6)
                 pos_err = float(err_f[:, :3].norm(dim=-1).max())
                 rot_err = float(err_f[:, 3:].norm(dim=-1).max())
+                if soft_pos_tol is not None and pos_err <= soft_pos_tol and rot_err <= (soft_rot_tol if soft_rot_tol is not None else rot_tol):
+                    soft.append({"index": wi, "pos_err": pos_err, "rot_err": rot_err})
+                    converged = True
+            if not converged:
+                at_lo = [active[k] for k in range(n) if abs(float(q_cur[aidx[k]] - lo[k])) < 1e-4]
+                at_hi = [active[k] for k in range(n) if abs(float(q_cur[aidx[k]] - hi[k])) < 1e-4]
                 status = (
                     f"differential IK did not converge at waypoint {wi}/{len(waypoints)}: "
                     f"pos_err={pos_err*1000:.1f}mm rot_err={rot_err:.3f}rad "
@@ -1199,7 +1210,8 @@ class R1ProCuRobo:
             if bool(coll.any()):
                 first = int(th.nonzero(coll).view(-1)[0])
                 return PlanResult(success=False, status=f"collision at waypoint {first}/{len(waypoints)}", dt=self.control_dt, plan_time=time.time() - t0)
-        return PlanResult(success=True, q_traj=q_traj, dt=self.control_dt, status="ok", plan_time=time.time() - t0)
+        status = "ok" if not soft else f"ok ({len(soft)} waypoints within the soft tolerance, max {max(w['pos_err'] for w in soft) * 1000:.1f} mm)"
+        return PlanResult(success=True, q_traj=q_traj, dt=self.control_dt, status=status, plan_time=time.time() - t0, diagnostics={"soft_waypoints": soft} if soft else {})
 
 
 # --------------------------------------------------------------------------------------

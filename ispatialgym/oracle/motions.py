@@ -87,6 +87,10 @@ class MotionsConfig:
     diff_ik_pos_tol: float = 2e-3
     diff_ik_rot_tol: float = 1e-2
     diff_ik_max_iters: int = 100
+    #: a waypoint the iterations leave within these residuals is accepted (a straight approach stalling 2.1 mm short
+    #: of the 2 mm tolerance is not a failed approach; the eef postcondition is 2 cm)
+    diff_ik_soft_pos_tol: float = 5e-3
+    diff_ik_soft_rot_tol: float = 3e-2
     #: gripper actuation wait (steps)
     gripper_steps: int = 60
     #: base tracking (paths) and base-follow (articulation) tracker configurations
@@ -540,7 +544,11 @@ class Motions:
             max_iters=self.cfg.diff_ik_max_iters,
             check_collisions=False,
             sync_world=False,
+            soft_pos_tol=self.cfg.diff_ik_soft_pos_tol,
+            soft_rot_tol=self.cfg.diff_ik_soft_rot_tol,
         )
+        if res.success and (res.diagnostics or {}).get("soft_waypoints"):
+            log.info("arm_along(%s): %s", arm, res.status)
         speed = self.cfg.cartesian_speed if speed is None else float(speed)
         steps = []
         prev = start
