@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 12:52 PDT — 4/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 14:10 PDT — 5/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -126,7 +126,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | camera_relocalization-obstructed | valid demo | tracker corner fix d4a1745 not yet re-demoed | oracle |
 | object_scaling | valid demo | - | - |
 | mental_rotation | valid demo | - | - |
-| disembedding | demo run (pre-fix success) | bottle_of_milk success 11:22 (1ca84d2) predates fd0411c/9729372 → re-run for validity; old chili instance blocked by branch-inconsistent witnesses (re-sample) | loop |
+| disembedding | valid demo | bottle_of_milk success 11:22 (1ca84d2) predates fd0411c/9729372 → re-run for validity; old chili instance blocked by branch-inconsistent witnesses (re-sample) | loop |
 | CM block_design | no instance | braces optional + ladder landed (561f343); still no instance: single-cube probe shows 14–30/56 pick classes feasible at every cell → the failure is the multi-block configuration (yaw jitter / neighbours / λ −0.4…−0.56 cells) → replay the failing block in the probe | tabletop |
 | CM attachment | no instance | attempts 260–320 s now (094cfe3) but no instance: reorientation_unreachable (SLERP to pre-attach), empty F, time_budget, contact_unreachable, partner_placement | tabletop |
 | CM articulation_open_small_scale | no instance | hinged_jar: handle band only at tall trunks (translate 0/0.25) and Phase 2 finds 0 (stance, focus) pairs within the 20° cone from them (no independent camera tilt) → decision: focus-in-frame instead of the 20° cone for small articulation? toolbox: lid handle at 85° out of reach; laptop: target_placement | tabletop / owner |
