@@ -6053,16 +6053,16 @@
    "kind": "tabletop",
    "wave": 3,
    "subtasks": "inter_object_relation_satisfaction-under_large_scale",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-a40-8",
+   "wall_s": 591,
+   "trunks_free": 0,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__house_single_floor__desk_xhjsub_0__briefcase-psvdau__3bf95bbf31ce906d",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd",
@@ -6085,32 +6085,32 @@
    "kind": "tabletop",
    "wave": 3,
    "subtasks": "inter_object_relation_satisfaction-ontop_large_scale",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-a40-9",
+   "wall_s": 581,
+   "trunks_free": 0,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__house_single_floor__desk_xhjsub_0__pen-gqwdor__5a2db8e1a78ae400",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__desk_xhjsub_0__pen-gzrbrx",
    "kind": "tabletop",
    "wave": 1,
    "subtasks": "inter_object_relation_satisfaction-ontop_large_scale",
-   "status": "failed",
-   "pod": "rb-a40b-0",
-   "wall_s": 13,
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
-   "error": "rc=1",
-   "script": ""
+   "status": "empty band",
+   "pod": "pilot2-a40-4",
+   "wall_s": 629,
+   "trunks_free": 0,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__house_single_floor__desk_xhjsub_0__pen-gzrbrx__1d1fcccca56133da",
+   "error": "",
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__desk_xhjsub_0__pen-hiyeki",
@@ -6149,32 +6149,32 @@
    "kind": "tabletop",
    "wave": 1,
    "subtasks": "inter_object_relation_satisfaction-under_large_scale",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-a40-5",
+   "wall_s": 563,
+   "trunks_free": 0,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__house_single_floor__desk_xhjsub_0__sandal-chgcrm__a18b0053d95a64ad",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__desk_xhjsub_0__sandal-shdahi",
    "kind": "tabletop",
    "wave": 3,
    "subtasks": "inter_object_relation_satisfaction-under_large_scale",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-a40-10",
+   "wall_s": 561,
+   "trunks_free": 0,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__house_single_floor__desk_xhjsub_0__sandal-shdahi__9548e95971a52f75",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__desk_xhjsub_0__sandal-spcddb",
@@ -6197,16 +6197,16 @@
    "kind": "tabletop",
    "wave": 1,
    "subtasks": "inter_object_relation_satisfaction-ontop_large_scale",
-   "status": "failed",
-   "pod": "rb-a40-0",
-   "wall_s": 17,
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
-   "error": "rc=1",
-   "script": ""
+   "status": "ok",
+   "pod": "pilot2-a40-7",
+   "wall_s": 1069,
+   "trunks_free": 21,
+   "trunks_total": 25,
+   "cells_total": 31,
+   "union_extent": "[-0.5600000023841858, -0.07999999821186066]",
+   "band_file": "tabletop__house_single_floor__sofa_lugrhk_1__box_of_shampoo-bclpiq__af5831f04684bf13",
+   "error": "",
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__sofa_wnzdke_0__box_of_shampoo-nijidu",
@@ -6901,16 +6901,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "inter_object_relation_satisfaction-nextto",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-0",
+   "wall_s": 1354,
+   "trunks_free": 18,
+   "trunks_total": 20,
+   "cells_total": 533,
+   "union_extent": "[-0.800000011920929, 0.0]",
+   "band_file": "tabletop__office_cubicles_right__conference_table_fpkmyw_0__jar_of_spaghetti_sauce-exmsmm__55c01614027d1e82",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__office_cubicles_right__conference_table_fpkmyw_0__keyboard-injrgc__gp",
@@ -11292,6 +11292,188 @@
    "band_files": [],
    "current_code": null
   },
+  "rb__tabletop__house_single_floor__desk_xhjsub_0__sandal-shdahi": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-10/rb__tabletop__house_single_floor__desk_xhjsub_0__sandal-shdahi",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-10/rb__tabletop__house_single_floor__desk_xhjsub_0__sandal-shdahi/tabletop__house_single_floor__desk_xhjsub_0__sandal-shdahi__9548e95971a52f75"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__desk_xhjsub_0__sandal-shdahi/tabletop__house_single_floor__desk_xhjsub_0__sandal-shdahi__9548e95971a52f75.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      true,
+      0.12,
+      null
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.03,
+      null
+     ]
+    ],
+    "time_s": 542.3
+   },
+   "error": null,
+   "pod": "pilot2-a40-10",
+   "rc": 0,
+   "wall_s": 561,
+   "band_files": [
+    "tabletop__house_single_floor__desk_xhjsub_0__sandal-shdahi__9548e95971a52f75"
+   ],
+   "current_code": true
+  },
   "v2__camera_relocalization-obstructed-footstool_1": {
    "dir": "runlogs/runpod/rb/pilot2-a40-11/v2__camera_relocalization-obstructed-footstool_1",
    "files": [],
@@ -11492,6 +11674,188 @@
    "band_files": [],
    "current_code": null
   },
+  "rb__tabletop__house_single_floor__desk_xhjsub_0__pen-gzrbrx": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-4/rb__tabletop__house_single_floor__desk_xhjsub_0__pen-gzrbrx",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-4/rb__tabletop__house_single_floor__desk_xhjsub_0__pen-gzrbrx/tabletop__house_single_floor__desk_xhjsub_0__pen-gzrbrx__1d1fcccca56133da"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__desk_xhjsub_0__pen-gzrbrx/tabletop__house_single_floor__desk_xhjsub_0__pen-gzrbrx__1d1fcccca56133da.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.05,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.03,
+      null
+     ]
+    ],
+    "time_s": 607.4
+   },
+   "error": null,
+   "pod": "pilot2-a40-4",
+   "rc": 0,
+   "wall_s": 629,
+   "band_files": [
+    "tabletop__house_single_floor__desk_xhjsub_0__pen-gzrbrx__1d1fcccca56133da"
+   ],
+   "current_code": true
+  },
   "v2__alignment-world_horizontal-shelf-walls": {
    "dir": "runlogs/runpod/rb/pilot2-a40-5/v2__alignment-world_horizontal-shelf-walls",
    "files": [],
@@ -11612,6 +11976,188 @@
    "band_files": [],
    "current_code": null
   },
+  "rb__tabletop__house_single_floor__desk_xhjsub_0__sandal-chgcrm": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-5/rb__tabletop__house_single_floor__desk_xhjsub_0__sandal-chgcrm",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-5/rb__tabletop__house_single_floor__desk_xhjsub_0__sandal-chgcrm/tabletop__house_single_floor__desk_xhjsub_0__sandal-chgcrm__a18b0053d95a64ad"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__desk_xhjsub_0__sandal-chgcrm/tabletop__house_single_floor__desk_xhjsub_0__sandal-chgcrm__a18b0053d95a64ad.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      true,
+      0.05,
+      null
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 547.5
+   },
+   "error": null,
+   "pod": "pilot2-a40-5",
+   "rc": 0,
+   "wall_s": 563,
+   "band_files": [
+    "tabletop__house_single_floor__desk_xhjsub_0__sandal-chgcrm__a18b0053d95a64ad"
+   ],
+   "current_code": true
+  },
   "v2__alignment-world_vertical-signpost-walls": {
    "dir": "runlogs/runpod/rb/pilot2-a40-7/v2__alignment-world_vertical-signpost-walls",
    "files": [],
@@ -11701,6 +12247,231 @@
    "wall_s": 11325,
    "band_files": [],
    "current_code": null
+  },
+  "rb__tabletop__house_single_floor__sofa_lugrhk_1__box_of_shampoo-bclpiq": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-7/rb__tabletop__house_single_floor__sofa_lugrhk_1__box_of_shampoo-bclpiq",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-7/rb__tabletop__house_single_floor__sofa_lugrhk_1__box_of_shampoo-bclpiq/tabletop__house_single_floor__sofa_lugrhk_1__box_of_shampoo-bclpiq__af5831f04684bf13"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__sofa_lugrhk_1__box_of_shampoo-bclpiq/tabletop__house_single_floor__sofa_lugrhk_1__box_of_shampoo-bclpiq__af5831f04684bf13.npz",
+    "union_extent": [
+     -0.5600000023841858,
+     -0.07999999821186066
+    ],
+    "n_reachable_total": 31,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      0.02,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      false,
+      0.11,
+      "untucked"
+     ],
+     [
+      0.0,
+      -1.2,
+      2,
+      false,
+      81.17,
+      "ready"
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      false,
+      0.02,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      false,
+      25.38,
+      "untucked"
+     ],
+     [
+      0.25,
+      -1.2,
+      7,
+      false,
+      115.33,
+      "tucked"
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      false,
+      0.1,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      4,
+      false,
+      64.81,
+      "tucked"
+     ],
+     [
+      0.5,
+      -1.2,
+      12,
+      false,
+      90.21,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      false,
+      0.06,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      false,
+      18.65,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.9,
+      6,
+      false,
+      55.21,
+      "tucked"
+     ],
+     [
+      0.75,
+      -1.2,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      2.46,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -1.2,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 1054.0
+   },
+   "error": null,
+   "pod": "pilot2-a40-7",
+   "rc": 0,
+   "wall_s": 1069,
+   "band_files": [
+    "tabletop__house_single_floor__sofa_lugrhk_1__box_of_shampoo-bclpiq__af5831f04684bf13"
+   ],
+   "current_code": true
   },
   "v2__alignment-world_vertical-wall_clock-walls": {
    "dir": "runlogs/runpod/rb/pilot2-a40-8/v2__alignment-world_vertical-wall_clock-walls",
@@ -11792,6 +12563,188 @@
    "band_files": [],
    "current_code": null
   },
+  "rb__tabletop__house_single_floor__desk_xhjsub_0__briefcase-psvdau": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-8/rb__tabletop__house_single_floor__desk_xhjsub_0__briefcase-psvdau",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-8/rb__tabletop__house_single_floor__desk_xhjsub_0__briefcase-psvdau/tabletop__house_single_floor__desk_xhjsub_0__briefcase-psvdau__3bf95bbf31ce906d"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__desk_xhjsub_0__briefcase-psvdau/tabletop__house_single_floor__desk_xhjsub_0__briefcase-psvdau__3bf95bbf31ce906d.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      true,
+      0.11,
+      null
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 575.2
+   },
+   "error": null,
+   "pod": "pilot2-a40-8",
+   "rc": 0,
+   "wall_s": 591,
+   "band_files": [
+    "tabletop__house_single_floor__desk_xhjsub_0__briefcase-psvdau__3bf95bbf31ce906d"
+   ],
+   "current_code": true
+  },
   "v2__alignment-axial-board_game-breakfast_table": {
    "dir": "runlogs/runpod/rb/pilot2-a40-9/v2__alignment-axial-board_game-breakfast_table",
    "files": [],
@@ -11851,6 +12804,188 @@
    "wall_s": 1239,
    "band_files": [],
    "current_code": null
+  },
+  "rb__tabletop__house_single_floor__desk_xhjsub_0__pen-gqwdor": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-9/rb__tabletop__house_single_floor__desk_xhjsub_0__pen-gqwdor",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-9/rb__tabletop__house_single_floor__desk_xhjsub_0__pen-gqwdor/tabletop__house_single_floor__desk_xhjsub_0__pen-gqwdor__5a2db8e1a78ae400"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__desk_xhjsub_0__pen-gqwdor/tabletop__house_single_floor__desk_xhjsub_0__pen-gqwdor__5a2db8e1a78ae400.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      true,
+      0.12,
+      null
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.04,
+      null
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.04,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.03,
+      null
+     ]
+    ],
+    "time_s": 560.8
+   },
+   "error": null,
+   "pod": "pilot2-a40-9",
+   "rc": 0,
+   "wall_s": 581,
+   "band_files": [
+    "tabletop__house_single_floor__desk_xhjsub_0__pen-gqwdor__5a2db8e1a78ae400"
+   ],
+   "current_code": true
   },
   "v2__camera_relocalization-obstructed-hamper_1": {
    "dir": "runlogs/runpod/rb/pilot2-l40s-0/v2__camera_relocalization-obstructed-hamper_1",
@@ -15454,6 +16589,191 @@
    "wall_s": 979,
    "band_files": [
     "tabletop__office_cubicles_right__conference_table_fpkmyw_0__dip_candle-poexjo__d96ad3cd4a7c1b79"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__office_cubicles_right__conference_table_fpkmyw_0__jar_of_spaghetti_sauce-exmsmm": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-0/rb__tabletop__office_cubicles_right__conference_table_fpkmyw_0__jar_of_spaghetti_sauce-exmsmm",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-0/rb__tabletop__office_cubicles_right__conference_table_fpkmyw_0__jar_of_spaghetti_sauce-exmsmm/tabletop__office_cubicles_right__conference_table_fpkmyw_0__jar_of_spaghetti_sauce-exmsmm__55c01614027d1e82"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__office_cubicles_right__conference_table_fpkmyw_0__jar_of_spaghetti_sauce-exmsmm/tabletop__office_cubicles_right__conference_table_fpkmyw_0__jar_of_spaghetti_sauce-exmsmm__55c01614027d1e82.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.0
+    ],
+    "n_reachable_total": 533,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      4,
+      false,
+      60.25,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      18,
+      false,
+      74.14,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      35,
+      false,
+      76.74,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      38,
+      false,
+      87.6,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      12,
+      false,
+      46.99,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      28,
+      false,
+      69.13,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      37,
+      false,
+      78.84,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      43,
+      false,
+      76.44,
+      "untucked"
+     ],
+     [
+      0.5,
+      0.0,
+      21,
+      false,
+      49.52,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      34,
+      false,
+      59.15,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      38,
+      false,
+      71.61,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      46,
+      false,
+      78.26,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      24,
+      false,
+      44.68,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      35,
+      false,
+      55.27,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      39,
+      false,
+      70.96,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.9,
+      36,
+      false,
+      97.07,
+      "tucked"
+     ],
+     [
+      0.95,
+      0.0,
+      17,
+      false,
+      39.16,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      28,
+      false,
+      61.93,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 1336.9
+   },
+   "error": null,
+   "pod": "pilot2-l40s-0",
+   "rc": 0,
+   "wall_s": 1354,
+   "band_files": [
+    "tabletop__office_cubicles_right__conference_table_fpkmyw_0__jar_of_spaghetti_sauce-exmsmm__55c01614027d1e82"
    ],
    "current_code": true
   },
@@ -19954,6 +21274,191 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__beaker-jdijek__placed-tray-gsxbym-s1.25-focus": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-1/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__beaker-jdijek__placed-tray-gsxbym-s1.25-focus",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-1/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__beaker-jdijek__placed-tray-gsxbym-s1.25-focus/tabletop__house_single_floor__breakfast_table_rhjoby_0__beaker-jdijek__placed-tray-gsxbym-s1.25-focus__9017c7fcb43933d8"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__beaker-jdijek__placed-tray-gsxbym-s1.25-focus/tabletop__house_single_floor__breakfast_table_rhjoby_0__beaker-jdijek__placed-tray-gsxbym-s1.25-focus__9017c7fcb43933d8.npz",
+    "union_extent": [
+     -0.5600000023841858,
+     0.0
+    ],
+    "n_reachable_total": 449,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      12,
+      false,
+      105.69,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      26,
+      false,
+      77.25,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      31,
+      false,
+      95.38,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      35,
+      false,
+      99.41,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      19,
+      false,
+      53.73,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      30,
+      false,
+      85.72,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      33,
+      false,
+      82.74,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      33,
+      false,
+      104.71,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      21,
+      false,
+      70.52,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      32,
+      false,
+      79.65,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      32,
+      false,
+      96.22,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      33,
+      false,
+      113.73,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      21,
+      false,
+      59.39,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      30,
+      false,
+      112.66,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      32,
+      false,
+      120.66,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      12,
+      false,
+      57.16,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      17,
+      false,
+      134.42,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 1890.5
+   },
+   "error": null,
+   "pod": "pilot2-l40s-1",
+   "rc": 0,
+   "wall_s": 1905,
+   "band_files": [
+    "tabletop__house_single_floor__breakfast_table_rhjoby_0__beaker-jdijek__placed-tray-gsxbym-s1.25-focus__9017c7fcb43933d8"
+   ],
+   "current_code": true
+  },
   "v2__alignment-axial-paperback_book-breakfast_table": {
    "dir": "runlogs/runpod/rb/pilot2-l40s-10/v2__alignment-axial-paperback_book-breakfast_table",
    "files": [],
@@ -24188,6 +25693,191 @@
    "wall_s": 392,
    "band_files": [
     "floor__house_single_floor__floor-under-desk_xhjsub_0__marker-gldosk__19fad99b55d395b3"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_baking_mix-fmewsz__placed-tray-gsxbym-s1.25-focus": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-10/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_baking_mix-fmewsz__placed-tray-gsxbym-s1.25-focus",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-10/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_baking_mix-fmewsz__placed-tray-gsxbym-s1.25-focus/tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_baking_mix-fmewsz__placed-tray-gsxbym-s1.25-focus__5b43dd6097c3acd8"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_baking_mix-fmewsz__placed-tray-gsxbym-s1.25-focus/tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_baking_mix-fmewsz__placed-tray-gsxbym-s1.25-focus__5b43dd6097c3acd8.npz",
+    "union_extent": [
+     -0.5600000023841858,
+     0.0
+    ],
+    "n_reachable_total": 408,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      14,
+      false,
+      117.02,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      28,
+      false,
+      62.45,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      34,
+      false,
+      70.91,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      32,
+      false,
+      87.22,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      20,
+      false,
+      54.51,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      32,
+      false,
+      59.89,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      33,
+      false,
+      78.53,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      33,
+      false,
+      91.91,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      25,
+      false,
+      53.13,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      31,
+      false,
+      67.4,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      31,
+      false,
+      87.59,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      29,
+      false,
+      120.48,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      19,
+      false,
+      57.5,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      23,
+      false,
+      110.52,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      22,
+      false,
+      111.45,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      2,
+      false,
+      40.85,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      50.45,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 1757.6
+   },
+   "error": null,
+   "pod": "pilot2-l40s-10",
+   "rc": 0,
+   "wall_s": 1777,
+   "band_files": [
+    "tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_baking_mix-fmewsz__placed-tray-gsxbym-s1.25-focus__5b43dd6097c3acd8"
    ],
    "current_code": true
   },
@@ -28735,6 +30425,191 @@
    "wall_s": 286,
    "band_files": [
     "floor__house_single_floor__floor__marker-gldosk__dfe93055bfbd0c6a"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_beer-meqliv__placed-tray-gsxbym-s1.25-focus": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-2/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_beer-meqliv__placed-tray-gsxbym-s1.25-focus",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-2/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_beer-meqliv__placed-tray-gsxbym-s1.25-focus/tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_beer-meqliv__placed-tray-gsxbym-s1.25-focus__1847796a71e11c26"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_beer-meqliv__placed-tray-gsxbym-s1.25-focus/tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_beer-meqliv__placed-tray-gsxbym-s1.25-focus__1847796a71e11c26.npz",
+    "union_extent": [
+     -0.5600000023841858,
+     0.0
+    ],
+    "n_reachable_total": 458,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      22,
+      false,
+      96.84,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      35,
+      false,
+      70.18,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      38,
+      false,
+      74.09,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      37,
+      false,
+      101.13,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      27,
+      false,
+      55.15,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      36,
+      false,
+      67.49,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      40,
+      false,
+      90.63,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      34,
+      false,
+      118.17,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      27,
+      false,
+      58.19,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      35,
+      false,
+      85.23,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      36,
+      false,
+      103.28,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      32,
+      false,
+      119.84,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      19,
+      false,
+      63.56,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      23,
+      false,
+      109.37,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      17,
+      false,
+      93.66,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      42.98,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      54.9,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 1727.9
+   },
+   "error": null,
+   "pod": "pilot2-l40s-2",
+   "rc": 0,
+   "wall_s": 1741,
+   "band_files": [
+    "tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_beer-meqliv__placed-tray-gsxbym-s1.25-focus__1847796a71e11c26"
    ],
    "current_code": true
   },
@@ -33352,6 +35227,191 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_medicine-syfpak__placed-tray-gsxbym-s1.25-focus": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-3/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_medicine-syfpak__placed-tray-gsxbym-s1.25-focus",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-3/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_medicine-syfpak__placed-tray-gsxbym-s1.25-focus/tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_medicine-syfpak__placed-tray-gsxbym-s1.25-focus__edcaf74178356ed3"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_medicine-syfpak__placed-tray-gsxbym-s1.25-focus/tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_medicine-syfpak__placed-tray-gsxbym-s1.25-focus__edcaf74178356ed3.npz",
+    "union_extent": [
+     -0.5600000023841858,
+     0.0
+    ],
+    "n_reachable_total": 438,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      13,
+      false,
+      106.33,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      27,
+      false,
+      67.72,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      32,
+      false,
+      87.11,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      33,
+      false,
+      93.83,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      19,
+      false,
+      52.2,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      30,
+      false,
+      71.38,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      33,
+      false,
+      83.51,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      34,
+      false,
+      95.0,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      24,
+      false,
+      62.39,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      32,
+      false,
+      74.75,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      33,
+      false,
+      85.57,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      32,
+      false,
+      108.9,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      21,
+      false,
+      54.87,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      27,
+      false,
+      112.17,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      27,
+      false,
+      122.52,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      8,
+      false,
+      48.6,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      13,
+      false,
+      123.85,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 1805.5
+   },
+   "error": null,
+   "pod": "pilot2-l40s-3",
+   "rc": 0,
+   "wall_s": 1823,
+   "band_files": [
+    "tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_medicine-syfpak__placed-tray-gsxbym-s1.25-focus__edcaf74178356ed3"
+   ],
+   "current_code": true
+  },
   "v2__alignment-axial-hardback-breakfast_table": {
    "dir": "runlogs/runpod/rb/pilot2-l40s-4/v2__alignment-axial-hardback-breakfast_table",
    "files": [],
@@ -37771,6 +39831,191 @@
    "wall_s": 292,
    "band_files": [
     "floor__house_single_floor__floor__marker-kjxpdi__0b779f3757034949"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_milk-mrejrs__placed-tray-gsxbym-s1.25-focus": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-4/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_milk-mrejrs__placed-tray-gsxbym-s1.25-focus",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-4/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_milk-mrejrs__placed-tray-gsxbym-s1.25-focus/tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_milk-mrejrs__placed-tray-gsxbym-s1.25-focus__9e978a09c6956d72"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_milk-mrejrs__placed-tray-gsxbym-s1.25-focus/tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_milk-mrejrs__placed-tray-gsxbym-s1.25-focus__9e978a09c6956d72.npz",
+    "union_extent": [
+     -0.5600000023841858,
+     0.0
+    ],
+    "n_reachable_total": 536,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      19,
+      false,
+      72.23,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      29,
+      false,
+      67.94,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      40,
+      false,
+      80.83,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      38,
+      false,
+      80.27,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      21,
+      false,
+      46.95,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      35,
+      false,
+      65.71,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      39,
+      false,
+      79.3,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      41,
+      false,
+      95.28,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      27,
+      false,
+      59.81,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      35,
+      false,
+      66.74,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      41,
+      false,
+      83.14,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      39,
+      false,
+      96.14,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      25,
+      false,
+      52.58,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      32,
+      false,
+      96.24,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      34,
+      false,
+      103.52,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      19,
+      false,
+      50.86,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      22,
+      false,
+      107.92,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 1612.2
+   },
+   "error": null,
+   "pod": "pilot2-l40s-4",
+   "rc": 0,
+   "wall_s": 1625,
+   "band_files": [
+    "tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_milk-mrejrs__placed-tray-gsxbym-s1.25-focus__9e978a09c6956d72"
    ],
    "current_code": true
   },
@@ -42570,6 +44815,191 @@
    "wall_s": 764,
    "band_files": [
     "contact__office_cubicles_right__desk_mdhelw_1__left_h0.12__836c8b0efc3ee03e"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_shampoo-stjjjm__placed-tray-gsxbym-s1.25-focus": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-7/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_shampoo-stjjjm__placed-tray-gsxbym-s1.25-focus",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-7/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_shampoo-stjjjm__placed-tray-gsxbym-s1.25-focus/tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_shampoo-stjjjm__placed-tray-gsxbym-s1.25-focus__243057eba2d82573"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_shampoo-stjjjm__placed-tray-gsxbym-s1.25-focus/tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_shampoo-stjjjm__placed-tray-gsxbym-s1.25-focus__243057eba2d82573.npz",
+    "union_extent": [
+     -0.5600000023841858,
+     0.0
+    ],
+    "n_reachable_total": 377,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      14,
+      false,
+      107.73,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      26,
+      false,
+      62.69,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      30,
+      false,
+      82.92,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      31,
+      false,
+      79.42,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      20,
+      false,
+      54.95,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      29,
+      false,
+      75.18,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      30,
+      false,
+      84.18,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      30,
+      false,
+      95.36,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      21,
+      false,
+      60.29,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      31,
+      false,
+      68.77,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      30,
+      false,
+      91.33,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      26,
+      false,
+      108.62,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      16,
+      false,
+      56.79,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      22,
+      false,
+      114.73,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      21,
+      false,
+      113.3,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      38.21,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      50.1,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 1654.5
+   },
+   "error": null,
+   "pod": "pilot2-l40s-7",
+   "rc": 0,
+   "wall_s": 1670,
+   "band_files": [
+    "tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_shampoo-stjjjm__placed-tray-gsxbym-s1.25-focus__243057eba2d82573"
    ],
    "current_code": true
   },
@@ -47510,16 +49940,6 @@
    ],
    "current_code": true
   },
-  "rb__tabletop__house_single_floor__sofa_lugrhk_1__box_of_shampoo-bclpiq": {
-   "dir": "runlogs/runpod/rb/rb-a40-0/rb__tabletop__house_single_floor__sofa_lugrhk_1__box_of_shampoo-bclpiq",
-   "files": [],
-   "error": null,
-   "pod": "rb-a40-0",
-   "rc": 1,
-   "wall_s": 17,
-   "band_files": [],
-   "current_code": null
-  },
   "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_milk-mrejrs__placed-tray-gsxbym": {
    "dir": "runlogs/runpod/rb/rb-a40-0/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_milk-mrejrs__placed-tray-gsxbym",
    "files": [
@@ -51023,16 +53443,6 @@
     "tabletop__house_single_floor__breakfast_table_rhjoby_0__toy_dice-hbkqqp__5f267a2572441db5"
    ],
    "current_code": true
-  },
-  "rb__tabletop__house_single_floor__desk_xhjsub_0__pen-gzrbrx": {
-   "dir": "runlogs/runpod/rb/rb-a40b-0/rb__tabletop__house_single_floor__desk_xhjsub_0__pen-gzrbrx",
-   "files": [],
-   "error": null,
-   "pod": "rb-a40b-0",
-   "rc": 1,
-   "wall_s": 13,
-   "band_files": [],
-   "current_code": null
   },
   "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_cereal-iucshm__placed-tray-gsxbym": {
    "dir": "runlogs/runpod/rb/rb-a40b-0/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_cereal-iucshm__placed-tray-gsxbym",
