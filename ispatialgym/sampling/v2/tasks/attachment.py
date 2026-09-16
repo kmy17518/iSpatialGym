@@ -323,7 +323,11 @@ class Attachment(SamplerV2):
         # pose anyway), and the exact IK only for the screened few (owner 2026-09-16 10:47 item 3: the per-cell exact IK
         # with the attached male took ~1 s a pose and the attempt 1457 s)
         geo: List[Tuple[Any, ...]] = []
-        for i in rng.permutation(len(cells))[:40]:
+        # partner cells nearest the manipulation focus first (owner 2026-09-16 12:52 item 2; ties broken by the draw)
+        focus_xy = manip.focus[:2] if manip.focus is not None else m_pose[0][:2]
+        perm = [int(i) for i in rng.permutation(len(cells))]
+        perm.sort(key=lambda i: float(th.linalg.norm(cells[i] - focus_xy)))
+        for i in perm[:40]:
             xy = cells[int(i)]
             if float(th.linalg.norm(xy - m_pose[0][:2])) < float(self.g("partner_centre_distance_min_m")):
                 fails["distance"] += 1
@@ -388,7 +392,13 @@ class Attachment(SamplerV2):
             with attached(self.kit, "right", male):
                 r_w = self.ikc.waypoints_ok([lift] + wps, manip, "right", ignore_all=[support])
                 if not r_w.ok:
-                    raise Reject("reorientation_unreachable", f"SLERP waypoints to the pre-attach pose: {r_w.reason}")
+                    # which waypoint fails and where it is (owner item 2: the carry height may still be too high for the band)
+                    seq = [lift] + wps
+                    desc = [f"wp{i}: z_top+{float(pz[0][2]) - float(self.top.z):.2f} m, base {[round(float(v), 2) for v in manip.world_to_base(pz[0][:2]).tolist()]}, "
+                            f"approach z {float(C.approach_axis(pz[1])[2]):+.2f}" for i, pz in enumerate(seq)]
+                    log.info("%s: SLERP_FAILURE %s | %s", self.gp.alias, r_w.reason, "; ".join(desc))
+                    raise Reject("reorientation_unreachable", f"SLERP waypoints to the pre-attach pose: {r_w.reason} (lift z_top+{carry:.2f}, pre-attach z_top+"
+                                                              f"{float(pre_attach[0][2]) - float(self.top.z):.2f})")
                 # partner brace (A1 / §4.6 step 6): the closed left gripper on the partner's face opposite to the insertion
                 # direction, B3's contact classes (pads on the face, fingers stacked / side by side, either wrist turn),
                 # the classes the left band recorded as passing first; the attach arm locked at its solution
