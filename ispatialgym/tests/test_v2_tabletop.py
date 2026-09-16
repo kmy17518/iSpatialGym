@@ -524,3 +524,32 @@ def test_union_extent_feeds_the_margins_table():
     assert m_R == pytest.approx(0.56 + info["w_diag"] + 0.02) and m_L == pytest.approx(0.56 + info["w_diag"] + 0.02)
     m_R1, m_L1, _ = TT.lateral_margins({"kind": "axial", "long": 0.30, "short": 0.10}, *TT.union_extent(right), 0.5, 0.5)
     assert m_R1 == pytest.approx(m_R) and m_L1 < m_L
+
+
+def test_block_record_extras_survive_the_f6_sidecar():
+    """Block follow-ups: ``yaw_align_deg`` on every record and the root->centre ``centre_offset`` (isgblk root off-centre)
+    reach the oracle through ``BlockRecord.extra``; the brace's ``pose_class`` rides along in the contact record."""
+    from ispatialgym.sampling.v2.stances import ContactRecord, pose_to_sidecar
+
+    sd, init, manip = _draft("configuration_matching-block_design-block_4-breakfast_table", "configuration_matching")
+    q = C.eef_quat(th.tensor([0.0, 0.0, -1.0]), th.tensor([0.0, 1.0, 0.0]))
+    rec = {"instance": "toy_dice.n.01_1", "order": 0, "face_pair": "x", "tilt_pick_deg": 0.0, "tilt_place_deg": 0.0, "yaw_deg": 90.0, "yaw_align_deg": 0.0,
+           "flip_axis": None, "flip_sign": 0, "pick": pose_to_sidecar(_pose(1.0, 0.0, 0.9, q)), "pre_pick": pose_to_sidecar(_pose(1.0, 0.0, 1.0, q)),
+           "place": pose_to_sidecar(_pose(1.0, 0.1, 0.9, q)), "pre_place": pose_to_sidecar(_pose(1.0, 0.1, 1.0, q)), "carry_height": 0.08, "goal_face": "+z", "slot": 0,
+           "centre_offset": [0.0, 0.0, 0.0125]}
+    rec["brace_row"] = ContactRecord("brace", "left", _pose(1.0, -0.1, 0.95, q), _pose(1.0, -0.05, 0.9, q), direction=th.tensor([0.0, 1.0, 0.0]), brace_kind="row_left",
+                                     object="toy_dice.n.01_2").to_sidecar()
+    rec["brace_row"]["pose_class"] = "side_v"
+    rec["push_row"] = ContactRecord("push", "right", _pose(1.0, 0.1, 0.95, q), _pose(1.0, 0.05, 0.9, q), None, _pose(1.0, 0.045, 0.9, q), th.tensor([0.0, -1.0, 0.0]), 0.005,
+                                    object="toy_dice.n.01_1").to_sidecar()
+    sd.blocks = [rec]
+    sd.describe("toy_dice.n.01_1", "block")
+    sd.describe("toy_dice.n.01_2", "block")
+    sc = _f6(sd)
+    assert sc.problems(check_program=True) == []
+    b = sc.blocks[0]
+    assert b.extra["centre_offset"] == [0.0, 0.0, 0.0125] and b.extra["yaw_align_deg"] == 0.0
+    from ispatialgym.oracle.actions import yaw_align_deg, block_reorients
+
+    assert yaw_align_deg(b) == 0.0 and not block_reorients(b)
+    assert b.brace_row.extra["pose_class"] == "side_v"
