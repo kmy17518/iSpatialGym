@@ -115,6 +115,13 @@ class IORSSmall(SamplerV2):
         tgt, prt = self.obj("target"), self.obj("partner")
         self.hull["target"], self.hull["partner"] = self.world.local_hull(tgt), self.world.local_hull(prt)
         self.grasps, self.grasp_key, self.rest["target"] = TT.library_grasps(self, "target")
+        # grasps whose attached object self-collides with the gripper palm / wrist (sphere fit vs the robot model) can
+        # never pass an attached check (lift, carry, place): they leave the grasp set here, once per template
+        attachable = [g for g in self.grasps if self.ikc.attachable(tgt, g.pose, "right")]
+        self.template_facts["grasps_dropped_not_attachable"] = [g.name for g in self.grasps if g not in attachable]
+        if not attachable:
+            raise Reject("no_attachable_grasp", f"{self.grasp_key}: every library grasp self-collides once the object is attached")
+        self.grasps = attachable
         self.rest["partner"] = self._partner_rest()
         self.pair = self.pair_admissibility()
         self.template_facts["pair"] = self.pair

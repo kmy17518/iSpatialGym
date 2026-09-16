@@ -160,16 +160,30 @@ class IKChecker:
         p, q = G.t(pose[0]), G.t(pose[1])
         return tuple(round(float(v), 3) for v in p.tolist()) + tuple(round(float(v), 3) for v in q.tolist())
 
+    SEED_POS_TOL = 0.03
+    SEED_ANG_TOL = 0.15
+
     def _seeded(self, q0: th.Tensor, pose: Pose, arm: str) -> th.Tensor:
-        """``q0`` with the working arm set to a remembered solution of ``pose`` (the other joints stay ``q0``'s: the
-        base virtual joints must belong to the current robot root)."""
-        q_rec = self.solutions.get((arm, self._pose_key(pose)))
-        if q_rec is None:
+        """``q0`` with the working arm set to the remembered solution of the nearest recorded pose of ``arm`` within
+        (3 cm, 0.15 rad) — the same pose, or the same pose after the settle moved the object by a few mm (the other
+        joints stay ``q0``'s: the base virtual joints must belong to the current robot root)."""
+        p, q = G.t(pose[0]), G.t(pose[1])
+        best, best_d = None, None
+        for (a, key), q_rec in self.solutions.items():
+            if a != arm:
+                continue
+            kp, kq = th.tensor(key[:3]), th.tensor(key[3:])
+            d = float(th.linalg.norm(kp - p))
+            if d > self.SEED_POS_TOL or G.quat_angle(kq, q) > self.SEED_ANG_TOL:
+                continue
+            if best_d is None or d < best_d:
+                best, best_d = q_rec, d
+        if best is None:
             return q0
-        q = q0.clone()
+        out = q0.clone()
         idx = self.kit.robot.arm_control_idx[arm]
-        q[idx] = q_rec[idx]
-        return q
+        out[idx] = best[idx]
+        return out
 
     # -- configurations -----------------------------------------------------------------------------------------
     def q_locked(self, stance: Stance, arms: str = "untucked", right_arm: Optional[th.Tensor] = None, left_arm: Optional[th.Tensor] = None) -> th.Tensor:
@@ -293,6 +307,21 @@ class IKChecker:
         if not r1.ok:
             return IKResult(False, None, "last waypoint fails the exact IK", len(wps))
         return IKResult(True, r1.q, policy, len(wps))
+
+    # -- attached objects ---------------------------------------------------------------------------------------
+    def attachable(self, obj, eef_in_object: Pose, arm: str = "right") -> bool:
+        """Whether the object, attached to ``arm`` per the grasp transform ``T_obj→eef``, is free of **self**-collision
+        with the robot in an untucked free-space configuration (the attached spheres vs the palm / wrist, which the
+        robot model does not exempt — only the finger links are). A grasp that fails here fails every attached check
+        (lift, carry, place) whatever the pose, so task modules drop it from the grasp set once per template."""
+        from ispatialgym.sampling.v2.navigation import attached
+
+        q = self.kit.q_at_base_pose(self.kit.q_config(arms="untucked", translate=0.5), *self.kit.world_base_pose2d())
+        with attached(self.kit, arm, obj, eef_in_object=eef_in_object):
+            self.kit._ensure_synced()
+            with_self = bool(self.kit.backend.check_collision(q.unsqueeze(0), emb_name="whole_body", sync_world=False, self_collision=True, margin=0.01)[0])
+            without = bool(self.kit.backend.check_collision(q.unsqueeze(0), emb_name="whole_body", sync_world=False, self_collision=False, margin=0.01)[0])
+        return not (with_self and not without)
 
     # -- gripper visibility -------------------------------------------------------------------------------------
     def eef_in_frame(self, pose: Pose, camera_pose: Pose, margin: float = IN_FRAME_MARGIN, eef_extent: float = 0.06) -> bool:

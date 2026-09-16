@@ -36,6 +36,7 @@ if TYPE_CHECKING:  # pragma: no cover
 log = logging.getLogger("ispatialgym.sampling.v2")
 
 STRIDE_M = 0.1
+ATTACH_FIT_SEED = 20260915
 TRANSITION_STEP = 0.1
 TRANSITION_EXTRA_MAX = 0.5
 TRANSITION_SAMPLES = 5
@@ -298,7 +299,17 @@ class attached:
             og.sim.step_physics()
             self.kit.robot.keep_still()
             self.obj.keep_still()
-        self.kit.backend.attach_object(self.arm, self.obj)
+        # the sphere fit of ``attach_object`` samples the mesh at random (5–7 spheres for a small object, a different set
+        # per call): seed torch around it so every check of one attempt sees the same attached geometry
+        cpu_state = th.get_rng_state()
+        cuda_state = th.cuda.get_rng_state_all() if th.cuda.is_available() else None
+        th.manual_seed(ATTACH_FIT_SEED)
+        try:
+            self.kit.backend.attach_object(self.arm, self.obj)
+        finally:
+            th.set_rng_state(cpu_state)
+            if cuda_state is not None:
+                th.cuda.set_rng_state_all(cuda_state)
         return self
 
     def __exit__(self, *exc):
