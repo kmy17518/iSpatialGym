@@ -452,6 +452,12 @@ class Motions:
             res = self.backend.plan_joint(emb, q_goal, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
             if not res.success:
                 raise SkillError("plan_failed", f"arm_to({arm}, witness q): {res.status}", diagnostics=dict(res.diagnostics), stage="trajopt")
+            if max_excursion is not None:
+                idx = self.robot.arm_control_idx[arm]
+                exc = float(th.max(th.abs(q_goal[idx] - q_start[idx])))
+                if exc > float(max_excursion):
+                    raise SkillError("plan_failed", f"arm_to({arm}, witness q): the recorded IK witness lies {exc:.2f} rad away in joint space (> {max_excursion:.2f} allowed for a "
+                                     f"finishing motion): the sidecar's pre-pose and end-pose witnesses are in different IK branches", stage="trajopt", excursion=exc)
             log.info("arm_to(%s): %d waypoints to the recorded IK witness (%.1fs), planned in %.2fs", arm, len(res.q_traj), res.duration, res.plan_time)
             yield from self.execute_joint_trajectory(res.q_traj, arms=arms)
             target = as_world_pose(pose)
