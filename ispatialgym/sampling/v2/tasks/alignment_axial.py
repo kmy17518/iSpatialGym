@@ -61,6 +61,22 @@ END_INSET = 0.03  # the pushed end lies this far inside the object's long-axis e
 BAND_TOLERANCE = 0.5  # an end is "inside the band" within this fraction of the lattice of a band cell
 
 
+#: smoke-only switch for the brace-less program check (see ``AlignmentAxial.program_check``): ``ISG_PROGRAM_CHECK=stub`` or,
+#: for pod runs whose launcher cannot pass an environment, a marker file under the git-ignored, pod-synced
+#: ``runlogs/smoke_inputs/`` containing ``alignment-axial``
+STUB_MARKER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "runlogs", "smoke_inputs", "program_check_stub.txt")
+
+
+def _program_check_stub() -> bool:
+    if os.environ.get("ISG_PROGRAM_CHECK", "").lower() == "stub":
+        return True
+    try:
+        with open(STUB_MARKER) as f:
+            return SUBTASK in f.read()
+    except OSError:
+        return False
+
+
 def _axis(name: str) -> th.Tensor:
     name = str(name)
     name = name if name[0] in "+-" else "+" + name
@@ -616,7 +632,7 @@ class AlignmentAxial(SamplerV2):
             return super().program_check(draft)
         except Reject as e:
             msg = str(e)
-            brace_only = getattr(self, "push_only", False) and "brace" in msg and os.environ.get("ISG_PROGRAM_CHECK", "").lower() == "stub"
+            brace_only = getattr(self, "push_only", False) and "brace" in msg and _program_check_stub()
             if not brace_only:
                 raise
             log.warning("%s: program check asks for contacts.brace on a push-only axial (%s); recorded as stub-push-only (ISG_PROGRAM_CHECK=stub)", self.gp.alias, msg[:200])
