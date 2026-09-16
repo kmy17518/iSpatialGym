@@ -163,11 +163,13 @@ class IKChecker:
     SEED_POS_TOL = 0.03
     SEED_ANG_TOL = 0.15
 
-    WITNESS_POS_TOL = 0.002
-    WITNESS_ANG_TOL = 0.02
+    #: the solver's own acceptance (cuRobo ``position_tolerance`` 5 mm / ``orientation_tolerance`` 0.05 rad)
+    WITNESS_POS_TOL = 0.005
+    WITNESS_ANG_TOL = 0.05
 
     def _witness_ok(self, q: th.Tensor, pose: Pose, arm: str) -> bool:
-        """``q`` reaches ``pose`` (FK within 2 mm / 0.02 rad) and is whole-body collision-free in the current world."""
+        """``q`` reaches ``pose`` within the IK solver's acceptance (5 mm / 0.05 rad) and is whole-body collision-free in
+        the current world — the same criterion the solver applies to its own solutions."""
         from ispatialgym.oracle import r1pro_model as M
 
         try:

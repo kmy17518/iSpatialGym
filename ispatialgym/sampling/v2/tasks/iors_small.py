@@ -298,8 +298,37 @@ class IORSSmall(SamplerV2):
         return g_lo, max(g_lo, D_p)
 
     def place_partner(self, rng: np.random.Generator, t_pose: G.Pose, manip: Stance, cam: G.Pose) -> G.Pose:
-        side = 1.0 if self.relation == "touching" else None  # touching: the partner on the robot's left (§6.11)
-        return TT.place_partner(self, rng, t_pose, self.hull["target"], self.hull["partner"], self.rest["partner"], manip, side, self.gap_range(),
+        """§4.6 step 2 with the gap range per side cut to the reach band of the manipulation trunk (§4.1 / principle 3:
+        placements come from the cached reachability sets): the goal position of the target — the partner's centre for
+        ontop / under / inside — must be a lateral the band covers at the target's depth, otherwise the place pose of
+        §6.11 cannot pass. Sides with an empty admissible gap range are not drawn; touching keeps the robot's left."""
+        g_lo, g_hi = self.gap_range()
+        sides = [1.0] if self.relation == "touching" else [1.0, -1.0]
+        ranges: Dict[float, Tuple[float, float]] = {}
+        if self.relation in ("ontop", "under", "inside") and getattr(self, "bands", None) is not None:
+            cells = self.bands.band(manip.translate, manip.tilt)
+            t_fp = self.world.footprint(self.hull["target"], t_pose)
+            t_lat = (t_fp - manip.base_xy) @ manip.tangent
+            depth_t = float(manip.world_to_base(t_pose[0][:2])[0])
+            w_p = TT.half_extent(self.hull["partner"], self.rest["partner"])
+            near = cells[np.abs(cells[:, 0] - depth_t) <= 0.12] if len(cells) else cells
+            if len(near):
+                lam_min, lam_max = float(near[:, 1].min()), float(near[:, 1].max())
+                for sd in sides:
+                    if sd > 0:
+                        lo, hi = lam_min - float(t_lat.max()) - w_p, lam_max - float(t_lat.max()) - w_p
+                    else:
+                        lo, hi = float(t_lat.min()) - w_p - lam_max, float(t_lat.min()) - w_p - lam_min
+                    lo, hi = max(lo, g_lo), min(hi, g_hi)
+                    if lo <= hi:
+                        ranges[sd] = (lo, hi)
+            if not ranges:
+                raise Reject("partner_placement", f"no side admits a partner centre inside the band (λ ∈ [{lam_min:.2f}, {lam_max:.2f}] at depth "
+                                                  f"{depth_t:.2f}) with g ∈ [{g_lo:.2f}, {g_hi:.2f}]" if len(near) else "band has no cell at the target's depth")
+        else:
+            ranges = {sd: (g_lo, g_hi) for sd in sides}
+        side = list(ranges)[int(rng.integers(len(ranges)))]
+        return TT.place_partner(self, rng, t_pose, self.hull["target"], self.hull["partner"], self.rest["partner"], manip, side, ranges[side],
                                 top=self.top, cam=cam, margin=self.margin_support, min_gap=self.gap_min)
 
     # ------------------------------------------------------------------ goal (§6.11)
