@@ -229,6 +229,10 @@ class SceneEntry:
         wl = self.whitelist.get(role, {}).get(category)
         if wl and model in wl:
             wl.remove(model)
+        if wl is not None and not wl:  # no empty lists linger (canonical form, `whitelist.get(role)` falsy when empty)
+            del self.whitelist[role][category]
+            if not self.whitelist[role]:
+                del self.whitelist[role]
 
     def is_blacklisted(self, role: str, category: str, model: str) -> bool:
         return model in self.blacklist.get(role, {}).get(category, {})
@@ -243,11 +247,14 @@ class SceneEntry:
                     yield role, cat, model, reason
 
     def to_dict(self) -> Dict[str, Any]:
+        """Canonical form (a re-grounding writes identical text): models sorted, empty categories / roles dropped."""
+        whitelist = {r: {c: sorted(ms) for c, ms in cats.items() if ms} for r, cats in self.whitelist.items()}
+        blacklist = {r: {c: {m: ms[m] for m in sorted(ms)} for c, ms in cats.items() if ms} for r, cats in self.blacklist.items()}
         return {
             "rooms": list(self.rooms),
             "bindings": copy.deepcopy(self.bindings),
-            "whitelist": {r: {c: list(ms) for c, ms in cats.items()} for r, cats in self.whitelist.items()},
-            "blacklist": {r: {c: dict(ms) for c, ms in cats.items()} for r, cats in self.blacklist.items()},
+            "whitelist": {r: cats for r, cats in whitelist.items() if cats},
+            "blacklist": {r: cats for r, cats in blacklist.items() if cats},
         }
 
     @classmethod

@@ -424,18 +424,22 @@ def _symmetry_tags(row: Dict[str, str]) -> List[str]:
 @dataclass
 class Verdict:
     """Admissibility of one candidate model for one role: ``reason`` (None = admitted), ``pending`` (soft records),
-    the admissible handle rows (articulation) and the grasp key of the pipeline."""
+    the admissible handle rows (articulation) and the grasp key of the pipeline. ``source`` names who rejected the
+    model (``ground_isg`` = the §2.2 checks; ``pilot`` = an owner / pilot blacklist given on the command line)."""
 
     reason: Optional[str] = None
     pending: List[str] = field(default_factory=list)
     handles: List[Dict[str, str]] = field(default_factory=list)
     grasp_key: Optional[str] = None
+    source: str = "ground_isg"
 
 
 class Admissibility:
-    def __init__(self, icl: ICL, strict_symmetric_180: bool = False):
+    def __init__(self, icl: ICL, strict_symmetric_180: bool = False, extra_blacklist: Optional[Dict[Tuple[str, str, str, str], str]] = None):
         self.icl = icl
         self.strict_symmetric_180 = strict_symmetric_180
+        #: (subtask, role, category, model) -> reason: models the pilot rejected (``--blacklist``), checked first
+        self.extra_blacklist = dict(extra_blacklist or {})
 
     def check(self, iddl: I.IDDL, role: str, row: Dict[str, str], scene: Optional[str] = None) -> Verdict:
         """§2.2 row admissibility of ``row`` (a ``roles/candidates.csv`` row of ``(iddl.subtask, role)``)."""
@@ -443,6 +447,10 @@ class Admissibility:
         subtask = iddl.subtask
         category, model = row["category"], row["model"]
         is_scene = row.get("kind") == "scene"
+        pilot = self.extra_blacklist.get((subtask, role, category, model))
+        if pilot:
+            v.reason, v.source = pilot, "pilot"
+            return v
         if not is_scene and (category, model) in self.icl.heldout_models:
             v.reason = "heldout"
             return v
@@ -623,6 +631,9 @@ class Options:
     scale_hints: Dict[str, float] = field(default_factory=dict)  # primary alias -> pilot template_meta.scale_hint
     scale_overrides: Dict[str, float] = field(default_factory=dict)  # primary alias -> scale (--scale-hint alias=s; persisted in the customs)
     reseed_generation: Tuple[str, ...] = ()  # generation keys re-seeded from the defaults ("*" = the whole block)
+    #: pilot / owner blacklist: (subtask, role, category, model) -> reason (``--blacklist``); written as
+    #: "pilot <date>: <reason>" into every scene block of the subtask's aliases and kept by later runs
+    blacklist: Dict[Tuple[str, str, str, str], str] = field(default_factory=dict)
 
 
 @dataclass
@@ -726,7 +737,7 @@ class Grounder:
         self.bddl_root = bddl_root
         self.iddl_root = iddl_root or DEFAULT_IDDL
         self.opt = options or Options()
-        self.adm = Admissibility(icl, self.opt.strict_symmetric_180)
+        self.adm = Admissibility(icl, self.opt.strict_symmetric_180, extra_blacklist=self.opt.blacklist)
         self.report = Report()
         self.today = _dt.date.today().isoformat()
         self.grounded: List[GroundedProblem] = []
@@ -1322,11 +1333,19 @@ class Grounder:
         return gp
 
     # -- fallback aliases (owner decision 2026-09-16 B) ------------------------------------------------------------------
-    def fallbacks_for(self, comb: Combination, alias: str) -> List[Combination]:
-        """The fallback combinations of a grounded primary, in rank order (empty for a fallback combination itself)."""
+    def fallbacks_for(self, comb: Combination, alias: str, entry: Optional[CustomsEntry] = None) -> List[Combination]:
+        """The fallback combinations of a grounded primary, in rank order (empty for a fallback combination itself).
+
+        A primary whose ``target`` whitelist is empty in every scene (the pilot blacklisted the pick, e.g. the hangers'
+        ``unstable_init``) gets the next admissible model of the category as its rank-1 fallback instead of the
+        model-bound fallbacks (a scaled alias of a blacklisted model would be as empty)."""
         if comb.fallback is not None or not self.opt.fallbacks:
             return []
         subtask = comb.subtask
+        if entry is not None and self._target_blacklisted(entry):
+            target = comb.roles.get("target")
+            if target is not None and target.kind == "sampleable":
+                return self._next_model_fallbacks(comb, alias)
         if subtask in INIT_SURFACE_FALLBACK_SUBTASKS:
             return self._init_surface_fallbacks(comb, alias)
         if subtask in SCALE_FALLBACK_SUBTASKS:
@@ -1334,6 +1353,14 @@ class Grounder:
         if subtask in NEXT_MODEL_FALLBACK_SUBTASKS:
             return self._next_model_fallbacks(comb, alias)
         return []
+
+    @staticmethod
+    def _target_blacklisted(entry: CustomsEntry) -> bool:
+        """The sampleable ``target`` of the entry has no whitelisted model in any scene block (all blacklisted)."""
+        t = entry.roles.get("target")
+        if t is None or not t.sampleable or not entry.scenes:
+            return False
+        return all(not any(sc.whitelist.get("target", {}).values()) for sc in entry.scenes.values())
 
     @staticmethod
     def _derive(comb: Combination, primary: str, rank: int, kind: str, params: Dict[str, Any]) -> Combination:
@@ -1591,10 +1618,20 @@ class Grounder:
                         entry.roles[role].joint[f"{sc}/{o['model']}"] = joint
                         entry.roles[role].handle_key[f"{sc}/{o['model']}"] = hrow.get("key") or o.get("handle_key") or ""
             se.bindings["floor"] = {"room": comb.floor_room.get(sc)} if comb.floor_room.get(sc) else {"room": None}
+            # rejections a sampler / the pilot recorded in this scene block earlier (any reason not ground_isg's own) bind
+            # before the §2.2 checks: the model stays blacklisted with that reason and gets no per-model facts
+            carried: Dict[Tuple[str, str, str], str] = {}
+            old_block = old_scenes.get(sc)
+            if old_block is not None:
+                carried = {(role, cat, m): reason for role, cat, m, reason in old_block.blacklist_reasons() if not reason.startswith("ground_isg")}
             # whitelists / blacklists of the spawned roles
             for role, rows in role_models.items():
                 rp = comb.roles[role]
                 for cat, m, r in rows:
+                    if (role, cat, m) in carried:
+                        se.blacklist_add(role, cat, m, carried[(role, cat, m)])
+                        self.report.blacklist[subtask][C.reason_code(carried[(role, cat, m)])] += 1
+                        continue
                     v = verdicts.get((role, cat, m))
                     if v is None or role == "obstacles":
                         v = self.adm.check(iddl, role, r, scene=sc)
@@ -1604,7 +1641,8 @@ class Grounder:
                     if role == "distractors" and self.icl.are_lookalikes((cat, m), tuple(comb.roles["target"].models[0])):
                         v = Verdict(reason="lookalike_of_target")
                     if v.reason:
-                        se.blacklist_add(role, cat, m, self._reason(v.reason))
+                        reason = self._reason(v.reason) if v.source == "ground_isg" else C.blacklist_reason(v.reason, tool=v.source, date=self.today)
+                        se.blacklist_add(role, cat, m, reason)
                         self.report.blacklist[subtask][v.reason] += 1
                         continue
                     se.whitelist_add(role, cat, m)
@@ -1740,7 +1778,7 @@ class Grounder:
                     continue
                 # fallback aliases behind the primary (owner decision 2026-09-16 B); the primary lists them in rank order
                 fallback_aliases: List[str] = []
-                for fb in self.fallbacks_for(comb, gp.alias):
+                for fb in self.fallbacks_for(comb, gp.alias, gp.entry):
                     fgp = self._ground_or_skip(fb)
                     if fgp is not None and fgp.alias not in fallback_aliases:
                         fallback_aliases.append(fgp.alias)
@@ -1939,6 +1977,10 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--reseed-generation", default=None, metavar="KEY[,KEY...]|*",
                     help="re-seed these generation keys of every re-grounded entry from generation_defaults.py (a spec number the owner "
                          "changed); '*' = the whole block")
+    ap.add_argument("--blacklist", action="append", default=None, metavar="SUBTASK:ROLE:CATEGORY/MODEL=REASON",
+                    help="pilot / owner rejection of a model (repeatable): blacklisted as 'pilot <date>: REASON' in every scene block of the "
+                         "subtask's aliases (kept by later runs); a primary whose target is left without a model gets the next model of the "
+                         "category as its rank-1 fallback")
     ap.add_argument("--dry-run", action="store_true", help="ground and report, write nothing")
     ap.add_argument("--report", default=None, help="also write the report (markdown) to this path; .json alongside")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -1969,6 +2011,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return 2
         overrides[alias.strip()] = s
     reseed = tuple(k.strip() for k in (args.reseed_generation or "").split(",") if k.strip())
+    blacklist: Dict[Tuple[str, str, str, str], str] = {}
+    for item in args.blacklist or []:
+        spec, _, reason = item.partition("=")
+        parts = spec.split(":")
+        if len(parts) != 3 or "/" not in parts[2] or not reason.strip():
+            print(f"--blacklist expects SUBTASK:ROLE:CATEGORY/MODEL=REASON, got {item!r}", file=sys.stderr)
+            return 2
+        cat, model = parts[2].split("/", 1)
+        blacklist[(parts[0].strip(), parts[1].strip(), cat.strip(), model.strip())] = reason.strip()
     opt = Options(
         mode=args.mode,
         slots=slots,
@@ -1984,6 +2035,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         scale_hints=hints,
         scale_overrides=overrides,
         reseed_generation=reseed,
+        blacklist=blacklist,
     )
     iddls = I.load_all(args.iddl)
     icl = ICL(args.icl)

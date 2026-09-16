@@ -1279,6 +1279,34 @@
    "fallback_of": "alignment-world_vertical-painting-walls",
    "fallback_rank": 1,
    "fallback_kind": "scale"
+  },
+  {
+   "alias": "alignment-world_vertical-hanger_nagryh-walls",
+   "id": 104,
+   "grounded": "2026-09-16",
+   "by": "ground_isg 2.0.0",
+   "subtask": "alignment-world_vertical",
+   "iddl": "alignment/world_vertical.iddl",
+   "pick": "alignment-world_vertical#03",
+   "slot": "representative",
+   "mode": "representative",
+   "fallback_of": "alignment-world_vertical-hanger-walls",
+   "fallback_rank": 1,
+   "fallback_kind": "next_model"
+  },
+  {
+   "alias": "alignment-world_horizontal-hanger_lymqks-walls",
+   "id": 105,
+   "grounded": "2026-09-16",
+   "by": "ground_isg 2.0.0",
+   "subtask": "alignment-world_horizontal",
+   "iddl": "alignment/world_horizontal.iddl",
+   "pick": "alignment-world_horizontal#08",
+   "slot": "representative",
+   "mode": "representative",
+   "fallback_of": "alignment-world_horizontal-hanger-walls",
+   "fallback_rank": 1,
+   "fallback_kind": "next_model"
   }
  ]
 }

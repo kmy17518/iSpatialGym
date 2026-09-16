@@ -6854,7 +6854,7 @@
   "iddl": "alignment/world_horizontal.iddl",
   "definition_id": 20,
   "fallbacks": [
-   "alignment-world_horizontal-hanger_s070-walls"
+   "alignment-world_horizontal-hanger_lymqks-walls"
   ],
   "roles": {
    "target": {
@@ -6952,17 +6952,12 @@
       "room": "living_room_0"
      }
     },
-    "whitelist": {
-     "target": {
-      "hanger": [
-       "nadesv"
-      ]
-     }
-    },
+    "whitelist": {},
     "blacklist": {
      "target": {
       "hanger": {
-       "ffecvd": "ground_isg 2026-09-16: heldout"
+       "ffecvd": "ground_isg 2026-09-16: heldout",
+       "nadesv": "pilot 2026-09-16: unstable_init"
       }
      }
     }
@@ -7043,6 +7038,204 @@
    }
   ]
  },
+ "alignment-world_horizontal-hanger_lymqks-walls": {
+  "iddl": "alignment/world_horizontal.iddl",
+  "definition_id": 105,
+  "fallback_of": "alignment-world_horizontal-hanger-walls",
+  "fallback_rank": 1,
+  "fallback_kind": "next_model",
+  "fallback_params": {
+   "model": "lymqks",
+   "slot": "variation_geometry",
+   "primary_model": "nadesv"
+  },
+  "roles": {
+   "target": {
+    "category": "hanger",
+    "sampleable": true,
+    "require": {
+     "contacts": true
+    },
+    "representative": "lymqks",
+    "orientation_equivalences": {
+     "hanger/lymqks": []
+    }
+   },
+   "support": {
+    "category": "walls",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "walls_dhsptd_0",
+      "walls_urngpl_0"
+     ],
+     "support_regions": [
+      {
+       "id": "living_room_0/walls_dhsptd_0/r00",
+       "wall": "walls_dhsptd_0",
+       "room": "living_room_0",
+       "p0": [
+        17.637,
+        2.109
+       ],
+       "p1": [
+        17.637,
+        1.59
+       ],
+       "normal": [
+        -1.0,
+        0.0
+       ],
+       "hang_z": 1.45,
+       "length_m": 0.77,
+       "max_object_m": 0.5
+      },
+      {
+       "id": "living_room_0/walls_urngpl_0/r01",
+       "wall": "walls_urngpl_0",
+       "room": "living_room_0",
+       "p0": [
+        16.847,
+        3.947
+       ],
+       "p1": [
+        17.507,
+        3.947
+       ],
+       "normal": [
+        0.0,
+        -1.0
+       ],
+       "hang_z": 1.45,
+       "length_m": 0.91,
+       "max_object_m": 0.5
+      },
+      {
+       "id": "living_room_0/walls_urngpl_0/r02",
+       "wall": "walls_urngpl_0",
+       "room": "living_room_0",
+       "p0": [
+        14.207,
+        3.947
+       ],
+       "p1": [
+        14.507,
+        3.947
+       ],
+       "normal": [
+        0.0,
+        -1.0
+       ],
+       "hang_z": 1.45,
+       "length_m": 0.55,
+       "max_object_m": 0.7
+      }
+     ],
+     "floor": {
+      "room": "living_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "hanger": [
+       "lymqks"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "hanger": {
+       "ffecvd": "ground_isg 2026-09-16: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "orientation": 0.08
+   },
+   "groups": {},
+   "path_buckets": null,
+   "hang_height_m": 1.45,
+   "wall_offset_extra_m": 0.01,
+   "deviation_range_deg": [
+    15.0,
+    25.0
+   ],
+   "max_deviation_deg": 25.0,
+   "stance_arm_posture": "tucked",
+   "hinge_drift_max_rad": 0.03,
+   "min_visible_objects": 5,
+   "min_object_pixels": 200,
+   "region_seed_step_m": 0.25,
+   "spot_search_rays": 24,
+   "flat_patch_rays": [
+    5,
+    5
+   ],
+   "flat_patch_tolerance_m": 0.01,
+   "flat_patch_margin_m": 0.1,
+   "front_clearance_m": 0.35,
+   "in_room_test_m": 0.8,
+   "prompt0": {
+    "beta_max_deg": 35.0,
+    "d_min_m": 0.5,
+    "d_max_m": 1.5
+   },
+   "lateral_range_m": [
+    -0.4,
+    0.4
+   ],
+   "contact_extreme_band_m": 0.03,
+   "brace_offset_m": 0.005,
+   "brace_clearance_m": 0.02,
+   "brace_kinds": [
+    "below_high",
+    "above_low",
+    "side_high"
+   ],
+   "template_filter_deviation_deg": 25.0,
+   "scale_hint_steps": [
+    0.9,
+    0.8,
+    0.7,
+    0.6,
+    0.5
+   ],
+   "settle_free": [],
+   "goal": "level",
+   "swept_patch": true
+  },
+  "constraints": [
+   {
+    "scope": {
+     "scene": "house_single_floor",
+     "target": "hanger/lymqks"
+    },
+    "type": "blacklist",
+    "reason": "missing_contacts_pending_B6",
+    "pending": true,
+    "hard": false,
+    "source": {
+     "sampler": "ground_isg 2.0.0",
+     "date": "2026-09-16"
+    }
+   }
+  ]
+ },
  "alignment-world_horizontal-hanger_s070-walls": {
   "iddl": "alignment/world_horizontal.iddl",
   "definition_id": 90,
@@ -7053,6 +7246,7 @@
    "scale": 0.7,
    "scale_source": "default_step"
   },
+  "superseded_by": true,
   "roles": {
    "target": {
     "category": "hanger",
@@ -11192,7 +11386,7 @@
   "iddl": "alignment/world_vertical.iddl",
   "definition_id": 25,
   "fallbacks": [
-   "alignment-world_vertical-hanger_s070-walls"
+   "alignment-world_vertical-hanger_nagryh-walls"
   ],
   "roles": {
    "target": {
@@ -11290,16 +11484,11 @@
       "room": "living_room_0"
      }
     },
-    "whitelist": {
-     "target": {
-      "hanger": [
-       "agrpio"
-      ]
-     }
-    },
+    "whitelist": {},
     "blacklist": {
      "target": {
       "hanger": {
+       "agrpio": "pilot 2026-09-16: unstable_init",
        "ffecvd": "ground_isg 2026-09-16: heldout"
       }
      }
@@ -11380,6 +11569,203 @@
    }
   ]
  },
+ "alignment-world_vertical-hanger_nagryh-walls": {
+  "iddl": "alignment/world_vertical.iddl",
+  "definition_id": 104,
+  "fallback_of": "alignment-world_vertical-hanger-walls",
+  "fallback_rank": 1,
+  "fallback_kind": "next_model",
+  "fallback_params": {
+   "model": "nagryh",
+   "slot": "variation_geometry",
+   "primary_model": "agrpio"
+  },
+  "roles": {
+   "target": {
+    "category": "hanger",
+    "sampleable": true,
+    "require": {
+     "contacts": true
+    },
+    "representative": "nagryh",
+    "orientation_equivalences": {
+     "hanger/nagryh": []
+    }
+   },
+   "support": {
+    "category": "walls",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "living_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "walls_dhsptd_0",
+      "walls_urngpl_0"
+     ],
+     "support_regions": [
+      {
+       "id": "living_room_0/walls_dhsptd_0/r00",
+       "wall": "walls_dhsptd_0",
+       "room": "living_room_0",
+       "p0": [
+        17.637,
+        2.109
+       ],
+       "p1": [
+        17.637,
+        1.59
+       ],
+       "normal": [
+        -1.0,
+        0.0
+       ],
+       "hang_z": 1.45,
+       "length_m": 0.77,
+       "max_object_m": 0.5
+      },
+      {
+       "id": "living_room_0/walls_urngpl_0/r01",
+       "wall": "walls_urngpl_0",
+       "room": "living_room_0",
+       "p0": [
+        16.847,
+        3.947
+       ],
+       "p1": [
+        17.507,
+        3.947
+       ],
+       "normal": [
+        0.0,
+        -1.0
+       ],
+       "hang_z": 1.45,
+       "length_m": 0.91,
+       "max_object_m": 0.5
+      },
+      {
+       "id": "living_room_0/walls_urngpl_0/r02",
+       "wall": "walls_urngpl_0",
+       "room": "living_room_0",
+       "p0": [
+        14.207,
+        3.947
+       ],
+       "p1": [
+        14.507,
+        3.947
+       ],
+       "normal": [
+        0.0,
+        -1.0
+       ],
+       "hang_z": 1.45,
+       "length_m": 0.55,
+       "max_object_m": 0.7
+      }
+     ],
+     "floor": {
+      "room": "living_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "hanger": [
+       "nagryh"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "hanger": {
+       "ffecvd": "ground_isg 2026-09-16: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "orientation": 0.08
+   },
+   "groups": {},
+   "path_buckets": null,
+   "hang_height_m": 1.45,
+   "wall_offset_extra_m": 0.01,
+   "deviation_range_deg": [
+    15.0,
+    25.0
+   ],
+   "max_deviation_deg": 25.0,
+   "stance_arm_posture": "tucked",
+   "hinge_drift_max_rad": 0.03,
+   "min_visible_objects": 5,
+   "min_object_pixels": 200,
+   "region_seed_step_m": 0.25,
+   "spot_search_rays": 24,
+   "flat_patch_rays": [
+    5,
+    5
+   ],
+   "flat_patch_tolerance_m": 0.01,
+   "flat_patch_margin_m": 0.1,
+   "front_clearance_m": 0.35,
+   "in_room_test_m": 0.8,
+   "prompt0": {
+    "beta_max_deg": 35.0,
+    "d_min_m": 0.5,
+    "d_max_m": 1.5
+   },
+   "lateral_range_m": [
+    -0.4,
+    0.4
+   ],
+   "contact_extreme_band_m": 0.03,
+   "brace_offset_m": 0.005,
+   "brace_clearance_m": 0.02,
+   "brace_kinds": [
+    "below_high",
+    "above_low",
+    "side_high"
+   ],
+   "template_filter_deviation_deg": 25.0,
+   "scale_hint_steps": [
+    0.9,
+    0.8,
+    0.7,
+    0.6,
+    0.5
+   ],
+   "settle_free": [],
+   "goal": "upright"
+  },
+  "constraints": [
+   {
+    "scope": {
+     "scene": "house_single_floor",
+     "target": "hanger/nagryh"
+    },
+    "type": "blacklist",
+    "reason": "missing_contacts_pending_B6",
+    "pending": true,
+    "hard": false,
+    "source": {
+     "sampler": "ground_isg 2.0.0",
+     "date": "2026-09-16"
+    }
+   }
+  ]
+ },
  "alignment-world_vertical-hanger_s070-walls": {
   "iddl": "alignment/world_vertical.iddl",
   "definition_id": 95,
@@ -11390,6 +11776,7 @@
    "scale": 0.7,
    "scale_source": "default_step"
   },
+  "superseded_by": true,
   "roles": {
    "target": {
     "category": "hanger",

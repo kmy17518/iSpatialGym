@@ -614,6 +614,34 @@ def test_next_model_fallbacks(grounded):
         assert fb.alias.endswith("-floor") == tall
 
 
+def test_pilot_blacklist_gives_the_next_model_fallback(tmp_path):
+    """Owner decision 2026-09-16 item 5: a pick the pilot rejected (hanger unstable_init) is blacklisted with the pilot
+    reason in every scene block, the primary keeps its alias with an empty whitelist and gets the next model of the
+    category as its rank-1 fallback; the blacklist and the fallback survive a re-run without the flag."""
+    icl = GI.ICL()
+    bl = {("alignment-world_vertical", "target", "hanger", "agrpio"): "unstable_init", ("alignment-world_horizontal", "target", "hanger", "nadesv"): "unstable_init"}
+    g = GI.Grounder(IDDLS, icl, C.Customs.load(str(tmp_path / "c.json")), bddl_root=str(tmp_path / "bddl"),
+                    options=GI.Options(representative_test=False, blacklist=bl))
+    g.run(["alignment-world_vertical", "alignment-world_horizontal"])
+    for st, model, nxt in (("alignment-world_vertical", "agrpio", "nagryh"), ("alignment-world_horizontal", "nadesv", "lymqks")):
+        primary = g.customs.entries[f"{st}-hanger-walls"]
+        sc = primary.scenes["house_single_floor"]
+        assert not sc.whitelist.get("target") and sc.blacklist["target"]["hanger"][model] == f"pilot {g.today}: unstable_init"
+        assert primary.fallbacks == [f"{st}-hanger_{nxt}-walls"]
+        fb = g.customs.entries[f"{st}-hanger_{nxt}-walls"]
+        assert fb.fallback_kind == "next_model" and fb.fallback_rank == 1 and fb.fallback_params["primary_model"] == model
+        assert fb.scenes["house_single_floor"].whitelist["target"] == {"hanger": [nxt]} and fb.roles["target"].representative == nxt
+        assert f"{st}-hanger_s070-walls" not in g.customs.entries  # no scaled alias of a model without a whitelist
+        other = g.customs.entries[f"{st}-picture-walls"]  # other picks keep their scale fallback
+        assert other.fallbacks and g.customs.entries[other.fallbacks[0]].fallback_kind == "scale"
+    # persisted: a re-run without --blacklist keeps the pilot rejection and the next-model fallback
+    g2 = GI.Grounder(IDDLS, icl, C.Customs.load(str(tmp_path / "c.json")), bddl_root=str(tmp_path / "bddl"), options=GI.Options(representative_test=False))
+    g2.run(["alignment-world_vertical"])
+    primary = g2.customs.entries["alignment-world_vertical-hanger-walls"]
+    assert not primary.scenes["house_single_floor"].whitelist.get("target") and primary.fallbacks == ["alignment-world_vertical-hanger_nagryh-walls"]
+    assert g2.customs.entries["alignment-world_vertical-hanger-walls"].to_dict() == g.customs.entries["alignment-world_vertical-hanger-walls"].to_dict()
+
+
 def test_no_fallbacks_option(tmp_path):
     g = GI.Grounder(IDDLS, GI.ICL(), C.Customs.load(str(tmp_path / "c.json")), bddl_root=str(tmp_path / "bddl"),
                     options=GI.Options(representative_test=False, fallbacks=False))
