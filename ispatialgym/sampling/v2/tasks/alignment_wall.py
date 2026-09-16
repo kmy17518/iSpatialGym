@@ -368,15 +368,16 @@ class AlignmentWall(SamplerV2):
             B, a = brace_point(pts_l, kind, side_l, high_sign, C_l, band)
             B = on_plane(B, mid_plane, n)
             eef = C.fingertip_eef(B, a, closing=n, clearance=float(self.param("brace_offset_m", 0.005)))
-            # brace pre-contact = eef − 0.10·a + 0.08·n: back along the approach axis (from outside the hull, as the spec
-            # has it) AND off the wall toward the room, so the straight approach pre → contact is within the wall's 1 cm
-            # check margin only at the contact itself (wall ignored there, §3.6). An approach sliding along the wall at
-            # 2 cm has every intermediate pose flagged by the sphere model (the pilot's program-check rejections); an
-            # approach normal to the wall at B passes through the tilted target's plane region (wall08f smoke).
-            # Spec §5.5 wording change proposed: "brace pre-contact = eef − 0.10·a + 0.08·n".
-            off_wall = float(self.param("brace_pre_offset_wall_m", 0.08))
+            # brace pre-contact = eef − 0.10·a (spec §5.5): the approach slides along the wall from outside the hull.
+            # ``generation.brace_pre_offset_wall_m`` (default 0) adds an offset off the wall along +n. Smoke findings
+            # (2026‑09‑16): the closed gripper's sphere model is flagged at the 1 cm margin at every pose within ≈ 5 cm of
+            # the wall, so neither an offset of 8 cm (diagonal approach) nor an approach normal to the wall (which passes
+            # through the tilted target's plane region) makes the intermediate poses pass with the wall present — the wall
+            # has to be ignored along the whole brace chain (as along the push chain), in the sampler and in the program
+            # check alike.
+            off_wall = float(self.param("brace_pre_offset_wall_m", 0.0))
             pre_a = C.pre_pose(eef)
-            pre = (pre_a[0] + off_wall * n, pre_a[1])
+            pre = (pre_a[0] + off_wall * n, pre_a[1]) if off_wall else pre_a
             braces.append({"kind": kind, "B": B, "a": a, "pose": eef, "pre": pre})
         push_arm = push_arm_of(E_low, C_, th.tensor([float(n[1]), -float(n[0]), 0.0]))
         return {"pose_tilted": pose_t, "pose_level": pose_l, "hull_tilted": pts_t, "hull_level": pts_l, "C": C_, "E_low": E_low, "E_high": E_high,
@@ -734,11 +735,12 @@ class AlignmentWall(SamplerV2):
         """§5.5 step 5 (brace first, target not ignored; push with the brace locked, target ignored for the contact
         poses; combined check with the push arm at its pre-contact) and step 6; fills the sidecar."""
         target = self.target
-        # §3.6: the wall is removed for the contact poses (pads parallel to the wall on the mid-thickness plane, 2 cm off
-        # it — the 1 cm check margin would flag the closed paddle there). The brace approach comes in normal to the wall
-        # (pre-contact 10 cm off it), so only its contact needs the wall removed — the same rule the program check
-        # applies to a brace; the push pre-contact and arc run along the wall and keep it removed (as the program check
-        # does for a push). The target stays in the world except for the push poses.
+        # §3.6: the wall is removed for the contact poses. Wall contacts (pads parallel to the wall on the mid-thickness
+        # plane, 2 cm off it) keep that distance along their whole approach (10 cm along the wall), and the 1 cm check
+        # margin flags the closed paddle's sphere model at every pose within ≈ 5 cm of the wall — so the wall is removed
+        # along the whole brace chain and the whole push chain (documented relaxation; the target stays in the world
+        # except for the push poses). The program check removes the wall along the push chain but only at the brace's
+        # final pose (``program_check._ignore_for``): every wall-alignment instance fails there until it does the same.
         wall = self.support_objects()
         push, brace_arm = geo["push"], geo["brace_arm"]
         manip.arms = [push["arm"], brace_arm]
@@ -751,7 +753,7 @@ class AlignmentWall(SamplerV2):
         why: List[str] = []
         solved = None
         for b, sp in braces:  # the target is *not* ignored for the brace (§5.5: ≥ 2 cm clear of the tilted hull)
-            r_pre_b = self.ikc.exact([b["pre"]], manip, brace_arm, q_seed=q0, cache=False)  # 10 cm off the wall: nothing ignored
+            r_pre_b = self.ikc.exact([b["pre"]], manip, brace_arm, ignore_for_last=wall, q_seed=q0, cache=False)
             if not r_pre_b.ok:
                 why.append(f"{b['kind']}: brace pre-contact")
                 continue
@@ -759,7 +761,8 @@ class AlignmentWall(SamplerV2):
             # program check re-solves those poses (§3.9: screening at the intermediate ones, exact at the ends); the same
             # chain is solved here exactly, pose by pose, so every pose has a remembered witness solution
             chain = [tuple(p) for p in C.line_waypoints(b["pre"], b["pose"], 3)]
-            res = self.ikc.exact(chain, manip, brace_arm, ignore_for_last=wall, q_seed=q0, cache=False)  # the wall ignored at the contact only
+            with self.ikc.ignoring(wall):  # the whole chain runs 2 cm off the wall (see above; the program check must do the same)
+                res = self.ikc.exact(chain, manip, brace_arm, q_seed=q0, cache=False)
             if not res.ok:
                 why.append(f"{b['kind']}: brace contact / approach ({res.reason})")
                 continue
