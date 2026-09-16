@@ -486,19 +486,30 @@ class IORSLarge(SamplerV2):
         """The under goal is reached by drop + straight floor push (``generation.under_mode`` = ``"push"`` default)."""
         return self.relation == "under" and str(self.gp.gen("under_mode", "push")) == "push"
 
-    def _free_floor_cell(self, xy) -> bool:
+    def _free_floor_cell(self, xy, why: Optional[Dict[str, int]] = None) -> bool:
         """Free floor for the drop: un-eroded traversable, in the task rooms, ≥ 2 cm outside every object AABB (flat
-        floor coverings < 5 cm ignored; the AABB list is built once per template)."""
-        if not self.kit.trav_free(xy) or not P0.in_task_rooms(self, xy):
+        floor coverings < 5 cm ignored; the AABB list is built once per template). ``why`` counts the failing filter."""
+        p = th.as_tensor([float(xy[0]), float(xy[1])])
+        if not self.kit.trav_free(p):
+            if why is not None:
+                why["not_traversable"] = why.get("not_traversable", 0) + 1
+            return False
+        if not P0.in_task_rooms(self, p):
+            if why is not None:
+                why["outside_rooms"] = why.get("outside_rooms", 0) + 1
             return False
         aabbs = self.__dict__.get("_floor_aabbs")
         if aabbs is None:
             objs = [o for o in self.world.scene.objects if o.category not in ("floors", "ceilings", "walls") and o is not self.robot and o.name not in self.world.spawned]
             objs = [o for o in objs if float(o.aabb[1][2] - o.aabb[0][2]) >= 0.05]
-            aabbs = [(o.aabb[0][:2].float() - 0.02, o.aabb[1][:2].float() + 0.02) for o in objs]
+            aabbs = [(o.name, o.aabb[0][:2].float() - 0.02, o.aabb[1][:2].float() + 0.02) for o in objs]
             self._floor_aabbs = aabbs
-        p = th.as_tensor([float(xy[0]), float(xy[1])])
-        return not any(bool((p >= a).all() and (p <= b).all()) for a, b in aabbs)
+        hit = [n for n, a, b in aabbs if bool((p >= a).all() and (p <= b).all())]
+        if hit:
+            if why is not None:
+                why[f"aabb:{hit[0]}"] = why.get(f"aabb:{hit[0]}", 0) + 1
+            return False
+        return True
 
     def drop_pose_at(self, xy, quat) -> G.Pose:
         """Release pose of the push-under drop: the target's bottom ``PUSH_UNDER_DROP_HEIGHT_M`` above the floor at ``xy``."""
@@ -1033,7 +1044,8 @@ class IORSLarge(SamplerV2):
         lo_ahead, hi_ahead = PUSH_UNDER_DROP_AHEAD_M
         cells = self.place["cells"]
         mid = th.as_tensor([float(edge.mid[0]), float(edge.mid[1])])
-        stats: Dict[str, int] = {"laterals": len(laterals), "goal_clear": 0, "drop_free": 0, "base_ok": 0, "candidates": 0}
+        stats: Dict[str, Any] = {"laterals": len(laterals), "goal_clear": 0, "drop_free": 0, "base_ok": 0, "candidates": 0, "drop_blocked": {},
+                                 "drop_out_m": round(out, 3), "edge_mid": [round(float(v), 2) for v in mid.tolist()], "inward": [round(float(v), 2) for v in d2.tolist()]}
         cands: List[Stance] = []
         for lat in laterals:
             g = mid + tangent * float(lat) + d2 * inside
@@ -1043,7 +1055,7 @@ class IORSLarge(SamplerV2):
                 continue
             stats["goal_clear"] += 1
             c_d = mid + tangent * float(lat) - d2 * out
-            if not self._free_floor_cell(c_d):
+            if not self._free_floor_cell(c_d, stats["drop_blocked"]):
                 continue
             stats["drop_free"] += 1
             for so in stand_offs:
