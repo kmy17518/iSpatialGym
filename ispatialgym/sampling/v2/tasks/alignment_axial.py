@@ -238,7 +238,7 @@ class AlignmentAxial(SamplerV2):
         raise Reject("target_placement", "; ".join(errors[-3:])[:1500])
 
     def _sample_with(self, rng, init: Stance, manip: Stance, k: int) -> Draft:
-        d = Draft()
+        draft = Draft()
         tname = self.tname
         target, support = self.obj("target"), self.obj("support")
         self.record_transition(init, manip)
@@ -370,18 +370,18 @@ class AlignmentAxial(SamplerV2):
         self.sidecar.add_contact(ContactRecord("push", "right", p_pre, p_init, p_mid, p_goal, d_push, dist, object=tname))
         self.sidecar.add_contact(ContactRecord("brace", "left", brace_pre, brace, direction=-d_stop, brace_kind="stop_edge", object=tname))
         manip.contacts = ["push", "brace"]
-        d.object_poses[tname] = pose
-        d.robot_q = self.stance_q(init)
-        d.base_pose2d = tuple(init.base_pose2d)
+        draft.object_poses[tname] = pose
+        draft.robot_q = self.stance_q(init)
+        draft.base_pose2d = tuple(init.base_pose2d)
         mc = self.choice.models["target"]
         equiv = self.gp.orientation_equivalences("target", mc.category, mc.model) or self.gen("orientation_equivalences", []) or []
-        d.pose_targets[tname] = pose_target(orientation=q_goal, orientation_metric="full", orientation_tolerance=self.tol("orientation", 0.10), equivalences=equiv)
-        d.goal_poses[tname] = goal_pose
-        d.summary.update({"yaw_goal": yaw_goal, "yaw_init": yaw0, "deviation_deg": math.degrees(delta), "push_end": end.tolist(), "push_distance_m": dist,
+        draft.pose_targets[tname] = pose_target(orientation=q_goal, orientation_metric="full", orientation_tolerance=self.tol("orientation", 0.10), equivalences=equiv)
+        draft.goal_poses[tname] = goal_pose
+        draft.summary.update({"yaw_goal": yaw_goal, "yaw_init": yaw0, "deviation_deg": math.degrees(delta), "push_end": end.tolist(), "push_distance_m": dist,
                           "manipulation_candidate": k, "spin": spin})
         self.sidecar.describe(tname, mc.category.replace("_", " "), f"the {mc.category.replace('_', ' ')} on the table")
         self.sidecar.language["goal_numbers"]["rotate_deg"] = math.degrees(d_goal)
-        return d
+        return draft
 
     def _extreme_point(self, pose: TT.Pose, direction: th.Tensor, near: Optional[th.Tensor] = None) -> th.Tensor:
         """Hull point (world) with the largest projection on ``direction`` (xy); with ``near`` only points within 4 cm of

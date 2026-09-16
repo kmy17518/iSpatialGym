@@ -57,12 +57,14 @@ while true; do
   t1=$(date +%s)
   nw=$(python - "$out" <<'EOF'
 import glob, json, sys
-reps = sorted(glob.glob(sys.argv[1] + "/sampling_report_*.json"))
+reps = sorted(glob.glob(sys.argv[1] + "/sampling_report_*.json")) or ([sys.argv[1] + "/summary.json"] if glob.glob(sys.argv[1] + "/summary.json") else [])
 if not reps:
-    print(-1)
+    print(-1)  # no report at all: the run crashed before writing one (retried by --rebalance)
 else:
     d = json.load(open(reps[-1]))
-    print(sum(int(t.get("n_written", 0)) for prob in d.get("problems", {}).values() for t in prob.values() if isinstance(t, dict)))
+    n = sum(int(t.get("n_written", 0)) for prob in d.get("problems", {}).values() for t in prob.values() if isinstance(t, dict))
+    errs = [t.get("error") for prob in d.get("problems", {}).values() for t in prob.values() if isinstance(t, dict) and t.get("error")]
+    print(-1 if (n == 0 and (errs or d.get("errors"))) else n)  # a code error (not a sampling outcome) counts as no report
 EOF
 )
   echo "$jid rc=$rc wall=$((t1-t0)) n_written=$nw" >> /root/samp/done.txt
@@ -225,7 +227,7 @@ def main():
             for line in out[0].splitlines():
                 if " rc=" in line:
                     jid, rest = line.split(" rc=", 1)
-                    if "n_written=-1" not in rest or "rc=139" not in line:  # a segfault is retried, a real run (even 0 instances) is not
+                    if "n_written=-1" not in rest:  # segfaults / crashes (no report or a code error) are retried, a real run (even 0 instances) is not
                         finished.add(jid.strip())
             if len(out) > 1 and out[1].strip():
                 running.add(out[1].strip())

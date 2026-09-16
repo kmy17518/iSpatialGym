@@ -27,10 +27,10 @@ CUSTOMS = os.path.join(REPO, "ispatialgym", "assets", "task_specs", "isg_customs
 WEIGHT = {"disembedding": 4.0, "inter_object_relation_satisfaction-ontop_large_scale": 4.0, "inter_object_relation_satisfaction-under_large_scale": 4.0,
           "configuration_matching-articulation_open_large_scale": 3.5, "configuration_matching-articulation_close_large_scale": 3.5,
           "configuration_matching-block_design": 3.0, "configuration_matching-attachment": 3.0, "alignment-world_vertical": 3.0,
-          "alignment-world_horizontal": 3.0, "alignment-axial": 3.0, "camera_relocalization-obstructed": 2.0}
+          "alignment-world_horizontal": 3.0, "alignment-axial": 0.5, "camera_relocalization-obstructed": 2.0}
 SAMPLE_CMD = ("cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && "
               "OMNIGIBSON_HEADLESS=1 timeout {timeout} python -m ispatialgym.sampling.sample_isg --alias {alias} --templates {templates} "
-              "--instances-per-template {instances} --seed {seed} --no-write-back --out \"$OUT\" --log-level INFO")
+              "--instances-per-template {instances} --max-attempts {max_attempts} --seed {seed} --no-write-back --out \"$OUT\" --log-level INFO")
 DEMO_CMD = ("cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && "
             "for tro in /root/samp/{jid}/*/*/instances/*-tro_state.json; do "
             "OMNIGIBSON_HEADLESS=1 timeout 1800 python -m ispatialgym.oracle.run_isg --instance \"$tro\" --mode oracle --out \"$OUT\" --video --video-size 540; "
@@ -68,7 +68,8 @@ def cmd_sample(args):
         if args.subtasks and st not in args.subtasks:
             continue
         jid = "v2__" + alias[:150]
-        jobs.append({"id": jid, "cmd": SAMPLE_CMD.format(alias=alias, templates=args.templates, instances=args.instances, seed=args.seed, timeout=args.timeout),
+        jobs.append({"id": jid, "cmd": SAMPLE_CMD.format(alias=alias, templates=args.templates, instances=args.instances, seed=args.seed, timeout=args.timeout,
+                                                        max_attempts=args.max_attempts),
                      "weight": WEIGHT.get(st, 2.0), "subtask": st, "alias": alias, "slot": "representative"})
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w") as f:
@@ -140,6 +141,7 @@ def main():
     s.add_argument("--instances", type=int, default=2)
     s.add_argument("--seed", type=int, default=0)
     s.add_argument("--timeout", type=int, default=5400)
+    s.add_argument("--max-attempts", type=int, default=10, help="sample_isg --max-attempts per instance (pilot: keep non-yielding aliases short)")
     s.add_argument("--out", required=True)
     s.set_defaults(fn=cmd_sample)
     s = sub.add_parser("demo")
