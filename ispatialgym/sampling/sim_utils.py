@@ -228,6 +228,10 @@ class SimWorld:
         self.scene.add_object(obj)
         og.sim.play()
         og.sim.load_state(state)
+        # stop / play rebuilt PhysX from USD: the objects parked earlier must stay parked (gravity off is written to USD by
+        # ``park`` since 2026-09-16, and their poses / velocities are re-applied here so nothing drifts before the next read)
+        for i, other in enumerate(self.spawned.values()):
+            self.park(other, i)
         self.spawned[name] = obj
         self.park(obj, len(self.spawned) - 1)
         og.sim.step()
@@ -253,18 +257,59 @@ class SimWorld:
         og.sim.step()
 
     def park(self, obj, index: int = 0):
-        """Move ``obj`` far away with gravity disabled (there is no floor there: partial-room loading)."""
+        """Move ``obj`` far away with gravity disabled (there is no floor there: partial-room loading). Gravity is
+        switched off **persistently** (:meth:`set_gravity`): the PhysX view alone forgets it at the next
+        ``og.sim.stop()`` / ``play()`` of a later :meth:`spawn`."""
         obj.set_position_orientation(PARK_POSITION + th.tensor([index * 1.0, 0.0, 0.0]), G.IDENTITY_QUAT)
-        obj.disable_gravity()
+        self.set_gravity(obj, False)
         obj.keep_still()
 
     def activate(self, obj):
         """Re-enable gravity for an object that has been placed. The body is woken explicitly: a sleeping body that was
         teleported through the physics API keeps its old render transform (it is then absent from segmentation renders
         although PhysX has it in view) until it is active during a rendering step."""
-        obj.enable_gravity()
+        self.set_gravity(obj, True)
         obj.wake()
         obj.keep_still()
+
+    def set_gravity(self, obj, enabled: bool):
+        """Gravity on / off for every rigid link of ``obj``, in PhysX **and** in USD.
+
+        ``RigidPrimView.disable_gravities`` writes the PhysX tensor view while the simulation plays and the USD attribute
+        only when it is stopped; ``og.sim.stop()`` / ``play()`` (every later :meth:`spawn`) rebuilds PhysX from USD, so a
+        PhysX-only switch is undone and parked objects fall (measured in the E1 pilot: the source tray's root at z 4.84
+        instead of 5.00 and still falling at ``sample_template`` time). The USD ``PhysxRigidBodyAPI.disableGravity``
+        attribute is therefore written as well (own ``editing_usd`` block — the prim methods open their own and the
+        context must not nest)."""
+        if enabled:
+            obj.enable_gravity()
+        else:
+            obj.disable_gravity()
+        import omnigibson.lazy as lazy
+
+        with og.sim.editing_usd():
+            for link in obj.links.values():
+                prim = getattr(link, "prim", None)
+                if prim is None or not prim.HasAPI(lazy.pxr.UsdPhysics.RigidBodyAPI):
+                    continue
+                api = lazy.pxr.PhysxSchema.PhysxRigidBodyAPI(prim) if prim.HasAPI(lazy.pxr.PhysxSchema.PhysxRigidBodyAPI) \
+                    else lazy.pxr.PhysxSchema.PhysxRigidBodyAPI.Apply(prim)
+                api.GetDisableGravityAttr().Set(not enabled)
+
+    def gravity_disabled_in_usd(self, obj) -> bool:
+        """Whether every rigid link of ``obj`` has ``disableGravity = True`` in USD (probe helper)."""
+        import omnigibson.lazy as lazy
+
+        vals = []
+        for link in obj.links.values():
+            prim = getattr(link, "prim", None)
+            if prim is None or not prim.HasAPI(lazy.pxr.UsdPhysics.RigidBodyAPI):
+                continue
+            if not prim.HasAPI(lazy.pxr.PhysxSchema.PhysxRigidBodyAPI):
+                vals.append(False)
+                continue
+            vals.append(bool(lazy.pxr.PhysxSchema.PhysxRigidBodyAPI(prim).GetDisableGravityAttr().Get()))
+        return bool(vals) and all(vals)
 
     def park_robot(self, xy: Optional[th.Tensor] = None, floor_z: float = 0.0):
         """Stand the robot on a free traversability-map cell of the loaded floor (it must not float / fall)."""
@@ -296,7 +341,15 @@ class SimWorld:
         return xy
 
     def local_hull(self, obj) -> th.Tensor:
-        """Collision boundary points of every link in the object's root frame (for footprints at any orientation)."""
+        """Collision boundary points of every link in the object's root frame (for footprints at any orientation).
+
+        ``link.collision_boundary_points_world`` is transformed with the **render-side** (Fabric / USD) link transform,
+        which physics-only steps do not refresh (``step_physics`` runs ``PhysicsContext._step(update_fabric=False)``),
+        while the root pose comes from PhysX. A body that moved since the last render or teleport therefore gave a hull
+        shifted by that motion (E1 pilot: +6.5 cm in z for a falling tray, ``bottom_offset`` off by the same amount, the
+        tray placed inside the table slab). PhysX is synchronised to Fabric first, so both sides describe the same pose.
+        """
+        self.sync_render_transforms()
         root = obj.get_position_orientation()
         pts = []
         for link in obj.links.values():
@@ -309,6 +362,15 @@ class SimWorld:
         world = th.cat(pts, dim=0)
         Rt = T.quat2mat(root[1]).T
         return (world - root[0]) @ Rt.T
+
+    def sync_render_transforms(self):
+        """Push the PhysX poses to the render-side (Fabric) transforms that ``collision_boundary_points_world`` / ``aabb``
+        read (``og.sim.sync_physx_to_fabric``; a single render frame when the fabric interface is unavailable)."""
+        try:
+            og.sim.sync_physx_to_fabric()
+        except Exception as e:  # noqa: BLE001 - e.g. no fabric interface in this build: a render does the same, slower
+            log.debug("sync_physx_to_fabric unavailable (%r); rendering one frame instead", e)
+            og.sim.render()
 
     def hull_at(self, local_hull: th.Tensor, pose: G.Pose) -> th.Tensor:
         return G.local_points_world(local_hull, pose)

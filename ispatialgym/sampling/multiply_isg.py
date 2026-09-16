@@ -88,7 +88,9 @@ def main(argv=None):
     parser.add_argument("--log-level", default=os.environ.get("ISPATIALGYM_LOG_LEVEL", "INFO"))
     args = parser.parse_args(argv)
 
-    logging.basicConfig(level=args.log_level, format="[%(levelname)s %(name)s] %(message)s", stream=sys.stdout, force=True)
+    from ispatialgym.sampling.sample_isg import configure_logging
+
+    configure_logging(args.log_level)
     template_dir = os.path.abspath(args.template)
     meta = load_template(template_dir)
     meta["_dir"] = template_dir

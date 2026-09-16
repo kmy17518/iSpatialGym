@@ -62,6 +62,27 @@ log = logging.getLogger("ispatialgym.sampling.v2")
 # ----------------------------------------------------------------------------------------------------------------
 
 
+def configure_logging(level: str) -> None:
+    """The CLI ``--log-level`` wins: ``ispatialgym.oracle`` gives the ``ispatialgym`` logger its own stdout handler with the
+    level of ``ISPATIALGYM_LOG_LEVEL`` (read at import) and ``propagate = False``, so ``basicConfig`` alone never reaches the
+    ``ispatialgym.*`` loggers. The env is set for the imports still to come and the existing logger / handlers re-levelled."""
+    lvl = str(level).upper()
+    os.environ["ISPATIALGYM_LOG_LEVEL"] = lvl
+    # third-party loggers (h5py, matplotlib, ...) stay at INFO: only the ispatialgym tree follows the flag
+    logging.basicConfig(level="INFO", format="[%(levelname)s %(name)s] %(message)s", stream=sys.stdout, force=True)
+    root = logging.getLogger("ispatialgym")
+    if not root.handlers:  # the same handler ispatialgym.oracle would create at import (it then finds one and keeps it)
+        h = logging.StreamHandler(sys.stdout)
+        h.setFormatter(logging.Formatter("[%(levelname)s %(name)s] %(message)s"))
+        root.addHandler(h)
+        root.propagate = False
+    root.setLevel(lvl)
+    for h in root.handlers:
+        h.setLevel(lvl)
+    for name in ("ispatialgym.sampling", "ispatialgym.sampling.v2", "ispatialgym.oracle", "ispatialgym.validate"):
+        logging.getLogger(name).setLevel(lvl)
+
+
 def rooms_for(problem: GroundedProblem, scene: str, stable_scene: dict) -> List[str]:
     """Task rooms = ``scenes.<scene>.rooms`` + the rooms of the bound scene objects (§3.1)."""
     rooms = list(problem.rooms(scene))
@@ -275,7 +296,7 @@ def main(argv=None):
     parser.add_argument("--log-level", default=os.environ.get("ISPATIALGYM_LOG_LEVEL", "INFO"))
     args = parser.parse_args(argv)
 
-    logging.basicConfig(level=args.log_level, format="[%(levelname)s %(name)s] %(message)s", stream=sys.stdout, force=True)
+    configure_logging(args.log_level)
     if args.world_key:
         return print_world_keys(args)
     os.makedirs(args.out, exist_ok=True)

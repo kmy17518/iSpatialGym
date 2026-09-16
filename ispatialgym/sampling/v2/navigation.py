@@ -303,7 +303,10 @@ class attached:
             from ispatialgym.sampling import geometry as G
 
             p, q = self.obj.get_position_orientation()
-            self._saved = (p.clone(), q.clone(), bool(getattr(self.obj, "_gravity_enabled", True)))
+            world = getattr(self.kit, "world", None)
+            # the object's gravity state before the teleport: parked objects have it off persistently (USD), placed ones on
+            grav = (not world.gravity_disabled_in_usd(self.obj)) if world is not None and hasattr(world, "gravity_disabled_in_usd") else True
+            self._saved = (p.clone(), q.clone(), grav)
             eef = self.kit.robot.eef_links[self.arm].get_position_orientation()
             obj_pose = G.compose((eef[0].float(), eef[1].float()), G.invert((G.t(self.eef_in_object[0]), G.t(self.eef_in_object[1]))))
             self.obj.disable_gravity()
@@ -343,7 +346,10 @@ class attached:
 
             p, q, grav = self._saved
             self.obj.set_position_orientation(p, q)
-            if grav:
+            world = getattr(self.kit, "world", None)
+            if world is not None and hasattr(world, "set_gravity"):
+                world.set_gravity(self.obj, grav)  # back to the state it had (parked objects stay gravity-free)
+            elif grav:
                 self.obj.enable_gravity()
             self.obj.keep_still()
             og.sim.step_physics()

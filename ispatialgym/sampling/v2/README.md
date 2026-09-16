@@ -270,6 +270,22 @@ two world loads (1096 s: 562 + 534 s on a cold pod — dining room vs living roo
 **reused** the first world (134 s for the whole alias vs 961 / 984 s for the loading ones; template + instance 122 s); fleet
 reach-band cache hits for apple and marker. Sidecars carry `idle_posture` / `arms_q` per stance and `ik_witnesses` per action.
 
+### Simulator facts fixed in `sim_utils.py` (2026-09-16, from the disembedding root cause `9744b34`)
+
+- **Parked objects fell**: `RigidPrimView.disable_gravities` writes the PhysX view while playing and USD only when stopped;
+  every later `spawn()` does `og.sim.stop()/play()`, which rebuilds PhysX from USD → gravity back on for everything parked
+  before, and there is no floor under the parking slots. `SimWorld.set_gravity(obj, enabled)` now writes the USD
+  `PhysxRigidBodyAPI.disableGravity` attribute too (persistent across stop/play), `park()` / `activate()` use it and
+  `spawn()` re-parks every earlier spawned object after `play()`. `navigation.attached` restores the object's *previous*
+  gravity state (`gravity_disabled_in_usd`) instead of re-enabling it blindly.
+- **`local_hull` mixed frames**: `collision_boundary_points_world` is transformed with the render-side (Fabric) link
+  pose, refreshed only by a render or a teleport, while the root pose is PhysX; after physics-only steps a moving body's
+  hull was shifted by the motion since the last render (+6.5 cm for a falling tray → `bottom_offset` wrong → tray inside
+  the table slab). `local_hull` now calls `SimWorld.sync_render_transforms()` (`og.sim.sync_physx_to_fabric()`, a render
+  frame as fallback) before reading. Task modules may drop their re-park workarounds once they run on this version.
+- `--log-level` of the CLIs now wins over `ISPATIALGYM_LOG_LEVEL` (`sample_isg.configure_logging`: the `ispatialgym` logger and
+  its stdout handler are re-levelled; third-party loggers stay at INFO).
+
 ## Status (D2 / D4, 2026-09-15) and gaps
 
 Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,
