@@ -478,7 +478,8 @@ class BlockDesign(SamplerV2):
                         lift = (g_pick.eef[0] + th.tensor([0.0, 0.0, self._carry_height()]), g_pick.eef[1])
                         pivot = self._centre(pick_pose)[0] + th.tensor([0.0, 0.0, self._carry_height()])
                         if plan["flips"]:
-                            wps = list(C.flip_waypoints(lift, pivot, plan["flip_axis"], plan["flip_sign"], math.radians(plan["yaw_deg"]), n_yaw=2, n_flip=3))
+                            # F5 order: (eef_pose, pivot, yaw [rad], flip_axis, flip_sign)
+                            wps = list(C.flip_waypoints(lift, pivot, math.radians(plan["yaw_deg"]), plan["flip_axis"], plan["flip_sign"], n_yaw=2, n_flip=3))
                         else:
                             wps = list(C.orbit_waypoints(lift, pivot, C.quat_from_yaw(math.radians(plan["yaw_deg"])), n=2))
                         r_w = self.ikc.waypoints_ok([lift] + wps, manip, "right", ignore_all=[support])
