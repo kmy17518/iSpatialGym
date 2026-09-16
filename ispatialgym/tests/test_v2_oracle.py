@@ -15,6 +15,8 @@ from __future__ import annotations
 import json
 import math
 from types import SimpleNamespace
+
+import h5py
 import os
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -371,6 +373,7 @@ class FakeSim:
 
     def render(self):
         self.renders += 1
+        self.env._render_once()
 
 
 class FakeEnv:
@@ -388,9 +391,40 @@ class FakeEnv:
         self.last_action = None
         self._closing = {a: False for a in M.ARMS}
         self._refuse = {a: False for a in M.ARMS}
+        # the fake renderer: like the simulator, a frame shows the scene the renderer last synced, one step behind
+        # the physics (after ``load_state`` the first draw still shows the pre-restore scene)
+        self._usd_state = self._render_state()
+        self._frame = self._image_of(self._usd_state)
+
+    def _render_state(self):
+        """What the renderer would draw: the robot joints + every object pose (a scalar signature per pixel row)."""
+        parts = [self.robot.q.clone(), self.robot.pos.clone()]
+        for o in self.objects.values():
+            parts += [o.pos.clone(), o.quat.clone()]
+        return th.cat(parts)
+
+    @staticmethod
+    def _image_of(state):
+        """An 8x8x4 uint8 'image' encoding the state (so a frame can be traced back to the state it shows)."""
+        vals = th.remainder((state.float() * 1000.0).round(), 251.0).to(th.uint8)
+        rgb = th.zeros(8 * 8 * 3, dtype=th.uint8)
+        n = min(vals.numel(), rgb.numel())
+        rgb[:n] = vals[:n]
+        img = th.full((8, 8, 4), 255, dtype=th.uint8)
+        img[..., :3] = rgb.view(8, 8, 3)
+        return img
+
+    def _render_once(self):
+        self._frame = self._image_of(self._usd_state)  # draws the last synced scene ...
+        self._usd_state = self._render_state()  # ... then syncs the current physics state for the next draw
+
+    def frame_matches_state(self, rgb, state=None) -> bool:
+        """Whether an observed frame (rgb or rgba) shows ``state`` (default: the current physics state)."""
+        want = self._image_of(self._render_state() if state is None else state)[..., :3]
+        return bool(th.equal(th.as_tensor(np.asarray(rgb))[..., :3], want))
 
     def _obs(self):
-        return {self.robot.name: {CAM_KEY: {"rgb": th.zeros(8, 8, 4, dtype=th.uint8)}, "proprio": self.robot.q.clone()}}
+        return {self.robot.name: {CAM_KEY: {"rgb": self._frame.clone()}, "proprio": self.robot.q.clone()}}
 
     def _info(self):
         isg = self.evaluate(self)
@@ -452,6 +486,7 @@ class FakeEnv:
         self.last_action = action.clone()
         if getattr(self, "after_step", None) is not None:
             self.after_step(action)  # test hook: scripted world reactions (an object following the pad, spinning, ...)
+        self._render_once()  # env.step(..., n_render_iterations=1)
         return self._obs(), 0.0, False, False, self._info()
 
 
@@ -727,6 +762,66 @@ def test_arm_along_finishes_a_stalled_approach_with_arm_to():
     assert ex.run_action(1, expand(sc.alias, sc)[1]) is None  # the retry from the checkpoint succeeds (the fake stall is one-shot)
     rec = ex.action_records[1]
     assert rec.attempts[0]["category"] == "plan_failed" and rec.attempts[1] is None and "approach_finish" not in rec.notes
+
+
+class _CollectingWriter:
+    """Stands in for the imageio video writer: keeps the frames the recorder commits."""
+
+    def __init__(self):
+        self.frames = []
+
+    def append_data(self, frame):
+        self.frames.append(np.array(frame))
+
+    def close(self):
+        pass
+
+
+def test_failed_attempt_leaves_no_frame_in_the_committed_episode(tmp_path, monkeypatch):
+    """Owner review 2026-09-16: frames of a rolled-back attempt survived in ``head_rgb.mp4``. The renderer trails the
+    physics, so the restore's recorded hold step showed the failed attempt's last arm pose. Every committed row,
+    video frame and LeRobot frame must belong to the committed steps, and every committed frame must show the state
+    of its own row (the fake renderer lags one frame like the simulator)."""
+    monkeypatch.setattr(Recorder, "_open_video", lambda self: setattr(self, "_writer", _CollectingWriter()))
+    sc, env = iors_world()
+    env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path, recorder_cfg=RecorderConfig(hdf5=True, lerobot=False, video=True, frame_buffer="raw"))
+    backend.fail_ik_paths = 1  # the grasp approach fails once: attempt 0 has N > 0 recorded steps (gripper + arm_to)
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["success"], result["verdict"]
+    grasp = result["actions"][1]
+    assert grasp["attempts"][0]["category"] == "plan_failed" and grasp["attempts"][1] is None
+    n_failed = grasp["attempts"][0]["step"] - grasp["step_start"]
+    assert n_failed > 0
+    rows = rec.rows
+    steps = np.asarray(rows["step"])
+    assert len(steps) == result["n_steps"] and np.all(np.diff(steps) == 1)  # committed steps only, contiguous
+    frames = rec._writer.frames
+    assert len(frames) == result["n_steps"]
+    # every committed frame shows a state of the committed sequence: its own row's or (the renderer's one-frame lag)
+    # the previous committed row's — never the failed attempt's (the restore hold step used to show its last pose)
+    q = np.asarray(rows["joint_positions"])
+    base = np.asarray(rows["base_pose"])
+    obj_pose = {name: np.asarray(rows[f"object_pose/{name}"]) for name in env.objects}
+
+    def state_of(i):
+        return th.cat([th.tensor(q[i]).float(), th.tensor(base[i][:3]).float()] + [th.cat([th.tensor(obj_pose[n][i][:3]).float(), th.tensor(obj_pose[n][i][3:]).float()]) for n in env.objects])
+
+    states = [state_of(i) for i in range(len(steps))]
+    for i in range(1, len(steps)):
+        ok = env.frame_matches_state(frames[i], states[i]) or env.frame_matches_state(frames[i], states[i - 1])
+        assert ok, f"frame at committed row {i} (step {steps[i]}) shows a state outside the committed episode"
+    # and the boundary frame in particular is the restored state, not the failed attempt's last one
+    b = grasp["step_start"]  # row index of the restore hold step (steps are 1-based)
+    paths = rec.close({"instance_id": sc.instance_id, "success": True}, qa=result["qa"]["stats"], success=True)
+    with h5py.File(paths["hdf5"]) as f:
+        g = f["data/demo_0"]
+        assert len(g["isg/step"]) == result["n_steps"]
+        rb = g["rollbacks/action_1_attempt_0"]
+        assert len(rb["isg/step"]) == n_failed and int(rb["isg/step"][0]) == grasp["step_start"] + 1
+        q_fail = th.tensor(rb["isg/joint_positions"][-1]).float()
+    failed_state = th.cat([q_fail, states[b][28:]])
+    assert not env.frame_matches_state(frames[b], failed_state) and not env.frame_matches_state(frames[b + 1], failed_state)
 
 
 def test_epilogue_motion_rule_ignores_rotation_without_an_orientation_target(tmp_path):

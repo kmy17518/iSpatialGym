@@ -84,6 +84,9 @@ class ExecutorConfig:
     #: goal image
     goal_image: bool = False
     goal_image_renders: int = 10
+    #: renders after a checkpoint restore before the (recorded) hold step, so no frame of the rolled-back attempt
+    #: survives in the video / dataset (the renderer trails ``load_state`` by 1-2 frames)
+    restore_renders: int = 3
     #: TRO goal override thresholds for measured-only targets (spec §8): max(min_pos, extent_fraction × smallest
     #: horizontal extent) / rot
     override_min_pos: float = 0.01
@@ -478,6 +481,12 @@ class Executor:
         if self.recorder is not None:
             self.recorder.set_observation(cp.obs)
         self.checkpoint_reports.append(report)
+        # -- the renderer trails the physics: the first frame after ``load_state`` still shows the pre-restore scene
+        #    (a sensor read lags the last render by 1-2 frames plus the USD sync, B10), so the failed attempt's last
+        #    arm pose leaked into the committed video as the restore step's frame. Render until the buffers show the
+        #    restored scene before anything is recorded again.
+        for _ in range(int(self.cfg.restore_renders)):
+            self.sim.render()
         # -- the PhysX drive targets are not state: apply the restored hold targets with one (recorded) hold step;
         #    the monitors are off for it (their per-action whitelist is not set up yet)
         if self.motions is not None:
