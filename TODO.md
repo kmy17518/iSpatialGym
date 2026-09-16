@@ -118,14 +118,14 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 10:43 PDT — 5/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 10:44 PDT — 2/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
 | camera_relocalization-standard | valid demo | - | - |
 | camera_relocalization-obstructed | valid demo | tracker corner fix d4a1745 not yet re-demoed | oracle |
-| object_scaling | valid demo | - | - |
-| mental_rotation | valid demo | - | - |
+| object_scaling | demo run (pre-fix success) | - | - |
+| mental_rotation | demo run (pre-fix success) | - | - |
 | disembedding | demo run | chili: empty feasible set F at the focus (tray 1.25 bands landing ≈10:15; in-process band used?) | tabletop / bands |
 | CM block_design | no instance | target_placement x8: no pick passes the screening IK / place + flip exact IK / row brace | tabletop |
 | CM attachment | no instance | one attempt took 1457 s (brace candidates) → remote_run timeout; needs the attempt budget cut | tabletop |
@@ -135,7 +135,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | CM articulation_close_large_scale | no instance | same as open | large-scale |
 | alignment-world_vertical | demo run | instance OK; demo: transition drive-in with untucked arms hits the wall — the stance records arm_posture tucked + arms_q for BOTH arms but the oracle's move_idle_arms moves idle arms only (idle_arms_moved: []) → oracle: apply arms_q to every free arm before the drive-in | oracle |
 | alignment-world_horizontal | no instance | decorative_sign: push_unreachable x8; picture_s070: no spot → next alias / scale fallback | loop / large-scale |
-| alignment-axial | valid demo | - | - |
+| alignment-axial | demo run (pre-fix success) | - | - |
 | IORS ontop_small_scale | demo run (pre-fix success) | - | - |
 | IORS under_small_scale | demo run (pre-fix success) | honest fail now: placed_orientation (cup falls at release) → core item 3 release height from the raycast surface, then re-run | core |
 | IORS inside | demo run (pre-fix success) | re-sample after 160c518 (release height) + drop executor | core / oracle |
