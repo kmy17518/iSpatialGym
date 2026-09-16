@@ -116,6 +116,35 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | G1 | `ground_isg → sample_isg → multiply_isg` on the fleet for all subtasks | E1, D4 | pods | | todo | |
 | G2 | Demo collection with `run_isg`, QA statistics, LeRobot shards | F4, G1 | pods | | todo | |
 
+## First-demo board (mirror)
+
+<!-- first-demo-board --> _2026-09-16 06:57 PDT — 0/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+
+| subtask | state | blocking | owner |
+|---|---|---|---|
+| camera_relocalization-standard | demo run (pre-fix success) | - | - |
+| camera_relocalization-obstructed | demo run (pre-fix success) | tracker corner fix d4a1745 not yet re-demoed | oracle |
+| object_scaling | demo run (pre-fix success) | - | - |
+| mental_rotation | demo run (pre-fix success) | - | - |
+| disembedding | no instance | 4a distractor budget (D1), 4b tray 1.25 (D1+tabletop), 9 band keying (bands) | D1 / tabletop / bands |
+| CM block_design | no instance | pick spacing 10.1 cm smoke; left band + A1 placement | tabletop |
+| CM attachment | no instance | left band + A1 placement (skateboard edge_too_short = yield) | tabletop |
+| CM articulation_open_small_scale | no instance | brace band empty (§5.4) → left contact band wiring; floor_support_todo | tabletop |
+| CM articulation_close_small_scale | no instance | same as open | tabletop |
+| CM articulation_open_large_scale | no instance | item 6 roomy picks (A3 + D1), A4 cabinet class landed | A3 / D1 / large-scale |
+| CM articulation_close_large_scale | no instance | same as open | A3 / D1 / large-scale |
+| alignment-world_vertical | no instance | program_check brace ignore set (core), hanger blacklist (D1) | core / D1 |
+| alignment-world_horizontal | no instance | same as vertical | core / D1 |
+| alignment-axial | no instance | two-arm stop at the robot's limit (decision), blade stand-off landed | tabletop / owner |
+| IORS ontop_small_scale | demo run (pre-fix success) | - | - |
+| IORS under_small_scale | no instance | re-run after e4a1b5c (stalled approach finish) | oracle |
+| IORS inside | no instance | re-sample after 160c518 (release height) + drop executor | core / oracle |
+| IORS nextto | demo run (pre-fix success) | near-side goal 160c518 (future sampling) | - |
+| IORS touching | no instance | left band + joint gate (core landed), blade stand-off | core / tabletop |
+| IORS ontop_large_scale | no instance | T2/T3 supports or floor class (new machinery) | large-scale |
+| IORS under_large_scale | no instance | item 7 push-under (sampler + program + oracle) | large-scale / oracle |
+<!-- /first-demo-board -->
+
 ## Decisions register (apply everywhere; details in the design thread and, after A3, in the docs)
 
 - Names: `iddl` (files), `icl` (candidate list), stages `ground_isg → sample_isg → multiply_isg`, demo/eval script `run_isg`.
