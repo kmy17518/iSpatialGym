@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 16:04 PDT — 5/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 16:05 PDT — 5/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -133,16 +133,16 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | CM articulation_close_small_scale | no instance | same as open | owner / tabletop |
 | CM articulation_open_large_scale | no instance | floor fixed (7 Phase-2 survivors/attempt); step 5: handle [pre, final] exact IK fails (pinch -1) x15, arm reaches j_link_2 only to fraction ≤ 0.11 from d 0.75–0.80 x8 → large-scale (stance distance / opening reach); no blacklist before the verdict (owner) | large-scale |
 | CM articulation_close_large_scale | no instance | same as open | large-scale |
-| alignment-world_vertical | demo run | after the wrist-camera fix: push_unreachable x8 (26dfaab) → large-scale | large-scale |
-| alignment-world_horizontal | demo run | first horizontal instance sampled (15:02); demo plan_failed at push → oracle / large-scale | oracle |
+| alignment-world_vertical | demo run | sampler yields (painting_s070, 1 instance in 2 attempts); demo: brace ✓, push [execution] joints did not converge 1.39 rad → oracle | oracle |
+| alignment-world_horizontal | demo run | sampler yields (license_plate, attempt 0); demo: brace ✓, push plan_failed (pushed target not ignored by the push plan) → oracle | oracle |
 | alignment-axial | valid demo | - | - |
 | IORS ontop_small_scale | demo run (pre-fix success) | - | - |
 | IORS under_small_scale | demo run (pre-fix success) | sweep: placed_orientation again with the well release (cup still tips) → core: check the landing (well rim vs bottom) / drop height | core |
 | IORS inside | demo run (pre-fix success) | sweep-1 regression: grasp_unreachable x6 'exact IK failed at pose 1 of 2' (the pre-grasp) after the 12:00–14:00 core changes (11:01 run sampled at attempt 0) → core to bisect | core |
-| IORS nextto | demo run (pre-fix success) | sampled; demo lift stalled (diff-IK 5.2 mm at waypoint 7/31, no joint limit) → oracle DLS item, demo-only re-run | oracle |
+| IORS nextto | demo run (pre-fix success) | clean execution; placed_orientation 0.386 rad = the marker rolls about its axis at release → proposal: gate on the up-axis tilt (15°) instead of the full orientation (owner veto?) | oracle / owner |
 | IORS touching | no instance | approach_untrackable (intermediate waypoint collides with the target itself) + place_unreachable → core: ignore the target along the approach segment | core |
 | IORS ontop_large_scale | no instance | countertop pair (local, 11:15): stance A failed the new goal-region rule on all 6 lateral redraws at the only free edge (+u), no reason logged → large-scale to diagnose; sofa-bar running locally with the C in-frame rule | large-scale / coordinator (local) |
-| IORS under_large_scale | no instance | push-under sampler + program landed; no instance yet (floor reach at the envelope edge; side stances, deepest trunk first untested) → loop run on the pool now | large-scale / loop |
+| IORS under_large_scale | no instance | push-under: drops feasible at side stances; push chain failed at the ground slab → blade 6–9 cm (d073579); loop re-run in progress | large-scale / loop |
 <!-- /first-demo-board -->
 
 ## Decisions register (apply everywhere; details in the design thread and, after A3, in the docs)

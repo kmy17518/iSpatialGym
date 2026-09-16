@@ -973,6 +973,16 @@ reject `no_stance` (with `scale_hint`).
 `:init` true, goal false, goal feasibility by teleport to the level pose + settle). Sidecar: `init_stance`,
 `manipulation_stance`, `push_contacts`, `constraints`, `scale`.
 
+**Contacts near the wall (`[pilot]` 2026‑09‑16, implemented `2e29921` / `1f921e5` / `464259c` / `20cfe86`).** Every solved
+contact configuration (brace pre / contact, push pre / init / goal, the combined brace + push) is re‑checked with the
+wall present at margin 0 after the wall‑free IK: the pads may sit 2 cm off the wall, a wrist or wrist camera inside it
+fails. The closing axis may lie in the wall plane (the gripper's thin side toward the wall; along n the palm penetrates
+the wall at either wrist turn); the brace / push approach is pitched 30° / 45° off the wall toward the room (0° last;
+with the approach in the wall plane the forearm lies along the wall 2 cm from it and penetrates it). Brace / push key
+poses require the fingertips in the head camera frame (5 %) from the manipulation stance. The loose angle class stays
+as the step‑5 fall‑back pool behind the best class. `[pilot]`: `painting_s070` writes an instance in 2 attempts,
+`license_plate` (horizontal) at attempt 0.
+
 **Two-arm stance posture (A6).** The manipulation stance records the idle-arm / drive-in posture it was checked with
 (`arms_q`, `idle_posture`, `fingers`; the wall uses `tucked` with closed pads: hanging arms clear the wall at
 d = 0.5–0.55 m where untucked or ready hands do not), self-collision on; the drive-in s_T → s is checked with that

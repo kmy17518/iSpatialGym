@@ -56,11 +56,11 @@
   "owner": "large-scale"
  },
  "alignment-world_vertical": {
-  "blocking": "after the wrist-camera fix: push_unreachable x8 (26dfaab) \u2192 large-scale",
-  "owner": "large-scale"
+  "blocking": "sampler yields (painting_s070, 1 instance in 2 attempts); demo: brace \u2713, push [execution] joints did not converge 1.39 rad \u2192 oracle",
+  "owner": "oracle"
  },
  "alignment-world_horizontal": {
-  "blocking": "first horizontal instance sampled (15:02); demo plan_failed at push \u2192 oracle / large-scale",
+  "blocking": "sampler yields (license_plate, attempt 0); demo: brace \u2713, push plan_failed (pushed target not ignored by the push plan) \u2192 oracle",
   "owner": "oracle"
  },
  "alignment-axial": {
@@ -83,8 +83,8 @@
   "owner": "core"
  },
  "inter_object_relation_satisfaction-nextto": {
-  "blocking": "sampled; demo lift stalled (diff-IK 5.2 mm at waypoint 7/31, no joint limit) \u2192 oracle DLS item, demo-only re-run",
-  "owner": "oracle"
+  "blocking": "clean execution; placed_orientation 0.386 rad = the marker rolls about its axis at release \u2192 proposal: gate on the up-axis tilt (15\u00b0) instead of the full orientation (owner veto?)",
+  "owner": "oracle / owner"
  },
  "inter_object_relation_satisfaction-touching": {
   "blocking": "approach_untrackable (intermediate waypoint collides with the target itself) + place_unreachable \u2192 core: ignore the target along the approach segment",
@@ -95,7 +95,7 @@
   "owner": "large-scale / coordinator (local)"
  },
  "inter_object_relation_satisfaction-under_large_scale": {
-  "blocking": "push-under sampler + program landed; no instance yet (floor reach at the envelope edge; side stances, deepest trunk first untested) \u2192 loop run on the pool now",
+  "blocking": "push-under: drops feasible at side stances; push chain failed at the ground slab \u2192 blade 6\u20139 cm (d073579); loop re-run in progress",
   "owner": "large-scale / loop"
  }
 }
