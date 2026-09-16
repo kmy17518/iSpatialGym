@@ -351,8 +351,10 @@ class AlignmentAxial(SamplerV2):
                     # waypoint was screened above, §3.9) — B3's contact classes on the stop face first (pads on the
                     # face, fingers stacked / side by side), then the legacy top-down blade beside the stop edge
                     for brace_pre, brace, kind in self._brace_candidates(manip, stop_pt, d_stop, jp.get("brace_classes")):
+                        # the contact pose touches the target (pads on its face / the blade against its edge) and stands
+                        # on the top: both are ignored for the contact pose only, as the target is for the push (§3.6)
                         res_b = TT.brace_second_arm(self, manip, "right", [p_pre, p_goal], "left", [brace_pre, brace], ignore_work_last=[support, target],
-                                                    ignore_brace_last=[support])
+                                                    ignore_brace_last=[support, target])
                         if res_b.ok:
                             brace_found = (brace_pre, brace, kind)
                             break

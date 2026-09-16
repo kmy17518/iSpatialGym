@@ -1535,10 +1535,27 @@ def whole_body_check_at(s, stances: Sequence[Stance], objects: Dict[str, Pose], 
 
 
 def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose], brace_arm: str, brace_poses: Sequence[Pose], *,
-                     ignore_work_last: Sequence[Any] = (), ignore_brace_last: Sequence[Any] = ()):
+                     ignore_work_last: Sequence[Any] = (), ignore_brace_last: Sequence[Any] = (), fingers: Optional[float] = None):
     """§4.6 step 6: the working arm's poses first (exact IK), then the other arm's [pre-contact, contact] with the working
-    arm locked at its solution, combined whole-body check (``IKChecker.exact_both_arms``). Returns the ``IKResult``."""
-    return s.ikc.exact_both_arms((work_arm, list(work_poses)), (brace_arm, list(brace_poses)), stance, list(ignore_work_last), list(ignore_brace_last))
+    arm locked at its solution, combined whole-body check of the final configuration. Same steps as
+    ``IKChecker.exact_both_arms``, except that the combined check ignores the objects the two final poses touch
+    (``ignore_work_last`` ∪ ``ignore_brace_last``: the support and the pushed / braced object — §3.6 "ignored for the
+    contact pose only"); with them in the world every pad-on-face contact reads "combined configuration collides".
+    Returns the ``IKResult``."""
+    IK = _ik()
+    ikc = s.ikc
+    r1 = ikc.exact(list(work_poses), stance, work_arm, list(ignore_work_last), cache=False, fingers=fingers)
+    if not r1.ok:
+        return IK.IKResult(False, None, f"{work_arm}: {r1.reason}")
+    r2 = ikc.exact(list(brace_poses), stance, brace_arm, list(ignore_brace_last), q_seed=r1.q.clone(), cache=False, fingers=fingers)
+    if not r2.ok:
+        return IK.IKResult(False, None, f"{brace_arm} (brace): {r2.reason}")
+    touched = list(ignore_work_last) + [o for o in ignore_brace_last if all(o is not w for w in ignore_work_last)]
+    with ikc.ignoring(touched):
+        free = bool(s.kit.collision_free(r2.q, margin=0.01)[0])
+    if not free:
+        return IK.IKResult(False, None, "combined configuration collides")
+    return IK.IKResult(True, r2.q, "", len(work_poses) + len(brace_poses))
 
 
 @contextmanager
