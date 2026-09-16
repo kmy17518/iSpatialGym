@@ -47,6 +47,65 @@ ReachBands.load(scene, support, obj, key, placed=["tray/gsxbym"])        # disem
 `~/.cache/ispatialgym/reach_bands`, matching the meta fields (never the hashed file name); a miss raises
 `FileNotFoundError` — `sample_isg` then runs the script (spec §4.1). `ReachBands.from_files(path_npz)` reads one file.
 
+## 2026-09-16 additions (owner decisions A1 / A2 / A6, commit `54097c0`)
+
+**Left-arm generic CONTACT bands** (`--arm left --generic-contact --height H`, files `contact__<scene>__<support>__left_h<class>__<key>`):
+one band per (support, object height class) — heights binned to 2 cm (`height_class(h) = round(h / 0.02) * 0.02`), the
+21 brace-task objects of the representative slot on `breakfast_table_rhjoby_0` fall into 8 classes (0.02: blocks, lids,
+caps, books, magazine, letter, keyboard, catalog; 0.04: cork, hardback; 0.06: frying pan; 0.08: light bulb, bag of chips,
+teacup; 0.10: box of sanitary napkins, bottle of medicine; 0.14: skateboard wheel assembly, gym shoe; 0.16: dip candle;
+0.22: carton of milk). The **cell is the contact point** (x ahead, lateral, base frame at the same edge stance as the
+right-hand bands: edge midpoint, s = 0.45 + overhang), not the object centre: placement computes the brace point on the
+object's face and looks it up. Pose set (`CONTACT_CLASSES`, bit order of the per-cell bitmask), closed gripper
+(`fingers = 0`), the idle right arm locked in the trunk's posture, pre-contact 10 cm back along −a against the full
+world, contact pose with the support ignored (§3.6), eef origin = point − `CONTACT_CENTER_Z`·a (pad centre on the point):
+
+| bit | class | approach a (base frame) | closing axis c | contact height |
+|---|---|---|---|---|
+| 0 / 1 | `near_v` / `near_h` | +x (pads on the face toward the robot, pushing away) | up / lateral | top + ¾ h |
+| 2 / 3 | `far_v` / `far_h` | −x (pads on the far face, pulling toward the robot) | up / lateral | top + ¾ h |
+| 4 / 5 | `left_v` / `left_h` | −y (pads on the robot-left face, pushing to the robot's right: row-left / touching-partner braces) | up / forward | top + ¾ h |
+| 6 / 7 | `right_v` / `right_h` | +y (pads on the robot-right face, pushing left) | up / forward | top + ¾ h |
+| 8 / 9 | `top_y0` / `top_y90` | −z (top press) | lateral / forward | top + h |
+
+Smoke (h = 0.10, trunk (0.5, 0), 8 cm): 34 cells, union extent [−0.16, +0.56] (the left band lies to the robot's left,
+mirroring the right band's [−0.56, +0.08]); classes passing: `near_h` 28, `top_y90` 20, `near_v` 13, `left_h` 8,
+`left_v` 5, `top_y0` 5, `far_*` / `right_*` 0 (pulling faces and the robot-right face are out of the left arm's reach).
+
+**Pitched push / pinch classes** (`--generic-pinch`): the generic set is now 2 wrist yaws × pitches {0, 30, 45, 60}° (the
+approach vector tilted from straight down toward the robot's forward direction, i.e. the hand comes from the robot's
+side; `GENERIC_CLASSES = p00_y0, p00_y90, p30_y0, …, p60_y90`, pitch-major). Every generic / contact band stores per
+trunk `t<..>__classes` = `(N,)` int bitmask (bit k = class `meta["classes"][k]` passed at the cell); the `pairs` array
+still lists `(cell, -1, class)` for every passing class. The axial / block bands were recomputed with the extended set
+(new cache keys; the old two-pitch bands were removed).
+
+**Idle-arm posture retry (A6)**: a trunk whose untucked configuration is not collision-free is retried with
+`ARM_READY_Q` (`ready`) and then `tucked` (`POSTURES`); the posture used is recorded per trunk (`trunks[].posture`,
+`trunks[].idle_arm_q = {left: [7], right: [7]}`) and returned by `ReachBands.posture(translate, tilt)`; the stance
+selection uses the same retry. Measured on the floor band (`childs_room_0`, apple): (0.5, −1.2) and (0.75, −1.2) are
+unblocked by `tucked` (`ready` still collides), (0.95, −0.9) and (0.95, −1.2) collide with every posture at a floor
+stance (torso / head within the 1 cm margin of the floor mesh), and at the table stance the crouched trunks collide with
+the table whatever the arms do. The `brace` mode and the v2 `articulation_small` module's `brace_candidates` consumer
+keep working (`BraceCandidate` unpacks as `(kind, pair)`, `.q_prefix` carries the joint-value prefix).
+
+**Loader API (additions, backward compatible)**::
+
+    rb_r = ReachBands.load(scene, support, obj, grasp_key)                                   # right-hand band (unchanged)
+    rb_l = ReachBands.load(scene, support, arm="left", contact_set="generic_contact", height=h)  # left contact band of the object's height class
+    rb_l.union_extent()                       # (λmin, λmax) of the left band -> §4.4 margins use the union of both bands' extents
+    rb_l.classes_at(translate, tilt, brace_pt)  # ["near_h", "top_y90", ...] contact classes feasible at the brace point (nearest cell)
+    rb_l.band_for_class(translate, tilt, "left_h")  # cells where one class passes
+    rb_r.classes_at(translate, tilt, push_pt)   # generic push classes at a cell, e.g. ["p00_y0", "p30_y0", "p45_y0"] -> prefer the shallowest pitch
+    rb.posture(translate, tilt)               # {"posture": "tucked", "idle_arm_q": {...}} - the idle-arm posture the trunk needs
+    rb.class_names                            # bit order of the bitmask
+    rb.classes[(translate, tilt)]             # raw (N,) bitmask aligned with rb.cells[(translate, tilt)]
+
+Joint placement (owner A1): work point ∈ `rb_r.band(t, k)` **and** brace point ∈ `rb_l.band(t, k)` at the same trunk, then
+the exact two-arm IK; the trunk's `posture()` is the idle-arm posture to record in the stance. `BandComputer.compute`
+now returns `result["classes"]` as well — in-process band writers (`sampling.v2.tabletop.compute_bands`) should save it
+as `t<..>__classes` and copy `meta["classes"]`, and pass `arm=` / set `bc.contact_height` + `bc.fingers = 0` for a left
+contact band.
+
 ## Smoke (local RTX 4090, `--smoke`: 16 cm lattice, trunks (0.5, 0) and (0.25, −0.3))
 
 * **Shoulder-FK fix verified**: the band computation's shoulder position (cuRobo FK of `torso_link4` + the constant

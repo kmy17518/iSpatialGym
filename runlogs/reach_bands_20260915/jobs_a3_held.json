@@ -1,0 +1,3080 @@
+[
+ {
+  "id": "rb__contact__restaurant_diner__bar_xxftww_0__h0.02__left",
+  "kind": "contact",
+  "subtasks": [
+   "brace"
+  ],
+  "picks": [],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--arm",
+   "left",
+   "--generic-contact",
+   "--height",
+   "0.02"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --arm left --generic-contact --height 0.02 --out $OUT"
+ },
+ {
+  "id": "rb__contact__restaurant_diner__bar_xxftww_0__h0.04__left",
+  "kind": "contact",
+  "subtasks": [
+   "brace"
+  ],
+  "picks": [],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--arm",
+   "left",
+   "--generic-contact",
+   "--height",
+   "0.04"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --arm left --generic-contact --height 0.04 --out $OUT"
+ },
+ {
+  "id": "rb__contact__restaurant_diner__bar_xxftww_0__h0.10__left",
+  "kind": "contact",
+  "subtasks": [
+   "brace"
+  ],
+  "picks": [],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--arm",
+   "left",
+   "--generic-contact",
+   "--height",
+   "0.10"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --arm left --generic-contact --height 0.10 --out $OUT"
+ },
+ {
+  "id": "rb__contact__restaurant_diner__bar_xxftww_0__h0.12__left",
+  "kind": "contact",
+  "subtasks": [
+   "brace"
+  ],
+  "picks": [],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--arm",
+   "left",
+   "--generic-contact",
+   "--height",
+   "0.12"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --arm left --generic-contact --height 0.12 --out $OUT"
+ },
+ {
+  "id": "rb__contact__restaurant_diner__commercial_kitchen_table_vxvtec_0__h0.02__left",
+  "kind": "contact",
+  "subtasks": [
+   "brace"
+  ],
+  "picks": [],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--arm",
+   "left",
+   "--generic-contact",
+   "--height",
+   "0.02"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --arm left --generic-contact --height 0.02 --out $OUT"
+ },
+ {
+  "id": "rb__contact__restaurant_diner__commercial_kitchen_table_vxvtec_0__h0.04__left",
+  "kind": "contact",
+  "subtasks": [
+   "brace"
+  ],
+  "picks": [],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--arm",
+   "left",
+   "--generic-contact",
+   "--height",
+   "0.04"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --arm left --generic-contact --height 0.04 --out $OUT"
+ },
+ {
+  "id": "rb__contact__restaurant_diner__commercial_kitchen_table_vxvtec_0__h0.10__left",
+  "kind": "contact",
+  "subtasks": [
+   "brace"
+  ],
+  "picks": [],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--arm",
+   "left",
+   "--generic-contact",
+   "--height",
+   "0.10"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --arm left --generic-contact --height 0.10 --out $OUT"
+ },
+ {
+  "id": "rb__contact__restaurant_diner__commercial_kitchen_table_vxvtec_0__h0.12__left",
+  "kind": "contact",
+  "subtasks": [
+   "brace"
+  ],
+  "picks": [],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--arm",
+   "left",
+   "--generic-contact",
+   "--height",
+   "0.12"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --arm left --generic-contact --height 0.12 --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__apple-bwteqh",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-ontop_small_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-ontop_small_scale#02"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "apple/bwteqh",
+   "--grasp-key",
+   "apple__bwteqh__t"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object apple/bwteqh --grasp-key apple__bwteqh__t --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__bag_of_chips-ennnjj__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#07"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "bag_of_chips/ennnjj",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object bag_of_chips/ennnjj --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__bar_soap-utgixp__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#30"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "bar_soap/utgixp",
+   "--grasp-key",
+   "bar_soap__utgixp",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object bar_soap/utgixp --grasp-key bar_soap__utgixp --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__beaker-exzsal__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#10"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "beaker/exzsal",
+   "--grasp-key",
+   "beaker__exzsal__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object beaker/exzsal --grasp-key beaker__exzsal__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__board_game-frgdqh__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#03"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "board_game/frgdqh",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object board_game/frgdqh --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__bottle_of_beer-rdnopv__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#11"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "bottle_of_beer/rdnopv",
+   "--grasp-key",
+   "bottle_of_beer__rdnopv__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object bottle_of_beer/rdnopv --grasp-key bottle_of_beer__rdnopv__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__bottle_of_medicine-qqsukh",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-touching"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-touching#04"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "bottle_of_medicine/qqsukh",
+   "--grasp-key",
+   "bottle_of_medicine__qqsukh__t"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object bottle_of_medicine/qqsukh --grasp-key bottle_of_medicine__qqsukh__t --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__bottle_of_medicine-qqsukh__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#22"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "bottle_of_medicine/qqsukh",
+   "--grasp-key",
+   "bottle_of_medicine__qqsukh__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object bottle_of_medicine/qqsukh --grasp-key bottle_of_medicine__qqsukh__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__bottle_of_milk-czblzn__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#07"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "bottle_of_milk/czblzn",
+   "--grasp-key",
+   "bottle_of_milk__czblzn__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object bottle_of_milk/czblzn --grasp-key bottle_of_milk__czblzn__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__bottle_of_shampoo-hlkpwd__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#06"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "bottle_of_shampoo/hlkpwd",
+   "--grasp-key",
+   "bottle_of_shampoo__hlkpwd__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object bottle_of_shampoo/hlkpwd --grasp-key bottle_of_shampoo__hlkpwd__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__box_of_baking_mix-fnbgwd__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#21"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "box_of_baking_mix/fnbgwd",
+   "--grasp-key",
+   "box_of_baking_mix__fnbgwd",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object box_of_baking_mix/fnbgwd --grasp-key box_of_baking_mix__fnbgwd --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__box_of_cane_sugar-rvsivw__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#12"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "box_of_cane_sugar/rvsivw",
+   "--grasp-key",
+   "box_of_cane_sugar__rvsivw",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object box_of_cane_sugar/rvsivw --grasp-key box_of_cane_sugar__rvsivw --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__box_of_cereal-sgirte__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#02"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "box_of_cereal/sgirte",
+   "--grasp-key",
+   "box_of_cereal__sgirte",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object box_of_cereal/sgirte --grasp-key box_of_cereal__sgirte --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__box_of_cookies-levwda__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#03"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "box_of_cookies/levwda",
+   "--grasp-key",
+   "box_of_cookies__levwda",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object box_of_cookies/levwda --grasp-key box_of_cookies__levwda --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__box_of_rice-yyheuw__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#17"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "box_of_rice/yyheuw",
+   "--grasp-key",
+   "box_of_rice__yyheuw__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object box_of_rice/yyheuw --grasp-key box_of_rice__yyheuw__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__box_of_sanitary_napkins-arqcyu",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-touching"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-touching#01"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "box_of_sanitary_napkins/arqcyu",
+   "--grasp-key",
+   "box_of_sanitary_napkins__arqcyu"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object box_of_sanitary_napkins/arqcyu --grasp-key box_of_sanitary_napkins__arqcyu --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__box_of_sanitary_napkins-arqcyu__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#04"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "box_of_sanitary_napkins/arqcyu",
+   "--grasp-key",
+   "box_of_sanitary_napkins__arqcyu",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object box_of_sanitary_napkins/arqcyu --grasp-key box_of_sanitary_napkins__arqcyu --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__box_of_shampoo-tzghev__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#01"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "box_of_shampoo/tzghev",
+   "--grasp-key",
+   "box_of_shampoo__tzghev",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object box_of_shampoo/tzghev --grasp-key box_of_shampoo__tzghev --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__box_of_tissues-xwstls__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#27"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "box_of_tissues/xwstls",
+   "--grasp-key",
+   "box_of_tissues__xwstls",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object box_of_tissues/xwstls --grasp-key box_of_tissues__xwstls --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__brussels_sprouts-vdamtq",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-inside"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-inside#01"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "brussels_sprouts/vdamtq",
+   "--grasp-key",
+   "brussels_sprouts__vdamtq__i"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object brussels_sprouts/vdamtq --grasp-key brussels_sprouts__vdamtq__i --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__can_of_soda-lugwcz__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#24"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "can_of_soda/lugwcz",
+   "--grasp-key",
+   "can_of_soda__lugwcz__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object can_of_soda/lugwcz --grasp-key can_of_soda__lugwcz__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__carton_of_milk-kklgxk__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#13"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "carton_of_milk/kklgxk",
+   "--grasp-key",
+   "carton_of_milk__kklgxk",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object carton_of_milk/kklgxk --grasp-key carton_of_milk__kklgxk --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__cellulose_tape-sklkyc__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#18"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "cellulose_tape/sklkyc",
+   "--grasp-key",
+   "cellulose_tape__sklkyc",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object cellulose_tape/sklkyc --grasp-key cellulose_tape__sklkyc --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__chili-xhbpqh__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#14"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "chili/xhbpqh",
+   "--grasp-key",
+   "chili__xhbpqh",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object chili/xhbpqh --grasp-key chili__xhbpqh --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__cinnamon_stick-qmlyim__scaled",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-nextto"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-nextto#04"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "cinnamon_stick/qmlyim",
+   "--grasp-key",
+   "cinnamon_stick__qmlyim__s",
+   "--scale",
+   "1.054,1.0,1.326"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object cinnamon_stick/qmlyim --grasp-key cinnamon_stick__qmlyim__s --scale 1.054,1.0,1.326 --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__coffee_cup-fgizgn",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-ontop_small_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-ontop_small_scale#03"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "coffee_cup/fgizgn",
+   "--grasp-key",
+   "coffee_cup__fgizgn__t"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object coffee_cup/fgizgn --grasp-key coffee_cup__fgizgn__t --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__conditioner_dispenser-udeflt__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#19"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "conditioner_dispenser/udeflt",
+   "--grasp-key",
+   "conditioner_dispenser__udeflt__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object conditioner_dispenser/udeflt --grasp-key conditioner_dispenser__udeflt__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__cork-lseuwf",
+  "kind": "tabletop",
+  "subtasks": [
+   "configuration_matching-attachment"
+  ],
+  "picks": [
+   "configuration_matching-attachment#02"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "cork/lseuwf",
+   "--grasp-key",
+   "cork__lseuwf"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object cork/lseuwf --grasp-key cork__lseuwf --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__dip_candle-gbaons",
+  "kind": "tabletop",
+  "subtasks": [
+   "configuration_matching-attachment"
+  ],
+  "picks": [
+   "configuration_matching-attachment#01"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "dip_candle/gbaons",
+   "--grasp-key",
+   "dip_candle__gbaons"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object dip_candle/gbaons --grasp-key dip_candle__gbaons --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__french_fries-oeterg__scaled",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-under_small_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-under_small_scale#01"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "french_fries/oeterg",
+   "--grasp-key",
+   "french_fries__oeterg__s",
+   "--scale",
+   "1.0,1.871,2.385"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object french_fries/oeterg --grasp-key french_fries__oeterg__s --scale 1.0,1.871,2.385 --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__frying_pan-aewpzn__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#08"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "frying_pan/aewpzn",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object frying_pan/aewpzn --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__gym_shoe-arigtn__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#04"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "gym_shoe/arigtn",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object gym_shoe/arigtn --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__hard_candy-vyxhmv",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-inside"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-inside#02"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "hard_candy/vyxhmv",
+   "--grasp-key",
+   "hard_candy__vyxhmv"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object hard_candy/vyxhmv --grasp-key hard_candy__vyxhmv --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__hardback-bqvvvx__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#05"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "hardback/bqvvvx",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object hardback/bqvvvx --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__ice_cube-kdlafa",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-inside"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-inside#04"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "ice_cube/kdlafa",
+   "--grasp-key",
+   "ice_cube__kdlafa__i"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object ice_cube/kdlafa --grasp-key ice_cube__kdlafa__i --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__jar_of_spaghetti_sauce-efrxze",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-nextto"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-nextto#05"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "jar_of_spaghetti_sauce/efrxze",
+   "--grasp-key",
+   "jar_of_spaghetti_sauce__efrxze__t"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object jar_of_spaghetti_sauce/efrxze --grasp-key jar_of_spaghetti_sauce__efrxze__t --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__keyboard-nddmmy__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#09"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "keyboard/nddmmy",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object keyboard/nddmmy --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__letter-bdlpry__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#06"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "letter/bdlpry",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object letter/bdlpry --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__light_bulb-ymomhw",
+  "kind": "tabletop",
+  "subtasks": [
+   "configuration_matching-attachment"
+  ],
+  "picks": [
+   "configuration_matching-attachment#03"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "light_bulb/ymomhw",
+   "--grasp-key",
+   "light_bulb__ymomhw"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object light_bulb/ymomhw --grasp-key light_bulb__ymomhw --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__magazine-ehdwsd__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#02"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "magazine/ehdwsd",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object magazine/ehdwsd --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__marker-qemval",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-nextto"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-nextto#02"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "marker/qemval",
+   "--grasp-key",
+   "marker__qemval"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object marker/qemval --grasp-key marker__qemval --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__mouse-eosngb__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#28"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "mouse/eosngb",
+   "--grasp-key",
+   "mouse__eosngb__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object mouse/eosngb --grasp-key mouse__eosngb__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__mug-ehnmxj__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#25"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "mug/ehnmxj",
+   "--grasp-key",
+   "mug__ehnmxj__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object mug/ehnmxj --grasp-key mug__ehnmxj__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__notebook-dlhxxl__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#08"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "notebook/dlhxxl",
+   "--grasp-key",
+   "notebook__dlhxxl",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object notebook/dlhxxl --grasp-key notebook__dlhxxl --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__pack_of_cigarettes-ppbmak__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#15"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "pack_of_cigarettes/ppbmak",
+   "--grasp-key",
+   "pack_of_cigarettes__ppbmak",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object pack_of_cigarettes/ppbmak --grasp-key pack_of_cigarettes__ppbmak --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__pack_of_kielbasa-fwqdoy",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-ontop_small_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-ontop_small_scale#01"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "pack_of_kielbasa/fwqdoy",
+   "--grasp-key",
+   "pack_of_kielbasa__fwqdoy__t"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object pack_of_kielbasa/fwqdoy --grasp-key pack_of_kielbasa__fwqdoy__t --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__paperback_book-vciijb__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#01"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "paperback_book/vciijb",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object paperback_book/vciijb --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__parsnip-fwmatc",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-nextto"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-nextto#03"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "parsnip/fwmatc",
+   "--grasp-key",
+   "parsnip__fwmatc"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object parsnip/fwmatc --grasp-key parsnip__fwmatc --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__pencil-fnlbpu__scaled",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-nextto"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-nextto#01"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "pencil/fnlbpu",
+   "--grasp-key",
+   "pencil__fnlbpu__s",
+   "--scale",
+   "1.0,4.217,5.069"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object pencil/fnlbpu --grasp-key pencil__fnlbpu__s --scale 1.0,4.217,5.069 --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__pencil_case-acikzo__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#20"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "pencil_case/acikzo",
+   "--grasp-key",
+   "pencil_case__acikzo",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object pencil_case/acikzo --grasp-key pencil_case__acikzo --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__pickle-gytwes",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-ontop_small_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-ontop_small_scale#04"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "pickle/gytwes",
+   "--grasp-key",
+   "pickle__gytwes"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object pickle/gytwes --grasp-key pickle__gytwes --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__quartz-drqtci",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-inside"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-inside#03"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "quartz/drqtci",
+   "--grasp-key",
+   "quartz__drqtci"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object quartz/drqtci --grasp-key quartz__drqtci --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__soap_dispenser-sinntg__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#09"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "soap_dispenser/sinntg",
+   "--grasp-key",
+   "soap_dispenser__sinntg__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object soap_dispenser/sinntg --grasp-key soap_dispenser__sinntg__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__tablefork-yuihyg__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#29"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "tablefork/yuihyg",
+   "--grasp-key",
+   "tablefork__yuihyg__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object tablefork/yuihyg --grasp-key tablefork__yuihyg__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__teacup-cpozxi",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-under_small_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-under_small_scale#02"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "teacup/cpozxi",
+   "--grasp-key",
+   "teacup__cpozxi__t"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object teacup/cpozxi --grasp-key teacup__cpozxi__t --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__teaspoon-nxddfp__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#16"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "teaspoon/nxddfp",
+   "--grasp-key",
+   "teaspoon__nxddfp__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object teaspoon/nxddfp --grasp-key teaspoon__nxddfp__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__toy_dice-bjrxkj__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#26"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "toy_dice/bjrxkj",
+   "--grasp-key",
+   "toy_dice__bjrxkj",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object toy_dice/bjrxkj --grasp-key toy_dice__bjrxkj --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__bar_xxftww_0__video_game-lfdpse__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#05"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "bar_xxftww_0",
+   "--object",
+   "video_game/lfdpse",
+   "--grasp-key",
+   "video_game__lfdpse",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support bar_xxftww_0 --object video_game/lfdpse --grasp-key video_game__lfdpse --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__apple-bwteqh",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-ontop_small_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-ontop_small_scale#02"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "apple/bwteqh",
+   "--grasp-key",
+   "apple__bwteqh__t"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object apple/bwteqh --grasp-key apple__bwteqh__t --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__bag_of_chips-ennnjj__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#07"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "bag_of_chips/ennnjj",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object bag_of_chips/ennnjj --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__bar_soap-utgixp__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#30"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "bar_soap/utgixp",
+   "--grasp-key",
+   "bar_soap__utgixp",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object bar_soap/utgixp --grasp-key bar_soap__utgixp --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__beaker-exzsal__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#10"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "beaker/exzsal",
+   "--grasp-key",
+   "beaker__exzsal__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object beaker/exzsal --grasp-key beaker__exzsal__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__board_game-frgdqh__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#03"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "board_game/frgdqh",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object board_game/frgdqh --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__bottle_of_beer-rdnopv__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#11"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "bottle_of_beer/rdnopv",
+   "--grasp-key",
+   "bottle_of_beer__rdnopv__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object bottle_of_beer/rdnopv --grasp-key bottle_of_beer__rdnopv__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__bottle_of_medicine-qqsukh",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-touching"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-touching#04"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "bottle_of_medicine/qqsukh",
+   "--grasp-key",
+   "bottle_of_medicine__qqsukh__t"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object bottle_of_medicine/qqsukh --grasp-key bottle_of_medicine__qqsukh__t --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__bottle_of_medicine-qqsukh__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#22"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "bottle_of_medicine/qqsukh",
+   "--grasp-key",
+   "bottle_of_medicine__qqsukh__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object bottle_of_medicine/qqsukh --grasp-key bottle_of_medicine__qqsukh__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__bottle_of_milk-czblzn__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#07"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "bottle_of_milk/czblzn",
+   "--grasp-key",
+   "bottle_of_milk__czblzn__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object bottle_of_milk/czblzn --grasp-key bottle_of_milk__czblzn__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__bottle_of_shampoo-hlkpwd__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#06"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "bottle_of_shampoo/hlkpwd",
+   "--grasp-key",
+   "bottle_of_shampoo__hlkpwd__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object bottle_of_shampoo/hlkpwd --grasp-key bottle_of_shampoo__hlkpwd__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_baking_mix-fnbgwd__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#21"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "box_of_baking_mix/fnbgwd",
+   "--grasp-key",
+   "box_of_baking_mix__fnbgwd",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object box_of_baking_mix/fnbgwd --grasp-key box_of_baking_mix__fnbgwd --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_cane_sugar-rvsivw__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#12"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "box_of_cane_sugar/rvsivw",
+   "--grasp-key",
+   "box_of_cane_sugar__rvsivw",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object box_of_cane_sugar/rvsivw --grasp-key box_of_cane_sugar__rvsivw --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_cereal-sgirte__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#02"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "box_of_cereal/sgirte",
+   "--grasp-key",
+   "box_of_cereal__sgirte",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object box_of_cereal/sgirte --grasp-key box_of_cereal__sgirte --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_cookies-levwda__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#03"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "box_of_cookies/levwda",
+   "--grasp-key",
+   "box_of_cookies__levwda",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object box_of_cookies/levwda --grasp-key box_of_cookies__levwda --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_rice-yyheuw__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#17"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "box_of_rice/yyheuw",
+   "--grasp-key",
+   "box_of_rice__yyheuw__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object box_of_rice/yyheuw --grasp-key box_of_rice__yyheuw__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_sanitary_napkins-arqcyu",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-touching"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-touching#01"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "box_of_sanitary_napkins/arqcyu",
+   "--grasp-key",
+   "box_of_sanitary_napkins__arqcyu"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object box_of_sanitary_napkins/arqcyu --grasp-key box_of_sanitary_napkins__arqcyu --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_sanitary_napkins-arqcyu__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#04"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "box_of_sanitary_napkins/arqcyu",
+   "--grasp-key",
+   "box_of_sanitary_napkins__arqcyu",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object box_of_sanitary_napkins/arqcyu --grasp-key box_of_sanitary_napkins__arqcyu --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_shampoo-tzghev__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#01"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "box_of_shampoo/tzghev",
+   "--grasp-key",
+   "box_of_shampoo__tzghev",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object box_of_shampoo/tzghev --grasp-key box_of_shampoo__tzghev --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__box_of_tissues-xwstls__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#27"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "box_of_tissues/xwstls",
+   "--grasp-key",
+   "box_of_tissues__xwstls",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object box_of_tissues/xwstls --grasp-key box_of_tissues__xwstls --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__brussels_sprouts-vdamtq",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-inside"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-inside#01"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "brussels_sprouts/vdamtq",
+   "--grasp-key",
+   "brussels_sprouts__vdamtq__i"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object brussels_sprouts/vdamtq --grasp-key brussels_sprouts__vdamtq__i --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__can_of_soda-lugwcz__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#24"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "can_of_soda/lugwcz",
+   "--grasp-key",
+   "can_of_soda__lugwcz__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object can_of_soda/lugwcz --grasp-key can_of_soda__lugwcz__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__carton_of_milk-kklgxk__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#13"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "carton_of_milk/kklgxk",
+   "--grasp-key",
+   "carton_of_milk__kklgxk",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object carton_of_milk/kklgxk --grasp-key carton_of_milk__kklgxk --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__cellulose_tape-sklkyc__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#18"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "cellulose_tape/sklkyc",
+   "--grasp-key",
+   "cellulose_tape__sklkyc",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object cellulose_tape/sklkyc --grasp-key cellulose_tape__sklkyc --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__chili-xhbpqh__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#14"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "chili/xhbpqh",
+   "--grasp-key",
+   "chili__xhbpqh",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object chili/xhbpqh --grasp-key chili__xhbpqh --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__cinnamon_stick-qmlyim__scaled",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-nextto"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-nextto#04"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "cinnamon_stick/qmlyim",
+   "--grasp-key",
+   "cinnamon_stick__qmlyim__s",
+   "--scale",
+   "1.054,1.0,1.326"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object cinnamon_stick/qmlyim --grasp-key cinnamon_stick__qmlyim__s --scale 1.054,1.0,1.326 --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__coffee_cup-fgizgn",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-ontop_small_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-ontop_small_scale#03"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "coffee_cup/fgizgn",
+   "--grasp-key",
+   "coffee_cup__fgizgn__t"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object coffee_cup/fgizgn --grasp-key coffee_cup__fgizgn__t --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__conditioner_dispenser-udeflt__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#19"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "conditioner_dispenser/udeflt",
+   "--grasp-key",
+   "conditioner_dispenser__udeflt__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object conditioner_dispenser/udeflt --grasp-key conditioner_dispenser__udeflt__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__cork-lseuwf",
+  "kind": "tabletop",
+  "subtasks": [
+   "configuration_matching-attachment"
+  ],
+  "picks": [
+   "configuration_matching-attachment#02"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "cork/lseuwf",
+   "--grasp-key",
+   "cork__lseuwf"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object cork/lseuwf --grasp-key cork__lseuwf --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__dip_candle-gbaons",
+  "kind": "tabletop",
+  "subtasks": [
+   "configuration_matching-attachment"
+  ],
+  "picks": [
+   "configuration_matching-attachment#01"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "dip_candle/gbaons",
+   "--grasp-key",
+   "dip_candle__gbaons"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object dip_candle/gbaons --grasp-key dip_candle__gbaons --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__french_fries-oeterg__scaled",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-under_small_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-under_small_scale#01"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "french_fries/oeterg",
+   "--grasp-key",
+   "french_fries__oeterg__s",
+   "--scale",
+   "1.0,1.871,2.385"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object french_fries/oeterg --grasp-key french_fries__oeterg__s --scale 1.0,1.871,2.385 --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__frying_pan-aewpzn__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#08"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "frying_pan/aewpzn",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object frying_pan/aewpzn --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__gym_shoe-arigtn__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#04"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "gym_shoe/arigtn",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object gym_shoe/arigtn --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__hard_candy-vyxhmv",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-inside"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-inside#02"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "hard_candy/vyxhmv",
+   "--grasp-key",
+   "hard_candy__vyxhmv"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object hard_candy/vyxhmv --grasp-key hard_candy__vyxhmv --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__hardback-bqvvvx__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#05"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "hardback/bqvvvx",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object hardback/bqvvvx --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__ice_cube-kdlafa",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-inside"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-inside#04"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "ice_cube/kdlafa",
+   "--grasp-key",
+   "ice_cube__kdlafa__i"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object ice_cube/kdlafa --grasp-key ice_cube__kdlafa__i --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__jar_of_spaghetti_sauce-efrxze",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-nextto"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-nextto#05"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "jar_of_spaghetti_sauce/efrxze",
+   "--grasp-key",
+   "jar_of_spaghetti_sauce__efrxze__t"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object jar_of_spaghetti_sauce/efrxze --grasp-key jar_of_spaghetti_sauce__efrxze__t --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__keyboard-nddmmy__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#09"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "keyboard/nddmmy",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object keyboard/nddmmy --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__letter-bdlpry__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#06"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "letter/bdlpry",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object letter/bdlpry --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__light_bulb-ymomhw",
+  "kind": "tabletop",
+  "subtasks": [
+   "configuration_matching-attachment"
+  ],
+  "picks": [
+   "configuration_matching-attachment#03"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "light_bulb/ymomhw",
+   "--grasp-key",
+   "light_bulb__ymomhw"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object light_bulb/ymomhw --grasp-key light_bulb__ymomhw --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__magazine-ehdwsd__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#02"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "magazine/ehdwsd",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object magazine/ehdwsd --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__marker-qemval",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-nextto"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-nextto#02"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "marker/qemval",
+   "--grasp-key",
+   "marker__qemval"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object marker/qemval --grasp-key marker__qemval --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__mouse-eosngb__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#28"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "mouse/eosngb",
+   "--grasp-key",
+   "mouse__eosngb__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object mouse/eosngb --grasp-key mouse__eosngb__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__mug-ehnmxj__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#25"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "mug/ehnmxj",
+   "--grasp-key",
+   "mug__ehnmxj__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object mug/ehnmxj --grasp-key mug__ehnmxj__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__notebook-dlhxxl__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#08"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "notebook/dlhxxl",
+   "--grasp-key",
+   "notebook__dlhxxl",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object notebook/dlhxxl --grasp-key notebook__dlhxxl --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_cigarettes-ppbmak__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#15"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "pack_of_cigarettes/ppbmak",
+   "--grasp-key",
+   "pack_of_cigarettes__ppbmak",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object pack_of_cigarettes/ppbmak --grasp-key pack_of_cigarettes__ppbmak --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pack_of_kielbasa-fwqdoy",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-ontop_small_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-ontop_small_scale#01"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "pack_of_kielbasa/fwqdoy",
+   "--grasp-key",
+   "pack_of_kielbasa__fwqdoy__t"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object pack_of_kielbasa/fwqdoy --grasp-key pack_of_kielbasa__fwqdoy__t --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__paperback_book-vciijb__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#01"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "paperback_book/vciijb",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object paperback_book/vciijb --generic-pinch --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__parsnip-fwmatc",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-nextto"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-nextto#03"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "parsnip/fwmatc",
+   "--grasp-key",
+   "parsnip__fwmatc"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object parsnip/fwmatc --grasp-key parsnip__fwmatc --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil-fnlbpu__scaled",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-nextto"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-nextto#01"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "pencil/fnlbpu",
+   "--grasp-key",
+   "pencil__fnlbpu__s",
+   "--scale",
+   "1.0,4.217,5.069"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object pencil/fnlbpu --grasp-key pencil__fnlbpu__s --scale 1.0,4.217,5.069 --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pencil_case-acikzo__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#20"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "pencil_case/acikzo",
+   "--grasp-key",
+   "pencil_case__acikzo",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object pencil_case/acikzo --grasp-key pencil_case__acikzo --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__pickle-gytwes",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-ontop_small_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-ontop_small_scale#04"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "pickle/gytwes",
+   "--grasp-key",
+   "pickle__gytwes"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object pickle/gytwes --grasp-key pickle__gytwes --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__quartz-drqtci",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-inside"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-inside#03"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "quartz/drqtci",
+   "--grasp-key",
+   "quartz__drqtci"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object quartz/drqtci --grasp-key quartz__drqtci --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__soap_dispenser-sinntg__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#09"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "soap_dispenser/sinntg",
+   "--grasp-key",
+   "soap_dispenser__sinntg__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object soap_dispenser/sinntg --grasp-key soap_dispenser__sinntg__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__tablefork-yuihyg__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#29"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "tablefork/yuihyg",
+   "--grasp-key",
+   "tablefork__yuihyg__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object tablefork/yuihyg --grasp-key tablefork__yuihyg__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__teacup-cpozxi",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-under_small_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-under_small_scale#02"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "teacup/cpozxi",
+   "--grasp-key",
+   "teacup__cpozxi__t"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object teacup/cpozxi --grasp-key teacup__cpozxi__t --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__teaspoon-nxddfp__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#16"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "teaspoon/nxddfp",
+   "--grasp-key",
+   "teaspoon__nxddfp__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object teaspoon/nxddfp --grasp-key teaspoon__nxddfp__t --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__toy_dice-bjrxkj__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#26"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "toy_dice/bjrxkj",
+   "--grasp-key",
+   "toy_dice__bjrxkj",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object toy_dice/bjrxkj --grasp-key toy_dice__bjrxkj --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__video_game-lfdpse__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#05"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "video_game/lfdpse",
+   "--grasp-key",
+   "video_game__lfdpse",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object video_game/lfdpse --grasp-key video_game__lfdpse --placed tray/gsxbym --out $OUT"
+ }
+]

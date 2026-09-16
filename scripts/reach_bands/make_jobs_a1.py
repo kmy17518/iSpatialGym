@@ -134,23 +134,25 @@ def main():
                     jj = dict(j, cmd=j["cmd"].replace("timeout 3000 ", TIMEOUT), weight=3.0)
                     jobs[jj["id"]] = jj
     else:
+        # representatives.csv (A3): every pick carries one support row per triplet member and slot (T1/T2/T3), so the
+        # objects of a support = the targets of the picks whose support rows (same slot) name it
         rows = list(csv.DictReader(open(MJ.REPS)))
-        by_pick = defaultdict(dict)
+        targets = defaultdict(dict)  # (pick, slot) -> target row
+        sup_rows = defaultdict(list)  # (pick, slot) -> support rows
         for r in rows:
-            if r["slot"] in args.slots or (r["kind"] == "scene" and r["slot"] == "representative"):
-                by_pick[r["pick"]][r["role"] + ("" if r["slot"] in args.slots else ":rep")] = r
+            if r["role"] in ("target", "targets") and r["slot"] in args.slots:
+                targets[(r["pick"], r["slot"])] = r
+            if r["role"] == "support" and r["kind"] == "scene":
+                sup_rows[(r["pick"], r["slot"])].append(r)
         for ss in args.supports:
             scene, support = ss.split("/", 1)
             classes = set()
-            for pick, roles in by_pick.items():
-                sup = roles.get("support") or roles.get("support:rep")
-                tgt = roles.get("target") or roles.get("targets")
-                if tgt is None or sup is None:
+            for (pick, slot), tgt in targets.items():
+                sups = sup_rows.get((pick, slot)) or sup_rows.get((pick, "representative")) or []
+                if not args.all_objects and not any(s["scene"] == scene and s["name"] == support for s in sups):
                     continue
                 subtask = tgt["subtask"]
                 if subtask not in MJ.TABLETOP_SUBTASKS:
-                    continue
-                if not args.all_objects and not (sup["scene"] == scene and sup["name"] == support):
                     continue
                 pipeline = MJ.TABLETOP_SUBTASKS[subtask]
                 obj = f"{tgt['category']}/{tgt['model']}"

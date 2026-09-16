@@ -1,0 +1,342 @@
+[
+ {
+  "id": "rb__contact__house_single_floor__breakfast_table_rhjoby_0__h0.02__left",
+  "kind": "contact",
+  "subtasks": [
+   "alignment-axial",
+   "configuration_matching-attachment",
+   "configuration_matching-block_design"
+  ],
+  "picks": [
+   "alignment-axial#01",
+   "alignment-axial#02",
+   "alignment-axial#03",
+   "alignment-axial#06",
+   "alignment-axial#09",
+   "alignment-axial#10",
+   "configuration_matching-attachment#05",
+   "configuration_matching-attachment#06",
+   "configuration_matching-block_design#01"
+  ],
+  "slot": "a1",
+  "scene": "house_single_floor",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "breakfast_table_rhjoby_0",
+   "--arm",
+   "left",
+   "--generic-contact",
+   "--height",
+   "0.02"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support breakfast_table_rhjoby_0 --arm left --generic-contact --height 0.02 --out $OUT",
+  "members": [
+   {
+    "pick": "configuration_matching-block_design#01",
+    "object": "toy_dice/isgblk",
+    "height": 0.025
+   },
+   {
+    "pick": "configuration_matching-attachment#05",
+    "object": "lid/tnwisp",
+    "height": 0.028
+   },
+   {
+    "pick": "configuration_matching-attachment#06",
+    "object": "cap/xxqyrt",
+    "height": 0.011
+   },
+   {
+    "pick": "alignment-axial#01",
+    "object": "paperback_book/jhaltj",
+    "height": 0.008
+   },
+   {
+    "pick": "alignment-axial#02",
+    "object": "magazine/tfovwy",
+    "height": 0.01
+   },
+   {
+    "pick": "alignment-axial#03",
+    "object": "board_game/qgvsnb",
+    "height": 0.025
+   },
+   {
+    "pick": "alignment-axial#06",
+    "object": "letter/oheufk",
+    "height": 0.014
+   },
+   {
+    "pick": "alignment-axial#09",
+    "object": "keyboard/injrgc",
+    "height": 0.021
+   },
+   {
+    "pick": "alignment-axial#10",
+    "object": "catalog/aygcnt",
+    "height": 0.006
+   }
+  ]
+ },
+ {
+  "id": "rb__contact__house_single_floor__breakfast_table_rhjoby_0__h0.04__left",
+  "kind": "contact",
+  "subtasks": [
+   "alignment-axial",
+   "configuration_matching-attachment"
+  ],
+  "picks": [
+   "alignment-axial#05",
+   "configuration_matching-attachment#02"
+  ],
+  "slot": "a1",
+  "scene": "house_single_floor",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "breakfast_table_rhjoby_0",
+   "--arm",
+   "left",
+   "--generic-contact",
+   "--height",
+   "0.04"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support breakfast_table_rhjoby_0 --arm left --generic-contact --height 0.04 --out $OUT",
+  "members": [
+   {
+    "pick": "configuration_matching-attachment#02",
+    "object": "cork/uyceta",
+    "height": 0.045
+   },
+   {
+    "pick": "alignment-axial#05",
+    "object": "hardback/acbrnv",
+    "height": 0.031
+   }
+  ]
+ },
+ {
+  "id": "rb__contact__house_single_floor__breakfast_table_rhjoby_0__h0.06__left",
+  "kind": "contact",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#08"
+  ],
+  "slot": "a1",
+  "scene": "house_single_floor",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "breakfast_table_rhjoby_0",
+   "--arm",
+   "left",
+   "--generic-contact",
+   "--height",
+   "0.06"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support breakfast_table_rhjoby_0 --arm left --generic-contact --height 0.06 --out $OUT",
+  "members": [
+   {
+    "pick": "alignment-axial#08",
+    "object": "frying_pan/jpzusm",
+    "height": 0.062
+   }
+  ]
+ },
+ {
+  "id": "rb__contact__house_single_floor__breakfast_table_rhjoby_0__h0.08__left",
+  "kind": "contact",
+  "subtasks": [
+   "alignment-axial",
+   "configuration_matching-attachment",
+   "inter_object_relation_satisfaction-touching"
+  ],
+  "picks": [
+   "alignment-axial#07",
+   "configuration_matching-attachment#03",
+   "inter_object_relation_satisfaction-touching#02"
+  ],
+  "slot": "a1",
+  "scene": "house_single_floor",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "breakfast_table_rhjoby_0",
+   "--arm",
+   "left",
+   "--generic-contact",
+   "--height",
+   "0.08"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support breakfast_table_rhjoby_0 --arm left --generic-contact --height 0.08 --out $OUT",
+  "members": [
+   {
+    "pick": "configuration_matching-attachment#03",
+    "object": "light_bulb/kfmkwd",
+    "height": 0.071
+   },
+   {
+    "pick": "alignment-axial#07",
+    "object": "bag_of_chips/dwkdko",
+    "height": 0.09
+   },
+   {
+    "pick": "inter_object_relation_satisfaction-touching#02",
+    "object": "teacup/oxfzfe",
+    "height": 0.072
+   }
+  ]
+ },
+ {
+  "id": "rb__contact__house_single_floor__breakfast_table_rhjoby_0__h0.10__left",
+  "kind": "contact",
+  "subtasks": [
+   "inter_object_relation_satisfaction-touching"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-touching#01",
+   "inter_object_relation_satisfaction-touching#04"
+  ],
+  "slot": "a1",
+  "scene": "house_single_floor",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "breakfast_table_rhjoby_0",
+   "--arm",
+   "left",
+   "--generic-contact",
+   "--height",
+   "0.10"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support breakfast_table_rhjoby_0 --arm left --generic-contact --height 0.10 --out $OUT",
+  "members": [
+   {
+    "pick": "inter_object_relation_satisfaction-touching#01",
+    "object": "box_of_sanitary_napkins/humkqw",
+    "height": 0.109
+   },
+   {
+    "pick": "inter_object_relation_satisfaction-touching#04",
+    "object": "bottle_of_medicine/kasbsy",
+    "height": 0.094
+   }
+  ]
+ },
+ {
+  "id": "rb__contact__house_single_floor__breakfast_table_rhjoby_0__h0.14__left",
+  "kind": "contact",
+  "subtasks": [
+   "alignment-axial",
+   "configuration_matching-attachment"
+  ],
+  "picks": [
+   "alignment-axial#04",
+   "configuration_matching-attachment#04"
+  ],
+  "slot": "a1",
+  "scene": "house_single_floor",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "breakfast_table_rhjoby_0",
+   "--arm",
+   "left",
+   "--generic-contact",
+   "--height",
+   "0.14"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support breakfast_table_rhjoby_0 --arm left --generic-contact --height 0.14 --out $OUT",
+  "members": [
+   {
+    "pick": "configuration_matching-attachment#04",
+    "object": "skateboard_wheel_assembly/jljqtt",
+    "height": 0.137
+   },
+   {
+    "pick": "alignment-axial#04",
+    "object": "gym_shoe/kmcbym",
+    "height": 0.145
+   }
+  ]
+ },
+ {
+  "id": "rb__contact__house_single_floor__breakfast_table_rhjoby_0__h0.16__left",
+  "kind": "contact",
+  "subtasks": [
+   "configuration_matching-attachment"
+  ],
+  "picks": [
+   "configuration_matching-attachment#01"
+  ],
+  "slot": "a1",
+  "scene": "house_single_floor",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "breakfast_table_rhjoby_0",
+   "--arm",
+   "left",
+   "--generic-contact",
+   "--height",
+   "0.16"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support breakfast_table_rhjoby_0 --arm left --generic-contact --height 0.16 --out $OUT",
+  "members": [
+   {
+    "pick": "configuration_matching-attachment#01",
+    "object": "dip_candle/poexjo",
+    "height": 0.169
+   }
+  ]
+ },
+ {
+  "id": "rb__contact__house_single_floor__breakfast_table_rhjoby_0__h0.22__left",
+  "kind": "contact",
+  "subtasks": [
+   "inter_object_relation_satisfaction-touching"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-touching#03"
+  ],
+  "slot": "a1",
+  "scene": "house_single_floor",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "breakfast_table_rhjoby_0",
+   "--arm",
+   "left",
+   "--generic-contact",
+   "--height",
+   "0.22"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support breakfast_table_rhjoby_0 --arm left --generic-contact --height 0.22 --out $OUT",
+  "members": [
+   {
+    "pick": "inter_object_relation_satisfaction-touching#03",
+    "object": "carton_of_milk/xmugpm",
+    "height": 0.218
+   }
+  ]
+ }
+]
