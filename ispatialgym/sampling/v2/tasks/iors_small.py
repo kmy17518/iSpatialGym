@@ -90,6 +90,8 @@ PUSH_MAX_HEIGHT = 0.30
 PARTNER_MAX_ASPECT = 2.5
 #: inside (owner decision 2026-09-16): the open gripper's lowest point clears the partner's rim by this at the release
 RELEASE_CLEARANCE = 0.02
+#: ontop / under (owner item 3): the object is released this far above the actual surface under its footprint centre
+RELEASE_ABOVE_SURFACE = 0.01
 #: touching brace (axial stop-brace rule): the pads' / blade's outer face this far outside the partner's far face, and the
 #: partner height below which the top-down blade is tried before the pad contacts
 STOP_CLEARANCE = 0.005
@@ -137,6 +139,7 @@ class IORSSmall(SamplerV2):
         self.bands = None
         self.goal_side: Optional[str] = None  # nextto / touching: partner side the target goes to ("left" / "right", robot frame)
         self.release: Optional[Dict[str, Any]] = None  # inside: release-height facts of :meth:`release_pose`
+        self.release_surface_z: Optional[float] = None  # ontop / under: the raycast surface under the goal footprint centre
 
     # ------------------------------------------------------------------ numbers (customs generation)
 
@@ -462,8 +465,15 @@ class IORSSmall(SamplerV2):
         st = self.sidecar.stance("manipulation")
         self.goal_side = None
         if self.relation in ("ontop", "under"):
-            z = float(p_hull_w[:, 2].max()) - float(t_hull[:, 2].min()) + self.goal_drop
             xy = (p_hull_w[:, :2].max(dim=0).values + p_hull_w[:, :2].min(dim=0).values) / 2
+            top = float(p_hull_w[:, 2].max())
+            # owner item 3 (2026-09-16 10:15): release 1 cm above the *actual* surface under the footprint centre (saucer
+            # well, plate centre) — a downward raycast from above the partner, the target ignored — instead of goal_drop
+            # above the partner's hull top (the teacup fell rim-to-well in the demo); usable once the partner is placed
+            surface = self.release_surface(xy, p_pose, top)
+            self.release_surface_z = None if surface is None else surface["z"]
+            base_z = top if surface is None else float(surface["z"])
+            z = base_z + float(self.gen("release_above_surface_m", RELEASE_ABOVE_SURFACE)) - float(t_hull[:, 2].min())
             return th.tensor([float(xy[0]), float(xy[1]), z]), t_quat
         if self.relation == "inside":
             return self.release_pose(t_quat, t_hull, p_hull_w, p_pose)
@@ -480,6 +490,21 @@ class IORSSmall(SamplerV2):
         depth_t, _ = st.local(t_pose[0])
         xy = st.world(depth_t, lat)
         return th.tensor([float(xy[0]), float(xy[1]), float(t_pose[0][2])]), t_quat
+
+    def release_surface(self, xy: th.Tensor, p_pose: G.Pose, top_z: float) -> Optional[Dict[str, Any]]:
+        """``SimWorld.surface_z_under`` at the goal xy (ray from 30 cm above the partner's top, the target ignored) when the
+        partner actually stands at ``p_pose`` (it is parked while the first goal is drafted; ``after_settle`` recomputes);
+        a hit above the support and within the partner's height range counts, else None (hull-top rule)."""
+        p_now = self.obj("partner").get_position_orientation()[0].float()
+        if float(th.linalg.norm(p_now[:2] - G.t(p_pose[0])[:2])) > 0.05:
+            return None
+        hit = self.world.surface_z_under(xy, top_z + 0.30, ignore=[self.obj("target")])
+        if hit is None:
+            return None
+        lo = float(self.top.z) if self.top is not None else -math.inf
+        if not (lo - 0.005 <= hit["z"] <= top_z + 0.005):
+            return None
+        return hit
 
     def release_pose(self, t_quat: th.Tensor, t_hull: th.Tensor, p_hull_w: th.Tensor, p_pose: G.Pose) -> G.Pose:
         """§6.11 inside, owner decision 2026-09-16: release just above the partner's rim so the gripper never contacts it.
@@ -604,6 +629,9 @@ class IORSSmall(SamplerV2):
             place = IK.grasp_pose((goal_pos, goal_quat), grasp.eef_in_object)
             pre_place = IK.pre_pose(place)
             ignore = self.support_objects() + [self.obj("partner")]
+            if self.relation in ("ontop", "under"):
+                grasp.extras["release_surface_z"] = None if self.release_surface_z is None else round(float(self.release_surface_z), 4)
+                draft.summary["release_surface_z"] = grasp.extras["release_surface_z"]
         if self.goal_side is not None:
             draft.summary["goal_side"] = self.goal_side
         with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):

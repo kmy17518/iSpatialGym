@@ -14,7 +14,7 @@ import math
 import os
 import time
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import torch as th
 
@@ -739,6 +739,23 @@ class SimWorld:
 
     def raycast(self, starts: th.Tensor, ends: th.Tensor):
         return raytest_batch(G.t(starts).tolist(), G.t(ends).tolist(), only_closest=True)
+
+    def surface_z_under(self, xy, from_z: float, ignore: Sequence[Any] = (), depth: float = 1.0) -> Optional[Dict[str, Any]]:
+        """The actual surface under world ``xy`` (owner item 3, 2026-09-16 10:15): a downward raycast from ``from_z`` (the
+        release height) to ``from_z - depth`` with the rigid bodies of ``ignore`` (the placed object itself, the robot)
+        excluded — the saucer well, the plate centre, the tray floor, the table under a hole — instead of the partner's
+        hull top. Returns ``{"z", "body", "normal"}`` or None when nothing is hit. Task modules place / release 1 cm
+        above ``z`` (IORS ontop / under, the disembedding destination, attachment place, block slots)."""
+        bodies: List[str] = []
+        for o in list(ignore) + [self.robot]:
+            for link in getattr(o, "links", {}).values():
+                bodies.append(link.prim_path)
+        x, y = float(G.t(xy)[0]), float(G.t(xy)[1])
+        hits = raytest_batch([[x, y, float(from_z)]], [[x, y, float(from_z) - float(depth)]], only_closest=True, ignore_bodies=bodies or None)
+        h = hits[0] if hits else {}
+        if not h.get("hit"):
+            return None
+        return {"z": float(h["position"][2]), "body": str(h.get("rigidBody")), "normal": [float(v) for v in h.get("normal", (0.0, 0.0, 1.0))]}
 
     # ------------------------------------------------------------------ validation (BEHAVIOR semantics)
 
