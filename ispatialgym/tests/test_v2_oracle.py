@@ -13,6 +13,7 @@ round-trips the AG bookkeeping (or, with ``ag_roundtrip=False``, does not — th
 from __future__ import annotations
 
 import json
+import glob
 import math
 from types import SimpleNamespace
 
@@ -567,8 +568,10 @@ def test_executors_cover_every_action_class():
 
 
 def test_every_test_sidecar_program_dispatches():
-    for fn in sorted(os.listdir(SIDECARS)):
-        sc = Sidecar.load(os.path.join(SIDECARS, fn))
+    paths = sorted(glob.glob(os.path.join(SIDECARS, "*.json")) + glob.glob(os.path.join(SIDECARS, "variants", "*.json")))
+    assert len(paths) >= 22
+    for path in paths:
+        sc = Sidecar.load(path)
         for action in expand(sc.alias, sc):
             ex_fn, post_fn = EX.executor_for(action)
             assert ex_fn is not None and post_fn is not None
