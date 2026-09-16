@@ -782,6 +782,15 @@ class AlignmentWall(SamplerV2):
             with self.ikc.ignoring(list(ignore)):
                 return bool(self.kit.collision_free(q, margin=0.0)[0])
 
+        cam = self.camera_pose_at(manip)
+
+        def tips_in_frame(poses: Sequence[Any]) -> bool:
+            """QA ``gripper_out_of_fov`` (oracle/qa.py): from the pre-pose to the end of a brace / push the acting arm's
+            fingertips must be in the head camera frame (5 %) — checked here for the recorded key poses (a pre-pose on
+            the margin is a sampler defect, first demo 13:42: the side_high brace hand 0.2 m above the camera)."""
+            pts = th.stack([C.fingertip(p) for p in poses])
+            return P0.in_frame(self, cam, pts)
+
         # brace candidates in order (kind order, both wrist turns; first whose pre-contact and contact pass), then the push
         # arm (both wrist turns) with the brace arm locked at its solution; when the push chain fails with that brace, the
         # next brace candidate is tried before the caller moves to the next survivor
@@ -789,6 +798,9 @@ class AlignmentWall(SamplerV2):
         solved = None
         for b, sp in braces:  # the target is *not* ignored for the brace (§5.5: ≥ 2 cm clear of the tilted hull)
             tag = f"{b['kind']}/{b.get('wrist', 'n+')}"
+            if not tips_in_frame([b["pre"], b["pose"]]):
+                why.append(f"{tag}: brace fingertips out of the head camera frame at the pre-contact / contact")
+                continue
             r_pre_b = self.ikc.exact([b["pre"]], manip, brace_arm, ignore_for_last=wall, q_seed=q0, cache=False)
             if not r_pre_b.ok:
                 why.append(f"{tag}: brace pre-contact")
@@ -811,6 +823,9 @@ class AlignmentWall(SamplerV2):
             arm_p = self.kit.robot.arm_control_idx[push_arm]
             for push in geo["push"].get("variants") or [geo["push"]]:
                 ptag = f"{tag}/push-{push.get('wrist', 'n+')}"
+                if not tips_in_frame([push["pre"], push["init"], push["mid"], push["goal"]]):
+                    why.append(f"{ptag}: push fingertips out of the head camera frame along pre / arc")
+                    continue
                 # the push pre-contact lies 10 cm along -a from E_low (the low *side* of the target), i.e. alongside the hull
                 # with ~2 cm of air: the target is removed for it as for the contact poses (the approach pre -> init runs along
                 # the side and the pads only meet the target at init; documented relaxation of §3.6 for the wall push)
