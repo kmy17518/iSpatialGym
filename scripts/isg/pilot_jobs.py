@@ -160,7 +160,11 @@ def cmd_chunks(args):
     requested = args.instances
     complete = {a for a, r in progress.items() if r.get("n_written", 0) >= requested}
     fallback_ids = {a for a, (st, e) in entries.items() if e.get("fallback_of")}
-    todo = [a for a in entries if a not in complete and a not in fallback_ids and (not args.subtasks or entries[a][0] in args.subtasks)]
+    import re as _re
+
+    excl = _re.compile(args.exclude_alias_regex) if args.exclude_alias_regex else None
+    todo = [a for a in entries if a not in complete and a not in fallback_ids and (not args.subtasks or entries[a][0] in args.subtasks)
+            and not (excl and excl.search(a))]
     keys = world_keys(todo)
     by_st = collections.defaultdict(list)
     for a in todo:
@@ -317,6 +321,7 @@ def main():
     s.add_argument("--coverage", type=int, default=5, help="templates (aliases) per subtask in the coverage wave")
     s.add_argument("--chunk-minutes", type=float, default=100.0)
     s.add_argument("--chunk-max", type=int, default=6)
+    s.add_argument("--exclude-alias-regex", default=None, help="skip aliases matching this regex (e.g. supports whose bands do not exist yet)")
     s.add_argument("--out", required=True, help="directory for jobs_coverage.json / jobs_rest.json / world_keys.json")
     s.set_defaults(fn=cmd_chunks)
     s = sub.add_parser("fallbacks", help="B: fallback aliases whose primary yielded nothing")
