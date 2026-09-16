@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 08:21 PDT — 4/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 08:27 PDT — 4/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -127,9 +127,9 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | object_scaling | valid demo | - | - |
 | mental_rotation | valid demo | - | - |
 | disembedding | demo run | 4a/4b landed (D1 d455b77/b4ab9f9), tray band keying (634f423/8bd1012); per-role scale spawn (core) pending; bands computing (1.25 tray) | core / tabletop / bands |
-| CM block_design | no instance | pick spacing 10.1 cm smoke; left band + A1 placement | tabletop |
-| CM attachment | no instance | left band + A1 placement (skateboard edge_too_short = yield) | tabletop |
-| CM articulation_open_small_scale | no instance | brace band empty (§5.4) → left contact band wiring; floor_support_todo | tabletop |
+| CM block_design | no instance | left band 0.02 available; 10.1 cm spacing; loop running | loop / tabletop |
+| CM attachment | no instance | left bands available (all classes); loop running (cap-lemonade_bottle) | loop / tabletop |
+| CM articulation_open_small_scale | no instance | left band wiring in articulation_small (tabletop item 2) → then loop (laptop) | tabletop |
 | CM articulation_close_small_scale | no instance | same as open | tabletop |
 | CM articulation_open_large_scale | no instance | re-grounded on roomy picks (c161a04); needs a first sample (rvunhj_0) | large-scale |
 | CM articulation_close_large_scale | no instance | same as open | large-scale |
@@ -140,7 +140,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | IORS under_small_scale | demo run | approach witnesses in different IK branches → core branch-consistent solve (approach_untrackable) | core |
 | IORS inside | demo run (pre-fix success) | re-sample after 160c518 (release height) + drop executor | core / oracle |
 | IORS nextto | demo run | near-side goal 160c518 (future sampling) | - |
-| IORS touching | no instance | left band + joint gate (core landed), blade stand-off | core / tabletop |
+| IORS touching | no instance | left bands available; joint gate + blade record (core item 3 pending); loop running (carton_of_milk) | loop / core |
 | IORS ontop_large_scale | no instance | floor-class alias running on the local GPU (owner 08:19); floor cells in-process if the band is empty | coordinator (local) |
 | IORS under_large_scale | no instance | push-under: sampler landed (25e94d3/8140025/032d849), program + executor (oracle) pending | large-scale / oracle |
 <!-- /first-demo-board -->
@@ -252,3 +252,4 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026‑09‑16 07:05 PDT agent-e2e: **owner decisions 06:50 applied** — coverage paused (queued chunk moved aside, running chunks finish; `runlogs/pilot_20260915/paused_for_resume.md` lists stopped chunks, deferred waves, fallbacks, band waves); no fallback wave; pre‑fix demo full set stopped (120 pre‑fix demos on record). Tracking: `runlogs/pilot_20260915/first_demo_board.md` (21 rows, mirrored below the pitfalls section of this file between the board markers), `fix_log.jsonl` (7 entries seeded: d4a1745, e4a1b5c, 160c518, 7a340e4, 9744b34, 4fd4c89, 6abf9da), `first_demo/ledger.jsonl` (every run: code commit + dirty flag, sampler_version, sampling outcome, demo verdict, meta path); `scripts/isg/first_demo.py run --alias …` = sample 1 × 1 → run_isg → ledger → board. Loop launched 06:58 for the 8 fix‑landed subtasks (mental rotation, object scaling, camera standard / obstructed, IORS ontop‑small, nextto, inside, under‑small) on the 6 pool pods. Item 8 mesh cache 8192 (`6abf9da`). Agents: D1 (4a distractor budget, 4b `roles.source.scale` 1.25, 5 hanger blacklist, 6 re‑ground), A3 selection (6 roomy articulation units + handle rows), large‑scale (7 push‑under sampler), tabletop (4b/9 stance‑relative tray, small‑artic left band wiring, block spacing smoke), new bands agent c239cbc6 (7a queue order, 9 placed‑tray keying, disembedding bands at 1.25, under‑edge floor band later); oracle (7 program + executor, brace ladder, drop, centre_offset) and core (role scale, wall ignore set) get their items when they report. Sampling pods move to the pool or the band fleet as their chunks end (never both roles).
 - 2026‑09‑16 08:15 PDT agent-e2e: owner decision — axial push‑only (brace optional, see the register); tabletop agent → `alignment_axial.py`, oracle agent → `programs.py` / `sidecar.py` (F6 files, it owns them now), spec §6.10 / §4.6 by me; then the first‑demo loop on `alignment-axial-board_game-breakfast_table`. Context: the oracle's push closure already turned the pilot's blocked axial instance into a success (final error 0.027 rad) on the old sidecar, and the A1 joint placement yields 0 on the breakfast table (bands overlap only at λ ≈ 0).
 - 2026‑09‑16 08:25 PDT agent-e2e: owner 08:19 — `first_demo.py --local` added; the ontop‑large floor‑class demo launched on the local GPU (GPU was free: 945 MiB used, no compute apps; the earlier 7.6 GB process had ended). Found the bands agent computing an under‑edge floor band locally (pid 48693) → told to stop it and use the band fleet. A3 picks (`05ce671`) + D1 items (`d455b77` distractor budget: 90 disembedding aliases, 33/27/30 with 3/2/1 distractors; `b4ab9f9` source tray 1.25; `4eb66f5` hanger blacklist + next‑model fallbacks; `c161a04` articulation re‑ground; top‑level `superseded_by`) integrated in the scheduler; loop launched for articulation open/close on `rvunhj_0` and disembedding `chili-asparagus_1`.
+- 2026‑09‑16 08:30 PDT agent-e2e: bands agent (c239cbc6) reported — band queue re‑ordered on the 15 band pods (30 disembedding bands with the 1.25 stance‑relative tray first on the 8 L40S, ETA ≈ 10:05 PDT; then 285 A3/A6 jobs by weight; 11 A6 re‑runs last); **every left‑brace subtask on the breakfast table already has its left contact band** (8 height classes; coverage 74/0 missing) → attachment (`cap-lemonade_bottle`), block design, touching (`carton_of_milk-box_of_cookies`) entered the first‑demo loop; small articulation waits for the tabletop agent's left‑band wiring. Placed‑tray spec `tray/gsxbym*1.25@focus_centred_edge_aligned` agreed with the tabletop agent (first result: 536 cells vs 100 legacy). Under‑edge floor‑band mode landed; local probe of sandal/bed at s = 0.45 empty (crouched trunks collide with the bed) → probes on 4 A40 pods. Dispatcher caveat: `--rebalance` treats band CMD jobs as unfinished (no summary.json) — use `fleet_remaining.py` for band manifests.

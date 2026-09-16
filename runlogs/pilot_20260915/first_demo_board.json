@@ -32,15 +32,15 @@
   "owner": "core / tabletop / bands"
  },
  "configuration_matching-block_design": {
-  "blocking": "pick spacing 10.1 cm smoke; left band + A1 placement",
-  "owner": "tabletop"
+  "blocking": "left band 0.02 available; 10.1 cm spacing; loop running",
+  "owner": "loop / tabletop"
  },
  "configuration_matching-attachment": {
-  "blocking": "left band + A1 placement (skateboard edge_too_short = yield)",
-  "owner": "tabletop"
+  "blocking": "left bands available (all classes); loop running (cap-lemonade_bottle)",
+  "owner": "loop / tabletop"
  },
  "configuration_matching-articulation_open_small_scale": {
-  "blocking": "brace band empty (\u00a75.4) \u2192 left contact band wiring; floor_support_todo",
+  "blocking": "left band wiring in articulation_small (tabletop item 2) \u2192 then loop (laptop)",
   "owner": "tabletop"
  },
  "configuration_matching-articulation_close_small_scale": {
@@ -90,8 +90,8 @@
   "last_change": "2026-09-16 04:37 PDT"
  },
  "inter_object_relation_satisfaction-touching": {
-  "blocking": "left band + joint gate (core landed), blade stand-off",
-  "owner": "core / tabletop"
+  "blocking": "left bands available; joint gate + blade record (core item 3 pending); loop running (carton_of_milk)",
+  "owner": "loop / core"
  },
  "inter_object_relation_satisfaction-ontop_large_scale": {
   "blocking": "floor-class alias running on the local GPU (owner 08:19); floor cells in-process if the band is empty",
