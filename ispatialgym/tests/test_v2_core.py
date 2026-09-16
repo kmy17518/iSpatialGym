@@ -322,6 +322,25 @@ def test_program_check_ignore_sets_mirror_the_sampler():
     assert every == [wall, partner] and last == []
 
 
+def test_straight_approach_detection_and_reject_code():
+    """Branch consistency (oracle finding): pre -> end segments are tracked from the pre solution; the failure carries the
+    distinct ``approach_untrackable`` code for the callers' Reject."""
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling.v2 import ik as IK
+
+    q = C.eef_quat(th.tensor([0.0, 0.0, -1.0]), th.tensor([0.0, 1.0, 0.0]))
+    grasp = (th.tensor([1.0, 0.0, 0.9]), q)
+    pre = IK.pre_pose(grasp)  # 10 cm back along -a, same orientation
+    assert IK.is_approach(pre, grasp) and IK.is_approach(grasp, pre)
+    assert not IK.is_approach(grasp, grasp)  # zero length
+    far = (th.tensor([1.0, 0.0, 1.3]), q)
+    assert not IK.is_approach(far, grasp)  # 40 cm: a carry, not an approach
+    turned = (th.tensor([1.0, 0.0, 1.0]), C.eef_quat(th.tensor([0.0, 0.0, -1.0]), th.tensor([1.0, 0.0, 0.0])))
+    assert not IK.is_approach(turned, grasp)  # 90 deg wrist turn: not a straight same-orientation segment
+    assert IK.IKResult(False, None, "approach_untrackable: joint jump 2.9 rad at waypoint 4").code == "approach_untrackable"
+    assert IK.IKResult(False, None, "exact IK failed at pose 2 of 2").code == ""
+
+
 def test_transition_resweep_never_lowers_the_recorded_standoff():
     """The re-sweep with the objects placed starts at the recorded s_T; the path's end gives the extra drive-back start."""
     from ispatialgym.sampling.v2 import navigation as NAV

@@ -397,7 +397,9 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                 res = sampler.ikc.waypoints_ok(poses, stance, arm, ignore_for_last=ignore_last, ignore_all=ignore_all, cache=False, fingers=fingers)
             n += len(poses)
             if not res.ok:
-                raise Reject("program_check_failed", f"{key}: {res.reason} (stance {stance_name}, arm {arm}, carried {carried})", action=name)
+                # a straight approach without a configuration in the pre pose's IK branch is its own reason (the oracle
+                # cannot track it: plan_failed); everything else is program_check_failed
+                raise Reject(res.code or "program_check_failed", f"{key}: {res.reason} (stance {stance_name}, arm {arm}, carried {carried})", action=name)
             if res.q is not None:
                 last = poses[-1]
                 witnesses[key] = {"pose": {"position": [round(float(v), 5) for v in last[0].tolist()], "orientation": [round(float(v), 6) for v in last[1].tolist()]},

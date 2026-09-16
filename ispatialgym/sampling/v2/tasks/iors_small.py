@@ -524,7 +524,7 @@ class IORSSmall(SamplerV2):
             res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, ignore_for_last=self.support_objects(),
                                  scale_key=self.choice.models["target"].scale, cache=False)
             if not res.ok:
-                raise Reject("grasp_unreachable", "pre-grasp / grasp at the settled target pose fail the exact IK")
+                raise Reject(res.code or "grasp_unreachable", f"pre-grasp / grasp at the settled target pose fail the exact IK ({res.reason})")
 
     def refine_targets_from_goal(self, draft: Draft):
         tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
@@ -602,6 +602,8 @@ class IORSSmall(SamplerV2):
             draft.summary["goal_side"] = self.goal_side
         with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
             res = self.ikc.exact([pre_place, place], manip, grasp.arm, ignore_for_last=ignore, scale_key=self.choice.models["target"].scale, cache=False)
+        if not res.ok and res.code:
+            raise Reject(res.code, f"pre-place -> place descent from the manipulation stance with the object attached: {res.reason}")
         if not res.ok:
             # diagnostics only on failure (which pose, and whether the attached object / the world / the reach is the cause)
             def _ok(r):
@@ -625,9 +627,10 @@ class IORSSmall(SamplerV2):
         # object leaves it); the pre-place is where the carry ends, so the lift end must be IK-feasible too
         lift_end = (G.t(grasp.grasp[0]) + th.tensor([0.0, 0.0, float(grasp.carry_height)]), G.t(grasp.grasp[1]))
         with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
-            r_lift = self.ikc.exact([lift_end], manip, grasp.arm, ignore_for_last=self.support_objects(), cache=False)
+            # tracked from the grasp configuration (one IK branch along the lift), support ignored throughout
+            r_lift = self.ikc.waypoints_ok([grasp.grasp, lift_end], manip, grasp.arm, ignore_all=self.support_objects(), cache=False)
         if not r_lift.ok:
-            raise Reject("lift_unreachable", f"lift end pose ({grasp.carry_height:.2f} m above the grasp) fails the exact IK with the object attached")
+            raise Reject(r_lift.code or "lift_unreachable", f"lift ({grasp.carry_height:.2f} m above the grasp) fails with the object attached: {r_lift.reason}")
         cam = self.camera_pose_at(manip)
         if not self.ikc.eef_in_frame(grasp.grasp, cam):
             raise Reject("gripper_not_in_frame", "grasp eef pose outside the manipulation image (5 %)")

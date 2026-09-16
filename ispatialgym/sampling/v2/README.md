@@ -320,6 +320,19 @@ reach-band cache hits for apple and marker. Sidecars carry `idle_posture` / `arm
   `waypoints_ok` now solves the endpoints first and screens the intermediate waypoints seeded from them; the found
   screening solutions are remembered (deterministic re-check in the program check / `validate_instances`).
 
+### Branch-consistent approaches (oracle finding, 2026-09-16)
+
+The under-small french-fries sidecar had pre_grasp / grasp witnesses 3.16 rad apart (different IK branches): the 10 cm
+straight approach was trackable in neither. `IKChecker.exact` now treats a straight same-orientation segment between
+consecutive chain poses (`is_approach`: ≤ 0.25 m, same orientation within 0.05 rad — pre → grasp / place / contact, lifts,
+the wall brace chain) as an **approach tracked from the previous solution** (`track_approach` → `backend.solve_ik_path`,
+1 cm steps, ≤ 0.2 rad per step, ≤ 0.6 rad between consecutive §3.9 waypoints, intermediate configurations collision-free
+against the world, the end one with the end pose's ignore set). When the forward tracking fails the end pose is solved on
+its own and the segment tracked backward; the pre witness then moves to the end's branch. Neither → the chain fails with
+`approach_untrackable` (`IKResult.code`), which `iors_small` (grasp at the settled pose, lift, place descent) and the
+program check raise as their own reject reason. `waypoints_ok` hands straight chains to `exact` (one tracked motion with
+`ignore_all` removed throughout). `IKChecker.ignoring` contexts nest (refcounted per mesh).
+
 ## Status (D2 / D4, 2026-09-15) and gaps
 
 Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,

@@ -20,6 +20,7 @@ re-implements a conventions function (README contract 2).
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -39,6 +40,17 @@ HANDLE_OFFSET = C.HANDLE_EEF_OFFSET
 IN_FRAME_MARGIN = 0.05
 FINGER_OPEN_DEFAULT = C.FINGER_OPEN
 FINGER_CLOSED = C.FINGER_CLOSED
+#: a segment between consecutive chain poses counts as a straight *approach* (tracked from the previous solution) when
+#: the orientation is the same within this angle (rad) and the distance at most this (m): pre -> grasp / place /
+#: contact (``PRE_DIST`` 0.10), the wall brace chain, lifts and descents recorded as pose lists
+APPROACH_SAME_ORIENT_RAD = 0.05
+APPROACH_MAX_M = 0.25
+
+
+def is_approach(a: Pose, b: Pose) -> bool:
+    """Whether ``a -> b`` is a straight same-orientation segment of at most ``APPROACH_MAX_M`` (a pre-pose to its end pose)."""
+    d = float(th.linalg.norm(G.t(b[0]) - G.t(a[0])))
+    return 1e-4 < d <= APPROACH_MAX_M and G.quat_angle(G.t(a[1]), G.t(b[1])) <= APPROACH_SAME_ORIENT_RAD
 
 # ----------------------------------------------------------------------------------------------------------------
 # conventions (F5) — argument-shape wrappers
@@ -151,12 +163,17 @@ class _Ignoring:
             return self
         self.kit._ensure_synced()
         disabled = getattr(backend, "_disabled_obstacles", set())
+        active = _ACTIVE_IGNORES.setdefault(id(backend), {})
         for o in self.objs:
             for link in getattr(o, "links", {}).values():
                 for cm in getattr(link, "collision_meshes", {}).values():
                     name = cm.prim_path
                     if name in backend._world_mesh_names and name not in disabled:
-                        backend._mesh_enable(name, False)
+                        # nested contexts may ignore the same mesh: it is switched off once and back on when the last
+                        # context that asked for it exits (refcount)
+                        if active.get(name, 0) == 0:
+                            backend._mesh_enable(name, False)
+                        active[name] = active.get(name, 0) + 1
                         self.names.append(name)
         return self
 
@@ -164,10 +181,18 @@ class _Ignoring:
         if self._fallback is not None:
             self._fallback.__exit__(*exc)
             return False
+        active = _ACTIVE_IGNORES.setdefault(id(self.kit.backend), {})
         for name in self.names:
-            self.kit.backend._mesh_enable(name, True)
+            active[name] = active.get(name, 1) - 1
+            if active[name] <= 0:
+                active.pop(name, None)
+                self.kit.backend._mesh_enable(name, True)
         self.names = []
         return False
+
+
+#: per backend: collision meshes currently switched off by active ``_Ignoring`` contexts -> number of contexts asking
+_ACTIVE_IGNORES: Dict[int, Dict[str, int]] = {}
 
 
 @dataclass
@@ -176,6 +201,12 @@ class IKResult:
     q: Optional[th.Tensor] = None
     reason: str = ""
     n_checked: int = 0
+
+    @property
+    def code(self) -> str:
+        """Distinct rejection code carried by the reason (``approach_untrackable``: a straight approach whose end pose has
+        no configuration in the pre pose's IK branch), else ``""`` — callers use ``res.code or "<their reason>"``."""
+        return "approach_untrackable" if self.reason.startswith("approach_untrackable") else ""
 
 
 class IKChecker:
@@ -190,6 +221,7 @@ class IKChecker:
         #: marginal pose can pass once and fail when re-solved (the program check re-solves every recorded pose): the
         #: sampler's own solution is used as the seed configuration then. Cleared per attempt (``core``).
         self.solutions: Dict[Tuple[str, Tuple[float, ...]], th.Tensor] = {}
+        self._last_track_start: Optional[th.Tensor] = None  # pre-pose configuration of the last tracked approach
 
     def ignoring(self, objs: Sequence[Any]):
         """Context manager: ``objs`` leave the cuRobo collision world for the queries inside (§3.6 "support ignored for the
@@ -404,23 +436,102 @@ class IKChecker:
                 return IKResult(bool(hit["ok"]), q_hit, "cache", len(poses))
         q = None
         n = len(poses)
+        why = "exact IK failed"
         for i, p in enumerate(poses):
             ign = list(ignore_for_last) if i == n - 1 else []
-            with self.ignoring(ign):
-                # a remembered solution of this very pose is verified as a witness (FK + collision) before the solver
-                # is asked again (cuRobo's IK is randomised, a witness check is not); otherwise it seeds the solver
-                q_near = self._seeded(q0, p, arm) if q_seed is None else q0
-                if q_seed is None and not th.equal(q_near, q0) and self._witness_ok(q_near, p, arm):
-                    q = q_near
-                else:
-                    q = self.kit.ik(p, q_near, arm=arm)
-            if q is None:
-                break
+            if i > 0 and q is not None and is_approach(poses[i - 1], p):
+                # a straight same-orientation segment from the previous pose (pre-grasp -> grasp, pre-place -> place,
+                # pre-contact -> contact): the end pose is *tracked* from the previous solution so both witnesses lie in
+                # one IK branch and the oracle's straight approach is executable (oracle finding: the french-fries pre_grasp
+                # / grasp witnesses 3.16 rad apart -> plan_failed); an untrackable approach fails the chain
+                q, why = self.track_approach(q, poses[i - 1], p, arm, ignore_end=ign, q_hint=q0)
+                if q is None:
+                    break
+                self.solutions[(arm, self._pose_key(poses[i - 1]))] = self._last_track_start.clone()
+            else:
+                with self.ignoring(ign):
+                    # a remembered solution of this very pose is verified as a witness (FK + collision) before the solver
+                    # is asked again (cuRobo's IK is randomised, a witness check is not); otherwise it seeds the solver
+                    q_near = self._seeded(q0, p, arm) if q_seed is None else q0
+                    if q_seed is None and not th.equal(q_near, q0) and self._witness_ok(q_near, p, arm):
+                        q = q_near
+                    else:
+                        q = self.kit.ik(p, q_near, arm=arm)
+                if q is None:
+                    why = f"exact IK failed at pose {i + 1} of {n}"
+                    break
             self.solutions[(arm, self._pose_key(p))] = q.clone()
-        res = IKResult(q is not None, q, "" if q is not None else "exact IK failed", len(poses))
+        res = IKResult(q is not None, q, "" if q is not None else why, len(poses))
         if key is not None and res.ok:  # a failure may be a random miss of the solver: only witnesses are cached
             cache_put(key, {"ok": True, "q": q.tolist()})
         return res
+
+    # -- straight approaches (branch consistency) -----------------------------------------------------------------
+    #: dense tracking step along an approach (m), the largest joint change allowed per dense step (rad), the largest
+    #: joint excursion allowed between two §3.9 waypoints (~3.3 cm apart; the oracle's finishing-motion bound), and the
+    #: longest segment treated as an approach
+    APPROACH_STEP_M = 0.01
+    APPROACH_MAX_STEP = 0.2
+    APPROACH_MAX_EXCURSION = 0.6
+    APPROACH_WAYPOINT_M = 0.1 / 3
+
+    def track_segment(self, q_from: th.Tensor, pose_from: Pose, pose_to: Pose, arm: str, ignore_mid: Sequence[Any] = (),
+                      ignore_end: Sequence[Any] = ()) -> Tuple[Optional[th.Tensor], str]:
+        """Differential-IK tracking (``backend.solve_ik_path``) of the straight segment ``pose_from -> pose_to`` from the
+        configuration ``q_from`` (which reaches ``pose_from``) in ``APPROACH_STEP_M`` steps: continuous joint path, no
+        step above ``APPROACH_MAX_STEP`` rad, joint excursion between consecutive §3.9 waypoints ≤ ``APPROACH_MAX_EXCURSION``,
+        intermediate configurations collision-free with ``ignore_mid`` removed, the end one with ``ignore_mid + ignore_end``
+        removed. Returns ``(q_end, "ok")`` or ``(None, reason)``."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        p0, p1 = (G.t(pose_from[0]), G.t(pose_from[1])), (G.t(pose_to[0]), G.t(pose_to[1]))
+        dist = float(th.linalg.norm(p1[0] - p0[0]))
+        n = max(2, int(math.ceil(dist / self.APPROACH_STEP_M)))
+        wps = [tuple(w) for w in C.line_waypoints(p0, p1, n)]
+        self.kit._ensure_synced()
+        with self.ignoring(ignore_mid):
+            res = self.kit.backend.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(w[0]), G.t(w[1]))} for w in wps], q_start=G.t(q_from),
+                                                 check_collisions=False, sync_world=False, max_joint_step=self.APPROACH_MAX_STEP)
+        self.kit.stats["ik_calls"] = self.kit.stats.get("ik_calls", 0) + 1
+        if not res.success:
+            return None, f"approach_untrackable: {res.status}"
+        traj = res.q_traj  # (n + 1, 28): the start and one configuration per dense waypoint
+        idx = self.kit.robot.arm_control_idx[arm]
+        k = max(1, int(round(self.APPROACH_WAYPOINT_M / self.APPROACH_STEP_M)))
+        coarse = list(range(0, len(traj) - 1, k)) + [len(traj) - 1]
+        exc = max(float(th.max(th.abs(traj[b, idx] - traj[a, idx]))) for a, b in zip(coarse[:-1], coarse[1:]))
+        if exc > self.APPROACH_MAX_EXCURSION:
+            return None, f"approach_untrackable: joint excursion {exc:.2f} rad between consecutive waypoints (> {self.APPROACH_MAX_EXCURSION})"
+        if len(traj) > 2:
+            with self.ignoring(ignore_mid):
+                if not bool(self.kit.collision_free(traj[1:-1], margin=0.0).all()):
+                    return None, "approach_untrackable: an intermediate configuration of the approach collides"
+        with self.ignoring(list(ignore_mid) + list(ignore_end)):
+            if not bool(self.kit.collision_free(traj[-1], margin=0.0)[0]):
+                return None, "approach_untrackable: the end configuration collides"
+        return traj[-1].clone(), "ok"
+
+    def track_approach(self, q_pre: th.Tensor, pre: Pose, end: Pose, arm: str, ignore_end: Sequence[Any] = (), ignore_mid: Sequence[Any] = (),
+                       q_hint: Optional[th.Tensor] = None) -> Tuple[Optional[th.Tensor], str]:
+        """End-pose configuration of a straight approach, branch-consistent with the pre-pose configuration ``q_pre``:
+        the segment is tracked forward from ``q_pre``; when that fails the end pose is solved on its own (32 seeds around
+        ``q_hint``) and the segment tracked *backward* to the pre pose — the pre configuration is then replaced by the
+        end's branch (``self._last_track_start``, recorded by the caller as the pre-pose witness). ``(None, reason)`` when
+        neither branch tracks (``approach_untrackable``)."""
+        self._last_track_start = G.t(q_pre).clone()
+        q_end, why = self.track_segment(q_pre, pre, end, arm, ignore_mid=ignore_mid, ignore_end=ignore_end)
+        if q_end is not None:
+            return q_end, "ok"
+        seed = q_hint if q_hint is not None else q_pre
+        with self.ignoring(list(ignore_mid) + list(ignore_end)):
+            q_alt = self.kit.ik(end, self._seeded(G.t(seed), end, arm), arm=arm)
+        if q_alt is None:
+            return None, f"{why}; the end pose has no solution on its own either"
+        q_pre2, why2 = self.track_segment(q_alt, end, pre, arm, ignore_mid=ignore_mid, ignore_end=())
+        if q_pre2 is None:
+            return None, f"{why}; from the end's branch: {why2}"
+        self._last_track_start = q_pre2.clone()
+        return q_alt, "ok"
 
     def exact_both_arms(self, work: Tuple[str, Sequence[Pose]], other: Tuple[str, Sequence[Pose]], stance: Stance, ignore_for_last: Sequence[Any] = (),
                         ignore_other_last: Sequence[Any] = (), fingers: Optional[float] = None) -> IKResult:
@@ -451,6 +562,13 @@ class IKChecker:
         wps = list(waypoints)
         if len(wps) < 2:
             return self.exact(wps, stance, arm, ignore_for_last, q_seed=q_seed, scale_key=scale_key, cache=cache, fingers=fingers)
+        if all(is_approach(a, b) for a, b in zip(wps[:-1], wps[1:])):
+            # a straight same-orientation chain (approach, lift, descent, retreat, the wall brace chain): solved by
+            # ``exact`` as one tracked motion from the first pose's solution (branch-consistent witnesses at every
+            # waypoint; ``approach_untrackable`` otherwise) with ``ignore_all`` removed throughout
+            with self.ignoring(list(ignore_all)):
+                res = self.exact(wps, stance, arm, list(ignore_for_last), q_seed=q_seed, scale_key=scale_key, cache=False, fingers=fingers)
+            return IKResult(res.ok, res.q, policy if res.ok else res.reason, len(wps))
         # endpoints first (exact): their solutions seed the screening of the intermediate waypoints, which otherwise
         # misses poses near the ends that the 32-seed solver finds (the wall brace chain)
         r0 = self.exact([wps[0]], stance, arm, list(ignore_all), q_seed=q_seed, scale_key=scale_key, cache=cache, fingers=fingers)
