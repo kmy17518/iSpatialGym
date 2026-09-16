@@ -357,6 +357,9 @@ class SamplerV2(TaskSampler):
             log.warning("%s: %s; parking at the room centre", self.gp.alias, e)
             xy = self.world.robot_park_xy
         self._park_xy = xy
+        # the task room's measured floor (``SimWorld.measure_floor_z``: raycast, cached per room); the kit's copy follows
+        self.world.floor_z = self.world.measure_floor_z(xy)
+        self.kit.floor_z = self.world.floor_z
         self.world.park_robot(xy, floor_z=self.world.floor_z)
         self.kit.sync_world()
         return xy
@@ -583,7 +586,9 @@ class SamplerV2(TaskSampler):
     def template_summary(self, n_written: int, time_s: float) -> Dict[str, Any]:
         return template_summary(n_written, time_s, self.rejection_log, self.instance_seeds,
                                 {"scene": self.scene, "template_id": self.ctx.template_id, "kit": self.kit.stats_snapshot(), "counters": dict(self.counters),
-                                 "checks": self.check_flags()})
+                                 "checks": self.check_flags(),
+                                 "floor": {"floor_z": round(float(self.world.floor_z), 4), "by_room": {k: round(v, 4) for k, v in getattr(self.world, "floor_z_by_room", {}).items()},
+                                           "probe": dict(getattr(self.world, "floor_probe", {}) or {})}})
 
     # ------------------------------------------------------------------ main loop
 

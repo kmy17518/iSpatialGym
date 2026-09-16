@@ -147,14 +147,22 @@ class SimWorld:
         self.n_scene_objects = len(self.scene.objects)
         self.scene_object_names = {o.name for o in self.scene.objects}
         self.spawned: Dict[str, DatasetObject] = {}
-        self.floor_z = float(self.scene.trav_map.floor_heights[0]) if getattr(self.scene, "trav_map", None) is not None else 0.0
+        #: the traversability map's nominal floor height (OmniGibson's default 0.0 in every scene) — only a fallback: the
+        #: task room's actual floor surface is measured below (``measure_floor_z``) and drives every robot height
+        self.floor_z_default = float(self.scene.trav_map.floor_heights[0]) if getattr(self.scene, "trav_map", None) is not None else 0.0
+        self.floor_z = self.floor_z_default
+        self.floor_z_by_room: Dict[str, float] = {}
+        self.floor_probe: Dict[str, Any] = {}
         if self.scene_variant.get("freed_footprints"):
             # the traversability PNG is baked with the furniture: free the removed objects' footprints
             from ispatialgym.sampling.scene_variants import patch_trav_map
 
             n_freed = patch_trav_map(self.scene, self.scene_variant["freed_footprints"])
             log.info("traversability map patched for the scene variant: %d cells freed", n_freed)
-        self.robot_park_xy = self.park_robot(floor_z=self.floor_z)
+        xy = self.park_cell()
+        self.floor_z = self.measure_floor_z(xy)
+        self.robot_park_xy = self.park_robot(xy, floor_z=self.floor_z)
+        self.probe_floor_height(self.robot_park_xy)
         self.scene.update_initial_file()
         # ``ISG_HIDE_CATEGORY_SUBSTRINGS`` (comma separated category substrings, default none): emergency override that
         # hides scene objects while sampling and shows them again around template saving (see save_template). v1 hid
@@ -311,26 +319,102 @@ class SimWorld:
             vals.append(bool(lazy.pxr.PhysxSchema.PhysxRigidBodyAPI(prim).GetDisableGravityAttr().Get()))
         return bool(vals) and all(vals)
 
-    def park_robot(self, xy: Optional[th.Tensor] = None, floor_z: float = 0.0):
-        """Stand the robot on a free traversability-map cell of the loaded floor (it must not float / fall)."""
-        if xy is None:
-            trav = self.scene.trav_map
-            m = trav._erode_trav_map(th.clone(trav.floor_map[0]), robot=self.robot)
-            free = th.nonzero(m == 255)
-            if len(free) == 0:
-                raise RuntimeError("no free traversable cell to park the robot")
-            # the parking cell must lie in a *loaded* room: elsewhere there is no floor and the robot falls, which
-            # silently shifts the cuRobo world (meshes are stored relative to the robot root at sync time)
-            if self.rooms:
-                seg = self.scene.seg_map
-                in_rooms = th.tensor([seg.get_room_instance_by_point(trav.map_to_world(c)) in self.rooms for c in free])
-                if bool(in_rooms.any()):
-                    free = free[in_rooms]
+    def park_cell(self) -> th.Tensor:
+        """World xy of the robot's parking cell: the free (eroded) traversability cell nearest the centre of the free
+        cells inside the task rooms (elsewhere there is no floor under partial-room loading and the robot falls, which
+        silently shifts the cuRobo world: meshes are stored relative to the robot root at sync time)."""
+        trav = self.scene.trav_map
+        m = trav._erode_trav_map(th.clone(trav.floor_map[0]), robot=self.robot)
+        free = th.nonzero(m == 255)
+        if len(free) == 0:
+            raise RuntimeError("no free traversable cell to park the robot")
+        if self.rooms:
+            seg = self.scene.seg_map
+            in_rooms = th.tensor([seg.get_room_instance_by_point(trav.map_to_world(c)) in self.rooms for c in free])
+            if bool(in_rooms.any()):
+                free = free[in_rooms]
+            else:
+                log.warning("no free traversable cell inside %s; parking the robot elsewhere", self.rooms)
+        centre = free.float().mean(dim=0)
+        k = int(th.argmin(th.linalg.norm(free.float() - centre, dim=1)))
+        return trav.map_to_world(free[k])
+
+    #: a floor hit counts when it lies within this of the nominal floor height (a step / mezzanine is another floor)
+    FLOOR_MEASURE_RANGE = 0.30
+
+    def room_of(self, xy) -> Optional[str]:
+        try:
+            return self.scene.seg_map.get_room_instance_by_point(G.t(xy)[:2])
+        except Exception:  # noqa: BLE001 - no segmentation map for this scene
+            return None
+
+    def measure_floor_z(self, xy, room: Optional[str] = None) -> float:
+        """Height of the walkable floor surface under world ``xy`` — what the robot actually stands on.
+
+        ``trav_map.floor_heights[0]`` is OmniGibson's default 0.0 in every scene, but a room's floor slab may sit
+        elsewhere (``office_cubicles_right`` / ``shared_office_0``: ``floors_ovpbsn_0`` collision top at z +0.0071); a stance
+        check standing ``base_link`` at ``0.0 + NOMINAL_BASE_Z`` then sinks the wheel spheres 5 mm into the slab and cuRobo's
+        penetration query — which has no ground-like exemption — fails **every** configuration in the room (0 / 205 in
+        the articulation diagnosis). Order: (1) downward raycast at ``xy`` (the robot's bodies ignored) hitting within
+        ``FLOOR_MEASURE_RANGE`` of the nominal height; (2) the room's ``floors`` object's collision-hull top; (3) its
+        AABB top; (4) the nominal height. The result is cached per room (``floor_z_by_room``) and logged."""
+        room = room or self.room_of(xy)
+        if room in self.floor_z_by_room:
+            return self.floor_z_by_room[room]
+        z0 = self.floor_z_default
+        x, y = float(G.t(xy)[0]), float(G.t(xy)[1])
+        z, how = None, None
+        try:
+            ignore = [link.prim_path for link in self.robot.links.values()]
+            hits = raytest_batch([[x, y, z0 + 0.5]], [[x, y, z0 - 0.5]], only_closest=True, ignore_bodies=ignore)
+            h = hits[0] if hits else {}
+            if h.get("hit") and abs(float(h["position"][2]) - z0) <= self.FLOOR_MEASURE_RANGE:
+                z, how = float(h["position"][2]), f"raycast on {h.get('rigidBody')}"
+        except Exception as e:  # noqa: BLE001
+            log.debug("floor raycast failed at (%.2f, %.2f): %r", x, y, e)
+        if z is None and room is not None:
+            try:
+                floors = self.floor_of_room(room)
+                self.sync_render_transforms()
+                tops = [float(p[:, 2].max()) for p in (l.collision_boundary_points_world for l in floors.links.values()) if p is not None and len(p)]
+                if tops and abs(max(tops) - z0) <= self.FLOOR_MEASURE_RANGE:
+                    z, how = max(tops), f"collision hull top of {floors.name}"
                 else:
-                    log.warning("no free traversable cell inside %s; parking the robot elsewhere", self.rooms)
-            centre = free.float().mean(dim=0)
-            k = int(th.argmin(th.linalg.norm(free.float() - centre, dim=1)))
-            xy = trav.map_to_world(free[k])
+                    top = float(floors.aabb[1][2])
+                    if abs(top - z0) <= self.FLOOR_MEASURE_RANGE:
+                        z, how = top, f"AABB top of {floors.name}"
+            except Exception as e:  # noqa: BLE001 - no floors object in the room
+                log.debug("no floors object for room %s: %r", room, e)
+        if z is None:
+            z, how = z0, "trav_map.floor_heights[0] (nothing measured)"
+        z = float(z)
+        if room is not None:
+            self.floor_z_by_room[room] = z
+        log.info("floor height in %s at (%.2f, %.2f): z = %.4f (%s; nominal %.4f, delta %+.1f mm)", room or "?", x, y, z, how, z0, (z - z0) * 1000)
+        return z
+
+    def probe_floor_height(self, xy, tol_m: float = 0.002) -> Dict[str, Any]:
+        """After parking at the measured floor height: the physically settled ``base_link`` z minus ``NOMINAL_BASE_Z`` must
+        agree with the raycast floor within ``tol_m`` (2 mm); the result is kept in ``floor_probe`` (template meta) and a
+        disagreement is logged as a warning (the checks would stand the robot at a wrong height)."""
+        settled = float(self.robot.get_position_orientation()[0][2])
+        floor_from_settled = settled - robot_utils.NOMINAL_BASE_Z
+        diff = floor_from_settled - self.floor_z
+        self.floor_probe = {"room": self.room_of(xy), "floor_z_measured": round(self.floor_z, 4), "floor_z_default": round(self.floor_z_default, 4),
+                            "settled_base_z": round(settled, 4), "settled_minus_nominal": round(floor_from_settled, 4), "diff_mm": round(diff * 1000, 2),
+                            "ok": abs(diff) <= tol_m}
+        (log.info if abs(diff) <= tol_m else log.warning)("floor probe: raycast floor %.4f vs settled base %.4f - %.4f = %.4f (%+.1f mm)%s", self.floor_z,
+                                                           settled, robot_utils.NOMINAL_BASE_Z, floor_from_settled, diff * 1000,
+                                                           "" if abs(diff) <= tol_m else " - DISAGREE beyond 2 mm")
+        return self.floor_probe
+
+    def park_robot(self, xy: Optional[th.Tensor] = None, floor_z: Optional[float] = None):
+        """Stand the robot on a free traversability-map cell of the loaded floor (it must not float / fall) at
+        ``floor_z + NOMINAL_BASE_Z`` (``floor_z`` = the measured floor of the task room by default)."""
+        if xy is None:
+            xy = self.park_cell()
+        if floor_z is None:
+            floor_z = self.floor_z
         self.robot.set_joint_positions(self.robot.tucked_default_joint_pos)
         self.robot.set_joint_velocities(th.zeros(self.robot.n_joints))
         self.robot.set_position_orientation(th.tensor([float(xy[0]), float(xy[1]), floor_z + robot_utils.NOMINAL_BASE_Z]), G.IDENTITY_QUAT)
@@ -785,7 +869,8 @@ class SimWorld:
         self.robot.keep_still()
 
     def robot_floor_z(self) -> float:
-        return 0.0
+        """The measured floor height the robot stands on (see ``measure_floor_z``)."""
+        return float(self.floor_z)
 
     def camera_pose(self) -> G.Pose:
         p, q = self.cam.get_position_orientation()
