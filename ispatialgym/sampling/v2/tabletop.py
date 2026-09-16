@@ -855,7 +855,18 @@ def load_left_contact_band(s, height: float, *, top=None, edge: Optional[EdgeFra
         except FileNotFoundError:
             bands = None
     except FileNotFoundError:
-        log.info("no B3 left contact band for %s (height class %.2f)", support, cls)
+        # the B3 manifest computes the classes of its own object-height table (band metas' object_extent): a neighbouring
+        # class stands in when the exact 2 cm class is missing (contact height differs by <= a few cm)
+        try:
+            bands = RB.ReachBands.load(scene, support, arm="left", contact_set=CONTACT_SET, height=None)
+            near = bands.meta.get("height_class")
+            if near is not None and abs(float(near) - cls) > 0.04 + 1e-6:
+                log.info("left contact band of %s: nearest class %.2f is > 4 cm from %.2f; not used", support, float(near), cls)
+                bands = None
+            else:
+                log.info("left contact band for %s: class %.2f stands in for %.2f (%s)", support, float(near) if near is not None else float("nan"), cls, bands.path)
+        except (FileNotFoundError, TypeError):
+            log.info("no B3 left contact band for %s (height class %.2f)", support, cls)
     if bands is None and compute:
         spec = BandSpec(object=left_contact_object(cls), generic_pinch=True, height=cls, arm="left", contact=True)
         bands = compute_bands(s, spec, top, edge)
