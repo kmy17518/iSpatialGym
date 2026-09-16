@@ -50,8 +50,15 @@ def sync_tree(ep) -> None:
         src = os.path.join(rp.REPO, d)
         if not os.path.isdir(src):
             continue
-        subprocess.run(["rsync", "-az"] + ex + ["-e", ssh_cmd, src + "/", f"root@{ip}:/root/ispatialgym/{d}/"], check=False,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=900)
+        for attempt in range(3):  # a failed rsync must not leave a stale tree under the run (seen once: an already-fixed import error)
+            r = subprocess.run(["rsync", "-az"] + ex + ["-e", ssh_cmd, src + "/", f"root@{ip}:/root/ispatialgym/{d}/"], check=False,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=900)
+            if r.returncode == 0:
+                break
+            print(f"remote_run: rsync of {d} failed (rc {r.returncode}): {r.stderr.strip()[-200:]}; retrying", file=sys.stderr, flush=True)
+            time.sleep(5)
+        else:
+            sys.exit(f"remote_run: could not sync {d} to {ip} after 3 attempts")
 
 
 def acquire_pod(api, wait_s: int):
