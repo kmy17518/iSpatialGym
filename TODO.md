@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 14:10 PDT — 5/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 14:38 PDT — 6/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -127,16 +127,16 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | object_scaling | valid demo | - | - |
 | mental_rotation | valid demo | - | - |
 | disembedding | valid demo | bottle_of_milk success 11:22 (1ca84d2) predates fd0411c/9729372 → re-run for validity; old chili instance blocked by branch-inconsistent witnesses (re-sample) | loop |
-| CM block_design | no instance | braces optional + ladder landed (561f343); still no instance: single-cube probe shows 14–30/56 pick classes feasible at every cell → the failure is the multi-block configuration (yaw jitter / neighbours / λ −0.4…−0.56 cells) → replay the failing block in the probe | tabletop |
-| CM attachment | no instance | attempts 260–320 s now (094cfe3) but no instance: reorientation_unreachable (SLERP to pre-attach), empty F, time_budget, contact_unreachable, partner_placement | tabletop |
-| CM articulation_open_small_scale | no instance | hinged_jar: handle band only at tall trunks (translate 0/0.25) and Phase 2 finds 0 (stance, focus) pairs within the 20° cone from them (no independent camera tilt) → decision: focus-in-frame instead of the 20° cone for small articulation? toolbox: lid handle at 85° out of reach; laptop: target_placement | tabletop / owner |
-| CM articulation_close_small_scale | no instance | same as open | tabletop / owner |
+| CM block_design | no instance | DECISION: picks pass now; every remaining failure is the pre-place of the flipped in-hand orientation (no IK at any trunk) — options: goal face up at init (no flips), flip on the table, or 3 blocks no-flip | owner / tabletop |
+| CM attachment | no instance | DECISION: attempts 30–100 s; 902/1694 partner-cell rejections are the A1 brace gate (bands do not overlap) — brace optional for attachment too, or partner only where the bands overlap | owner / tabletop |
+| CM articulation_open_small_scale | no instance | DECISION: hinged jar best focus 24° off the camera axis (cone 20°); 25° admits 42 foci over 3 stand-offs; toolbox yield (lid handle at 85° unreachable) | owner / tabletop |
+| CM articulation_close_small_scale | no instance | same as open | owner / tabletop |
 | CM articulation_open_large_scale | no instance | floor fixed (7 Phase-2 survivors/attempt); step 5: handle [pre, final] exact IK fails (pinch -1) x15, arm reaches j_link_2 only to fraction ≤ 0.11 from d 0.75–0.80 x8 → large-scale (stance distance / opening reach); no blacklist before the verdict (owner) | large-scale |
 | CM articulation_close_large_scale | no instance | same as open | large-scale |
 | alignment-world_vertical | demo run | transition passes now (d03b21d); brace: right wrist camera into the wall from the recorded side_high pose (wall ignored for the whole arm in the sampler's chain) → large-scale: keep the wall for the arm/wrist links, ignore it for the pads only / off-wall pre-contact | large-scale |
 | alignment-world_horizontal | no instance | same brace geometry; decorative_sign push_unreachable | large-scale |
 | alignment-axial | demo run (pre-fix success) | - | - |
-| IORS ontop_small_scale | demo run (pre-fix success) | - | - |
+| IORS ontop_small_scale | valid demo | - | - |
 | IORS under_small_scale | demo run (pre-fix success) | french_fries: branch problem gone (witness reached, 3.1 mm) → ghost_hand at lift (grasp physics); teacup-saucer: placed_orientation → core release height (item C) then re-run | core |
 | IORS inside | demo run (pre-fix success) | re-sample after 160c518 (release height) + drop executor | core / oracle |
 | IORS nextto | demo run (pre-fix success) | near-side goal 160c518 (future sampling) | - |
