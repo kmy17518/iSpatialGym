@@ -100,6 +100,45 @@ keep working (`BraceCandidate` unpacks as `(kind, pair)`, `.q_prefix` carries th
     rb.class_names                            # bit order of the bitmask
     rb.classes[(translate, tilt)]             # raw (N,) bitmask aligned with rb.cells[(translate, tilt)]
 
+**Measured 2026-09-16 (pilot pods, `breakfast_table_rhjoby_0`)**:
+
+* Left contact bands (8 height classes, 16–21 min each): 17 of 20 trunks are usable (13 untucked, 3 `ready`, 1 `tucked`
+  — the posture retry unlocks 4 trunks that collided with the table with untucked arms), 432–815 cells, union extent
+  λ ∈ [0.00, +0.56] for the flat classes (0.02 / 0.04 m) and [−0.16, +0.56] from 0.06 m up — the left band lies to the
+  robot's **left**, the right-hand bands ([−0.56, +0.08]) to its right, so a two-arm placement has to sit near the
+  centre line (overlap λ ∈ [−0.16, +0.08]) with the brace point left of the work point. Classes (cells summed over
+  trunks, class 0.10 m): `near_h` 528, `top_y90` 371, `left_h` 243, `near_v` 150, `top_y0` 124, `left_v` 69, `far_*` 0,
+  `right_*` 0; for objects ≤ 4 cm only the `near_*` faces and the top presses pass (the side contact at ¾ × 2–4 cm puts
+  the closed gripper into the table), `left_h` passes from 6 cm, `left_v` from 8 cm; `far_*` (pulling toward the robot)
+  never, `right_*` only 2–6 cells for objects ≥ 14 cm.
+* Pitched push classes (11 axial / block generic bands recomputed): 699–718 cells per band vs 427–463 with the two-pitch
+  set (17 trunks vs 13 thanks to the posture retry, plus the far cells). Pass rate per class over all band cells by
+  distance ahead of the base (`p00` = straight down, `p30/45/60` = approach tilted toward the robot's side; `y0`/`y90` =
+  wrist yaw):
+
+  | x ahead | cells | p00_y0 | p00_y90 | p30_y0 | p30_y90 | p45_y0 | p45_y90 | p60_y0 | p60_y90 | only 45/60° |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | 0.4–0.5 | 570 | 0.75 | 0.61 | 0.45 | 0.28 | 0.41 | 0.32 | 0.39 | 0.52 | 0.20 |
+  | 0.5–0.6 | 599 | 0.76 | 0.65 | 0.60 | 0.46 | 0.50 | 0.38 | 0.44 | 0.46 | 0.08 |
+  | 0.6–0.7 | 676 | 0.70 | 0.64 | 0.66 | 0.54 | 0.60 | 0.48 | 0.52 | 0.48 | 0.03 |
+  | 0.7–0.8 | 684 | 0.60 | 0.55 | 0.67 | 0.58 | 0.63 | 0.54 | 0.59 | 0.52 | 0.04 |
+  | 0.8–0.9 | 1077 | 0.43 | 0.45 | 0.70 | 0.65 | 0.72 | 0.66 | 0.71 | 0.63 | 0.18 |
+  | 0.9–1.0 | 336 | 0.17 | 0.21 | 0.69 | 0.66 | 0.85 | 0.79 | 0.88 | 0.86 | 0.31 |
+  | 1.0–1.1 | 199 | 0.00 | 0.00 | 0.57 | 0.54 | 0.84 | 0.83 | 1.00 | 0.92 | 0.43 |
+
+  Straight-down pushes die beyond 0.9 m; 31–43 % of the cells at 0.9–1.1 m are reachable **only** with the 45° / 60°
+  pitches — placement should pick the shallowest passing pitch per cell (`classes_at`).
+* Coverage (`scripts/reach_bands/check_coverage.py`, pilot manifest `runlogs/pilot_20260915/jobs_sample.json`, 197
+  aliases): 110 aliases need no tabletop band, 74 (support, object, grasp set) needs are covered by a band with cells, 16
+  by an **empty** band (8 small-articulation brace bands — see below —, 3 `desk_xhjsub_0` init / placement bands, 4
+  `--under` bands, the `sofa_lugrhk_1` placement band), **0 missing** (`coverage.json`).
+* Toolbox `no_workspace`: `brace__…toolbox-redmtl__f7a311f9f055b593` was computed at the right height (z = top 0.8126 m,
+  stand-off 0.45, 225 lattice cells on the top, 123–197 within reach per trunk) and the handle grasp is feasible at 30–70
+  (cell, yaw) pairs per trunk for translate 0–0.5, but **no brace contact of §5.4 is IK-feasible** (`opposite_face` =
+  the far face of the lid hinged at the back, `top_press` excluded by the swept-AABB rule), so the band is genuinely
+  empty at s = 0.45 — a yield problem of the brace rule, not of the band; the left contact band of the toolbox's height
+  class (0.14 / 0.16 m: `near_*`, `left_*`, top presses) is the replacement the joint placement should use.
+
 Joint placement (owner A1): work point ∈ `rb_r.band(t, k)` **and** brace point ∈ `rb_l.band(t, k)` at the same trunk, then
 the exact two-arm IK; the trunk's `posture()` is the idle-arm posture to record in the stance. `BandComputer.compute`
 now returns `result["classes"]` as well — in-process band writers (`sampling.v2.tabletop.compute_bands`) should save it
