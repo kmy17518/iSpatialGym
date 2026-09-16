@@ -298,8 +298,8 @@ def _ignore_for(action, sampler, carried: Optional[str]) -> Tuple[List[Any], Lis
         every += supports  # the lift starts at the grasp pose (object resting on the support) and goes up
     if name == "place":
         every += supports  # the descent ends 1 cm above the support / partner with the object attached
-        g = getattr(action, "grasp", None)
-        place_on = getattr(g, "place_on", None)
+        # F6 ``Place.on`` = the instance placed on / into (``grasps[].place_on``); older drafts carried the grasp record
+        place_on = getattr(action, "on", None) or getattr(getattr(action, "grasp", None), "place_on", None)
         if place_on in objs:
             every.append(objs[place_on])
     if name == "push":
