@@ -889,6 +889,27 @@ def test_under_large_push_under_chain():
     assert sc4.problems() == [] and [a.name for a in expand(sc4.alias, sc4)] == ["transition", "grasp", "lift", "navigate", "place", "retreat"]
 
 
+def test_block_design_braces_are_optional():
+    """Owner decision 2026-09-16 11:08: row / column braces (with their paired pushes) are recorded only when a joint
+    two-arm placement exists; a brace-less block record is valid and its program is pick → [reorient] → place →
+    retreat with no brace / push tail; a half-recorded axis is still rejected."""
+    with open(os.path.join(VARIANTS, "configuration_matching-block_design__brace_less.json")) as f:
+        d = json.load(f)
+    assert all(k not in b for b in d["blocks"] for k in ("brace_row", "push_row", "brace_col", "push_col"))
+    sc = Sidecar.from_dict(d)
+    assert sc.problems() == [] and sc.validate() is sc
+    assert "contacts.brace" not in REQUIRED_BLOCKS["configuration_matching-block_design"]
+    names = [a.name for a in expand(sc.alias, sc)]
+    assert "brace" not in names and "push" not in names
+    per_block = ["grasp", "lift", "place", "retreat"]
+    assert names == _TABLE_IN + per_block + ["grasp", "lift", "reorient", "place", "retreat"] + per_block + ["grasp", "lift", "reorient", "place", "retreat"]
+    # the fully recorded fixture keeps its tails; a brace without its push (or the reverse) on one axis is rejected
+    assert [a.name for a in expand(load("configuration_matching-block_design").alias, load("configuration_matching-block_design"))] == EXPECTED_SEQUENCE["configuration_matching-block_design"]
+    d2 = raw("configuration_matching-block_design")
+    d2["blocks"][1].pop("brace_row")
+    assert any("must be recorded together" in p for p in Sidecar.from_dict(d2).problems())
+
+
 def test_axial_is_push_only_without_a_brace_record():
     """Owner decision 2026-09-16 08:10: ``contacts.brace`` is optional for axial; without it the program is
     transition → push → retreat (the oracle's push closure is the stop), with it the braced chain as before."""

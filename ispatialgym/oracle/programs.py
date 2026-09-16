@@ -191,7 +191,12 @@ def program_block_design(sc: Sidecar) -> List[Action]:
     neither — the wrist yaw alone is not a reorientation) → place at its slot → push it left against the placed row
     with the working hand while the closed other gripper braces the row-left blocks (where ``brace_row`` /
     ``push_row`` are recorded) → push it up while the other gripper braces the column-top blocks (where recorded) →
-    retreat both grippers."""
+    retreat both grippers.
+
+    The braces are **optional** (owner decision 2026-09-16 11:08, the axial rule): the sampler records ``brace_row`` /
+    ``brace_col`` with their paired pushes only when a joint two-arm placement exists; a block without them is
+    pick → [reorient] → place → retreat, no brace / push tail (all-or-none per axis is enforced by
+    ``Sidecar.problems()`` and here)."""
     if not sc.blocks:
         raise SidecarError("blocks: required for block design")
     arm = _working_arm(sc)
