@@ -25,6 +25,7 @@ carry height (>= tallest distractor + tray rim + 3 cm above the source floor). S
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import math
 from typing import Any, Dict, List, Optional
@@ -260,6 +261,7 @@ class Disembedding(SamplerV2):
         self.dst_floor: Optional[TrayFloor] = None
         self.band_spec: Optional[TT.BandSpec] = None
         self.bands = None
+        self.placed_key: Optional[str] = None  # band key of the stance-relative source tray (item 9)
 
     # ------------------------------------------------------------------ parameters (§2.3: numbers from generation)
 
@@ -290,9 +292,49 @@ class Disembedding(SamplerV2):
         return [self.obj(role) for role in ("support", self.src_role, self.dst_role) if self.bindings.has(role)]
 
     def spawn_roles(self):
+        # owner decision 2026-09-16 4b: the source tray spawns at ``roles.source.scale`` (D1 writes 1.25; until it lands the
+        # ``source_tray_scale`` default), the destination tray at 1.0. The scaled choice replaces the template's so the band
+        # key, the hulls and the spawn agree
+        mc = self.choice.models.get(self.src_role)
+        if mc is not None and not mc.scale:
+            s = self._source_scale(mc)
+            if s is not None and abs(s - 1.0) > 1e-6:
+                self.choice.models[self.src_role] = dataclasses.replace(mc, scale=[float(s)] * 3)
+                self.template_meta["source_tray_scale"] = float(s)
         super().spawn_roles()
         if not self.bindings.has("distractors"):
             self._spawn_facade_distractors()
+
+    def _source_scale(self, mc) -> Optional[float]:
+        """Uniform spawn scale of the source tray: ``roles.<source>.scale`` of the customs entry (per model, or a scalar /
+        list for the role), else the ``source_tray_scale`` generation default (1.25)."""
+        role = self.gp.roles.get(self.src_role)
+        raw = (self.gp.entry.get("roles") or {}).get(self.src_role, {}).get("scale") if isinstance(getattr(self.gp, "entry", None), dict) else None
+        val = None
+        if role is not None:
+            try:
+                val = role.scale_of(mc.category, mc.model)
+            except AttributeError:
+                val = None
+        if val is None and raw is not None and not isinstance(raw, dict):
+            val = raw
+        if val is None:
+            val = self.g("source_tray_scale")
+        if isinstance(val, (list, tuple)):
+            val = val[0] if val else None
+        return None if val is None else float(val)
+
+    def _tray_budget(self) -> float:
+        """§6.4 distractor budget: D1's ``generation.distractor_budget`` (the grounding's maths: its ``budget`` / ``fraction``
+        value, or a bare number) when present, else the ``tray_budget`` default (0.45)."""
+        db = self.gen("distractor_budget", None)
+        if isinstance(db, dict):
+            for k in ("budget", "fraction", "max_fraction", "tray_budget"):
+                if db.get(k) is not None:
+                    return float(db[k])
+        elif isinstance(db, (int, float)):
+            return float(db)
+        return float(self.g("tray_budget"))
 
     def _spawn_facade_distractors(self):
         """v1 facade only (no D1 ``distractors`` group in the template choice): draw the set from the v1 spec's
@@ -355,8 +397,13 @@ class Disembedding(SamplerV2):
         # itself (the tray walls are ignored for the grasp pose per §3.6; the pre-grasp is 10 cm above the rim in practice)
         mc = self.choice.models["target"]
         src_mc = self.choice.models[self.src_role]
+        # band key (item 9, agreed form for ``reach_bands.placed_specs``): ``<category>/<model>@<scale>:focus:edge`` = the
+        # source tray at that uniform scale, its inner-floor centre on the manipulation focus cell, long axis along the
+        # edge — stance-relative, so every template of the alias hits the same band
+        src_scale = float(src_mc.scale[0]) if src_mc.scale else 1.0
+        self.placed_key = f"{src_mc.category}/{src_mc.model}@{src_scale:.2f}:focus:edge"
         self.band_spec = TT.BandSpec(object=f"{mc.category}/{mc.model}", grasp_key=self.grasp_key, grasps=self.grasps, hull=self.hull["target"],
-                                     rest_quat=self.rest["target"], scale=list(mc.scale) if mc.scale else None, placed=[f"{src_mc.category}/{src_mc.model}@focus"],
+                                     rest_quat=self.rest["target"], scale=list(mc.scale) if mc.scale else None, placed=[self.placed_key],
                                      z_support=self.top.z + self.src_floor.z_local + self.world.bottom_offset(self.hull[self.src_role], C.IDENTITY_QUAT),
                                      height=self.height["target"])
         H_max = max(self.height.values())
@@ -394,7 +441,8 @@ class Disembedding(SamplerV2):
             raise Reject("no_stance", "; ".join(errors)[:1500])
         self.template_facts.update({"support": self.top.to_json(), "edge": self.edge.to_json(), "init_stance": self.init_stance.to_meta(),
                                     "n_manipulation_candidates": len(self.manip_candidates), "grasp_key": self.grasp_key, "n_grasps": len(self.grasps),
-                                    "band": getattr(self.bands, "path", None), "src_floor_cells": self.src_floor.n_cells, "dst_floor_cells": self.dst_floor.n_cells,
+                                    "band": getattr(self.bands, "path", None), "placed_key": self.placed_key, "source_tray_scale": src_scale,
+                                    "src_floor_cells": self.src_floor.n_cells, "dst_floor_cells": self.dst_floor.n_cells,
                                     "H_max": H_max, "distractors": [b.name for b in self.bindings.many("distractors")]})
 
     def _tray_yaw(self, key: str, stance: Stance) -> float:
@@ -471,7 +519,7 @@ class Disembedding(SamplerV2):
         items = [(n, self.hull[n], self.rest[n]) for n in dnames]
         grow = {n: TT.distractor_spacing(width if width is not None else 0.0, 0.0) for n in dnames}
         dist_poses = TT.place_distractors(self, rng, src_w, src_w.z, t_pose, self.hull["target"], items, spacing_axis=pinch_axis[:2], spacing=spacing,
-                                          margin=float(self.g("tray_footprint_margin_m")), gap=0.01, cam=cam_init, budget=float(self.g("tray_budget")), grow=grow)
+                                          margin=float(self.g("tray_footprint_margin_m")), gap=0.01, cam=cam_init, budget=self._tray_budget(), grow=grow)
         objects = {tname: t_pose, sname: s_pose, dname: d_pose, **dist_poses}
         # §4.6 step 4: every object in frame (5 %) in the init image except the destination tray
         items_all = [(tname, self.hull["target"], t_pose), (sname, self.hull[self.src_role], s_pose)] + [(n, self.hull[n], dist_poses[n]) for n in dnames]
