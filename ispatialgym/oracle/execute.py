@@ -129,6 +129,12 @@ def _cfg(ctx: Dict[str, Any]) -> ExecuteConfig:
     return ctx.get("cfg") or CONFIG
 
 
+def _hook(ctx: Dict[str, Any], name: str):
+    """An executor hook (``ctx["hooks"][name]``; a no-op without an executor): ``fov(enabled)`` enables / disables
+    the gripper-in-FOV monitor around the checked segment of the action (``qa.Monitors`` arming rule)."""
+    return (ctx.get("hooks") or {}).get(name) or (lambda *a, **k: None)
+
+
 def _witness(ctx: Dict[str, Any], key: str):
     """The sampler's IK witness (28-D q) of the action target ``key`` when the sidecar recorded one (``arm_to`` then
     plans to that configuration, i.e. into the branch the following approach / descent was validated from)."""
@@ -289,8 +295,10 @@ def post_set_torso(action: SetTorso, state, targets, ctx) -> Optional[str]:
 
 def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     arm = action.arm
+    _hook(ctx, "fov")(False)  # the idle posture / the transit to the pre-grasp are not the sampler's to guarantee
     yield from motions.gripper(arm, close=False)
     yield from motions.arm_to(arm, pose=targets["pre_grasp"], q_hint=_witness(ctx, "pre_grasp"))
+    _hook(ctx, "fov")(True)  # from the pre-grasp on the fingertips enter the frame and must stay (recorded grasp pose in frame)
     yield from motions.arm_along(arm, targets["approach"])
     yield from motions.gripper(arm, close=True)
     obj = state.object(action.object)
@@ -336,10 +344,13 @@ def _release(motions: Motions, state, arm: str) -> None:
 def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.arm
+    _hook(ctx, "fov")(False)  # the transit to the pre-place (10 cm back along a tilted approach) may leave the margin
     yield from motions.arm_to(arm, pose=targets["pre_place"], q_hint=_witness(ctx, "pre_place"))
+    _hook(ctx, "fov")(True)  # the descent ends at the recorded (in-frame) place pose
     yield from motions.arm_along(arm, targets["descent"])
     yield from motions.gripper(arm, close=False)
     _release(motions, state, arm)
+    _hook(ctx, "fov")(False)  # the retreat leg is the same as a Retreat action: exempt
     yield from motions.arm_along(arm, targets["retreat"])
     yield from motions.settle(max_steps=cfg.place_settle_steps)
 
@@ -379,8 +390,10 @@ def post_retreat(action: Retreat, state, targets, ctx) -> Optional[str]:
 
 def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     arm = action.contact.arm
+    _hook(ctx, "fov")(False)
     yield from motions.gripper(arm, close=True)
     yield from motions.arm_to(arm, pose=targets["pre"], q_hint=_witness(ctx, "pre"))
+    _hook(ctx, "fov")(True)
     ctx["object_pose0"] = tuple(x.clone() for x in state.object_pose(action.contact.object))
     yield from motions.arm_along(arm, targets["waypoints"])
 
@@ -400,8 +413,10 @@ def post_push(action: Push, state, targets, ctx) -> Optional[str]:
 
 def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     arm = action.contact.arm
+    _hook(ctx, "fov")(False)
     yield from motions.gripper(arm, close=True)
     yield from motions.arm_to(arm, pose=targets["pre"], q_hint=_witness(ctx, "pre"))
+    _hook(ctx, "fov")(True)
     yield from motions.arm_along(arm, targets["approach"])
 
 

@@ -784,6 +784,32 @@ def test_grasp_plans_to_the_recorded_ik_witness_and_closes_the_residual(tmp_path
     assert "plan_pose" in backend2.calls
 
 
+def test_execute_functions_toggle_the_fov_monitor_around_the_checked_segment(tmp_path):
+    """Grasp / Place enable the gripper-in-FOV monitor once the pre-pose is reached and Place disables it again before
+    its retreat leg (the executor wires ``ctx["hooks"]["fov"]`` to ``Monitors.set_fov_enabled``)."""
+    sc, env = iors_world()
+    env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path)
+    calls = []
+    orig = ex.monitors.set_fov_enabled
+
+    def spy(enabled=True):
+        calls.append((ex.monitors.action_index, bool(enabled)))
+        orig(enabled)
+
+    ex.monitors.set_fov_enabled = spy
+    actions = expand(sc.alias, sc)
+    for i, a in enumerate(actions[:4]):
+        assert ex.run_action(i, a) is None, a.name
+    by_action = {}
+    for idx, en in calls:
+        by_action.setdefault(idx, []).append(en)
+    assert by_action[1] == [False, True]  # grasp: transit to the pre-grasp unmonitored, approach on
+    assert 2 not in by_action  # lift: monitored from its first step
+    assert by_action[3] == [False, True, False]  # place: transit off, descent on, retreat leg off
+    assert ex.monitors.fov_enabled  # end_action resets the hook state
+
+
 def test_transition_moves_the_idle_arm_to_its_recorded_posture_before_the_trunk(tmp_path):
     """A6: the arriving stance records the idle arm's joint values (``arms_q``) / posture (``idle_posture``); the
     oracle moves that arm there at the stand-off, before the trunk motion (the sampler swept the trunk with it)."""
@@ -1085,6 +1111,27 @@ def test_fov_pause_and_ghost_hand_monitors():
     verdicts = [mon.check(i) for i in range(9, 12)]
     assert verdicts[:2] == [None, None] and verdicts[2].category == "gripper_out_of_fov" and verdicts[2].details["arm"] == "right"
     mon.end_action()
+    # (b') the execute hook: disabled while the hand transits to a pre-pose that sits in the margin, enabled from the
+    # pre-pose on; disabling disarms (a place's retreat leg after the release)
+    mon.begin_action(grasp, 1, 0, intended=set(), held=[])
+    mon.set_fov_enabled(False)
+    robot.q[robot.arm_control_idx["right"]] = in_q
+    mon.check(1)
+    robot.q[robot.arm_control_idx["right"]] = out_q
+    assert [mon.check(i) for i in range(2, 10)] == [None] * 8 and not mon._fov_armed["right"]
+    mon.set_fov_enabled(True)
+    assert [mon.check(i) for i in range(10, 14)] == [None] * 4  # still not armed: never in frame since enabling
+    robot.q[robot.arm_control_idx["right"]] = in_q
+    assert mon.check(14) is None and mon._fov_armed["right"]
+    robot.q[robot.arm_control_idx["right"]] = out_q
+    assert [mon.check(i) for i in range(15, 17)] == [None, None] and mon.check(17).category == "gripper_out_of_fov"
+    mon.begin_action(grasp, 1, 1, intended=set(), held=[])
+    robot.q[robot.arm_control_idx["right"]] = in_q
+    mon.check(1)
+    mon.set_fov_enabled(False)  # e.g. after the release, before the retreat leg
+    robot.q[robot.arm_control_idx["right"]] = out_q
+    assert [mon.check(i) for i in range(2, 12)] == [None] * 10
+    mon.end_action()
     # (c) a retreat is exempt even when the hand leaves the frame
     mon.begin_action(retreat, 4, 0, intended=set(), held=[])
     robot.q[robot.arm_control_idx["right"]] = in_q
@@ -1107,8 +1154,8 @@ def test_fov_pause_and_ghost_hand_monitors():
     v = mon.check(11)
     assert v is not None and v.category == "ghost_hand" and v.details["object"] == "apple_0"
     stats = mon.stats.to_dict()
-    assert stats["by_category"] == {"gripper_out_of_fov": 1, "paused": 1, "ghost_hand": 1}
-    assert stats["by_action"]["grasp"] == {"gripper_out_of_fov": 1, "paused": 1}
+    assert stats["by_category"] == {"gripper_out_of_fov": 2, "paused": 1, "ghost_hand": 1}  # (b) and (b')
+    assert stats["by_action"]["grasp"] == {"gripper_out_of_fov": 2, "paused": 1}
 
 
 def test_category_of_and_verdict_validation():

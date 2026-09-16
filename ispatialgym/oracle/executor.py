@@ -470,6 +470,7 @@ class Executor:
         ctx["targets_keys"] = sorted(targets.keys())
         ctx["witnesses"] = self.witnesses_for(index)
         if self.monitors is not None:
+            ctx["hooks"] = {"fov": self.monitors.set_fov_enabled}
             self.monitors.begin_action(action, index, attempt, intended=self._scene_names(action.objects), held=self.state.held_objects(), manipulation=is_manipulation(action),
                                        fov=fov_monitored(action))
         try:
@@ -856,12 +857,14 @@ def _unsatisfied(isg: Dict[str, Any]) -> List[str]:
 
 
 def _out_of_tolerance(isg: Dict[str, Any]) -> List[str]:
-    """Targets whose current error report says ``within_tolerance: False`` (pose and layout targets)."""
+    """**Gating** targets whose current error report says ``within_tolerance: False`` (pose and layout targets). The
+    measured-only ``(:measure ...)`` targets of disembedding / IORS (``gating: False``) are reported, never a verdict:
+    their tolerance is the reporting / goal-override band of spec §8, the relation predicate is what gates."""
     errs = isg.get("errors") or {}
     out = []
     for kind in ("pose_errors", "layout_errors"):
         for inst, rep in (errs.get(kind) or {}).items():
-            if isinstance(rep, dict) and rep.get("within_tolerance") is False:
+            if isinstance(rep, dict) and rep.get("within_tolerance") is False and rep.get("gating", True):
                 out.append(inst)
     return out
 
