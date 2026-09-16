@@ -103,7 +103,8 @@ def test_customs_entry_has_the_spec_keys(grounded):
     data = json.load(open(grounded.customs_path))
     for gp in grounded.grounder.grounded:
         e = data[gp.alias]
-        assert tuple(e) == C.ENTRY_KEYS
+        assert set(e) <= set(C.ENTRY_KEYS) and list(e) == [k for k in C.ENTRY_KEYS if k in e]  # spec order, optional fallback keys
+        assert {"iddl", "definition_id", "roles", "scenes", "generation", "constraints"} <= set(e)
         assert e["iddl"] == I.relative_path(IDDLS[gp.subtask].path) and e["definition_id"] == gp.definition_id
         assert "floor" in e["roles"] and e["roles"]["floor"] == {"sampleable": False}
         for role, r in e["roles"].items():
@@ -154,6 +155,8 @@ def test_heldout_models_are_blacklisted_in_every_role(grounded):
     assert ("box_of_shampoo", "tzghev") in heldout and ("pencil", "fnlbpu") in heldout
     n = 0
     for gp in grounded.grounder.grounded:
+        if gp.entry.fallback_kind == "next_model":
+            continue  # the next-model fallback may name the held-out model of its category on purpose
         for scene in gp.entry.scenes.values():
             for role, r in gp.entry.roles.items():
                 if not r.sampleable:
@@ -389,8 +392,208 @@ def test_cli_dry_run(tmp_path):
 def test_legacy_activity_names(tmp_path):
     icl = GI.ICL()
     customs = C.Customs.load(str(tmp_path / "c.json"))
-    grounder = GI.Grounder(IDDLS, icl, customs, bddl_root=str(tmp_path / "bddl"), options=GI.Options(representative_test=False, legacy_activity_names=True))
+    grounder = GI.Grounder(IDDLS, icl, customs, bddl_root=str(tmp_path / "bddl"),
+                           options=GI.Options(representative_test=False, legacy_activity_names=True, fallbacks=False))
     grounder.run(["alignment-axial"])
     assert os.path.isdir(tmp_path / "bddl" / "world_alignment")
     assert P.list_problem_ids("world_alignment", str(tmp_path / "bddl")) == list(range(10))
     assert all(gp.activity == "world_alignment" for gp in grounder.grounded)
+    assert not grounder.report.fallbacks
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Fallback aliases (owner decision 2026-09-16 B)
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def _fallbacks_of(grounded, alias):
+    return [gp for gp in grounded.grounder.grounded if gp.entry.fallback_of == alias]
+
+
+def test_fallback_entries_carry_the_schema_fields(grounded):
+    data = json.load(open(grounded.customs_path))
+    n = 0
+    for alias, e in data.items():
+        if alias.startswith("_"):
+            continue
+        if "fallback_of" in e:
+            n += 1
+            assert e["fallback_of"] in data and "fallback_of" not in data[e["fallback_of"]]  # a fallback of a primary
+            assert e["fallback_rank"] >= 1 and e["fallback_kind"] in C.FALLBACK_KINDS
+            assert alias in data[e["fallback_of"]]["fallbacks"]
+            assert alias.startswith(e["fallback_of"].split("-")[0])
+            # the registry record carries the same fields
+            act = IDDLS[next(gp.subtask for gp in grounded.grounder.grounded if gp.alias == alias)].family
+            reg = B.ProblemRegistry.load(os.path.join(grounded.bddl_root, act))
+            rec = reg.record(alias)
+            assert rec["fallback_of"] == e["fallback_of"] and rec["fallback_rank"] == e["fallback_rank"] and rec["fallback_kind"] == e["fallback_kind"]
+        else:
+            for fb in e.get("fallbacks", []):
+                assert data[fb]["fallback_of"] == alias
+            ranks = [data[fb]["fallback_rank"] for fb in e.get("fallbacks", [])]
+            assert ranks == sorted(ranks)
+        assert C.CustomsEntry.from_dict(alias, e).to_dict() == e
+    assert n >= 10
+    assert set(grounded.report.to_json()["fallbacks"]) <= set(SUBTASKS)
+
+
+def test_init_surface_fallback_chain(grounded):
+    under = _entries(grounded, "inter_object_relation_satisfaction-under_large_scale")
+    primaries = [gp for gp in under if not gp.entry.is_fallback]
+    assert primaries
+    for gp in primaries:
+        support = gp.entry.roles["support"]
+        fbs = sorted(_fallbacks_of(grounded, gp.alias), key=lambda g: g.entry.fallback_rank)
+        partner_cat = gp.entry.roles["partner"].category
+        if support.category == GI.FLOOR_CATEGORY:
+            assert fbs == [] and gp.entry.fallbacks == []  # floor is the last class
+            continue
+        if support.category == partner_cat and all(sc.bindings["support"] == sc.bindings["partner"] for sc in gp.entry.scenes.values()):
+            expected = ["floor"]
+        else:
+            expected = ["partner", "floor"]
+        assert [fb.entry.fallback_params["init_surface"] for fb in fbs] == expected
+        assert [fb.entry.fallback_rank for fb in fbs] == list(range(1, len(expected) + 1))
+        assert gp.entry.fallbacks == [fb.alias for fb in fbs]
+        for fb in fbs:
+            assert fb.entry.fallback_kind == "init_surface"
+            assert fb.entry.roles["target"].to_dict() == gp.entry.roles["target"].to_dict()
+            assert fb.entry.roles["partner"].to_dict() == gp.entry.roles["partner"].to_dict()
+            cls = fb.entry.fallback_params["init_surface"]
+            for scene, sc in fb.entry.scenes.items():
+                assert sc.bindings["partner"] == gp.entry.scenes[scene].bindings["partner"]
+                assert sc.whitelist == gp.entry.scenes[scene].whitelist
+                if cls == "partner":
+                    assert fb.alias.endswith(f"-{partner_cat}-{partner_cat}")
+                    assert sc.bindings["support"] == sc.bindings["partner"]
+                    assert fb.entry.roles["support"].category == partner_cat
+                    assert fb.rendered.instances["support"] == fb.rendered.instances["partner"]  # declared once
+                else:
+                    assert fb.alias.endswith("-floor")
+                    assert sc.bindings["support"] == {"room": sc.rooms[0]}
+                    assert fb.entry.roles["support"].category == GI.FLOOR_CATEGORY
+                    assert fb.rendered.instances["support"] == "floor.n.01_1"
+    # ontop: support -> floor only (the partner's own top would satisfy the goal at init)
+    ontop_root = os.path.join(grounded.root, "ontop")
+    g2 = GI.Grounder(IDDLS, grounded.icl, C.Customs.load(os.path.join(ontop_root, "c.json")), bddl_root=os.path.join(ontop_root, "bddl"),
+                     options=GI.Options(representative_test=False))
+    g2.run(["inter_object_relation_satisfaction-ontop_large_scale"])
+    for gp in [g for g in g2.grounded if not g.entry.is_fallback]:
+        fbs = [g for g in g2.grounded if g.entry.fallback_of == gp.alias]
+        if gp.entry.roles["support"].category == GI.FLOOR_CATEGORY:
+            assert fbs == []
+        else:
+            assert len(fbs) == 1 and fbs[0].entry.fallback_params == {"init_surface": "floor"} and fbs[0].alias.endswith("-floor")
+
+
+def test_scale_fallbacks(grounded, tmp_path):
+    for st in ("alignment-world_vertical", "alignment-axial"):
+        primaries = [gp for gp in _entries(grounded, st) if not gp.entry.is_fallback]
+        assert primaries
+        for gp in primaries:
+            fbs = _fallbacks_of(grounded, gp.alias)
+            assert len(fbs) == 1 and gp.entry.fallbacks == [fbs[0].alias]
+            fb = fbs[0]
+            s = fb.entry.fallback_params["scale"]
+            assert fb.entry.fallback_kind == "scale" and 0 < s < 1
+            cat = gp.entry.roles["target"].category
+            assert fb.alias == gp.alias.replace(f"-{cat}-", f"-{cat}{GI.scale_token(s)}-")
+            assert P.ALIAS_RE.match(fb.alias)
+            scale = fb.entry.roles["target"].scale
+            assert scale["default"] == s
+            for scene_name, scene in fb.entry.scenes.items():
+                for c, models in scene.whitelist["target"].items():
+                    assert models and models == gp.entry.scenes[scene_name].whitelist["target"][c]  # same models as the primary ...
+                    for m in models:
+                        assert scale[f"{c}/{m}"] == s  # ... spawned at the fallback scale
+            assert fb.entry.fallback_params["scale_source"] in ("template_meta.scale_hint", "default_step")
+            assert fb.problem.objects == gp.problem.objects  # same synsets, other alias
+    assert GI.scale_token(0.7) == "_s070" and GI.scale_token(0.6) == "_s060" and GI.scale_token(0.85) == "_s085"
+    # the pilot's scale_hint wins over the default step; several metas -> the largest hint (closest to native)
+    metas = tmp_path / "pilot" / "pod" / "v2__alignment-axial-letter-breakfast_table" / "alias" / "template"
+    metas.mkdir(parents=True)
+    (metas / "template_meta.json").write_text(json.dumps({"alias": "alignment-axial-letter-breakfast_table", "scale_hint": 0.8}))
+    metas2 = tmp_path / "pilot" / "pod2" / "v2__alignment-axial-letter-breakfast_table" / "alias" / "template"
+    metas2.mkdir(parents=True)
+    (metas2 / "template_meta.json").write_text(json.dumps({"alias": "alignment-axial-letter-breakfast_table", "scale_hint": 0.6}))
+    (metas2.parent / "other.json").write_text("{}")
+    hints = GI.load_scale_hints(str(tmp_path / "pilot" / "*" / "v2__*" / "*" / "*" / "template_meta.json"))
+    assert hints == {"alignment-axial-letter-breakfast_table": 0.8}
+    g3 = GI.Grounder(IDDLS, grounded.icl, C.Customs.load(str(tmp_path / "c.json")), bddl_root=str(tmp_path / "bddl"),
+                     options=GI.Options(representative_test=False, scale_hints=hints, fallback_scale=0.75))
+    g3.run(["alignment-axial"])
+    fbs = {g.entry.fallback_of: g for g in g3.grounded if g.entry.is_fallback}
+    letter = fbs["alignment-axial-letter-breakfast_table"]
+    assert letter.alias == "alignment-axial-letter_s080-breakfast_table" and letter.entry.fallback_params == {"scale": 0.8, "scale_source": "template_meta.scale_hint"}
+    other = next(g for a, g in fbs.items() if a != "alignment-axial-letter-breakfast_table")
+    assert other.alias.split("-")[2].endswith("_s075") and other.entry.fallback_params["scale_source"] == "default_step"
+
+
+def test_next_model_fallbacks(grounded):
+    small = _entries(grounded, "configuration_matching-articulation_open_small_scale")
+    primaries = {gp.entry.roles["target"].category: gp for gp in small if not gp.entry.is_fallback}
+    assert set(primaries) == {"blender", "hinged_jar", "laptop", "toolbox", "carton"}
+    for cat, gp in primaries.items():
+        fbs = _fallbacks_of(grounded, gp.alias)
+        slots = grounded.icl.picks[gp.combination.pick]["target"]
+        others = [r for s in GI.NEXT_MODEL_SLOT_ORDER for r in slots.get(s, []) if r["model"] != gp.entry.roles["target"].representative]
+        if not others:
+            assert fbs == [] and gp.entry.fallbacks == []
+            assert any(gp.alias in n and "no next-model fallback" in n for n in grounded.report.notes[gp.subtask])
+            continue
+        assert len(fbs) == 1
+        fb = fbs[0]
+        model = fb.entry.fallback_params["model"]
+        assert fb.entry.fallback_kind == "next_model" and model == others[0]["model"]
+        assert fb.entry.fallback_params["primary_model"] == gp.entry.roles["target"].representative
+        assert fb.alias.split("-")[2] == f"{cat}_{model}"
+        assert fb.entry.roles["target"].representative == model
+        for sc in fb.entry.scenes.values():
+            assert sc.whitelist["target"] == {cat: [model]}
+        assert fb.entry.roles["target"].joint[f"{cat}/{model}"] and fb.entry.roles["target"].handle_key[f"{cat}/{model}"]
+        # the support follows the §5.4 floor rule of the new model
+        tall = float(fb.combination.roles["target"].pick_row["bbox_z"]) > GI.FLOOR_SUPPORT_HEIGHT_M
+        assert fb.alias.endswith("-floor") == tall
+
+
+def test_no_fallbacks_option(tmp_path):
+    g = GI.Grounder(IDDLS, GI.ICL(), C.Customs.load(str(tmp_path / "c.json")), bddl_root=str(tmp_path / "bddl"),
+                    options=GI.Options(representative_test=False, fallbacks=False))
+    g.run(["inter_object_relation_satisfaction-under_large_scale", "alignment-axial"])
+    assert g.grounded and not any(gp.entry.is_fallback for gp in g.grounded) and not g.report.fallbacks
+    assert all(not gp.entry.fallbacks for gp in g.grounded)
+
+
+def test_several_representative_supports_per_pick(tmp_path):
+    """A3 support triplets: several support rows in the representative slot of one pick -> one alias per support
+    category (scene per support), same-category supports share the alias and union their scene blocks."""
+    icl = GI.ICL()
+    pick = "inter_object_relation_satisfaction-nextto#01"
+    base = icl.picks[pick]["support"]["representative"][0]
+    extra = [
+        ("countertop", "house_single_floor", "countertop_kelker_0"),
+        ("bar", "house_single_floor", "bar_udatjt_0"),
+        ("commercial_kitchen_table", "restaurant_diner", "commercial_kitchen_table_vxvtec_0"),
+        ("conference_table", "office_cubicles_right", "conference_table_fpkmyw_0"),
+        ("desk", "office_cubicles_right", "desk_mdhelw_1"),
+        ("bar", "restaurant_diner", "bar_xxftww_0"),
+    ]
+    for cat, scene, name in extra:
+        icl.picks[pick]["support"]["representative"].append(dict(base, category=cat, scene=scene, name=name, model=name.rsplit("_", 2)[1]))
+    g = GI.Grounder(IDDLS, icl, C.Customs.load(str(tmp_path / "c.json")), bddl_root=str(tmp_path / "bddl"), options=GI.Options(representative_test=False))
+    g.run(["inter_object_relation_satisfaction-nextto"])
+    aliases = {gp.alias for gp in g.grounded if gp.combination.pick.startswith(pick)}
+    tokens = {a.split("-")[-1] for a in aliases}
+    assert tokens == {"breakfast_table", "countertop", "bar", "commercial_kitchen_table", "conference_table", "desk"}
+    bar = g.customs.entries["inter_object_relation_satisfaction-nextto-pencil-ruler-bar"]
+    assert set(bar.scenes) == {"house_single_floor", "restaurant_diner"}
+    assert bar.scenes["house_single_floor"].bindings["support"] == ["bar_udatjt_0"] and bar.scenes["restaurant_diner"].bindings["support"] == ["bar_xxftww_0"]
+    assert bar.scenes["house_single_floor"].rooms == ["kitchen_0"] and set(bar.scenes["restaurant_diner"].rooms) == {"bar_0", "dining_room_0"}
+    for sc in bar.scenes.values():
+        assert sc.whitelist["target"] == {"pencil": ["hmawzy"]} and sc.bindings["floor"] == {"room": sc.rooms[0]}
+    # the desk alias also carries the other picks' representative desk? no: only the supports of the selection
+    desk = g.customs.entries["inter_object_relation_satisfaction-nextto-pencil-ruler-desk"]
+    assert desk.scenes["office_cubicles_right"].bindings["support"] == ["desk_mdhelw_1"]
+    ids = P.list_problem_ids("inter_object_relation_satisfaction", str(tmp_path / "bddl"))
+    assert len(ids) == len({gp.alias for gp in g.grounded})
+    assert P.validate_problem_registry("inter_object_relation_satisfaction", str(tmp_path / "bddl"))

@@ -17,7 +17,14 @@ every candidate) this module
    admissible pool for group roles), ``blacklist`` with reasons, ``generation`` seeded from the existing entry or
    ``sampling/generation_defaults.py``, ``constraints`` (empty, except the soft ``missing_contacts_pending_B6``
    records while ``require/contacts.csv`` is header-only);
-4. calls the representative-test hook :func:`run_representative_test` (template + instance 0; implemented by the v2
+4. emits the **fallback aliases** of the primary (owner decision 2026-09-16 B; customs ``fallback_of`` /
+   ``fallback_rank`` / ``fallback_kind`` / ``fallback_params``, the primary's ``fallbacks`` list, the same fields in
+   ``problems.json``): large-scale IORS init surface (under: support -> the partner's own top -> floor; ontop: support
+   -> floor), the wall / axial scale fallback (``<target>_s070`` = ``roles.target.scale`` 0.70, the pilot's
+   ``template_meta.scale_hint`` when it recorded one) and the small-scale articulation next-model fallback
+   (``<target>_<model>``: the next admissible model of the category in variation / held-out order). A scheduler
+   queues a fallback only after its primary yielded nothing — the sampler never falls back at run time;
+5. calls the representative-test hook :func:`run_representative_test` (template + instance 0; implemented by the v2
    sampler, TODO D2 — skipped with a log line until ``ispatialgym.sampling.v2.core`` provides it).
 
 Run::
@@ -25,6 +32,7 @@ Run::
     python -m ispatialgym.sampling.ground_isg [--representative-only | --test-only | --all] [--subtask ID ...]
         [--slots representative,variation_geometry,...] [--out-bddl DIR] [--customs FILE] [--scene S ...]
         [--full-whitelists] [--distractors same:2,other:1] [--legacy-activity-names] [--dry-run]
+        [--no-fallbacks] [--fallback-scale 0.7] [--scale-hints GLOB|none]
 
 Decisions taken where the docs leave room (all reported by the CLI, see ``--help`` and the run report):
 
@@ -55,7 +63,7 @@ import sys
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
-from ispatialgym import ASSETS_ROOT
+from ispatialgym import ASSETS_ROOT, REPO_ROOT
 from ispatialgym.activity.problem import ISGProblemError
 from ispatialgym.sampling import customs as C
 from ispatialgym.sampling import generation_defaults as G
@@ -96,6 +104,21 @@ HANDLE_ADMISSIBLE_VERDICTS = ("handle", "edge", "manual")
 PINCH_RANGE_M = (0.015, 0.080)
 PENDING_CONTACTS_REASON = "missing_contacts_pending_B6"
 
+#: Fallback aliases (owner decision 2026-09-16 B). Subtasks with an init-surface chain (§5.6: under support -> the
+#: partner's own top -> floor; ontop support -> floor), with a scale fallback (§5.5 / §6.10 ``scale_hint``) and with a
+#: next-model fallback (small-scale articulation: the next candidate model of the category in variation / held-out order).
+INIT_SURFACE_FALLBACK_SUBTASKS = {
+    "inter_object_relation_satisfaction-under_large_scale": ("partner", "floor"),
+    "inter_object_relation_satisfaction-ontop_large_scale": ("floor",),
+}
+SCALE_FALLBACK_SUBTASKS = ("alignment-world_vertical", "alignment-world_horizontal", "alignment-axial")
+NEXT_MODEL_FALLBACK_SUBTASKS = ("configuration_matching-articulation_open_small_scale", "configuration_matching-articulation_close_small_scale")
+NEXT_MODEL_SLOT_ORDER = ("variation_geometry", "variation_texture", "heldout")
+#: The single scale step used when the pilot left no ``template_meta.scale_hint`` for the primary alias.
+DEFAULT_FALLBACK_SCALE = 0.7
+#: Where the pilot wrote its template metadata (``scale_hint`` of the wall / axial templates), relative to the repo.
+DEFAULT_SCALE_HINT_GLOB = os.path.join("runlogs", "runpod", "pilot", "*", "v2__*", "*", "*", "template_meta.json")
+
 _TRUE = ("1", "true", "True", "yes")
 
 
@@ -135,6 +158,37 @@ def _scene_object_key(row: Dict[str, str]) -> str:
     return row.get("region_id") or row.get("model") or ""
 
 
+def load_scale_hints(pattern: Optional[str] = None) -> Dict[str, float]:
+    """``{alias: scale_hint}`` from the pilot's ``template_meta.json`` files (the diagnostic pass of §5.5 writes the
+    largest feasible uniform scale; several runs -> the largest hint, i.e. the one closest to the native scale).
+    The alias is the ``alias`` field of the meta (fallback: the ``v2__<alias>`` job directory)."""
+    import glob
+
+    pattern = pattern or os.path.join(REPO_ROOT, DEFAULT_SCALE_HINT_GLOB)
+    out: Dict[str, float] = {}
+    for path in sorted(glob.glob(pattern)):
+        try:
+            with open(path) as f:
+                meta = json.load(f)
+        except Exception:
+            continue
+        hint = meta.get("scale_hint")
+        if hint in (None, "", False):
+            continue
+        try:
+            hint = float(hint)
+        except (TypeError, ValueError):
+            continue
+        alias = meta.get("alias")
+        if not alias:
+            job = next((p[4:] for p in path.split(os.sep) if p.startswith("v2__")), None)
+            alias = job
+        if not alias:
+            continue
+        out[alias] = max(out.get(alias, 0.0), hint)
+    return out
+
+
 def _parse_vec(value: str) -> Optional[List[float]]:
     if not value:
         return None
@@ -166,9 +220,11 @@ class ICL:
             self.by_sr[(r["subtask"], r["role"])].append(r)
             self.by_key.setdefault((r["subtask"], r["role"], r["category"], r["model"]), r)
         self.representatives = _read_csv(os.path.join(roles, "representatives.csv"))
-        self.picks: Dict[str, Dict[str, Dict[str, Dict[str, str]]]] = collections.defaultdict(lambda: collections.defaultdict(dict))
+        # pick -> role -> slot -> rows (several rows per slot for the roles the selection lists more than once, e.g.
+        # the A3 support triplets); insertion order = sheet order
+        self.picks: Dict[str, Dict[str, Dict[str, List[Dict[str, str]]]]] = collections.defaultdict(lambda: collections.defaultdict(dict))
         for r in self.representatives:
-            self.picks[r["pick"]][r["role"]][r["slot"]] = r
+            self.picks[r["pick"]][r["role"]].setdefault(r["slot"], []).append(r)
         self.heldout_models: Set[Tuple[str, str]] = {
             (r["category"], r["model"]) for r in self.representatives if r["slot"] == "heldout" and r["kind"] != "scene" and r["model"]
         }
@@ -463,7 +519,10 @@ class RolePick:
     def is_floor(self) -> bool:
         return self.kind == "scene" and self.category == FLOOR_CATEGORY
 
-    def alias_token(self, icl: ICL, subtask: str) -> str:
+    def alias_token(self, icl: ICL, subtask: str, scale: Optional[float] = None, with_model: bool = False) -> str:
+        """The ``{role}`` slot value: the category (``floor`` for the floor; group roles ``<category>_<count>`` tokens),
+        with ``_s<NNN>`` for a scaled fallback (``picture_s070`` = spawn scale 0.70) and ``_<model>`` for a
+        model-specific fallback (``blender_eyedvd``)."""
         if self.kind == "group":
             parts = []
             for cat, n in self.members.items():
@@ -475,7 +534,27 @@ class RolePick:
             return "_".join(parts)
         if self.is_floor:
             return FLOOR_ALIAS_TOKEN
-        return self.category or ""
+        token = self.category or ""
+        if with_model and self.models:
+            token += f"_{self.models[0][1]}"
+        if scale is not None:
+            token += scale_token(scale)
+        return token
+
+
+def scale_token(scale: float) -> str:
+    """``0.7`` -> ``_s070`` (two decimals, stays within the parser's alias alphabet)."""
+    return f"_s{int(round(float(scale) * 100)):03d}"
+
+
+@dataclass
+class FallbackSpec:
+    """What makes a combination a fallback of ``primary`` (customs ``fallback_of`` / ``fallback_rank`` / ``fallback_kind``)."""
+
+    primary: str
+    rank: int
+    kind: str  # init_surface | scale | next_model
+    params: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -488,10 +567,17 @@ class Combination:
     rooms: Dict[str, List[str]] = field(default_factory=dict)  # scene -> task rooms
     floor_room: Dict[str, str] = field(default_factory=dict)  # scene -> the floor's room
     notes: List[str] = field(default_factory=list)
+    scale: Dict[str, float] = field(default_factory=dict)  # role -> uniform spawn scale (scale fallbacks)
+    model_tokens: Set[str] = field(default_factory=set)  # roles whose alias token carries the model (next-model fallbacks)
+    fallback: Optional[FallbackSpec] = None
 
     @property
     def label(self) -> str:
-        return f"{self.pick}/{self.slot}"
+        base = f"{self.pick}/{self.slot}"
+        return f"{base}/fallback{self.fallback.rank}:{self.fallback.kind}" if self.fallback else base
+
+    def alias_values(self, icl: ICL, iddl: I.IDDL) -> Dict[str, str]:
+        return {r: self.roles[r].alias_token(icl, self.subtask, scale=self.scale.get(r), with_model=r in self.model_tokens) for r in iddl.alias_slots}
 
 
 class Skip(Exception):
@@ -519,6 +605,9 @@ class Options:
     strict_symmetric_180: bool = False
     dry_run: bool = False
     representative_test: bool = True
+    fallbacks: bool = True  # emit the fallback aliases (owner decision 2026-09-16 B)
+    fallback_scale: float = DEFAULT_FALLBACK_SCALE  # scale fallback step when the pilot recorded no scale_hint
+    scale_hints: Dict[str, float] = field(default_factory=dict)  # primary alias -> pilot template_meta.scale_hint
 
 
 @dataclass
@@ -547,19 +636,29 @@ class Report:
         self.pending: Dict[str, int] = collections.Counter()
         self.notes: Dict[str, List[str]] = collections.defaultdict(list)
         self.tests: List[str] = []
+        self.fallbacks: Dict[str, List[Tuple[str, str, int, str]]] = collections.defaultdict(list)  # subtask -> (alias, primary, rank, kind)
 
     def text(self) -> str:
         lines = [f"ground_isg {VERSION} report ({_dt.datetime.now().isoformat(timespec='seconds')})", ""]
-        lines.append("| subtask | problems | groundings | skipped | blacklist entries (reason: n) |")
-        lines.append("|---|---|---|---|---|")
+        lines.append("| subtask | primaries | fallbacks | groundings | skipped | blacklist entries (reason: n) |")
+        lines.append("|---|---|---|---|---|---|")
         for st in sorted(set(self.problems) | set(self.skipped) | set(self.blacklist)):
             hist = ", ".join(f"{k}: {v}" for k, v in sorted(self.blacklist[st].items()))
-            n_alias = len({a for a, _, _ in self.problems[st]})
-            lines.append(f"| {st} | {n_alias} | {len(self.problems[st])} | {len(self.skipped[st])} | {hist} |")
+            fb_aliases = {a for a, _, _, _ in self.fallbacks[st]}
+            n_alias = len({a for a, _, _ in self.problems[st]} - fb_aliases)
+            lines.append(f"| {st} | {n_alias} | {len(fb_aliases)} | {len(self.problems[st])} | {len(self.skipped[st])} | {hist} |")
+        all_fb = {a for v in self.fallbacks.values() for a, _, _, _ in v}
         total = len({a for v in self.problems.values() for a, _, _ in v})
         groundings = sum(len(v) for v in self.problems.values())
         lines.append("")
-        lines.append(f"{total} problems written ({groundings} groundings), {sum(len(v) for v in self.skipped.values())} combinations skipped")
+        lines.append(f"{total} problems written ({total - len(all_fb)} primaries + {len(all_fb)} fallbacks; {groundings} groundings), "
+                     f"{sum(len(v) for v in self.skipped.values())} combinations skipped")
+        if all_fb:
+            lines.append("")
+            lines.append("fallback aliases (rank, kind) <- primary:")
+            for st in sorted(self.fallbacks):
+                for alias, primary, rank, kind in self.fallbacks[st]:
+                    lines.append(f"- {alias} ({rank}, {kind}) <- {primary}")
         if self.pending:
             lines.append("")
             lines.append("pending requirements (recorded as soft `blacklist` constraint records, models stay whitelisted):")
@@ -592,6 +691,7 @@ class Report:
             "pending": dict(self.pending),
             "notes": {st: sorted(set(v)) for st, v in self.notes.items()},
             "tests": list(self.tests),
+            "fallbacks": {st: [{"alias": a, "fallback_of": p, "fallback_rank": r, "fallback_kind": k} for a, p, r, k in v] for st, v in self.fallbacks.items()},
         }
 
 
@@ -663,15 +763,25 @@ class Grounder:
             for slot in self.opt.slots:
                 if slot != "representative" and not any(slot in slots for slots in roles.values()):
                     continue
-                rows: Dict[str, Dict[str, str]] = {}
+                # one row per role from the slot (else the representative row); a role with several rows in the
+                # slot (the A3 support triplets: several representative supports per pick) gives one combination
+                # per row -- the support token differs per category, same-category supports share the alias and
+                # union their scene blocks
+                choices: Dict[str, List[Dict[str, str]]] = {}
                 for role, slots in roles.items():
-                    row = slots.get(slot) or slots.get("representative")
-                    if row is not None:
-                        rows[role] = row
-                try:
-                    out.append(self._build(iddl, pick, slot, rows))
-                except Skip as s:
-                    self.report.skipped[subtask].append((f"{pick}/{slot}", str(s)))
+                    rows_ = slots.get(slot) or slots.get("representative") or []
+                    if rows_:
+                        choices[role] = list(rows_)
+                multi = [r for r, rs in choices.items() if len(rs) > 1]
+                variants: List[Dict[str, Dict[str, str]]] = [{}]
+                for role, rs in choices.items():
+                    variants = [dict(v, **{role: r}) for v in variants for r in (rs if role in multi else rs[:1])]
+                for i, rows in enumerate(variants):
+                    label = pick if len(variants) == 1 else f"{pick}~{i + 1}"
+                    try:
+                        out.append(self._build(iddl, label, slot, rows))
+                    except Skip as s:
+                        self.report.skipped[subtask].append((f"{label}/{slot}", str(s)))
         return out
 
     def _combinations_from_candidates(self, iddl: I.IDDL) -> List[Combination]:
@@ -1055,8 +1165,7 @@ class Grounder:
         subtask = iddl.subtask
         activity = self.activity_of(iddl)
         # alias
-        slot_values = {r: comb.roles[r].alias_token(self.icl, subtask) for r in iddl.alias_slots}
-        alias = iddl.fill_alias(slot_values)
+        alias = iddl.fill_alias(comb.alias_values(self.icl, iddl))
         # BDDL groundings
         groundings: Dict[str, RoleGrounding] = {}
         for role in iddl.roles:
@@ -1076,8 +1185,17 @@ class Grounder:
             else:
                 groundings[role] = RoleGrounding(role, "scene", rp.category, self._synset(rp.category))
         comment = f"{GROUNDER} {self.today}: {alias} ({I.relative_path(iddl.path, self.iddl_root) if iddl.path else iddl.subtask}; {comb.label})"
+        if comb.fallback is not None:
+            comment += f"\nfallback {comb.fallback.rank} ({comb.fallback.kind}) of {comb.fallback.primary}"
+            if comb.fallback.params:
+                comment += ": " + ", ".join(f"{k} = {v}" for k, v in comb.fallback.params.items())
         if iddl.comment:
             comment += "\n" + iddl.comment
+        meta: Dict[str, Any] = {"subtask": subtask, "iddl": I.relative_path(iddl.path, self.iddl_root) if iddl.path else None,
+                                "pick": comb.pick, "slot": comb.slot, "mode": self.opt.mode,
+                                "fallback_of": None, "fallback_rank": None, "fallback_kind": None}
+        if comb.fallback is not None:
+            meta.update({"fallback_of": comb.fallback.primary, "fallback_rank": comb.fallback.rank, "fallback_kind": comb.fallback.kind})
         rendered = write_problem(
             self.bddl_root,
             activity,
@@ -1085,8 +1203,7 @@ class Grounder:
             groundings,
             alias,
             comment=comment,
-            meta={"subtask": subtask, "iddl": I.relative_path(iddl.path, self.iddl_root) if iddl.path else None,
-                  "pick": comb.pick, "slot": comb.slot, "mode": self.opt.mode},
+            meta=meta,
             dry_run=self.opt.dry_run,
         )
         entry = self._customs_entry(iddl, comb, alias, rendered.definition_id)
@@ -1106,9 +1223,128 @@ class Grounder:
         )
         self.grounded.append(gp)
         self.report.problems[subtask].append((alias, rendered.definition_id, comb.label))
+        if comb.fallback is not None:
+            self.report.fallbacks[subtask].append((alias, comb.fallback.primary, comb.fallback.rank, comb.fallback.kind))
         for n in comb.notes:
             self.report.notes[subtask].append(n)
         return gp
+
+    # -- fallback aliases (owner decision 2026-09-16 B) ------------------------------------------------------------------
+    def fallbacks_for(self, comb: Combination, alias: str) -> List[Combination]:
+        """The fallback combinations of a grounded primary, in rank order (empty for a fallback combination itself)."""
+        if comb.fallback is not None or not self.opt.fallbacks:
+            return []
+        subtask = comb.subtask
+        if subtask in INIT_SURFACE_FALLBACK_SUBTASKS:
+            return self._init_surface_fallbacks(comb, alias)
+        if subtask in SCALE_FALLBACK_SUBTASKS:
+            return self._scale_fallbacks(comb, alias)
+        if subtask in NEXT_MODEL_FALLBACK_SUBTASKS:
+            return self._next_model_fallbacks(comb, alias)
+        return []
+
+    @staticmethod
+    def _derive(comb: Combination, primary: str, rank: int, kind: str, params: Dict[str, Any]) -> Combination:
+        """A copy of ``comb`` (roles shared unless replaced by the caller) marked as fallback ``rank`` of ``primary``."""
+        return Combination(
+            subtask=comb.subtask,
+            pick=comb.pick,
+            slot=comb.slot,
+            roles=dict(comb.roles),
+            scale=dict(comb.scale),
+            model_tokens=set(comb.model_tokens),
+            fallback=FallbackSpec(primary, rank, kind, dict(params)),
+        )
+
+    def _init_surface_fallbacks(self, comb: Combination, alias: str) -> List[Combination]:
+        """§5.6 init-surface classes after the grounded one: under support -> partner's own top -> floor; ontop
+        support -> floor. The support role is re-bound; everything else (target, partner, scenes) stays."""
+        support, partner = comb.roles.get("support"), comb.roles.get("partner")
+        if support is None or partner is None or partner.kind != "scene":
+            return []
+        chain = list(INIT_SURFACE_FALLBACK_SUBTASKS[comb.subtask])
+        current = "floor" if support.is_floor else ("partner" if support.same_as == "partner" else "support")
+        later = chain[chain.index(current) + 1:] if current in chain else chain
+        out: List[Combination] = []
+        for rank, cls in enumerate(later, start=1):
+            if cls == "partner":
+                rp = RolePick("support", "scene", partner.category, same_as="partner", scene_objects=dict(partner.scene_objects), pick_row=partner.pick_row)
+            else:
+                rp = RolePick("support", "scene", FLOOR_CATEGORY, same_as="floor", scene_objects={sc: [] for sc in partner.scene_objects}, pick_row=partner.pick_row)
+            fb = self._derive(comb, alias, rank, "init_surface", {"init_surface": cls})
+            fb.roles["support"] = rp
+            fb.notes = list(comb.notes)
+            try:
+                self._bind_scenes(self.iddls[comb.subtask], fb)
+            except Skip as s:
+                self.report.skipped[comb.subtask].append((fb.label, str(s)))
+                continue
+            out.append(fb)
+        return out
+
+    def _scale_fallbacks(self, comb: Combination, alias: str) -> List[Combination]:
+        """§5.5 / §6.10 ``scale_hint``: the target spawned at the pilot's hint (else :attr:`Options.fallback_scale`);
+        the same models (variation / held-out included) run at that scale."""
+        target = comb.roles.get("target")
+        if target is None or target.kind != "sampleable" or "target" in comb.scale:
+            return []
+        hint = self.opt.scale_hints.get(alias)
+        scale = float(hint) if hint else float(self.opt.fallback_scale)
+        if scale <= 0 or scale >= 1.0:
+            return []
+        params = {"scale": round(scale, 3), "scale_source": "template_meta.scale_hint" if hint else "default_step"}
+        fb = self._derive(comb, alias, 1, "scale", params)
+        fb.scale["target"] = round(scale, 3)
+        fb.scenes, fb.rooms, fb.floor_room = list(comb.scenes), dict(comb.rooms), dict(comb.floor_room)
+        return [fb]
+
+    def _next_model_fallbacks(self, comb: Combination, alias: str) -> List[Combination]:
+        """Small-scale articulation yield fallback: the next candidate model of the category in variation / held-out
+        order (``roles/representatives.csv`` slots of the pick) that passes the ``(handle target)`` requirement; the
+        alias token carries the model (``blender_eyedvd``) because the category alone would be the primary's alias."""
+        target = comb.roles.get("target")
+        if target is None or target.kind != "sampleable" or "target" in comb.model_tokens or not target.models:
+            return []
+        iddl = self.iddls[comb.subtask]
+        pick_id = comb.pick.split("~")[0]
+        slots = self.icl.picks.get(pick_id, {}).get("target", {})
+        current = target.models[0]
+        seen = {current}
+        candidates: List[Dict[str, str]] = []
+        for slot in NEXT_MODEL_SLOT_ORDER:
+            for row in slots.get(slot, []):
+                cm = (row["category"], row["model"])
+                if cm[0] == current[0] and cm not in seen:
+                    seen.add(cm)
+                    candidates.append(row)
+        for row in candidates:
+            resolved = self._resolve_row(comb.subtask, "target", row)
+            is_heldout = (resolved["category"], resolved["model"]) in self.icl.heldout_models
+            verdict = self._recheck_without_heldout(iddl, "target", resolved, None) if is_heldout else self.adm.check(iddl, "target", resolved)
+            if verdict.reason:
+                self.report.notes[comb.subtask].append(f"{alias}: next-model fallback candidate {row['category']}/{row['model']} ({row['slot']}) is {verdict.reason}")
+                continue
+            rp = RolePick("target", "sampleable", target.category, [(resolved["category"], resolved["model"])], pick_row=resolved,
+                          joint=resolved.get("joint") or None, allow_heldout=True)
+            fb = self._derive(comb, alias, 1, "next_model", {"model": resolved["model"], "slot": row["slot"], "primary_model": current[1]})
+            fb.roles["target"] = rp
+            fb.model_tokens.add("target")
+            fb.notes = list(comb.notes)
+            # the support follows the new model (a shorter / taller model may change the floor rule of §5.4)
+            support_row = comb.roles["support"].pick_row if "support" in comb.roles else None
+            if support_row is not None:
+                try:
+                    fb.roles["support"] = self._scene_pick(iddl, "support", dict(support_row), fb)
+                    self._bind_scenes(iddl, fb)
+                except Skip as s:
+                    self.report.skipped[comb.subtask].append((fb.label, str(s)))
+                    continue
+            else:
+                fb.scenes, fb.rooms, fb.floor_room = list(comb.scenes), dict(comb.rooms), dict(comb.floor_room)
+            return [fb]
+        self.report.notes[comb.subtask].append(
+            f"{alias}: no next-model fallback ({target.category}/{current[1]} is the only admissible model of the category in the selection)")
+        return []
 
     def _customs_entry(self, iddl: I.IDDL, comb: Combination, alias: str, definition_id: int) -> CustomsEntry:
         subtask = iddl.subtask
@@ -1116,10 +1352,16 @@ class Grounder:
         existing_dict = existing.to_dict() if existing is not None else None
         entry = self.customs.get_or_create_entry(alias, iddl=I.relative_path(iddl.path, self.iddl_root) if iddl.path else None, definition_id=definition_id)
         entry.generation = G.seed_generation(subtask, existing_dict)
+        if comb.fallback is not None:
+            entry.set_fallback(comb.fallback.primary, comb.fallback.rank, comb.fallback.kind, comb.fallback.params)
+        else:
+            entry.fallback_of, entry.fallback_rank, entry.fallback_kind, entry.fallback_params = None, None, None, {}
         old_roles = dict(entry.roles)
         old_scenes = dict(entry.scenes)
         entry.roles = {}
-        entry.scenes = {}
+        # scene blocks of this combination are rebuilt below; blocks of other scenes (another support of the same
+        # category grounded earlier, A3 triplets) stay
+        entry.scenes = {sc: se for sc, se in old_scenes.items() if sc not in comb.scenes}
         pose_roles = set(iddl.pose_evaluated_roles())
         for comp, members in iddl.groups.items():
             if comp in pose_roles:
@@ -1290,7 +1532,33 @@ class Grounder:
                 for role, cat, m, reason in old.blacklist_reasons():
                     if not se.is_blacklisted(role, cat, m) and not reason.startswith("ground_isg"):
                         se.blacklist_add(role, cat, m, reason)
+                # scene objects another combination of the same alias bound in this scene (a second representative
+                # support of the category, A3 triplets) stay bound
+                for role, old_val in old.bindings.items():
+                    new_val = se.bindings.get(role)
+                    if isinstance(old_val, list) and isinstance(new_val, list):
+                        if role.endswith("_regions"):
+                            ids = {r.get("id") for r in new_val if isinstance(r, dict)}
+                            new_val.extend(r for r in old_val if isinstance(r, dict) and r.get("id") not in ids)
+                        else:
+                            new_val.extend(o for o in old_val if o not in new_val)
+                    for room in old.rooms:
+                        if room not in se.rooms:
+                            se.rooms.append(room)
             entry.scenes[sc] = se
+
+        # ---- scale fallbacks: every whitelisted model of the role spawns at the fallback scale (§5.5 dict form) ----
+        for role, s in comb.scale.items():
+            re_ = entry.roles.get(role)
+            if re_ is None:
+                continue
+            for sc in entry.scenes.values():
+                for cat, models in sc.whitelist.get(role, {}).items():
+                    for m in models:
+                        key = C.model_key(cat, m)
+                        base = re_.scale.get(key)
+                        re_.scale[key] = [round(float(b) * s, 4) for b in base] if isinstance(base, list) else s
+            re_.scale["default"] = s
         return entry
 
     def _recheck_without_heldout(self, iddl: I.IDDL, role: str, row: Dict[str, str], scene: str) -> Verdict:
@@ -1352,21 +1620,19 @@ class Grounder:
             if not combos and not self.report.skipped.get(subtask):
                 self.report.skipped[subtask].append((subtask, f"no_combination: no candidate rows carry the {self.opt.mode} mark"))
             for comb in combos:
-                try:
-                    gp = self.ground(comb)
-                except Skip as s:
-                    self.report.skipped[subtask].append((comb.label, str(s)))
+                gp = self._ground_or_skip(comb)
+                if gp is None:
                     continue
-                except ISGProblemError as e:
-                    # the rendered BDDL is rejected by ispatialgym.activity.problem (e.g. a synset the INSTANCE_RE
-                    # of the parser does not accept): nothing is written for this combination
-                    self.report.skipped[subtask].append((comb.label, f"bddl_rejected: {e}"))
-                    log.warning("%s: BDDL rejected by the parser: %s", comb.label, e)
-                    continue
-                except (GroundingError, I.IDDLError, KeyError) as e:
-                    self.report.skipped[subtask].append((comb.label, f"error: {e}"))
-                    log.warning("%s: %s", comb.label, e)
-                    continue
+                # fallback aliases behind the primary (owner decision 2026-09-16 B); the primary lists them in rank order
+                fallback_aliases: List[str] = []
+                for fb in self.fallbacks_for(comb, gp.alias):
+                    fgp = self._ground_or_skip(fb)
+                    if fgp is not None and fgp.alias not in fallback_aliases:
+                        fallback_aliases.append(fgp.alias)
+                if fallback_aliases or gp.entry.fallbacks:
+                    merged = [a for a in gp.entry.fallbacks if a in self.customs.entries and self.customs.entries[a].fallback_of == gp.alias]
+                    merged += [a for a in fallback_aliases if a not in merged]
+                    gp.entry.fallbacks = sorted(merged, key=lambda a: (self.customs.entries[a].fallback_rank or 0, a))
                 if self.opt.representative_test and not self.opt.dry_run:
                     for sc in comb.scenes:
                         outcome = run_representative_test(gp, self.customs, sc)
@@ -1375,6 +1641,22 @@ class Grounder:
             if not self.opt.dry_run:
                 self.customs.save()
         return self.report
+
+    def _ground_or_skip(self, comb: Combination) -> Optional[GroundedProblem]:
+        subtask = comb.subtask
+        try:
+            return self.ground(comb)
+        except Skip as s:
+            self.report.skipped[subtask].append((comb.label, str(s)))
+        except ISGProblemError as e:
+            # the rendered BDDL is rejected by ispatialgym.activity.problem (e.g. a synset the INSTANCE_RE of the
+            # parser does not accept): nothing is written for this combination
+            self.report.skipped[subtask].append((comb.label, f"bddl_rejected: {e}"))
+            log.warning("%s: BDDL rejected by the parser: %s", comb.label, e)
+        except (GroundingError, I.IDDLError, KeyError) as e:
+            self.report.skipped[subtask].append((comb.label, f"error: {e}"))
+            log.warning("%s: %s", comb.label, e)
+        return None
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -1466,6 +1748,12 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--legacy-activity-names", action="store_true", help="write the alignment family under the retired activity name world_alignment")
     ap.add_argument("--strict-symmetric-180", action="store_true", help="spec 2.2 literally: wall targets without a filled symmetric_180 are missing_frame")
     ap.add_argument("--no-representative-test", action="store_true", help="do not call the D2 representative-test hook")
+    ap.add_argument("--no-fallbacks", action="store_true", help="do not emit the fallback aliases (owner decision 2026-09-16 B)")
+    ap.add_argument("--fallback-scale", type=float, default=DEFAULT_FALLBACK_SCALE,
+                    help="uniform target scale of the wall / axial scale fallback when the pilot recorded no scale_hint (default 0.7)")
+    ap.add_argument("--scale-hints", default=None,
+                    help=f"glob of pilot template_meta.json files whose scale_hint sets the fallback scale per alias (default {DEFAULT_SCALE_HINT_GLOB}; "
+                         "'none' = ignore the pilot)")
     ap.add_argument("--dry-run", action="store_true", help="ground and report, write nothing")
     ap.add_argument("--report", default=None, help="also write the report (markdown) to this path; .json alongside")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -1480,6 +1768,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if bad:
         print(f"unknown slot(s) {bad}; expected {SLOTS}", file=sys.stderr)
         return 2
+    hints: Dict[str, float] = {}
+    if not args.no_fallbacks and (args.scale_hints or "").lower() != "none":
+        hints = load_scale_hints(args.scale_hints)
+        log.info("scale hints from the pilot: %d aliases%s", len(hints), f" ({', '.join(f'{a}={s}' for a, s in sorted(hints.items()))})" if hints else "")
     opt = Options(
         mode=args.mode,
         slots=slots,
@@ -1490,6 +1782,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         strict_symmetric_180=args.strict_symmetric_180,
         dry_run=args.dry_run,
         representative_test=not args.no_representative_test,
+        fallbacks=not args.no_fallbacks,
+        fallback_scale=args.fallback_scale,
+        scale_hints=hints,
     )
     iddls = I.load_all(args.iddl)
     icl = ICL(args.icl)

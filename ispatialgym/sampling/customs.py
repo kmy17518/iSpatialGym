@@ -27,12 +27,27 @@ One entry per grounded alias::
       }
     }
 
-``roles.<role>`` optional keys (§2.3): ``scale`` (``{"<category>/<model>": s | [sx, sy, sz]}``), ``joint`` /
-``handle_key`` (``{"<category>/<model>" | "<scene>/<object name>": ...}``), ``dataset`` (non-BEHAVIOR assets),
-``orientation_equivalences`` (§3.13: ``{"<category>/<model>": [symmetry tags]}`` — the rotation group is enumerated
-with :func:`equivalence_group`), ``grasp_keys`` (``{"<category>/<model>": "<require/grasps.csv key>"}``, the explicit
-library key of the pipeline so no sampler guesses a suffix). ``category`` is a string, or a list for a group role
-whose members come from several categories (the alias token lists them).
+``roles.<role>`` optional keys (§2.3): ``scale`` (``{"<category>/<model>": s | [sx, sy, sz], "default": s}`` — the
+spawn scale per model; ``default`` is the spec §5.5 dict form for a role-wide scale, written by the scale fallbacks),
+``joint`` / ``handle_key`` (``{"<category>/<model>" | "<scene>/<object name>": ...}``), ``dataset`` (non-BEHAVIOR
+assets), ``orientation_equivalences`` (§3.13: ``{"<category>/<model>": [symmetry tags]}`` — the rotation group is
+enumerated with :func:`equivalence_group`), ``grasp_keys`` (``{"<category>/<model>": "<require/grasps.csv key>"}``,
+the explicit library key of the pipeline so no sampler guesses a suffix). ``category`` is a string, or a list for a
+group role whose members come from several categories (the alias token lists them).
+
+``scenes.<scene>.bindings.<role>`` of a scene role is a list of scene object names, or — when the role is bound to the
+**floor** of the task room (large-scale IORS floor init, §5.6; small-scale articulation targets taller than 0.6 m,
+§5.4; the implicit ``floor`` role) — ``{"room": "<room instance>"}``: the alias carries the token ``floor`` and
+``roles.<role>.category`` is ``floors``. Wall regions add ``bindings.<role>_regions`` (§5.5).
+
+**Fallback aliases** (owner decision 2026-09-16 B): a fallback entry is a full entry of its own (BDDL, id, scenes)
+plus ``fallback_of`` (the primary alias), ``fallback_rank`` (1 = tried first after the primary yielded nothing),
+``fallback_kind`` (``init_surface`` — large-scale IORS init surface class under: support → partner's own top → floor,
+ontop: support → floor; ``scale`` — wall / axial alignment target spawned at ``roles.target.scale``; ``next_model`` —
+small-scale articulation: the next candidate model of the category) and ``fallback_params`` (kind-specific facts, e.g.
+``{"scale": 0.7, "scale_source": "template_meta.scale_hint"}``). The primary lists its fallbacks in rank order under
+``fallbacks``. A scheduler queues a fallback job only after the primary produced nothing; the sampler itself never
+falls back (spec principle 2).
 
 Dataclasses here are thin, typed views over that JSON; :class:`Customs` loads / saves the file and hands out entries.
 """
@@ -73,8 +88,11 @@ CONSTRAINT_TYPES = ("stance", "grasp_set", "joint_set", "placement", "scale", "b
 SCOPE_KEYS = ("scene", "support", "partner", "target", "model", "support_height", "trunk")
 #: Fields a ``hold`` record carries (``Constraint.fields``); the write-back adds ``source``.
 HOLD_FIELDS = ("robot", "depth_m", "trunk", "roll_deg", "eef_in_base", "approach", "closing", "right_arm_q", "idle_arms")
-#: Keys of a customs entry, in the order they are written.
-ENTRY_KEYS = ("iddl", "definition_id", "roles", "scenes", "generation", "constraints")
+#: Keys of a customs entry, in the order they are written (the fallback keys only when set).
+ENTRY_KEYS = ("iddl", "definition_id", "fallback_of", "fallback_rank", "fallback_kind", "fallback_params", "fallbacks", "roles", "scenes",
+              "generation", "constraints")
+#: ``fallback_kind`` values (see the module docstring).
+FALLBACK_KINDS = ("init_surface", "scale", "next_model")
 #: Keys of a role entry, in the order they are written (§2.3 + the documented extensions).
 ROLE_KEYS = (
     "category",
@@ -309,6 +327,25 @@ class CustomsEntry:
     scenes: Dict[str, SceneEntry] = field(default_factory=dict)
     generation: Dict[str, Any] = field(default_factory=dict)
     constraints: List[Constraint] = field(default_factory=list)
+    # fallback aliases (module docstring): set on a fallback entry ...
+    fallback_of: Optional[str] = None
+    fallback_rank: Optional[int] = None
+    fallback_kind: Optional[str] = None
+    fallback_params: Dict[str, Any] = field(default_factory=dict)
+    # ... and, on a primary, its fallbacks in rank order
+    fallbacks: List[str] = field(default_factory=list)
+
+    @property
+    def is_fallback(self) -> bool:
+        return self.fallback_of is not None
+
+    def set_fallback(self, primary: str, rank: int, kind: str, params: Optional[Dict[str, Any]] = None) -> None:
+        if kind not in FALLBACK_KINDS:
+            raise CustomsError(f"unknown fallback kind {kind!r}; expected one of {FALLBACK_KINDS}")
+        if rank < 1:
+            raise CustomsError("fallback_rank starts at 1")
+        self.fallback_of, self.fallback_rank, self.fallback_kind = primary, int(rank), kind
+        self.fallback_params = dict(params or {})
 
     def role(self, name: str) -> RoleEntry:
         return self.roles.setdefault(name, RoleEntry())
@@ -351,21 +388,31 @@ class CustomsEntry:
         return [r for r, e in self.roles.items() if not e.sampleable]
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "iddl": self.iddl,
-            "definition_id": self.definition_id,
-            "roles": {r: e.to_dict() for r, e in self.roles.items()},
-            "scenes": {s: e.to_dict() for s, e in self.scenes.items()},
-            "generation": copy.deepcopy(self.generation),
-            "constraints": [c.to_dict() for c in self.constraints],
-        }
+        d: Dict[str, Any] = {"iddl": self.iddl, "definition_id": self.definition_id}
+        if self.fallback_of is not None:
+            d["fallback_of"] = self.fallback_of
+            d["fallback_rank"] = self.fallback_rank
+            d["fallback_kind"] = self.fallback_kind
+            if self.fallback_params:
+                d["fallback_params"] = copy.deepcopy(self.fallback_params)
+        if self.fallbacks:
+            d["fallbacks"] = list(self.fallbacks)
+        d.update(
+            {
+                "roles": {r: e.to_dict() for r, e in self.roles.items()},
+                "scenes": {s: e.to_dict() for s, e in self.scenes.items()},
+                "generation": copy.deepcopy(self.generation),
+                "constraints": [c.to_dict() for c in self.constraints],
+            }
+        )
+        return d
 
     @classmethod
     def from_dict(cls, alias: str, d: Dict[str, Any]) -> "CustomsEntry":
         unknown = set(d) - set(ENTRY_KEYS)
         if unknown:
             raise CustomsError(f"entry {alias!r} has unknown keys {sorted(unknown)}; expected {ENTRY_KEYS}")
-        return cls(
+        entry = cls(
             alias=alias,
             iddl=d.get("iddl"),
             definition_id=None if d.get("definition_id") is None else int(d["definition_id"]),
@@ -373,7 +420,11 @@ class CustomsEntry:
             scenes={s: SceneEntry.from_dict(e) for s, e in (d.get("scenes") or {}).items()},
             generation=copy.deepcopy(d.get("generation") or {}),
             constraints=[Constraint.from_dict(c) for c in (d.get("constraints") or [])],
+            fallbacks=list(d.get("fallbacks") or []),
         )
+        if d.get("fallback_of") is not None:
+            entry.set_fallback(d["fallback_of"], int(d.get("fallback_rank") or 1), d.get("fallback_kind") or "init_surface", d.get("fallback_params"))
+        return entry
 
 
 class Customs:
@@ -550,6 +601,7 @@ __all__ = [
     "CustomsError",
     "DEFAULT_CUSTOMS_PATH",
     "ENTRY_KEYS",
+    "FALLBACK_KINDS",
     "HOLD_FIELDS",
     "ROLE_KEYS",
     "RoleEntry",
