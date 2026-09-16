@@ -13,20 +13,47 @@ Owner request (2026-09-15): ~30 representative picks per task family, >= 5 per s
 * scene roles (supports, big partners, scene articulated targets, wall regions) get the same three slots where the
   scene inventory allows (VB-ISC "support height / model change", VB-MOBJ "partner / target model change").
 
+Owner decisions 2026-09-16 (TODO.md, A3 / A5):
+
+* **A3 support triplets**: every §4 tabletop pick (the 11 subtasks whose objects rest on a scene support) carries N
+  support triplets (``--support-triplets``, default 3) in its ``support`` role: T1 = the 2026-09-15 triplet (test pin
+  ``breakfast_table_rhjoby_0`` / same-scene height variation / other-scene held-out), T2 / T3 = the owner's pins
+  (:data:`SUPPORT_TRIPLETS`), each member verified against the B4 inventory (exists, top height in the tabletop range,
+  usable edge >= the longest §4.4 margin row the pilot measured). Held-out supports are global (held out in every
+  tabletop subtask). Rows keep the slot names ``representative`` / ``variation_geometry`` / ``heldout`` and carry the
+  triplet index in the ``triplet`` column; within a pick the rows are written T2, T3, ..., T1 so that readers indexing
+  (pick, role, slot) without the column keep the T1 binding (backward compatibility); T1 rows are unchanged.
+* **Edge-length-vs-margin check** (:meth:`Selector.support_admission`): per support and per edge the usable length =
+  min(edge length, free-floor run at stand-off 0.45 with the chairs removed), 0 when an object stands closer than
+  :data:`BLOCKED_IN_FRONT_MAX_M` in front of the edge (the breakfast table's window side) or the run is below the 0.60 m
+  admission; the longest §4.4 margin row (:data:`MARGIN_ROWS`, m_R + m_L) the best usable edge admits is recorded per
+  support and supports that admit only the short rows are flagged (``short_rows_only``). The report has the table.
+* **A5 partner's own top** (spec §5.6 b, IORS under large-scale): when no admitted support lies within 3 m of the
+  representative partner, the init surface is the partner instance itself if its top admits the A / B stances per the
+  B4 inventory (an admitted support whose best usable edge admits the large-scale init row for the pick's targets);
+  the floor stays the last class. ``--patch-only under_large_scale`` applies the branch to the existing
+  ``representatives.csv`` without re-running the selection (a re-run on a rebuilt icl shifts other picks);
+  ``--patch-only support_triplets`` appends the T2..TN rows the same way. Both patch the report in place.
+
 Inputs: ``ispatialgym/assets/icl/{roles,require}/*.csv`` (built by ``build_icl.py``), the duplicate / texture-variant
-reviews under ``runlogs/*/duplicates*.json``, the B4 scene inventory ``runlogs/scene_inventory_20260915/summary.json``.
+reviews under ``runlogs/*/duplicates*.json``, the B4 scene inventory ``runlogs/scene_inventory_20260915/summary.json``
+(+ ``<scene>/supports/<name>.json`` for the per-edge runs, blocked objects and rooms).
 
 Outputs (``ispatialgym/assets/icl/roles/``):
 
 * ``representatives.csv`` - one row per (pick, role, slot): ``family, subtask, pick, role, slot, category, model,
-  scene, name, joint, kind, grasp_key, scale, geometry_group, exact_group, status, note``; slots are ``representative``,
-  ``variation_texture``, ``variation_geometry``, ``heldout`` (heldout rows are the global per-category choice);
+  scene, name, joint, kind, grasp_key, scale, geometry_group, exact_group, status, note, triplet``; slots are
+  ``representative``, ``variation_texture``, ``variation_geometry``, ``heldout`` (heldout rows are the global per-category
+  choice); ``triplet`` is set on the support rows of the tabletop picks only (1 = T1, 2 = T2, ...);
 * ``candidates_extra.csv`` - candidate rows the icl did not have (same columns as ``candidates.csv`` + ``plan``),
-  ``status = incomplete:<reason>``; ``build_icl.py`` / ``ground_isg`` merge them until a survey validates them;
-* ``representatives_report.md`` - per subtask: the picks, which variation / generalization axes are unavailable and why.
+  ``status = incomplete:<reason>``; ``build_icl.py`` / ``ground_isg`` merge them until a survey validates them (support
+  rows are added only for selected supports that ``candidates.csv`` lacks - none today);
+* ``representatives_report.md`` - per subtask: the picks, which variation / generalization axes are unavailable and why;
+  the support triplets and the per-support admission table.
 
-Run: ``python scripts/icl/select_representatives.py [--out ispatialgym/assets/icl/roles] [--per-family 30]``.
-Deterministic (no randomness): greedy by a documented score, ties by icl rank / row order.
+Run: ``python scripts/icl/select_representatives.py [--out ispatialgym/assets/icl/roles] [--per-family 30]
+[--support-triplets 3]`` (full selection) or ``... --patch-only under_large_scale,support_triplets`` (targeted patch of
+the files under ``--out``). Deterministic (no randomness): greedy by a documented score, ties by icl rank / row order.
 """
 
 from __future__ import annotations
@@ -94,7 +121,62 @@ LARGE_TARGET_FILL_FROM = {f"{IORS}-ontop_small_scale", f"{IORS}-nextto", f"{IORS
 UNDER_LARGE_MAX_HEIGHT = 0.20  # m: must fit under a 0.30 m clearance with the gripper below the wrist (spec 6.12)
 
 REP_COLUMNS = ["family", "subtask", "pick", "role", "slot", "category", "model", "scene", "name", "joint", "kind", "grasp_key",
-               "scale", "geometry_group", "exact_group", "status", "note"]
+               "scale", "geometry_group", "exact_group", "status", "note", "triplet"]
+
+#: the §4 tabletop subtasks (objects rest on a scene support chosen by ``support_slots``): the support triplets apply here;
+#: the two large-scale IORS subtasks choose their init surface per partner (spec 5.6) and wall subtasks use wall regions
+TABLETOP_SUPPORT_SUBTASKS = [st for st, sp in SUBTASKS.items()
+                             if sp["roles"].get("support", {}).get("kind") == "scene"
+                             and sp["roles"].get("partner", {}).get("kind") != "scene_partner"]
+SUPPORT_TOP_Z = (0.55, 1.20)                # spec 3.2 tabletop range (build_icl admission)
+SUPPORT_MIN_AREA_M2 = 0.12
+EDGE_FREE_RUN_MIN_M = 0.60                  # spec 3.2 / build_icl: >= 1 edge with a free-floor run >= 0.60 m at stand-off 0.45
+ADMIT_STAND_OFF = "0.45"                    # the B4 run used for admission (Phase 1a init stand-off)
+STAND_OFFS = ("0.35", "0.45", "0.55")       # the B4 runs (Phase 2 scans the three)
+#: an object closer than this in front of the edge midpoint (B4 ray at top + 0.3 m, 1.2 m out) leaves no room for the base
+#: at any stand-off (0.45 + ~0.3 m base half-length; the pilot: the breakfast table's +u side with the window at 0.635 m)
+BLOCKED_IN_FRONT_MAX_M = 0.80
+OVERHANG_FLAG_M = 0.05                      # spec 4.2: the stand-off is measured from the AABB when the overhang is >= 5 cm
+#: abs(lambda_min) + max(0, lambda_max): lateral span of the right-arm band union at the init trunk [pilot]. Back-solved from the
+#: two measured margin rows: toolbox (w_a 0.30) 1.30 = span + 0.61 + 0.04 -> 0.65; IORS 35 cm platter with a 7 cm target
+#: 2.35 = span + 0.14 + 0.76 + 0.70 + 0.04 -> 0.71 (the band lies to the robot's right, lambda_max <= 0.08).
+BAND_SPAN_M = 0.70
+#: §4.4 margin rows (m_R + m_L, the edge length a row needs after the lateral margins), longest first. ``pilot`` rows are the
+#: numbers the E1 pilot measured on breakfast_table_rhjoby_0 (TODO.md, 2026-09-15 19:50 / 2026-09-16 01:40); ``estimate`` rows
+#: apply the §4.4 formula with BAND_SPAN_M to the picked objects (per-pick values in the note). Two long rows (>= 2.30 m) and
+#: five short rows: a support whose best usable edge is below the long rows is flagged ``short_rows_only``.
+MARGIN_ROWS: List[dict] = [
+    {"id": "iors_small_scale", "need": 2.35, "how": "pilot",
+     "subtasks": [f"{IORS}-ontop_small_scale", f"{IORS}-under_small_scale", f"{IORS}-inside", f"{IORS}-nextto", f"{IORS}-touching"],
+     "note": "abs(lambda_min) + max(0, lambda_max) + 2 w_t + 2 D_p + 4 w_p + 0.04 with a 35 cm platter partner (D_p 0.38, w_p 0.175)"},
+    {"id": "disembedding", "need": 2.30, "how": "pilot", "subtasks": ["disembedding"],
+     "note": "2 (b + 0.437 + 0.02), b = 0.66-0.70 at tilt 0 with the 99 deg hfov (two fixed trays along the edge)"},
+    {"id": "articulation_small_scale", "need": 1.30, "how": "pilot",
+     "subtasks": [f"{CM}-articulation_open_small_scale", f"{CM}-articulation_close_small_scale"],
+     "note": "toolbox (0.61 m at q_init): span + 2 w_a + 0.04; the 1.0 m carton pick would need ~1.75"},
+    {"id": "axial", "need": 1.30, "how": "estimate", "subtasks": ["alignment-axial"],
+     "note": "span + 2 w_diag + 0.04, w_diag = 1/2 sqrt(long^2 + short^2): frying pan 1.29, keyboard 1.25, books ~1.1"},
+    {"id": "attachment", "need": 1.20, "how": "estimate", "subtasks": [f"{CM}-attachment"],
+     "note": "span + 2 max(w_target, w_partner) + 0.04: table-lamp pair 1.20, bottle / candle pairs ~0.85; the skateboard-deck pair (1.04 m) ~1.8"},
+    {"id": "iors_large_scale_init", "need": 1.10, "how": "estimate", "subtasks": [f"{IORS}-ontop_large_scale", f"{IORS}-under_large_scale"],
+     "note": "target only on the init surface (spec 5.6 stances A / B): span + 2 w_t + 0.04: briefcase 1.07, sandal 0.98, marker 0.89, apple 0.83"},
+    {"id": "block_design", "need": 0.80, "how": "estimate", "subtasks": [f"{CM}-block_design"],
+     "note": "span + 0.0125 + 0.026 + 0.0125 + 0.04 (half edge + one pitch to the right of the anchor)"},
+]
+LONG_ROWS = ("iors_small_scale", "disembedding")
+LONGEST_NEED_M = max(r["need"] for r in MARGIN_ROWS)
+
+#: owner decision 2026-09-16 (A3): the support triplets after T1, (scene, name) per slot; T1 is derived in ``support_slots``
+#: (test pin + same-scene height variation + other-scene held-out). ``heldout_alt`` replaces ``heldout`` when it fails the checks.
+SUPPORT_TRIPLETS: List[dict] = [
+    {"representative": ("house_single_floor", "countertop_kelker_0"), "variation_geometry": ("house_single_floor", "bar_udatjt_0"),
+     "heldout": ("restaurant_diner", "commercial_kitchen_table_vxvtec_0"), "heldout_alt": None},
+    {"representative": ("office_cubicles_right", "conference_table_fpkmyw_0"), "variation_geometry": ("office_cubicles_right", "desk_mdhelw_1"),
+     "heldout": ("restaurant_diner", "bar_xxftww_0"), "heldout_alt": ("Rs_int", "bottom_cabinet_jhymlr_0")},
+]
+SUPPORT_SLOTS = ("representative", "variation_geometry", "heldout")
+FLOOR = "floor"
+PATCH_KINDS = ("under_large_scale", "support_triplets")
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -174,9 +256,11 @@ def admissible_handles(handles: List[dict]) -> Dict[Tuple[str, str], List[str]]:
 # selection
 # ----------------------------------------------------------------------------------------------------------------------
 class Selector:
-    def __init__(self, icl_dir: str, per_family: int, min_per_subtask: int):
+    def __init__(self, icl_dir: str, per_family: int, min_per_subtask: int, n_triplets: int = 3):
         self.per_family = per_family
         self.min_per_subtask = min_per_subtask
+        self.n_triplets = max(1, n_triplets)
+        self.icl_dir = icl_dir
         self.cands = read_csv(os.path.join(icl_dir, "roles", "candidates.csv"))
         self.compat = read_csv(os.path.join(icl_dir, "roles", "constraints_compatible.csv"))
         self.conflict = read_csv(os.path.join(icl_dir, "roles", "constraints_conflicting.csv"))
@@ -193,9 +277,19 @@ class Selector:
         self.rows: List[dict] = []
         self.extra: List[dict] = []
         self.report: Dict[str, List[str]] = collections.defaultdict(list)
+        self._admission: Dict[Tuple[str, str], dict] = {}   # (scene, name) -> support_admission record (cached)
+        self._triplets: Optional[List[dict]] = None          # support_triplets() cache
+        self.support_notes: List[str] = []                    # triplet / own-top notes for the report
+        self.patch_log: Dict[str, List[str]] = collections.defaultdict(list)  # --patch-only: what changed
         self.by_subtask_role: Dict[Tuple[str, str], List[dict]] = collections.defaultdict(list)
+        self.bbox: Dict[Tuple[str, str], Tuple[float, float, float]] = {}  # (category, model) -> native bbox (m)
         for r in self.cands:
             self.by_subtask_role[(r["subtask"], r["role"])].append(r)
+            if r.get("kind") == "sampleable" and r.get("bbox_x") and (r["category"], r["model"]) not in self.bbox:
+                try:
+                    self.bbox[(r["category"], r["model"])] = (float(r["bbox_x"]), float(r["bbox_y"]), float(r["bbox_z"]))
+                except ValueError:
+                    pass
         # every pipeline a category is required with anywhere (for the global held-out choice)
         self.category_pipelines: Dict[str, Set[str]] = collections.defaultdict(set)
         for st, spec in SUBTASKS.items():
@@ -407,10 +501,108 @@ class Selector:
                             "rooms": s.get("rooms", [])})
         return out
 
-    def support_slots(self, subtask: str, pick: str) -> List[str]:
-        """Representative support = the test pin (breakfast_table_rhjoby_0); variation = a support of a different height
-        (>= 10 cm) in the same scene; held-out = a support of another category / scene."""
-        notes = []
+    # -- edge length vs §4.4 margins ---------------------------------------------------------------------------------
+    def support_record(self, scene: str, name: str) -> Optional[dict]:
+        """The B4 per-support JSON (edges with runs at the three stand-offs, blocked objects, rooms in front)."""
+        path = os.path.join(os.path.dirname(SCENE_INVENTORY), scene, "supports", f"{name}.json")
+        if not os.path.exists(path):
+            return None
+        with open(path) as f:
+            return json.load(f)
+
+    def support_admission(self, scene: str, name: str) -> dict:
+        """Edge-length-vs-margin check of one support (owner decision 2026-09-16, A3 follow-up).
+
+        Per edge: ``usable`` = min(edge length, longest free-floor run at stand-off 0.45 with the chairs within 1 m removed),
+        0 when the run is below the 0.60 m admission or an object stands closer than BLOCKED_IN_FRONT_MAX_M in front of the
+        edge midpoint (B4 ray; the free-floor run does not see walls between the edge and the stand-off line - the run of an
+        edge that faces a wall is the floor of the next room). ``longest_row`` = the first :data:`MARGIN_ROWS` entry whose
+        m_R + m_L fits the best usable edge; flags: ``short_rows_only`` (below both long rows), ``no_measured_row`` (below
+        every pilot-measured row), ``overhang`` (Phase 1a measures the stand-off from the AABB), ``run035_short`` (the
+        Phase 2 stand-off 0.35 run of the best edge does not hold the admitted row), ``top_z`` / ``area`` out of range."""
+        key = (scene, name)
+        if key in self._admission:
+            return self._admission[key]
+        rec = self.support_record(scene, name)
+        summ = (self.inventory.get(scene) or {}).get("supports", {}).get(name)
+        out: dict = {"scene": scene, "name": name, "exists": rec is not None or summ is not None, "edges": [], "best": None,
+                     "usable_m": 0.0, "longest_row": None, "admits": [], "flags": [], "blocked": [],
+                     "category": (rec or summ or {}).get("category", ""), "model": (rec or {}).get("model", ""),
+                     "rooms": list((rec or summ or {}).get("rooms") or []),
+                     "top_z": float(((rec or {}).get("top") or {}).get("z", (summ or {}).get("top_z", 0.0)) or 0.0),
+                     "area": float(((rec or {}).get("top") or {}).get("area_m2", (summ or {}).get("area_m2", 0.0)) or 0.0),
+                     "summary_edge": (summ or {}).get("best_edge"), "summary_run": float((summ or {}).get("best_run_m", 0.0) or 0.0)}
+        if rec is None:
+            out["flags"].append("no_B4_support_record" if summ is not None else "not_in_B4_inventory")
+            self._admission[key] = out
+            return out
+        for e in rec.get("edges") or []:
+            runs = {s: float(((e.get("runs") or {}).get(s) or {}).get("longest_free_run_m", 0.0)) for s in STAND_OFFS}
+            blocked = e.get("blocked_in_front") or None
+            dist = float(blocked["distance_m"]) if blocked else None
+            is_blocked = dist is not None and dist < BLOCKED_IN_FRONT_MAX_M
+            length = float(e.get("length_m", 0.0))
+            usable = 0.0 if is_blocked or runs[ADMIT_STAND_OFF] < EDGE_FREE_RUN_MIN_M else round(min(length, runs[ADMIT_STAND_OFF]), 2)
+            edge = {"name": e["name"], "length": length, "runs": runs, "usable": usable, "overhang": float(e.get("overhang_m", 0.0)),
+                    "room": e.get("room_in_front"), "blocked": f"{blocked['object']}@{dist:.2f}" if is_blocked else "",
+                    "in_front": f"{blocked['object']}@{dist:.2f}" if blocked else ""}
+            out["edges"].append(edge)
+            if is_blocked:
+                out["blocked"].append(f"{e['name']}:{blocked['object']}@{dist:.2f}")
+        usable_edges = [e for e in out["edges"] if e["usable"] > 0]
+        if usable_edges:  # ties: the longer 0.35 run, then the summary's best edge, then the name
+            best = max(usable_edges, key=lambda e: (e["usable"], e["runs"]["0.35"], e["name"] == out["summary_edge"], e["name"]))
+            out["best"], out["usable_m"] = best, best["usable"]
+        out["admits"] = [r["id"] for r in MARGIN_ROWS if out["usable_m"] >= r["need"]]
+        out["longest_row"] = out["admits"][0] if out["admits"] else None
+        if not (SUPPORT_TOP_Z[0] <= out["top_z"] <= SUPPORT_TOP_Z[1]):
+            out["flags"].append(f"top_z={out['top_z']:.2f} outside {SUPPORT_TOP_Z[0]:.2f}-{SUPPORT_TOP_Z[1]:.2f}")
+        if out["area"] < SUPPORT_MIN_AREA_M2:
+            out["flags"].append(f"area={out['area']:.2f} < {SUPPORT_MIN_AREA_M2}")
+        if not usable_edges:
+            out["flags"].append("no_usable_edge")
+        elif out["usable_m"] < min(r["need"] for r in MARGIN_ROWS if r["id"] in LONG_ROWS):
+            out["flags"].append("short_rows_only")
+            if out["usable_m"] < min(r["need"] for r in MARGIN_ROWS if r["how"] == "pilot"):
+                out["flags"].append("no_measured_row")
+        if out["best"] is not None:
+            if out["best"]["overhang"] >= OVERHANG_FLAG_M:
+                out["flags"].append(f"overhang={out['best']['overhang']:.2f} (stand-off from the AABB {0.45 + out['best']['overhang']:.2f} m)")
+            need = next((r["need"] for r in MARGIN_ROWS if r["id"] == out["longest_row"]), None)
+            if need is not None and min(out["best"]["length"], out["best"]["runs"]["0.35"]) < need:
+                out["flags"].append(f"run035_short={out['best']['runs']['0.35']:.2f}")
+        self._admission[key] = out
+        return out
+
+    def support_dict(self, adm: dict) -> dict:
+        """The support dict used for rows (schema of ``supports_admitted``) from an admission record: the usable best edge."""
+        best = adm["best"] or {}
+        return {"scene": adm["scene"], "name": adm["name"], "category": adm["category"], "top_z": adm["top_z"], "area": adm["area"],
+                "run": adm["usable_m"], "edge": best.get("name", "-"), "rooms": adm["rooms"], "longest_row": adm["longest_row"],
+                "flags": list(adm["flags"])}
+
+    def pin_check(self, scene: str, name: str, need: float = LONGEST_NEED_M) -> Tuple[bool, List[str]]:
+        """A pinned triplet support must exist in the B4 inventory, have its top in the tabletop range and a usable edge that
+        admits the longest §4.4 row (``need``)."""
+        adm = self.support_admission(scene, name)
+        why = []
+        if not adm["exists"] or "no_B4_support_record" in adm["flags"]:
+            return False, [f"{scene}/{name}: not in the B4 inventory"]
+        if not (SUPPORT_TOP_Z[0] <= adm["top_z"] <= SUPPORT_TOP_Z[1]):
+            why.append(f"top z {adm['top_z']:.2f} outside the tabletop range")
+        if adm["area"] < SUPPORT_MIN_AREA_M2:
+            why.append(f"area {adm['area']:.2f} m2 < {SUPPORT_MIN_AREA_M2}")
+        if adm["usable_m"] < need:
+            why.append(f"best usable edge {adm['usable_m']:.2f} m < {need:.2f} m (longest admissible row: {adm['longest_row'] or 'none'})")
+        return not why, [f"{scene}/{name}: " + "; ".join(why)] if why else []
+
+    def support_triplets(self) -> List[dict]:
+        """The N support triplets shared by every tabletop pick: ``[{"triplet": i, "slots": {slot: support dict}, "notes": [...]}]``.
+        T1 = the 2026-09-15 rule (test pin, same-scene height variation, other-scene held-out; unchanged), T2.. = the owner's
+        pins verified by :meth:`pin_check` (held-out falls back to ``heldout_alt``; a failing representative drops the triplet)."""
+        if self._triplets is not None:
+            return self._triplets
+        notes: List[str] = []
         sup = self.supports_admitted()
         by_name = {(s["scene"], s["name"]): s for s in sup}
         rep = by_name.get((TEST_SCENE, TEST_SUPPORT))
@@ -426,15 +618,160 @@ class Selector:
             notes.append("VB-ISC support change: no second admitted support in the test scene")
         elif abs(var["top_z"] - rep["top_z"]) < 0.10:
             notes.append("VB-ISC support height change < 10 cm in the test scene (same-height alternates only)")
-        for slot, s in (("representative", rep), ("variation_geometry", var), ("heldout", held)):
-            if s is None:
+        t1 = {"triplet": 1, "slots": {}, "notes": notes, "pick_notes": list(notes)}
+        for slot, s in zip(SUPPORT_SLOTS, (rep, var, held)):
+            if s is not None:
+                t1["slots"][slot] = s
+        out = [t1]
+        for i, pin in enumerate(SUPPORT_TRIPLETS[: self.n_triplets - 1], start=2):
+            t = {"triplet": i, "slots": {}, "notes": [], "pick_notes": []}
+            for slot in SUPPORT_SLOTS:
+                cands = [pin[slot]] + ([pin["heldout_alt"]] if slot == "heldout" and pin.get("heldout_alt") else [])
+                chosen = None
+                for j, (scene, name) in enumerate(cands):
+                    ok, why = self.pin_check(scene, name)
+                    if ok:
+                        chosen = self.support_dict(self.support_admission(scene, name))
+                        if j > 0:
+                            t["notes"].append(f"T{i} {slot}: {cands[0][0]}/{cands[0][1]} failed the checks, alternative {scene}/{name} used")
+                        break
+                    t["notes"].append(f"T{i} {slot} rejected - " + "; ".join(why))
+                if chosen is None:
+                    if slot == "representative":
+                        t["notes"].append(f"T{i} dropped: the representative support failed the checks")
+                        t["slots"] = {}
+                        break
+                    continue
+                t["slots"][slot] = chosen
+            if "variation_geometry" in t["slots"] and abs(t["slots"]["representative"]["top_z"] - t["slots"]["variation_geometry"]["top_z"]) < 0.10:
+                t["notes"].append(f"T{i}: VB-ISC support height change < 10 cm")
+            elif t["slots"] and "variation_geometry" not in t["slots"]:
+                t["notes"].append(f"T{i}: VB-ISC support change unavailable (variation support failed the checks)")
+            if t["slots"]:
+                out.append(t)
+            else:
+                notes.extend(t["notes"])
+        if self.n_triplets - 1 > len(SUPPORT_TRIPLETS):
+            notes.append(f"only {len(SUPPORT_TRIPLETS) + 1} support triplets are pinned (--support-triplets {self.n_triplets})")
+        self._triplets = out
+        return out
+
+    def support_row(self, subtask: str, pick: str, slot: str, s: dict, triplet: int) -> dict:
+        note = f"top_z={s['top_z']:.2f} area={s['area']:.2f} best_edge={s['edge']} run045={s['run']:.2f}"
+        status = "geometric_ok" if s["run"] >= EDGE_FREE_RUN_MIN_M else "geometric_weak"
+        if triplet > 1:  # T1 notes / statuses stay exactly as written on 2026-09-15 (summary best edge); T2.. use the usable edge
+            note += f" margin_row={s.get('longest_row') or 'none'} rooms={','.join(s.get('rooms') or []) or '-'}"
+            if slot == "heldout":
+                note += " (global held-out support)"
+            if s.get("flags"):
+                note += " flags=" + ";".join(s["flags"])
+            status = "geometric_ok" if s.get("longest_row") in LONG_ROWS else "geometric_weak:short_rows_only"
+        return {"family": SUBTASKS[subtask]["family"], "subtask": subtask, "pick": pick, "role": "support", "slot": slot,
+                "category": s["category"], "model": "", "scene": s["scene"], "name": s["name"], "joint": "", "kind": "scene",
+                "grasp_key": "", "scale": "", "geometry_group": "", "exact_group": "", "status": status, "note": note, "triplet": str(triplet)}
+
+    def support_slots(self, subtask: str, pick: str) -> List[str]:
+        """Append the support rows of a tabletop pick: N triplets (``support_triplets``), written T2, T3, ..., T1 so that
+        readers indexing (pick, role, slot) without the ``triplet`` column keep the T1 binding. Returns the T1 notes (the
+        per-pick report line); the T2.. notes go to the support section of the report."""
+        triplets = self.support_triplets()
+        for t in triplets[1:] + triplets[:1]:
+            for slot in SUPPORT_SLOTS:
+                s = t["slots"].get(slot)
+                if s is not None:
+                    self.rows.append(self.support_row(subtask, pick, slot, s, t["triplet"]))
+        return list(triplets[0]["pick_notes"])
+
+    # -- IORS large-scale init surface: the partner's own top (spec 5.6 b, owner decision A5) ---------------------------
+    def init_row_need(self, target_rows: List[dict]) -> Tuple[float, str]:
+        """m_R + m_L of the large-scale init row for a pick: span + 2 w_t + 0.04 with w_t = half the larger horizontal bbox
+        side over the pick's target models (representative / variation / held-out; the largest decides; bbox from the icl)."""
+        w, who = 0.0, ""
+        for r in target_rows:
+            bb = self.bbox.get((r["category"], r["model"]))
+            if bb is None:
                 continue
-            self.rows.append({"family": SUBTASKS[subtask]["family"], "subtask": subtask, "pick": pick, "role": "support", "slot": slot,
-                              "category": s["category"], "model": "", "scene": s["scene"], "name": s["name"], "joint": "", "kind": "scene",
-                              "grasp_key": "", "scale": "", "geometry_group": "", "exact_group": "",
-                              "status": "geometric_ok" if s["run"] >= 0.6 else "geometric_weak",
-                              "note": f"top_z={s['top_z']:.2f} area={s['area']:.2f} best_edge={s['edge']} run045={s['run']:.2f}"})
-        return notes
+            wt = max(bb[0], bb[1]) / 2
+            if wt > w:
+                w, who = wt, f"{r['category']}/{r['model']}"
+        return round(BAND_SPAN_M + 2 * w + 0.04, 2), who
+
+    def floor_row(self, subtask: str, pick: str, slot: str, p: dict, why: str = "") -> dict:
+        return {"family": IORS, "subtask": subtask, "pick": pick, "role": "support", "slot": slot, "category": FLOOR, "model": "",
+                "scene": p["scene"], "name": FLOOR, "joint": "", "kind": "scene", "grasp_key": "", "scale": "", "geometry_group": "",
+                "exact_group": "", "status": "untested", "note": f"floor beside {p['name']}" + (f" ({why})" if why else ""), "triplet": ""}
+
+    def fix_heldout_support_collisions(self, subtask: str) -> List[str]:
+        """Global held-out rule for the own-top class: a partner instance that another pick of the subtask trains on as its
+        init surface cannot be a held-out support as well; that heldout slot falls back to the floor beside the held-out
+        partner (the last init-surface class). Returns the log lines."""
+        trained: Dict[Tuple[str, str], str] = {}
+        for r in self.rows:
+            if r["subtask"] == subtask and r["role"] == "support" and r["slot"] != "heldout" and r["category"] != FLOOR:
+                trained.setdefault((r["scene"], r["name"]), r["pick"])
+        log = []
+        for i, r in enumerate(self.rows):
+            if r["subtask"] != subtask or r["role"] != "support" or r["slot"] != "heldout" or r["category"] == FLOOR:
+                continue
+            if not r["note"].startswith("partner's own top") or (r["scene"], r["name"]) not in trained:
+                continue
+            other = trained[(r["scene"], r["name"])]
+            why = f"own top not held out: {r['name']} is the init surface of {other}"
+            self.rows[i] = self.floor_row(subtask, r["pick"], "heldout", {"scene": r["scene"], "name": r["name"]}, why)
+            log.append(f"{r['pick']}: heldout support {r['name']}@{r['scene']} -> floor ({why})")
+        return log
+
+    def own_top_admitted(self, subtask: str, p: dict, need: float) -> Tuple[bool, dict, str]:
+        """The partner's own top admits the A / B stances per the B4 inventory when the instance is an admitted support (top
+        height, area, free cells, >= 0.60 m run) whose best usable edge admits the pick's large-scale init row (``need``)."""
+        adm = self.support_admission(p["scene"], p["name"])
+        admitted = {(s["scene"], s["name"]) for s in self.supports_admitted()}
+        if (p["scene"], p["name"]) not in admitted:
+            return False, adm, f"{p['name']}@{p['scene']}: top not an admitted support (B4: top z {adm['top_z']:.2f}, area {adm['area']:.2f}, flags {';'.join(adm['flags']) or '-'})"
+        if adm["best"] is None or adm["usable_m"] < need:
+            return False, adm, (f"{p['name']}@{p['scene']}: best usable edge {adm['usable_m']:.2f} m < init row {need:.2f} m "
+                                f"(blocked: {', '.join(adm['blocked']) or '-'}; flags {';'.join(adm['flags']) or '-'})")
+        return True, adm, ""
+
+    def own_top_rows(self, subtask: str, pick: str, partner_slots: Dict[str, Optional[dict]], target_rows: List[dict]) -> Tuple[List[dict], List[str]]:
+        """Support rows for the own-top class of an under large-scale pick: one row per partner slot whose own top is admitted
+        (the support of a slot is that slot's partner instance); a slot whose partner top is not admitted gets the floor
+        beside that partner. Empty when the representative partner's top is not admitted (the pick stays on the floor)."""
+        need, who = self.init_row_need(target_rows)
+        rows, notes = [], []
+        rep = partner_slots.get("representative")
+        ok, adm, why = self.own_top_admitted(subtask, rep, need)
+        if not ok:
+            return [], [why]
+        for slot in SUPPORT_SLOTS:
+            p = partner_slots.get(slot)
+            if p is None:
+                continue
+            ok, adm, why = self.own_top_admitted(subtask, p, need)
+            if not ok:
+                notes.append(f"{slot}: {why} -> floor beside {p['name']}")
+                rows.append(self.floor_row(subtask, pick, slot, p))
+                continue
+            best = adm["best"]
+            why_class = (f"no admitted support within 3 m of {p['name']}" if slot == "representative"
+                         else f"the pick's class: no admitted support within 3 m of the representative partner {rep['name']}")
+            note = (f"partner's own top (spec 5.6 b): {why_class}; usable edge {best['name']} "
+                    f"{adm['usable_m']:.2f} m >= init row {need:.2f} m ({who}); top_z={adm['top_z']:.2f} area={adm['area']:.2f} "
+                    f"run035/045/055={best['runs']['0.35']:.2f}/{best['runs']['0.45']:.2f}/{best['runs']['0.55']:.2f} "
+                    f"rooms={','.join(adm['rooms']) or '-'}")
+            if adm["blocked"]:
+                note += " blocked_edges=" + ",".join(adm["blocked"])
+            if adm["flags"]:
+                note += " flags=" + ";".join(adm["flags"])
+            near = p.get("near_supports") or []
+            if near:
+                note += f" (supports within 3 m of this partner: {','.join(near)})"
+            rows.append({"family": IORS, "subtask": subtask, "pick": pick, "role": "support", "slot": slot, "category": p["category"], "model": "",
+                         "scene": p["scene"], "name": p["name"], "joint": "", "kind": "scene", "grasp_key": "", "scale": "", "geometry_group": "",
+                         "exact_group": "", "status": "geometric_ok", "note": note, "triplet": ""})
+            notes.append(f"{slot}: {p['name']}@{p['scene']} own top, usable edge {best['name']} {adm['usable_m']:.2f} m >= {need:.2f} m"
+                         + (f" [{';'.join(adm['flags'])}]" if adm["flags"] else ""))
+        return rows, notes
 
     def wall_slots(self, subtask: str, pick: str) -> List[str]:
         regions = self.by_subtask_role.get((subtask, "support"), [])
@@ -695,7 +1032,7 @@ class Selector:
                                   "geometry_group": "", "exact_group": "", "status": "geometric_ok",
                                   "note": f"face_z={p['face_z']:.2f} clearance={p['clearance']:.2f} near_supports={','.join(p['near_supports']) or '-'}"})
             # support: a support within 3 m of the representative partner (init surface); under: the partner's own top
-            # is the second choice (spec 5.6 b); floor is always a third
+            # is the second choice (spec 5.6 b, owner decision A5 2026-09-16); floor is always the last class
             sup = self.supports_admitted()
             near = [s for s in sup if s["scene"] == prep["scene"] and s["name"] in prep["near_supports"]]
             snote = []
@@ -706,10 +1043,16 @@ class Selector:
                                   "model": "", "scene": srep["scene"], "name": srep["name"], "joint": "", "kind": "scene", "grasp_key": "", "scale": "",
                                   "geometry_group": "", "exact_group": "", "status": "geometric_ok", "note": f"init surface within 3 m of {prep['name']}"})
             else:
-                snote.append("no admitted support within 3 m of the partner: init surface = floor" + (" or the partner's own top" if under else ""))
-                self.rows.append({"family": IORS, "subtask": subtask, "pick": pick, "role": "support", "slot": "representative", "category": "floor",
-                                  "model": "", "scene": prep["scene"], "name": "floor", "joint": "", "kind": "scene", "grasp_key": "", "scale": "",
-                                  "geometry_group": "", "exact_group": "", "status": "untested", "note": f"floor beside {prep['name']}"})
+                partner_slots = {"representative": prep, "variation_geometry": var, "heldout": held}
+                target_rows = [r for r in self.rows if r["pick"] == pick and r["role"] == "target"]
+                own_rows, own_notes = self.own_top_rows(subtask, pick, partner_slots, target_rows) if under else ([], [])
+                if own_rows:
+                    snote.append("no admitted support within 3 m of the partner: init surface = the partner's own top (spec 5.6 b); " + "; ".join(own_notes))
+                    self.rows.extend(own_rows)
+                else:
+                    snote.append("no admitted support within 3 m of the partner: init surface = floor"
+                                 + ("; own top not admitted: " + "; ".join(own_notes) if own_notes else ""))
+                    self.rows.append(self.floor_row(subtask, pick, "representative", prep))
             self.used_categories[cat] += 1
             chosen += 1
             self.report[subtask].append(
@@ -719,6 +1062,8 @@ class Selector:
                 f"partner: {'; '.join(pnotes) or 'ok'}{'; ' + '; '.join(snote) if snote else ''}")
         if chosen < n:
             self.report[subtask].append(f"only {chosen} of {n} picks ({len(tpool)} target categories after filling, {len(pcats)} partner categories)")
+        for line in self.fix_heldout_support_collisions(subtask):
+            self.report[subtask].append(line)
 
     def select_scene_artic(self, subtask: str, n: int) -> None:
         arts = self.artic_admitted()
@@ -795,8 +1140,121 @@ class Selector:
                     sup = "wall" if roles.get("support", {}).get("kind") == "wall" else ("scene" if "support" in roles else None)
                     self.select_single(st, role, roles[role], n, sup)
 
+    # -- targeted patches (--patch-only) ---------------------------------------------------------------------------------
+    def patch(self, out_dir: str, what: Set[str]) -> None:
+        """Apply the owner's targeted patches to the existing ``representatives.csv`` under ``out_dir`` (no re-selection):
+        ``under_large_scale`` - the own-top branch for the under large-scale picks whose init surface is the floor (A5);
+        ``support_triplets`` - the T2..TN support rows of every tabletop pick (A3). Other rows are copied unchanged."""
+        unknown = what - set(PATCH_KINDS)
+        if unknown:
+            raise SystemExit(f"--patch-only: unknown patch {sorted(unknown)} (known: {', '.join(PATCH_KINDS)})")
+        existing = read_csv(os.path.join(out_dir, "representatives.csv"))
+        picks: List[Tuple[str, List[dict]]] = []
+        for r in existing:  # consecutive runs of one pick (the selection writes the rows of a pick together)
+            if picks and picks[-1][0] == r["pick"]:
+                picks[-1][1].append(r)
+            else:
+                picks.append((r["pick"], [r]))
+        out: List[dict] = []
+        for pick, prs in picks:
+            subtask = prs[0]["subtask"]
+            if "under_large_scale" in what and subtask == f"{IORS}-under_large_scale":
+                prs = self.patch_own_top(pick, prs)
+            if "support_triplets" in what and subtask in TABLETOP_SUPPORT_SUBTASKS:
+                prs = self.patch_triplets(pick, prs)
+            out.extend(prs)
+        self.rows = out
+        if "under_large_scale" in what:
+            for line in self.fix_heldout_support_collisions(f"{IORS}-under_large_scale"):
+                self.patch_log["under_large_scale"].append(line)
+                pick = line.split(":", 1)[0]
+                if f"line:{pick}" in self.patch_log:
+                    self.patch_log[f"line:{pick}"][0] += "; " + line.split(": ", 1)[1]
+
+    def patch_own_top(self, pick: str, prs: List[dict]) -> List[dict]:
+        subtask = prs[0]["subtask"]
+        sup_rows = [r for r in prs if r["role"] == "support"]
+        if not (len(sup_rows) == 1 and sup_rows[0]["category"] == FLOOR):
+            self.patch_log["under_large_scale"].append(f"{pick}: unchanged (init surface {', '.join(r['name'] for r in sup_rows) or '-'})")
+            return prs
+        partner_slots: Dict[str, Optional[dict]] = {}
+        for r in prs:
+            if r["role"] == "partner" and r["kind"] == "scene":
+                near = ((self.inventory.get(r["scene"]) or {}).get("partners", {}).get(r["name"]) or {}).get("supports_within_3m") or []
+                partner_slots[r["slot"]] = {"scene": r["scene"], "name": r["name"], "category": r["category"],
+                                            "near_supports": [n.split(" (")[0] for n in near]}
+        if "representative" not in partner_slots:
+            self.patch_log["under_large_scale"].append(f"{pick}: unchanged (no scene partner rows)")
+            return prs
+        target_rows = [r for r in prs if r["role"] == "target"]
+        own_rows, notes = self.own_top_rows(subtask, pick, partner_slots, target_rows)
+        if not own_rows:
+            self.patch_log["under_large_scale"].append(f"{pick}: unchanged, own top not admitted - " + "; ".join(notes))
+            return prs
+        idx = prs.index(sup_rows[0])
+        old = sup_rows[0]
+        self.patch_log["under_large_scale"].append(
+            f"{pick}: support representative `{old['name']}@{old['scene']}` ({old['category']}) -> "
+            + ", ".join(f"{r['slot']}=`{r['name']}@{r['scene']}` ({r['category']})" for r in own_rows) + "; " + "; ".join(notes))
+        self.patch_log[f"line:{pick}"] = ["no admitted support within 3 m of the partner: init surface = the partner's own top (spec 5.6 b; A5 patch 2026-09-16); "
+                                          + "; ".join(notes)]
+        return prs[:idx] + own_rows + prs[idx + 1:]
+
+    def patch_triplets(self, pick: str, prs: List[dict]) -> List[dict]:
+        subtask = prs[0]["subtask"]
+        t1 = [r for r in prs if r["role"] == "support" and r["kind"] == "scene" and r["category"] not in ("walls", FLOOR)]
+        if not t1 or any((r.get("triplet") or "") not in ("", "1") for r in prs):
+            self.patch_log["support_triplets"].append(f"{pick}: unchanged (no T1 support rows or triplets already present)")
+            return prs
+        triplets = self.support_triplets()
+        new: List[dict] = []
+        for t in triplets[1:]:
+            for slot in SUPPORT_SLOTS:
+                s = t["slots"].get(slot)
+                if s is not None:
+                    new.append(self.support_row(subtask, pick, slot, s, t["triplet"]))
+        for r in t1:
+            r["triplet"] = "1"
+        idx = prs.index(t1[0])
+        self.patch_log["support_triplets"].append(f"{pick}: +{len(new)} rows (T{', T'.join(str(t['triplet']) for t in triplets[1:])}) before the T1 rows")
+        return prs[:idx] + new + prs[idx:]
+
+    # -- support candidates the icl lacks -------------------------------------------------------------------------------
+    def ensure_support_candidates(self) -> List[dict]:
+        """``candidates_extra.csv`` support rows (kind ``scene``; scene / instance / room columns as the existing support rows)
+        for every scene support of the selection that ``roles/candidates.csv`` does not list for the subtask (any status)."""
+        added: List[dict] = []
+        have = {(r["subtask"], r["role"], r["scene"], r["model"]) for r in self.cands if r.get("kind") == "scene"}
+        have |= {(r["subtask"], r["role"], r["scene"], r["model"]) for r in self.extra if r.get("kind") == "scene"}
+        for r in self.rows:
+            if r["role"] != "support" or r["kind"] != "scene" or r["category"] in ("walls", FLOOR):
+                continue
+            key = (r["subtask"], "support", r["scene"], r["name"])
+            if key in have:
+                continue
+            have.add(key)
+            adm = self.support_admission(r["scene"], r["name"])
+            rec = self.support_record(r["scene"], r["name"]) or {}
+            aabb = rec.get("aabb_world") or {}
+            lo, hi = aabb.get("min"), aabb.get("max")
+            row = {k: "" for k in self.cands[0].keys()}
+            row.update({"subtask": r["subtask"], "role": "support", "kind": "scene", "category": r["category"], "model": r["name"],
+                        "display_name": r["category"].replace("_", " "), "scene": r["scene"], "room": ",".join(adm["rooms"]), "rank": "4",
+                        "status": "incomplete:support_from_B4_inventory", "top_z": f"{adm['top_z']:.3f}" if adm["top_z"] else "",
+                        "world_ext_x": f"{hi[0] - lo[0]:.3f}" if lo and hi else "", "world_ext_y": f"{hi[1] - lo[1]:.3f}" if lo and hi else "",
+                        "pos_x": f"{(lo[0] + hi[0]) / 2:.3f}" if lo and hi else "", "pos_y": f"{(lo[1] + hi[1]) / 2:.3f}" if lo and hi else "",
+                        "note": f"B4: top z {adm['top_z']:.2f}, area {adm['area']:.2f} m2; usable edges="
+                                + ",".join(f"{e['name']}({e['usable']:.2f})" for e in adm["edges"] if e["usable"] > 0)
+                                + f"; margin_row={adm['longest_row'] or 'none'}" + ("; flags=" + ";".join(adm["flags"]) if adm["flags"] else ""),
+                        "source": f"scene_inventory_20260915/{r['scene']}/supports/{r['name']}.json",
+                        "plan": "support selected by select_representatives (A3 triplet / A5 own top) that roles/candidates.csv does not list for "
+                                "this subtask; validate with the sampler's stance search (rejections -> customs blacklist per (scene, support))"})
+            self.extra.append(row)
+            added.append(row)
+        return added
+
     # -- output ---------------------------------------------------------------------------------------------------------
-    def write(self, out_dir: str) -> None:
+    def write(self, out_dir: str, patch: bool = False) -> None:
         os.makedirs(out_dir, exist_ok=True)
         with open(os.path.join(out_dir, "representatives.csv"), "w", newline="") as f:
             w = csv.DictWriter(f, fieldnames=REP_COLUMNS)
@@ -804,19 +1262,179 @@ class Selector:
             for r in self.rows:
                 w.writerow({k: r.get(k, "") for k in REP_COLUMNS})
         cols = list(self.cands[0].keys()) + ["plan"]
-        with open(os.path.join(out_dir, "candidates_extra.csv"), "w", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=cols)
-            w.writeheader()
-            seen = set()
-            for r in self.extra:
-                key = (r["subtask"], r["role"], r["category"], r["model"])
-                if key in seen:
-                    continue
-                seen.add(key)
-                w.writerow({k: r.get(k, "") for k in cols})
-        self.write_report(os.path.join(out_dir, "representatives_report.md"))
+        extra_path = os.path.join(out_dir, "candidates_extra.csv")
+        write_extra = True
+        if patch:
+            # the filled candidates of the last full run stay as they are; only support rows the icl lacks are appended
+            self.extra = read_csv(extra_path) if os.path.exists(extra_path) else []
+            added = self.ensure_support_candidates()
+            self.patch_log["candidates_extra"].append(f"{len(added)} support rows appended" if added
+                                                      else "no support row needed (candidates.csv lists every selected support)")
+            write_extra = bool(added)
+        else:
+            self.ensure_support_candidates()
+        if write_extra:
+            with open(extra_path, "w", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=cols)
+                w.writeheader()
+                seen = set()
+                for r in self.extra:
+                    key = (r["subtask"], r["role"], r["category"], r["model"])
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    w.writerow({k: r.get(k, "") for k in cols})
+        self.write_report(os.path.join(out_dir, "representatives_report.md"), patch=patch)
 
-    def write_report(self, path: str) -> None:
+    def support_report_lines(self) -> List[str]:
+        """The two support sections: the triplets (A3) and the per-support admission table (edge length vs §4.4 margins)."""
+        triplets = self.support_triplets()
+        tabletop_picks = sorted({r["pick"] for r in self.rows if r["subtask"] in TABLETOP_SUPPORT_SUBTASKS and r["role"] == "support"
+                                 and r["kind"] == "scene" and r["slot"] == "representative"})
+        with_t = collections.Counter(r.get("triplet") or "" for r in self.rows if r["subtask"] in TABLETOP_SUPPORT_SUBTASKS and r["role"] == "support"
+                                     and r["slot"] == "representative")
+        lines = ["## Support triplets (owner decision 2026-09-16, A3)", "",
+                 f"Every §4 tabletop pick ({len(TABLETOP_SUPPORT_SUBTASKS)} subtasks, {len(tabletop_picks)} picks) carries the same "
+                 f"{len(triplets)} support triplets in its `support` role (`triplet` column; rows per pick: "
+                 + ", ".join(f"T{t}: {n}" for t, n in sorted(with_t.items()) if t) + "). "
+                 "T1 = the 2026-09-15 rule (test pin `breakfast_table_rhjoby_0`, same-scene height variation, other-scene held-out), "
+                 "T2 / T3 = the owner's pins (TODO.md A3), each verified against the B4 inventory: exists, top height in the tabletop range "
+                 f"({SUPPORT_TOP_Z[0]:.2f}-{SUPPORT_TOP_Z[1]:.2f} m), best usable edge >= the longest §4.4 margin row the pilot measured "
+                 f"({LONGEST_NEED_M:.2f} m, see the admission table). Held-out supports are **global**: held out in every tabletop subtask "
+                 "(`ground_isg` excludes a held-out scene object from every other combination of the subtask). Within a pick the rows are "
+                 "written T2, T3, T1 so that readers indexing (pick, role, slot) without the `triplet` column keep the T1 binding; the T1 rows "
+                 "are unchanged (summary best edge in the note), T2 / T3 notes carry the usable edge, the longest admissible row and the flags.", "",
+                 "| triplet | slot | scene / support | category | rooms | top z | best usable edge (m, 0.45 run 0.35/0.45/0.55) | longest admissible row | status |",
+                 "|---|---|---|---|---|---|---|---|---|"]
+        for t in triplets:
+            for slot in SUPPORT_SLOTS:
+                s = t["slots"].get(slot)
+                if s is None:
+                    lines.append(f"| T{t['triplet']} | {slot} | - | | | | | | unavailable |")
+                    continue
+                adm = self.support_admission(s["scene"], s["name"])
+                best = adm["best"]
+                edge = (f"{best['name']} {adm['usable_m']:.2f} ({best['runs']['0.35']:.2f}/{best['runs']['0.45']:.2f}/{best['runs']['0.55']:.2f})"
+                        if best else "none")
+                status = "ok" if adm["longest_row"] in LONG_ROWS else ("short rows only" if adm["longest_row"] else "no usable edge")
+                other_flags = [f for f in adm["flags"] if f != "short_rows_only"]
+                if other_flags:
+                    status += " [" + "; ".join(other_flags) + "]"
+                lines.append(f"| T{t['triplet']} | {slot} | `{s['scene']}/{s['name']}` | {s['category']} | {', '.join(adm['rooms']) or '-'} | "
+                             f"{adm['top_z']:.2f} | {edge} | {adm['longest_row'] or 'none'} | {status} |")
+        lines.append("")
+        notes = [n for t in triplets for n in t["notes"]] + self.support_notes
+        for pin in SUPPORT_TRIPLETS:
+            alt = pin.get("heldout_alt")
+            if alt and not any(s["scene"] == alt[0] and s["name"] == alt[1] for t in triplets for s in t["slots"].values()):
+                adm = self.support_admission(*alt)
+                notes.append(f"alternative held-out `{alt[0]}/{alt[1]}` checked, not needed: best usable edge {adm['usable_m']:.2f} m -> "
+                             f"longest admissible row {adm['longest_row'] or 'none'}" + (f", flags {'; '.join(adm['flags'])}" if adm["flags"] else ""))
+        for i, t in enumerate(triplets):
+            for j, u in enumerate(triplets):
+                if j <= i:
+                    continue
+                for sa, a in t["slots"].items():
+                    for sb, b in u["slots"].items():
+                        if a["category"] == b["category"]:
+                            notes.append(f"category `{a['category']}` appears in T{t['triplet']} {sa} (`{a['name']}`) and T{u['triplet']} {sb} "
+                                         f"(`{b['name']}`): category-based alias names need the triplet / instance to stay distinct")
+        if any(len(t["slots"]) >= 2 for t in triplets):
+            for t in triplets:
+                r, v = t["slots"].get("representative"), t["slots"].get("variation_geometry")
+                if r and v:
+                    notes.append(f"T{t['triplet']} VB-ISC height change: {r['top_z']:.2f} -> {v['top_z']:.2f} m ({abs(v['top_z'] - r['top_z']) * 100:.0f} cm)")
+        for n in notes:
+            lines.append(f"- {n}")
+        # per-support admission table: every scene support of the selection + the alternative pins
+        lines += ["", "## Support admission: edge length vs §4.4 margins", "",
+                  "Per edge the usable length is min(edge length, longest free-floor run at stand-off 0.45 with the chairs within 1 m removed); "
+                  f"an edge is unusable when an object stands closer than {BLOCKED_IN_FRONT_MAX_M:.2f} m in front of its midpoint (B4 ray at top + 0.3 m; the "
+                  "free-floor run does not see walls between the edge and the stand-off line, so the run of a wall-facing edge is the floor of the "
+                  f"next room) or its run is below the {EDGE_FREE_RUN_MIN_M:.2f} m admission. The longest §4.4 row (m_R + m_L) the best usable edge "
+                  "admits is recorded; supports below both long rows are flagged `short_rows_only`. Rows:", "",
+                  "| row | m_R + m_L (m) | source | subtasks | derivation |", "|---|---|---|---|---|"]
+        for r in MARGIN_ROWS:
+            lines.append(f"| {r['id']} | {r['need']:.2f} | {r['how']} | {', '.join(s.replace(IORS, 'IORS').replace(CM, 'CM') for s in r['subtasks'])} | {r['note']} |")
+        lines += ["", f"Band span abs(lambda_min) + max(0, lambda_max) = {BAND_SPAN_M:.2f} m [pilot] (back-solved from the toolbox and the platter rows). "
+                  "The estimate rows use the picked objects' bboxes; the sampler's stance search stays the validation.", "",
+                  "| scene / support | category | rooms | top z | area m² | edges: usable m @0.45 (runs 0.35/0.45/0.55; room in front) | blocked edges | best usable | longest admissible row | flags | used as |",
+                  "|---|---|---|---|---|---|---|---|---|---|---|"]
+        used: Dict[Tuple[str, str], List[str]] = collections.defaultdict(list)
+        for r in self.rows:
+            if r["role"] == "support" and r["kind"] == "scene" and r["category"] not in ("walls", FLOOR):
+                tag = (f"T{r['triplet']} " if r.get("triplet") else f"{r['subtask'].replace(IORS, 'IORS')} ") + r["slot"]
+                if tag not in used[(r["scene"], r["name"])]:
+                    used[(r["scene"], r["name"])].append(tag)
+        for pin in SUPPORT_TRIPLETS:
+            alt = pin.get("heldout_alt")
+            if alt and alt not in used:
+                used[alt].append("alternative held-out (not used)")
+        for (scene, name), tags in sorted(used.items()):
+            adm = self.support_admission(scene, name)
+            edges = "; ".join(f"{e['name']} {e['usable']:.2f} ({e['runs']['0.35']:.2f}/{e['runs']['0.45']:.2f}/{e['runs']['0.55']:.2f}; {e['room'] or '-'})"
+                              + (f" overhang {e['overhang']:.2f}" if e["overhang"] >= OVERHANG_FLAG_M else "")
+                              for e in adm["edges"] if e["usable"] > 0) or "none"
+            lines.append(f"| `{scene}/{name}` | {adm['category']} | {', '.join(adm['rooms']) or '-'} | {adm['top_z']:.2f} | {adm['area']:.2f} | {edges} | "
+                         f"{', '.join(adm['blocked']) or '-'} | {adm['usable_m']:.2f} | {adm['longest_row'] or 'none'} | {'; '.join(adm['flags']) or '-'} | "
+                         f"{', '.join(tags)} |")
+        return lines
+
+    def patch_report(self, text: str) -> str:
+        """Splice the support sections and the patched per-subtask lines into an existing report (``--patch-only``)."""
+        lines = text.rstrip("\n").split("\n")
+        out: List[str] = []
+        for line in lines:
+            for key, val in self.patch_log.items():
+                if key.startswith("line:") and line.startswith(f"- {key[5:]}: "):
+                    line = line.rsplit("; no admitted support within 3 m of the partner", 1)[0] + "; " + val[0]
+            if line.startswith("- **Supports** (`geometric_ok` only)"):
+                line = self.supports_validation_line()
+            out.append(line)
+        # drop a previous version of the support sections, then insert the fresh ones before the held-out list
+        for head in ("## Support triplets", "## Support admission"):
+            if any(l.startswith(head) for l in out):
+                i = next(i for i, l in enumerate(out) if l.startswith(head))
+                j = next((k for k in range(i + 1, len(out)) if out[k].startswith("## ")), len(out))
+                out = out[:i] + out[j:]
+        anchor = next((i for i, l in enumerate(out) if l.startswith("## Held-out models (global)")), len(out))
+        patched = ["", "## Targeted patches (`--patch-only`)", "",
+                   "Applied to the 2026-09-15 selection without re-running it (a re-run on the rebuilt icl shifts the teacup picks and the global "
+                   "held-out `cpozxi` -> `wopjex`, TODO.md A5):", ""]
+        for kind in PATCH_KINDS + ("candidates_extra",):
+            entries = self.patch_log.get(kind, [])
+            if kind == "support_triplets":  # one line per outcome instead of one per pick
+                by_outcome: Dict[str, List[str]] = collections.defaultdict(list)
+                for entry in entries:
+                    pick, outcome = entry.split(": ", 1)
+                    by_outcome[outcome].append(pick)
+                for outcome, pk in by_outcome.items():
+                    subs = sorted({p.rsplit("#", 1)[0] for p in pk})
+                    patched.append(f"- {kind}: {len(pk)} picks {outcome} ({len(subs)} subtasks: {', '.join(subs)})")
+                continue
+            for entry in entries:
+                patched.append(f"- {kind}: {entry}")
+        if any(l.startswith("## Targeted patches") for l in out):
+            i = next(i for i, l in enumerate(out) if l.startswith("## Targeted patches"))
+            j = next((k for k in range(i + 1, len(out)) if out[k].startswith("## ")), len(out))
+            out = out[:i] + out[j:]
+            anchor = next((i for i, l in enumerate(out) if l.startswith("## Held-out models (global)")), len(out))
+        out = out[:anchor] + self.support_report_lines() + patched + [""] + out[anchor:]
+        return "\n".join(out) + "\n"
+
+    @staticmethod
+    def supports_validation_line() -> str:
+        return ("- **Supports** (`geometric_ok` only): admitted by top height, area, short side and a >= 0.60 m free-floor edge run at stand-off 0.45 "
+                "(0.35 / 0.55 in the note); the edge-length-vs-margin check (table above) records the longest §4.4 row each support admits and flags "
+                "`short_rows_only`; the sampler's stance search is the validation (rejections `no_support` / `no_stance` -> customs blacklist per (scene, support)).")
+
+    def write_report(self, path: str, patch: bool = False) -> None:
+        if patch:
+            with open(path) as f:
+                text = f.read()
+            with open(path, "w") as f:
+                f.write(self.patch_report(text))
+            return
         picks = collections.Counter()
         for r in self.rows:
             if r["slot"] == "representative" and r["role"] in ("target", "targets", "obstacles"):
@@ -842,7 +1460,8 @@ class Selector:
             for l in self.report.get(st, []):
                 lines.append(f"- {l}")
             lines.append("")
-        lines += ["## Held-out models (global)", ""]
+        lines += self.support_report_lines()
+        lines += ["", "## Held-out models (global)", ""]
         for cat in sorted(self.heldout):
             lines.append(f"- {cat}: `{self.heldout[cat]}`")
         reused = sorted((c for c, n in self.used_categories.items() if n > 1), key=lambda c: -self.used_categories[c])
@@ -867,8 +1486,7 @@ class Selector:
                   "- **Scene articulated targets without a canonical handle annotation** (`incomplete:handle_from_B4_heuristic`, e.g. bottom_cabinet_fancyy_0, "
                   "bottom_cabinet_no_top_gjrero_*): the B4 geometric handle proposal is used through the `handle_file` role option; validate with the C3 review round "
                   "on `runlogs/scene_inventory_20260915/<scene>/artic/strips/` (verdicts -> `require/handles.csv`), then the representative test.",
-                  "- **Supports** (`geometric_ok` only): admitted by top height, area, short side and a >= 0.60 m free-floor edge run at stand-off 0.45 (0.35 / 0.55 in the note); "
-                  "the sampler's stance search is the validation (rejections `no_support` / `no_stance` -> customs blacklist per (scene, support)).",
+                  self.supports_validation_line(),
                   "- **Alignment targets**: `(contacts target)` cannot be checked until B6 writes `require/contacts.csv`; the v1 geometric push / brace contacts are used meanwhile; "
                   "wall regions stay the 2026-09-11 survey until B5.",
                   "- **Short pools** (variation / held-out unavailable, see the per-subtask notes): small-scale articulation (5 categories, 8 annotated models -> annotate handles of "
@@ -886,12 +1504,25 @@ def main(argv=None):
     ap.add_argument("--out", default=os.path.join(ICL, "roles"))
     ap.add_argument("--per-family", type=int, default=30)
     ap.add_argument("--min-per-subtask", type=int, default=5)
+    ap.add_argument("--support-triplets", type=int, default=3, help="support triplets per tabletop pick: T1 (derived) + the pinned T2, T3 (A3)")
+    ap.add_argument("--patch-only", default="", metavar="KINDS",
+                    help=f"comma list of {' / '.join(PATCH_KINDS)}: patch the files under --out in place instead of re-running the selection")
     args = ap.parse_args(argv)
-    sel = Selector(args.icl, args.per_family, args.min_per_subtask)
+    sel = Selector(args.icl, args.per_family, args.min_per_subtask, n_triplets=args.support_triplets)
+    if args.patch_only:
+        what = {w.strip() for w in args.patch_only.split(",") if w.strip()}
+        sel.patch(args.out, what)
+        sel.write(args.out, patch=True)
+        for kind in PATCH_KINDS + ("candidates_extra",):
+            for entry in sel.patch_log.get(kind, []):
+                print(f"{kind}: {entry}")
+        print(f"patched {sorted(what)}: {len(sel.rows)} slot rows -> {args.out}")
+        return
     sel.run()
     sel.write(args.out)
     n_picks = sum(1 for r in sel.rows if r["slot"] == "representative" and r["role"] in ("target", "targets", "obstacles"))
-    print(f"{n_picks} picks, {len(sel.rows)} slot rows, {len(sel.heldout)} held-out categories, {len(sel.extra)} extra candidate rows -> {args.out}")
+    print(f"{n_picks} picks, {len(sel.rows)} slot rows, {len(sel.heldout)} held-out categories, {len(sel.extra)} extra candidate rows, "
+          f"{len(sel.support_triplets())} support triplets -> {args.out}")
 
 
 if __name__ == "__main__":
