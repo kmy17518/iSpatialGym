@@ -53,6 +53,8 @@ SUBTASK = "configuration_matching-block_design"
 DEFAULT_FACES = {"+z": "red", "-z": "blue", "+x": "white", "-x": "yellow", "+y": "blue|yellow", "-y": "red|white"}
 #: approach tilt below the horizontal of the push / brace contacts on a block face (the pads stay above the table)
 CONTACT_TILT_DEG = 30.0
+#: closed fingers: half thickness of the blade beside a block face (eef origin this far outside the touched face)
+FINGER_HALF_THICKNESS = 0.012
 #: the place puts the block this far right and toward the robot of its slot; the pushes close the margin (§6.2 "small safety margin")
 PLACE_MARGIN = 0.005
 REGION_RADIUS = 0.20
@@ -447,9 +449,12 @@ class BlockDesign(SamplerV2):
         else:
             up = TT.up_face(pick_pose[1])
             pairs = [ax for ax in "xyz" if ax != up[1]]
-            for pair in pairs:
-                for yaw in (table_yaw, table_yaw + math.pi / 2, table_yaw + math.pi, table_yaw - math.pi / 2):
-                    cands.append((pair, 0.0, 0.0, yaw, 0))
+            # straight down first, then the pitched approaches of the band's generic classes (the same tilt at the pick
+            # and the place: no reorientation in hand) — the far cells of the band pass only with a pitched approach
+            for tilt in (0.0, 30.0, -30.0, 45.0, -45.0):
+                for pair in pairs:
+                    for yaw in (table_yaw, table_yaw + math.pi / 2, table_yaw + math.pi, table_yaw - math.pi / 2):
+                        cands.append((pair, tilt, tilt, yaw, 0))
         # keep the downward pick approaches only (exactly one tilt sign for a flipping block), then screen pick + place pairs
         screened = []
         for pair, tilt_pick, tilt_place, yaw, sign in cands:
@@ -558,43 +563,75 @@ class BlockDesign(SamplerV2):
         a = -face_normal * math.cos(math.radians(CONTACT_TILT_DEG)) + th.tensor([0.0, 0.0, -math.sin(math.radians(CONTACT_TILT_DEG))])
         return point, a / th.linalg.norm(a)
 
+    def _blade_height(self) -> float:
+        """eef origin height of a top-down blade beside a block: the closed fingertips 3 mm above the top (a 2.5 cm cube
+        sits entirely below the wrist of a horizontal contact)."""
+        return float(self.top.z) + max(0.6 * self.edge, C.FINGERTIP_LENGTH + 0.003)
+
+    def _blade_poses(self, pose: TT.Pose, direction_xy: th.Tensor, into: bool, manip: Stance, prefix: str):
+        """Top-down blade contacts of the closed gripper beside a block face (outward normal ``-direction_xy`` for a
+        push, ``+direction_xy`` for a brace): the eef origin half a finger outside the face at the blade height,
+        approach straight down / pitched 30° / 45° / 60° toward the robot, closing axis (the blade) along the face
+        normal with either wrist turn. Yields ``(pose, approach, name)``."""
+        dxy = th.tensor([float(direction_xy[0]), float(direction_xy[1]), 0.0])
+        dxy = dxy / th.linalg.norm(dxy)
+        face_normal = -dxy if into else dxy  # outward normal of the face touched
+        centre = self._centre(pose)[0]
+        origin = th.tensor([float(centre[0]), float(centre[1]), self._blade_height()]) + face_normal * (0.5 * self.edge + FINGER_HALF_THICKNESS)
+        for pitch in TT.approach_pitch_order(None):
+            a_vec = TT.pitched_approach(pitch, manip.forward)
+            for c_sign in (1.0, -1.0):
+                yield (origin, C.eef_quat(a_vec, c_sign * face_normal)), a_vec, f"{prefix}_blade_{pitch:.0f}{'' if c_sign > 0 else '-'}"
+
     def _brace_push(self, rec: Dict[str, Any], kind: str, pushed: str, braced: str, world_poses: Dict[str, TT.Pose], direction: th.Tensor, brace_dir: th.Tensor, manip: Stance):
         """Right-hand push of ``pushed`` along ``direction`` by the place margin while the closed left gripper braces
-        ``braced`` on its face opposite to the push; pre-contact + contact IK for both arms (§4.6 step 6)."""
+        ``braced`` on its face opposite to the push; pre-contact + contact IK for both arms (§4.6 step 6). Contacts:
+        the top-down blade beside the face (the blocks are 2.5 cm cubes) with the pitched approach classes first, the
+        tilted / horizontal side contacts (pads on the face at 3/4 height) as the fallback; the first push pose whose
+        pre + init pass the exact IK is paired with the first brace pose that passes the two-arm check."""
         support = self.obj("support")
-        push_point, push_a = self._face_contact(world_poses[pushed], direction, into=False)
-        c_axis = th.tensor([float(-direction[1]), float(direction[0]), 0.0])  # pads close across the push direction (horizontal)
-        push_init = C.contact_eef(push_point, push_a, c_axis)
         dist = PLACE_MARGIN
         d3 = th.tensor([float(direction[0]), float(direction[1]), 0.0])
         d3 = d3 / th.linalg.norm(d3)
-        push_goal = (push_init[0] + d3 * dist, push_init[1])
-        push_pre = C.pre_pose(push_init)
-        brace_point, brace_a = self._face_contact(world_poses[braced], brace_dir, into=True)
-        c_axis_b = th.tensor([float(-brace_dir[1]), float(brace_dir[0]), 0.0])
-        # the push init / goal touch the block: init is exact-IK-checked with the block ignored, then pre + goal with the brace arm
-        r_init = self.ikc.exact([push_pre, push_init], manip, "right", ignore_for_last=[support, self.objects[pushed]], cache=False)
-        if not r_init.ok:
-            raise Reject("contact_unreachable", f"{kind} push init of {pushed}: {r_init.reason}")
-        # A1 / §4.6 step 6: brace candidates on the braced block's face — the tilted approach with the pads closing
-        # across the brace direction (either wrist turn), then B3's horizontal contact classes (closing horizontal /
-        # vertical); the push arm locked at its goal solution
         z_axis = th.tensor([0.0, 0.0, 1.0])
-        a_h = th.tensor([float(brace_dir[0]), float(brace_dir[1]), 0.0])  # horizontal approach into the face (outward normal −brace_dir)
+        # push candidates: blades, then the tilted side contact
+        push_cands = list(self._blade_poses(world_poses[pushed], direction, False, manip, "push"))
+        p_pt, p_a = self._face_contact(world_poses[pushed], direction, into=False)
+        c_axis = th.tensor([float(-direction[1]), float(direction[0]), 0.0])  # pads close across the push direction (horizontal)
+        push_cands.append((C.contact_eef(p_pt, p_a, c_axis), p_a, "push_tilted"))
+        # brace candidates: blades, then the tilted side contact (either wrist turn) and B3's horizontal classes
+        brace_cands = list(self._blade_poses(world_poses[braced], brace_dir, True, manip, "brace"))
+        b_pt, b_a = self._face_contact(world_poses[braced], brace_dir, into=True)
+        c_axis_b = th.tensor([float(-brace_dir[1]), float(brace_dir[0]), 0.0])
+        a_h = th.tensor([float(brace_dir[0]), float(brace_dir[1]), 0.0])
         a_h = a_h / th.linalg.norm(a_h)
-        cands = [(brace_a, c_axis_b, "tilted_h"), (brace_a, -c_axis_b, "tilted_h-"), (a_h, c_axis_b, "side_h"), (a_h, z_axis, "side_v"), (a_h, -c_axis_b, "side_h-")]
-        res, brace_pre, brace, used, fails = None, None, None, None, []
-        for a_vec, c_vec, name in cands:
-            b = C.contact_eef(brace_point, a_vec, c_vec)
-            b_pre = C.pre_pose(b)
-            res = TT.brace_second_arm(self, manip, "right", [push_pre, push_goal], "left", [b_pre, b], ignore_work_last=[support, self.objects[pushed]],
-                                      ignore_brace_last=[support, self.objects[braced]])
-            if res.ok:
-                brace_pre, brace, used, brace_a = b_pre, b, name, a_vec
+        for a_vec, c_vec, name in ((b_a, c_axis_b, "tilted_h"), (b_a, -c_axis_b, "tilted_h-"), (a_h, c_axis_b, "side_h"), (a_h, z_axis, "side_v")):
+            brace_cands.append((C.contact_eef(b_pt, a_vec, c_vec), a_vec, name))
+        push_fails, brace_fails = [], []
+        chosen = None
+        for push_init, push_a, p_name in push_cands:
+            push_goal = (push_init[0] + d3 * dist, push_init[1])
+            push_pre = C.pre_pose(push_init)
+            # the push init / goal touch the block: init is exact-IK-checked with the block ignored, then pre + goal with the brace arm
+            r_init = self.ikc.exact([push_pre, push_init], manip, "right", ignore_for_last=[support, self.objects[pushed]], cache=False)
+            if not r_init.ok:
+                push_fails.append(f"{p_name}: {r_init.reason}")
+                continue
+            for b, b_a_vec, b_name in brace_cands:
+                b_pre = C.pre_pose(b)
+                res = TT.brace_second_arm(self, manip, "right", [push_pre, push_goal], "left", [b_pre, b], ignore_work_last=[support, self.objects[pushed]],
+                                          ignore_brace_last=[support, self.objects[braced]])
+                if res.ok:
+                    chosen = (push_pre, push_init, push_goal, b_pre, b, b_a_vec, f"{p_name}+{b_name}")
+                    break
+                brace_fails.append(f"{p_name}+{b_name}: {res.reason}")
+            if chosen is not None:
                 break
-            fails.append(f"{name}: {res.reason}")
-        if res is None or not res.ok:
-            raise Reject("contact_unreachable", f"{kind} brace / push of {pushed}: {sorted(set(fails))[:3]}")
+        if chosen is None:
+            if brace_fails:
+                raise Reject("contact_unreachable", f"{kind} brace / push of {pushed}: {sorted(set(brace_fails))[:3]}")
+            raise Reject("contact_unreachable", f"{kind} push init of {pushed}: {sorted(set(push_fails))[:3]}")
+        push_pre, push_init, push_goal, brace_pre, brace, brace_a, used = chosen
         rec[f"push_{kind}"] = ContactRecord("push", "right", push_pre, push_init, None, push_goal, d3, dist, object=pushed).to_sidecar()
         rec[f"brace_{kind}"] = ContactRecord("brace", "left", brace_pre, brace, direction=brace_a, brace_kind="row_left" if kind == "row" else "column_top",
                                               object=braced).to_sidecar()
