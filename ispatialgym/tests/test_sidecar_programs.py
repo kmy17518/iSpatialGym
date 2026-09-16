@@ -11,6 +11,7 @@ keys and shapes only and are skipped with a message when the module is not impor
 import copy
 import glob
 import json
+import math
 import os
 
 import pytest
@@ -33,7 +34,8 @@ from ispatialgym.oracle.sidecar import (
 DATA = os.path.join(os.path.dirname(__file__), "data", "sidecars")
 
 try:
-    import ispatialgym.robot.conventions  # noqa: F401
+    import torch as th
+    from ispatialgym.robot import conventions as C
 
     HAVE_CONVENTIONS = True
 except ImportError:
@@ -60,10 +62,12 @@ EXPECTED_SEQUENCE = {
     "object_scaling": ["reorient"],
     "mental_rotation": ["reorient"],
     "disembedding": _TABLE_IN + _PICK + ["navigate"] + _PLACE,
+    # blocks: ``yaw_deg`` is the wrist yaw of the cube grasp (not an in-hand rotation); the fixture records no
+    # ``yaw_align_deg`` (the table-alignment yaw ψ the sampler writes next to it), so only the flipping blocks reorient
     "configuration_matching-block_design": _TABLE_IN
-    + ["grasp", "lift", "reorient"] + _PLACE  # anchor: yaw-align only, its own init position, nothing to push against
+    + ["grasp", "lift"] + _PLACE  # anchor: no flip, its own init position, nothing to push against
     + ["grasp", "lift", "reorient"] + _PLACE + _BRACE_PUSH  # top-right: flips; pushed left against the anchor (row brace)
-    + ["grasp", "lift"] + _PLACE + _BRACE_PUSH  # bottom-left: no yaw, no flip; pushed up against the anchor (column brace)
+    + ["grasp", "lift"] + _PLACE + _BRACE_PUSH  # bottom-left: no flip; pushed up against the anchor (column brace)
     + ["grasp", "lift", "reorient"] + _PLACE + _BRACE_PUSH + _BRACE_PUSH,  # bottom-right: flips; row push, then column push
     "configuration_matching-articulation_open_large_scale": _WALL_IN + ["grasp", "base_follow", "retreat"],
     "configuration_matching-articulation_close_large_scale": _WALL_IN + ["grasp", "base_follow", "retreat"],
@@ -289,7 +293,16 @@ def test_block_design_program_details():
     assert all(a.arms == ("right",) for a in actions if a.name == "push")
     assert all(a.arms == ("left",) for a in actions if a.name == "brace")
     reoriented = [a.object for a in actions if a.name == "reorient"]
-    assert reoriented == [b.instance for b in sorted(sc.blocks, key=lambda b: b.order) if b.reorients]
+    assert reoriented == [b.instance for b in sorted(sc.blocks, key=lambda b: b.order) if A.block_reorients(b)]
+    assert reoriented == [b.instance for b in sorted(sc.blocks, key=lambda b: b.order) if b.flips]  # no yaw_align_deg recorded
+    assert all(a.mode == "flip" and a.block.flips for a in actions if a.name == "reorient")
+    # a non-zero table-alignment yaw ψ (``yaw_align_deg``) makes a block reorient even without a flip; the wrist yaw does not
+    d = raw("configuration_matching-block_design")
+    assert d["blocks"][0]["flip_sign"] == 0 and abs(d["blocks"][0]["yaw_deg"]) > 1.0
+    d["blocks"][0]["yaw_align_deg"] = 12.0
+    sc_psi = Sidecar.from_dict(d)
+    assert A.yaw_align_deg(sc_psi.blocks[0]) == 12.0 and A.block_reorients(sc_psi.blocks[0])
+    assert [a.name for a in expand(sc_psi.alias, sc_psi)][:7] == _TABLE_IN + ["grasp", "lift", "reorient", "place", "retreat", "grasp"]
     # brace/push pairing: the brace holds an already placed block, the push moves the block just placed
     for brace, push in zip((a for a in actions if a.name == "brace"), (a for a in actions if a.name == "push")):
         assert brace.contact.object in order[: order.index(push.contact.object)]
@@ -438,7 +451,7 @@ def test_direction_words():
 
 def _check_value(key, value, where):
     if value is None:
-        assert key in ("base_poses", "recorded", "carried"), where
+        assert key in ("base_poses", "carried"), where
         return
     if isinstance(value, Pose):
         assert len(value.position) == 3 and len(value.orientation) == 4, where
@@ -498,6 +511,279 @@ def test_targets_chain_through_end_poses():
     # the retreat leaves from where the place ended and moves RETREAT_LITTLE further along -a
     start = place.end_pose(sc, state)
     assert sum((a - b) ** 2 for a, b in zip(r[-1].position, start.position)) ** 0.5 == pytest.approx(A.RETREAT_LITTLE, abs=1e-5)
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# targets(): the F5 call shapes (signatures, units, fields, waypoint counts) the actions resolve through
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def _close(a, b, tol=1e-5):
+    return float((C.as_tensor(a) - C.as_tensor(b)).abs().max()) < tol
+
+
+def _same_quat(a, b, tol=1e-5):
+    a, b = C.as_tensor(a), C.as_tensor(b)
+    return min(float((a - b).abs().max()), float((a + b).abs().max())) < tol
+
+
+def _same_pose(pose: Pose, other, tol=1e-5):
+    p, q = pose.tensors()
+    return _close(p, other[0], tol) and _same_quat(q, other[1], tol)
+
+
+def _pose_dict(p, q):
+    return {"position": [float(v) for v in p], "orientation": [float(v) for v in q]}
+
+
+@needs_conventions
+def test_transition_targets_are_the_transition_poses_fields():
+    sc = load("disembedding")
+    tr = [a for a in expand(sc.alias, sc) if a.name == "transition"][0]
+    tp = C.transition_poses(tr.stance_from.to_dict(), tr.stance_to.to_dict(), tr.transition.stand_off)
+    assert isinstance(tp, C.TransitionPoses)
+    t = tr.targets(sc, StubState())
+    assert t["drive_back"] == pytest.approx(list(tp.drive_back))
+    assert t["drive_in"] == pytest.approx(list(tp.drive_in))
+    assert t["drive_in"] == pytest.approx(list(tr.stance_to.base_pose2d))
+    assert t["trunk"] == pytest.approx(tuple(tp.trunk))
+    assert t["trunk"] == pytest.approx(tr.stance_to.trunk)
+    assert isinstance(t["trunk"][0], float) and isinstance(t["trunk"][1], float)
+    # drive-back = the arriving stance backed off by s_T - stand_off along its own -x, yaw kept (spec §3.8)
+    back = tr.transition.stand_off - tr.stance_to.stand_off
+    x, y, yaw = tr.stance_to.base_pose2d
+    assert t["drive_back"] == pytest.approx([x - back * math.cos(yaw), y - back * math.sin(yaw), yaw], abs=1e-6)
+    assert tp.start == pytest.approx(tuple(tr.stance_from.base_pose2d))
+    assert tp.trunk_from == pytest.approx(tr.stance_from.trunk)
+
+
+@needs_conventions
+def test_library_grasp_is_derived_from_the_settled_pose_without_the_recorded_yaw():
+    sc = load("inter_object_relation_satisfaction-ontop_small_scale")
+    grasp = [a for a in expand(sc.alias, sc) if a.name == "grasp"][0]
+    g = grasp.grasp
+    assert grasp.kind == "library" and abs(g.yaw) > 0.1
+    # the settled object stands at the yaw the sampler drew (spec §4.6: R_z(yaw) on the library's rest orientation)
+    obj = (th.tensor([7.0, 3.1, 0.85]), C.qmul(C.quat_from_yaw(g.yaw), C.rest_quat(g.grasp_key)))
+
+    class Settled:
+        def object_pose(self, name):
+            return obj
+
+    got = grasp.grasp_pose(sc, Settled())
+    # == conventions.grasp_pose(obj_pose, grasp_key, grasp_name) with yaw omitted == obj_pose ∘ library entry
+    assert _same_pose(got, C.grasp_pose(obj, g.grasp_key, g.grasp_name))
+    assert _same_pose(got, C.compose(obj, C.grasp_entry(g.grasp_key, g.grasp_name).pose))
+    # a float yaw makes F5 *replace* the orientation by the nominal R_z(yaw) ∘ rest_quat: the recorded yaw reproduces
+    # the (un-drifted) settled object here, yaw 0 does not - so neither is what the oracle passes
+    assert _same_pose(got, C.grasp_pose(obj, g.grasp_key, g.grasp_name, yaw=g.yaw))
+    assert not _same_pose(got, C.grasp_pose(obj, g.grasp_key, g.grasp_name, yaw=0.0))
+    # a drifted settled pose moves the grasp with it (the oracle tracks the object in front of the robot)
+    drifted = (obj[0] + th.tensor([0.01, -0.02, 0.0]), C.qmul(C.quat_from_yaw(0.05), obj[1]))
+
+    class Drifted:
+        def object_pose(self, name):
+            return drifted
+
+    assert _same_pose(grasp.grasp_pose(sc, Drifted()), C.compose(drifted, C.grasp_entry(g.grasp_key, g.grasp_name).pose))
+    t = grasp.targets(sc, Settled())
+    assert _same_pose(t["pre_grasp"], C.pre_pose(got.tensors(), A.PRE_DIST)) and len(t["approach"]) == A.N_WAYPOINTS
+
+
+@needs_conventions
+def test_cube_grasp_uses_the_wrist_yaw_in_radians_and_the_pick_tilt_in_degrees():
+    sc = load("configuration_matching-block_design")
+    state = StubState()
+    grasps = [a for a in expand(sc.alias, sc) if a.name == "grasp"]
+    assert grasps and all(a.kind == "cube" for a in grasps)
+    for grasp in grasps:
+        b = grasp.block
+        cube = C.cube_grasp(state.object_pose(b.instance), b.face_pair, b.tilt_pick_deg, math.radians(b.yaw_deg))
+        assert _same_pose(grasp.grasp_pose(sc, state), cube.eef)
+        assert cube.tilt_deg == b.tilt_pick_deg and cube.face_pair == b.face_pair and cube.downward
+        # F5 snaps the wrist yaw to the nearer admissible value (eef +x ⊥ the pinch axis)
+        assert abs(C.wrap_angle(cube.yaw - math.radians(b.yaw_deg))) <= math.pi / 2 + 1e-6
+        face_axis = {"x": [1.0, 0.0, 0.0], "y": [0.0, 1.0, 0.0], "z": [0.0, 0.0, 1.0]}[b.face_pair]
+        assert _close(C.closing_axis(cube.eef[1]).abs(), C.quat_rotate(state.object_pose(b.instance)[1], th.tensor(face_axis)).abs())  # pads close across the face pair
+        _, numbers = grasp.annotate(sc)
+        assert f"wrist yaw {b.yaw_deg:.0f}°" in numbers and f"pick tilt {b.tilt_pick_deg:.0f}°" in numbers
+
+
+@needs_conventions
+def test_flip_reorient_calls_flip_waypoints_with_the_f5_signature():
+    state = StubState()
+    d = raw("configuration_matching-block_design")
+    flipper = next(b for b in d["blocks"] if b["flip_sign"] != 0)
+    flipper["yaw_align_deg"] = -31.0  # the table-alignment yaw ψ, written next to the wrist yaw
+    sc = Sidecar.from_dict(d)
+    reor = next(a for a in expand(sc.alias, sc) if a.name == "reorient" and a.object == flipper["instance"])
+    assert reor.mode == "flip" and reor.after.name == "lift" and reor.waypoints is None
+    t = reor.targets(sc, state)
+    start = reor.after.end_pose(sc, state).tensors()
+    pivot = th.tensor(t["pivot"])
+    # flip_waypoints(eef, pivot, yaw=ψ rad, flip_axis, flip_sign, n_yaw=2, n_flip=3): the yaw stage then the flip stage
+    want = C.flip_waypoints(start, pivot, yaw=math.radians(-31.0), flip_axis=th.tensor(flipper["flip_axis"]), flip_sign=flipper["flip_sign"],
+                            n_yaw=A.N_YAW_ALIGN, n_flip=A.N_FLIP)
+    assert len(t["waypoints"]) == len(t["derived"]) == len(want) == A.N_YAW_ALIGN + A.N_FLIP == 5
+    assert t["waypoints"] == t["derived"] and t["end"] == t["derived"][-1]  # nothing recorded: the regeneration is tracked
+    for got, exp in zip(t["derived"], want):
+        assert _same_pose(got, exp)
+    q_yaw = C.qmul(C.quat_from_yaw(math.radians(-31.0)), start[1])  # +ψ about world z through the pivot ...
+    assert _same_quat(t["derived"][A.N_YAW_ALIGN - 1].tensors()[1], q_yaw)
+    q_end = C.qmul(C.quat_from_axis_angle(th.tensor(flipper["flip_axis"]), flipper["flip_sign"] * math.pi / 2), q_yaw)  # ... then ±90° about the flip axis
+    assert _same_quat(t["end"].tensors()[1], q_end)
+    r0 = float(th.linalg.norm(start[0] - pivot))
+    assert all(abs(float(th.linalg.norm(w.tensors()[0] - pivot)) - r0) < 1e-5 for w in t["derived"])  # the block turns in place
+    fine, numbers = reor.annotate(sc)
+    assert "yaw it -31°" in numbers and "flip it 90°" in numbers and "yawing and flipping" in fine
+    # ψ = 0: the yaw stage is skipped -> the 3 flip poses only
+    flipper["yaw_align_deg"] = 0.0
+    sc0 = Sidecar.from_dict(d)
+    reor0 = next(a for a in expand(sc0.alias, sc0) if a.name == "reorient" and a.object == flipper["instance"])
+    t0 = reor0.targets(sc0, state)
+    assert len(t0["derived"]) == A.N_FLIP == 3 and "yaw it" not in reor0.annotate(sc0)[1]
+    want0 = C.flip_waypoints(start, pivot, yaw=0.0, flip_axis=th.tensor(flipper["flip_axis"]), flip_sign=flipper["flip_sign"],
+                             n_yaw=A.N_YAW_ALIGN, n_flip=A.N_FLIP)
+    assert len(want0) == 3
+    for got, exp in zip(t0["derived"], want0):
+        assert _same_pose(got, exp)
+    assert _same_quat(t0["end"].tensors()[1], C.qmul(C.quat_from_axis_angle(th.tensor(flipper["flip_axis"]), flipper["flip_sign"] * math.pi / 2), start[1]))
+    # a yaw-align without a flip: orbit_waypoints(eef, pivot, quat_from_yaw(ψ), n=2)
+    anchor = d["blocks"][0]
+    assert anchor["flip_sign"] == 0 and anchor.get("flip_axis") is None
+    anchor["yaw_align_deg"] = 12.0
+    sc1 = Sidecar.from_dict(d)
+    reor1 = next(a for a in expand(sc1.alias, sc1) if a.name == "reorient" and a.object == anchor["instance"])
+    t1 = reor1.targets(sc1, state)
+    s1 = reor1.after.end_pose(sc1, state).tensors()
+    assert len(t1["derived"]) == A.N_YAW_ALIGN == 2
+    for got, exp in zip(t1["derived"], C.orbit_waypoints(s1, th.tensor(t1["pivot"]), C.quat_from_yaw(math.radians(12.0)), n=2)):
+        assert _same_pose(got, exp)
+    assert _same_quat(t1["end"].tensors()[1], C.qmul(C.quat_from_yaw(math.radians(12.0)), s1[1]))
+    # recorded block waypoints (``blocks[].waypoints``) are tracked verbatim; the regeneration stays alongside as ``derived``
+    recorded = [w.to_dict() for w in reversed(t["derived"])]
+    flipper["yaw_align_deg"] = -31.0
+    flipper["waypoints"] = recorded
+    sc2 = Sidecar.from_dict(d)
+    reor2 = next(a for a in expand(sc2.alias, sc2) if a.name == "reorient" and a.object == flipper["instance"])
+    t2 = reor2.targets(sc2, state)
+    assert [w.to_dict() for w in t2["waypoints"]] == recorded and t2["end"].to_dict() == recorded[-1]
+    assert reor2.end_pose(sc2, state).to_dict() == recorded[-1]
+    assert [w.to_dict() for w in t2["derived"]] == [w.to_dict() for w in t["derived"]]
+
+
+@needs_conventions
+@pytest.mark.parametrize("subtask,mode", [("object_scaling", "line"), ("mental_rotation", "orbit")])
+def test_held_object_reorient_tracks_the_recorded_three_intermediate_waypoints(subtask, mode):
+    sc = load(subtask)
+    state = StubState()
+    (reor,) = expand(sc.alias, sc)
+    g = sc.grasps[0]
+    assert reor.mode == mode and reor.n == A.N_INHAND == 4 and reor.start_pose == g.grasp
+    t = reor.targets(sc, state)
+    # the recorded key poses (3 intermediate + the goal) are what the oracle tracks; the end is the recorded goal
+    assert t["waypoints"] == g.waypoints and len(t["waypoints"]) == 4
+    assert t["end"] == g.waypoints[-1] and reor.end_pose(sc, state) == g.waypoints[-1]
+    assert len(t["derived"]) == 4  # regenerated with the same count: line_waypoints(p0, p1, 4) / orbit_waypoints(..., n=4)
+    assert t["pivot"] == pytest.approx(state.object_pose(g.object)[0].tolist())  # the object root at the start
+    # a sidecar whose key poses come from the sampler's own construction (held_object.line_key_poses /
+    # orbit_key_poses with 3 intermediate poses): the regeneration reproduces them pose by pose
+    start, end = g.grasp.tensors(), g.waypoints[-1].tensors()
+    pivot = state.object_pose(g.object)[0]
+    if mode == "line":
+        sampler = C.line_waypoints(start, end, 3 + 1)
+    else:
+        sampler = C.orbit_waypoints(start, pivot, C.qmul(end[1], C.qinv(start[1])), 3 + 1, frame="world")
+    d = raw(subtask)
+    d["grasps"][0]["waypoints"] = [_pose_dict(p, q) for p, q in sampler]
+    sc2 = Sidecar.from_dict(d)
+    (reor2,) = expand(sc2.alias, sc2)
+    t2 = reor2.targets(sc2, state)
+    assert len(t2["waypoints"]) == len(t2["derived"]) == 4
+    for got, exp in zip(t2["derived"], t2["waypoints"]):
+        assert _same_pose(got, exp.tensors())
+    # the intermediate poses sit at the fractions 1/4, 2/4, 3/4 of the motion, the last one is the goal
+    total = C.quat_angle(start[1], end[1])
+    for k, w in enumerate(t2["waypoints"], start=1):
+        p, q = w.tensors()
+        if mode == "line":
+            assert _close(p, start[0] + (end[0] - start[0]) * k / 4) and _same_quat(q, start[1])
+        else:
+            assert C.quat_angle(start[1], q) == pytest.approx(total * k / 4, abs=1e-4)
+            assert float(th.linalg.norm(p - pivot)) == pytest.approx(float(th.linalg.norm(start[0] - pivot)), abs=1e-5)
+    if mode == "line":
+        assert _same_pose(t2["waypoints"][-1], end)
+    else:  # the goal orientation is the recorded one; the eef turned rigidly with the object about its root
+        assert _same_quat(t2["waypoints"][-1].tensors()[1], end[1])
+        assert _close(t2["waypoints"][-1].tensors()[0], pivot + C.quat_rotate(C.qmul(end[1], C.qinv(start[1])), start[0] - pivot))
+    # regeneration without recorded poses is refused for the held-object modes (the sidecar must carry them)
+    with pytest.raises(ValueError, match="recorded waypoints"):
+        A.Reorient(mode=mode, arm=g.arm, object=g.object, start_pose=g.grasp)
+
+
+@needs_conventions
+def test_attachment_reorient_is_the_eef_line_with_slerped_orientation():
+    sc = load("configuration_matching-attachment")
+    state = StubState()
+    reor = next(a for a in expand(sc.alias, sc) if a.name == "reorient")
+    assert reor.mode == "slerp" and reor.after.name == "lift"
+    t = reor.targets(sc, state)
+    g = sc.grasps[0]
+    assert t["waypoints"] == g.waypoints and len(t["derived"]) == A.N_INHAND
+    start = reor.after.end_pose(sc, state).tensors()
+    for got, exp in zip(t["derived"], C.line_waypoints(start, g.waypoints[-1].tensors(), A.N_INHAND)):
+        assert _same_pose(got, exp)
+
+
+@needs_conventions
+def test_handle_records_reproduce_handle_waypoints_of_the_sampler():
+    # the sampler's inputs - the handle annotation (object frame) and the joint info - and its F5 call ...
+    handle = {"contact": [0.35, -0.02, 0.95], "pinch_axis": [0.0, 0.0, 1.0], "approach_dir": [-1.0, 0.0, 0.0]}
+    jinfo = {"type": "RevoluteJoint", "axis_dir_obj": [0.0, 0.0, 1.0], "hinge_point_obj": [0.4, -0.45, 0.0], "lower": 0.0}
+    d = raw("configuration_matching-articulation_open_large_scale")
+    art = d["articulation"]
+    q_init, q_goal = art["q_init"], art["q_goal"]
+    fractions = [0.0, 0.25, 0.5, 0.75, 1.0]
+    q_values = [q_init + k * (q_goal - q_init) for k in fractions]
+    obj_pose = (th.tensor([4.9, -1.45, 0.0]), C.quat_from_yaw(math.pi))
+    wps = C.handle_waypoints(handle, jinfo, q_values, obj_pose)
+    assert len(wps) == 5 and all(isinstance(w, C.HandleWaypoint) for w in wps)
+    # ... whose *outputs* the sidecar carries: contact / approach / pinch per fraction key (HandleWaypoint.to_sidecar)
+    art["waypoints"] = {str(k): w.to_sidecar() for k, w in zip(fractions, wps)}
+    assert set(art["waypoints"]) == {"0.0", "0.25", "0.5", "0.75", "1.0"}
+    assert set(art["waypoints"]["0.5"]) == {"contact", "approach", "pinch"}
+    art["handle_reach"] = {str(k): True for k in fractions[1:]}
+    art["passive_from"] = None
+    stance = d["stances"]["manipulation"]
+    base = C.pose2d_to_pose(*stance["base_pose2d"], z=C.NOMINAL_BASE_Z)
+    T = C.eef_base_transform(wps[0].eef, base)
+    art["base_follow"] = {str(k): [float(v) for v in b] for k, b in zip(fractions[1:], C.base_follow_poses([w.eef for w in wps[1:]], T))}
+    sc = Sidecar.from_dict(d)
+    assert sc.problems() == []
+    actions = expand(sc.alias, sc)
+    grasp = next(a for a in actions if a.name == "grasp")
+    follow = next(a for a in actions if a.name == "base_follow")
+    state = StubState()
+    # Grasp[handle]: handle_eef of h(q_init) == HandleWaypoint.eef (origin = contact - 0.012·a, a = approach, c = pinch)
+    got = grasp.grasp_pose(sc, state)
+    assert _same_pose(got, wps[0].eef)
+    p, q = got.tensors()
+    assert _close(p, th.tensor(art["waypoints"]["0.0"]["contact"]) - C.HANDLE_EEF_OFFSET * C.approach_axis(q))
+    assert _close(C.approach_axis(q), wps[0].approach) and _close(C.closing_axis(q), wps[0].pinch)
+    gt = grasp.targets(sc, state)
+    assert _same_pose(gt["pre_grasp"], wps[0].pre_grasp) and _same_pose(gt["approach"][-1], wps[0].eef)
+    # BaseFollow: every followed h(q_k) as handle_eef of its record; b_k = h(q_k) ∘ T_eef→base(q*) as base_follow_poses
+    t = follow.targets(sc, state)
+    assert t["mode"] == "base" and t["fractions"] == fractions[1:]
+    assert t["q_values"] == pytest.approx(q_values[1:])
+    for got_k, w in zip(t["handle_poses"], wps[1:]):
+        assert _same_pose(got_k, w.eef)
+    assert len(t["base_poses"]) == 4
+    for got_k, exp in zip(t["base_poses"], art["base_follow"].values()):
+        assert got_k == pytest.approx(exp, abs=1e-4)
+    assert follow.end_pose(sc, state) == t["handle_poses"][-1]
+    # the handle must not be re-derived from the annotation: the records already moved with the joint
+    assert not _close(th.tensor(art["waypoints"]["1.0"]["contact"]), th.tensor(art["waypoints"]["0.0"]["contact"]), 1e-3)
 
 
 # ----------------------------------------------------------------------------------------------------------------

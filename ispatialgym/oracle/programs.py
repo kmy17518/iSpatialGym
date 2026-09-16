@@ -42,6 +42,7 @@ from ispatialgym.oracle.actions import (
     Retreat,
     SetTorso,
     Transition,
+    block_reorients,
 )
 from ispatialgym.oracle.sidecar import ARMS, GraspRecord, Sidecar, SidecarError, subtask_of_alias
 
@@ -154,15 +155,17 @@ def program_camera_relocalization(sc: Sidecar, obstructed: bool = False) -> List
 
 
 def program_held_object_scaling(sc: Sidecar) -> List[Action]:
-    """move the held object along the camera centre ray to the recorded depth (arm only; 3 recorded waypoints), object
-    orientation unchanged."""
+    """move the held object along the camera centre ray to the recorded depth (arm only), object orientation
+    unchanged — through the recorded key poses ``grasps[0].waypoints`` (3 intermediate + the goal, spec §3.9 / §6.3;
+    the sampler's ``line_waypoints(hold, goal, 4)``), which ``Reorient`` tracks as recorded."""
     g = _single_grasp(sc, "waypoints")
     return [Reorient(mode="line", arm=g.arm, object=g.object, start_pose=g.grasp, waypoints=g.waypoints)]
 
 
 def program_held_object_rotation(sc: Sidecar) -> List[Action]:
-    """rotate the held object to the goal orientation about its own centre (arm only; SLERP waypoints), position
-    unchanged."""
+    """rotate the held object to the goal orientation about its own centre (arm only), position unchanged — through
+    the recorded key poses ``grasps[0].waypoints`` (3 intermediate SLERP poses + the goal; the sampler's
+    ``orbit_waypoints(hold, object root, Δq, 4)``), which ``Reorient`` tracks as recorded."""
     g = _single_grasp(sc, "waypoints")
     return [Reorient(mode="orbit", arm=g.arm, object=g.object, start_pose=g.grasp, waypoints=g.waypoints)]
 
@@ -182,11 +185,13 @@ def program_disembedding(sc: Sidecar) -> List[Action]:
 
 
 def program_block_design(sc: Sidecar) -> List[Action]:
-    """init → manipulation stance → for each block in the recorded order (anchor first): grasp (recorded cube grasp)
-    → lift → reorient_in_hand (smallest yaw to the table axes, then one 90° flip about the pinch axis; skipped for a
-    block that needs neither) → place at its slot → push it left against the placed row with the working hand while
-    the closed other gripper braces the row-left blocks (where ``brace_row`` / ``push_row`` are recorded) → push it up
-    while the other gripper braces the column-top blocks (where recorded) → retreat both grippers."""
+    """init → manipulation stance → for each block in the recorded order (anchor first): grasp (recorded cube grasp:
+    pinch across ``face_pair``, ``tilt_pick_deg``, wrist yaw ``yaw_deg``) → lift → reorient_in_hand (smallest yaw ψ =
+    ``yaw_align_deg`` to the table axes, then one 90° flip about the pinch axis; skipped for a block that needs
+    neither — the wrist yaw alone is not a reorientation) → place at its slot → push it left against the placed row
+    with the working hand while the closed other gripper braces the row-left blocks (where ``brace_row`` /
+    ``push_row`` are recorded) → push it up while the other gripper braces the column-top blocks (where recorded) →
+    retreat both grippers."""
     if not sc.blocks:
         raise SidecarError("blocks: required for block design")
     arm = _working_arm(sc)
@@ -197,7 +202,7 @@ def program_block_design(sc: Sidecar) -> List[Action]:
         lift = Lift(arm=arm, object=b.instance, carry_height=b.carry_height, after=grasp)
         actions += [grasp, lift]
         last: Action = lift
-        if b.reorients:
+        if block_reorients(b):
             last = Reorient(mode="flip", arm=arm, object=b.instance, after=lift, block=b, waypoints=b.waypoints)
             actions.append(last)
         slot = "at its initial position (the anchor)" if b.order == 0 else "at its slot in the goal grid"

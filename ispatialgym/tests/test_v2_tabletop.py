@@ -18,8 +18,14 @@ from ispatialgym.sampling.v2 import tabletop as TT
 
 
 def test_module_imports_without_the_simulator():
-    assert "omnigibson" not in sys.modules or True  # the import above must not have pulled the simulator in
-    assert not any(m.startswith("omnigibson") for m in sys.modules if m == "omnigibson"), "tabletop.py must not import omnigibson at module level"
+    # in a fresh interpreter: other test modules of the suite legitimately import OmniGibson first, so ``sys.modules``
+    # of this process proves nothing (same pattern as ``test_conventions.py::test_module_is_pure``)
+    import subprocess
+
+    code = ("import sys, ispatialgym.sampling.v2.tabletop; "
+            "assert 'omnigibson' not in sys.modules, 'tabletop.py must not import omnigibson at module level'")
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300)
+    assert r.returncode == 0, r.stderr[-2000:]
 
 
 # ----------------------------------------------------------------------------------------------------------------

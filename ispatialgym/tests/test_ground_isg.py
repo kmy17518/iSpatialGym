@@ -323,6 +323,27 @@ def test_render_rejects_missing_or_extra_roles():
     assert ["pose_reached", "?" + p] in r.problem.measure
 
 
+def test_hold_constraint_of_the_held_object_sampler_round_trips():
+    # the record ``sampling/v2/tasks/held_object.py::record_constraints`` writes back (robot-level: empty scope)
+    rec = {
+        "scope": {}, "type": "hold", "robot": "r1pro", "depth_m": 0.5, "trunk": [0.5, 0.0], "roll_deg": 15.0,
+        "approach": "base +y", "closing": "world down rolled 15.0 deg about the approach",
+        "eef_in_base": {"position": [0.31, -0.08, 1.21], "orientation": [0.0, 0.0, 0.0, 1.0]},
+        "right_arm_q": [0.1, -0.2, 0.3, -0.4, 0.5, -0.6, 0.7], "idle_arms": "reset", "hard": False,
+        "source": {"instance": "object_scaling-beaker-0000", "sampler": "2.0.0", "date": "2026-09-15"},
+    }
+    c = C.Constraint.from_dict(rec)
+    assert "hold" in C.CONSTRAINT_TYPES and c.type == "hold" and c.scope == {} and not c.hard
+    assert set(C.HOLD_FIELDS) <= set(c.fields) and c.fields["trunk"] == [0.5, 0.0] and c.fields["eef_in_base"]["position"] == [0.31, -0.08, 1.21]
+    assert c.to_dict() == rec
+    entry = C.CustomsEntry(alias="object_scaling-beaker")
+    assert entry.add_constraint(c) and not entry.add_constraint(C.Constraint.from_dict(dict(rec, source={})))  # deduped by type / scope / fields
+    assert entry.constraints_of("hold") == [c] and entry.constraints_of("hold", scene="Rs_int") == [c]  # robot-level: any scene
+    assert C.CustomsEntry.from_dict(entry.alias, entry.to_dict()).constraints == [c]
+    with pytest.raises(C.CustomsError, match="unknown constraint type"):
+        C.Constraint.from_dict(dict(rec, type="grip"))
+
+
 def test_equivalence_groups():
     assert C.equivalence_group([]) == [[0.0, 0.0, 0.0, 1.0]]
     assert len(C.equivalence_group(["z2"])) == 2

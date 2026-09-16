@@ -21,7 +21,9 @@ One entry per grounded alias::
           }
         },
         "generation": {...},            # sampling/generation_defaults.py seeds it
-        "constraints": [ {"scope": {...}, "type": "stance", ..., "hard": false, "source": {...}} ]
+        "constraints": [ {"scope": {...}, "type": "stance", ..., "hard": false, "source": {...}},
+                         {"scope": {}, "type": "hold", "robot": "r1pro", "depth_m": 0.5, "trunk": [0.5, 0.0], "roll_deg": 15.0,
+                          "eef_in_base": {"position": [], "orientation": []}, ..., "hard": false, "source": {...}} ]
       }
     }
 
@@ -61,9 +63,16 @@ SCENE_CANDIDATES = (
     "office_cubicles_right",
 )
 
-#: §2.3 constraint record types and scope keys.
-CONSTRAINT_TYPES = ("stance", "grasp_set", "joint_set", "placement", "scale", "band_ref", "contacts", "blacklist")
+#: §2.3 constraint record types and scope keys. ``hold`` (beyond the §2.3 list) is the robot-level constant of the
+#: held-object tasks (spec §6.3, ``sampling/v2/tasks/held_object.py``): the fixed hold the right arm carries the
+#: object in, written once per entry with an empty scope (it depends on the robot, not on a scene / support / model):
+#: ``robot``, ``depth_m`` (pad centre on the optical axis), ``trunk`` ``[translate, tilt]``, ``roll_deg`` (closing
+#: axis rolled from world down about the approach), the hold eef pose ``eef_in_base`` (``{"position", "orientation"}``
+#: in the base frame), ``approach`` / ``closing`` descriptions, ``right_arm_q`` (the IK solution) and ``idle_arms``.
+CONSTRAINT_TYPES = ("stance", "grasp_set", "joint_set", "placement", "scale", "band_ref", "contacts", "blacklist", "hold")
 SCOPE_KEYS = ("scene", "support", "partner", "target", "model", "support_height", "trunk")
+#: Fields a ``hold`` record carries (``Constraint.fields``); the write-back adds ``source``.
+HOLD_FIELDS = ("robot", "depth_m", "trunk", "roll_deg", "eef_in_base", "approach", "closing", "right_arm_q", "idle_arms")
 #: Keys of a customs entry, in the order they are written.
 ENTRY_KEYS = ("iddl", "definition_id", "roles", "scenes", "generation", "constraints")
 #: Keys of a role entry, in the order they are written (§2.3 + the documented extensions).
@@ -541,6 +550,7 @@ __all__ = [
     "CustomsError",
     "DEFAULT_CUSTOMS_PATH",
     "ENTRY_KEYS",
+    "HOLD_FIELDS",
     "ROLE_KEYS",
     "RoleEntry",
     "SCENE_CANDIDATES",

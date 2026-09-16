@@ -414,7 +414,11 @@ class InstanceLoader:
 
     def _restore_grasps(self, records: List[dict]) -> List[dict]:
         """spec §3.14: the object at ``object_pose_in_eef_frame``, the recorded finger joints, the assisted grasp
-        attached before the first policy step; an attach failure fails the load."""
+        attached before the first policy step; an attach failure fails the load. The held object is re-placed at
+        ``eef ∘ object_pose_in_eef_frame`` **unconditionally** before the grasp is established: the §3.5 reload
+        check (``validate_instances``) holds every object to 1 mm / 0.005 rad, so a "close enough" gate above that
+        (the earlier 2 mm / 0.02 rad) would let a settle drift into the in-hand pose the sampler recorded; the
+        deviation found is still reported (``object_pose_dev_before_*``)."""
         robot = self.robot
         out = []
         for g in records:
@@ -431,10 +435,9 @@ class InstanceLoader:
                 dp, da = float(th.linalg.norm(want[0] - have[0])), C.quat_angle(want[1], have[1])
                 rec["object_pose_dev_before_mm"] = 1000.0 * dp
                 rec["object_pose_dev_before_deg"] = math.degrees(da)
-                if dp > 2e-3 or da > 0.02:
-                    obj.set_position_orientation(want[0], want[1])
-                    obj.keep_still()
-                    rec["object_replaced"] = True
+                obj.set_position_orientation(want[0], want[1])
+                obj.keep_still()
+                rec["object_replaced"] = True
             if g.get("finger_q"):
                 q = robot.get_joint_positions()
                 q[robot.gripper_control_idx[arm]] = th.tensor(g["finger_q"], dtype=th.float32)

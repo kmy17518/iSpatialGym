@@ -18,32 +18,44 @@ sidecar fact, so a program stays pure and the chain of eef poses through consecu
 measured (``end_pose()``); the tracking residual at run time is closed by the Layer-1 motions (correction, not a
 fallback, §3 rules).
 
-Conventions used (``ispatialgym/robot/conventions.py``; tensors are float32 CPU, poses ``(pos (3,), quat_xyzw (4,))``
-tuples — :func:`_as_pose` also accepts ``FramedPose``, ``{"position", "orientation"}`` dicts and 7-vectors). Every
-waypoint generator returns the poses at fractions k/n, k = 1..n (start excluded, goal last):
+Conventions used (``ispatialgym/robot/conventions.py``, F5; tensors are float32 CPU, poses ``(pos (3,), quat_xyzw
+(4,))`` tuples — :func:`_as_pose` also accepts ``FramedPose``, ``{"position", "orientation"}`` dicts and 7-vectors).
+F5 waypoint rule (spec §3.9): every generator returns the ``n`` poses at fractions k/n, k = 1..n — the start excluded,
+the goal last — so "3 intermediate waypoints" is ``n = 4`` (:data:`N_INHAND`). Signatures as called here:
 
-=========================================================  ========================================================
-``grasp_pose(obj_pose, grasp_key, grasp_name, yaw=0)``      library grasp at the object's *current* pose (yaw 0: the
-                                                            recorded ``yaw`` was the sampler's draw, the settled pose
-                                                            already carries it) — ``Grasp[library]``
-``cube_grasp(block_pose, face_pair, tilt_pick_deg, yaw)``   ``.eef`` of the cube grasp — ``Grasp[cube]``
-``handle_eef(contact, approach, pinch)``                    eef of a recorded handle waypoint h(q_k) (contact −
-                                                            0.012·a) — ``Grasp[handle]``, ``BaseFollow``
-``pre_pose(pose, dist)``                                    back along −a — pre-grasp / pre-place / retreats
-``line_waypoints(p0, p1, n)``                               straight segments (approach, lift, descent, retreat,
-                                                            straight pushes, the held object's camera ray)
-``slerp_waypoints(q0, q1, n)``                              object orientation path of an in-hand rotation +
-                                                            translation (attachment)
-``orbit_waypoints(pose, pivot, delta_quat, n)``             rotation about the object centre (mental rotation, block
-                                                            yaw-align)
-``flip_waypoints(eef, pivot, flip_axis, flip_sign, yaw)``   block yaw-align + 90° flip (``Reorient[flip]``)
-``transition_poses(stance_from, stance_to, s_T)``           drive-back / trunk / drive-in of a ``Transition``
-``eef_base_transform(eef, base)``, ``base_follow_poses``    b_k = h(q_k) ∘ T_eef→base(q*) (``BaseFollow`` base mode)
-=========================================================  ========================================================
+==============================================================  ===================================================
+``grasp_pose(obj_pose, grasp_key, grasp_name)``                  library grasp at the object's *current* (settled)
+                                                                 pose; ``yaw`` omitted (``None`` = the object's own
+                                                                 orientation — the recorded ``yaw`` was the sampler's
+                                                                 draw and is already part of the settled pose; a
+                                                                 float would *replace* the orientation with the
+                                                                 nominal ``R_z(yaw) ∘ rest_quat``) — ``Grasp[library]``
+``cube_grasp(block_pose, face_pair, tilt_pick_deg, yaw).eef``    ``tilt_pick_deg`` in degrees, ``yaw`` = the wrist yaw
+                                                                 in radians (``blocks[].yaw_deg`` → rad) — ``Grasp[cube]``
+``handle_eef(contact, approach=, closing=pinch)``                eef of a recorded handle waypoint h(q_k) (contact −
+                                                                 0.012·a) — ``Grasp[handle]``, ``BaseFollow``
+``pre_pose(pose, dist)``                                         back along −a — pre-grasp / pre-place / retreats
+``line_waypoints(p0, p1, n)``                                    straight segments (positions in → ``(n, 3)``; poses in
+                                                                 → orientation SLERPed alongside): approach, lift,
+                                                                 descent, retreat, straight pushes, the held object's
+                                                                 camera ray, the attachment's eef path
+``orbit_waypoints(pose, pivot, delta_quat, n)``                  rotation about the object centre (mental rotation,
+                                                                 block yaw-align), ``delta_quat`` in the world frame
+``flip_waypoints(eef, pivot, yaw, flip_axis, flip_sign,``        block yaw-align ψ (rad, ``blocks[].yaw_align_deg``) +
+``               n_yaw=2, n_flip=3)``                            one 90° flip (``Reorient[flip]``); 2 + 3 poses
+``transition_poses(stance_from, stance_to, s_T)``                ``TransitionPoses`` dataclass: ``.drive_back``,
+                                                                 ``.trunk``, ``.drive_in`` of a ``Transition``
+``eef_base_transform(eef, base)``, ``base_follow_poses``         b_k = h(q_k) ∘ T_eef→base(q*) (``BaseFollow`` base mode)
+==============================================================  ===================================================
 
 Two §3.5 functions are the sampler's and not re-evaluated here because spec §7 records their *outputs*:
-``handle_waypoints`` (the sidecar carries the moved contact / approach / pinch per k, turned into eef poses with
-``handle_eef``) and ``arc_waypoints`` (the push record carries ``mid`` / ``goal``, not the arc centre / axis / δ).
+``handle_waypoints(handle, joint_info, q_values, obj_pose)`` (the ``articulation`` block carries the moved
+``contact`` / ``approach`` / ``pinch`` per k — ``HandleWaypoint.to_sidecar()`` —, not the handle annotation and the
+joint info it takes; the eef poses are ``handle_eef`` of those records, identical to ``HandleWaypoint.eef``) and
+``arc_waypoints`` (the push record carries ``mid`` / ``goal``, not the arc centre / axis / δ). Recorded key poses win
+over regeneration: where the sidecar carries an in-hand motion's waypoints (``grasps[].waypoints`` of the
+held-object tasks and the attachment, ``blocks[].waypoints``) ``Reorient`` tracks exactly those and exposes its own
+regeneration as ``derived`` for the program check to compare.
 """
 
 from __future__ import annotations
@@ -72,7 +84,11 @@ from ispatialgym.oracle.sidecar import (
 PRE_DIST = 0.10  # pre-grasp / pre-contact / pre-place stand-off along −a
 RETREAT_DIST = 0.10  # retreat along −a after a release / contact
 RETREAT_LITTLE = 0.05  # "move contacting grippers away a little" after a place (§6.1)
-N_WAYPOINTS = 3  # intermediate waypoints of a straight / slerp segment (spec §3.9)
+# Waypoint counts follow the F5 rule (poses at k/n, the goal last): ``n`` poses = ``n − 1`` intermediate + the goal.
+N_WAYPOINTS = 3  # poses of a short straight segment (approach, lift, descent, retreat, straight push): 2 + the goal
+N_INHAND = 4  # in-hand motions of the held-object tasks / attachment: 3 intermediate + the goal (spec §3.9, §6.3)
+N_YAW_ALIGN = 2  # block yaw-align stage (``flip_waypoints`` ``n_yaw``; the sampler's ``orbit_waypoints(..., n=2)``)
+N_FLIP = 3  # block 90° flip stage (``flip_waypoints`` ``n_flip``)
 
 QA_FAILED_GRASP = "failed_grasp"
 
@@ -178,7 +194,10 @@ def _tensor(v: Sequence[float]):
 
 
 def _handle_eef(C, wp) -> Pose:
-    """eef pose of a recorded handle waypoint h(q_k) (``HandleWaypoint`` record) through ``conventions.handle_eef``."""
+    """eef pose of a recorded handle waypoint h(q_k) (sidecar ``HandleWaypoint``: the world-frame ``contact`` /
+    ``approach`` / ``pinch`` the sampler wrote with ``conventions.HandleWaypoint.to_sidecar()``) through
+    ``conventions.handle_eef(contact, approach=, closing=)`` — the same eef ``handle_waypoints(handle, joint_info,
+    q_values, obj_pose)`` computed for the sampler (its inputs are not in the sidecar, its outputs are)."""
     return _as_pose(C.handle_eef(_tensor(wp.contact), approach=_tensor(wp.approach), closing=_tensor(wp.pinch)))
 
 
@@ -195,27 +214,6 @@ def _qmul(a: Sequence[float], b: Sequence[float]) -> List[float]:
 
 def _qconj(q: Sequence[float]) -> List[float]:
     return [-q[0], -q[1], -q[2], q[3]]
-
-
-def _qrot(q: Sequence[float], v: Sequence[float]) -> List[float]:
-    return _qmul(_qmul(list(q), [v[0], v[1], v[2], 0.0]), _qconj(q))[:3]
-
-
-def _compose(a: Pose, b: Pose) -> Pose:
-    """T_a ∘ T_b (apply b in a's frame)."""
-    p = _qrot(a.orientation, b.position)
-    return Pose([a.position[i] + p[i] for i in range(3)], _qmul(a.orientation, b.orientation))
-
-
-def _inverse(a: Pose) -> Pose:
-    qi = _qconj(a.orientation)
-    p = _qrot(qi, a.position)
-    return Pose([-v for v in p], qi)
-
-
-def _relative(target: Pose, frame: Pose) -> Pose:
-    """``target`` expressed in ``frame`` (both in the same parent frame)."""
-    return _compose(_inverse(frame), target)
 
 
 def _quat_angle(q1: Sequence[float], q2: Sequence[float]) -> float:
@@ -246,6 +244,23 @@ def _line(C, a: Pose, b: Pose, n: int = N_WAYPOINTS) -> List[Pose]:
 
 def _pre(C, pose: Pose, dist: float) -> Pose:
     return _as_pose(C.pre_pose(pose.tensors(), dist))
+
+
+def yaw_align_deg(block: BlockRecord) -> float:
+    """ψ (degrees) of a block record: the smallest yaw that aligns the block with the table axes (``R_z(ψ) ∘ q_block``,
+    the sampler's ``cube_flip_plan``), written by the block-design sampler as ``yaw_align_deg`` **next to** the wrist
+    yaw ``yaw_deg`` of the cube grasp (both in degrees; spec §7 lists ``yaw_deg`` only). Read from the record's own
+    field when the schema carries one, else from ``extra``; a record without it records no yaw-align (ψ = 0)."""
+    value = getattr(block, "yaw_align_deg", None)
+    if value is None:
+        value = block.extra.get("yaw_align_deg", 0.0)
+    return float(value)
+
+
+def block_reorients(block: BlockRecord) -> bool:
+    """Whether a block needs an in-hand reorientation between the lift and the place: a flip, or a non-zero yaw-align
+    ψ (``yaw_align_deg``) — the wrist yaw ``yaw_deg`` of the cube grasp is not a rotation of the block."""
+    return block.flips or abs(yaw_align_deg(block)) > 1e-6
 
 
 def _hand(arm: str) -> str:
@@ -396,8 +411,9 @@ class Transition(Action):
     """Stance transition (``transitions[i]`` + the two stances, spec §3.8): drive back to the transition stand-off
     s_T, move the trunk, drive in (motions ``track_path`` → ``trunk_to`` → ``track_path``).
 
-    targets: ``{"drive_back": [x, y, yaw], "trunk": (translate, tilt), "drive_in": [x, y, yaw]}`` from
-    ``conventions.transition_poses(stance_from, stance_to, s_T)``.
+    targets: ``{"drive_back": [x, y, yaw], "trunk": (translate, tilt), "drive_in": [x, y, yaw]}`` — the fields
+    ``drive_back`` / ``trunk`` / ``drive_in`` of the ``TransitionPoses`` dataclass
+    ``conventions.transition_poses(stance_from, stance_to, s_T)`` returns (stances passed as their sidecar dicts).
     """
 
     name: str = "transition"
@@ -410,12 +426,8 @@ class Transition(Action):
     def targets(self, sidecar, state):
         C = _conventions()
         tp = C.transition_poses(self.stance_from.to_dict(), self.stance_to.to_dict(), self.transition.stand_off)
-        if hasattr(tp, "drive_back"):
-            back, trunk, drive_in = tp.drive_back, tp.trunk, tp.drive_in
-        else:
-            back, trunk, drive_in = tp
-        translate, tilt = _to_list(trunk)
-        return {"drive_back": _as_pose2d(back), "trunk": (translate, tilt), "drive_in": _as_pose2d(drive_in)}
+        translate, tilt = (float(v) for v in tp.trunk)
+        return {"drive_back": _as_pose2d(tp.drive_back), "trunk": (translate, tilt), "drive_in": _as_pose2d(tp.drive_in)}
 
     def annotate(self, sidecar):
         purpose = "placing" if self.transition.to == "placement" else "manipulation"
@@ -471,9 +483,18 @@ class Grasp(Action):
     at q_init): ``gripper(open)`` → ``arm_to(pre_grasp)`` → ``arm_along(approach)`` → ``gripper(close)``;
     postcondition: assisted grasp attached (``failed_grasp`` otherwise).
 
-    ``kind``: ``"library"`` (``grasp_pose(obj_pose, grasp_key, grasp_name)`` at the object's current pose — the
-    recorded ``yaw`` was the sampler's draw and is already part of the settled pose), ``"cube"``
-    (``cube_grasp(block_pose, face_pair, tilt_pick_deg, yaw).eef``), ``"handle"`` (``handle_eef`` of h(q_init)).
+    ``kind``:
+
+    * ``"library"`` — ``conventions.grasp_pose(obj_pose, grasp_key, grasp_name)`` at the object's **current** pose
+      (``state.object_pose``: the settled init pose for the sampler's check, the restored / drifted pose at run time)
+      with ``yaw`` **omitted**. The sidecar's ``grasps[].yaw`` is the object yaw the sampler drew (spec §4.6) and the
+      settled pose already carries it; F5 takes a float ``yaw`` as "replace the orientation by the nominal
+      ``R_z(yaw) ∘ rest_quat(grasp_key)``", so passing the recorded yaw — or 0 — would grasp the un-drifted nominal
+      object instead of the one in front of the robot. ``yaw`` stays an annotation fact only.
+    * ``"cube"`` — ``conventions.cube_grasp(block_pose, face_pair, tilt_pick_deg, yaw).eef`` with ``tilt_pick_deg``
+      in degrees as recorded and ``yaw`` = the recorded **wrist yaw** ``blocks[].yaw_deg`` converted to radians (F5
+      snaps it to the nearer admissible value; the table-alignment yaw ``yaw_align_deg`` belongs to ``Reorient``).
+    * ``"handle"`` — ``conventions.handle_eef`` of the recorded h(q_init) (``articulation.waypoints["0.0"]``).
 
     targets: ``{"pre_grasp": Pose, "grasp": Pose, "approach": [Pose, ...]}`` — ``pre_grasp = pre_pose(grasp,
     PRE_DIST)``, ``approach`` = straight segment pre_grasp → grasp (``line_waypoints``).
@@ -503,12 +524,13 @@ class Grasp(Action):
         if self.kind == "library":
             g = self.grasp
             obj = _state_pose(state, self.object)
+            # yaw omitted on purpose: the settled pose carries the drawn yaw (see the class docstring)
             return _as_pose(C.grasp_pose(obj.tensors(), g.grasp_key, g.grasp_name))
         if self.kind == "cube":
             b = self.block
             obj = _state_pose(state, self.object)
-            cube = C.cube_grasp(obj.tensors(), face_pair=b.face_pair, tilt_pick_deg=b.tilt_pick_deg, yaw=math.radians(b.yaw_deg))
-            return _as_pose(getattr(cube, "eef", cube))
+            cube = C.cube_grasp(obj.tensors(), face_pair=b.face_pair, tilt_pick_deg=float(b.tilt_pick_deg), yaw=math.radians(b.yaw_deg))
+            return _as_pose(cube.eef)
         art = self.articulation
         return _handle_eef(C, art.waypoints[art.key_at(0.0)])
 
@@ -531,7 +553,7 @@ class Grasp(Action):
         elif self.kind == "cube":
             b = self.block
             fine = f"grasp {obj} with the {_hand(self.arm)}"
-            numbers = f"{fine} (pinch across the {b.face_pair} faces, pick tilt {b.tilt_pick_deg:.0f}°, yaw {b.yaw_deg:.0f}°, {approach})"
+            numbers = f"{fine} (pinch across the {b.face_pair} faces, pick tilt {b.tilt_pick_deg:.0f}°, wrist yaw {b.yaw_deg:.0f}°, {approach})"
         else:
             g = self.grasp
             fine = f"grasp {obj} with the {_hand(self.arm)}"
@@ -581,19 +603,26 @@ class Lift(Action):
 
 @dataclass(kw_only=True)
 class Reorient(Action):
-    """Move the held object through recorded in-hand key poses with the object attached (``arm_along``; §6.1):
-    ``mode`` ``"orbit"`` — rotation about the object's centre (mental rotation, ``orbit_waypoints``); ``"line"`` —
-    translation with the orientation kept (object scaling along the camera ray, ``line_waypoints``); ``"slerp"`` —
-    rotation + translation of the held object (attachment: toward the pre-attach pose, ``slerp_waypoints`` +
-    ``line_waypoints`` on the object pose); ``"flip"`` — the block yaw-align + 90° flip (``flip_waypoints``).
-    Postcondition: object pose within tolerance of the waypoint end.
+    """Move the held object through in-hand key poses with the object attached (``arm_along``; §6.1): ``mode``
+    ``"orbit"`` — rotation about the object's centre, position kept (mental rotation, ``orbit_waypoints``);
+    ``"line"`` — translation with the orientation kept (object scaling along the camera ray, ``line_waypoints``);
+    ``"slerp"`` — rotation + translation of the held object (attachment: the eef on a straight line to the pre-attach
+    pose with its orientation SLERPed alongside, ``line_waypoints`` on poses); ``"flip"`` — the block yaw-align ψ +
+    one 90° flip (``flip_waypoints``; ``orbit_waypoints`` for a yaw-align without a flip). Postcondition: object pose
+    within tolerance of the waypoint end.
 
     Start = ``start_pose`` (the recorded hold of the held-object tasks) or ``after.end_pose`` (a lifted grasp);
-    ``waypoints`` = the sampler's recorded key eef poses (last = the end; required except for ``"flip"``).
+    ``waypoints`` = the sampler's recorded key eef poses in order, last = the end (required except for ``"flip"``,
+    where the block record may or may not carry them). ``n`` = the poses of a regenerated in-hand motion at
+    fractions k/n, the goal last: :data:`N_INHAND` = 4 gives the 3 intermediate waypoints of spec §3.9 / §6.3, the
+    count the held-object sampler records (``line_waypoints(p0, p1, 4)`` / ``orbit_waypoints(..., n=4)``).
 
-    targets: ``{"waypoints": [Pose, ...], "recorded": [Pose, ...] | None, "pivot": [x, y, z], "end": Pose}`` —
-    ``waypoints`` derived through the conventions from start / end / pivot (what the oracle tracks), ``recorded``
-    the sampler's key poses (both are IK-checked; they must agree), ``pivot`` the object centre at the start.
+    targets: ``{"waypoints": [Pose, ...], "derived": [Pose, ...], "pivot": [x, y, z], "end": Pose}`` —
+    ``waypoints`` is what the oracle tracks: the **recorded** key poses when the sidecar carries them (the program
+    check and the executor then use exactly the poses the sampler validated), else ``derived``; ``derived`` is the
+    same motion regenerated through the conventions from start / end / pivot (always present; IK-checked alongside,
+    it must agree with the recorded poses); ``pivot`` the object root position at the start (the orbit centre);
+    ``end`` = ``waypoints[-1]``.
     """
 
     name: str = "reorient"
@@ -604,8 +633,8 @@ class Reorient(Action):
     start_pose: Optional[Pose] = None
     after: Optional[Action] = None
     block: Optional[BlockRecord] = None
-    n: int = N_WAYPOINTS
-    TARGET_KEYS = ("waypoints", "recorded", "pivot", "end")
+    n: int = N_INHAND
+    TARGET_KEYS = ("waypoints", "derived", "pivot", "end")
     MODES: ClassVar[Tuple[str, ...]] = ("orbit", "line", "slerp", "flip")
 
     def __post_init__(self):
@@ -645,34 +674,31 @@ class Reorient(Action):
             return list(obj.position)
         return [obj.position[i] + start.position[i] - grasp.position[i] for i in range(3)]
 
-    def targets(self, sidecar, state):
+    def derived_waypoints(self, sidecar, state, start: Pose, pivot: List[float]) -> List[Pose]:
+        """The in-hand motion regenerated through the conventions (the sampler's own construction per mode)."""
         C = _conventions()
-        start = self._start(sidecar, state)
-        pivot = self._pivot(sidecar, state, start)
         if self.mode == "flip":
             b = self.block
-            yaw = -math.radians(b.yaw_deg)  # the block sits at yaw ψ off the table axes; the smallest align is −ψ
+            psi = math.radians(yaw_align_deg(b))  # +ψ: R_z(ψ) ∘ q_block aligns the block (sampler's cube_flip_plan)
             if b.flips:
-                wps = _as_pose_list(C.flip_waypoints(start.tensors(), _tensor(pivot), yaw=yaw, flip_axis=_tensor(b.flip_axis), flip_sign=b.flip_sign))
+                wps = C.flip_waypoints(start.tensors(), _tensor(pivot), yaw=psi, flip_axis=_tensor(b.flip_axis), flip_sign=b.flip_sign,
+                                       n_yaw=N_YAW_ALIGN, n_flip=N_FLIP)
             else:
-                wps = _as_pose_list(C.orbit_waypoints(start.tensors(), _tensor(pivot), C.quat_from_yaw(yaw), n=self.n))
-        else:
-            end = self.waypoints[-1]
-            if self.mode == "orbit":
-                delta = _qmul(end.orientation, _qconj(start.orientation))  # world-frame rotation start -> end
-                wps = _as_pose_list(C.orbit_waypoints(start.tensors(), _tensor(pivot), _tensor(delta), n=self.n))
-            else:
-                # object-centred: the object pose moves on a line / slerp, the eef follows through the rigid in-hand
-                # transform (for "line" the slerp is trivial: orientation kept)
-                obj0 = Pose(pivot, _state_pose(state, self.object).orientation)
-                t_obj_eef = _relative(start, obj0)
-                obj1 = _compose(end, _inverse(t_obj_eef))
-                pts = _as_pose_list(C.line_waypoints(_tensor(obj0.position), _tensor(obj1.position), self.n), quat=obj1.orientation)
-                quats = C.slerp_waypoints(_tensor(obj0.orientation), _tensor(obj1.orientation), self.n)
-                quats = [[float(v) for v in q] for q in (quats.tolist() if hasattr(quats, "tolist") else quats)]
-                wps = [_compose(Pose(p.position, q), t_obj_eef) for p, q in zip(pts, quats)]
-        end_pose = self.waypoints[-1] if self.waypoints else wps[-1]
-        return {"waypoints": wps, "recorded": list(self.waypoints) if self.waypoints else None, "pivot": pivot, "end": end_pose}
+                wps = C.orbit_waypoints(start.tensors(), _tensor(pivot), C.quat_from_yaw(psi), n=N_YAW_ALIGN)
+            return _as_pose_list(wps)
+        end = self.waypoints[-1]
+        if self.mode == "orbit":
+            delta = _qmul(end.orientation, _qconj(start.orientation))  # world-frame rotation start -> end
+            return _as_pose_list(C.orbit_waypoints(start.tensors(), _tensor(pivot), _tensor(delta), n=self.n))
+        # "line" / "slerp": the eef on a straight line start -> end, orientation SLERPed alongside (constant for "line")
+        return _as_pose_list(C.line_waypoints(start.tensors(), end.tensors(), self.n))
+
+    def targets(self, sidecar, state):
+        start = self._start(sidecar, state)
+        pivot = self._pivot(sidecar, state, start)
+        derived = self.derived_waypoints(sidecar, state, start, pivot)
+        tracked = list(self.waypoints) if self.waypoints else derived
+        return {"waypoints": tracked, "derived": derived, "pivot": pivot, "end": tracked[-1]}
 
     def end_pose(self, sidecar, state):
         if self.waypoints:
@@ -683,11 +709,14 @@ class Reorient(Action):
         obj = sidecar.language.phrase(self.object)
         if self.mode == "flip":
             b = self.block
+            psi = yaw_align_deg(b)
             what = []
-            if abs(b.yaw_deg) > 1e-6:
-                what.append(f"yaw it {b.yaw_deg:.0f}° to the table axes")
+            if abs(psi) > 1e-6:
+                what.append(f"yaw it {psi:.0f}° to the table axes")
             if b.flips:
                 what.append(f"flip it 90° about the pinch axis ({'+' if b.flip_sign > 0 else '-'}{b.face_pair}, tilt {b.tilt_pick_deg:.0f}° → {b.tilt_place_deg:.0f}°)")
+            if not what:
+                what.append("no in-hand rotation recorded (0° yaw-align, no flip)")
             fine = f"turn {obj} in hand to its goal face" + (" by yawing and flipping it" if len(what) == 2 else "")
             return fine, f"turn {obj} in hand: " + ", then ".join(what)
         start = self.start_pose if self.start_pose is not None else None
@@ -866,9 +895,12 @@ class BaseFollow(Action):
     q_goal. Postcondition: joint at q_goal, or ``passive_from`` reached and the joint continued passively.
 
     targets: ``{"mode": str, "fractions": [k, ...], "q_values": [q_k, ...], "handle_poses": [Pose, ...],
-    "base_poses": [[x, y, yaw], ...] | None}`` — ``handle_poses`` = ``handle_eef`` of the recorded h(q_k) records;
-    ``base_poses`` (base mode) = ``base_follow_poses(handle_poses, T_eef_base)`` with ``T_eef_base =
-    eef_base_transform(h(q_init) eef, stance base pose)`` (the arm locked at its grasp solution).
+    "base_poses": [[x, y, yaw], ...] | None}`` — ``handle_poses`` = ``conventions.handle_eef`` of the recorded
+    h(q_k) records (``articulation.waypoints[k]``: the ``contact`` / ``approach`` / ``pinch`` the sampler's
+    ``handle_waypoints(handle, joint_info, q_values, obj_pose)`` produced, in the world frame — the sidecar carries
+    those outputs, not the handle annotation / joint info, so the eef is re-derived from the records, never from
+    ``handle_waypoints``); ``base_poses`` (base mode) = ``base_follow_poses(handle_poses, T_eef_base)`` with
+    ``T_eef_base = eef_base_transform(h(q_init) eef, stance base pose)`` (the arm locked at its grasp solution).
     """
 
     name: str = "base_follow"
@@ -971,7 +1003,7 @@ VOCABULARY: Tuple[type, ...] = (Navigate, Transition, SetTorso, Grasp, Lift, Reo
 ACTION_NAMES: Tuple[str, ...] = tuple(cls.__dataclass_fields__["name"].default for cls in VOCABULARY)
 
 __all__ = [
-    "PRE_DIST", "RETREAT_DIST", "RETREAT_LITTLE", "N_WAYPOINTS", "QA_FAILED_GRASP", "State", "Action", "Navigate",
-    "Transition", "SetTorso", "Grasp", "Lift", "Reorient", "Place", "Push", "Brace", "BaseFollow", "Retreat",
-    "VOCABULARY", "ACTION_NAMES", "direction_word",
+    "PRE_DIST", "RETREAT_DIST", "RETREAT_LITTLE", "N_WAYPOINTS", "N_INHAND", "N_YAW_ALIGN", "N_FLIP", "QA_FAILED_GRASP",
+    "State", "Action", "Navigate", "Transition", "SetTorso", "Grasp", "Lift", "Reorient", "Place", "Push", "Brace",
+    "BaseFollow", "Retreat", "VOCABULARY", "ACTION_NAMES", "direction_word", "yaw_align_deg", "block_reorients",
 ]
