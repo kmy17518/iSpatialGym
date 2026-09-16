@@ -751,15 +751,16 @@ class IORSSmall(SamplerV2):
         # order (pads on the far face / top-down blade beside it, ``touching_brace_candidates``)
         why: List[str] = []
         chosen = None
-        pushes = [("push_h", IK.contact_eef(p_init, direction)), ("push_v", IK.contact_eef(p_init, direction, closing=th.tensor([0.0, 0.0, 1.0])))]
-        for push_kind, push_init in pushes:
+        t_hull_w = self.world.hull_at(self.hull["target"], t_pose)
+        t_face_z = (float(t_hull_w[:, 2].min()), float(t_hull_w[:, 2].max()))
+        for push_kind, push_init, push_extras in self.touching_push_candidates(manip, p_init, t_face_z, direction):
             push_goal = (push_init[0] + direction * dist, push_init[1])
             push_pre = IK.pre_pose(push_init)
             for pre, contact, kind, extras in self.touching_brace_candidates(manip, b_point, face_z, -direction):
                 res = self.ikc.exact_both_arms(("right", [push_pre, push_init, push_goal]), ("left", [pre, contact]), manip,
                                                self.support_objects() + [self.obj("target")], self.support_objects() + [self.obj("partner")], fingers=IK.FINGER_CLOSED)
                 if res.ok:
-                    chosen = (push_kind, push_pre, push_init, push_goal, pre, contact, kind, extras)
+                    chosen = (push_kind, push_pre, push_init, push_goal, push_extras, pre, contact, kind, extras)
                     break
                 why.append(f"{push_kind}/{kind}: {res.reason}")
                 if res.reason.startswith("right"):
@@ -768,12 +769,37 @@ class IORSSmall(SamplerV2):
                 break
         if chosen is None:
             raise Reject("contact_unreachable", f"touching push / brace: {'; '.join(why[-3:]) or 'no brace candidate (partner face reaches the palm section)'}")
-        push_kind, push_pre, push_init, push_goal, pre, contact, kind, extras = chosen
-        draft.summary.setdefault("touching", {})["push_kind"] = push_kind
-        self.sidecar.add_contact(ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname))
+        push_kind, push_pre, push_init, push_goal, push_extras, pre, contact, kind, extras = chosen
+        draft.summary.setdefault("touching", {}).update({"push_kind": push_kind, **{k: v for k, v in push_extras.items() if v is not None}})
+        self.sidecar.add_contact(ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname, extras=dict(push_extras, pose_class=push_kind)))
         self.sidecar.add_contact(TT.BraceRecord("brace", "left", pre, contact, direction=-direction, brace_kind=kind, object=pname, extras=extras))
         draft.summary["brace"] = {"kind": kind, **{k: v for k, v in extras.items() if v is not None}}
         manip.arms = ["right", "left"]
+
+    def touching_push_candidates(self, manip: Stance, face_point: th.Tensor, face_z: Tuple[float, float], direction: th.Tensor):
+        """Push poses of the closed right gripper at the target's right face (``face_point``, mid height), pushing along
+        ``direction`` (robot's left, into the partner), in the order to try: (1) the pads on the face — pad centre on the
+        point, approach along ``direction``, closing horizontal then vertical; (2) the top-down blade beside the face
+        (``tabletop.blade_standoff`` over the target's face height above the tips, pitched per ``approach_pitch_order``,
+        pads' faces parallel to the pushed face, either wrist turn) — a sideways pad push 10 cm right of the target was
+        out of reach for the right arm on every attempt of the sanitary-napkins loop. Yields ``(kind, eef pose, extras)``."""
+        d = C.unit(G.t(direction))
+        outward = -d  # the pushed (right) face's outward normal
+        z0, z1 = face_z
+        clearance = float(self.gen("stop_clearance_m", STOP_CLEARANCE))
+        yield "push_h", IK.contact_eef(face_point, d), {"blade_half_thickness_m": None}
+        yield "push_v", IK.contact_eef(face_point, d, closing=th.tensor([0.0, 0.0, 1.0])), {"blade_half_thickness_m": None}
+        for pitch in TT.approach_pitch_order(None):
+            z_tip = z0 + 0.005
+            so = TT.blade_standoff((z0, z1), z_tip, pitch, clearance, side=False)
+            if so is None:
+                continue  # the face reaches the palm section: no blade push
+            standoff, half = so
+            a_vec = TT.pitched_approach(pitch, manip.forward)
+            origin = th.tensor([float(face_point[0]), float(face_point[1]), z_tip + C.FINGERTIP_LENGTH * math.cos(math.radians(pitch))]) + outward * standoff
+            for c_sign in (1.0, -1.0):
+                yield f"push_blade_{pitch:.0f}{'' if c_sign > 0 else '-'}", (origin, C.eef_quat(a_vec, c_sign * outward)), {
+                    "blade_half_thickness_m": half, "stop_clearance_m": clearance, "blade_standoff_m": standoff, "fingertip_z": z_tip}
 
     def touching_brace_candidates(self, manip: Stance, b_point: th.Tensor, face_z: Tuple[float, float], a_face: th.Tensor):
         """Brace poses of the closed left gripper at the partner's far (robot-left) face, in the order to try — the axial

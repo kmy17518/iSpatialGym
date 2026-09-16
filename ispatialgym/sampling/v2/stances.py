@@ -441,6 +441,7 @@ class ContactRecord:
     brace_kind: Optional[str] = None
     object: Optional[str] = None
     stance: str = "manipulation"
+    extras: Dict[str, Any] = field(default_factory=dict)  # blade / pose-class facts (F6 keeps unknown keys in ``extra``)
 
     def to_sidecar(self) -> Dict[str, Any]:
         d: Dict[str, Any] = {"arm": self.arm, "pre": pose_to_sidecar(self.pre), "stance": self.stance}
@@ -451,6 +452,9 @@ class ContactRecord:
                       "direction": _lst(self.direction), "distance_m": None if self.distance_m is None else float(self.distance_m)})
         else:
             d.update({"kind": self.brace_kind, "contact": pose_to_sidecar(self.contact), "direction": _lst(self.direction)})
+        for k, v in (self.extras or {}).items():
+            if k not in d and v is not None and not str(k).startswith("_"):
+                d[k] = v
         return d
 
 
