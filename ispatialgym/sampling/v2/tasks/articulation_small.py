@@ -463,8 +463,13 @@ class ArticulationSmall(SamplerV2):
         wp = C.handle_waypoints(self.handle, self.jinfo, [self.q_init], pose)[0]
         pts_b = [wp.contact]
         if self.handle_only_band:
-            # the brace is a pad contact on a face of the base link (left contact band classes): every candidate face point in frame
-            pts_b += [pt for _, pt, _, _ in self._body_brace_points(pose, stance)]
+            # the brace is a pad contact on the near face or the brace arm's own-side face of the base link: the handle
+            # contact and at least one of those face points in frame (the far / across faces are never braced)
+            own = "left" if self.brace_arm == "left" else "right"
+            face_pts = [pt for cls, pt, _, _ in self._body_brace_points(pose, stance) if cls.startswith(("near", own))]
+            if not TT.in_frame(self, cam, th.stack(pts_b), TT.IN_FRAME_MARGIN):
+                return False
+            return any(TT.in_frame(self, cam, pt.unsqueeze(0), TT.IN_FRAME_MARGIN) for pt in face_pts)
         else:
             feas = self.bands.brace_feasible(stance.translate, stance.tilt)
             kinds = next((f["brace_kinds"] for f in feas if abs(f["cell"][0] - float(stance.world_to_base(focus[:2])[0])) < 0.05
