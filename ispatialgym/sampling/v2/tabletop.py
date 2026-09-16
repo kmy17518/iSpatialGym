@@ -1424,6 +1424,7 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
     erosion = float(target_half_extent) + float(erosion_extra)
     classes: Dict[int, List[Stance]] = {0: [], 1: []}
     n_cells = 0
+    diag: List[str] = []  # per trunk candidate: cells on the top, min axis angle, nearest focus (base frame) — for the cone question
     for st, cam in zip(cands, cams):
         cells = band_cells_world(bands, st)
         if len(cells) == 0:
@@ -1433,10 +1434,12 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
             continue
         cw = th.stack(keep)
         foci = focus_candidates(s, st, cam, cw) if focus_candidates is not None else [(c, None) for c in cw]
+        angs = []
         for focus_xy, info in foci:
             fz = float(focus_z) if focus_z is not None else float(top.z) + 0.5 * height
             focus = th.tensor([float(focus_xy[0]), float(focus_xy[1]), fz])
             ang = cm.angle_off_axis(cam, focus)
+            angs.append((float(ang), focus_xy))
             if ang > math.radians(angle_classes_deg[1]):
                 continue
             n_cells += 1
@@ -1448,9 +1451,15 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
             c.focus = focus
             c.extras.update({"axis_angle": ang, "angle_class": 0 if ang <= math.radians(angle_classes_deg[0]) else 1, "focus_info": info})
             classes[c.extras["angle_class"]].append(c)
+        if angs:
+            a_min, f_min = min(angs, key=lambda t: t[0])
+            diag.append(f"s={st.stand_off:.2f} t=({st.translate:.2f},{st.tilt:+.2f}): {len(foci)} foci, min axis angle {math.degrees(a_min):.0f}° at base "
+                        f"{[round(float(v), 2) for v in st.world_to_base(f_min[:2]).tolist()]}")
     out = classes[0] or classes[1]
     log.info("phase 2: %d trunk candidates collision-free, %d (stance, focus) pairs within 20°, %d survivors in class %s", len(cands), n_cells, len(out),
              0 if classes[0] else 1)
+    if not out and diag:
+        log.info("phase 2: no survivor — per trunk candidate: %s", " | ".join(diag[:24]))
     return out
 
 
