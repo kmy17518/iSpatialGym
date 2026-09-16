@@ -76,6 +76,7 @@ class Attachment(SamplerV2):
         self.band_spec: Optional[TT.BandSpec] = None
         self.bands = None
         self.attach_bands = None
+        self.left_bands = None  # A1: the left arm's contact band (partner brace), None until B3's bands exist
 
     def g(self, key: str):
         return self.gen(key, self.defaults.get(key))
@@ -168,7 +169,9 @@ class Attachment(SamplerV2):
                     self.attach_bands = TT.RB.ReachBands.load(self.world.scene_model, self.top.name, attach_spec.object, attach_spec.grasp_key, placed=attach_spec.placed, scale=attach_spec.scale)
                 except FileNotFoundError:
                     self.attach_bands = TT.compute_bands(self, attach_spec, self.top, edge)
-                init = TT.phase1b_init_trunk(self, st, H_max, bands=bands, top=self.top)
+                # A1: the left contact band of the partner's height class (partner brace face); §4.4 margins over the union
+                self.left_bands = TT.load_left_contact_band(self, self.height[self.p_role], top=self.top, edge=edge, compute=TT.left_band_compute())
+                init = TT.phase1b_init_trunk(self, st, H_max, bands=bands, top=self.top, left_bands=self.left_bands)
                 init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=bands)
                 init.name = "init"
                 cands = TT.phase2_manipulation_stance(self, init, TT.half_extent(self.hull[self.t_role], self.rest[self.t_role]), target_height=self.height[self.t_role],
@@ -297,7 +300,8 @@ class Attachment(SamplerV2):
             raise Reject("partner_placement", "no attach-reach cell at this trunk")
         m_fp = self.world.footprint(self.hull[self.t_role], m_pose)
         f_pose = attach = pre_attach = None
-        fails = {"distance": 0, "support": 0, "gap": 0, "frame": 0, "ik": 0}
+        fails = {"distance": 0, "support": 0, "gap": 0, "frame": 0, "brace_off_band": 0, "brace_class_failed": 0, "ik": 0}
+        brace_geom = None
         for i in rng.permutation(len(cells))[:40]:
             xy = cells[int(i)]
             if float(th.linalg.norm(xy - m_pose[0][:2])) < float(self.g("partner_centre_distance_min_m")):
@@ -314,6 +318,15 @@ class Attachment(SamplerV2):
             if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull[self.p_role], pose), TT.IN_FRAME_MARGIN):
                 fails["frame"] += 1
                 continue
+            # A1 joint placement: the partner cell is an attach-reach cell (right arm, by construction) AND its brace face
+            # point lies in a left contact band cell at this trunk (the brace's contact class passing when recorded)
+            point, b_dir = self._partner_brace_point(pose, manip)
+            jp = TT.joint_placement(self.attach_bands, self.left_bands, manip, xy, point[:2], brace_class=TT.contact_class(manip, -b_dir, th.tensor([0.0, 0.0, 1.0])))
+            if not jp["ok"] and jp["brace_ok"] and not jp["brace_class_ok"]:
+                jp = TT.joint_placement(self.attach_bands, self.left_bands, manip, xy, point[:2], brace_class=TT.contact_class(manip, -b_dir, C.default_closing_axis(-b_dir)))
+            if not jp["ok"]:
+                fails["brace_off_band" if not jp["brace_ok"] else "brace_class_failed"] += 1
+                continue
             # attach pose of the drawn grasp; pre-attach 10 cm back along the female insertion axis; male in hand
             goal = self._attached_pose(pose)
             eef_attach = IK.grasp_pose(goal, grasp.eef_in_object)
@@ -329,9 +342,11 @@ class Attachment(SamplerV2):
                 fails["ik"] += 1
                 continue
             f_pose, attach, pre_attach = pose, eef_attach, eef_pre
+            brace_geom = (point, b_dir, jp.get("brace_classes"))
             break
         if f_pose is None:
-            raise Reject("partner_placement", f"no partner cell with a reachable attach pose ({fails})")
+            raise Reject("partner_placement", f"no partner cell with a reachable attach pose ({fails}"
+                                              f"{'' if self.left_bands is not None else '; no left contact band: brace side by IK only'})")
         goal = self._attached_pose(f_pose)
         # in-hand reorientation: lifted grasp -> pre-attach at 3 SLERP waypoints (male attached)
         carry = 0.12  # the lift clears the table; the SLERP waypoints carry the male up to the pre-attach pose above the partner
@@ -342,12 +357,21 @@ class Attachment(SamplerV2):
                 r_w = self.ikc.waypoints_ok([lift] + wps, manip, "right", ignore_all=[support])
                 if not r_w.ok:
                     raise Reject("reorientation_unreachable", f"SLERP waypoints to the pre-attach pose: {r_w.reason}")
-                # partner brace: the closed left gripper on the partner's face opposite to the insertion direction
-                brace_pre, brace, brace_dir = self._partner_brace(f_pose, manip)
-                res_b = TT.brace_second_arm(self, manip, "right", [pre_attach, attach], "left", [brace_pre, brace], ignore_work_last=[support, female],
-                                            ignore_brace_last=[support, female])
-        if not res_b.ok:
-            raise Reject("contact_unreachable", f"partner brace with the attach arm locked: {res_b.reason}")
+                # partner brace (A1 / §4.6 step 6): the closed left gripper on the partner's face opposite to the insertion
+                # direction, B3's contact classes (pads on the face, fingers stacked / side by side, either wrist turn),
+                # the classes the left band recorded as passing first; the attach arm locked at its solution
+                point, b_dir, passing = brace_geom
+                res_b, brace_pre, brace, brace_kind, brace_fails = None, None, None, None, []
+                for pre_c, c_pose, kind in self._brace_candidates(manip, point, b_dir, passing):
+                    res_b = TT.brace_second_arm(self, manip, "right", [pre_attach, attach], "left", [pre_c, c_pose], ignore_work_last=[support, female],
+                                                ignore_brace_last=[support, female])
+                    if res_b.ok:
+                        brace_pre, brace, brace_kind = pre_c, c_pose, kind
+                        break
+                    brace_fails.append(f"{kind}: {res_b.reason}")
+                brace_dir = -b_dir
+        if res_b is None or not res_b.ok:
+            raise Reject("contact_unreachable", f"partner brace with the attach arm locked: {sorted(set(brace_fails))[:3]}")
         cam_manip = self.camera_pose_at(manip)
         for nm, p in (("grasp", grasp.grasp), ("attach", attach), ("brace", brace)):
             if not self.ikc.eef_in_frame(p, cam_manip):
@@ -363,6 +387,7 @@ class Attachment(SamplerV2):
         self.sidecar.add_grasp(grasp)
         self.sidecar.add_contact(ContactRecord("brace", "left", brace_pre, brace, direction=brace_dir, brace_kind="partner_face", object=pname))
         manip.contacts = ["brace"]
+        manip.extras.update({"brace_class": brace_kind, "left_band": self.left_bands is not None})
         d.object_poses.update(objects)
         d.goal_poses[tname] = goal
         d.robot_q = self.stance_q(init)
@@ -373,30 +398,48 @@ class Attachment(SamplerV2):
         mc, pc = self.choice.models[self.t_role], self.choice.models[self.p_role]
         self.sidecar.describe(tname, mc.category.replace("_", " "))
         self.sidecar.describe(pname, pc.category.replace("_", " "))
-        d.summary.update({"grasp": {"key": grasp.grasp_key, "name": grasp.grasp_name, "yaw": grasp.yaw}, "manipulation_candidate": k, "partner_fails": fails})
+        d.summary.update({"grasp": {"key": grasp.grasp_key, "name": grasp.grasp_name, "yaw": grasp.yaw}, "manipulation_candidate": k, "partner_fails": fails,
+                          "brace_class": brace_kind, "joint_placement": {"left_band": self.left_bands is not None}})
         return d
 
-    def _partner_brace(self, f_pose: TT.Pose, manip: Stance) -> Tuple[TT.Pose, TT.Pose, th.Tensor]:
-        """Closed left gripper on the partner's face opposite to the insertion direction (the face the insertion pushes
-        toward): the horizontal insertion direction when it has one (>= 30 % horizontal), else the partner's side on
-        the robot's left; contact at mid-height, approach into the face, pre-contact 10 cm back."""
+    def _partner_brace_point(self, f_pose: TT.Pose, manip: Stance) -> Tuple[th.Tensor, th.Tensor]:
+        """Brace face of the partner: the face opposite to the insertion direction (the face the insertion pushes
+        toward) — the horizontal insertion direction when it has one (>= 30 % horizontal), else the partner's face
+        toward the robot (the left gripper reaches forward); ``point`` = the partner's centre pushed out to the hull's
+        extreme along ``b_dir`` at B3's contact height (0.75 of the partner's height). Returns ``(point, b_dir)``
+        (``b_dir`` = outward normal of the braced face; the approach is −b_dir)."""
         axis = self._insertion_axis_world(f_pose)
         d_ins = -axis  # the male moves along -axis into the female
         horiz = th.tensor([float(d_ins[0]), float(d_ins[1]), 0.0])
         if float(th.linalg.norm(horiz)) >= 0.3:
             b_dir = horiz / th.linalg.norm(horiz)
         else:
-            # vertical insertion: hold the partner on the face toward the robot (the left gripper reaches forward)
             f = manip.forward
             b_dir = th.tensor([-float(f[0]), -float(f[1]), 0.0])
         pts = C.transform_points(f_pose, self.hull[self.p_role])
         proj = pts[:, :2] @ b_dir[:2]
-        z_mid = float(pts[:, 2].min()) + 0.5 * float(pts[:, 2].max() - pts[:, 2].min())
+        z_c = TT.contact_height(float(pts[:, 2].min()), float(pts[:, 2].max() - pts[:, 2].min()))
         centre = pts.mean(dim=0)
-        # face point: the partner's centre pushed out to the hull's extreme along b_dir, at mid-height
-        point = th.tensor([float(centre[0]), float(centre[1]), z_mid]) + b_dir * (float(proj.max()) - float(centre[:2] @ b_dir[:2]))
-        brace = C.contact_eef(point, -b_dir)
-        return C.pre_pose(brace), brace, -b_dir
+        point = th.tensor([float(centre[0]), float(centre[1]), z_c]) + b_dir * (float(proj.max()) - float(centre[:2] @ b_dir[:2]))
+        return point, b_dir
+
+    def _brace_candidates(self, manip: Stance, point: th.Tensor, b_dir: th.Tensor, passing: Optional[List[str]]):
+        """Brace poses of the closed left gripper on the partner face at ``point``: approach −b_dir into the face
+        (pad centre on the point, ``contact_eef``), closing axis vertical (``_v``) then horizontal (``_h``), either wrist
+        turn; the contact classes the left band recorded as passing at the cell first. Yields ``(pre, contact, kind)``."""
+        z_axis = th.tensor([0.0, 0.0, 1.0])
+        a = -b_dir
+        side_h = C.unit(th.cross(z_axis, b_dir, dim=0))
+        classes = []
+        for c_axis, suffix in ((z_axis, "v"), (side_h, "h")):
+            name = TT.contact_class(manip, a, c_axis)
+            classes.append((name or f"side_{suffix}", c_axis))
+        if passing:
+            classes.sort(key=lambda nc: 0 if nc[0] in passing else 1)
+        for name, c_axis in classes:
+            for c_sign in (1.0, -1.0):
+                brace = C.contact_eef(point, a, c_sign * c_axis)
+                yield C.pre_pose(brace), brace, f"{name}{'' if c_sign > 0 else '-'}"
 
     def _group_name(self, names: List[str]) -> str:
         if self.problem is not None:

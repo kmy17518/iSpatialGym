@@ -75,6 +75,8 @@ class BlockDesign(SamplerV2):
         self.manip_candidates: List[Stance] = []
         self.band_spec: Optional[TT.BandSpec] = None
         self.bands = None
+        self.left_bands = None  # A1: the left arm's contact band (row-left / column-top braces), None until B3's bands exist
+        self._regions_off_left_band = 0
 
     def g(self, key: str):
         return self.gen(key, self.defaults.get(key))
@@ -139,13 +141,16 @@ class BlockDesign(SamplerV2):
         for edge, st in TT.edge_candidates(self, self.top, rng):
             try:
                 bands = TT.ensure_bands(self, self.band_spec, top=self.top, edge=edge)
-                init = TT.phase1b_init_trunk(self, st, self.edge, bands=bands, top=self.top)
+                # A1: the left contact band of the block's height class (row-left / column-top braces at the goal grid);
+                # §4.4 margins over the union of both bands
+                self.left_bands = TT.load_left_contact_band(self, self.edge, top=self.top, edge=edge, compute=TT.left_band_compute())
+                init = TT.phase1b_init_trunk(self, st, self.edge, bands=bands, top=self.top, left_bands=self.left_bands)
                 init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=bands)
                 init.name = "init"
                 cands = TT.phase2_manipulation_stance(self, init, 0.5 * self.edge, target_height=self.edge, focus_candidates=self._regions, in_frame_fn=self._region_in_frame,
                                                       bands=bands, top=self.top, erosion_extra=0.02 + self.edge, focus_z=self.top.z + 0.5 * self.edge)
                 if not cands:
-                    raise Reject("no_manipulation_stance", "Phase 2 left no region survivor")
+                    raise Reject("no_manipulation_stance", f"Phase 2 left no region survivor ({self._regions_off_left_band} regions off the left contact band)")
                 self.edge_frame, self.init_stance, self.manip_candidates = edge, init, cands
                 break
             except Reject as e:
@@ -155,7 +160,8 @@ class BlockDesign(SamplerV2):
             raise Reject("no_stance", "; ".join(errors)[:1500])
         self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
                                     "n_manipulation_candidates": len(self.manip_candidates), "edge_m": self.edge, "faces": self.faces,
-                                    "band": getattr(self.bands, "path", None)})
+                                    "band": getattr(self.bands, "path", None), "left_band": getattr(self.left_bands, "path", None) if self.left_bands is not None else None,
+                                    "regions_off_left_band": self._regions_off_left_band})
 
     # -- Phase 2 hooks (§4.5 blocks) --------------------------------------------------------------------------------
 
@@ -197,6 +203,13 @@ class BlockDesign(SamplerV2):
             grid_ok = all(self.top.contains(focus + right * (cc * pitch) + toward * (rr * pitch), 0.5 * self.edge + 0.02) for rr in range(2) for cc in range(2))
             if not grid_ok:
                 continue
+            # A1 joint placement: the goal grid (anchor at the focus; every brace point within two pitches of it) must lie
+            # in a left contact band cell at this trunk as well as in the right band cells the region is made of
+            if self.left_bands is not None:
+                brace_pts = [focus + right * (cc * pitch) + toward * (rr * pitch) for rr in range(2) for cc in range(2)]
+                if not all(TT.in_band(self.left_bands, stance, p, tol=1.0)[0] for p in brace_pts):
+                    self._regions_off_left_band += 1
+                    continue
             seen.add(key)
             out.append((focus, {"cells": region}))
         return out
@@ -499,7 +512,10 @@ class BlockDesign(SamplerV2):
                                "flip_axis": None if plan["flip_axis"] is None else [float(v) for v in plan["flip_axis"]],
                                "flip_sign": int(plan["flip_sign"]), "pick": pose_to_sidecar(g_pick.eef), "pre_pick": pose_to_sidecar(pre_pick),
                                "place": pose_to_sidecar(place_eef), "pre_place": pose_to_sidecar(pre_place), "carry_height": float(self._carry_height()),
-                               "goal_face": TT.up_face(goal_pose[bi][1]), "slot": step}
+                               "goal_face": TT.up_face(goal_pose[bi][1]), "slot": step,
+                               # the cube's geometric centre in the block's root frame (m): the ``isgblk`` root origin is
+                               # off-centre; ``cube_grasp`` / the flip pivot take the centre pose = root pose ∘ (centre_offset, I)
+                               "centre_offset": [float(v) for v in self.c_local.tolist()]}
         if wps:
             rec["waypoints"] = [pose_to_sidecar(w) for w in wps]
         # brace points (§6.5): row-left / column-top blocks braced by the closed left gripper while the right hand pushes
@@ -556,19 +572,33 @@ class BlockDesign(SamplerV2):
         push_pre = C.pre_pose(push_init)
         brace_point, brace_a = self._face_contact(world_poses[braced], brace_dir, into=True)
         c_axis_b = th.tensor([float(-brace_dir[1]), float(brace_dir[0]), 0.0])
-        brace = C.contact_eef(brace_point, brace_a, c_axis_b)
-        brace_pre = C.pre_pose(brace)
         # the push init / goal touch the block: init is exact-IK-checked with the block ignored, then pre + goal with the brace arm
         r_init = self.ikc.exact([push_pre, push_init], manip, "right", ignore_for_last=[support, self.objects[pushed]], cache=False)
         if not r_init.ok:
             raise Reject("contact_unreachable", f"{kind} push init of {pushed}: {r_init.reason}")
-        res = TT.brace_second_arm(self, manip, "right", [push_pre, push_goal], "left", [brace_pre, brace], ignore_work_last=[support, self.objects[pushed]],
-                                  ignore_brace_last=[support, self.objects[braced]])
-        if not res.ok:
-            raise Reject("contact_unreachable", f"{kind} brace / push of {pushed}: {res.reason}")
+        # A1 / §4.6 step 6: brace candidates on the braced block's face — the tilted approach with the pads closing
+        # across the brace direction (either wrist turn), then B3's horizontal contact classes (closing horizontal /
+        # vertical); the push arm locked at its goal solution
+        z_axis = th.tensor([0.0, 0.0, 1.0])
+        a_h = th.tensor([float(brace_dir[0]), float(brace_dir[1]), 0.0])  # horizontal approach into the face (outward normal −brace_dir)
+        a_h = a_h / th.linalg.norm(a_h)
+        cands = [(brace_a, c_axis_b, "tilted_h"), (brace_a, -c_axis_b, "tilted_h-"), (a_h, c_axis_b, "side_h"), (a_h, z_axis, "side_v"), (a_h, -c_axis_b, "side_h-")]
+        res, brace_pre, brace, used, fails = None, None, None, None, []
+        for a_vec, c_vec, name in cands:
+            b = C.contact_eef(brace_point, a_vec, c_vec)
+            b_pre = C.pre_pose(b)
+            res = TT.brace_second_arm(self, manip, "right", [push_pre, push_goal], "left", [b_pre, b], ignore_work_last=[support, self.objects[pushed]],
+                                      ignore_brace_last=[support, self.objects[braced]])
+            if res.ok:
+                brace_pre, brace, used, brace_a = b_pre, b, name, a_vec
+                break
+            fails.append(f"{name}: {res.reason}")
+        if res is None or not res.ok:
+            raise Reject("contact_unreachable", f"{kind} brace / push of {pushed}: {sorted(set(fails))[:3]}")
         rec[f"push_{kind}"] = ContactRecord("push", "right", push_pre, push_init, None, push_goal, d3, dist, object=pushed).to_sidecar()
         rec[f"brace_{kind}"] = ContactRecord("brace", "left", brace_pre, brace, direction=brace_a, brace_kind="row_left" if kind == "row" else "column_top",
                                               object=braced).to_sidecar()
+        rec[f"brace_{kind}"]["pose_class"] = used
 
     # ------------------------------------------------------------------ goal / hooks
 

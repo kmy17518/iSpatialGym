@@ -408,3 +408,119 @@ def test_block_and_articulation_blocks_expand():
                                  object="toolbox.n.01_1"))
     sd.describe("toolbox.n.01_1", "toolbox")
     assert _f6(sd).problems(check_program=True) == []
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# A1 joint two-arm placement (owner decision 2026-09-16): synthetic right / left bands, no simulator
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def _synthetic_band(cells_by_trunk, classes_by_trunk=None, class_names=None, lattice=0.08, arm="right"):
+    """A ``ReachBands`` with the given base-frame cells per trunk (x ahead, lateral + = left) at a stance of yaw 0."""
+    from ispatialgym.sampling.reach_bands import ReachBands
+
+    meta = {"scene": "s", "support": "t", "lattice": lattice, "arm": arm, "stance": {"base_pose2d": [0.0, 0.0, 0.0]},
+            "trunks": [{"translate": k[0], "tilt": k[1], "collides": False} for k in cells_by_trunk]}
+    if class_names:
+        meta["classes"] = list(class_names)
+    cells = {k: np.asarray(v, dtype=np.float32).reshape(-1, 2) for k, v in cells_by_trunk.items()}
+    pairs = {k: np.zeros((0, 3), dtype=np.int32) for k in cells}
+    if classes_by_trunk is not None:
+        try:
+            return ReachBands(meta, cells, pairs, None, {k: np.asarray(v, dtype=np.int64) for k, v in classes_by_trunk.items()})
+        except TypeError:  # loader before B3's classes field: attach the masks the way ``cell_classes`` reads them
+            rb = ReachBands(meta, cells, pairs, None)
+            rb.classes = {k: np.asarray(v, dtype=np.int64) for k, v in classes_by_trunk.items()}
+            return rb
+    return ReachBands(meta, cells, pairs, None)
+
+
+def _stance(translate, tilt=0.0, yaw=0.0, xy=(0.0, 0.0)):
+    from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
+
+    edge = EdgeFrame("e0", th.tensor([float(xy[0]) + 0.45 * math.cos(yaw), float(xy[1]) + 0.45 * math.sin(yaw)]), th.tensor([math.cos(yaw), math.sin(yaw)]), 1.6)
+    return Stance("manipulation", (float(xy[0]), float(xy[1]), float(yaw)), translate, tilt, 0.45, edge, arms=["right", "left"])
+
+
+def test_height_class_uses_two_centimetre_bins():
+    assert TT.height_class(0.049) == pytest.approx(0.04)
+    assert TT.height_class(0.051) == pytest.approx(0.06)
+    assert TT.height_class(0.002) == pytest.approx(0.02)  # never the empty class
+    assert TT.contact_height(0.81, 0.10) == pytest.approx(0.81 + 0.75 * 0.10)
+
+
+def test_joint_placement_requires_both_cells_at_the_same_trunk():
+    right = _synthetic_band({(0.5, 0.0): [[0.60, -0.20], [0.68, -0.20]], (0.25, 0.0): [[0.60, 0.00]]})
+    left = _synthetic_band({(0.5, 0.0): [[0.60, 0.20]]}, arm="left")
+    st = _stance(0.5)
+    ok = TT.joint_placement(right, left, st, work_xy=(0.61, -0.21), brace_xy=(0.59, 0.21))
+    assert ok["ok"] and ok["work_ok"] and ok["brace_ok"] and ok["left_band"]
+    assert np.allclose(ok["work_cell"], [0.60, -0.20]) and np.allclose(ok["brace_cell"], [0.60, 0.20])
+    # the brace point outside the half-cell tolerance of every left cell
+    assert not TT.joint_placement(right, left, st, (0.61, -0.21), (0.60, 0.30))["ok"]
+    # the same points at another trunk: the right band has a cell there, the left band none -> rejected as a pair
+    st2 = _stance(0.25)
+    r2 = TT.joint_placement(right, left, st2, (0.60, 0.0), (0.60, 0.20))
+    assert r2["work_ok"] and not r2["brace_ok"] and not r2["ok"]
+    # a rotated stance: the band cells follow the base frame
+    st3 = _stance(0.5, yaw=math.pi / 2, xy=(1.0, 1.0))
+    r3 = TT.joint_placement(right, left, st3, work_xy=(1.20, 1.60), brace_xy=(0.80, 1.60))
+    assert r3["ok"]
+    # no left band yet: the brace side is left to the exact two-arm IK, flagged for the record
+    r4 = TT.joint_placement(right, None, st, (0.61, -0.21), (5.0, 5.0))
+    assert r4["ok"] and not r4["left_band"] and r4["brace_cell"] is None
+
+
+def test_joint_placement_checks_the_brace_class_when_the_band_records_classes():
+    names = ["near_v", "near_h", "far_v", "far_h", "left_v", "left_h", "right_v", "right_h", "top_y0", "top_y90"]
+    right = _synthetic_band({(0.5, 0.0): [[0.60, -0.20]]})
+    # the single left cell passed near_v (bit 0) and left_h (bit 5) only
+    left = _synthetic_band({(0.5, 0.0): [[0.60, 0.20]]}, {(0.5, 0.0): [(1 << 0) | (1 << 5)]}, names, arm="left")
+    st = _stance(0.5)
+    assert TT.cell_classes(left, 0.5, 0.0, [0.60, 0.20]) == ["near_v", "left_h"]
+    assert TT.cell_classes(left, 0.5, 0.0, [0.60, 0.50]) is None  # not a band cell
+    assert TT.cell_classes(right, 0.5, 0.0, [0.60, -0.20]) is None  # no mask recorded
+    assert TT.joint_placement(right, left, st, (0.60, -0.20), (0.60, 0.20), brace_class="near_v")["ok"]
+    r = TT.joint_placement(right, left, st, (0.60, -0.20), (0.60, 0.20), brace_class="far_v")
+    assert r["brace_ok"] and not r["brace_class_ok"] and not r["ok"] and r["brace_classes"] == ["near_v", "left_h"]
+    # a band without masks accepts any class
+    plain = _synthetic_band({(0.5, 0.0): [[0.60, 0.20]]}, arm="left")
+    assert TT.joint_placement(right, plain, st, (0.60, -0.20), (0.60, 0.20), brace_class="far_v")["ok"]
+
+
+def test_contact_class_names_follow_the_base_frame():
+    st = _stance(0.5)  # facing +x, robot's left = +y
+    up, fwd, left = th.tensor([0.0, 0.0, 1.0]), th.tensor([1.0, 0.0, 0.0]), th.tensor([0.0, 1.0, 0.0])
+    assert TT.contact_class(st, fwd, up) == "near_v"  # pads on the face toward the robot, pushing away, fingers stacked
+    assert TT.contact_class(st, -fwd, left) == "far_h"
+    assert TT.contact_class(st, -left, up) == "left_v"  # the hand on the object's robot-left face pushing to the right
+    assert TT.contact_class(st, left, fwd) == "right_h"
+    assert TT.contact_class(st, -up, left) == "top_y0" and TT.contact_class(st, -up, fwd) == "top_y90"
+    assert TT.contact_class(st, C.unit(fwd - up), up) is None  # a 45° approach is no contact class
+    st2 = _stance(0.5, yaw=math.pi / 2)  # facing +y: the robot's left is -x
+    assert TT.contact_class(st2, th.tensor([0.0, 1.0, 0.0]), up) == "near_v" and TT.contact_class(st2, th.tensor([1.0, 0.0, 0.0]), up) == "left_v"
+
+
+def test_approach_pitch_order_prefers_the_passing_pitched_classes():
+    assert TT.approach_pitch_order(None) == [0.0, 30.0, 45.0, 60.0]
+    assert TT.approach_pitch_order(["p45_y0", "p60_y90"]) == [45.0, 60.0, 0.0, 30.0]
+    assert TT.approach_pitch_order(["p00_y0", "p00_y90", "p30_y0"]) == [0.0, 30.0, 45.0, 60.0]
+    assert TT.approach_pitch_order(["near_v"]) == [0.0, 30.0, 45.0, 60.0]  # contact names carry no pitch
+    assert TT.class_pitch_deg("p30_y90") == 30.0 and TT.class_pitch_deg("top_y0") is None
+    a = TT.pitched_approach(60.0, th.tensor([1.0, 0.0]))
+    assert a[2] == pytest.approx(-math.cos(math.radians(60))) and a[0] == pytest.approx(math.sin(math.radians(60)))
+
+
+def test_union_extent_feeds_the_margins_table():
+    right = _synthetic_band({(0.5, 0.0): [[0.60, -0.56], [0.60, 0.00]]})
+    left = _synthetic_band({(0.5, 0.0): [[0.60, 0.16], [0.60, 0.56]]}, arm="left")
+    assert TT.union_extent(right) == (pytest.approx(-0.56), pytest.approx(0.0))
+    assert TT.union_extent(right, left) == (pytest.approx(-0.56), pytest.approx(0.56))
+    assert TT.union_extent(right, None) == (pytest.approx(-0.56), pytest.approx(0.0))
+    assert TT.union_extent(None) is None
+    # §4.4 axial row over the union: both margins grow to |λ| + w_diag + 0.02
+    lo, hi = TT.union_extent(right, left)
+    m_R, m_L, info = TT.lateral_margins({"kind": "axial", "long": 0.30, "short": 0.10}, lo, hi, 0.5, 0.5)
+    assert m_R == pytest.approx(0.56 + info["w_diag"] + 0.02) and m_L == pytest.approx(0.56 + info["w_diag"] + 0.02)
+    m_R1, m_L1, _ = TT.lateral_margins({"kind": "axial", "long": 0.30, "short": 0.10}, *TT.union_extent(right), 0.5, 0.5)
+    assert m_R1 == pytest.approx(m_R) and m_L1 < m_L

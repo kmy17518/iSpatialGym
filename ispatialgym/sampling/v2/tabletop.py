@@ -544,6 +544,7 @@ class BandSpec:
     generic_pinch: bool = False
     height: float = 0.05
     eef_of_grasp: Optional[Callable[[Any], Pose]] = None  # T_obj->eef of a grasp entry (default ``g.pose``)
+    contact: bool = False  # A1: B3's generic CONTACT set of the brace arm (closed gripper) instead of the pinch set
 
     @staticmethod
     def from_sampler(s, role: str = "target") -> "BandSpec":
@@ -594,7 +595,16 @@ def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, latt
     lattice_world = spec.lattice_world if spec.lattice_world is not None else top.cells(free_only=True)
     ignore = [support] + list(spec.ignore)
     h = float(spec.height)
-    if spec.generic_pinch or not spec.grasps:
+    contact_mode = bool(spec.contact and hasattr(bc, "contact_height"))
+    if spec.contact and not contact_mode:
+        log.info("reach_bands.BandComputer has no contact mode yet: the left band uses the generic pinch set with the left arm")
+    if contact_mode:
+        # B3's contact set: closed fingers, side contacts at CONTACT_HEIGHT_FRACTION·h / top presses, the classes bitmask
+        bc.contact_height = h
+        bc.fingers = float(getattr(C, "FINGER_CLOSED", 0.0))
+        pose_fn, grasp_sets, max_off = None, None, 0.0
+        z_eval = z
+    elif spec.generic_pinch or not spec.grasps:
         pose_fn, grasp_sets, max_off = None, None, 0.0
         z_eval = z + max(0.6 * h, 0.03)
     else:
@@ -623,7 +633,12 @@ def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, latt
                             "top": top.to_json(), "z_support": z_eval, "trunks": result["trunks"],
                             "union_extent": [float(lat_all.min()), float(lat_all.max())] if len(lat_all) else None,
                             "n_reachable_total": int(sum(len(c) for c in result["cells"].values())), "time_s": round(time.time() - t0, 1),
-                            "computed_by": "sampling.v2.tabletop.compute_bands"}
+                            "computed_by": "sampling.v2.tabletop.compute_bands", "arm": spec.arm}
+    if contact_mode:  # B3's contact-band fields (``ReachBands.find(arm="left", contact_set=..., height=...)`` matches them)
+        meta.update({"contact_set": CONTACT_SET, "height_class": height_class(h), "contact_height_fraction": CONTACT_HEIGHT_FRACTION,
+                     "classes": [c["name"] for c in getattr(RB, "CONTACT_CLASSES", [])], "fingers": bc.fingers})
+    elif grasp_sets is None:
+        meta["classes"] = list(getattr(RB, "GENERIC_CLASSES", []))
     key = RB._key({"scene": world.scene_model, "support": top.name, "z": round(z_eval, 2), "stance": stance["edge"], "s": RB.STAND_OFF, "object": spec.object,
                    "scale": spec.scale, "grasps": [(g.name, _t(g.position).tolist(), _t(g.quat).tolist()) for g in (grasp_sets or [])] or "generic",
                    "rest": _t(spec.rest_quat).tolist(), "placed": list(spec.placed), "grid": meta["grid"], "lattice": lattice, "arms": "untucked", "seeds": 12})
@@ -635,15 +650,22 @@ def compute_bands(s, spec: BandSpec, top, edge: Optional[EdgeFrame] = None, latt
     arrays = {RB.trunk_key(tr, ti): np.asarray(c, dtype=np.float32).reshape(-1, 2) for (tr, ti), c in result["cells"].items()}
     for (tr, ti), p in result.get("pairs", {}).items():
         arrays[RB.trunk_key(tr, ti) + "__pairs"] = np.asarray(p, dtype=np.int32).reshape(-1, 3)
+    for (tr, ti), m in (result.get("classes") or {}).items():  # B3's per-cell class bitmask (generic / contact sets)
+        if m is not None and len(m):
+            arrays[RB.trunk_key(tr, ti) + "__classes"] = np.asarray(m, dtype=np.int64).reshape(-1)
     path = os.path.join(out_dir, name + ".npz")
     np.savez_compressed(path, **arrays)
     with open(os.path.join(out_dir, name + ".json"), "w") as f:
         json.dump(meta, f, indent=1, default=str)
     cells = {k: np.asarray(v, dtype=np.float32).reshape(-1, 2) for k, v in result["cells"].items() if not _trunk_collides(result["trunks"], k)}
     pairs = {k: np.asarray(v, dtype=np.int32).reshape(-1, 3) for k, v in result.get("pairs", {}).items() if k in cells}
+    classes = {k: np.asarray(v, dtype=np.int64).reshape(-1) for k, v in (result.get("classes") or {}).items() if k in cells and v is not None and len(v)}
     log.info("reach band computed for %s / %s: %d reachable cells over %d trunks in %.0fs -> %s", top.name, spec.object, meta["n_reachable_total"], len(cells),
              meta["time_s"], path)
-    return RB.ReachBands(meta, cells, pairs, path)
+    try:
+        return RB.ReachBands(meta, cells, pairs, path, classes)
+    except TypeError:  # loader without the classes field
+        return RB.ReachBands(meta, cells, pairs, path)
 
 
 def _trunk_collides(entries: Sequence[Dict[str, Any]], key: Tuple[float, float]) -> bool:
@@ -757,6 +779,239 @@ def store_feasible_set(bands: RB.ReachBands, stance: Stance, F: Sequence[Tuple[f
 
 
 # ----------------------------------------------------------------------------------------------------------------
+# A1 — left-arm contact bands, per-cell approach classes and the joint two-arm placement (owner decision 2026-09-16;
+# spec §4.1 band scope, §4.4 margins = union of both bands, §4.6 step 6 two-arm IK)
+# ----------------------------------------------------------------------------------------------------------------
+
+#: approach pitches of the generic push / stop set (deg from straight down toward the robot's forward), B3's
+#: ``TILTS_GENERIC``: the owner's A1 decision added 45° and 60° so far cells (0.9–1.0 m) keep an IK-feasible arc. B3's
+#: per-cell class bitmask (``<trunk>__classes`` in the ``.npz``, names in ``meta["classes"]``) names the generic classes
+#: ``p<pitch>_y<wrist yaw>`` (pitch-major) and the left contact classes ``near|far|left|right_v|h`` / ``top_y0|y90``.
+APPROACH_PITCHES_DEG: Tuple[float, ...] = tuple(float(t) for t in getattr(RB, "TILTS_GENERIC", (0.0, 30.0, 45.0, 60.0)))
+#: B3's contact set of the brace arm (``reach_bands.CONTACT_SET``): closed gripper, pads on a vertical face at 0.75 of
+#: the object's height (``CONTACT_HEIGHT_FRACTION``) or a top press; one band per 2 cm object height class
+CONTACT_SET = getattr(RB, "CONTACT_SET", "generic_contact")
+CONTACT_HEIGHT_FRACTION = float(getattr(RB, "CONTACT_HEIGHT_FRACTION", 0.75))
+#: a point is "in a band cell" when it lies within this fraction of the lattice from a cell centre (half a cell = the
+#: cell's own square)
+CELL_TOLERANCE = 0.5
+
+
+def height_class(height: float) -> float:
+    """B3's object height class (2 cm bins, the class value = the rounded height) of the left contact bands."""
+    if hasattr(RB, "height_class"):
+        return float(RB.height_class(float(height)))
+    return round(max(1, int(round(float(height) / 0.02))) * 0.02, 4)
+
+
+def contact_height(top_z: float, height: float) -> float:
+    """Height of a side contact of the brace arm on an object ``height`` tall standing on ``top_z`` (B3's contact set:
+    pads at ``CONTACT_HEIGHT_FRACTION`` of the height)."""
+    return float(top_z) + CONTACT_HEIGHT_FRACTION * float(height)
+
+
+def left_band_compute() -> bool:
+    """Whether a missing left contact band is computed in-process (15–25 min per support / height class on an L40S):
+    ``ISG_LEFT_BAND_COMPUTE=1``; default off — until B3's left bands exist the brace side is decided by the exact two-arm
+    IK alone and the instance records ``left_band: false``."""
+    return os.environ.get("ISG_LEFT_BAND_COMPUTE", "0").strip().lower() in ("1", "true", "yes")
+
+
+def left_contact_object(cls: float) -> str:
+    """The ``meta.object`` token under which an in-process left contact band is cached (distinct from every real object
+    so that a loader without the arm filter never mistakes it for a right-arm generic band)."""
+    return f"contact-left/h{cls:.2f}"
+
+
+def load_left_contact_band(s, height: float, *, top=None, edge: Optional[EdgeFrame] = None, compute: bool = True) -> Optional[RB.ReachBands]:
+    """A1: the left arm's generic CONTACT band (closed gripper, brace approach) of the support for the object's height
+    class, cached on ``s.bands_left[cls]``. Loader order: B3's left-arm mode
+    ``ReachBands.load(scene, support, arm="left", contact_set="generic_contact", height=h)``; a loader that predates the
+    keywords (``TypeError``) or has no such band (``FileNotFoundError``) falls back to the in-process band of
+    ``compute_bands`` with ``BandSpec(arm="left", generic_pinch=True, contact=True)`` (B3's ``BandComputer`` contact
+    mode when it has one — closed fingers, the contact classes —, else the generic top-down / pitched set with the left
+    arm) under the object token ``left_contact_object(cls)`` with the meta fields B3's ``find`` matches (``arm``,
+    ``contact_set``, ``height_class``). ``compute=False`` returns None on a miss (unit tests, dry runs)."""
+    cls = height_class(height)
+    cache = getattr(s, "bands_left", None)
+    if cache is None:
+        cache = {}
+        try:
+            s.bands_left = cache
+        except AttributeError:  # a sampler without the attribute slot: no caching
+            pass
+    if cls in cache:
+        return cache[cls]
+    top = _top(s, top)
+    scene, support = s.world.scene_model, top.name
+    bands = None
+    try:
+        bands = RB.ReachBands.load(scene, support, arm="left", contact_set=CONTACT_SET, height=float(height))
+        log.info("left contact band cache hit for %s (height class %.2f): %s", support, cls, bands.path)
+    except TypeError:
+        log.info("reach_bands loader has no left-arm mode yet: using the in-process left contact band")
+        try:
+            bands = RB.ReachBands.load(scene, support, left_contact_object(cls), "generic")
+        except FileNotFoundError:
+            bands = None
+    except FileNotFoundError:
+        log.info("no B3 left contact band for %s (height class %.2f)", support, cls)
+    if bands is None and compute:
+        spec = BandSpec(object=left_contact_object(cls), generic_pinch=True, height=cls, arm="left", contact=True)
+        bands = compute_bands(s, spec, top, edge)
+    cache[cls] = bands
+    return bands
+
+
+def cell_classes(bands: Optional[RB.ReachBands], translate: float, tilt: float, cell_base) -> Optional[List[str]]:
+    """B3's per-cell pose classes that pass at ``cell_base`` (base frame) of the trunk (``ReachBands.classes_at``:
+    names in bit order of ``meta["classes"]`` from the ``<trunk>__classes`` array); None when the band records no
+    classes (library-grasp bands, bands computed before A1) or the cell is not in the band."""
+    if bands is None or cell_base is None:
+        return None
+    names = bands.meta.get("classes") if isinstance(bands.meta, dict) else None
+    masks = getattr(bands, "classes", None)
+    if not names or not masks:
+        return None
+    k = bands.nearest_trunk(float(translate), float(tilt))
+    if k is None or k not in masks:
+        return None
+    i = bands.cell_index(k[0], k[1], np.asarray(cell_base, dtype=np.float32))
+    if i is None or i >= len(masks[k]):
+        return None
+    m = int(masks[k][i])
+    return [n for b, n in enumerate(names) if (m >> b) & 1]
+
+
+def class_pitch_deg(name: str) -> Optional[float]:
+    """Approach pitch of a generic class name ``p<pitch>_y<yaw>`` (None for other classes)."""
+    if not name or not name.startswith("p") or "_" not in name:
+        return None
+    try:
+        return float(int(name[1:].split("_", 1)[0]))
+    except ValueError:
+        return None
+
+
+def approach_pitch_order(classes: Optional[Sequence[str]], pitches_deg: Sequence[float] = APPROACH_PITCHES_DEG) -> List[float]:
+    """The approach pitches (deg from straight down, forward) to try for a generic push / stop pose at a cell: the
+    pitches of the cell's passing classes first (shallowest first), then the remaining ones so that the 45° / 60°
+    classes are tried before the placement is rejected; without a recorded mask the plain order."""
+    pitches = [float(p) for p in pitches_deg]
+    if not classes:
+        return pitches
+    passing = sorted({p for p in (class_pitch_deg(c) for c in classes) if p is not None and p in pitches})
+    return passing + [p for p in pitches if p not in passing]
+
+
+def contact_class(stance: Stance, approach_world, closing_world) -> Optional[str]:
+    """B3's contact class name of a brace pose: ``approach_world`` = the eef approach axis (into the face / down onto
+    the top), ``closing_world`` = the closing axis; base frame of ``stance`` (x ahead, lateral + = robot's left).
+    Side classes ``near`` (pads on the face toward the robot, approach +x), ``far`` (−x), ``left`` (approach −lateral: the
+    hand on the object's robot-left face), ``right`` (+lateral) with ``_v`` (closing vertical) / ``_h`` (horizontal);
+    ``top_y0`` / ``top_y90`` for a downward approach with the closing axis lateral / ahead."""
+    a = _t(approach_world)
+    c = _t(closing_world)
+    fx, fy = float(stance.forward[0]), float(stance.forward[1])
+    lx, ly = float(stance.left[0]), float(stance.left[1])
+    ax, al, az = float(a[0]) * fx + float(a[1]) * fy, float(a[0]) * lx + float(a[1]) * ly, float(a[2])
+    cx, cl, cz = float(c[0]) * fx + float(c[1]) * fy, float(c[0]) * lx + float(c[1]) * ly, float(c[2])
+    if az < -0.9:
+        return "top_y0" if abs(cl) >= abs(cx) else "top_y90"
+    if abs(az) > 0.3:  # a pitched approach belongs to no contact class
+        return None
+    side = ("near" if ax > 0 else "far") if abs(ax) >= abs(al) else ("left" if al < 0 else "right")
+    return f"{side}_{'v' if abs(cz) > 0.7 else 'h'}"
+
+
+def pitched_approach(pitch_deg: float, forward: th.Tensor) -> th.Tensor:
+    """Approach direction of the generic set: straight down rotated ``pitch_deg`` toward ``forward`` (the robot's
+    forward, horizontal)."""
+    z = th.tensor([0.0, 0.0, 1.0])
+    f = th.tensor([float(forward[0]), float(forward[1]), 0.0])
+    f = f / max(float(th.linalg.norm(f)), 1e-9)
+    a = math.radians(float(pitch_deg))
+    return C.unit(-z * math.cos(a) + f * math.sin(a))
+
+
+def in_band(bands: Optional[RB.ReachBands], stance: Stance, xy, tol: float = CELL_TOLERANCE) -> Tuple[bool, Optional[np.ndarray]]:
+    """Whether the world point ``xy`` lies within ``tol``·lattice of a cell of ``bands`` at the stance's trunk (same
+    translate, nearest tilt); returns ``(ok, nearest cell in base coordinates)``."""
+    if bands is None:
+        return False, None
+    cells = bands.band(float(stance.translate), float(stance.tilt))
+    if len(cells) == 0:
+        return False, None
+    base = bands.to_base(np.asarray([[float(xy[0]), float(xy[1])]], dtype=np.float32), stance.base_pose2d)[0]
+    d = np.linalg.norm(np.asarray(cells, dtype=np.float32) - base, axis=1)
+    j = int(d.argmin())
+    lat = float(bands.meta.get("lattice", RB.LATTICE)) if isinstance(bands.meta, dict) else RB.LATTICE
+    return bool(d[j] <= tol * lat + 1e-6), np.asarray(cells[j], dtype=np.float32)
+
+
+def joint_placement(bands_right: RB.ReachBands, bands_left: Optional[RB.ReachBands], stance: Stance, work_xy, brace_xy, tol: float = CELL_TOLERANCE,
+                    brace_class: Optional[str] = None) -> Dict[str, Any]:
+    """A1 placement test for a candidate (target pose → work point of the right arm, brace point of the left arm):
+    ``work_xy`` ∈ a right band cell AND ``brace_xy`` ∈ a left contact band cell **at the same trunk** (the stance's);
+    with ``brace_class`` (B3 contact class of the intended brace pose, ``contact_class``) and a band that records the
+    per-cell classes, the class must have passed at that cell. Without a left band (None) the brace side is left to
+    the exact two-arm IK alone and ``left_band`` is False so the caller can record it. The dict carries ``ok`` /
+    ``work_ok`` / ``brace_ok`` / ``brace_class_ok``, the nearest cells (base frame), the work cell's ``classes`` and the
+    brace cell's ``brace_classes`` (B3 bitmasks, None when absent)."""
+    work_ok, work_cell = in_band(bands_right, stance, work_xy, tol)
+    brace_classes = None
+    class_ok = True
+    if bands_left is None:
+        brace_ok, brace_cell = True, None
+    else:
+        brace_ok, brace_cell = in_band(bands_left, stance, brace_xy, tol)
+        if brace_ok:
+            brace_classes = cell_classes(bands_left, stance.translate, stance.tilt, brace_cell)
+            if brace_class is not None and brace_classes is not None:
+                class_ok = brace_class in brace_classes
+    return {"ok": bool(work_ok and brace_ok and class_ok), "work_ok": bool(work_ok), "brace_ok": bool(brace_ok), "brace_class_ok": bool(class_ok),
+            "work_cell": work_cell, "brace_cell": brace_cell, "left_band": bands_left is not None,
+            "classes": cell_classes(bands_right, stance.translate, stance.tilt, work_cell), "brace_classes": brace_classes, "brace_class": brace_class}
+
+
+def joint_two_arm_placement(s, stance: Stance, bands_right: RB.ReachBands, bands_left: Optional[RB.ReachBands], work_xy, brace_xy, work_arm: str,
+                            work_poses: Sequence[Pose], brace_arm: str, brace_poses: Sequence[Pose], *, ignore_work_last: Sequence[Any] = (),
+                            ignore_brace_last: Sequence[Any] = (), tol: float = CELL_TOLERANCE, brace_class: Optional[str] = None) -> Tuple[bool, Dict[str, Any]]:
+    """A1 in one call: the band test (``joint_placement``) first, then the exact two-arm IK of §4.6 step 6
+    (``brace_second_arm``: work arm poses, brace arm [pre-contact, contact] with the work arm locked, combined whole-body
+    check). Returns ``(ok, info)`` with ``info["reason"]`` = ``"work_off_band"`` / ``"brace_off_band"`` /
+    ``"brace_class_failed"`` / the IK reason."""
+    info = joint_placement(bands_right, bands_left, stance, work_xy, brace_xy, tol, brace_class=brace_class)
+    if not info["work_ok"]:
+        info["reason"] = "work_off_band"
+        return False, info
+    if not info["brace_ok"]:
+        info["reason"] = "brace_off_band"
+        return False, info
+    if not info["brace_class_ok"]:
+        info["reason"] = "brace_class_failed"
+        return False, info
+    res = brace_second_arm(s, stance, work_arm, work_poses, brace_arm, brace_poses, ignore_work_last=ignore_work_last, ignore_brace_last=ignore_brace_last)
+    info["ik"] = res
+    info["reason"] = None if res.ok else f"ik: {res.reason}"
+    return bool(res.ok), info
+
+
+def union_extent(*bands: Optional[RB.ReachBands]) -> Optional[Tuple[float, float]]:
+    """§4.4 (A1): the lateral extent [λ_min, λ_max] of the union of the given bands (the right grasp band and the left
+    contact band), None when none has cells."""
+    lo, hi = math.inf, -math.inf
+    for b in bands:
+        if b is None:
+            continue
+        ext = b.union_extent() if hasattr(b, "union_extent") else None
+        if ext is None:
+            continue
+        lo, hi = min(lo, float(ext[0])), max(hi, float(ext[1]))
+    return None if lo > hi else (lo, hi)
+
+
+# ----------------------------------------------------------------------------------------------------------------
 # camera helpers (§3.4)
 # ----------------------------------------------------------------------------------------------------------------
 
@@ -862,17 +1117,27 @@ def phase1_edge_and_standoff(s, top, rng=None, stand_off: float = STAND_OFF) -> 
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def phase1b_init_trunk(s, init: Stance, H_max: float, *, bands: Optional[RB.ReachBands] = None, top=None, margin: float = IN_FRAME_MARGIN) -> Stance:
+def phase1b_init_trunk(s, init: Stance, H_max: float, *, bands: Optional[RB.ReachBands] = None, top=None, margin: float = IN_FRAME_MARGIN,
+                       left_bands: Optional[RB.ReachBands] = None) -> Stance:
     """§4.3: the init trunk (translate t*, tilt 0) from the camera FK: Δ = clamp(Δ_aim, Δ_min, Δ_max), t* = z_c⁻¹(h + Δ)
     clamped to [0, 0.95]; records ``b`` (image border lateral at the workspace centre depth), ``R_img`` (centre line),
     the workspace depths, the band union extent [λ_min, λ_max] and the translate range of [Δ_min, Δ_max] in
-    ``stance.extras`` for Phase 1c."""
+    ``stance.extras`` for Phase 1c. With ``left_bands`` (A1: the left contact band of a two-arm task) the lateral extent
+    is the union of both bands' workspaces on this top (§4.4 margins use the union; the depths stay the work arm's)."""
     top = _top(s, top)
     bands = bands or ensure_bands(s, top=top, edge=init.edge)
     fk = camera_fk(s)
     ws = workspace(s, bands, init, top)
     if len(ws["cells_world"]) == 0:
         _reject("no_workspace", f"{top.name} edge {init.edge.name}: no band cell of {bands.path or 'the band'} falls on the top at s = {init.stand_off:.2f}")
+    if left_bands is not None:
+        ws_l = workspace(s, left_bands, init, top)
+        if len(ws_l["cells_world"]):
+            ws["lam_min_right"], ws["lam_max_right"] = ws["lam_min"], ws["lam_max"]
+            ws["lam_min_left"], ws["lam_max_left"] = ws_l["lam_min"], ws_l["lam_max"]
+            ws["lam_min"], ws["lam_max"] = min(ws["lam_min"], ws_l["lam_min"]), max(ws["lam_max"], ws_l["lam_max"])
+        else:
+            log.info("phase 1b: the left contact band has no cell on %s at edge %s; λ from the right band alone", top.name, init.edge.name)
     h = float(top.z) - float(s.kit.floor_z)
     phi_m = fk.phi_m(margin)
     t = float(init.translate)
@@ -889,7 +1154,8 @@ def phase1b_init_trunk(s, init: Stance, H_max: float, *, bands: Optional[RB.Reac
     st.extras.update({"H_max": float(H_max), **res, "d_ws": ws["d_ws"], "d_near": ws["d_near"], "d_far": ws["d_far"], "lam_min": ws["lam_min"],
                       "lam_max": ws["lam_max"], "x_c": fk.x_at(t), "z_c": fk.z_at(t), "b": b, "b_right": b_r, "b_left": b_l, "R_img": b,
                       "t_range": [min(t_lo, t_hi), max(t_lo, t_hi)], "camera_pitch_deg": math.degrees(fk.pitch), "hand_below": fk.hand_below,
-                      "n_workspace_cells": int(len(ws["cells_world"]))})
+                      "n_workspace_cells": int(len(ws["cells_world"])), "left_band": left_bands is not None,
+                      **{k: ws[k] for k in ("lam_min_right", "lam_max_right", "lam_min_left", "lam_max_left") if k in ws}})
     log.info("phase 1b: edge %s h=%.2f d_ws=%.2f d_near=%.2f Δ_aim=%.2f Δ_min=%.2f Δ_max=%.2f -> Δ=%.2f t*=%.2f b=%.2f λ=[%.2f, %.2f]", init.edge.name, h,
              ws["d_ws"], ws["d_near"], res["delta_aim"], res["delta_min"], res["delta_max"], res["delta"], t, b, ws["lam_min"], ws["lam_max"])
     return st

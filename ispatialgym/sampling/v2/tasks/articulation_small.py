@@ -2,8 +2,9 @@
 the §5.4 substitutions, everything object-related from §5.4).
 
 Roles: ``target`` (spawned articulated object; ``roles.target.joint`` / ``handle_key``; the v1 facade names it ``artic``
-with the options on the role), scene ``support`` (the floor for objects taller than 0.6 m is **not** implemented here:
-``floor_support`` rejects), ``floor``.
+with the options on the role), scene ``support`` (a scene object, or — for objects taller than 0.6 m — the room floor
+bound as ``{"room": R}`` by the iddl grounding: accepted at the binding, the grounded BDDL has one floor instance for
+both roles; its init is **not** sampled yet: ``floor_support_todo`` rejects cleanly), ``floor``.
 
 Template: the handle annotation (``artic/handles/<key>.json``, scaled to the instance), the facing direction f (moving
 face outward normal; lids: from the hinge line to the centre) -> face yaw per edge, handle arm (the arm on the handle's
@@ -83,6 +84,10 @@ class ArticulationSmall(SamplerV2):
         self.manip_candidates: List[Stance] = []
         self.bands = None
         self.face_yaw: Optional[float] = None
+        #: §5.4 floor support: the customs bind ``support = {"room": R}`` (targets > 0.6 m stand on the room floor)
+        self.floor_support = False
+        self.floor_room: Optional[str] = None
+        self.floor_obj = None
 
     def g(self, key: str):
         return self.gen(key, self.defaults.get(key))
@@ -93,12 +98,27 @@ class ArticulationSmall(SamplerV2):
         return {"artic": self.role} if self.role != "artic" else {}
 
     def bind_scene_roles(self):
-        self.bind_floor_v2()
+        floor = self.bind_floor_v2()
         req = self.choice.bindings.get("support")
+        if isinstance(req, dict) and req.get("room"):
+            # §5.4 floor support (targets taller than 0.6 m): the iddl grounding binds the support as ``{"room": R}`` and
+            # the grounded BDDL has one floor instance for both roles (``(ontop target floor.n.01_1)``) — the target stands
+            # on the room's floor patch; no separate support instance is bound
+            self.floor_support = True
+            self.floor_room = str(req["room"])
+            floor_req = self.choice.bindings.get("floor")
+            if isinstance(floor_req, dict) and floor_req.get("room") and floor_req["room"] != self.floor_room:
+                raise Reject("spec", f"{self.gp.alias}: support room {self.floor_room} differs from the floor room {floor_req['room']}")
+            self.floor_obj = self.objects[floor.name]
+            return
         names = [n for n in (req if isinstance(req, list) else []) if isinstance(n, str)]
         if not names:
-            raise Reject("spec", f"{self.gp.alias}: scenes.{self.scene}.bindings.support must list scene object names")
+            raise Reject("spec", f"{self.gp.alias}: scenes.{self.scene}.bindings.support must list scene object names or a room ({{'room': ...}}, floor support)")
         self.bind_scene_object("support", self.world.obj(names[0]))
+
+    def _support(self):
+        """The support object: the bound scene object, or the room floor for the §5.4 floor support."""
+        return self.floor_obj if self.floor_support else self.obj("support")
 
     @property
     def tname(self) -> str:
@@ -181,8 +201,13 @@ class ArticulationSmall(SamplerV2):
         self._load_handle(target)
         self.facing_local = self._facing_local()
         ext = self.hull.max(dim=0).values - self.hull.min(dim=0).values
-        if float(ext[2]) > float(self.g("floor_support_height_m")):
-            raise Reject("floor_support", f"target height {float(ext[2]):.2f} m > {self.g('floor_support_height_m')}: the floor support of §5.4 is not implemented")
+        if self.floor_support or float(ext[2]) > float(self.g("floor_support_height_m")):
+            # §5.4 floor support (owner decision 2026-09-16, item 2) accepted at the binding, not yet sampled: it needs the
+            # floor band (``ReachBands.load(scene, "floor", ...)`` with the A6 posture retry), stances per the tabletop
+            # phases with the floor as the support (no edge: the target's facing direction as the edge normal, stand-off
+            # from the target's footprint) and the brace candidates on a > 0.6 m body — rejected cleanly for now
+            why = f"support bound to the floor of {self.floor_room}" if self.floor_support else f"target height {float(ext[2]):.2f} m > {self.g('floor_support_height_m')}"
+            raise Reject("floor_support_todo", f"{why}: the §5.4 floor-support init (floor band + virtual edge along the target's facing direction) is not implemented yet")
         # arms: the handle's side of the target centre (> 0.05 m) decides
         hc = th.tensor(self.handle["contact"], dtype=th.float32)
         side_axis = th.tensor([-float(self.facing_local[1]), float(self.facing_local[0]), 0.0])  # robot's left when f points at the robot
@@ -190,7 +215,7 @@ class ArticulationSmall(SamplerV2):
         arm_cfg = self.g("arm")
         self.handle_arm = arm_cfg if arm_cfg in ("left", "right") else ("left" if lat > float(self.g("handle_arm_side_threshold_m")) else "right")
         self.brace_arm = "right" if self.handle_arm == "left" else "left"
-        support = self.obj("support")
+        support = self._support()
         self.top = self.support_top(support)
         if int(self.top.free.sum()) < 50:
             raise Reject("support_small", f"{support.name}: too little free top")
@@ -335,7 +360,7 @@ class ArticulationSmall(SamplerV2):
         except FileNotFoundError:
             pass
         kit, world = self.kit, self.world
-        support = self.obj("support")
+        support = self._support()
         bc = RB.BandComputer(world, kit, arms=(self.handle_arm, self.brace_arm))
         stance = bc.stance_at_edge(self.top, support, RB.STAND_OFF, edge.name)
         base_cells, world_cells = bc.lattice_on_cells(stance, self.top.cells(free_only=True))
@@ -464,7 +489,7 @@ class ArticulationSmall(SamplerV2):
     def _sample_with(self, rng, init: Stance, manip: Stance, k: int) -> Draft:
         d = Draft()
         tname = self.tname
-        target, support = self.obj(self.role), self.obj("support")
+        target, support = self.obj(self.role), self._support()
         self.record_transition(init, manip)
         cam_init = self.camera_pose_at(init)
         yaw = self.face_yaw + float(rng.uniform(-float(self.g("yaw_jitter_rad")), float(self.g("yaw_jitter_rad"))))
