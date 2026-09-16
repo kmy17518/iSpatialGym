@@ -48,12 +48,12 @@
   "owner": "tabletop"
  },
  "configuration_matching-articulation_open_large_scale": {
-  "blocking": "re-grounded on roomy picks (c161a04); needs a first sample (rvunhj_0)",
-  "owner": "large-scale"
+  "blocking": "Phase 1: 950+ (d,t) in frame, 0 collision-free on rvunhj_0 (office_cubicles_right) \u2014 scene-specific? diagnostic agent 79dce47f",
+  "owner": "large-scale / diag"
  },
  "configuration_matching-articulation_close_large_scale": {
   "blocking": "same as open",
-  "owner": "large-scale"
+  "owner": "large-scale / diag"
  },
  "alignment-world_vertical": {
   "blocking": "first instance written (4074359); demo loop running (painting_s080)",
@@ -64,8 +64,8 @@
   "owner": "loop"
  },
  "alignment-axial": {
-  "blocking": "push-only axial (owner 08:10): tabletop brace-optional + oracle program; then loop",
-  "owner": "tabletop / oracle"
+  "blocking": "-",
+  "owner": "-"
  },
  "inter_object_relation_satisfaction-ontop_small_scale": {
   "pre_fix_demo": true,
@@ -75,8 +75,8 @@
   "last_change": "2026-09-16 04:37 PDT"
  },
  "inter_object_relation_satisfaction-under_small_scale": {
-  "blocking": "approach witnesses in different IK branches \u2192 core branch-consistent solve (approach_untrackable)",
-  "owner": "core"
+  "blocking": "french_fries: approach_untrackable x8 (branch-consistent rule rejects all grasps); second alias teacup-saucer running",
+  "owner": "core / loop"
  },
  "inter_object_relation_satisfaction-inside": {
   "blocking": "re-sample after 160c518 (release height) + drop executor",
@@ -90,8 +90,8 @@
   "last_change": "2026-09-16 04:37 PDT"
  },
  "inter_object_relation_satisfaction-touching": {
-  "blocking": "left bands available; joint gate + blade record (core item 3 pending); loop running (carton_of_milk)",
-  "owner": "loop / core"
+  "blocking": "carton_of_milk: place_unreachable 4 + approach_untrackable 4; second alias teacup-teapot running",
+  "owner": "core / loop"
  },
  "inter_object_relation_satisfaction-ontop_large_scale": {
   "blocking": "floor-class alias running on the local GPU (owner 08:19); floor cells in-process if the band is empty",

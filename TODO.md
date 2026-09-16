@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 09:07 PDT — 7/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 09:08 PDT — 7/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -131,16 +131,16 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | CM attachment | no instance | left bands available (all classes); loop running (cap-lemonade_bottle) | loop / tabletop |
 | CM articulation_open_small_scale | no instance | left band wiring in articulation_small (tabletop item 2) → then loop (laptop) | tabletop |
 | CM articulation_close_small_scale | no instance | same as open | tabletop |
-| CM articulation_open_large_scale | no instance | re-grounded on roomy picks (c161a04); needs a first sample (rvunhj_0) | large-scale |
-| CM articulation_close_large_scale | no instance | same as open | large-scale |
+| CM articulation_open_large_scale | no instance | Phase 1: 950+ (d,t) in frame, 0 collision-free on rvunhj_0 (office_cubicles_right) — scene-specific? diagnostic agent 79dce47f | large-scale / diag |
+| CM articulation_close_large_scale | no instance | same as open | large-scale / diag |
 | alignment-world_vertical | demo run | first instance written (4074359); demo loop running (painting_s080) | core / loop |
 | alignment-world_horizontal | no instance | demo loop running (picture_s070) | loop |
-| alignment-axial | valid demo | push-only axial (owner 08:10): tabletop brace-optional + oracle program; then loop | tabletop / oracle |
+| alignment-axial | valid demo | - | - |
 | IORS ontop_small_scale | valid demo | - | - |
-| IORS under_small_scale | demo run | approach witnesses in different IK branches → core branch-consistent solve (approach_untrackable) | core |
+| IORS under_small_scale | demo run | french_fries: approach_untrackable x8 (branch-consistent rule rejects all grasps); second alias teacup-saucer running | core / loop |
 | IORS inside | demo run (pre-fix success) | re-sample after 160c518 (release height) + drop executor | core / oracle |
 | IORS nextto | valid demo | near-side goal 160c518 (future sampling) | - |
-| IORS touching | no instance | left bands available; joint gate + blade record (core item 3 pending); loop running (carton_of_milk) | loop / core |
+| IORS touching | no instance | carton_of_milk: place_unreachable 4 + approach_untrackable 4; second alias teacup-teapot running | core / loop |
 | IORS ontop_large_scale | no instance | floor-class alias running on the local GPU (owner 08:19); floor cells in-process if the band is empty | coordinator (local) |
 | IORS under_large_scale | no instance | push-under: sampler landed (25e94d3/8140025/032d849), program + executor (oracle) pending | large-scale / oracle |
 <!-- /first-demo-board -->
@@ -257,3 +257,4 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026‑09‑16 08:30 PDT agent-e2e: bands agent (c239cbc6) reported — band queue re‑ordered on the 15 band pods (30 disembedding bands with the 1.25 stance‑relative tray first on the 8 L40S, ETA ≈ 10:05 PDT; then 285 A3/A6 jobs by weight; 11 A6 re‑runs last); **every left‑brace subtask on the breakfast table already has its left contact band** (8 height classes; coverage 74/0 missing) → attachment (`cap-lemonade_bottle`), block design, touching (`carton_of_milk-box_of_cookies`) entered the first‑demo loop; small articulation waits for the tabletop agent's left‑band wiring. Placed‑tray spec `tray/gsxbym*1.25@focus_centred_edge_aligned` agreed with the tabletop agent (first result: 536 cells vs 100 legacy). Under‑edge floor‑band mode landed; local probe of sandal/bed at s = 0.45 empty (crouched trunks collide with the bed) → probes on 4 A40 pods. Dispatcher caveat: `--rebalance` treats band CMD jobs as unfinished (no summary.json) — use `fleet_remaining.py` for band manifests.
 - 2026‑09‑16 09:05 PDT agent-e2e: owner note 08:45 — killed B3's two stuck local band waiters (pids 3003199 / 3823256; their `while pgrep -f` patterns matched their own command lines, no `run_local.sh` ever started); their queued job lists saved (`/tmp/waiter1_jobs.txt` 17 breakfast‑table jobs incl. 6 legacy placed‑tray bands, `/tmp/waiter2_jobs.txt` 14 `desk_xhjsub_0` / sofa A6 jobs) and handed to the bands agent for a coverage check (placed‑tray ones superseded by the 1.25 stance‑relative bands; missing desk bands queued on the fleet, not locally). Same self‑match bug in the watchdog's idle check (`isg_boot/bench.sh`) fixed with the bracket trick; no other `while pgrep` waiters found in `scripts/` or as processes. Local GPU stays reserved for the ontop‑large demo.
 - 2026‑09‑16 09:10 PDT agent-e2e: coverage of the two killed local band queues confirmed by the bands agent — the 10 right‑hand / generic / scaled breakfast‑table bands exist with cells; the 6 legacy placed‑tray bands are superseded by the 1.25 stance‑relative bands already in `w11` (all 30 by ≈ 10:15 PDT, `pencil_case` ≈ 10:45); the 13 `desk_xhjsub_0` init bands exist but are empty by geometry (the desk's 0.66 m overhang puts the Phase‑1a stance in the bathroom furniture; A6 re‑runs queued but expected to stay empty unless the stance rule changes); the sofa band now has 31 cells. Nothing queued, nothing local.
+- 2026‑09‑16 09:20 PDT agent-e2e: **board 7/21 valid** — camera standard, camera obstructed, object scaling, mental rotation, IORS ontop‑small, IORS nextto and **axial (push‑only, `282dafe`)** re‑sampled + demoed on commits that contain every fix affecting them (board validity = commit ⊇ fixes; the pool syncs the working tree, so the `dirty` flag is provenance only). Running: inside re‑run, wall v/h (`painting_s080`, `picture_s070`), attachment, block design, disembedding (`chili`), under‑small (`teacup-saucer`; `french_fries` now rejected `approach_untrackable` ×8 by the branch‑consistent rule), touching (`teacup-teapot`; `carton_of_milk` failed place/approach IK), ontop‑large floor class locally (B stance `path_collision` / `no_transition` so far). Large articulation on the roomy `rvunhj_0`: Phase 1 finds ~1000 (d, t) with the target in frame but 0 collision‑free → scene‑specific suspicion (floor height / ceiling / room‑spanning object), diagnostic agent 79dce47f on the pool.
