@@ -1,0 +1,294 @@
+{
+ "scene": "house_single_floor",
+ "rooms": [
+  "dining_room_0"
+ ],
+ "support": "breakfast_table_rhjoby_0",
+ "removed_chairs": [
+  "straight_chair_jgoolz_0",
+  "straight_chair_jgoolz_1",
+  "straight_chair_jgoolz_2",
+  "straight_chair_jgoolz_3",
+  "straight_chair_jgoolz_4",
+  "straight_chair_jgoolz_5"
+ ],
+ "lattice": 0.08,
+ "stand_off": 0.45,
+ "arms": "untucked",
+ "grid": {
+  "translates": [
+   0.0,
+   0.25,
+   0.5,
+   0.75,
+   0.95
+  ],
+  "tilts": [
+   0.0,
+   -0.3,
+   -0.6,
+   -0.9
+  ],
+  "low_top_tilt": -1.2
+ },
+ "seeds": 12,
+ "pre_grasp": 0.1,
+ "mode": "tabletop",
+ "stance": {
+  "edge": "+v",
+  "edge_mid": [
+   5.839193344116211,
+   3.5011637210845947
+  ],
+  "inward": [
+   0.9999967217445374,
+   -0.0025519859045743942
+  ],
+  "tangent": [
+   0.0025519859045743942,
+   0.9999967217445374
+  ],
+  "length_m": 1.160200595855713,
+  "base_pose2d": [
+   5.389194965362549,
+   3.502312183380127,
+   -0.002551988730582312
+  ],
+  "stand_off": 0.45,
+  "overhang": 0.0,
+  "edge_depth": 0.4499998390674591
+ },
+ "top": {
+  "name": "breakfast_table_rhjoby_0",
+  "z": 0.8126286864280701,
+  "yaw": 1.5682443380355835,
+  "local_bounds": [
+   2.9359536170959473,
+   4.09615421295166,
+   -8.733036994934082,
+   -5.830239295959473
+  ],
+  "n_free_cells": 8463,
+  "occupants": [],
+  "resolution": 0.02
+ },
+ "z_support": 0.8126286864280701,
+ "object": "teacup/wopjex",
+ "grasp_key": "teacup__wopjex__t",
+ "n_grasps": 5,
+ "rest_quat_xyzw": [
+  0.0,
+  0.0,
+  0.0,
+  1.0
+ ],
+ "trunks": [
+  {
+   "translate": 0.0,
+   "tilt": 0.0,
+   "collides": false,
+   "n_lattice": 225,
+   "n_after_prune": 71,
+   "n_reachable": 26,
+   "rounds": 10,
+   "time_s": 202.85
+  },
+  {
+   "translate": 0.0,
+   "tilt": -0.3,
+   "collides": false,
+   "n_lattice": 225,
+   "n_after_prune": 98,
+   "n_reachable": 41,
+   "rounds": 10,
+   "time_s": 263.17
+  },
+  {
+   "translate": 0.0,
+   "tilt": -0.6,
+   "collides": false,
+   "n_lattice": 225,
+   "n_after_prune": 124,
+   "n_reachable": 59,
+   "rounds": 10,
+   "time_s": 256.14
+  },
+  {
+   "translate": 0.0,
+   "tilt": -0.9,
+   "collides": false,
+   "n_lattice": 225,
+   "n_after_prune": 149,
+   "n_reachable": 67,
+   "rounds": 10,
+   "time_s": 304.19
+  },
+  {
+   "translate": 0.25,
+   "tilt": 0.0,
+   "collides": false,
+   "n_lattice": 225,
+   "n_after_prune": 86,
+   "n_reachable": 32,
+   "rounds": 10,
+   "time_s": 233.03
+  },
+  {
+   "translate": 0.25,
+   "tilt": -0.3,
+   "collides": false,
+   "n_lattice": 225,
+   "n_after_prune": 110,
+   "n_reachable": 49,
+   "rounds": 10,
+   "time_s": 218.24
+  },
+  {
+   "translate": 0.25,
+   "tilt": -0.6,
+   "collides": false,
+   "n_lattice": 225,
+   "n_after_prune": 137,
+   "n_reachable": 67,
+   "rounds": 10,
+   "time_s": 265.84
+  },
+  {
+   "translate": 0.25,
+   "tilt": -0.9,
+   "collides": true,
+   "n_lattice": 225,
+   "n_after_prune": 0,
+   "n_reachable": 0,
+   "rounds": 0,
+   "time_s": 0.01
+  },
+  {
+   "translate": 0.5,
+   "tilt": 0.0,
+   "collides": false,
+   "n_lattice": 225,
+   "n_after_prune": 99,
+   "n_reachable": 39,
+   "rounds": 10,
+   "time_s": 227.74
+  },
+  {
+   "translate": 0.5,
+   "tilt": -0.3,
+   "collides": false,
+   "n_lattice": 225,
+   "n_after_prune": 123,
+   "n_reachable": 56,
+   "rounds": 10,
+   "time_s": 250.74
+  },
+  {
+   "translate": 0.5,
+   "tilt": -0.6,
+   "collides": false,
+   "n_lattice": 225,
+   "n_after_prune": 150,
+   "n_reachable": 64,
+   "rounds": 10,
+   "time_s": 307.23
+  },
+  {
+   "translate": 0.5,
+   "tilt": -0.9,
+   "collides": true,
+   "n_lattice": 225,
+   "n_after_prune": 0,
+   "n_reachable": 0,
+   "rounds": 0,
+   "time_s": 0.01
+  },
+  {
+   "translate": 0.75,
+   "tilt": 0.0,
+   "collides": false,
+   "n_lattice": 225,
+   "n_after_prune": 106,
+   "n_reachable": 39,
+   "rounds": 10,
+   "time_s": 241.07
+  },
+  {
+   "translate": 0.75,
+   "tilt": -0.3,
+   "collides": false,
+   "n_lattice": 225,
+   "n_after_prune": 132,
+   "n_reachable": 53,
+   "rounds": 10,
+   "time_s": 281.51
+  },
+  {
+   "translate": 0.75,
+   "tilt": -0.6,
+   "collides": true,
+   "n_lattice": 225,
+   "n_after_prune": 0,
+   "n_reachable": 0,
+   "rounds": 0,
+   "time_s": 0.01
+  },
+  {
+   "translate": 0.75,
+   "tilt": -0.9,
+   "collides": true,
+   "n_lattice": 225,
+   "n_after_prune": 0,
+   "n_reachable": 0,
+   "rounds": 0,
+   "time_s": 0.01
+  },
+  {
+   "translate": 0.95,
+   "tilt": 0.0,
+   "collides": false,
+   "n_lattice": 225,
+   "n_after_prune": 107,
+   "n_reachable": 34,
+   "rounds": 10,
+   "time_s": 231.51
+  },
+  {
+   "translate": 0.95,
+   "tilt": -0.3,
+   "collides": true,
+   "n_lattice": 225,
+   "n_after_prune": 0,
+   "n_reachable": 0,
+   "rounds": 0,
+   "time_s": 0.01
+  },
+  {
+   "translate": 0.95,
+   "tilt": -0.6,
+   "collides": true,
+   "n_lattice": 225,
+   "n_after_prune": 0,
+   "n_reachable": 0,
+   "rounds": 0,
+   "time_s": 0.01
+  },
+  {
+   "translate": 0.95,
+   "tilt": -0.9,
+   "collides": true,
+   "n_lattice": 225,
+   "n_after_prune": 0,
+   "n_reachable": 0,
+   "rounds": 0,
+   "time_s": 0.01
+  }
+ ],
+ "union_extent": [
+  -0.5600000023841858,
+  0.1599999964237213
+ ],
+ "n_reachable_total": 626,
+ "key": "5b1e533122dee68b",
+ "time_s": 3921.0
+}

@@ -77,4 +77,336 @@ cells that only a lower-ranked grasp with another approach direction reaches); t
 objects within 1.6 m of the base (below 2.1 m; floors dropped for tabletop bands, the cuRobo ground slab stays); the
 support is switched off for the grasp poses by disabling its meshes directly (no world re-sync).
 
+## Fleet run (RunPod SECURE, purpose `rb`, 2026-09-15 21:20 → 2026-09-16 UTC)
+
+Manifests: `jobs.json` (95 jobs, `representative` slot: 70 tabletop picks on `breakfast_table_rhjoby_0` — 30 disembedding
+with the source tray placed, 1 block design, 6 attachment targets, 10 axial targets (generic pinch), 23 small-scale IORS
+targets —, 5 small-scale articulation brace jobs, 20 large-scale IORS bands: 5 placement bands with the partner as the
+support, 5 `--support floor --under` bands, 10 init bands (7 tabletop supports, 3 floor rooms)), `jobs_w2.json` (90
+jobs, `variation_geometry` slot, mostly `countertop_ikwqer_0`), `jobs_w3_heldout.json` (77 jobs, `heldout` slot, mostly
+`desk_pfsjbc_0` in `office_cubicles_right`). Pods: round 1 = 5 × A40 + 3 × L40S (3 h TTL), round 2 = 5 × A40 + 2 ×
+L40S, rounds 3–5 = L40S only (A40 hosts at load average 30–50 took 2–4× longer per job); ≤ 15 live at a time after the
+first TTL cliff, one process per pod, `dispatch_samp.py` queues (`w01_` representative, `w04_` variation, `w05_` heldout,
+`w09_` brace on L40S only), `scripts/reach_bands/redistribute.sh` re-balanced the queues after every TTL cliff
+(`fleet_remaining.py`: a job is done when a `.npz` exists on some pod or in the pulled copies), `pull_loop.sh` rsynced
+`/root/samp` every 8–10 min so that nothing was lost when a pod self-terminated.
+
+Incidents: (1) the first dispatch ran **stale code** on the pods — `dispatch_samp.py` did not sync the new
+`ispatialgym/robot/` package that `robot_utils.py` imports since F5 — and all 95 wave-1 jobs died with `ImportError`
+after 10–19 s (89 recorded in `done.txt`, 6 still queued); the package was pushed by hand, the dispatcher fixed by the
+coordinator (`7384318`), and every job re-queued (95 re-runs). (2) The first brace run crashed in
+`brace_candidates` (`G.rotate` on an `(8, 3)` corner array, fixed in `fc5eadf`; the same commit records per cell the set
+of joint values whose handle poses are feasible and the longest joint-value prefix the brace contact is valid for,
+instead of requiring every joint value). (3) Two brace jobs on A40 pods hit the 50 min `timeout` (blender 1613 s +
+timeout, carton 3002 s, ~250 s per trunk vs 60 s on an L40S); the remaining brace jobs run on L40S only with a 90 min
+timeout. Local runs (`scripts/reach_bands/run_local.sh`, shared RTX 4090, one process at a time, < 12 GB rule) did the
+`desk_xhjsub_0` / countertop / sofa init bands.
+
+Timing per job (wall incl. the scene load): L40S tabletop median 9 min (7–22), A40 tabletop median 18.5 min (12–40),
+floor / under bands 5 min (L40S) – 10 min (A40) (few cells survive the shoulder prune), brace 19–24 min (L40S).
+
+## Findings for the spec (measured)
+
+* **Tabletop bands are wide and consistent**: on `breakfast_table_rhjoby_0` (top 0.81 m, stance 0.45 m from the +v edge)
+  every library-grasp object gets 325–608 cells over the 13 collision-free trunks (the 7 crouched trunks (0.25, −0.9),
+  (0.5, −0.9), (0.75, −0.6/−0.9), (0.95, −0.3/−0.6/−0.9) collide with the table at stand-off 0.45 with untucked arms),
+  union extent λ ∈ [−0.56, 0] to [−0.56, +0.16] (the right arm reaches 0–56 cm to the robot's right, ≤ 16 cm to its
+  left), x = 0.48–0.80 m ahead (3–35 cm into the top). Generic-pinch bands (blocks, axial targets): 427–463 cells,
+  [−0.56, 0]. Disembedding bands (lattice = the `tray/gsxbym` floor, 8 cm behind the edge): 64–143 cells, λ ∈ [−0.16,
+  0..0.08] — the tray floor is 0.40 m wide, the right hand reaches its right half.
+* **Support geometry decides more than the object**: `countertop_ikwqer_0` / `fjkase_0` / `kelker_0` (0.89–0.93 m): 9–10
+  free trunks, 265–474 cells, λ ∈ [−0.80, +0.08]; `bar_udatjt_0` (1.05 m): 5 free trunks, 108 cells; beds as ontop
+  partners (`bed_rrcvaq_0`, `bed_gxfipj_0`, 0.49 m, tilt −1.2 added): 21/25 free trunks, 400–446 cells; `sofa_lugrhk_1`
+  (seat 0.40 m): 16 free trunks but **0 cells** (the seat lies beyond the armrest overhang); **`desk_xhjsub_0`
+  (house_single_floor, childs_room_0): every Phase-1a stance collides** — its AABB extends 0.66 m beyond the exposed top
+  (+u edge), so the spec's stand-off + overhang puts the base 1.11 m from the top edge into the bathroom furniture next
+  to it; all 4 init bands and the 2 `--under` bands (the AABB-edge stance collides at every trunk too) are empty → the
+  3 under-large picks and 2 ontop-large picks using this desk cannot be initialized under §4.2 / §5.6 as written (the
+  overhang rule should use the top's own AABB, or the pick needs another support).
+* **Floor is out of reach**: every `--support floor --room R` init band (5 jobs, 21/25 free trunks) and 3 of 5
+  `--under` bands are empty: from a standing base the eef cannot reach the floor 0.45–0.9 m ahead (the stretched arm
+  is 0.79 m from a shoulder ≥ 0.79 m above the floor at the deepest collision-free crouch; the reach volume's pinch band
+  bottoms out at z 0.25 m). Only tall objects under a bed at stand-off 0.45 work (`briefcase/lwbctq` under
+  `bed_rrcvaq_0`: 16 cells at translate 0.95 / tilt −0.6…−0.9, λ ∈ [−0.56, −0.16]; `sandal` under the same bed: 0).
+  §5.6's floor init and under placement need a smaller stand-off (0.35), a bent-over posture, or a push.
+* **Small-scale articulation brace rule yields nothing**: for all five targets the handle is reachable (50–160
+  (cell, yaw) combinations per trunk with ≥ 1 feasible joint value) but **no brace contact is IK-feasible**: the
+  `opposite_face` of §5.4 is the face the handle motion points toward = the far face of a lid hinged at the back, so the
+  brace hand would have to reach behind the object and point back at the robot; `top_press` is excluded by the ≥ 2 cm
+  swept-AABB rule because the lid sweeps over the base link's top (laptop: the base link is entirely under the lid, no
+  candidate at all). The bands record the handle-feasible pairs (`n_handle_only_pairs`) so the sampler can initialize
+  without a brace if the rule is relaxed.
+* **Cost**: 15–25 min per (support, object) on an L40S — 5× the §4.1 estimate; the two-factor cache pays off only
+  across objects sharing a support (the support factor is < 10 % of a job), so a multi-object mode (one scene load,
+  many objects) is the next speed-up.
+
 <!-- results -->
+
+## Results per job (regenerated by `scripts/reach_bands/collect_bands.py`)
+
+Status: {'failed': 2, 'empty band': 25, 'not run': 122, 'ok': 113}
+
+| job | kind | status | pod | wall s | trunks free/total | cells | union extent [λmin, λmax] | note |
+|---|---|---|---|---|---|---|---|---|
+| `rb__brace__house_single_floor__breakfast_table_rhjoby_0__blender-cwkvib-j_lid` | brace | failed | rb-a40-0 | 3002 | / |  |  | rc=124 |
+| `rb__brace__house_single_floor__breakfast_table_rhjoby_0__carton-causya-j_link_2` | brace | failed | rb-a40-1 | 3002 | / |  |  | rc=124 |
+| `rb__brace__house_single_floor__breakfast_table_rhjoby_0__hinged_jar-gqtsam-j_cap` | brace | empty band | rb-l40s-0 | 1141 | 13/20 | 0 | null |  |
+| `rb__brace__house_single_floor__breakfast_table_rhjoby_0__laptop-nvulcs-j_link_0` | brace | empty band | rb-l40s-1 | 1167 | 13/20 | 0 | null |  |
+| `rb__brace__house_single_floor__breakfast_table_rhjoby_0__toolbox-redmtl-j_lid` | brace | empty band | rb-l40s-2 | 1443 | 13/20 | 0 | null |  |
+| `rb__brace__house_single_floor__countertop_ikwqer_0__blender-eyedvd-j_lid` | brace | not run |  |  | / |  |  |  |
+| `rb__brace__house_single_floor__countertop_ikwqer_0__carton-msfzpz-j_link_0` | brace | not run |  |  | / |  |  |  |
+| `rb__brace__house_single_floor__countertop_ikwqer_0__hinged_jar-vzwhbg-j_rb1` | brace | not run |  |  | / |  |  |  |
+| `rb__floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd` | floor | empty band | rb2-l40s-0 | 243 | 18/25 | 0 | null |  |
+| `rb__floor__Rs_int__floor-under-bed_zrumze_0__sandal-spcddb` | floor | empty band | rb2-a40-0 | 327 | 18/25 | 0 | null |  |
+| `rb__floor__house_double_floor_lower__floor-under-sofa_frlxgz_0__pencil-vpzhth__scaled` | floor | empty band | rb-l40s-0 | 308 | 0/25 | 0 | null |  |
+| `rb__floor__house_double_floor_upper__floor-bedroom_0__apple-bwteqh` | floor | not run |  |  | / |  |  |  |
+| `rb__floor__house_double_floor_upper__floor-bedroom_0__marker-qemval` | floor | not run |  |  | / |  |  |  |
+| `rb__floor__house_double_floor_upper__floor-bedroom_0__pencil-fnlbpu__scaled` | floor | not run |  |  | / |  |  |  |
+| `rb__floor__house_double_floor_upper__floor-under-desk_aduafr_0__apple-bwteqh` | floor | not run |  |  | / |  |  |  |
+| `rb__floor__house_double_floor_upper__floor-under-desk_aduafr_0__marker-qemval` | floor | empty band | rb2-l40s-0 | 168 | 7/25 | 0 | null |  |
+| `rb__floor__house_double_floor_upper__floor-under-sofa_ukfaaz_0__pencil-fnlbpu__scaled` | floor | not run |  |  | / |  |  |  |
+| `rb__floor__house_double_floor_upper__floor-under-sofa_ukfaaz_0__pencil-lykqoh__scaled` | floor | empty band | rb-a40b-0 | 664 | 25/25 | 0 | null |  |
+| `rb__floor__house_single_floor__floor-childs_room_0__apple-omzprq` | floor | empty band | rb-a40b-1 | 605 | 21/25 | 0 | null |  |
+| `rb__floor__house_single_floor__floor-childs_room_0__marker-gldosk` | floor | empty band | rb-a40-0 | 594 | 21/25 | 0 | null |  |
+| `rb__floor__house_single_floor__floor-childs_room_0__pencil-gbzzcg__scaled` | floor | empty band | rb-a40-1 | 567 | 21/25 | 0 | null |  |
+| `rb__floor__house_single_floor__floor-childs_room_1__apple-zlxfxt` | floor | empty band | rb-l40s-1 | 305 | 20/25 | 0 | null |  |
+| `rb__floor__house_single_floor__floor-childs_room_1__marker-kjxpdi` | floor | empty band | rb-l40s-2 | 325 | 20/25 | 0 | null |  |
+| `rb__floor__house_single_floor__floor-childs_room_1__pencil-lruiot__scaled` | floor | empty band | rb2-a40b-0 | 474 | 20/25 | 0 | null |  |
+| `rb__floor__house_single_floor__floor-under-bed_rrcvaq_0__briefcase-lwbctq` | floor | ok | rb-l40s-0 | 445 | 21/25 | 16 | [-0.5600000023841858, -0.1599999964237213] |  |
+| `rb__floor__house_single_floor__floor-under-bed_rrcvaq_0__briefcase-psvdau` | floor | not run |  |  | / |  |  |  |
+| `rb__floor__house_single_floor__floor-under-bed_rrcvaq_0__sandal-chgcrm` | floor | empty band | rb-l40s-0 | 300 | 21/25 | 0 | null |  |
+| `rb__floor__house_single_floor__floor-under-bed_rrcvaq_0__sandal-shdahi` | floor | not run |  |  | / |  |  |  |
+| `rb__floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt` | floor | empty band | rb2-a40b-0 | 518 | 0/25 | 0 | null |  |
+| `rb__floor__house_single_floor__floor-under-desk_bhkhxo_0__marker-kjxpdi` | floor | empty band | rb2-a40b-1 | 596 | 0/25 | 0 | null |  |
+| `rb__floor__house_single_floor__floor-under-desk_xhjsub_0__apple-omzprq` | floor | empty band | rb-l40s-1 | 291 | 0/25 | 0 | null |  |
+| `rb__floor__house_single_floor__floor-under-desk_xhjsub_0__marker-gldosk` | floor | empty band | rb-l40s-2 | 294 | 0/25 | 0 | null |  |
+| `rb__tabletop__Rs_int__countertop_tpuwys_0__shampoo_dispenser-ndrvvm` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_double_floor_upper__bed_tjfzsb_0__beaker-exzsal` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_double_floor_upper__bed_tjfzsb_0__pen-gqwdor` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_double_floor_upper__desk_aduafr_0__pencil-fnlbpu__scaled` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_double_floor_upper__desk_aduafr_0__pencil-lykqoh__scaled` | tabletop | ok | rb-a40b-0 | 785 | 7/20 | 231 | [-0.7200000286102295, 0.07999999821186066] |  |
+| `rb__tabletop__house_double_floor_upper__desk_aduafr_0__pencil-vpzhth__scaled` | tabletop | ok | rb2-l40s-0 | 485 | 7/20 | 232 | [-0.7200000286102295, 0.07999999821186066] |  |
+| `rb__tabletop__house_double_floor_upper__sofa_ukfaaz_0__box_of_shampoo-tzghev` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__bar_udatjt_0__box_of_shampoo-bclpiq` | tabletop | ok | rb-a40b-1 | 1156 | 5/20 | 108 | [-0.7200000286102295, 0.0] |  |
+| `rb__tabletop__house_single_floor__bar_udatjt_0__box_of_shampoo-nijidu` | tabletop | ok | rb2-a40-0 | 1071 | 5/20 | 88 | [-0.7200000286102295, 0.0] |  |
+| `rb__tabletop__house_single_floor__bar_udatjt_0__box_of_shampoo-tzghev` | tabletop | ok | rb2-l40sb-0 | 516 | 5/20 | 91 | [-0.7200000286102295, 0.0] |  |
+| `rb__tabletop__house_single_floor__bed_gxfipj_0__beaker-dtjmai` | tabletop | ok | rb2-a40-1 | 1664 | 21/25 | 631 | [-0.800000011920929, 0.1599999964237213] |  |
+| `rb__tabletop__house_single_floor__bed_gxfipj_0__pen-hiyeki` | tabletop | ok | rb2-a40b-0 | 1395 | 21/25 | 401 | [-0.800000011920929, 0.0] |  |
+| `rb__tabletop__house_single_floor__bed_rrcvaq_0__beaker-fyrkzs` | tabletop | ok | rb-l40s-1 | 1037 | 21/25 | 446 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__bed_rrcvaq_0__pen-gzrbrx` | tabletop | ok | rb-l40s-2 | 833 | 21/25 | 438 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__apple-zlxfxt` | tabletop | ok | rb-a40b-2 | 1642 | 13/20 | 426 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bag_of_chips-dwkdko__gp` | tabletop | ok | rb-l40s-0 | 521 | 13/20 | 436 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bar_soap-ofargb__placed-tray-gsxbym` | tabletop | ok | rb2-a40b-1 | 1693 | 13/20 | 143 | [-0.1599999964237213, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__beaker-jdijek__placed-tray-gsxbym` | tabletop | ok | rb-l40s-0 | 482 | 13/20 | 78 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__beer_glass-mxsliu` | tabletop | ok | rb-l40s-1 | 920 | 13/20 | 600 | [-0.5600000023841858, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__board_game-qgvsnb__gp` | tabletop | ok | rb-l40s-2 | 512 | 13/20 | 427 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_beer-meqliv__placed-tray-gsxbym` | tabletop | ok | rb-l40s-1 | 459 | 13/20 | 97 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_medicine-kasbsy` | tabletop | ok | rb-a40b-0 | 1819 | 13/20 | 341 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_medicine-syfpak__placed-tray-gsxbym` | tabletop | ok | rb-l40s-2 | 474 | 13/20 | 81 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_milk-mrejrs__placed-tray-gsxbym` | tabletop | ok | rb-a40-0 | 914 | 13/20 | 100 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_shampoo-stjjjm__placed-tray-gsxbym` | tabletop | ok | rb-a40-1 | 909 | 13/20 | 75 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_supplements-oqakev` | tabletop | ok | rb2-l40s-0 | 1348 | 13/20 | 350 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__bottle_of_wine-lacaoa__placed-tray-gsxbym` | tabletop | ok | rb-l40s-0 | 444 | 13/20 | 64 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_baking_mix-fmewsz__placed-tray-gsxbym` | tabletop | ok | rb-l40s-1 | 468 | 13/20 | 77 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_cane_sugar-gpbobo__placed-tray-gsxbym` | tabletop | ok | rb-l40s-2 | 455 | 13/20 | 76 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_cereal-iucshm__placed-tray-gsxbym` | tabletop | ok | rb-a40b-0 | 890 | 13/20 | 76 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_cookies-apjokz__placed-tray-gsxbym` | tabletop | ok | rb-a40b-1 | 924 | 13/20 | 81 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_rice-pstqvm__placed-tray-gsxbym` | tabletop | ok | rb-a40b-2 | 979 | 13/20 | 78 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_sanitary_napkins-humkqw` | tabletop | ok | rb2-a40-0 | 2085 | 13/20 | 334 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_sanitary_napkins-tkrzkb__placed-tray-gsxbym` | tabletop | ok | rb2-l40s-0 | 574 | 13/20 | 76 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_shampoo-bclpiq__placed-tray-gsxbym` | tabletop | ok | rb2-a40-0 | 866 | 13/20 | 80 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__box_of_tissues-uglbjc__placed-tray-gsxbym` | tabletop | ok | rb2-a40-1 | 1443 | 13/20 | 79 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__brussels_sprouts-mbkrxe` | tabletop | ok | rb2-a40-1 | 1610 | 13/20 | 484 | [-0.5600000023841858, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__can_of_soda-bfrzvk__placed-tray-gsxbym` | tabletop | ok | rb2-a40b-0 | 1377 | 13/20 | 74 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__cap-xxqyrt` | tabletop | ok | rb2-a40b-0 | 1681 | 13/20 | 521 | [-0.5600000023841858, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__carton_of_milk-kszoro__placed-tray-gsxbym` | tabletop | ok | rb2-a40b-1 | 874 | 13/20 | 81 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__carton_of_milk-xmugpm` | tabletop | ok | rb-a40-0 | 1552 | 13/20 | 328 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__catalog-aygcnt__gp` | tabletop | ok | rb2-l40sb-0 | 512 | 13/20 | 427 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__cellulose_tape-kavsnx__placed-tray-gsxbym` | tabletop | ok | rb2-l40sb-0 | 446 | 13/20 | 90 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__chili-agecro__placed-tray-gsxbym` | tabletop | ok | rb2-a40c | 875 | 13/20 | 90 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__cinnamon_stick-qxpzdm__scaled` | tabletop | ok | rb-a40-1 | 1600 | 13/20 | 444 | [-0.5600000023841858, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__coffee_cup-siksnl` | tabletop | ok | rb-l40s-0 | 803 | 13/20 | 330 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__conditioner_dispenser-njqnuo__placed-tray-gsxbym` | tabletop | ok | rb2-a40-1 | 964 | 13/20 | 154 | [-0.1599999964237213, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__cork-uyceta` | tabletop | ok | rb-l40s-1 | 750 | 13/20 | 333 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__dip_candle-poexjo` | tabletop | ok | rb-l40s-0 | 849 | 13/20 | 576 | [-0.5600000023841858, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__french_fries-kxpfcj__scaled` | tabletop | ok | rb-l40s-1 | 717 | 13/20 | 425 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__frying_pan-jpzusm__gp` | tabletop | ok | rb-l40s-2 | 529 | 13/20 | 428 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__gym_shoe-kmcbym__gp` | tabletop | ok | rb-a40b-0 | 1073 | 13/20 | 463 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__half_bagel-gywbkh` | tabletop | ok | rb-a40b-1 | 1590 | 13/20 | 608 | [-0.5600000023841858, 0.1599999964237213] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__hard_candy-vwegtt` | tabletop | ok | rb-l40s-2 | 677 | 13/20 | 362 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__hardback-acbrnv__gp` | tabletop | ok | rb2-l40s-0 | 643 | 13/20 | 427 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__ice_cube-ujmgkb` | tabletop | ok | rb2-l40s-0 | 849 | 13/20 | 360 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__jar_of_spaghetti_sauce-exmsmm` | tabletop | ok | rb-a40b-2 | 2429 | 13/20 | 325 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__keyboard-injrgc__gp` | tabletop | ok | rb-a40b-1 | 1012 | 13/20 | 441 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__letter-oheufk__gp` | tabletop | ok | rb-a40b-2 | 1112 | 13/20 | 441 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__lid-tnwisp` | tabletop | ok | rb2-l40s-0 | 836 | 13/20 | 377 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__light_bulb-kfmkwd` | tabletop | ok | rb2-l40sb-0 | 712 | 13/20 | 420 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__magazine-tfovwy__gp` | tabletop | ok | rb2-a40-0 | 1058 | 13/20 | 441 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__marker-xakoic` | tabletop | ok | rb2-a40-1 | 1589 | 13/20 | 536 | [-0.5600000023841858, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__mouse-wwyopp__placed-tray-gsxbym` | tabletop | ok | rb-l40s-0 | 475 | 13/20 | 83 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__mug-ycbmug__placed-tray-gsxbym` | tabletop | ok | rb-l40s-0 | 478 | 13/20 | 73 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__notebook-umxsmd__placed-tray-gsxbym` | tabletop | ok | rb-a40b-2 | 989 | 13/20 | 84 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__pack_of_cigarettes-ghbqav__placed-tray-gsxbym` | tabletop | ok | rb-l40s-1 | 460 | 13/20 | 80 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__pack_of_kielbasa-dgodnn` | tabletop | ok | rb2-a40b-0 | 1543 | 13/20 | 493 | [-0.5600000023841858, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__paperback_book-jhaltj__gp` | tabletop | ok | rb-l40s-0 | 518 | 13/20 | 427 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__parsnip-osqisk` | tabletop | ok | rb2-a40b-1 | 1410 | 13/20 | 389 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__pencil-hmawzy__scaled` | tabletop | ok | rb-l40s-2 | 688 | 13/20 | 367 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__pencil_case-otcmih__placed-tray-gsxbym` | tabletop | ok | rb-l40s-2 | 519 | 13/20 | 113 | [-0.1599999964237213, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__pickle-iobrqp` | tabletop | ok | rb-a40b-0 | 1772 | 13/20 | 555 | [-0.5600000023841858, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__quartz-vfuilh` | tabletop | ok | rb2-l40sb-0 | 798 | 13/20 | 558 | [-0.5600000023841858, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__skateboard_wheel_assembly-jljqtt` | tabletop | ok | rb2-a40c | 1482 | 13/20 | 354 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__soap_dispenser-zwudcz__placed-tray-gsxbym` | tabletop | ok | rb2-a40b-0 | 837 | 13/20 | 76 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh` | tabletop | ok | rb3-l40s-0 | 3912 | 13/20 | 693 | [-0.5600000023841858, 0.1599999964237213] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__tablefork-pqrtkc__placed-tray-gsxbym` | tabletop | ok | rb2-a40b-1 | 958 | 13/20 | 127 | [-0.1599999964237213, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe` | tabletop | ok | rb3-l40s-1 | 3804 | 13/20 | 480 | [-0.5600000023841858, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex` | tabletop | ok | rb3-l40s-3 | 3936 | 13/20 | 626 | [-0.5600000023841858, 0.1599999964237213] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teaspoon-qdepdj__placed-tray-gsxbym` | tabletop | ok | rb-a40b-2 | 1001 | 13/20 | 128 | [-0.1599999964237213, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__toy_dice-hbkqqp__placed-tray-gsxbym` | tabletop | ok | rb2-l40s-0 | 567 | 13/20 | 80 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__toy_dice-isgblk__gp` | tabletop | ok | rb2-a40-0 | 1036 | 13/20 | 441 | [-0.5600000023841858, 0.0] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__video_game-ceaxsd__placed-tray-gsxbym` | tabletop | ok | rb2-a40-0 | 891 | 13/20 | 83 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_fjkase_0__shampoo_dispenser-zoyyia` | tabletop | ok | local | None | 7/20 | 361 | [-0.800000011920929, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__apple-netbsb` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__bag_of_chips-bryahw__gp` | tabletop | ok | rb-l40s-1 | 535 | 9/20 | 387 | [-0.800000011920929, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__beaker-sfvswx__placed-tray-gsxbym` | tabletop | ok | rb2-a40-0 | 821 | 9/20 | 92 | [-0.1599999964237213, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__board_game-eoywpy__gp` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__bottle_of_beer-dcwvkg__placed-tray-gsxbym` | tabletop | ok | rb2-a40-1 | 779 | 9/20 | 51 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__bottle_of_medicine-egondf__placed-tray-gsxbym` | tabletop | ok | rb2-l40s-0 | 522 | 9/20 | 53 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__bottle_of_medicine-zfbnjh` | tabletop | ok | rb2-l40sb-0 | 679 | 9/20 | 279 | [-0.800000011920929, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__bottle_of_milk-ddvsgl__placed-tray-gsxbym` | tabletop | ok | rb2-a40-0 | 808 | 9/20 | 59 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__bottle_of_shampoo-dvrzmy__placed-tray-gsxbym` | tabletop | ok | rb2-a40-1 | 851 | 9/20 | 85 | [-0.1599999964237213, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__bottle_of_supplements-kgreql` | tabletop | ok | rb2-a40c | 1567 | 9/20 | 327 | [-0.800000011920929, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__bottle_of_wine-wcokej__placed-tray-gsxbym` | tabletop | ok | rb2-a40b-0 | 736 | 9/20 | 49 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_cane_sugar-qvjiti__placed-tray-gsxbym` | tabletop | ok | rb2-a40b-1 | 781 | 9/20 | 55 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_cereal-ykuyqb__placed-tray-gsxbym` | tabletop | ok | rb2-l40sb-0 | 401 | 9/20 | 52 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_cookies-dlhqft__placed-tray-gsxbym` | tabletop | ok | rb2-a40c | 854 | 9/20 | 57 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__placed-tray-gsxbym` | tabletop | ok | rb3-l40s-0 | 1150 | 9/20 | 138 | [-0.1599999964237213, 0.1599999964237213] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym` | tabletop | ok | rb3-l40s-1 | 1009 | 9/20 | 57 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-zqinib` | tabletop | ok | rb2-l40s-0 | 811 | 9/20 | 265 | [-0.800000011920929, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__placed-tray-gsxbym` | tabletop | ok | rb3-l40s-3 | 947 | 9/20 | 54 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__can_of_soda-evcxlr__placed-tray-gsxbym` | tabletop | ok | rb2-l40sb-0 | 388 | 9/20 | 53 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__cap-hbafeb` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-atyqub__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__catalog-uilzqm__gp` | tabletop | ok | rb2-a40b-1 | 1029 | 9/20 | 384 | [-0.800000011920929, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__cellulose_tape-gchdhk__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__cinnamon_stick-kdaxdy__scaled` | tabletop | ok | rb2-l40sb-0 | 694 | 9/20 | 383 | [-0.800000011920929, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__coffee_cup-ckkwmj` | tabletop | ok | rb2-a40c | 1608 | 9/20 | 387 | [-0.800000011920929, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__placed-tray-gsxbym` | tabletop | ok | rb4-l40s-1 | 1090 | 9/20 | 61 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__cork-ncxgpe` | tabletop | ok | rb2-l40s-0 | 951 | 9/20 | 451 | [-0.800000011920929, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__french_fries-xshwvn__scaled` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__frying_pan-sfbdjn__gp` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__gym_shoe-qxecbh__gp` | tabletop | ok | rb2-l40sb-0 | 517 | 9/20 | 402 | [-0.800000011920929, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__hard_candy-yuatcg` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__gp` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__ice_cube-tqsquu` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__jar_of_spaghetti_sauce-fyocnu` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__keyboard-jtdyix__gp` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__letter-qhqhwk__gp` | tabletop | ok | rb2-l40s-0 | 605 | 9/20 | 379 | [-0.800000011920929, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__lid-zkderg` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__light_bulb-sxkjea` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__magazine-zfeoeu__gp` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__marker-kjxpdi` | tabletop | ok | rb2-a40b-1 | 1506 | 9/20 | 451 | [-0.800000011920929, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__mouse-pljjtu__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__mug-waqrdy__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__notebook-yibctu__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__pack_of_cigarettes-qabdgg__placed-tray-gsxbym` | tabletop | ok | rb2-l40s-0 | 499 | 9/20 | 54 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__pack_of_kielbasa-femhoz` | tabletop | ok | rb2-l40sb-0 | 808 | 9/20 | 407 | [-0.800000011920929, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__paperback_book-aubynm__gp` | tabletop | ok | rb2-a40c | 1069 | 9/20 | 384 | [-0.800000011920929, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__parsnip-invznw` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__pencil-rzscao__scaled` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__pencil_case-cqxkgl__placed-tray-gsxbym` | tabletop | ok | rb2-l40sb-0 | 397 | 9/20 | 55 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__pickle-ifterk` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__quartz-poplsu` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__shampoo_dispenser-kkbhzw` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__shampoo_dispenser-ndrvvm` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__shampoo_dispenser-zoyyia` | tabletop | ok | local | None | 9/20 | 474 | [-0.800000011920929, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__skateboard_wheel_assembly-acmbvb` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__soap_dispenser-cgxrwd__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__sunflower-mdpoct` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__tablefork-uodzrq__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__teacup-tfzfam` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__teacup-wopjex` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__teaspoon-piqabk__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__toy_dice-ievnsq__placed-tray-gsxbym` | tabletop | ok | rb2-l40sb-0 | 410 | 9/20 | 56 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__video_game-ppnzqm__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_kelker_0__shampoo_dispenser-kkbhzw` | tabletop | ok | rb2-l40sb-0 | 716 | 10/20 | 315 | [-0.800000011920929, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__desk_bhkhxo_0__pencil-lruiot__scaled` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__desk_xhjsub_0__beaker-exzsal` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__desk_xhjsub_0__beaker-fyrkzs` | tabletop | empty band | local | None | 0/20 | 0 | null |  |
+| `rb__tabletop__house_single_floor__desk_xhjsub_0__briefcase-lwbctq` | tabletop | empty band | local | None | 0/20 | 0 | null |  |
+| `rb__tabletop__house_single_floor__desk_xhjsub_0__briefcase-psvdau` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__desk_xhjsub_0__pen-gqwdor` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__desk_xhjsub_0__pen-gzrbrx` | tabletop | empty band | local | None | 0/20 | 0 | null |  |
+| `rb__tabletop__house_single_floor__desk_xhjsub_0__pen-hiyeki` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__scaled` | tabletop | empty band | local | None | 0/20 | 0 | null |  |
+| `rb__tabletop__house_single_floor__desk_xhjsub_0__sandal-chgcrm` | tabletop | empty band | local | None | 0/20 | 0 | null |  |
+| `rb__tabletop__house_single_floor__desk_xhjsub_0__sandal-shdahi` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__desk_xhjsub_0__sandal-spcddb` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__sofa_lugrhk_1__box_of_shampoo-bclpiq` | tabletop | empty band | local | None | 16/25 | 0 | null |  |
+| `rb__tabletop__house_single_floor__sofa_wnzdke_0__box_of_shampoo-nijidu` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__apple-bwteqh` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__bag_of_chips-ennnjj__gp` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__bar_soap-utgixp__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__beaker-exzsal__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__board_game-frgdqh__gp` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__bottle_of_beer-rdnopv__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__bottle_of_medicine-qqsukh` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__bottle_of_medicine-qqsukh__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__bottle_of_milk-czblzn__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__bottle_of_shampoo-hlkpwd__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__box_of_baking_mix-fnbgwd__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__box_of_cane_sugar-rvsivw__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__box_of_cereal-sgirte__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__box_of_cookies-levwda__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__box_of_rice-yyheuw__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__box_of_sanitary_napkins-arqcyu` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__box_of_sanitary_napkins-arqcyu__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__box_of_shampoo-tzghev__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__box_of_tissues-xwstls__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__brussels_sprouts-vdamtq` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__can_of_soda-lugwcz__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__carton_of_milk-kklgxk__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__cellulose_tape-sklkyc__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__chili-xhbpqh__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__cinnamon_stick-qmlyim__scaled` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__coffee_cup-fgizgn` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__conditioner_dispenser-udeflt__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__cork-lseuwf` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__dip_candle-gbaons` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__french_fries-oeterg__scaled` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__frying_pan-aewpzn__gp` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__gym_shoe-arigtn__gp` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__hard_candy-vyxhmv` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__hardback-bqvvvx__gp` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__ice_cube-kdlafa` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__jar_of_spaghetti_sauce-efrxze` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__keyboard-nddmmy__gp` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__letter-bdlpry__gp` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__light_bulb-ymomhw` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__magazine-ehdwsd__gp` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__marker-qemval` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__mouse-eosngb__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__mug-ehnmxj__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__notebook-dlhxxl__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__pack_of_cigarettes-ppbmak__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__pack_of_kielbasa-fwqdoy` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__paperback_book-vciijb__gp` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__parsnip-fwmatc` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__pencil-fnlbpu__scaled` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__pencil_case-acikzo__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__pickle-gytwes` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__quartz-drqtci` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__soap_dispenser-sinntg__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__tablefork-yuihyg__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__teacup-cpozxi` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__teaspoon-nxddfp__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__toy_dice-bjrxkj__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__video_game-lfdpse__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
