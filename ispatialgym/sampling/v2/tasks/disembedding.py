@@ -397,11 +397,16 @@ class Disembedding(SamplerV2):
         # itself (the tray walls are ignored for the grasp pose per §3.6; the pre-grasp is 10 cm above the rim in practice)
         mc = self.choice.models["target"]
         src_mc = self.choice.models[self.src_role]
-        # band key (item 9, agreed form for ``reach_bands.placed_specs``): ``<category>/<model>@<scale>:focus:edge`` = the
-        # source tray at that uniform scale, its inner-floor centre on the manipulation focus cell, long axis along the
-        # edge — stance-relative, so every template of the alias hits the same band
+        # band key (item 9, B3's ``reach_bands.PlacedSpec`` grammar ``CATEGORY/MODEL[*SCALE][@MODE]``): the source tray at
+        # its spawn scale, mode ``focus_centred_edge_aligned`` = inner-floor centroid on the manipulation focus cell, long
+        # axis along the edge — stance-relative, so every template of the alias hits the same band
         src_scale = float(src_mc.scale[0]) if src_mc.scale else 1.0
-        self.placed_key = f"{src_mc.category}/{src_mc.model}@{src_scale:.2f}:focus:edge"
+        mode = getattr(TT.RB, "PLACED_MODE_FOCUS", "focus_centred_edge_aligned")
+        spec_obj = getattr(TT.RB, "PlacedSpec", None)
+        if spec_obj is not None:
+            self.placed_key = spec_obj.parse((f"{src_mc.category}/{src_mc.model}", src_scale if abs(src_scale - 1.0) > 1e-6 else None, mode)).canonical()
+        else:
+            self.placed_key = f"{src_mc.category}/{src_mc.model}" + (f"*{src_scale:g}" if abs(src_scale - 1.0) > 1e-6 else "") + f"@{mode}"
         self.band_spec = TT.BandSpec(object=f"{mc.category}/{mc.model}", grasp_key=self.grasp_key, grasps=self.grasps, hull=self.hull["target"],
                                      rest_quat=self.rest["target"], scale=list(mc.scale) if mc.scale else None, placed=[self.placed_key],
                                      z_support=self.top.z + self.src_floor.z_local + self.world.bottom_offset(self.hull[self.src_role], C.IDENTITY_QUAT),
