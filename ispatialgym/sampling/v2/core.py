@@ -376,6 +376,7 @@ class SamplerV2(TaskSampler):
             err = self.world.settle(ents, steps=int(self.gen("goal_settle_steps", self.GOAL_SETTLE_STEPS)))
             if err:
                 raise Reject("goal_unstable", err)
+            self.check_goal_upright(draft)
             self.refine_targets_from_goal(draft)
             self.configure_targets(draft)
             holds, status = self.binary_goal_holds()
@@ -394,6 +395,32 @@ class SamplerV2(TaskSampler):
             self.robot.keep_still()
             self.kit.sync_world()
             self.configure_targets(draft)
+
+    #: up-axis guard (owner item 4, 2026-09-16 10:15): after the goal settle an object's up axis must stay within this
+    #: of the up axis of the goal pose it was released at (= its init orientation for IORS)
+    GOAL_TIP_MAX_DEG = 15.0
+
+    def check_goal_upright(self, draft: Draft):
+        """After the goal-feasibility settle every object with a goal pose must keep its up axis within
+        ``GOAL_TIP_MAX_DEG`` of the goal pose's up axis (a cup that fell rim-to-well, a box that toppled off a plate) —
+        ``Reject("goal_tipped")``; the measured tilts go to ``summary.goal_tilt_deg`` and the counter ``goal_tipped``."""
+        up = th.tensor([0.0, 0.0, 1.0])
+        tilts: Dict[str, float] = {}
+        max_deg = float(self.gen("goal_tip_max_deg", self.GOAL_TIP_MAX_DEG))
+        for name, pose in draft.goal_poses.items():
+            obj = self.objects.get(name)
+            if obj is None:
+                continue
+            _, q_now = obj.get_position_orientation()
+            u_goal = G.rotate(G.t(pose[1]), up)
+            u_now = G.rotate(q_now.float(), up)
+            c = float(th.clamp(th.dot(u_goal, u_now), -1.0, 1.0))
+            tilts[name] = round(math.degrees(math.acos(c)), 2)
+        draft.summary["goal_tilt_deg"] = tilts
+        bad = {n: d for n, d in tilts.items() if d > max_deg}
+        if bad:
+            self.counters["goal_tipped"] = self.counters.get("goal_tipped", 0) + 1
+            raise Reject("goal_tipped", f"up axis after the goal settle off by {bad} deg (> {max_deg:.0f})")
 
     def check_stances_with_objects(self, draft: Draft):
         """§4.6 step 5: whole-body collision check of every recorded stance (init, manipulation, placement, ...) with the
