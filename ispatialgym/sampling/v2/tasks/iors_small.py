@@ -56,31 +56,29 @@ from ispatialgym.sampling.v2.stances import BAND_CELL_TOL, brace_placement_admis
 
 
 def left_contact_band_cells(s, trunk: Tuple[float, float], height: float):
-    """Base-frame cells of the left-arm contact band (closed gripper, brace approach; one band per object height class —
-    B3 A1) for ``trunk``. Coded against the documented APIs in this order: ``tabletop.ensure_contact_bands(s, arm="left",
-    height=h)`` (tabletop A1 helper) then ``reach_bands.ReachBands.load(scene, support, mode="contact", arm="left",
-    height_class=...)``; returns None while neither exists (the caller records the gate as unavailable and falls back to
-    the exact two-arm IK alone)."""
+    """Base-frame cells of the left-arm generic CONTACT band (closed gripper, brace approach; one band per object height
+    class — B3 A1) at ``trunk``, through ``tabletop.load_left_contact_band`` (B3's ``ReachBands.load(scene, support,
+    arm="left", contact_set="generic_contact", height=h)``, nearest class within ±4 cm, in-process compute as the last
+    resort; cached on ``s.bands_left``). None only when no band can be had — then the key looked for and the left bands
+    present for the support are logged and the caller records the gate as unavailable."""
     bands = None
-    fn = getattr(TT, "ensure_contact_bands", None)
-    if fn is not None:
-        try:
-            bands = fn(s, arm="left", height=float(height))
-        except Exception as e:  # noqa: BLE001 - the helper's signature may still move
-            log.info("tabletop.ensure_contact_bands unavailable for the left band: %r", e)
-            bands = None
+    try:
+        bands = TT.load_left_contact_band(s, float(height), top=s.top, edge=s.edge, compute=True)
+    except Exception as e:  # noqa: BLE001 - loader / compute failure: recorded, the exact two-arm IK stays the gate
+        log.warning("left contact band for height %.3f unavailable: %r", float(height), e)
     if bands is None:
-        try:
-            from ispatialgym.sampling import reach_bands as RB
+        import glob
+        import os
 
-            bands = RB.ReachBands.load(s.world.scene_model, s.top.name, mode="contact", arm="left", height_class=float(height))
-        except TypeError:
-            bands = None  # the B3 left-band loader is not there yet (no ``arm`` / ``height_class`` factors)
-        except Exception:  # FileNotFoundError: no left band computed for this support yet
-            bands = None
-    if bands is None:
+        cls = TT.height_class(float(height))
+        root = os.environ.get("ISPATIALGYM_REACH_BANDS", "runlogs/reach_bands_20260915/bands")
+        present = sorted(os.path.basename(p) for p in glob.glob(os.path.join(root, f"contact__{s.world.scene_model}__{s.top.name}__left_*.npz")))
+        log.warning("no left contact band: key scene=%s support=%s arm=left contact_set=%s height=%.3f (class %.2f); left bands present: %s",
+                    s.world.scene_model, s.top.name, getattr(TT, "CONTACT_SET", "generic_contact"), float(height), cls, present or "none")
         return None
-    return bands.band(trunk[0], trunk[1])
+    cells = bands.band(trunk[0], trunk[1])
+    log.info("left contact band %s: %d cells at trunk (%.2f, %.2f)", getattr(bands, "path", "?"), len(cells), trunk[0], trunk[1])
+    return cells
 
 
 #: §6.11 touching admissibility numbers (pushability / stability; ``generation`` overrides)
@@ -438,19 +436,37 @@ class IORSSmall(SamplerV2):
         left_cells = left_contact_band_cells(self, (manip.translate, manip.tilt), TT.height_of(self.hull["partner"], self.rest["partner"]))
         self.template_facts["left_contact_band"] = "unavailable" if left_cells is None else int(len(left_cells))
         errors = []
+        n_tried = 0
         for _ in range(8):
             p_pose = TT.place_partner(self, rng, t_pose, self.hull["target"], self.hull["partner"], self.rest["partner"], manip, side, ranges[side],
                                       top=self.top, cam=cam, margin=self.margin_support, min_gap=self.gap_min)
             if left_cells is None or right_cells is None:
                 return p_pose  # the joint band gate cannot run yet (recorded); the exact two-arm IK remains the gate
-            work, brace = self.touching_points(t_pose, p_pose, manip)
+            # the push starts at the *place* (nextto) position: the work point is the target's right face there
+            work, brace = self.touching_points(self.place_pose_for(t_pose, p_pose, manip), p_pose, manip)
+            n_tried += 1
             if brace_placement_admissible(manip.world_to_base(work[:2]), manip.world_to_base(brace[:2]), right_cells, left_cells):
                 return p_pose
-            errors.append(f"work {manip.world_to_base(work[:2]).tolist()} / brace {manip.world_to_base(brace[:2]).tolist()}")
+            w_b, b_b = manip.world_to_base(work[:2]), manip.world_to_base(brace[:2])
+            errors.append(f"work {[round(float(v), 2) for v in w_b]} {'in' if in_band(w_b, right_cells) else 'OFF'} right band / brace "
+                          f"{[round(float(v), 2) for v in b_b]} {'in' if in_band(b_b, left_cells) else 'OFF'} left band")
         # distinct reason for the board (owner: touching may get axial's optional-brace rule later; until then the joint
         # band gate rejects as ``brace_off_band``)
-        raise Reject("brace_off_band", f"no partner position puts the push point in the right band and the brace point in the left band "
-                                       f"at trunk ({manip.translate}, {manip.tilt:.2f}); tried {errors[-2:]}")
+        raise Reject("brace_off_band", f"none of {n_tried} partner positions puts the push point in the right band ({len(right_cells)} cells) and the brace "
+                                       f"point in the left contact band ({len(left_cells)} cells) at trunk ({manip.translate}, {manip.tilt:.2f}); e.g. {errors[-2:]}")
+
+    def place_pose_for(self, t_pose: G.Pose, p_pose: G.Pose, manip: Stance) -> G.Pose:
+        """Target pose at its *place* position for a drafted partner pose: the nearer-side rule of ``goal_pose`` with the
+        place gap (nextto: g_NT - 1 cm; touching: the same, the push closes it)."""
+        t_quat = t_pose[1]
+        t_hull = G.local_points_world(self.hull["target"], (th.zeros(3), t_quat))
+        p_hull_w = self.world.hull_at(self.hull["partner"], p_pose)
+        p_lat = (p_hull_w[:, :2] - manip.base_xy) @ manip.tangent
+        t_lat = t_hull[:, :2] @ manip.tangent
+        depth_t, lat_init = manip.local(t_pose[0])
+        _, lat = nearer_side_lateral(lat_init, (float(p_lat.min()), float(p_lat.max())), (float(t_lat.min()), float(t_lat.max())), self.place_gap())
+        xy = manip.world(depth_t, lat)
+        return th.tensor([float(xy[0]), float(xy[1]), float(t_pose[0][2])]), t_quat
 
     def touching_points(self, t_pose: G.Pose, p_pose: G.Pose, manip: Stance) -> Tuple[th.Tensor, th.Tensor]:
         """§6.11 touching: the push contact on the target's right face (mid height) and the brace point on the partner's far
