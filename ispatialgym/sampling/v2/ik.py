@@ -494,7 +494,7 @@ class IKChecker:
         self.kit._ensure_synced()
         with self.ignoring(ignore_mid):
             res = self.kit.backend.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(w[0]), G.t(w[1]))} for w in wps], q_start=G.t(q_from),
-                                                 check_collisions=False, sync_world=False, max_joint_step=self.APPROACH_MAX_STEP)
+                                                 check_collisions=False, sync_world=False, max_joint_step=self.APPROACH_MAX_STEP, max_iters=60)
         self.kit.stats["ik_calls"] = self.kit.stats.get("ik_calls", 0) + 1
         if not res.success:
             return None, f"approach_untrackable: {res.status}"
@@ -507,12 +507,18 @@ class IKChecker:
             return None, f"approach_untrackable: joint excursion {exc:.2f} rad between consecutive waypoints (> {self.APPROACH_MAX_EXCURSION})"
         # configuration i (1..n) sits i / n of the way; the tails near the start / end poses take those poses' ignore sets
         m = len(traj) - 1
-        near_end = [i for i in range(1, m) if dist * (m - i) / m < self.APPROACH_WAYPOINT_M - 1e-9]
-        near_start = [i for i in range(1, m) if dist * i / m < self.APPROACH_WAYPOINT_M - 1e-9 and i not in near_end]
-        body = [i for i in range(1, m) if i not in near_end and i not in near_start]
+        is_end = [dist * (m - i) / m < self.APPROACH_WAYPOINT_M - 1e-9 for i in range(m + 1)]
+        is_start = [dist * i / m < self.APPROACH_WAYPOINT_M - 1e-9 for i in range(m + 1)]
+        # a short segment (the §3.9 waypoint spacing itself) lies within range of both poses: those configurations take
+        # both ignore sets (the grasp's support stays removed 8 mm from the grasp whichever way the segment is tracked)
+        both = [i for i in range(1, m) if is_end[i] and is_start[i]]
+        near_end = [i for i in range(1, m) if is_end[i] and not is_start[i]]
+        near_start = [i for i in range(1, m) if is_start[i] and not is_end[i]]
+        body = [i for i in range(1, m) if not is_end[i] and not is_start[i]]
         for idxs, extra, what in ((body, (), "an intermediate configuration of the approach collides"),
                                   (near_start, ignore_start, "a configuration just after the start pose collides"),
-                                  (near_end, ignore_end, "a configuration just before the end pose collides")):
+                                  (near_end, ignore_end, "a configuration just before the end pose collides"),
+                                  (both, list(ignore_start) + list(ignore_end), "a configuration of the short segment collides")):
             if not idxs:
                 continue
             ign = list(ignore_mid) + list(extra)
