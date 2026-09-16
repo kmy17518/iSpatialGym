@@ -467,16 +467,29 @@ class IKChecker:
                                             "locked": q0[[i for a in ("left", "right") for i in self.kit.robot.arm_control_idx[a].tolist()] + self.kit.robot.gripper_control_idx["right"].tolist()]})
             hit = cache_get(key)
             if hit is not None:
-                q_hit = None if hit.get("q") is None else th.tensor(hit["q"])
-                if q_hit is not None:
-                    self.solutions[(arm, self._pose_key(poses[-1]))] = q_hit.clone()
-                # every pose of the chain keeps its witness (entries written before 2026-09-16 14:45 carry the last only):
-                # without them a later re-solve of the pre pose at the settled object pose starts from cold seeds
-                for p_i, q_i in zip(poses, hit.get("qs") or []):
-                    if q_i is not None:
-                        self.solutions[(arm, self._pose_key(p_i))] = th.tensor(q_i)
-                log.debug("exact IK cache hit (%d poses, arm %s, witnesses for %d)", len(poses), arm, len(hit.get("qs") or []))
-                return IKResult(bool(hit["ok"]), q_hit, "cache", len(poses))
+                # a cached verdict is only a set of *candidate witnesses*: each stored configuration (arm joints on the
+                # current locked configuration - the base joints belong to another robot root) is verified in the current
+                # world (FK + collision, the last pose with ``ignore_for_last`` removed) before it counts; anything that
+                # does not verify - a stale entry from another object layout, an entry without per-pose witnesses - is a
+                # miss and gets solved. Entries written before 2026-09-16 14:45 carry the last pose only.
+                stored = hit.get("qs") or [None] * (len(poses) - 1) + [hit.get("q")]
+                verified: List[th.Tensor] = []
+                idx = self.kit.robot.arm_control_idx[arm]
+                for i, (p, q_i) in enumerate(zip(poses, stored)):
+                    if q_i is None or len(stored) != len(poses):
+                        break
+                    q_v = q0.clone()
+                    q_v[idx] = th.tensor(q_i)[idx]
+                    with self.ignoring(list(ignore_for_last) if i == len(poses) - 1 else []):
+                        if not self._witness_ok(q_v, p, arm):
+                            break
+                    verified.append(q_v)
+                if len(verified) == len(poses) and bool(hit.get("ok", True)):
+                    for p, q_v in zip(poses, verified):
+                        self.solutions[(arm, self._pose_key(p))] = q_v.clone()
+                    log.debug("exact IK cache hit verified (%d poses, arm %s)", len(poses), arm)
+                    return IKResult(True, verified[-1], "cache", len(poses))
+                log.debug("exact IK cache entry not verified in the current world (%d/%d poses): solving", len(verified), len(poses))
         q = None
         qs: List[Optional[th.Tensor]] = []
         n = len(poses)
