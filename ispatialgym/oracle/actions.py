@@ -758,6 +758,9 @@ class Place(Action):
     pre_place: Optional[Pose] = None
     on: Optional[str] = None
     relation: str = "on"
+    #: instances the action must not touch (QA: forbidden contacts beyond the drop container), e.g. the partner a
+    #: push-under drop lands in front of
+    avoid: Tuple[str, ...] = ()
     TARGET_KEYS = ("pre_place", "place", "descent", "retreat")
     KINDS: ClassVar[Tuple[str, ...]] = ("support", "drop", "attach")
 
@@ -783,8 +786,10 @@ class Place(Action):
         on = lang.phrase(self.on) if self.on else None
         if self.kind == "attach":
             fine = f"insert {obj} into {on} until it attaches" if on else f"insert {obj} until it attaches"
-        elif self.kind == "drop":
+        elif self.kind == "drop" and self.relation in ("into", "on"):
             fine = f"lower {obj} into {on} and let it drop" if on else f"lower {obj} into its container and let it drop"
+        elif self.kind == "drop":
+            fine = f"lower {obj} to {on} and let it drop" if on else f"lower {obj} and let it drop"
         elif on:
             fine = f"place {obj} {self.relation} {on}"
         else:
@@ -809,6 +814,10 @@ class Push(Action):
     name: str = "push"
     contact: PushContact
     base_yaw: Optional[float] = None
+    #: instances the push may touch besides the pushed object (QA whitelist): the floor of a ``push_under``
+    touches: Tuple[str, ...] = ()
+    #: instances the push must not touch (QA forbidden contacts): the partner of a ``push_under``
+    avoid: Tuple[str, ...] = ()
     qa_exempt: frozenset = frozenset({QA_FAILED_GRASP})
     TARGET_KEYS = ("pre", "waypoints", "direction", "distance_m")
 
@@ -816,6 +825,12 @@ class Push(Action):
         self.arms = (self.contact.arm,)
         self.objects = (self.contact.object,)
         super().__post_init__()
+
+    @property
+    def kind(self) -> str:
+        """``contacts.push.kind``: ``"push"`` (default) or ``"push_under"`` (the floor-level push of IORS under, spec
+        §5.6 owner decision 2026-09-16 item 7)."""
+        return str(self.contact.extra.get("kind") or "push")
 
     def targets(self, sidecar, state):
         C = _conventions()
@@ -830,6 +845,12 @@ class Push(Action):
         c = self.contact
         obj = sidecar.language.phrase(c.object)
         word = direction_word(c.direction, self.base_yaw)
+        if self.kind == "push_under":
+            partner = c.extra.get("partner")
+            under = f" under {sidecar.language.phrase(partner)}" if partner else ""
+            fine = f"push {obj} along the floor{under} with the closed {_hand(c.arm)}"
+            numbers = f"push {obj} {_cm(c.distance_m)} {word} along the floor{under} with the closed {_hand(c.arm)} from {_xyz(c.init.position)}"
+            return fine, numbers
         arc = " along the recorded arc" if c.mid is not None else ""
         fine = f"push {obj} {word} with the closed {_hand(c.arm)}"
         numbers = f"push {obj} {_cm(c.distance_m)} {word}{arc} with the closed {_hand(c.arm)} from {_xyz(c.init.position)}"

@@ -1,0 +1,277 @@
+{
+  "schema": "isg-oracle-v1",
+  "instance_id": "inter_object_relation_satisfaction-under_large_scale-briefcase-breakfast_table-floor__house_single_floor__target-briefcase-lwbctq__push_under__0000",
+  "tro_sha256": "dd3a52849c9e53199a949e2d455b2af496daa885e71b4516d552d8e6245dbba8",
+  "task_family": "inter_object_relation_satisfaction",
+  "alias": "inter_object_relation_satisfaction-under_large_scale-briefcase-breakfast_table-floor",
+  "path_bucket_m": null,
+  "stances": {
+    "init": {
+      "base_pose2d": [
+        6.3,
+        1.05,
+        1.5707963267948966
+      ],
+      "translate": 0.5,
+      "tilt": 0.0,
+      "arms": "untucked",
+      "distance": 0.95
+    },
+    "manipulation": {
+      "base_pose2d": [
+        6.3,
+        1.55,
+        1.5707963267948966
+      ],
+      "translate": 0.95,
+      "tilt": -1.2,
+      "stand_off": 0.45,
+      "focus": [
+        6.3,
+        2.0,
+        0.0
+      ],
+      "arms": [
+        "right"
+      ]
+    },
+    "placement": {
+      "base_pose2d": [
+        6.5,
+        2.4545,
+        1.5707963267948966
+      ],
+      "translate": 0.95,
+      "tilt": -1.2,
+      "stand_off": 0.45,
+      "lateral": -0.795,
+      "focus": [
+        6.5,
+        3.2,
+        0.0
+      ],
+      "goal_cell": [
+        6.5,
+        3.2
+      ],
+      "arms": [
+        "right"
+      ]
+    }
+  },
+  "transitions": [
+    {
+      "from": "init",
+      "to": "manipulation",
+      "stand_off": 0.65,
+      "order": [
+        "drive-back",
+        "trunk",
+        "drive-in"
+      ]
+    }
+  ],
+  "paths": [
+    {
+      "from": "manipulation",
+      "to": "placement",
+      "mode": "local",
+      "waypoints": [
+        [
+          6.3,
+          1.55,
+          1.5707963267948966
+        ],
+        [
+          6.4,
+          2.0,
+          1.5707963267948966
+        ],
+        [
+          6.5,
+          2.4545,
+          1.5707963267948966
+        ]
+      ],
+      "length_m": 0.93,
+      "posture": "untucked",
+      "carried": "briefcase.n.01_1"
+    }
+  ],
+  "grasps": [
+    {
+      "object": "briefcase.n.01_1",
+      "arm": "right",
+      "grasp_key": "briefcase__lwbctq",
+      "grasp_name": "grasp_0",
+      "yaw": -0.3,
+      "pre_grasp": {
+        "position": [
+          6.3,
+          2.0,
+          0.26
+        ],
+        "orientation": [
+          0.988771,
+          -0.149438,
+          -0.0,
+          0.0
+        ]
+      },
+      "grasp": {
+        "position": [
+          6.3,
+          2.0,
+          0.16
+        ],
+        "orientation": [
+          0.988771,
+          -0.149438,
+          -0.0,
+          0.0
+        ]
+      },
+      "pre_place": {
+        "position": [
+          6.5,
+          2.95,
+          0.263
+        ],
+        "orientation": [
+          0.988771,
+          -0.149438,
+          -0.0,
+          0.0
+        ]
+      },
+      "place": {
+        "position": [
+          6.5,
+          2.95,
+          0.163
+        ],
+        "orientation": [
+          0.988771,
+          -0.149438,
+          -0.0,
+          0.0
+        ]
+      },
+      "carry_height": 0.25,
+      "place_on": "floor.n.01_1",
+      "place_kind": "drop",
+      "drop_height_m": 0.03,
+      "drop_cell": [
+        6.5,
+        2.95
+      ],
+      "goal_cell": [
+        6.5,
+        3.2
+      ],
+      "then": "push_under"
+    }
+  ],
+  "language": {
+    "objects": {
+      "briefcase.n.01_1": {
+        "display_name": "briefcase",
+        "descriptor": "the briefcase on the floor"
+      },
+      "breakfast_table.n.01_1": {
+        "display_name": "table",
+        "descriptor": "the dining table"
+      },
+      "floor.n.01_1": {
+        "display_name": "floor",
+        "descriptor": "the floor in front of the table"
+      }
+    },
+    "goal_numbers": {
+      "geodesic_m": 0.93,
+      "push_distance_cm": 25.0
+    }
+  },
+  "waypoint_policy": "checked",
+  "init_surface": "floor",
+  "contacts": {
+    "push": {
+      "arm": "right",
+      "object": "briefcase.n.01_1",
+      "kind": "push_under",
+      "stance": "placement",
+      "pre": {
+        "position": [
+          6.5,
+          2.745,
+          0.15
+        ],
+        "orientation": [
+          0.988771,
+          -0.149438,
+          -0.0,
+          0.0
+        ]
+      },
+      "init": {
+        "position": [
+          6.5,
+          2.745,
+          0.05
+        ],
+        "orientation": [
+          0.988771,
+          -0.149438,
+          -0.0,
+          0.0
+        ]
+      },
+      "mid": {
+        "position": [
+          6.5,
+          2.87,
+          0.05
+        ],
+        "orientation": [
+          0.988771,
+          -0.149438,
+          -0.0,
+          0.0
+        ]
+      },
+      "goal": {
+        "position": [
+          6.5,
+          2.995,
+          0.05
+        ],
+        "orientation": [
+          0.988771,
+          -0.149438,
+          -0.0,
+          0.0
+        ]
+      },
+      "direction": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "distance_m": 0.25,
+      "push_height_m": 0.045,
+      "pitch_deg": 45.0,
+      "blade_standoff_m": 0.0134,
+      "half_extent_m": 0.2,
+      "fingertip_z_m": 0.02,
+      "drop_cell": [
+        6.5,
+        2.95
+      ],
+      "goal_cell": [
+        6.5,
+        3.2
+      ],
+      "partner": "breakfast_table.n.01_1"
+    }
+  }
+}

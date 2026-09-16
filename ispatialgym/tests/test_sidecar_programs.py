@@ -820,6 +820,40 @@ def test_from_dict_rejects_structural_errors():
         Sidecar.from_dict(d)
 
 
+def test_under_large_push_under_chain():
+    """Owner decision 2026-09-16 item 7: ``grasps[0].place_kind == "drop"`` + ``contacts.push`` of kind ``push_under``
+    turn the under-large chain into … → place(drop on the floor) → retreat → push (along the floor, partner forbidden)
+    → retreat; without the push record the sidecar is invalid."""
+    with open(os.path.join(DATA, "variants", "inter_object_relation_satisfaction-under_large_scale__push_under.json")) as f:
+        d = json.load(f)
+    sc = Sidecar.from_dict(d)
+    assert sc.problems() == [] and sc.contacts.push.kind == "push_under"
+    actions = expand(sc.alias, sc)
+    assert [a.name for a in actions] == ["transition", "grasp", "lift", "navigate", "place", "retreat", "push", "retreat"]
+    place, ret1, push, ret2 = actions[4:]
+    assert place.kind == "drop" and place.on == "floor.n.01_1" and place.relation == "under" and place.avoid == ("breakfast_table.n.01_1",)
+    assert ret1.after is place and push.kind == "push_under" and push.touches == ("floor.n.01_1",) and push.avoid == ("breakfast_table.n.01_1",)
+    assert push.arms == ("right",) and push.objects == ("briefcase.n.01_1",) and ret2.after is push
+    assert "along the floor under the dining table" in push.annotate(sc)[0] and "let it drop" in place.annotate(sc)[0]
+    t = push.targets(sc, StubState()) if HAVE_CONVENTIONS else None
+    if t is not None:
+        assert len(t["waypoints"]) == 3 and t["distance_m"] == 0.25
+    # the plain under-large fixture (no drop) keeps the support place
+    plain = load("inter_object_relation_satisfaction-under_large_scale")
+    assert [a.name for a in expand(plain.alias, plain)] == EXPECTED_SEQUENCE["inter_object_relation_satisfaction-under_large_scale"]
+    # a drop without the push record, or with a plain push, is rejected
+    d2 = copy.deepcopy(d)
+    d2.pop("contacts")
+    assert any("push_under" in p for p in Sidecar.from_dict(d2).problems())
+    d3 = copy.deepcopy(d)
+    d3["contacts"]["push"].pop("kind")
+    assert any("push_under" in p for p in Sidecar.from_dict(d3).problems())
+    d4 = copy.deepcopy(d)
+    d4["grasps"][0].pop("place_kind")
+    sc4 = Sidecar.from_dict(d4)
+    assert sc4.problems() == [] and [a.name for a in expand(sc4.alias, sc4)] == ["transition", "grasp", "lift", "navigate", "place", "retreat"]
+
+
 def test_axial_is_push_only_without_a_brace_record():
     """Owner decision 2026-09-16 08:10: ``contacts.brace`` is optional for axial; without it the program is
     transition → push → retreat (the oracle's push closure is the stop), with it the braced chain as before."""

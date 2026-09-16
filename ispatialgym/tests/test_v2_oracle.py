@@ -1237,6 +1237,21 @@ def inside_world():
     return sc, env
 
 
+def test_push_under_contacts_floor_and_target_allowed_partner_forbidden():
+    """Item 7: for the push-under push the floor and the target are intended contacts, the partner is forbidden
+    (fingers / held object included); the preceding drop on the floor forbids the partner too."""
+    sc = Sidecar.load(os.path.join(SIDECARS, "variants", "inter_object_relation_satisfaction-under_large_scale__push_under.json"))
+    actions = expand(sc.alias, sc)
+    place = [a for a in actions if isinstance(a, Place)][0]
+    push = [a for a in actions if isinstance(a, Push)][0]
+    assert push.kind == "push_under"
+    assert set(EX.intended_contacts(push)) == {"briefcase.n.01_1", "floor.n.01_1"} and EX.forbidden_contacts(push) == ("breakfast_table.n.01_1",)
+    assert EX.intended_contacts(place) == ("briefcase.n.01_1",) and set(EX.forbidden_contacts(place)) == {"floor.n.01_1", "breakfast_table.n.01_1"}
+    # the geometry of the recorded straight floor push: a line, 25 cm along +y
+    geom = EX.push_geometry(push.targets(sc, SimpleNamespace(object_pose=lambda n: None))["waypoints"], push.contact.direction)
+    assert geom.kind == "line" and abs(geom.distance - 0.25) < 1e-6
+
+
 def test_drop_place_forbids_any_contact_with_the_container(tmp_path):
     """Owner decision 2026-09-16 (IORS inside): the drop releases at the recorded place pose above the rim; the
     container is not an intended contact — a finger (exempt link during manipulation) or the held object touching

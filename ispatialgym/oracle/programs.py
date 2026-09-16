@@ -325,17 +325,36 @@ def program_alignment_axial(sc: Sidecar) -> List[Action]:
 def program_iors_large(sc: Sidecar, relation: str = "ontop") -> List[Action]:
     """init A → manipulation B (transition) → grasp → lift (orientation kept) → navigate_to placement C with the object
     attached (recorded path; the retreat transition before lowering the trunk toward the floor band for under, where
-    recorded) → place at the goal cell → retreat."""
+    recorded) → place at the goal cell → retreat.
+
+    **Push-under** (owner decision 2026-09-16 item 7, under large-scale): when ``grasps[0].place_kind == "drop"`` the
+    object is dropped on the floor outside the partner's footprint edge and pushed under it with the closed gripper
+    along the recorded straight floor push ``contacts.push`` (``kind: "push_under"``, from stance C): ``… → place(drop)
+    → retreat → push → retreat``. The push may touch the floor and the target, never the partner; ``under`` is read in
+    the epilogue after the push."""
     g = _single_grasp(sc, "pre_grasp", "carry_height", "place", "place_on")
     if sc.path("manipulation", "placement") is None:
         raise SidecarError("paths: IORS large-scale needs the recorded path from 'manipulation' to 'placement'")
     grasp, lift = _pick(g)
-    return (
-        _travel(sc, "init", "manipulation")
-        + [grasp, lift]
-        + _travel(sc, "manipulation", "placement", carried=g.object)
-        + _place_and_retreat(g, "support", _IORS_RELATION_WORDS[relation])
-    )
+    head = _travel(sc, "init", "manipulation") + [grasp, lift] + _travel(sc, "manipulation", "placement", carried=g.object)
+    drop = str(g.extra.get("place_kind") or "support") == "drop"
+    if not drop:
+        return head + _place_and_retreat(g, "support", _IORS_RELATION_WORDS[relation])
+    if relation != "under":
+        raise SidecarError(f"grasps[0].place_kind 'drop' is the push-under release of the under relation, not of {relation!r}")
+    push = sc.contacts.push if sc.contacts is not None else None
+    if push is None or push.kind != "push_under":
+        raise SidecarError("contacts.push: a record with kind 'push_under' is required when grasps[0].place_kind == 'drop' (push-under)")
+    if push.object != g.object:
+        raise SidecarError(f"contacts.push.object {push.object!r} is not the dropped target {g.object!r}")
+    if push.arm != g.arm:
+        raise SidecarError(f"contacts.push.arm {push.arm!r} differs from the grasp arm {g.arm!r} (the same closed gripper pushes)")
+    partner = push.extra.get("partner")
+    avoid = (partner,) if isinstance(partner, str) and partner else ()
+    place = Place(kind="drop", arm=g.arm, object=g.object, place=g.place, pre_place=g.pre_place, on=g.place_on, relation="under", avoid=avoid)
+    base_yaw = sc.stance("placement").base_pose2d[2]
+    p = Push(contact=push, base_yaw=base_yaw, touches=(g.place_on,) if g.place_on else (), avoid=avoid)
+    return head + [place, Retreat(arm=g.arm, object=g.object, after=place, distance=RETREAT_LITTLE), p, Retreat(arm=push.arm, object=push.object, after=p)]
 
 
 def program_iors_small(sc: Sidecar, relation: str = "ontop") -> List[Action]:

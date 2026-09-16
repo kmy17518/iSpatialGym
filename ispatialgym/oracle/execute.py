@@ -370,20 +370,23 @@ def _release(motions: Motions, state, arm: str) -> None:
 
 
 def intended_contacts(action: Action) -> Tuple[str, ...]:
-    """The bddl instances an action may touch (the QA collision whitelist): its ``objects``, except that a
-    ``Place(kind="drop")`` must not touch its container (owner decision 2026-09-16: release above the rim)."""
-    objs = tuple(getattr(action, "objects", ()) or ())
-    if isinstance(action, Place) and action.kind == "drop" and action.on:
-        return tuple(o for o in objs if o != action.on)
-    return objs
+    """The bddl instances an action may touch (the QA collision whitelist): its ``objects`` plus ``touches`` (the floor
+    of a push-under), except that a ``Place(kind="drop")`` must not touch its container (owner decision 2026-09-16:
+    release above the rim)."""
+    objs = tuple(getattr(action, "objects", ()) or ()) + tuple(getattr(action, "touches", ()) or ())
+    forbidden = set(forbidden_contacts(action))
+    return tuple(o for o in objs if o not in forbidden)
 
 
 def forbidden_contacts(action: Action) -> Tuple[str, ...]:
     """Instances no robot link — fingers included — and no held object may touch during the action, whatever the
-    per-link exemptions: the container of a drop (a bowl lifted by the opening fingers is a ``collision``)."""
+    per-link exemptions: the container of a drop (a bowl lifted by the opening fingers is a ``collision``) and the
+    action's ``avoid`` list (the partner of a push-under, during the drop and the push)."""
+    out: List[str] = []
     if isinstance(action, Place) and action.kind == "drop" and action.on:
-        return (action.on,)
-    return ()
+        out.append(action.on)
+    out.extend(getattr(action, "avoid", ()) or ())
+    return tuple(dict.fromkeys(out))
 
 
 def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:

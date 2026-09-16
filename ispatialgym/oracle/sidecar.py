@@ -457,6 +457,12 @@ class PushContact:
         """The recorded contact key poses in order: init, (mid,) goal."""
         return [self.init] + ([self.mid] if self.mid is not None else []) + [self.goal]
 
+    @property
+    def kind(self) -> str:
+        """``"push"`` (default) or ``"push_under"`` — the straight floor-level push of IORS under from the placement
+        stance (extras ``partner``, ``drop_cell``, ``goal_cell``, ``push_height_m``, ...)."""
+        return str(self.extra.get("kind") or "push")
+
 
 @dataclass
 class BraceContact:
