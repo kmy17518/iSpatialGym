@@ -341,6 +341,16 @@ role (D1's `roles.source.scale = 1.25` for the disembedding tray included); `spa
 The template id carries the scale (`source-tray-gsxbym-s1.25`, `problem.scale_tag`; unscaled ids unchanged), so scaled
 and unscaled draws never share a directory; band keys use the same `ModelChoice.scale` (`tray/gsxbym*1.25@…`).
 
+### Two-arm check and the touching brace (2026-09-16)
+
+`IKChecker.exact_both_arms` now ignores the objects the two final poses touch in its combined check (`ignore_for_last` ∪
+`ignore_other_last`) and offers `brace_only_check=(ignored, margin)` — the same steps as `tabletop.brace_second_arm`,
+which can call it again. `iors_small.touching_contacts` builds the brace like axial's stop brace
+(`touching_brace_candidates`): pads on the partner's far face `STOP_CLEARANCE` (5 mm) outside it (closing vertical /
+horizontal, either wrist turn), then the top-down blade beside the face with `tabletop.blade_standoff` over the face
+height (pitches per `approach_pitch_order`); thin partners (< 4 cm) try the blade first. The record is a `tabletop.BraceRecord`
+with `blade_half_thickness_m`, `stop_clearance_m`, `blade_standoff_m`, `pose_class` (`summary.brace` mirrors it).
+
 ## Status (D2 / D4, 2026-09-15) and gaps
 
 Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,

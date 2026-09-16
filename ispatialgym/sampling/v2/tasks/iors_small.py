@@ -90,6 +90,10 @@ PUSH_MAX_HEIGHT = 0.30
 PARTNER_MAX_ASPECT = 2.5
 #: inside (owner decision 2026-09-16): the open gripper's lowest point clears the partner's rim by this at the release
 RELEASE_CLEARANCE = 0.02
+#: touching brace (axial stop-brace rule): the pads' / blade's outer face this far outside the partner's far face, and the
+#: partner height below which the top-down blade is tried before the pad contacts
+STOP_CLEARANCE = 0.005
+THIN_PARTNER_HEIGHT = 0.04
 #: R1Pro finger envelope beyond the pad faces (m): pad / finger thickness outward of the open pads along ±c, finger
 #: half width along eef x (conservative; only the open-gripper lowest point is derived from them)
 FINGER_THICKNESS = 0.012
@@ -645,23 +649,78 @@ class IORSSmall(SamplerV2):
         tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
         t_pose = draft.goal_poses[tname]
         p_now = self.obj("partner").get_position_orientation()
+        p_pose = (p_now[0].clone().float(), p_now[1].clone().float())
         tangent = manip.tangent
         direction = th.tensor([float(tangent[0]), float(tangent[1]), 0.0])  # toward the partner = robot's left
-        p_init, b_point = self.touching_points(t_pose, (p_now[0].clone(), p_now[1].clone()), manip)
+        p_init, b_point = self.touching_points(t_pose, p_pose, manip)
         dist = float(self.pair.get("g_NT", 0.02)) + 0.01
         push_init = IK.contact_eef(p_init, direction)
         push_goal = (push_init[0] + direction * dist, push_init[1])
         push_pre = IK.pre_pose(push_init)
-        brace = IK.contact_eef(b_point, -direction)
-        brace_pre = IK.pre_pose(brace)
-        # closed pads for both contacts (§3.6); the push arm first, then the brace with the push arm locked (§4.6 step 6)
-        res = self.ikc.exact_both_arms(("right", [push_pre, push_init, push_goal]), ("left", [brace_pre, brace]), manip,
-                                       self.support_objects() + [self.obj("target")], self.support_objects() + [self.obj("partner")], fingers=IK.FINGER_CLOSED)
-        if not res.ok:
-            raise Reject("contact_unreachable", f"touching push / brace: {res.reason}")
+        p_hull = self.world.hull_at(self.hull["partner"], p_pose)
+        face_z = (float(p_hull[:, 2].min()), float(p_hull[:, 2].max()))
+        # closed pads for both contacts (§3.6); the push arm first, then the brace with the push arm locked (§4.6 step 6),
+        # brace candidates in order (pads on the far face / top-down blade beside it, ``touching_brace_candidates``)
+        why: List[str] = []
+        chosen = None
+        for pre, contact, kind, extras in self.touching_brace_candidates(manip, b_point, face_z, -direction):
+            res = self.ikc.exact_both_arms(("right", [push_pre, push_init, push_goal]), ("left", [pre, contact]), manip,
+                                           self.support_objects() + [self.obj("target")], self.support_objects() + [self.obj("partner")], fingers=IK.FINGER_CLOSED)
+            if res.ok:
+                chosen = (pre, contact, kind, extras)
+                break
+            why.append(f"{kind}: {res.reason}")
+            if res.reason.startswith("right"):
+                break  # the push chain itself fails: no brace candidate can change that
+        if chosen is None:
+            raise Reject("contact_unreachable", f"touching push / brace: {'; '.join(why[-3:]) or 'no brace candidate (partner face reaches the palm section)'}")
+        pre, contact, kind, extras = chosen
         self.sidecar.add_contact(ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname))
-        self.sidecar.add_contact(ContactRecord("brace", "left", brace_pre, brace, direction=-direction, brace_kind="side", object=pname))
+        self.sidecar.add_contact(TT.BraceRecord("brace", "left", pre, contact, direction=-direction, brace_kind=kind, object=pname, extras=extras))
+        draft.summary["brace"] = {"kind": kind, **{k: v for k, v in extras.items() if v is not None}}
         manip.arms = ["right", "left"]
+
+    def touching_brace_candidates(self, manip: Stance, b_point: th.Tensor, face_z: Tuple[float, float], a_face: th.Tensor):
+        """Brace poses of the closed left gripper at the partner's far (robot-left) face, in the order to try — the axial
+        stop-brace rule instead of the former 12 mm pad-slab at the face point: (1) the pads on the face, pad centre
+        ``STOP_CLEARANCE`` outside it (closing axis vertical then horizontal, either wrist turn); (2) the top-down blade
+        beside the face (``tabletop.blade_standoff``: eef origin ``finger half thickness over the face height above the
+        tips + STOP_CLEARANCE`` outside the face, approach pitched per ``tabletop.approach_pitch_order``, the pads' faces
+        parallel to the object face). Thin partners (< ``THIN_PARTNER_HEIGHT``) try the blade first. Yields ``(pre, contact,
+        kind, extras)`` with the brace record fields ``blade_half_thickness_m`` / ``stop_clearance_m`` / ``blade_standoff_m`` /
+        ``pose_class``."""
+        a = C.unit(G.t(a_face))  # into the face
+        outward = -a
+        z_axis = th.tensor([0.0, 0.0, 1.0])
+        side_h = C.unit(th.cross(z_axis, outward, dim=0))
+        z0, z1 = face_z
+        clearance = float(self.gen("stop_clearance_m", STOP_CLEARANCE))
+
+        def side_contacts():
+            point = G.t(b_point) + outward * clearance
+            for c_axis, suffix in ((z_axis, "v"), (side_h, "h")):
+                name = TT.contact_class(manip, a, c_axis) or f"side_{suffix}"
+                for c_sign in (1.0, -1.0):
+                    contact = IK.contact_eef(point, a, c_sign * c_axis)
+                    yield IK.pre_pose(contact), contact, f"{name}{'' if c_sign > 0 else '-'}", {"stop_clearance_m": clearance, "pose_class": name, "blade_half_thickness_m": None}
+
+        def blades():
+            for pitch in TT.approach_pitch_order(None):
+                z_tip = z0 + 0.005  # the fingertips just above the support: the fingers span the face height
+                so = TT.blade_standoff((z0, z1), z_tip, pitch, clearance, side=False)
+                if so is None:
+                    continue  # the face reaches the palm section: no blade contact
+                standoff, half = so
+                a_vec = TT.pitched_approach(pitch, manip.forward)
+                origin = th.tensor([float(b_point[0]), float(b_point[1]), z_tip + C.FINGERTIP_LENGTH * math.cos(math.radians(pitch))]) + outward * standoff
+                for c_sign in (1.0, -1.0):
+                    contact = (origin, C.eef_quat(a_vec, c_sign * outward))
+                    yield IK.pre_pose(contact), contact, f"blade_{pitch:.0f}{'' if c_sign > 0 else '-'}", {
+                        "blade_half_thickness_m": half, "stop_clearance_m": clearance, "blade_standoff_m": standoff, "fingertip_z": z_tip, "pose_class": f"blade_{pitch:.0f}"}
+
+        order = (blades, side_contacts) if (z1 - z0) < THIN_PARTNER_HEIGHT else (side_contacts, blades)
+        for gen in order:
+            yield from gen()
 
     def _nudge_until_touching(self, tname: str, pname: str, step: float = 0.001, max_steps: int = 25):
         from omnigibson.object_states import Touching

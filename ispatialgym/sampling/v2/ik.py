@@ -534,10 +534,17 @@ class IKChecker:
         return q_alt, "ok"
 
     def exact_both_arms(self, work: Tuple[str, Sequence[Pose]], other: Tuple[str, Sequence[Pose]], stance: Stance, ignore_for_last: Sequence[Any] = (),
-                        ignore_other_last: Sequence[Any] = (), fingers: Optional[float] = None) -> IKResult:
+                        ignore_other_last: Sequence[Any] = (), fingers: Optional[float] = None,
+                        brace_only_check: Optional[Tuple[Sequence[Any], float]] = None) -> IKResult:
         """Brace / second-arm rule (§4.6 step 6): the working arm's poses first; then the other arm with the working arm
-        locked at its solution; combined whole-body check of the final configuration. ``fingers`` = gripper opening of
-        both hands (closed for push + brace contacts)."""
+        locked at its solution; combined whole-body check of the final configuration **with the objects the two final
+        poses touch removed** (``ignore_for_last`` ∪ ``ignore_other_last``: the support and the pushed / braced object —
+        §3.6 "ignored for the contact pose only"; with them in the world every pad-on-face contact read "combined
+        configuration collides", which is why ``tabletop.brace_second_arm`` bypassed this method). ``fingers`` = gripper
+        opening of both hands (closed for push + brace contacts). ``brace_only_check = (ignored objects, margin)``: an
+        extra check of the brace arm's final configuration with the working arm back at the stance posture against
+        everything but the ignored objects at ``margin`` (a stop blade against the target at its goal pose while the
+        push hand, which touches the target, is out of the picture)."""
         arm_w, poses_w = work
         arm_o, poses_o = other
         r1 = self.exact(poses_w, stance, arm_w, ignore_for_last, cache=False, fingers=fingers)
@@ -547,8 +554,20 @@ class IKChecker:
         r2 = self.exact(poses_o, stance, arm_o, ignore_other_last, q_seed=q_seed, cache=False, fingers=fingers)
         if not r2.ok:
             return IKResult(False, None, f"{arm_o} (brace): {r2.reason}")
-        if not bool(self.kit.collision_free(r2.q, margin=0.01)[0]):
+        touched = list(ignore_for_last) + [o for o in ignore_other_last if all(o is not w for w in ignore_for_last)]
+        with self.ignoring(touched):
+            free = bool(self.kit.collision_free(r2.q, margin=0.01)[0])
+        if not free:
             return IKResult(False, None, "combined configuration collides")
+        if brace_only_check is not None:
+            ignored, margin = brace_only_check
+            q_b = self.q_locked(stance, fingers=fingers).clone()
+            idx = self.kit.robot.arm_control_idx[arm_o]
+            q_b[idx] = r2.q[idx]
+            with self.ignoring(list(ignored)):
+                ok_b = bool(self.kit.collision_free(q_b, margin=float(margin))[0])
+            if not ok_b:
+                return IKResult(False, None, f"{arm_o} (brace) intersects the target at its goal pose (margin {float(margin) * 1000:.0f} mm)")
         return IKResult(True, r2.q, "", len(poses_w) + len(poses_o))
 
     # -- waypoints ----------------------------------------------------------------------------------------------
