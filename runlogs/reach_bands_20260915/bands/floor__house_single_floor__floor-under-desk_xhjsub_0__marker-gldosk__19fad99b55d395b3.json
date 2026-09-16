@@ -124,7 +124,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": "ready",
    "idle_arm_q": {
     "left": [
@@ -165,7 +165,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": "ready",
    "idle_arm_q": {
     "left": [
@@ -206,7 +206,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": "ready",
    "idle_arm_q": {
     "left": [
@@ -247,7 +247,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": "ready",
    "idle_arm_q": {
     "left": [
@@ -288,7 +288,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": "ready",
    "idle_arm_q": {
     "left": [
@@ -329,7 +329,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": "ready",
    "idle_arm_q": {
     "left": [
@@ -370,7 +370,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": "tucked",
    "idle_arm_q": {
     "left": [
@@ -411,7 +411,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": "tucked",
    "idle_arm_q": {
     "left": [
@@ -452,7 +452,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": "ready",
    "idle_arm_q": {
     "left": [
@@ -493,7 +493,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": "tucked",
    "idle_arm_q": {
     "left": [
@@ -534,7 +534,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": "tucked",
    "idle_arm_q": {
     "left": [
@@ -575,7 +575,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": "tucked",
    "idle_arm_q": {
     "left": [
@@ -616,7 +616,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": "tucked",
    "idle_arm_q": {
     "left": [
@@ -657,7 +657,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": "tucked",
    "idle_arm_q": {
     "left": [
@@ -698,7 +698,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": null
   },
   {
@@ -712,7 +712,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": null
   },
   {
@@ -726,7 +726,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": null
   },
   {
@@ -740,7 +740,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": "ready",
    "idle_arm_q": {
     "left": [
@@ -781,7 +781,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": null
   },
   {
@@ -795,7 +795,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": null
   },
   {
@@ -809,7 +809,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": null
   },
   {
@@ -823,7 +823,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": null
   },
   {
@@ -837,7 +837,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": null
   },
   {
@@ -851,7 +851,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": null
   },
   {
@@ -865,14 +865,14 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01,
+   "time_s": 0.02,
    "posture": null
   }
  ],
  "union_extent": null,
  "n_reachable_total": 0,
  "key": "19fad99b55d395b3",
- "time_s": 126.6,
+ "time_s": 375.2,
  "kit_stats": {
   "ik_calls": 0,
   "ik_s": 0.0,
@@ -881,6 +881,6 @@
   "ik_batch_s": 0.0,
   "collision_calls": 76,
   "collision_configs": 76,
-  "collision_s": 0.4489405155181885
+  "collision_s": 0.9123165607452393
  }
 }

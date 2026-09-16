@@ -493,7 +493,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 13,
    "n_pose_pruned": 104,
-   "time_s": 0.07,
+   "time_s": 0.42,
    "posture": "untucked",
    "idle_arm_q": {
     "left": [
@@ -657,7 +657,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 13,
    "n_pose_pruned": 104,
-   "time_s": 0.05,
+   "time_s": 0.48,
    "posture": "untucked",
    "idle_arm_q": {
     "left": [
@@ -698,7 +698,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 62,
    "n_pose_pruned": 301,
-   "time_s": 74.31,
+   "time_s": 79.25,
    "posture": "tucked",
    "idle_arm_q": {
     "left": [
@@ -821,7 +821,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 20,
    "n_pose_pruned": 229,
-   "time_s": 34.36,
+   "time_s": 36.2,
    "posture": "untucked",
    "idle_arm_q": {
     "left": [
@@ -862,7 +862,7 @@
    "n_pairs": 4,
    "n_dropped_no_pre": 63,
    "n_pose_pruned": 301,
-   "time_s": 51.38,
+   "time_s": 53.48,
    "posture": "untucked",
    "idle_arm_q": {
     "left": [
@@ -903,7 +903,7 @@
    "n_pairs": 7,
    "n_dropped_no_pre": 100,
    "n_pose_pruned": 325,
-   "time_s": 62.67,
+   "time_s": 65.28,
    "posture": "tucked",
    "idle_arm_q": {
     "left": [
@@ -944,7 +944,7 @@
    "n_pairs": 1,
    "n_dropped_no_pre": 9,
    "n_pose_pruned": 162,
-   "time_s": 8.04,
+   "time_s": 8.51,
    "posture": "untucked",
    "idle_arm_q": {
     "left": [
@@ -985,7 +985,7 @@
    "n_pairs": 6,
    "n_dropped_no_pre": 26,
    "n_pose_pruned": 243,
-   "time_s": 21.38,
+   "time_s": 22.44,
    "posture": "untucked",
    "idle_arm_q": {
     "left": [
@@ -1026,7 +1026,7 @@
    "n_pairs": 6,
    "n_dropped_no_pre": 61,
    "n_pose_pruned": 296,
-   "time_s": 48.06,
+   "time_s": 50.18,
    "posture": "untucked",
    "idle_arm_q": {
     "left": [
@@ -1091,15 +1091,15 @@
  ],
  "n_reachable_total": 24,
  "key": "966467ca2df4471d",
- "time_s": 429.2,
+ "time_s": 590.2,
  "kit_stats": {
   "ik_calls": 0,
   "ik_s": 0.0,
   "ik_batch_calls": 70,
   "ik_batch_problems": 3819,
-  "ik_batch_s": 297.7414617538452,
+  "ik_batch_s": 295.6234664916992,
   "collision_calls": 43,
   "collision_configs": 43,
-  "collision_s": 0.3636617660522461
+  "collision_s": 0.4867672920227051
  }
 }
