@@ -1166,7 +1166,10 @@ class IORSLarge(SamplerV2):
                              [[round(float(v), 2) for v in p] for p in disc.tolist()])
                 continue
             ang = P0.axis_angle(self, cam, st.focus)
-            if ang > math.radians(P0.AXIS_LOOSE_DEG):
+            # at the crouched trunks the head hangs ≈ 0.6 m ahead of the base, i.e. over the lane: the drop cell lies almost
+            # straight below the camera, 30–40° off the (74–90° pitched) optical axis while squarely in frame — the 20° rule
+            # is relaxed to ``push_under_axis_max_deg`` (45°) for the push-under stance (deviation from §5.6 to record)
+            if ang > math.radians(float(self.num("push_under_axis_max_deg", 45.0))):
                 stats[f"{kind}_axis_off"] = stats.get(f"{kind}_axis_off", 0) + 1
                 if kind == "side" and stats[f"{kind}_axis_off"] == 1:
                     log.info("%s: side stance C example axis off by %.0f deg: trunk %s camera %s focus %s", self.gp.alias, math.degrees(ang), (st.translate, st.tilt),
