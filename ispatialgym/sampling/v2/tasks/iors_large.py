@@ -44,7 +44,7 @@ from ispatialgym import REPO_ROOT
 from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling import reach_bands as RB
 from ispatialgym.sampling.sim_utils import Reject, SupportTop
-from ispatialgym.sampling.tasks.base import Draft
+from ispatialgym.sampling.tasks.base import Draft, _jsonable
 from ispatialgym.sampling.tro_writer import full_pose_target
 from ispatialgym.sampling.v2 import ik as IK
 from ispatialgym.sampling.v2 import prompt0 as P0
@@ -176,7 +176,8 @@ class IORSLarge(SamplerV2):
             self.definition_id = V1_DEFINITION_ID[self.relation]
         self.hull: Optional[th.Tensor] = None
         self.rest: th.Tensor = G.IDENTITY_QUAT.clone()
-        self.bands: Optional[RB.ReachBands] = None
+        self.bands: Optional[RB.ReachBands] = None  # ``tabletop.ensure_bands`` caches the init-support band here
+        self.band_spec: Optional[TT.BandSpec] = None  # what ``ensure_bands`` computes on a miss (set once the grasps are loaded)
         self.grasps: List[Any] = []
         self.grasp_key: Optional[str] = None
         self.surface: Dict[str, Any] = {}  # kind, obj, top, band, edge, init, manip candidates
@@ -287,12 +288,19 @@ class IORSLarge(SamplerV2):
         return dist
 
     def prepare_bindings(self):
+        try:
+            self._prepare_bindings()
+        finally:  # the facts survive a template rejection (diagnostics in template_meta)
+            self.template_meta["template_facts"] = _jsonable(self.template_facts)
+
+    def _prepare_bindings(self):
         """Target geometry and grasps, the partner's placement geometry, then the init surface: one candidate of the
         grounded class drawn uniformly, the rest of the class in random order; the support role bound (aliased to the
         partner / floor bound when it is the same object)."""
         tgt = self.target
         self.hull = self.world.local_hull(tgt)
         self.grasps, self.grasp_key, self.rest = TT.library_grasps(self, "target")
+        self.band_spec = self.make_band_spec()
         self.floor_z = float(self.obj("floor").aabb[1][2])
         self.prepare_partner()
         kind, cands = self.surface_candidates()
@@ -404,7 +412,7 @@ class IORSLarge(SamplerV2):
 
     # ------------------------------------------------------------------ reach bands (B3)
 
-    def band_spec(self) -> TT.BandSpec:
+    def make_band_spec(self) -> TT.BandSpec:
         c = self.choice.models["target"]
         return TT.BandSpec(object=f"{c.category}/{c.model}", grasp_key=self.grasp_key, grasps=self.grasps, hull=self.hull, rest_quat=self.rest,
                            scale=list(c.scale) if c.scale else None, height=self.target_dims()[1])
@@ -430,7 +438,7 @@ class IORSLarge(SamplerV2):
                 raise Reject("missing_band", f"no reach band for scene={self.world.scene_model} support={support} object={obj} under={under} scale={c.scale}")
             if kind == "tabletop":
                 top = self.surface.get("top") if (self.surface.get("obj") is support_obj and self.surface.get("top") is not None) else self.support_top(support_obj, ignore=[self.target])
-                rb = TT.compute_bands(self, self.band_spec(), top)
+                rb = TT.compute_bands(self, self.make_band_spec(), top)
             else:
                 rb = self.compute_band(kind, support_obj, under_partner)
         memo[key] = rb
@@ -596,6 +604,8 @@ class IORSLarge(SamplerV2):
         self.surface["band"] = rb
         half, height = self.target_dims()
         objs = [o for o in self.world.scene.objects if o.category not in ("floors", "ceilings", "walls") and o is not self.robot and o.name not in self.world.spawned]
+        # flat floor coverings (carpets, rugs, mats: < 5 cm tall) are part of the floor the robot and the target stand on
+        objs = [o for o in objs if float(o.aabb[1][2] - o.aabb[0][2]) >= 0.05]
         aabbs = [(o.aabb[0][:2].float() - clearance, o.aabb[1][:2].float() + clearance) for o in objs]
         # candidate anchors: free floor cells within max_geo of the partner's near side, outside every AABB and the partner footprint
         xs = th.arange(float(lo[0]) + cell / 2, float(hi[0]), cell * 4)  # 8 cm search grid (the 2 cm raster is the draw's resolution)

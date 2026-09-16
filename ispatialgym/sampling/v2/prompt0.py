@@ -342,6 +342,44 @@ def body_free(s, stances: Sequence[Stance], arms_excluded: bool = False, margin:
     return th.cat(out)
 
 
+def debug_collisions(s, stances: Sequence[Stance], arms_excluded: bool, margin: float = COLLISION_MARGIN) -> None:
+    """Diagnostic log when a whole lattice collides: per stance the verdict of every arm posture and the penetrating
+    spheres (base-frame position, radius) of the checked posture."""
+    try:
+        from curobo._src.geom.collision.buffer_collision import CollisionBuffer
+        from curobo._src.robot.kinematics.kinematics_state import KinematicsState
+    except Exception:  # noqa: BLE001
+        return
+    be = s.kit.backend
+    entry = be.kin_entry("whole_body")
+    dev = be.device_cfg.device
+    for st in stances:
+        verdicts = {}
+        for arms, selfc in (("untucked", True), ("tucked", True), ("tucked", False)):
+            q = s.ikc.q_locked(st, arms=arms)
+            verdicts[f"{arms}/self={selfc}"] = bool(be.check_collision(q.unsqueeze(0), emb_name="whole_body", sync_world=False, self_collision=selfc, margin=margin)[0])
+        q = s.ikc.q_locked(st, arms="tucked")
+        verdicts["tucked/margin=0"] = bool(be.check_collision(q.unsqueeze(0), emb_name="whole_body", sync_world=False, self_collision=False, margin=0.0)[0])
+        try:
+            be._ground_obstacles_enabled(False)
+            verdicts["tucked/no_ground"] = bool(be.check_collision(q.unsqueeze(0), emb_name="whole_body", sync_world=False, self_collision=False, margin=margin)[0])
+        finally:
+            be._ground_obstacles_enabled(True)
+        q = s.ikc.q_locked(st, arms="tucked" if arms_excluded else "untucked")
+        js = be._active_js(entry, q.unsqueeze(0))
+        state = entry.fk.compute_kinematics(js)
+        spheres = state.robot_spheres.reshape(1, 1, -1, 4).contiguous()
+        buf = CollisionBuffer.from_shape(spheres.shape, be.device_cfg)
+        w = th.ones(1, device=dev)
+        d0 = be.checker.get_sphere_collision(KinematicsState(robot_spheres=spheres), buf, w, th.full((1,), float(margin), device=dev)).reshape(-1)
+        sp = spheres.reshape(-1, 4).cpu()
+        bad = (d0 > 0).nonzero().flatten().tolist()
+        rp = be.root_pose()[0]
+        desc = [([round(float(v), 2) for v in (sp[i, :3] + rp.cpu()[:3]).tolist()], round(float(sp[i, 3]), 3)) for i in bad[:6]]
+        log.info("collision debug %s d=%.2f λ=%.2f t=%.2f k=%.2f: %s; %d penetrating spheres (world pos, r) %s", st.name, st.stand_off or 0.0, st.lateral, st.translate,
+                 st.tilt, verdicts, len(bad), desc)
+
+
 def trunk_sweep_free(s, base_pose2d: Pose2D, translates: Sequence[float] = SWEEP_TRANSLATES, margin: float = COLLISION_MARGIN) -> bool:
     """Phase 1 (4) / §4.4 (3): base + torso links + head collision-free at every translate of the sweep, tilt 0, arms
     excluded (stand-in: arms hanging, self-collision off)."""
@@ -479,7 +517,10 @@ def phase2_step1(s, face: FaceFrame, d_range: Tuple[float, float], lam_range: Tu
     out = [st for st, f in zip(keep, free.tolist()) if f]
     log.info("Phase 2 step 1: %d lattice candidates, %d on free floor, %d collision-free (arms %s)", len(cands), len(keep), len(out),
              "excluded" if arms_excluded else "untucked")
-    if key is not None:
+    if not out and keep:
+        flat = [st for st in keep if abs(st.tilt) < 1e-9 and abs(st.translate - 0.5) < 1e-9]
+        debug_collisions(s, [flat[i] for i in range(0, len(flat), max(1, len(flat) // 6))][:6], arms_excluded)
+    if key is not None and out:  # an empty set is not cached (it is diagnosed, and may come from a transient world state)
         cache_put(key, {"survivors": [{"d": st.stand_off, "lam": st.lateral, "translate": st.translate, "tilt": st.tilt} for st in out]})
     return out
 
@@ -552,7 +593,7 @@ def phase2_manipulation(s, face: FaceFrame, contact_set: Sequence[ContactSpec], 
     out = phase2_screen(s, step1, contact_set, foc, extra_visibility, stats=st_)
     log.info("Phase 2: %d step-1 survivors, %d reach the contact set, %d visible, %d in the best class %s", len(step1), st_.get("step2_reach", 0),
              st_.get("step3_visible", 0), len(out), st_.get("best_class"))
-    if key is not None:
+    if key is not None and out:
         cache_put(key, {"survivors": [{"d": st.stand_off, "lam": st.lateral, "translate": st.translate, "tilt": st.tilt,
                                        "axis_angle_deg": st.extras["axis_angle_deg"], "angle_class": st.extras["angle_class"]} for st in out]})
     return out
@@ -560,36 +601,40 @@ def phase2_manipulation(s, face: FaceFrame, contact_set: Sequence[ContactSpec], 
 
 def draw_manipulation(s, survivors: Sequence[Stance], rng: np.random.Generator, arms: Sequence[str], focus=None,
                       extra_visibility: Optional[Callable[[Pose], bool]] = None, arms_excluded: Optional[bool] = None,
-                      in_frame_margin: float = IN_FRAME_MARGIN, name: str = "manipulation") -> Tuple[int, Optional[Stance]]:
+                      in_frame_margin: float = IN_FRAME_MARGIN, name: str = "manipulation", tilt_draws: int = 3) -> Tuple[int, Optional[Stance]]:
     """§5.2 step 4: one survivor drawn uniformly (its index is returned so the caller can drop it) with the tilt drawn
     continuously inside its band; the drawn stance is re-checked (collision, focus in frame, extra visibility, optical
-    axis within its class) — a failed re-check returns ``(index, None)`` and the caller takes the next survivor."""
+    axis within its class). The tilt is redrawn up to ``tilt_draws`` times inside the band (the grid tilt itself, which
+    passed steps 1–3, is the last draw); when every draw fails the re-check ``(index, None)`` is returned and the
+    caller takes the next survivor."""
     if not survivors:
         return -1, None
     i = int(rng.integers(len(survivors)))
     grid = survivors[i]
     lo, hi = grid.extras.get("band", tilt_band(grid.tilt, grid.translate))
-    tilt = float(rng.uniform(lo, hi)) if hi > lo else grid.tilt
-    st = grid.with_trunk(grid.translate, tilt, name)
-    st.focus = grid.focus if focus is None else _t(focus)
-    st.arms = list(arms)
-    st.extras = {k: v for k, v in grid.extras.items() if k in ("band", "angle_class")}
-    st.extras["grid_tilt"] = grid.tilt
     excl = (len(set(arms)) > 1) if arms_excluded is None else arms_excluded
-    if not bool(body_free(s, [st], arms_excluded=excl)[0]):
-        return i, None
-    cam = camera_poses(s, [st])[0]
-    if st.focus is not None:
-        if not in_frame(s, cam, st.focus.reshape(1, 3), in_frame_margin):
-            return i, None
-        ang = axis_angle(s, cam, st.focus)
-        k = angle_class(ang)
-        if k is None or k > int(grid.extras.get("angle_class", 1)):
-            return i, None
-        st.extras["axis_angle_deg"] = math.degrees(ang)
-    if extra_visibility is not None and not extra_visibility(cam):
-        return i, None
-    return i, st
+    draws = [float(rng.uniform(lo, hi)) if hi > lo else grid.tilt for _ in range(max(1, int(tilt_draws)) - 1)] + [float(grid.tilt)]
+    for tilt in draws:
+        st = grid.with_trunk(grid.translate, tilt, name)
+        st.focus = grid.focus if focus is None else _t(focus)
+        st.arms = list(arms)
+        st.extras = {k: v for k, v in grid.extras.items() if k in ("band", "angle_class")}
+        st.extras["grid_tilt"] = grid.tilt
+        if not bool(body_free(s, [st], arms_excluded=excl)[0]):
+            continue
+        cam = camera_poses(s, [st])[0]
+        if st.focus is not None:
+            if not in_frame(s, cam, st.focus.reshape(1, 3), in_frame_margin):
+                continue
+            ang = axis_angle(s, cam, st.focus)
+            k = angle_class(ang)
+            if k is None or k > int(grid.extras.get("angle_class", 1)):
+                continue
+            st.extras["axis_angle_deg"] = math.degrees(ang)
+        if extra_visibility is not None and not extra_visibility(cam):
+            continue
+        return i, st
+    return i, None
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -652,8 +697,21 @@ def exact_contacts(s, stance: Stance, contact_set: Sequence[ContactSpec], order:
 def connect(s, init: Stance, manip: Stance, path_max_m: float = PATH_MAX_M, carried: Optional[str] = None, arm: str = "right",
             blocked: Sequence[Any] = ()) -> Tuple[PathRecord, Transition]:
     """§5.2 step 6: the base path init → manipulation (§3.7, ≤ ``path_max_m``) and the transition (§3.8), both recorded
-    in the sidecar; ``Reject`` (``no_path`` / ``path_collision`` / ``path_too_long`` / ``no_transition``) otherwise."""
-    path = s.record_path(init, manip, carried=carried, arm=arm, max_length_m=path_max_m, blocked=blocked)
+    in the sidecar; ``Reject`` (``no_path`` / ``path_collision`` / ``path_too_long`` / ``no_transition``) otherwise.
+
+    The path is driven **before** the trunk change (§3.8: drive-back → trunk → drive-in at the arriving stance), so its
+    whole-body checks run at the *departing* stance's trunk (the navigation posture "trunk as recorded" of §3.7); the
+    core's ``record_path`` default (the arriving trunk) would check a leaning manipulation trunk at the init position."""
+    from ispatialgym.sampling.sim_utils import Reject
+    from ispatialgym.sampling.v2 import navigation as NAV
+
+    carried_obj = s.objects.get(carried) if carried else None
+    try:
+        path = NAV.plan_path(s.kit, init, manip, carried=carried, carried_obj=carried_obj, carried_arm=arm, rooms=s.gp.rooms(s.scene) or s.world.rooms,
+                             blocked=blocked, max_length_m=path_max_m, trunk=(init.translate, init.tilt))
+    except NAV.NavigationError as e:
+        raise Reject(e.reason, str(e))
+    s.sidecar.add_path(path)
     tr = s.record_transition(init, manip, carried=carried, arm=arm)
     return path, tr
 

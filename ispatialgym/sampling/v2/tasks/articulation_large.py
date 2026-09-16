@@ -46,7 +46,7 @@ from ispatialgym.sampling import geometry as G
 from ispatialgym.sampling.grasp_library import library_root
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.articulation import scale_handle, scale_joint_info
-from ispatialgym.sampling.tasks.base import Draft
+from ispatialgym.sampling.tasks.base import Draft, _jsonable
 from ispatialgym.sampling.v2 import navigation as NAV
 from ispatialgym.sampling.v2 import prompt0 as P0
 from ispatialgym.sampling.v2.core import SamplerV2, register
@@ -462,6 +462,14 @@ class ArticulationLarge(SamplerV2):
     def joint_value(self) -> float:
         return float(self.target.get_joint_positions()[self.joint_index()])
 
+    def pose_joint(self, q: float):
+        """Put the joint at ``q`` for a geometric / collision query: set, one physics step so the link poses (AABBs, the
+        cuRobo meshes) follow, set again (no residual velocity), then re-sync the collision world."""
+        self.set_joint(q)
+        self.world.step_physics(1, still=[self.robot])
+        self.set_joint(q)
+        self.kit.sync_world()
+
     def outward_world(self) -> th.Tensor:
         p, q = self.obj_pose()
         n = G.rotate(q, th.as_tensor(self.jinfo.get("outward_normal", [1.0, 0.0, 0.0]), dtype=th.float32))
@@ -502,6 +510,12 @@ class ArticulationLarge(SamplerV2):
     # ------------------------------------------------------------------ template (§5.3)
 
     def sample_template(self):
+        try:
+            self._sample_template()
+        finally:  # the facts survive a template rejection (diagnostics in template_meta)
+            self.template_meta["template_facts"] = _jsonable(self.template_facts)
+
+    def _sample_template(self):
         obj = self.target
         self.load_handle(obj)
         self.hull = self.world.local_hull(obj)
@@ -596,8 +610,7 @@ class ArticulationLarge(SamplerV2):
         fractions = list(self.gp.gen("waypoint_fractions", WAYPOINT_FRACTIONS))
         required = required_fractions(pf, fractions, self.gp.gen("require_goal_handle", "auto"))
         # the target in its init state for every check of this attempt
-        self.set_joint(q_init)
-        self.kit.sync_world()
+        self.pose_joint(q_init)
         gen_p0 = dict(self.gp.gen("prompt0") or {})
         beta_max = math.radians(float(gen_p0.get("beta_max_deg", 20.0)))
         d_min, d_max = float(gen_p0.get("d_min_m", 0.5)), float(gen_p0.get("d_max_m", 2.5))
@@ -659,31 +672,43 @@ class ArticulationLarge(SamplerV2):
         if not sol.ok:
             raise Reject("handle_unreachable", sol.reason)
         q_star = sol.q
-        arm_idx = self.kit.robot.arm_control_idx[self.arm]
-        # step 5b: the grasp pose at every required q_k with the world re-synced at q_k (target ignored for the grasp poses)
+        # step 5b: arm-only IK of the grasp pose at every q_k with the world re-synced at q_k (target ignored for the
+        # grasp poses) — the arm mode's waypoint check, and the oracle's secondary mode where the base follows
         fractions = list(self.gp.gen("waypoint_fractions", WAYPOINT_FRACTIONS))
         by_k = {k: w for (k, _), w in zip(waypoint_values(q_init, q_goal, fractions), wps[1:])}
-        handle_reach: Dict[str, bool] = {}
-        arm_q_at: Dict[float, th.Tensor] = {}
+        arm_reach: Dict[str, bool] = {}
         try:
             for k in fractions:
                 w = by_k[k]
-                self.set_joint(w.q)
-                self.kit.sync_world()
+                self.pose_joint(w.q)
                 res = self.ikc.exact([w.eef], manip, self.arm, ignore_for_last=[obj], q_seed=q_star, cache=False)
-                handle_reach[fraction_key(k)] = bool(res.ok)
-                if res.ok:
-                    arm_q_at[k] = res.q[arm_idx].clone()
+                arm_reach[fraction_key(k)] = bool(res.ok)
         finally:
-            self.set_joint(q_init)
-            self.kit.sync_world()
+            self.pose_joint(q_init)
+        # the primary mode decides ``handle_reach`` (F6: every followed waypoint must be reachable in the recorded mode):
+        # base mode = the base-follow pose b_k passes its checks (arm-only IK recorded separately as the per-waypoint
+        # fallback); arm mode = the arm-only IK
+        base_follow: Optional[Dict[str, List[float]]] = None
+        mode, base_follow_reason = self.mode, None
+        if mode == "base":
+            try:
+                base_follow = self._base_follow(manip, q_star, h0, by_k, required, q_init)
+            except Reject as e:
+                # the rigid eef->base sweep about the hinge is blocked (a door next to furniture): the oracle's secondary
+                # mode carries the instance when the arm alone reaches every required waypoint (§5.3 "arm-only IK at each
+                # waypoint ... as the oracle's secondary mode"); otherwise the candidate is rejected
+                if all(arm_reach.get(fraction_key(k), False) for k in required):
+                    mode, base_follow, base_follow_reason = "arm", None, f"{e.reason}: {e}"
+                    log.info("%s: base-follow blocked (%s); the arm reaches every required waypoint -> follow_mode arm", self.gp.alias, e)
+                else:
+                    raise
+        if mode == "base":
+            handle_reach = {fraction_key(k): (fraction_key(k) in base_follow) or arm_reach[fraction_key(k)] for k in fractions}
+        else:
+            handle_reach = dict(arm_reach)
         missing = [k for k in required if not handle_reach.get(fraction_key(k), False)]
         if missing:
-            raise Reject("handle_unreachable", f"grasp pose unreachable at required waypoints {missing} (reach {handle_reach})")
-        # base-follow (primary mode for vertical-axis revolute / horizontal prismatic joints)
-        base_follow: Optional[Dict[str, List[float]]] = None
-        if self.mode == "base":
-            base_follow = self._base_follow(manip, q_star, h0, by_k, required, q_init)
+            raise Reject("handle_unreachable", f"grasp pose unreachable in {mode} mode at required waypoints {missing} (arm-only reach {arm_reach})")
         # step 6: path + transition init -> manipulation
         manip.contacts = ["handle"]
         self.sidecar.add_stance(manip)
@@ -695,9 +720,10 @@ class ArticulationLarge(SamplerV2):
         pf = self.passive.get(f"{q_init:.4f}->{q_goal:.4f}")
         self.sidecar.articulation = {"object": tname, "joint": self.joint_name, "joint_type": "prismatic" if "rismatic" in self.jinfo["type"] else "revolute",
                                      "q_init": float(q_init), "q_goal": float(q_goal), "waypoints": waypoints, "handle_reach": handle_reach,
-                                     "passive_from": pf, "follow_mode": self.mode, "base_follow": base_follow,
+                                     "passive_from": pf, "follow_mode": mode, "base_follow": base_follow,
                                      "handle": {"kind": self.handle.get("kind"), "classes": list(contact.classes or ()), "width_m": self.handle.get("width")},
-                                     "required_fractions": [fraction_key(k) for k in required]}
+                                     "required_fractions": [fraction_key(k) for k in required], "arm_reach": arm_reach,
+                                     "primary_follow_mode": self.mode, "base_follow_blocked": base_follow_reason}
         self.sidecar.describe(tname, obj.category.replace("_", " "))
         # draft: joints only (nothing spawned), robot at the init stance, the moving link held while settling
         d = Draft()
@@ -719,7 +745,10 @@ class ArticulationLarge(SamplerV2):
         d.base_pose2d = tuple(init.base_pose2d)
         d.settle_free = []
         d.summary["handle_reach"] = handle_reach
+        d.summary["arm_reach"] = arm_reach
         d.summary["base_follow"] = base_follow
+        d.summary["follow_mode"] = mode
+        d.summary["base_follow_blocked"] = base_follow_reason
         return d
 
     def _base_follow(self, manip: Stance, q_star: th.Tensor, h0: C.HandleWaypoint, by_k: Dict[float, C.HandleWaypoint], required: List[float],
@@ -743,10 +772,9 @@ class ArticulationLarge(SamplerV2):
         try:
             for k, b in zip(ks, targets):
                 b = (float(b[0]), float(b[1]), float(b[2]))
-                if not P0.base_ok(self, b[:2]):
-                    raise Reject("base_follow_infeasible", f"b_{k:g} = {[round(v, 3) for v in b]} is off the free floor / task rooms")
-                self.set_joint(by_k[k].q)
-                self.kit.sync_world()
+                if not self.kit.trav_free(b[:2]):  # §5.3: b_k on free floor (un-eroded); the room rule binds the init stance only
+                    raise Reject("base_follow_infeasible", f"b_{k:g} = {[round(v, 3) for v in b]} is off the free floor")
+                self.pose_joint(by_k[k].q)
                 q_b = self.kit.q_at_base_pose(self.kit.q_config(arms="untucked", translate=trunk[0], tilt=trunk[1], **{f"{self.arm}_arm": arm_q}), *b)
                 with self.kit.ignoring([obj]):
                     free = bool(self.kit.collision_free(q_b, margin=P0.COLLISION_MARGIN)[0])
@@ -762,8 +790,7 @@ class ArticulationLarge(SamplerV2):
                 out[fraction_key(k)] = list(b)
                 prev = b
         finally:
-            self.set_joint(q_init)
-            self.kit.sync_world()
+            self.pose_joint(q_init)
         return out
 
     # ------------------------------------------------------------------ pipeline hooks (§5.3 Phase 3)
