@@ -88,6 +88,44 @@ def line_waypoints(p0: Pose, p1: Pose, n: int = 3, endpoints: bool = False) -> L
 
 
 # ----------------------------------------------------------------------------------------------------------------
+# stance arm postures (A6)
+# ----------------------------------------------------------------------------------------------------------------
+
+POSTURES = {"untucked": "untucked", "tucked": "tucked", "reset": "tucked", "ready": "ready"}
+
+
+def stance_arm_vectors(kit, stance: Stance, arms: Optional[str] = None, right_arm: Optional[th.Tensor] = None, left_arm: Optional[th.Tensor] = None,
+                       fingers: Optional[float] = None) -> Tuple[th.Tensor, th.Tensor, float]:
+    """``(right_arm, left_arm, fingers)`` of a stance, in this order of precedence: the explicit arguments, the stance's
+    **recorded configuration** ``stance.q`` (§3.3 exceptions: the held-object hold, the camera-relocalization reset arms)
+    and ``stance.fingers``, then per arm: the working arms (``stance.arms`` list) untucked, the idle arm in
+    ``stance.idle_posture`` (A6: untucked / ready / tucked), a posture string ``arms`` / ``stance.arms`` for both."""
+    robot = kit.robot
+    if stance.q is not None:
+        if right_arm is None:
+            right_arm = stance.q[robot.arm_control_idx["right"]].clone()
+        if left_arm is None:
+            left_arm = stance.q[robot.arm_control_idx["left"]].clone()
+        if fingers is None and stance.fingers is None:
+            fingers = float(stance.q[robot.gripper_control_idx["right"]][0])
+    if fingers is None:
+        fingers = stance.fingers if stance.fingers is not None else FINGER_OPEN_DEFAULT
+    both = POSTURES.get(arms or stance.posture, "untucked")
+    working = stance.working_arms
+    for arm in ("right", "left"):
+        cur = right_arm if arm == "right" else left_arm
+        if cur is not None:
+            continue
+        name = POSTURES.get(stance.idle_posture, "untucked") if (working and arm not in working and stance.idle_posture) else both
+        vec = kit.arm_q(name, arm)
+        if arm == "right":
+            right_arm = vec
+        else:
+            left_arm = vec
+    return right_arm, left_arm, float(fingers)
+
+
+# ----------------------------------------------------------------------------------------------------------------
 # IK checker
 # ----------------------------------------------------------------------------------------------------------------
 
@@ -207,36 +245,57 @@ class IKChecker:
 
     # -- configurations -----------------------------------------------------------------------------------------
     POSTURES = {"untucked": "untucked", "tucked": "tucked", "reset": "tucked", "ready": "ready"}
+    #: A6 (owner decision 2026-09-16): the idle arm of a manipulation stance may take any recorded collision-free posture;
+    #: the alternatives tried, in order, when the untucked idle arm collides
+    IDLE_POSTURES = ("untucked", "ready", "tucked")
+
+    def arm_vectors(self, stance: Stance, arms: Optional[str] = None, right_arm: Optional[th.Tensor] = None, left_arm: Optional[th.Tensor] = None,
+                    fingers: Optional[float] = None) -> Tuple[th.Tensor, th.Tensor, float]:
+        """``(right_arm, left_arm, fingers)`` of a stance — see :func:`stance_arm_vectors`."""
+        return stance_arm_vectors(self.kit, stance, arms, right_arm, left_arm, fingers)
 
     def q_locked(self, stance: Stance, arms: Optional[str] = None, right_arm: Optional[th.Tensor] = None, left_arm: Optional[th.Tensor] = None,
                  fingers: Optional[float] = None) -> th.Tensor:
         """28-D configuration at the stance (base pose + trunk) — the locked-joint source and IK seed of every check from
-        it. The arm joints and finger openings are, in this order: the explicit ``right_arm`` / ``left_arm`` / ``fingers``
-        arguments, the stance's **recorded configuration** ``stance.q`` (§3.3 exceptions: the held-object hold, the
-        camera-relocalization reset arms) and ``stance.fingers``, the posture ``arms`` (default ``stance.posture``:
-        untucked / tucked = reset / ready) with open grippers. The base virtual joints are always re-derived for the
-        robot's current root."""
-        robot = self.kit.robot
-        if stance.q is not None:
-            if right_arm is None:
-                right_arm = stance.q[robot.arm_control_idx["right"]].clone()
-            if left_arm is None:
-                left_arm = stance.q[robot.arm_control_idx["left"]].clone()
-            if fingers is None and stance.fingers is None:
-                fingers = float(stance.q[robot.gripper_control_idx["right"]][0])
-        if fingers is None:
-            fingers = stance.fingers if stance.fingers is not None else FINGER_OPEN_DEFAULT
-        posture = self.POSTURES.get(arms or stance.posture, "untucked")
-        q = self.kit.q_config(arms=posture, translate=stance.translate, tilt=stance.tilt, right_arm=right_arm, left_arm=left_arm, fingers=float(fingers))
+        it; arms and fingers per :meth:`arm_vectors`. The base virtual joints are always re-derived for the robot's
+        current root."""
+        r, l, f = self.arm_vectors(stance, arms, right_arm, left_arm, fingers)
+        q = self.kit.q_config(arms="untucked", translate=stance.translate, tilt=stance.tilt, right_arm=r, left_arm=l, fingers=f)
         return self.kit.q_at_base_pose(q, *stance.base_pose2d)
 
     def stance_collision_free(self, stance: Stance, margin: float = 0.01, arms: Optional[str] = None, **arm_q) -> bool:
         return bool(self.kit.collision_free(self.q_locked(stance, arms, **arm_q), margin=margin)[0])
 
-    def stances_collision_free(self, stances: Sequence[Stance], margin: float = 0.01) -> th.Tensor:
+    def stances_collision_free(self, stances: Sequence[Stance], margin: float = 0.01, try_idle_postures: bool = True) -> th.Tensor:
+        """Whole-body collision mask of the stances at their configuration. A6: a manipulation stance (``arms`` = list of
+        working arms) whose untucked idle arm collides is retried with the alternative idle postures (``IDLE_POSTURES``,
+        batched per posture); a survivor records the posture that passed in ``stance.idle_posture`` (its joint values go
+        to the sidecar as ``arms_q``). Init stances (``arms = "untucked"``) are never re-postured."""
         if not stances:
             return th.zeros(0, dtype=th.bool)
-        return self.kit.collision_free(th.stack([self.q_locked(s) for s in stances]), margin=margin)
+        free = self.kit.collision_free(th.stack([self.q_locked(s) for s in stances]), margin=margin).clone()
+        if not try_idle_postures:
+            return free
+        retry = [i for i, s in enumerate(stances) if not bool(free[i]) and s.working_arms and len(s.working_arms) < 2 and s.q is None]
+        for name in self.IDLE_POSTURES:
+            if not retry:
+                break
+            todo = [i for i in retry if (stances[i].idle_posture or "untucked") != name]
+            if not todo:
+                continue
+            qs = []
+            for i in todo:
+                s = stances[i]
+                idle = "left" if s.working_arms == ["right"] else "right"
+                vec = self.kit.arm_q(self.POSTURES[name], idle)
+                qs.append(self.q_locked(s, right_arm=vec if idle == "right" else None, left_arm=vec if idle == "left" else None))
+            ok = self.kit.collision_free(th.stack(qs), margin=margin)
+            for i, f in zip(todo, ok.tolist()):
+                if f:
+                    stances[i].idle_posture = name
+                    free[i] = True
+            retry = [i for i in retry if not bool(free[i])]
+        return free
 
     # -- screening / exact --------------------------------------------------------------------------------------
     def screen(self, poses: Sequence[Pose], stance: Stance, arm: str = "right", ignore: Sequence[Any] = (), q_seed: Optional[th.Tensor] = None,
@@ -311,16 +370,17 @@ class IKChecker:
         return res
 
     def exact_both_arms(self, work: Tuple[str, Sequence[Pose]], other: Tuple[str, Sequence[Pose]], stance: Stance, ignore_for_last: Sequence[Any] = (),
-                        ignore_other_last: Sequence[Any] = ()) -> IKResult:
+                        ignore_other_last: Sequence[Any] = (), fingers: Optional[float] = None) -> IKResult:
         """Brace / second-arm rule (§4.6 step 6): the working arm's poses first; then the other arm with the working arm
-        locked at its solution; combined whole-body check of the final configuration."""
+        locked at its solution; combined whole-body check of the final configuration. ``fingers`` = gripper opening of
+        both hands (closed for push + brace contacts)."""
         arm_w, poses_w = work
         arm_o, poses_o = other
-        r1 = self.exact(poses_w, stance, arm_w, ignore_for_last, cache=False)
+        r1 = self.exact(poses_w, stance, arm_w, ignore_for_last, cache=False, fingers=fingers)
         if not r1.ok:
             return IKResult(False, None, f"{arm_w}: {r1.reason}")
         q_seed = r1.q.clone()
-        r2 = self.exact(poses_o, stance, arm_o, ignore_other_last, q_seed=q_seed, cache=False)
+        r2 = self.exact(poses_o, stance, arm_o, ignore_other_last, q_seed=q_seed, cache=False, fingers=fingers)
         if not r2.ok:
             return IKResult(False, None, f"{arm_o} (brace): {r2.reason}")
         if not bool(self.kit.collision_free(r2.q, margin=0.01)[0]):

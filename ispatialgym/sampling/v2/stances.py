@@ -19,6 +19,7 @@ import math
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+import numpy as np
 import torch as th
 
 Pose = Tuple[th.Tensor, th.Tensor]
@@ -165,11 +166,27 @@ class Stance:
     carried: Optional[str] = None
     extras: Dict[str, Any] = field(default_factory=dict)
     fingers: Optional[float] = None
+    #: A6: posture of the idle arm at a manipulation stance (``"untucked"`` / ``"ready"`` / ``"tucked"``), set by the
+    #: stance search when the untucked idle arm collides; written to the sidecar as ``idle_posture`` + ``arms_q``
+    idle_posture: Optional[str] = None
 
     @property
     def posture(self) -> str:
-        """The idle-arm posture name (``arms`` when it is a posture string, else ``"untucked"``)."""
+        """The posture name for both arms (``arms`` when it is a posture string, else ``"untucked"``)."""
         return self.arms if isinstance(self.arms, str) and self.arms in ("untucked", "tucked", "reset", "ready") else "untucked"
+
+    @property
+    def working_arms(self) -> List[str]:
+        """The arms this stance was solved for (``arms`` as a list; empty for a posture string)."""
+        return list(self.arms) if isinstance(self.arms, (list, tuple)) else []
+
+    @property
+    def idle_arm(self) -> Optional[str]:
+        """The single idle arm of a one-arm manipulation stance (None for init stances and two-arm stances)."""
+        w = self.working_arms
+        if len(w) != 1:
+            return None
+        return "left" if w[0] == "right" else "right"
 
     # -- frame helpers ------------------------------------------------------------------------------------------
     @property
@@ -226,7 +243,7 @@ class Stance:
     def with_trunk(self, translate: float, tilt: float, name: Optional[str] = None) -> "Stance":
         """Copy with another trunk (``q`` dropped: it must be recomputed)."""
         return Stance(name or self.name, tuple(self.base_pose2d), float(translate), float(tilt), self.stand_off, self.edge, self.face,
-                      self.lateral, self.focus, self.arms, list(self.contacts), None, self.carried, dict(self.extras), self.fingers)
+                      self.lateral, self.focus, self.arms, list(self.contacts), None, self.carried, dict(self.extras), self.fingers, self.idle_posture)
 
     def shifted(self, stand_off: Optional[float] = None, lateral: Optional[float] = None, name: Optional[str] = None) -> "Stance":
         """Copy moved along the edge frame to another (stand_off, lateral); ``q`` dropped."""
@@ -236,7 +253,7 @@ class Stance:
         lat = self.lateral if lateral is None else float(lateral)
         xy = self.edge.base_xy(s, lat)
         return Stance(name or self.name, (float(xy[0]), float(xy[1]), self.edge.yaw), self.translate, self.tilt, s, self.edge, self.face, lat,
-                      self.focus, self.arms, list(self.contacts), None, self.carried, dict(self.extras), self.fingers)
+                      self.focus, self.arms, list(self.contacts), None, self.carried, dict(self.extras), self.fingers, self.idle_posture)
 
     # -- serialisation ------------------------------------------------------------------------------------------
     def to_sidecar(self) -> Dict[str, Any]:
@@ -260,6 +277,12 @@ class Stance:
             d["contacts"] = list(self.contacts)
         if self.carried is not None:
             d["carried"] = self.carried
+        # A6: the idle arm's posture (the oracle moves the arm there before the trunk motion); its joint values follow
+        # as ``arms_q`` once core annotated the stance (``SamplerV2.annotate_stance_arms``)
+        if self.idle_arm is not None:
+            d["idle_posture"] = self.idle_posture or "untucked"
+        elif self.posture != "untucked":
+            d["idle_posture"] = self.posture
         for k, v in self.extras.items():
             if k not in d and not str(k).startswith("_"):
                 d[k] = _jsonable(v)
@@ -457,6 +480,8 @@ class SidecarDraft:
         self.language: Dict[str, Any] = {"objects": {}, "goal_numbers": {}}
         self.waypoint_policy: str = "checked"
         self.checked_waypoints: List[Dict[str, Any]] = []  # what §3.9 checked (debug / summary)
+        #: the program check's joint solutions per action end pose (``program_check.run``): D5 verifies them as witnesses
+        self.ik_witnesses: List[Dict[str, Any]] = []
         self.tro_sha256: Optional[str] = None
 
     # -- writers ------------------------------------------------------------------------------------------------
@@ -521,6 +546,8 @@ class SidecarDraft:
             d["goal"] = dict(self.goal)
         d["language"] = _jsonable(self.language)
         d["waypoint_policy"] = self.waypoint_policy
+        if self.ik_witnesses:
+            d["ik_witnesses"] = _jsonable(self.ik_witnesses)
         return d
 
     def finalize(self, instance_id: str, tro_path: str) -> Dict[str, Any]:
@@ -549,12 +576,37 @@ class SidecarDraft:
         self.goal = None
         self.language = {"objects": {}, "goal_numbers": {}}
         self.checked_waypoints = []
+        self.ik_witnesses = []
         self.path_bucket_m = None
         self.tro_sha256 = None
 
 
 def G_index(q: th.Tensor, idx) -> th.Tensor:
     return q[idx].clone()
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Band membership (A1 joint placement; pure, base frame: x ahead, lateral + = robot's left)
+# ----------------------------------------------------------------------------------------------------------------
+
+BAND_CELL_TOL = 0.06  # a point counts as "in the band" within this distance of a band cell (8 cm lattice: half a diagonal)
+
+
+def in_band(point_base, cells, tol: float = BAND_CELL_TOL) -> bool:
+    """Whether a base-frame point lies within ``tol`` of a cell of a reach band (N x 2 base-frame cells, numpy or torch);
+    an empty / missing band admits nothing."""
+    if cells is None or len(cells) == 0:
+        return False
+    c = th.as_tensor(np.asarray(cells, dtype=float)).reshape(-1, 2)
+    p = th.tensor([float(point_base[0]), float(point_base[1])], dtype=c.dtype)
+    return bool(th.min(th.linalg.norm(c - p, dim=1)) <= tol)
+
+
+def brace_placement_admissible(work_point_base, brace_point_base, right_cells, left_cells, tol: float = BAND_CELL_TOL) -> bool:
+    """A1 (owner decision 2026-09-16): the pushed end / work point of the right arm lies in the **right** band and the
+    brace point of the left arm in the **left** contact band *of the same trunk*; the exact two-arm IK of §4.6 step 6
+    follows. Used by touching (partner far side), axial (stop edge), attachment (partner brace), block design (braces)."""
+    return in_band(work_point_base, right_cells, tol) and in_band(brace_point_base, left_cells, tol)
 
 
 def _jsonable(x):

@@ -151,6 +151,50 @@ it also calls `tabletop.edge_candidates` (per-edge retry when Phase 1c rejects a
 - `Stance.to_sidecar()` writes the task's `extras` next to the §7 keys (`goal_cell`, `init_surface`, `path_length_m`,
   `bearing_deg`, `deviation_deg`, ...); the F6 `Sidecar` keeps them in `extra`. Keys starting with `_` stay private.
 
+### A6 — idle-arm posture (owner decision 2026-09-16; §3.6)
+
+- `IKChecker.stances_collision_free(stances)` retries a one-arm manipulation stance whose untucked idle arm collides with
+  the alternative idle postures (`IDLE_POSTURES = untucked, ready (ARM_READY_Q), tucked`) and records the one that passed in
+  `Stance.idle_posture`; `q_locked` / the transition sweep / `check_stances_with_objects` / the program check lock the idle
+  arm in that posture (`ik.stance_arm_vectors`). Init stances (`arms = "untucked"`, tilt 0) and two-arm stances are never
+  re-postured; a stance with a recorded `q` keeps it.
+- **Sidecar fields (proposed to the oracle agent; F6 keeps unknown keys in `Stance.extra`):** `stances.<name>.idle_posture`
+  (`"untucked" | "ready" | "tucked"`, written for every one-arm stance) and `stances.<name>.arms_q = {"right": [7], "left":
+  [7]}` (the joint values the checks used for both arms; `fingers` when not the open default). The oracle moves the idle
+  arm to `arms_q[idle]` before the trunk motion of the transition (precedent: camera relocalization `goal.arms`).
+  `stances.<name>.arms` stays `"untucked"` or the working-arm list (the F6 validator rejects other strings).
+- The stance *search* lives in `tabletop.phase2_manipulation_stance` / `prompt0`; they call `stances_collision_free`, so
+  the retry applies there without changes (the band script does the same per trunk — B3).
+
+### A1 — joint work / brace placement (owner decision 2026-09-16)
+
+`stances.in_band(point_base, cells)` / `stances.brace_placement_admissible(work_base, brace_base, right_cells, left_cells)`
+(pure, 6 cm cell tolerance) gate a two-arm placement: the pushed end / work point ∈ right band AND the brace point ∈ left
+contact band *of the same trunk*, then the exact two-arm IK (`IKChecker.exact_both_arms(..., fingers=FINGER_CLOSED)`).
+`iors_small` applies it to touching (`touching_points` = target right face / partner far face; `Reject("brace_out_of_band")`).
+The left contact band is looked up by `iors_small.left_contact_band_cells` against the APIs to come: `tabletop.ensure_
+contact_bands(s, arm="left", height=h)` then `reach_bands.ReachBands.load(scene, support, mode="contact", arm="left",
+height_class=h)`; until one exists the gate is recorded as `template_facts.left_contact_band = "unavailable"` and the
+two-arm IK alone decides.
+
+### C5 — several aliases per process (`sample_isg --alias A --alias B …`)
+
+The world is reused when the **world key** `(scene, task rooms, removed chairs)` matches (`sample_isg.world_key`; log line
+`world reused for <alias>` / `world loaded for <alias> in Ns`); a failing alias is caught per alias (`summary.json`
+`aliases.<alias>.{time_s, world, n_written, templates, error}`, `errors[]`) and the chunk continues; `summary.json` /
+`SAMPLING_REPORT` carry `wall_time_s` and `world.{n_loads, load_time_s}` for the wall-time split.
+`python -m ispatialgym.sampling.sample_isg --world-key --alias A --alias B` prints `alias<TAB>scene|rooms=…|removed=…` per
+(alias, candidate scene) without a simulator (18 s for the imports), so the scheduler can group aliases by key.
+
+### Report layout changes (2026-09-16)
+
+- `scene_reset` is a **counter**, not a rejection: `template_summary` / `template_meta.json` carry `counters.scene_reset`;
+  `rejections` holds rejected attempts only (a legacy `rejections.scene_reset` is moved on read).
+- The program check records the joint solution of every checked end pose: `summary.program_check.actions[].witnesses
+  {<target key>: {pose, q (28), n_waypoints}}` and the sidecar `ik_witnesses[]` (per action: `stance`, `arm`, `carried`,
+  `targets`); D5's reload re-check verifies them as witnesses (FK within 5 mm / 0.05 rad + collision) instead of re-solving
+  the randomised IK — the same rule `IKChecker.exact` applies to its own remembered solutions.
+
 ### Sidecar semantics the task modules must keep (F6 programs read them)
 
 - `grasps[].yaw` is the drawn **object** yaw about world z relative to the rest orientation (§4.6); the recorded `grasp` /

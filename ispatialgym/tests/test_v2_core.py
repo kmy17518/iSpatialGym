@@ -326,6 +326,33 @@ def test_sample_isg_blacklist_after_failure_and_exclusion(tmp_path):
 # ----------------------------------------------------------------------------------------------------------------
 
 
+def test_a1_joint_band_gate_with_a_synthetic_band():
+    from ispatialgym.sampling.v2 import stances as IS
+
+    right = np.array([[x, lat] for x in (0.5, 0.58, 0.66) for lat in (-0.3, -0.22, -0.14)])
+    left = np.array([[x, lat] for x in (0.5, 0.58, 0.66) for lat in (0.18, 0.26, 0.34)])
+    assert IS.in_band((0.6, -0.2), right) and not IS.in_band((0.6, 0.2), right) and not IS.in_band((0.6, -0.2), np.zeros((0, 2)))
+    assert IS.brace_placement_admissible((0.6, -0.18), (0.6, 0.3), right, left)
+    assert not IS.brace_placement_admissible((0.6, -0.18), (0.6, 0.6), right, left)  # brace point outside the left band
+    assert not IS.brace_placement_admissible((0.9, -0.18), (0.6, 0.3), right, left)  # work point outside the right band
+
+
+def test_stance_idle_posture_and_world_key_string():
+    from ispatialgym.sampling.sample_isg import world_key_str
+
+    edge = EdgeFrame.from_edge("+u", [1.0, 0.0], [1.0, 0.0], 1.6)
+    manip = Stance("manipulation", (1.35, 0.0, math.pi), 0.75, -0.4, 0.35, edge, arms=["right"])
+    assert manip.working_arms == ["right"] and manip.idle_arm == "left" and manip.idle_posture is None
+    assert manip.to_sidecar()["idle_posture"] == "untucked"  # the default, always written for a one-arm stance
+    manip.idle_posture = "ready"
+    d = manip.with_trunk(0.5, -0.2).to_sidecar()
+    assert d["idle_posture"] == "ready" and d["arms"] == ["right"]
+    init = Stance("init", (1.45, 0.0, math.pi), 0.5, 0.0, 0.45, edge)
+    assert init.idle_arm is None and "idle_posture" not in init.to_sidecar()
+    assert world_key_str(("house_single_floor", ("dining_room_0", "living_room_0"), ("chair_a", "chair_b"))) == \
+        "house_single_floor|rooms=dining_room_0,living_room_0|removed=chair_a,chair_b"
+
+
 def test_rejection_log_and_summary_layout():
     rl = RejectionLog(keep=3)
     for i in range(5):
@@ -334,8 +361,12 @@ def test_rejection_log_and_summary_layout():
     d = rl.to_json()
     assert d["counts"] == {"grasp_unreachable": 5, "no_transition": 1} and len(d["examples"]["grasp_unreachable"]) == 3
     assert d["examples"]["grasp_unreachable"][0]["attempt"] == 0 and rl.total == 6
-    entry = template_summary(2, 123.456, rl, seeds=[7, 8])
+    entry = template_summary(2, 123.456, rl, seeds=[7, 8], extra={"counters": {"scene_reset": 12}})
     assert entry["n_written"] == 2 and entry["time_s"] == 123.46 and entry["rejections"]["no_transition"] == 1 and entry["seeds"] == [7, 8]
+    assert entry["counters"] == {"scene_reset": 12} and "scene_reset" not in entry["rejections"]
+    rl.counts["scene_reset"] = 3  # a legacy log that still counted resets as rejections
+    entry2 = template_summary(0, 1.0, rl)
+    assert entry2["counters"] == {"scene_reset": 3} and "scene_reset" not in entry2["rejections"]
     run = new_run_summary("2.0.0-dev", "customs.json", "/tmp/out")
     run["problems"].setdefault("alias", {})["scene__target-apple-a"] = entry
     # the layout bench_report.py reads: problems.<problem>.<template>.{n_written, time_s}

@@ -43,6 +43,7 @@ import omnigibson as og  # noqa: E402
 
 from ispatialgym.activity.problem import AGENT_INSTANCE, ISGProblem  # noqa: E402
 from ispatialgym.oracle import r1pro_model as M  # noqa: E402
+from ispatialgym.robot import conventions as C  # noqa: E402
 from ispatialgym.sampling import geometry as G  # noqa: E402
 from ispatialgym.sampling import knowledge as K  # noqa: E402
 from ispatialgym.sampling.bddl_writer import Bindings, Bound, build_problem  # noqa: E402
@@ -154,6 +155,7 @@ class SamplerV2(TaskSampler):
         self.sidecar = SidecarDraft(self.gp.alias, self.gp.family)
         self.ikc = IKChecker(self.kit, {"scene": self.world.scene_model, "rooms": sorted(self.world.loaded_rooms or []), "floor_z": self.kit.floor_z})
         self.rejection_log = RejectionLog(keep=3)
+        self.counters: Dict[str, int] = {}  # scene_reset, attempts, ... (not rejections)
         self.instance_seeds: List[int] = []
         self.template_facts: Dict[str, Any] = {}  # cached geometry of sample_template (written to template_meta)
         self.template_meta.update({"alias": self.gp.alias, "subtask": self.subtask, "scene": self.scene, "sampler_version": SAMPLER_VERSION,
@@ -331,7 +333,12 @@ class SamplerV2(TaskSampler):
         self.template_meta["n_written_before"] = int(old.get("n_written", 0))
         self.template_meta["n_written"] = int(old.get("n_written", 0))
         for k, v in (old.get("rejections") or {}).items():
+            if k == "scene_reset":  # written under rejections by the first runs; a counter since 2026-09-16
+                self.counters[k] = self.counters.get(k, 0) + int(v)
+                continue
             self.rejection_log.counts[k] = self.rejection_log.counts.get(k, 0) + int(v)
+        for k, v in (old.get("counters") or {}).items():
+            self.counters[k] = self.counters.get(k, 0) + int(v)
         self.instance_seeds = list(old.get("seeds") or [])
         log.info("%s: continuing template %s (%d instances so far, sha %s)", self.gp.alias, self.ctx.template_id, self.template_meta["n_written"], self.template_sha[:12])
         return True
@@ -502,6 +509,7 @@ class SamplerV2(TaskSampler):
         sidecar_path = os.path.join(inst_dir, f"{iid}.oracle.json")
         if not NAV.attached_checks_enabled():
             self.sidecar.waypoint_policy = "checked_without_attached_object"
+        self.annotate_stance_arms()
         self.sidecar.finalize(iid, path)
         self.sidecar.write(sidecar_path)
         summary = dict(draft.summary)
@@ -514,6 +522,16 @@ class SamplerV2(TaskSampler):
         if "stances" not in self.template_meta:
             self.template_meta["stances"] = {k: v.to_meta() for k, v in self.sidecar.stances.items()}
         return path
+
+    def annotate_stance_arms(self) -> None:
+        """A6: every recorded stance carries the arm joint values the checks used (``arms_q = {"right": [7], "left": [7]}``,
+        ``fingers`` when not the open default) next to ``idle_posture`` in the sidecar, so the oracle can move the idle
+        arm there before the trunk motion (unknown keys land in the F6 ``Sidecar.extra``)."""
+        for st in self.sidecar.stances.values():
+            r, l, f = self.ikc.arm_vectors(st)
+            st.extras["arms_q"] = {"right": [round(float(v), 5) for v in r.tolist()], "left": [round(float(v), 5) for v in l.tolist()]}
+            if abs(f - float(C.FINGER_OPEN)) > 1e-6:
+                st.extras["fingers"] = f
 
     def constraints_write_back(self, draft: Draft, iid: str) -> List[Dict[str, Any]]:
         """§2.3 / §9: append the task module's records (+ the stance record core derives) with ``source``."""
@@ -537,13 +555,15 @@ class SamplerV2(TaskSampler):
         self.template_meta["checks"] = self.check_flags()
         self.template_meta["rejections"] = dict(self.rejection_log.counts)
         self.template_meta["rejection_examples"] = {k: list(v) for k, v in self.rejection_log.examples.items()}
+        self.template_meta["counters"] = dict(self.counters)
         self.template_meta["seeds"] = list(self.instance_seeds)
         self.template_meta["kit_stats"] = self.kit.stats_snapshot()
         super().write_template_meta()
 
     def template_summary(self, n_written: int, time_s: float) -> Dict[str, Any]:
         return template_summary(n_written, time_s, self.rejection_log, self.instance_seeds,
-                                {"scene": self.scene, "template_id": self.ctx.template_id, "kit": self.kit.stats_snapshot()})
+                                {"scene": self.scene, "template_id": self.ctx.template_id, "kit": self.kit.stats_snapshot(), "counters": dict(self.counters),
+                                 "checks": self.check_flags()})
 
     # ------------------------------------------------------------------ main loop
 
@@ -570,7 +590,8 @@ class SamplerV2(TaskSampler):
                 try:
                     n_reset = self.world.reset_scene_objects([o.name for o in self.objects.values()])
                     if n_reset:
-                        self.rejection_log.counts["scene_reset"] = self.rejection_log.counts.get("scene_reset", 0) + n_reset
+                        # a counter (scene objects put back before the attempt), not a rejection
+                        self.counters["scene_reset"] = self.counters.get("scene_reset", 0) + n_reset
                     self.park_robot()
                     self.ikc.solutions.clear()
                     phase = "sample"

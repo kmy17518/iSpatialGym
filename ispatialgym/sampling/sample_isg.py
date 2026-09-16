@@ -30,7 +30,7 @@ import shutil
 import sys
 import time
 import traceback
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 os.environ.setdefault("OMNIGIBSON_HEADLESS", "1")
 os.environ.setdefault("OMNI_KIT_ACCEPT_EULA", "YES")
@@ -93,14 +93,37 @@ def chairs_to_remove(problem: GroundedProblem, scene: str, stable_scene: dict, r
     return SV.chairs_near_tables(stable_scene, rooms, tables, distance=float(problem.gen("chair_distance", 1.0)), categories=tuple(cats))
 
 
+def world_key(problem: GroundedProblem, scene: str, stable: Optional[dict] = None) -> Tuple[str, Tuple[str, ...], Tuple[str, ...]]:
+    """The **world key** of an alias in a scene — ``(scene, task rooms, removed chairs)`` — what decides whether two aliases
+    can share one loaded world (C5 reschedule: aliases are grouped by this key). Needs only the stable scene json."""
+    if stable is None:
+        from omnigibson.utils.asset_utils import get_dataset_path  # package import only, no simulator launch
+
+        path = os.path.join(get_dataset_path("2026-challenge-task-instances"), "scenes", scene, "json", f"{scene}_stable.json")
+        with open(path) as f:
+            stable = json.load(f)
+    rooms = rooms_for(problem, scene, stable)
+    removed = chairs_to_remove(problem, scene, stable, rooms)
+    return scene, tuple(sorted(rooms)), tuple(removed)
+
+
+def world_key_str(key: Tuple[str, Tuple[str, ...], Tuple[str, ...]]) -> str:
+    scene, rooms, removed = key
+    return f"{scene}|rooms={','.join(rooms)}|removed={','.join(removed)}"
+
+
 class WorldPool:
-    """One live OmniGibson world at a time, re-created when (scene, rooms, removed chairs) change."""
+    """One live OmniGibson world at a time, re-created when the world key (scene, task rooms, removed chairs) changes;
+    aliases with the same key reuse it (``last_action`` = ``"loaded"`` / ``"reused"`` after :meth:`get`)."""
 
     def __init__(self, out_root: str):
         self.out_root = out_root
         self.world = None
         self.kit = None
         self.key = None
+        self.last_action = None
+        self.n_loads = 0
+        self.load_time_s = 0.0
 
     def get(self, problem: GroundedProblem, scene: str):
         from ispatialgym.sampling.robot_utils import RobotKit
@@ -110,14 +133,17 @@ class WorldPool:
 
         with open(stable_scene_path(scene)) as f:
             stable = json.load(f)
-        rooms = rooms_for(problem, scene, stable)
-        removed = chairs_to_remove(problem, scene, stable, rooms)
-        key = (scene, tuple(sorted(rooms)), tuple(removed))
+        key = world_key(problem, scene, stable)
+        removed = list(key[2])
+        rooms = list(key[1])
         if self.key == key and self.world is not None:
+            self.last_action = "reused"
+            log.info("world reused for %s: %s", problem.alias, world_key_str(key))
             return self.world, self.kit
         if self.world is not None:
             og.clear()
             self.world, self.kit = None, None
+        t0 = time.time()
         variant = None
         if removed:
             from ispatialgym.sampling import scene_variants as SV
@@ -128,6 +154,10 @@ class WorldPool:
         self.world = SimWorld(scene, rooms, scene_variant=variant)
         self.kit = RobotKit(self.world, prebuild=("right_arm",))  # the left-arm planner is built on first use (brace tasks)
         self.key = key
+        self.last_action = "loaded"
+        self.n_loads += 1
+        self.load_time_s += time.time() - t0
+        log.info("world loaded for %s in %.1fs: %s", problem.alias, time.time() - t0, world_key_str(key))
         return self.world, self.kit
 
     def cleanup_template(self):
@@ -240,10 +270,14 @@ def main(argv=None):
     parser.add_argument("--v1-spec", default=None, help="facade: v1 task spec json (until ground_isg lands)")
     parser.add_argument("--v1-problem", default=None, help="facade: <activity>-<def_id> key in --v1-spec")
     parser.add_argument("--subtask", default=None, help="facade: subtask id of the v1 entry")
+    parser.add_argument("--world-key", action="store_true", help="print '<alias>\\t<world key>' per alias (no simulator) and exit; the "
+                                                                 "scheduler groups aliases with equal keys into one process")
     parser.add_argument("--log-level", default=os.environ.get("ISPATIALGYM_LOG_LEVEL", "INFO"))
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=args.log_level, format="[%(levelname)s %(name)s] %(message)s", stream=sys.stdout, force=True)
+    if args.world_key:
+        return print_world_keys(args)
     os.makedirs(args.out, exist_ok=True)
     customs_copy = os.path.join(args.out, "task_custom_lists.json")
     if not args.v1_spec and os.path.exists(args.customs):
@@ -252,56 +286,32 @@ def main(argv=None):
 
     customs_sha = hashlib.sha256(open(args.customs, "rb").read()).hexdigest() if (not args.v1_spec and os.path.exists(args.customs)) else None
     report = new_run_summary(SAMPLER_VERSION, None if args.v1_spec else args.customs, args.out, vars(args))
+    report["aliases"] = {}  # per alias: wall time, world action, n_written, error
     pool = WorldPool(args.out)
+    t_start = time.time()
     import omnigibson as og
 
     try:
-        for alias in args.alias:
-            args.alias = alias
-            try:
-                gp = load_problem_from_args(args)
+        for alias in list(args.alias):
+            t_alias = time.time()
+            arec = report["aliases"].setdefault(alias, {"n_written": 0, "templates": 0, "world": None, "time_s": None, "error": None})
+            try:  # a failing alias never aborts the rest of the chunk
+                run_alias(args, alias, pool, report, customs_copy, customs_sha)
             except Exception as e:
-                log.error("traceback", exc_info=True)
+                log.error("alias %s failed: %r", alias, e, exc_info=True)
+                arec["error"] = repr(e)
                 report["errors"].append({"alias": alias, "error": repr(e)})
-                continue
-            scenes = [args.scene] if args.scene else gp.scene_names()
-            rng = np.random.default_rng(args.seed)
-            n_inst = args.instances_per_template if args.instances_per_template is not None else int(gp.gen("instances_per_template", 5))
-            for scene in scenes:
-                if scene not in gp.scene_names():
-                    report["errors"].append({"alias": alias, "scene": scene, "error": "scene not in the customs entry"})
-                    continue
-                try:
-                    world, kit = pool.get(gp, scene)
-                except Exception as e:
-                    log.error("traceback", exc_info=True)
-                    report["errors"].append({"alias": alias, "scene": scene, "error": f"scene load failed: {e!r}"})
-                    pool.world, pool.kit, pool.key = None, None, None
-                    continue
-                exclude = _existing_templates(args.out, gp, scene)
-                for ti, choice in enumerate(iter_template_choices(gp, scene, rng, exclude=exclude, max_templates=args.templates)):
-                    out_dir = os.path.join(args.out, gp.alias, choice.template_id)
-                    if os.path.exists(os.path.join(out_dir, "template.json")) and not args.overwrite:
-                        log.info("skip existing template %s", out_dir)
-                        continue
-                    if os.path.exists(out_dir) and args.overwrite:
-                        shutil.rmtree(out_dir)
-                    entry = run_template(gp, choice, world, kit, args.out, n_inst, args.seed * 7919 + ti, args.max_attempts, args.variant, customs_sha)
-                    report["problems"].setdefault(gp.alias, {})[choice.template_id] = entry
-                    if entry.get("n_written", 0) == 0:
-                        entry["blacklisted"] = blacklist_after_failure(gp, choice, entry)
-                        log.warning("template %s produced no instance; blacklisted %s", choice.template_id, entry["blacklisted"])
-                    else:
-                        log.info("template %s done: %d instances in %.1fs (rejections %s)", choice.template_id, entry["n_written"], entry["time_s"], entry["rejections"])
-                    pool.cleanup_template()
-                    if not args.no_write_back and gp.customs_path:
-                        gp.save_customs()  # §1: sample_isg appends blacklists / constraints to the source customs list
-                    gp.save_customs(customs_copy)  # the copy under <out> always carries what this run learned
+            arec["time_s"] = round(time.time() - t_alias, 2)
+            arec["world"] = pool.last_action
+            arec["n_written"] = sum(int(e.get("n_written", 0)) for e in report["problems"].get(alias, {}).values())
+            arec["templates"] = len(report["problems"].get(alias, {}))
     except BaseException:
         log.error("traceback", exc_info=True)
         raise
     finally:
         report["finished"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+        report["wall_time_s"] = round(time.time() - t_start, 2)
+        report["world"] = {"n_loads": pool.n_loads, "load_time_s": round(pool.load_time_s, 2), "key": world_key_str(pool.key) if pool.key else None}
         report["n_written"] = sum(int(e.get("n_written", 0)) for temps in report["problems"].values() for e in temps.values())
         with open(os.path.join(args.out, "summary.json"), "w") as f:
             json.dump(report, f, indent=2, default=str)
@@ -309,6 +319,63 @@ def main(argv=None):
         og.shutdown()
     # exit code: 0 when at least one instance was written, 2 when every template failed (chains / job runners stop)
     sys.exit(0 if report["n_written"] > 0 else 2)
+
+
+def run_alias(args, alias: str, pool: WorldPool, report: Dict[str, Any], customs_copy: str, customs_sha: Optional[str]) -> None:
+    """All templates of one alias (every candidate scene unless ``--scene``): world from the pool (reused when the world key
+    matches), the §9 model draw, one ``run_template`` per choice, whitelist pruning, customs write-back."""
+    args.alias = alias
+    gp = load_problem_from_args(args)
+    scenes = [args.scene] if args.scene else gp.scene_names()
+    rng = np.random.default_rng(args.seed)
+    n_inst = args.instances_per_template if args.instances_per_template is not None else int(gp.gen("instances_per_template", 5))
+    for scene in scenes:
+        if scene not in gp.scene_names():
+            report["errors"].append({"alias": alias, "scene": scene, "error": "scene not in the customs entry"})
+            continue
+        try:
+            world, kit = pool.get(gp, scene)
+        except Exception as e:
+            log.error("traceback", exc_info=True)
+            report["errors"].append({"alias": alias, "scene": scene, "error": f"scene load failed: {e!r}"})
+            pool.world, pool.kit, pool.key = None, None, None
+            continue
+        exclude = _existing_templates(args.out, gp, scene)
+        for ti, choice in enumerate(iter_template_choices(gp, scene, rng, exclude=exclude, max_templates=args.templates)):
+            out_dir = os.path.join(args.out, gp.alias, choice.template_id)
+            if os.path.exists(os.path.join(out_dir, "template.json")) and not args.overwrite:
+                log.info("skip existing template %s", out_dir)
+                continue
+            if os.path.exists(out_dir) and args.overwrite:
+                shutil.rmtree(out_dir)
+            entry = run_template(gp, choice, world, kit, args.out, n_inst, args.seed * 7919 + ti, args.max_attempts, args.variant, customs_sha)
+            report["problems"].setdefault(gp.alias, {})[choice.template_id] = entry
+            if entry.get("n_written", 0) == 0:
+                entry["blacklisted"] = blacklist_after_failure(gp, choice, entry)
+                log.warning("template %s produced no instance; blacklisted %s", choice.template_id, entry["blacklisted"])
+            else:
+                log.info("template %s done: %d instances in %.1fs (rejections %s)", choice.template_id, entry["n_written"], entry["time_s"], entry["rejections"])
+            pool.cleanup_template()
+            if not args.no_write_back and gp.customs_path:
+                gp.save_customs()  # §1: sample_isg appends blacklists / constraints to the source customs list
+            gp.save_customs(customs_copy)  # the copy under <out> always carries what this run learned
+
+
+def print_world_keys(args) -> None:
+    """``--world-key``: one ``<alias>\\t<scene>|rooms=...|removed=...`` line per (alias, candidate scene) from the customs
+    entry and the stable scene json; no simulator. Aliases with equal keys can share one ``sample_isg`` process."""
+    for alias in list(args.alias):
+        args.alias = alias
+        try:
+            gp = load_problem_from_args(args)
+        except Exception as e:
+            print(f"{alias}\tERROR {e!r}")
+            continue
+        for scene in ([args.scene] if args.scene else gp.scene_names()):
+            try:
+                print(f"{alias}\t{world_key_str(world_key(gp, scene))}", flush=True)
+            except Exception as e:
+                print(f"{alias}\tERROR {scene}: {e!r}")
 
 
 def _existing_templates(out_root: str, gp: GroundedProblem, scene: str) -> List[Dict[str, str]]:
@@ -335,9 +402,10 @@ def _existing_templates(out_root: str, gp: GroundedProblem, scene: str) -> List[
 
 
 def _compact(report: Dict[str, Any]) -> Dict[str, Any]:
-    out = {"sampler_version": report["sampler_version"], "n_written": report.get("n_written", 0), "problems": {}, "errors": report.get("errors", [])}
+    out = {"sampler_version": report["sampler_version"], "n_written": report.get("n_written", 0), "wall_time_s": report.get("wall_time_s"),
+           "world": report.get("world"), "aliases": report.get("aliases", {}), "problems": {}, "errors": report.get("errors", [])}
     for alias, temps in report["problems"].items():
-        out["problems"][alias] = {t: {k: v for k, v in e.items() if k in ("n_written", "time_s", "rejections", "error", "blacklisted")} for t, e in temps.items()}
+        out["problems"][alias] = {t: {k: v for k, v in e.items() if k in ("n_written", "time_s", "rejections", "counters", "error", "blacklisted")} for t, e in temps.items()}
     return out
 
 

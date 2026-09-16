@@ -47,6 +47,41 @@ def _tabletop():
     return TT
 
 
+# ----------------------------------------------------------------------------------------------------------------
+# A1 (owner decision 2026-09-16): joint placement of a work point (right arm) and a brace point (left arm)
+# ----------------------------------------------------------------------------------------------------------------
+
+from ispatialgym.sampling.v2.stances import BAND_CELL_TOL, brace_placement_admissible, in_band  # noqa: E402,F401  (pure band gate, tested there)
+
+
+def left_contact_band_cells(s, trunk: Tuple[float, float], height: float):
+    """Base-frame cells of the left-arm contact band (closed gripper, brace approach; one band per object height class —
+    B3 A1) for ``trunk``. Coded against the documented APIs in this order: ``tabletop.ensure_contact_bands(s, arm="left",
+    height=h)`` (tabletop A1 helper) then ``reach_bands.ReachBands.load(scene, support, mode="contact", arm="left",
+    height_class=...)``; returns None while neither exists (the caller records the gate as unavailable and falls back to
+    the exact two-arm IK alone)."""
+    bands = None
+    fn = getattr(TT, "ensure_contact_bands", None)
+    if fn is not None:
+        try:
+            bands = fn(s, arm="left", height=float(height))
+        except Exception as e:  # noqa: BLE001 - the helper's signature may still move
+            log.info("tabletop.ensure_contact_bands unavailable for the left band: %r", e)
+            bands = None
+    if bands is None:
+        try:
+            from ispatialgym.sampling import reach_bands as RB
+
+            bands = RB.ReachBands.load(s.world.scene_model, s.top.name, mode="contact", arm="left", height_class=float(height))
+        except TypeError:
+            bands = None  # the B3 left-band loader is not there yet (no ``arm`` / ``height_class`` factors)
+        except Exception:  # FileNotFoundError: no left band computed for this support yet
+            bands = None
+    if bands is None:
+        return None
+    return bands.band(trunk[0], trunk[1])
+
+
 #: §6.11 touching admissibility numbers (pushability / stability; ``generation`` overrides)
 PUSH_MAX_PINCH = 0.089
 PUSH_MAX_LONG = 0.30
@@ -328,8 +363,42 @@ class IORSSmall(SamplerV2):
         else:
             ranges = {sd: (g_lo, g_hi) for sd in sides}
         side = list(ranges)[int(rng.integers(len(ranges)))]
-        return TT.place_partner(self, rng, t_pose, self.hull["target"], self.hull["partner"], self.rest["partner"], manip, side, ranges[side],
-                                top=self.top, cam=cam, margin=self.margin_support, min_gap=self.gap_min)
+        if self.relation != "touching":
+            return TT.place_partner(self, rng, t_pose, self.hull["target"], self.hull["partner"], self.rest["partner"], manip, side, ranges[side],
+                                    top=self.top, cam=cam, margin=self.margin_support, min_gap=self.gap_min)
+        # A1: the push work point (target's right face) must lie in the right band and the brace point (partner's far /
+        # left face) in the left contact band of the same trunk before the two-arm IK (§4.6 step 6) is attempted
+        right_cells = self.bands.band(manip.translate, manip.tilt) if getattr(self, "bands", None) is not None else None
+        left_cells = left_contact_band_cells(self, (manip.translate, manip.tilt), TT.height_of(self.hull["partner"], self.rest["partner"]))
+        self.template_facts["left_contact_band"] = "unavailable" if left_cells is None else int(len(left_cells))
+        errors = []
+        for _ in range(8):
+            p_pose = TT.place_partner(self, rng, t_pose, self.hull["target"], self.hull["partner"], self.rest["partner"], manip, side, ranges[side],
+                                      top=self.top, cam=cam, margin=self.margin_support, min_gap=self.gap_min)
+            if left_cells is None or right_cells is None:
+                return p_pose  # the joint band gate cannot run yet (recorded); the exact two-arm IK remains the gate
+            work, brace = self.touching_points(t_pose, p_pose, manip)
+            if brace_placement_admissible(manip.world_to_base(work[:2]), manip.world_to_base(brace[:2]), right_cells, left_cells):
+                return p_pose
+            errors.append(f"work {manip.world_to_base(work[:2]).tolist()} / brace {manip.world_to_base(brace[:2]).tolist()}")
+        raise Reject("brace_out_of_band", f"no partner position puts the push point in the right band and the brace point in the left band "
+                                          f"at trunk ({manip.translate}, {manip.tilt:.2f}); tried {errors[-2:]}")
+
+    def touching_points(self, t_pose: G.Pose, p_pose: G.Pose, manip: Stance) -> Tuple[th.Tensor, th.Tensor]:
+        """§6.11 touching: the push contact on the target's right face (mid height) and the brace point on the partner's far
+        (left) face (mid height), world xyz, from the target / partner poses."""
+        tangent = manip.tangent
+        t_hull = self.world.hull_at(self.hull["target"], t_pose)
+        p_hull = self.world.hull_at(self.hull["partner"], p_pose)
+        z_t = float(t_hull[:, 2].min()) + 0.5 * float(t_hull[:, 2].max() - t_hull[:, 2].min())
+        right_face = float((t_hull[:, :2] @ tangent).min())
+        centre_t = t_hull.mean(dim=0)
+        work = th.tensor([*(centre_t[:2] + tangent * (right_face - float(centre_t[:2] @ tangent))).tolist(), z_t])
+        left_face = float((p_hull[:, :2] @ tangent).max())
+        centre_p = p_hull.mean(dim=0)
+        z_p = float(p_hull[:, 2].min()) + 0.5 * float(p_hull[:, 2].max() - p_hull[:, 2].min())
+        brace = th.tensor([*(centre_p[:2] + tangent * (left_face - float(centre_p[:2] @ tangent))).tolist(), z_p])
+        return work, brace
 
     # ------------------------------------------------------------------ goal (§6.11)
 
@@ -463,26 +532,19 @@ class IORSSmall(SamplerV2):
         contact of the closed left gripper on the partner's far (left) side; both IK-checked (§4.6 step 6)."""
         tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
         t_pose = draft.goal_poses[tname]
-        t_hull = self.world.hull_at(self.hull["target"], t_pose)
-        p_hull = self.world.hull_at(self.hull["partner"], self.obj("partner").get_position_orientation())
+        p_now = self.obj("partner").get_position_orientation()
         tangent = manip.tangent
         direction = th.tensor([float(tangent[0]), float(tangent[1]), 0.0])  # toward the partner = robot's left
-        z_t = float(t_hull[:, 2].min()) + 0.5 * float(t_hull[:, 2].max() - t_hull[:, 2].min())
-        right_face = float((t_hull[:, :2] @ tangent).min())
-        centre_t = t_hull.mean(dim=0)
-        p_init = th.tensor([*(centre_t[:2] + tangent * (right_face - float(centre_t[:2] @ tangent))).tolist(), z_t])
+        p_init, b_point = self.touching_points(t_pose, (p_now[0].clone(), p_now[1].clone()), manip)
         dist = float(self.pair.get("g_NT", 0.02)) + 0.01
         push_init = IK.contact_eef(p_init, direction)
         push_goal = (push_init[0] + direction * dist, push_init[1])
         push_pre = IK.pre_pose(push_init)
-        left_face = float((p_hull[:, :2] @ tangent).max())
-        centre_p = p_hull.mean(dim=0)
-        z_p = float(p_hull[:, 2].min()) + 0.5 * float(p_hull[:, 2].max() - p_hull[:, 2].min())
-        b_point = th.tensor([*(centre_p[:2] + tangent * (left_face - float(centre_p[:2] @ tangent))).tolist(), z_p])
         brace = IK.contact_eef(b_point, -direction)
         brace_pre = IK.pre_pose(brace)
-        res = TT.brace_second_arm(self, manip, "right", [push_pre, push_init, push_goal], "left", [brace_pre, brace],
-                                  ignore_work_last=self.support_objects() + [self.obj("target")], ignore_brace_last=self.support_objects() + [self.obj("partner")])
+        # closed pads for both contacts (§3.6); the push arm first, then the brace with the push arm locked (§4.6 step 6)
+        res = self.ikc.exact_both_arms(("right", [push_pre, push_init, push_goal]), ("left", [brace_pre, brace]), manip,
+                                       self.support_objects() + [self.obj("target")], self.support_objects() + [self.obj("partner")], fingers=IK.FINGER_CLOSED)
         if not res.ok:
             raise Reject("contact_unreachable", f"touching push / brace: {res.reason}")
         self.sidecar.add_contact(ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname))

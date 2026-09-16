@@ -805,9 +805,15 @@ def new_run_summary(sampler_version: str, customs_path: Optional[str], out_root:
 
 def template_summary(n_written: int, time_s: float, rejections: RejectionLog, seeds: Sequence[int] = (), extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """``problems.<alias>.<template_id>`` entry: the v1 keys ``n_written`` / ``time_s`` (read by ``bench_report.py``) plus
-    the per-reason rejections with examples and the seeds."""
-    d = {"n_written": int(n_written), "time_s": round(float(time_s), 2), "rejections": dict(rejections.counts),
-         "rejection_examples": {k: list(v) for k, v in rejections.examples.items()}, "seeds": [int(s) for s in seeds]}
+    the per-reason ``rejections`` (attempts rejected, with examples), ``counters`` (bookkeeping such as ``scene_reset``
+    — not rejections; ``extra["counters"]``), and the seeds."""
+    counts = {k: v for k, v in rejections.counts.items() if k != "scene_reset"}
+    counters = dict((extra or {}).get("counters") or {})
+    if "scene_reset" in rejections.counts:
+        counters["scene_reset"] = counters.get("scene_reset", 0) + int(rejections.counts["scene_reset"])
+    d = {"n_written": int(n_written), "time_s": round(float(time_s), 2), "rejections": counts,
+         "rejection_examples": {k: list(v) for k, v in rejections.examples.items() if k != "scene_reset"}, "counters": counters,
+         "seeds": [int(s) for s in seeds]}
     if extra:
-        d.update(extra)
+        d.update({k: v for k, v in extra.items() if k != "counters"})
     return d

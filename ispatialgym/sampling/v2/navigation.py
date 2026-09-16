@@ -371,8 +371,11 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
     plans on the eroded map end to end (camera relocalization). Raises ``NavigationError`` with reason ``no_path`` /
     ``path_collision`` / ``path_too_long``."""
     trunk = (stance_from.translate, stance_from.tilt) if trunk is None else trunk
-    if arm_q is None and stance_from.q is not None:
-        arm_q = {a: stance_from.q[kit.robot.arm_control_idx[a]].clone() for a in ("left", "right")}
+    if arm_q is None:
+        from ispatialgym.sampling.v2.ik import stance_arm_vectors
+
+        r, l, _ = stance_arm_vectors(kit, stance_from, posture if posture != "untucked" else None)
+        arm_q = {"right": r, "left": l}
     a_xy, b_xy = stance_from.base_xy, stance_to.base_xy
     if float(th.linalg.norm(a_xy - b_xy)) < 1e-3 and abs(stance_from.yaw - stance_to.yaw) < 1e-3:
         return PathRecord(stance_from.name, stance_to.name, "local", [tuple(stance_to.base_pose2d)], 0.0, posture, carried, trunk, stride, 0)
@@ -438,18 +441,19 @@ def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_
     inward = stance_to.inward
     x0, y0, yaw = stance_to.base_pose2d
     sweep = trunk_sweep(tf, tt, n_samples)
-    postures = {"untucked": "untucked", "tucked": "tucked", "reset": "tucked", "ready": "ready"}
-    arms = postures.get(posture or stance_to.posture, "untucked")
-    arm_q = {a: stance_to.q[kit.robot.arm_control_idx[a]].clone() for a in ("left", "right")} if stance_to.q is not None else {}
-    fingers = stance_to.fingers if stance_to.fingers is not None else 0.05
+    from ispatialgym.sampling.v2.ik import stance_arm_vectors
+
+    # the arms of the arriving stance (its recorded configuration / working arms untucked / idle arm in its A6 posture):
+    # the oracle moves the idle arm there before the trunk motion (``idle_posture`` / ``arms_q`` in the sidecar)
+    right_arm, left_arm, fingers = stance_arm_vectors(kit, stance_to, posture)
     with attached(kit, carried_arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
         for s_T in transition_standoffs(s):
             back = s_T - s
             bx, by = x0 - float(inward[0]) * back, y0 - float(inward[1]) * back
             if not kit.trav_free((bx, by)):
                 continue
-            qs = th.stack([kit.q_at_base_pose(kit.q_config(arms=arms, translate=tr, tilt=ti, right_arm=arm_q.get("right"), left_arm=arm_q.get("left"),
-                                                            fingers=float(fingers)), bx, by, yaw) for tr, ti in sweep])
+            qs = th.stack([kit.q_at_base_pose(kit.q_config(arms="untucked", translate=tr, tilt=ti, right_arm=right_arm, left_arm=left_arm, fingers=fingers),
+                                              bx, by, yaw) for tr, ti in sweep])
             if bool(kit.collision_free(qs, margin=margin).all()):
                 return Transition(stance_from.name, stance_to.name, s_T, trunk_from=tf, trunk_to=tt, n_samples=n_samples)
     return None

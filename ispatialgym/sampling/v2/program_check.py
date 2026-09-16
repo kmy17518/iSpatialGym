@@ -229,16 +229,22 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
     report: Dict[str, Any] = {"mode": "expand", "actions": []}
     state = _SamplerState(sampler)
     tracker = _Tracker(sidecar)
-    for action in actions:
+    for i, action in enumerate(actions):
         name = getattr(action, "name", type(action).__name__)
         try:
             targets = action.targets(sc, state)
         except Exception as e:
             raise Reject("program_check_failed", f"targets() failed: {e!r}", action=name)
         stance_name, carried = tracker.before(action)
-        n = check_action_targets(sidecar, sampler, action, targets, stance_name, carried)
+        n, witnesses = check_action_targets(sidecar, sampler, action, targets, stance_name, carried)
         tracker.after(action)
-        report["actions"].append({"name": name, "stance": stance_name, "carried": carried, "n_poses": n})
+        entry = {"index": i, "name": name, "arms": list(getattr(action, "arms", ()) or []), "objects": list(getattr(action, "objects", ()) or []),
+                 "stance": stance_name, "carried": carried, "n_poses": n, "witnesses": witnesses}
+        report["actions"].append(entry)
+    # the recorded joint solutions (28-D, arm joints + trunk + fingers meaningful) per checked end pose: D5 verifies them as
+    # witnesses (FK + collision) instead of re-solving the randomised IK
+    sidecar.ik_witnesses = [{"action": e["index"], "name": e["name"], "stance": e["stance"], "arm": (e["arms"] or ["right"])[0], "carried": e["carried"],
+                            "targets": e["witnesses"]} for e in report["actions"] if e["witnesses"]]
     return report
 
 
@@ -319,11 +325,12 @@ def _ignore_for(action, sampler, carried: Optional[str]) -> Tuple[List[Any], Lis
     return last, every
 
 
-def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, stance_name: str, carried: Optional[str]) -> int:
+def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, stance_name: str, carried: Optional[str]) -> Tuple[int, Dict[str, Any]]:
     """IK / collision check of every eef pose / waypoint list in ``targets`` from the recorded stance ``stance_name``
-    (posture: untucked idle arm, trunk of the stance) with the ``carried`` object attached to the working arm.
-    Base-pose targets (paths, transitions, base-follow) are whole-body collision-checked at the stance trunk.
-    Returns the number of poses checked."""
+    (its recorded configuration: working arm untucked, idle arm in its posture, trunk of the stance) with the ``carried``
+    object attached to the carrying arm and posed in the hand. Base-pose targets (paths, transitions, base-follow) are
+    whole-body collision-checked at the stance trunk. Returns ``(number of poses checked, witnesses)`` where
+    ``witnesses`` maps each target key to ``{"pose": {position, orientation}, "q": [28 joints]}`` of the end pose."""
     from ispatialgym.sampling.sim_utils import Reject
     from ispatialgym.sampling.v2 import navigation as NAV
     from ispatialgym.sampling.v2.navigation import attached
@@ -345,6 +352,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     if name == "base_follow" and isinstance(targets, dict) and targets.get("mode") == "base":
         skip_keys.add("handle_poses")
     n = 0
+    witnesses: Dict[str, Any] = {}
     attach_arm = (g.arm if g is not None and g.arm else arm) if carried_obj is not None else None
     with attached(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object):
         for key, poses in iter_pose_targets(targets):
@@ -357,6 +365,10 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
             n += len(poses)
             if not res.ok:
                 raise Reject("program_check_failed", f"{key}: {res.reason} (stance {stance_name}, arm {arm}, carried {carried})", action=name)
+            if res.q is not None:
+                last = poses[-1]
+                witnesses[key] = {"pose": {"position": [round(float(v), 5) for v in last[0].tolist()], "orientation": [round(float(v), 6) for v in last[1].tolist()]},
+                                  "q": [round(float(v), 5) for v in res.q.tolist()], "n_waypoints": len(poses)}
         # base poses: a transition's drive-back pose is visited with the departing trunk (arrival) and the arriving trunk
         # (after the sweep), the drive-in pose with the arriving trunk only; a path's goal with the stance trunk
         checks: List[Tuple[Tuple[float, float, float], Tuple[float, float]]] = []
@@ -378,8 +390,9 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
             elif goal is not None:
                 checks.append((goal, to_trunk))
         for pose2d, trunk in checks:
-            ok, _ = NAV.path_collision_free(sampler.kit, [pose2d], trunk)
+            r_arm, l_arm, _ = sampler.ikc.arm_vectors(stance)
+            ok, _ = NAV.path_collision_free(sampler.kit, [pose2d], trunk, q_arms={"right": r_arm, "left": l_arm})
             n += 1
             if not ok:
                 raise Reject("program_check_failed", f"base pose {tuple(round(v, 3) for v in pose2d)} collides at trunk {trunk}", action=name)
-    return n
+    return n, witnesses
