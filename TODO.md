@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 08:13 PDT — 4/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 08:15 PDT — 4/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -126,23 +126,23 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | camera_relocalization-obstructed | valid demo | tracker corner fix d4a1745 not yet re-demoed | oracle |
 | object_scaling | valid demo | - | - |
 | mental_rotation | valid demo | - | - |
-| disembedding | no instance | 4a distractor budget (D1), 4b tray 1.25 (D1+tabletop), 9 band keying (bands) | D1 / tabletop / bands |
+| disembedding | no instance | 4a/4b landed (D1 d455b77/b4ab9f9), tray band keying (634f423/8bd1012); per-role scale spawn (core) pending; bands computing (1.25 tray) | core / tabletop / bands |
 | CM block_design | no instance | pick spacing 10.1 cm smoke; left band + A1 placement | tabletop |
 | CM attachment | no instance | left band + A1 placement (skateboard edge_too_short = yield) | tabletop |
 | CM articulation_open_small_scale | no instance | brace band empty (§5.4) → left contact band wiring; floor_support_todo | tabletop |
 | CM articulation_close_small_scale | no instance | same as open | tabletop |
-| CM articulation_open_large_scale | no instance | item 6 roomy picks (A3 + D1), A4 cabinet class landed | A3 / D1 / large-scale |
-| CM articulation_close_large_scale | no instance | same as open | A3 / D1 / large-scale |
-| alignment-world_vertical | no instance | program_check brace ignore set (core), hanger blacklist (D1) | core / D1 |
-| alignment-world_horizontal | no instance | same as vertical | core / D1 |
-| alignment-axial | no instance | two-arm stop at the robot's limit (decision), blade stand-off landed | tabletop / owner |
+| CM articulation_open_large_scale | no instance | re-grounded on roomy picks (c161a04); needs a first sample (rvunhj_0) | large-scale |
+| CM articulation_close_large_scale | no instance | same as open | large-scale |
+| alignment-world_vertical | no instance | first instance written (4074359); demo loop running (painting_s080) | core / loop |
+| alignment-world_horizontal | no instance | demo loop running (picture_s070) | loop |
+| alignment-axial | no instance | push-only axial (owner 08:10): tabletop brace-optional + oracle program; then loop | tabletop / oracle |
 | IORS ontop_small_scale | demo run (pre-fix success) | - | - |
-| IORS under_small_scale | demo run | re-run after e4a1b5c (stalled approach finish) | oracle |
+| IORS under_small_scale | demo run | approach witnesses in different IK branches → core branch-consistent solve (approach_untrackable) | core |
 | IORS inside | demo run (pre-fix success) | re-sample after 160c518 (release height) + drop executor | core / oracle |
 | IORS nextto | demo run | near-side goal 160c518 (future sampling) | - |
 | IORS touching | no instance | left band + joint gate (core landed), blade stand-off | core / tabletop |
 | IORS ontop_large_scale | no instance | T2/T3 supports or floor class (new machinery) | large-scale |
-| IORS under_large_scale | no instance | item 7 push-under (sampler + program + oracle) | large-scale / oracle |
+| IORS under_large_scale | no instance | push-under: sampler landed (25e94d3/8140025/032d849), program + executor (oracle) pending | large-scale / oracle |
 <!-- /first-demo-board -->
 
 ## Decisions register (apply everywhere; details in the design thread and, after A3, in the docs)

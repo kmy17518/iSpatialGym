@@ -28,8 +28,8 @@
   "last_change": "2026-09-16 03:00 PDT"
  },
  "disembedding": {
-  "blocking": "4a distractor budget (D1), 4b tray 1.25 (D1+tabletop), 9 band keying (bands)",
-  "owner": "D1 / tabletop / bands"
+  "blocking": "4a/4b landed (D1 d455b77/b4ab9f9), tray band keying (634f423/8bd1012); per-role scale spawn (core) pending; bands computing (1.25 tray)",
+  "owner": "core / tabletop / bands"
  },
  "configuration_matching-block_design": {
   "blocking": "pick spacing 10.1 cm smoke; left band + A1 placement",
@@ -48,24 +48,24 @@
   "owner": "tabletop"
  },
  "configuration_matching-articulation_open_large_scale": {
-  "blocking": "item 6 roomy picks (A3 + D1), A4 cabinet class landed",
-  "owner": "A3 / D1 / large-scale"
+  "blocking": "re-grounded on roomy picks (c161a04); needs a first sample (rvunhj_0)",
+  "owner": "large-scale"
  },
  "configuration_matching-articulation_close_large_scale": {
   "blocking": "same as open",
-  "owner": "A3 / D1 / large-scale"
+  "owner": "large-scale"
  },
  "alignment-world_vertical": {
-  "blocking": "program_check brace ignore set (core), hanger blacklist (D1)",
-  "owner": "core / D1"
+  "blocking": "first instance written (4074359); demo loop running (painting_s080)",
+  "owner": "core / loop"
  },
  "alignment-world_horizontal": {
-  "blocking": "same as vertical",
-  "owner": "core / D1"
+  "blocking": "demo loop running (picture_s070)",
+  "owner": "loop"
  },
  "alignment-axial": {
-  "blocking": "two-arm stop at the robot's limit (decision), blade stand-off landed",
-  "owner": "tabletop / owner"
+  "blocking": "push-only axial (owner 08:10): tabletop brace-optional + oracle program; then loop",
+  "owner": "tabletop / oracle"
  },
  "inter_object_relation_satisfaction-ontop_small_scale": {
   "pre_fix_demo": true,
@@ -75,8 +75,8 @@
   "last_change": "2026-09-16 04:37 PDT"
  },
  "inter_object_relation_satisfaction-under_small_scale": {
-  "blocking": "re-run after e4a1b5c (stalled approach finish)",
-  "owner": "oracle"
+  "blocking": "approach witnesses in different IK branches \u2192 core branch-consistent solve (approach_untrackable)",
+  "owner": "core"
  },
  "inter_object_relation_satisfaction-inside": {
   "blocking": "re-sample after 160c518 (release height) + drop executor",
@@ -98,7 +98,7 @@
   "owner": "large-scale"
  },
  "inter_object_relation_satisfaction-under_large_scale": {
-  "blocking": "item 7 push-under (sampler + program + oracle)",
+  "blocking": "push-under: sampler landed (25e94d3/8140025/032d849), program + executor (oracle) pending",
   "owner": "large-scale / oracle"
  }
 }
