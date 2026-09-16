@@ -81,21 +81,38 @@ def cmd_sample(args):
 
 
 def cmd_demo(args):
+    """Per-pod demo manifests (``jobs_demo_<pod id>.json`` + ``pods_demo.txt``); ``done.json`` names the pod, the fleet
+    registry maps the name to the live pod id. Jobs already listed in ``--skip`` manifests are not repeated."""
     done = json.load(open(args.done))
     jobs = [j for j in json.load(open(args.manifest))]
     by_id = {j["id"]: j for j in jobs}
+    fleet = json.load(open(os.path.join(REPO, "runlogs", "runpod", "fleet.json")))
+    name_to_pid = {i["name"]: pid for pid, i in fleet["pods"].items() if not i.get("terminated_at")}
+    skip = set()
+    for m in args.skip or []:
+        skip |= {j["id"] for j in json.load(open(m))}
     per_pod = collections.defaultdict(list)
     for jid, d in done.items():
         j = by_id.get(jid)
-        if j is None or d.get("n_written", 0) <= 0:
+        if j is None or d.get("n_written", 0) <= 0 or ("demo__" + jid) in skip:
             continue
-        per_pod[d["pod"]].append({"id": "demo__" + jid, "cmd": DEMO_CMD.format(jid=jid), "weight": 1.0, "subtask": j["subtask"], "alias": j["alias"],
-                                  "slot": j.get("slot", ""), "source_job": jid})
+        pid = name_to_pid.get(d["pod"])
+        if pid is None:
+            print(f"skip {jid}: pod {d['pod']} is gone")
+            continue
+        per_pod[pid].append({"id": "demo__" + jid, "cmd": DEMO_CMD.format(jid=jid), "weight": 1.0, "subtask": j["subtask"], "alias": j["alias"],
+                             "slot": j.get("slot", ""), "source_job": jid, "pod": pid})
     os.makedirs(args.out, exist_ok=True)
-    for pod, js in per_pod.items():
-        with open(os.path.join(args.out, f"jobs_demo_{pod}.json"), "w") as f:
+    for pid, js in per_pod.items():
+        with open(os.path.join(args.out, f"jobs_demo_{pid}.json"), "w") as f:
             json.dump(js, f, indent=1)
-        print(f"{pod}: {len(js)} demo jobs")
+        print(f"{pid}: {len(js)} demo jobs")
+    with open(os.path.join(args.out, "pods_demo.txt"), "w") as f:
+        f.write("\n".join(per_pod) + "\n")
+    all_jobs = [j for js in per_pod.values() for j in js]
+    with open(os.path.join(args.out, "jobs_demo_all.json"), "w") as f:
+        json.dump(all_jobs, f, indent=1)
+    print(f"{len(all_jobs)} demo jobs on {len(per_pod)} pods")
 
 
 def cmd_merge_constraints(args):
@@ -148,6 +165,7 @@ def main():
     s.add_argument("--done", required=True, help="done.json of samp_summary.py (job id -> pod, n_written)")
     s.add_argument("--manifest", required=True, help="the sample manifest")
     s.add_argument("--out", required=True, help="directory for the per-pod demo manifests")
+    s.add_argument("--skip", nargs="*", default=None, help="earlier demo manifests whose jobs are already dispatched")
     s.set_defaults(fn=cmd_demo)
     s = sub.add_parser("merge-constraints")
     s.add_argument("--customs", default=CUSTOMS)
