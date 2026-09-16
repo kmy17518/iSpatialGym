@@ -364,6 +364,25 @@ against it (2 mm; written to the template meta under `floor`). `SimWorld.floor_z
 `q_at_base_pose`), `teleport_robot`, `park_robot`, `prompt0.base_z` and the band script follow; `SamplerV2.park_robot_v2`
 re-measures at the task room's park cell.
 
+### Owner decisions 2026-09-16 10:15 (A–D)
+
+- **A. Approached object along the approach**: the grasped target / placed-on partner / touched object is removed from
+  the world along the **whole** tracked segment (`exact(..., approached=[...])`, `waypoints_ok(..., approached=...)`; the
+  program check passes it per action; without it `IKChecker.approached_objects(end_pose)` infers the spawned objects whose
+  AABB grown by 3 cm holds the pad centre / fingertip). Supports stay last-waypoint (3.3 cm tail), the pre pose keeps the
+  full world.
+- **B. Pre-poses in the frame check**: pre-grasp / pre-place / pre-contact and the contact poses go through
+  `eef_in_frame` (`iors_small.require_in_frame`); `camera_pose_at` / `IKChecker.camera_pose` use the shared
+  `conventions.camera_pose` FK (base on the measured floor, the kit's measured sensor offset) — the oracle's FOV monitor
+  model.
+- **C. Release above the actual surface**: `SimWorld.surface_z_under(xy, from_z, ignore=[target])` (downward raycast, robot
+  and ``ignore`` bodies excluded → `{z, body, normal}`); `iors_small.goal_pose` (ontop / under) releases
+  `release_above_surface_m` = 1 cm above it (saucer well, plate centre) instead of `goal_drop` above the hull top, once the
+  partner stands at its pose; `release_surface_z` in the grasp record / summary. Disembedding destination, attachment
+  place and block slots should adopt the same helper.
+- **D. Up-axis guard**: `SamplerV2.check_goal_upright` after the goal settle — every goal object's up axis within
+  `goal_tip_max_deg` (15°) of its goal pose's, else `Reject("goal_tipped")`; `summary.goal_tilt_deg`, counter `goal_tipped`.
+
 ## Status (D2 / D4, 2026-09-15) and gaps
 
 Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,
