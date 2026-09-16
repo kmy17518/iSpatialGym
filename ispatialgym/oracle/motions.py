@@ -91,6 +91,11 @@ class MotionsConfig:
     #: of the 2 mm tolerance is not a failed approach; the eef postcondition is 2 cm)
     diff_ik_soft_pos_tol: float = 5e-3
     diff_ik_soft_rot_tol: float = 3e-2
+    #: soft residual accepted on free-space legs (lift / retreat: the eef postcondition is 2 cm)
+    diff_ik_soft_pos_tol_free: float = 1e-2
+    #: joint speed bound of a streamed differential-IK path (rad/s; a nullspace escape near a singularity moves the
+    #: joints far for a small eef step)
+    diff_ik_joint_speed: float = 1.0
     #: gripper actuation wait (steps)
     gripper_steps: int = 60
     #: base tracking (paths) and base-follow (articulation) tracker configurations
@@ -517,7 +522,8 @@ class Motions:
             prev = (p1, q1)
         return dense
 
-    def arm_along(self, arm: str, waypoints: Sequence[Any], speed: Optional[float] = None, finish: Optional["ApproachFinish"] = None) -> Iterator[th.Tensor]:
+    def arm_along(self, arm: str, waypoints: Sequence[Any], speed: Optional[float] = None, finish: Optional["ApproachFinish"] = None,
+                  soft_pos_tol: Optional[float] = None) -> Iterator[th.Tensor]:
         """Track a given eef waypoint list with damped-least-squares differential IK on the arm's joints (trunk and
         base locked), streamed at ``speed`` (m/s; ``cartesian_speed``). The list is densified to the tracking
         resolution and every waypoint is reached in order; no collision veto (contact motions must touch — the QA
@@ -544,7 +550,7 @@ class Motions:
             max_iters=self.cfg.diff_ik_max_iters,
             check_collisions=False,
             sync_world=False,
-            soft_pos_tol=self.cfg.diff_ik_soft_pos_tol,
+            soft_pos_tol=self.cfg.diff_ik_soft_pos_tol if soft_pos_tol is None else float(soft_pos_tol),
             soft_rot_tol=self.cfg.diff_ik_soft_rot_tol,
         )
         if res.success and (res.diagnostics or {}).get("soft_waypoints"):
@@ -552,10 +558,16 @@ class Motions:
         speed = self.cfg.cartesian_speed if speed is None else float(speed)
         steps = []
         prev = start
-        for wp in dense:
+        q_traj = res.q_traj if res.q_traj is not None else None
+        for i, wp in enumerate(dense):
             seg = float(th.linalg.norm(wp[0] - prev[0]))
             ang = C.quat_angle(prev[1], wp[1])
-            steps.append(max(1, int(round(max(seg / (speed * self.dt), ang / (self.cfg.cartesian_ang_speed * self.dt))))))
+            n_steps = max(seg / (speed * self.dt), ang / (self.cfg.cartesian_ang_speed * self.dt))
+            if q_traj is not None and i + 1 < len(q_traj):
+                # a singularity escape may move the joints a lot for a small eef step: keep the joint speed bounded
+                dq = float(th.max(th.abs(q_traj[i + 1] - q_traj[i])))
+                n_steps = max(n_steps, dq / (self.cfg.diff_ik_joint_speed * self.dt))
+            steps.append(max(1, int(round(n_steps))))
             prev = wp
         if not res.success:
             diag = dict(getattr(res, "diagnostics", None) or {})

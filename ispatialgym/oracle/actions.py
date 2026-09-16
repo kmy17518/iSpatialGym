@@ -595,7 +595,19 @@ class Lift(Action):
         super().__post_init__()
 
     def _segment(self, sidecar, state) -> Tuple[Pose, Pose]:
-        start = self.after.end_pose(sidecar, state)
+        """Straight up from where the hand **is** (``state.eef_pose`` at run time — the grasp may have closed a few mm
+        off the recorded pose, and asking the lift to correct that residual first stalled the differential IK at the
+        shoulder singularity of the recorded configuration), else from the recorded grasp pose (the sampler's
+        check, the stub state)."""
+        start = None
+        eef = getattr(state, "eef_pose", None)
+        if callable(eef):
+            try:
+                start = _as_pose(eef(self.arm))
+            except Exception:  # noqa: BLE001
+                start = None
+        if start is None:
+            start = self.after.end_pose(sidecar, state)
         if start is None:
             raise SidecarError(f"lift: the preceding action {self.after.name} leaves no eef pose")
         return start, start.translated([0.0, 0.0, self.carry_height])

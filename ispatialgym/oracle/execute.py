@@ -135,6 +135,9 @@ class ExecuteConfig:
     #: the sidecar's IK witness when it has one, else cuRobo's own IK branch — instead of failing ``plan_failed``
     approach_finish_max_stall: float = 0.015
     approach_finish_max_remaining: float = 0.06
+    #: free-space legs (lift / retreat) are finished by ``arm_to`` to their end pose from any stall (no contact made)
+    free_leg_finish_max_stall: float = 0.03
+    free_leg_finish_max_remaining: float = 0.6
 
 
 CONFIG = ExecuteConfig()
@@ -406,9 +409,21 @@ def post_grasp(action: Grasp, state, targets, ctx) -> Optional[str]:
     return None if state.held_object(action.arm) is state.object(action.object) else "failed_grasp"
 
 
+def _free_leg_finish(state, end_pose, witness_q, ignore: Sequence[Any], cfg: ExecuteConfig) -> ApproachFinish:
+    """The finish of a free-space leg (lift, retreat): a differential-IK stall anywhere on it is completed by
+    ``arm_to`` to the leg's end pose (no contact is being made, a curved finish is fine)."""
+    return ApproachFinish(end_pose, q_hint=witness_q, ignore_objects=list(ignore), max_stall=cfg.free_leg_finish_max_stall, max_remaining=cfg.free_leg_finish_max_remaining)
+
+
 def execute_lift(action: Lift, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
+    cfg = _cfg(ctx)
     ctx["object_quat0"] = state.object_pose(action.object)[1]
-    yield from motions.arm_along(action.arm, targets["lift"])
+    # the supports the object leaves (the table, a tray) may sit within the planner's activation distance of the
+    # fingers at the grasp: out of the collision world for the finish, like the sampler's lift check
+    finish = _free_leg_finish(state, targets["lift"][-1], _witness(ctx, "lift"), contact_ignores(state, action.object), cfg)
+    yield from motions.arm_along(action.arm, targets["lift"], finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+    if finish.used:
+        ctx["lift_finish"] = finish.info
 
 
 def post_lift(action: Lift, state, targets, ctx) -> Optional[str]:
@@ -514,11 +529,21 @@ def post_place(action: Place, state, targets, ctx) -> Optional[str]:
 
 
 def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
+    cfg = _cfg(ctx)
     arm = action.arm
     if action.release:
         yield from motions.gripper(arm, close=False)
         _release(motions, state, arm)
-    yield from motions.arm_along(arm, targets["retreat"])
+    ignore: List[Any] = []
+    if getattr(action, "object", None):
+        try:
+            ignore = [state.object(action.object)] + contact_ignores(state, action.object)  # the released object and its support
+        except Exception:  # noqa: BLE001
+            ignore = []
+    finish = _free_leg_finish(state, targets["retreat"][-1], _witness(ctx, "retreat"), ignore, cfg)
+    yield from motions.arm_along(arm, targets["retreat"], finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+    if finish.used:
+        ctx["retreat_finish"] = finish.info
 
 
 def post_retreat(action: Retreat, state, targets, ctx) -> Optional[str]:

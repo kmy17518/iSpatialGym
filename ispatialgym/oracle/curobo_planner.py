@@ -1081,6 +1081,9 @@ class R1ProCuRobo:
         sync_world: bool = True,
         soft_pos_tol: Optional[float] = None,
         soft_rot_tol: Optional[float] = None,
+        sigma_thr: float = 0.08,
+        damping_boost: float = 0.02,
+        nullspace_gain: float = 0.0,
     ) -> PlanResult:
         """Track dense Cartesian ``waypoints`` (each ``{frame: (pos, quat_xyzw)}`` in world) with
         damped-least-squares differential IK on the embodiment's active joints.
@@ -1088,6 +1091,13 @@ class R1ProCuRobo:
         ``soft_pos_tol`` / ``soft_rot_tol``: a waypoint the iterations leave within these (but outside ``pos_tol`` /
         ``rot_tol``) is accepted with its residual instead of failing the path (``diagnostics["soft_waypoints"]`` lists
         them) — a straight approach that stalls 2 mm short of a 2 mm tolerance is not a failed approach.
+
+        Near a kinematic singularity (smallest singular value of the Jacobian below ``sigma_thr``) the damping is
+        raised (``damping + damping_boost·(1 − σ/σ_thr)²``); an optional **nullspace step** toward the joint
+        mid-ranges (``nullspace_gain``, projected with the damped pseudo-inverse, its own 0.05 rad clamp) is available
+        but off by default — on the pilot's stalled lift configuration (R1Pro ``arm_joint2 = 0.003``) the plain DLS
+        solved the 31 x 1 cm lift and its 5 mm-offset variant while the escape stalled the task (probe 2026-09-16); the
+        stall of that run came from the lift waypoints asking the hand to correct the approach residual first.
 
         Successive waypoints are solved from the previous solution, which yields a continuous
         joint-space path for straight-line / arc end-effector motions (something trajopt does not
@@ -1148,6 +1158,7 @@ class R1ProCuRobo:
         path = [q_full.clone()]
         q_cur = q_full.clone()
         soft: List[Dict[str, float]] = []
+        n_singular = 0
         for wi, wp in enumerate(waypoints):
             tgt = targets_root(wp)
             converged = False
@@ -1165,12 +1176,30 @@ class R1ProCuRobo:
                 J = -((e[1:] - e[0].unsqueeze(0)) / eps).T  # (6F, n)
                 q_act = q_cur[aidx]
                 free = th.ones(n, dtype=th.bool)
+                q_mid = 0.5 * (lo + hi)
+                q_mid[unbounded] = q_act[unbounded]  # virtual base joints: no centring
                 for _ in range(n):
                     Jf = J * free.to(J.dtype).unsqueeze(0)
+                    try:
+                        s_min = float(th.linalg.svdvals(Jf).min())
+                    except Exception:  # noqa: BLE001
+                        s_min = float("inf")
+                    lam = damping + (damping_boost * (1.0 - s_min / sigma_thr) ** 2 if s_min < sigma_thr else 0.0)
                     JJt = Jf @ Jf.T
-                    dq = Jf.T @ th.linalg.solve(JJt + damping * th.eye(JJt.shape[0]), err)
+                    inv = th.linalg.inv(JJt + lam * th.eye(JJt.shape[0]))
+                    dq = Jf.T @ (inv @ err)
+                    dq_ns = th.zeros_like(dq)
+                    if s_min < sigma_thr and nullspace_gain > 0.0:
+                        # singularity escape: joint centring in the nullspace of the (damped) Jacobian, its own
+                        # (small) step so it never scales the task step down
+                        N = th.eye(n) - Jf.T @ inv @ Jf
+                        dq_ns = N @ (nullspace_gain * (q_mid - q_act) * free.to(J.dtype))
+                        ns_step = float(dq_ns.abs().max())
+                        if ns_step > 0.05:
+                            dq_ns = dq_ns * (0.05 / ns_step)
+                        n_singular += 1
                     # joints pushed beyond a limit are saturated and removed from the solve
-                    saturated = ((q_act + dq > hi) & (dq > 0)) | ((q_act + dq < lo) & (dq < 0))
+                    saturated = ((q_act + dq + dq_ns > hi) & (dq + dq_ns > 0)) | ((q_act + dq + dq_ns < lo) & (dq + dq_ns < 0))
                     saturated &= free
                     if not bool(saturated.any()):
                         break
@@ -1178,7 +1207,7 @@ class R1ProCuRobo:
                 step = float(dq.abs().max())
                 if step > 0.15:
                     dq = dq * (0.15 / step)
-                q_cur[aidx] = th.clamp(q_act + dq, lo, hi)
+                q_cur[aidx] = th.clamp(q_act + dq + dq_ns, lo, hi)
             if not converged:
                 err_f = err.reshape(len(frames), 6)
                 pos_err = float(err_f[:, :3].norm(dim=-1).max())
@@ -1192,13 +1221,13 @@ class R1ProCuRobo:
                 status = (
                     f"differential IK did not converge at waypoint {wi}/{len(waypoints)}: "
                     f"pos_err={pos_err*1000:.1f}mm rot_err={rot_err:.3f}rad "
-                    f"at_lower={at_lo} at_upper={at_hi}"
+                    f"at_lower={at_lo} at_upper={at_hi} singular_iterations={n_singular}"
                 )
                 # the converged prefix (start + waypoints 0..wi-1) is returned so a caller may execute it and finish
                 # the segment another way (``Motions.arm_along(finish=...)``)
                 partial = th.stack(path) if len(path) > 1 else None
                 diag = {"stage": "diff_ik", "fail_index": wi, "n_waypoints": len(waypoints), "pos_err": pos_err, "rot_err": rot_err,
-                        "at_lower": at_lo, "at_upper": at_hi, "converged": len(path) - 1}
+                        "at_lower": at_lo, "at_upper": at_hi, "converged": len(path) - 1, "singular_iterations": n_singular}
                 return PlanResult(success=False, q_traj=partial, status=status, dt=self.control_dt, plan_time=time.time() - t0, diagnostics=diag)
             jump = float(th.max(th.abs(q_cur[aidx] - path[-1][aidx])))
             if jump > max_joint_step:
@@ -1211,7 +1240,10 @@ class R1ProCuRobo:
                 first = int(th.nonzero(coll).view(-1)[0])
                 return PlanResult(success=False, status=f"collision at waypoint {first}/{len(waypoints)}", dt=self.control_dt, plan_time=time.time() - t0)
         status = "ok" if not soft else f"ok ({len(soft)} waypoints within the soft tolerance, max {max(w['pos_err'] for w in soft) * 1000:.1f} mm)"
-        return PlanResult(success=True, q_traj=q_traj, dt=self.control_dt, status=status, plan_time=time.time() - t0, diagnostics={"soft_waypoints": soft} if soft else {})
+        diag = {"singular_iterations": n_singular}
+        if soft:
+            diag["soft_waypoints"] = soft
+        return PlanResult(success=True, q_traj=q_traj, dt=self.control_dt, status=status, plan_time=time.time() - t0, diagnostics=diag)
 
 
 # --------------------------------------------------------------------------------------
