@@ -69,6 +69,9 @@ class ExecutorConfig:
     #: epilogue no-op window: max(settle_min_steps, settle_fraction * action steps)
     settle_min_steps: int = 50
     settle_fraction: float = 0.2
+    #: second chance: when the first window shows motion (or the binary goal is lost), a second no-op window of this
+    #: many times the first runs and *its* motion / end state decide (0 = no second window)
+    settle_second_window_factor: float = 2.0
     #: motion over the no-op window that counts as "not settled" (robot base / joints / task objects)
     settled_pos_tol: float = 0.005
     settled_rot_tol: float = 0.01
@@ -111,6 +114,23 @@ class Checkpoint:
 TASK_TRACKING_ATTRS = ("_first_success_step", "_first_settled_success_step", "_errors_at_first_success", "_last_goal_eval")
 
 
+#: ctx keys the execute functions write for the record (meta.json ``actions[].notes``)
+NOTE_KEYS = ("push_residual", "push_pivot_offset_m", "push_object_drift_m", "approach_finish", "descent_finish", "idle_arms_moved", "object_motion",
+             "camera_error_before_correction", "camera_error", "attached")
+
+
+def _jsonable(x):
+    if isinstance(x, dict):
+        return {str(k): _jsonable(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [_jsonable(v) for v in x]
+    if isinstance(x, th.Tensor):
+        return x.detach().cpu().tolist()
+    if isinstance(x, (float, int, str, bool)) or x is None:
+        return x
+    return str(x)
+
+
 @dataclass
 class ActionRecord:
     index: int
@@ -120,11 +140,13 @@ class ActionRecord:
     step_start: int = 0
     step_end: int = 0
     targets_keys: List[str] = field(default_factory=list)
+    #: what the execute function reported about its closure (push residual, approach finish, idle arms moved, ...)
+    notes: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {"index": self.index, "name": self.name, "attempts": list(self.attempts), "verdict": self.verdict,
                 "step_start": self.step_start, "step_end": self.step_end, "n_steps": self.step_end - self.step_start,
-                "targets_keys": list(self.targets_keys)}
+                "targets_keys": list(self.targets_keys), "notes": _jsonable(self.notes)}
 
 
 # ==========================================================================================
@@ -166,6 +188,13 @@ class SimState:
     def base_pose2d(self) -> Tuple[float, float, float]:
         p, q = self.robot.get_position_orientation()
         return float(p[0]), float(p[1]), C.yaw_of(q.float())
+
+    def pose_target(self, name: str):
+        """The TRO pose target of ``name`` (``eval.targets.PoseTarget``: world / relative frame, position, orientation,
+        tolerances) or None — what a push closes the loop on (spec §8: the goal, not the arc)."""
+        tro = getattr(self.task, "_tro", None)
+        meta = getattr(tro, "meta", None)
+        return (getattr(meta, "pose_targets", None) or {}).get(name)
 
     def held_object(self, arm: str):
         return getattr(self.robot, "_ag_obj_in_hand", {}).get(arm)
@@ -252,6 +281,7 @@ class Executor:
         self.phase_steps: Dict[int, int] = {PHASE_ORACLE: 0, PHASE_SETTLE: 0, PHASE_GOAL: 0}
         self.stats: QAStats = monitors.stats if monitors is not None else QAStats()
         self.action_records: List[ActionRecord] = []
+        self.last_ctx: Dict[str, Any] = {}
         self.checkpoint_reports: List[Dict[str, Any]] = []
         self.timings: Dict[str, float] = {}
         self.result: Dict[str, Any] = {}
@@ -516,7 +546,9 @@ class Executor:
         for k in range(self.cfg.retries + 1):
             t0 = time.time()
             verdict, ctx = self.attempt(index, action, k)
+            self.last_ctx = ctx
             rec.targets_keys = ctx.get("targets_keys", [])
+            rec.notes = {key: val for key, val in ctx.items() if key in NOTE_KEYS}
             rec.attempts.append(None if verdict is None else verdict.to_dict())
             if verdict is None:
                 if self.recorder is not None:
@@ -593,6 +625,41 @@ class Executor:
 
     # ------------------------------------------------------------------ epilogue (§3.8 / §6.2)
 
+    def orientation_targets(self, isg: Optional[Dict[str, Any]] = None) -> set:
+        """Instances whose goal has an orientation target: the evaluator's report says so (``pose_errors[inst]
+        .orientation_error`` is a number, None for a position-only / relation-only target), else the TRO meta."""
+        isg = self.isg if isg is None else isg
+        out = set()
+        rep = ((isg.get("errors") or {}).get("pose_errors") or {})
+        for inst, r in rep.items():
+            if isinstance(r, dict) and r.get("orientation_error") is not None:
+                out.add(inst)
+        tro = getattr(self.task, "_tro", None)
+        meta = getattr(tro, "meta", None)
+        for inst, tgt in (getattr(meta, "pose_targets", None) or {}).items():
+            if getattr(tgt, "orientation", None) is not None:
+                out.add(inst)
+        return out
+
+    def _moved(self, motion: Dict[str, float], isg: Dict[str, Any]) -> bool:
+        """The epilogue's motion-window rule: the robot (joints, base) must be still; a tracked object's **position**
+        must be still; its **rotation** only counts when the goal has an orientation target for it (owner rule
+        2026-09-16: a near-spherical brussels sprout spinning in the bowl — 0.245 rad at 0.7 mm — is not a failed
+        IORS goal; the relation and the position decide)."""
+        if motion.get("joint_rad", 0.0) > self.cfg.settled_joint_tol or motion.get("base_m", 0.0) > self.cfg.settled_pos_tol or motion.get("base_rad", 0.0) > self.cfg.settled_rot_tol:
+            return True
+        oriented = self.orientation_targets(isg)
+        for k, v in motion.items():
+            if k in ("joint_rad", "base_m", "base_rad") or not isinstance(v, (int, float)):
+                continue
+            if k.endswith("_m"):
+                if v > self.cfg.settled_pos_tol:
+                    return True
+            elif k.endswith("_rad"):
+                if k[: -len("_rad")] in oriented and v > self.cfg.settled_rot_tol:
+                    return True
+        return False
+
     def epilogue(self, verdict: Optional[Verdict], n_action_steps: int) -> Dict[str, Any]:
         t0 = time.time()
         if self.monitors is not None:
@@ -600,6 +667,7 @@ class Executor:
         window = max(int(self.cfg.settle_min_steps), int(math.ceil(self.cfg.settle_fraction * n_action_steps)))
         before = MotionSnapshot(self.robot, self.tracked)
         settle_verdict = None
+        windows = [window]
         if verdict is None or verdict.category != "timeout":
             settle_verdict = self.run_generator(self._noop_actions(window), PHASE_SETTLE)
             if self.recorder is not None:
@@ -607,12 +675,27 @@ class Executor:
         after = MotionSnapshot(self.robot, self.tracked)
         motion = before.delta(after)
         isg = self.isg
-        binary_ever = bool(isg.get("binary_success_ever", isg.get("binary_success", False)))
+        moved = self._moved(motion, isg)
         binary_final = bool(isg.get("binary_success", False))
+        if verdict is None and settle_verdict is None and (moved or not binary_final) and self.cfg.settle_second_window_factor > 0:
+            # second chance (owner rule 2026-09-16): a longer no-op window before the verdict; the motion over *this*
+            # window and the binary goal at its end decide (a near-spherical object still rolling in a bowl, a
+            # released object still relaxing)
+            window2 = int(math.ceil(self.cfg.settle_second_window_factor * window))
+            log.info("epilogue: motion after the first no-op window (%s) - second window of %d steps", {k: round(v, 4) for k, v in motion.items() if (v > 1e-4)}, window2)
+            before2 = MotionSnapshot(self.robot, self.tracked)
+            settle_verdict = self.run_generator(self._noop_actions(window2), PHASE_SETTLE)
+            if self.recorder is not None:
+                self.recorder.commit()
+            motion_first = motion
+            motion = before2.delta(MotionSnapshot(self.robot, self.tracked))
+            motion["first_window"] = motion_first
+            isg = self.isg
+            moved = self._moved(motion, isg)
+            binary_final = bool(isg.get("binary_success", False))
+            windows.append(window2)
+        binary_ever = bool(isg.get("binary_success_ever", isg.get("binary_success", False)))
         settled_task = bool(isg.get("settled_success", False))
-        moved = motion.get("joint_rad", 0.0) > self.cfg.settled_joint_tol or motion.get("base_m", 0.0) > self.cfg.settled_pos_tol or motion.get("base_rad", 0.0) > self.cfg.settled_rot_tol or any(
-            (v > self.cfg.settled_pos_tol) if k.endswith("_m") else (v > self.cfg.settled_rot_tol) for k, v in motion.items() if k not in ("joint_rad", "base_m", "base_rad")
-        )
         out_of_tol = _out_of_tolerance(isg)
         if verdict is None and settle_verdict is not None:
             verdict = settle_verdict
@@ -665,6 +748,7 @@ class Executor:
             "n_action_steps": n_action_steps,
             "n_settle_steps": self.phase_steps.get(PHASE_SETTLE, 0),
             "settle_window": window,
+            "settle_windows": windows,
             "motion_delta": motion,
             "actions": [r.to_dict() for r in self.action_records],
             "qa": self.monitors.report() if self.monitors is not None else {"stats": self.stats.to_dict()},

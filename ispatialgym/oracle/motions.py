@@ -151,6 +151,21 @@ def as_pose2d(x: Any) -> Tuple[float, float, float]:
     return v[0], v[1], v[2]
 
 
+@dataclass
+class ApproachFinish:
+    """How ``Motions.arm_along`` may finish a stalled straight segment: plan the remainder with ``arm_to`` to
+    ``pose`` (``q_hint`` = the sidecar's IK witness of that pose when recorded), with ``ignore_objects`` out of the
+    collision world (the grasped object itself); ``used`` / ``info`` report what happened."""
+
+    pose: Any
+    q_hint: Any = None
+    ignore_objects: Sequence[Any] = ()
+    max_stall: float = 0.015
+    max_remaining: float = 0.06
+    used: bool = False
+    info: Optional[Dict[str, Any]] = None
+
+
 class PathTracker(BaseTrajectoryTracker):
     """The v1 joystick-like tracker (feed-forward + pose feedback, velocity / acceleration limits, exponential
     smoothing, simultaneous translation and rotation) with three changes found necessary on the pilot's obstructed
@@ -481,12 +496,19 @@ class Motions:
             prev = (p1, q1)
         return dense
 
-    def arm_along(self, arm: str, waypoints: Sequence[Any], speed: Optional[float] = None) -> Iterator[th.Tensor]:
+    def arm_along(self, arm: str, waypoints: Sequence[Any], speed: Optional[float] = None, finish: Optional["ApproachFinish"] = None) -> Iterator[th.Tensor]:
         """Track a given eef waypoint list with damped-least-squares differential IK on the arm's joints (trunk and
         base locked), streamed at ``speed`` (m/s; ``cartesian_speed``). The list is densified to the tracking
         resolution and every waypoint is reached in order; no collision veto (contact motions must touch — the QA
         collision monitor judges contacts). Raises ``plan_failed`` (stage ``diff_ik``) when a waypoint cannot be
-        reached from the current configuration."""
+        reached from the current configuration.
+
+        ``finish`` (owner rule 2026-09-16): when the differential IK **stalls** — no joint at a limit, the residual
+        below ``finish.max_stall`` — with at most ``finish.max_remaining`` of the segment left, the converged prefix
+        is executed and the rest is planned by ``arm_to`` to ``finish.pose`` (to the sidecar's IK witness
+        ``finish.q_hint`` when there is one, else cuRobo's own IK branch) instead of failing: the stall is the reach
+        boundary of the *branch* the straight segment started in (more iterations do not help: 30 → 100 moved a
+        7.2 mm stall to 7.0 mm), while the pose itself is reachable (the sampler's exact IK)."""
         waypoints = list(waypoints)
         if not waypoints:
             return
@@ -502,8 +524,6 @@ class Motions:
             check_collisions=False,
             sync_world=False,
         )
-        if not res.success:
-            raise SkillError("plan_failed", f"arm_along({arm}): {res.status}", stage="diff_ik", n_waypoints=len(waypoints))
         speed = self.cfg.cartesian_speed if speed is None else float(speed)
         steps = []
         prev = start
@@ -512,6 +532,24 @@ class Motions:
             ang = C.quat_angle(prev[1], wp[1])
             steps.append(max(1, int(round(max(seg / (speed * self.dt), ang / (self.cfg.cartesian_ang_speed * self.dt))))))
             prev = wp
+        if not res.success:
+            diag = dict(getattr(res, "diagnostics", None) or {})
+            k = diag.get("fail_index")
+            stall = diag.get("pos_err")
+            if finish is not None and diag.get("stage") == "diff_ik" and k is not None and stall is not None and not diag.get("at_lower") and not diag.get("at_upper"):
+                remaining = sum(float(th.linalg.norm(dense[i][0] - dense[i - 1][0])) for i in range(max(k, 1), len(dense)))
+                remaining += stall
+                if stall <= finish.max_stall and remaining <= finish.max_remaining:
+                    log.warning("arm_along(%s): %s -> executing the %d converged waypoints and finishing the last %.1f cm with arm_to (%s)", arm, res.status, int(diag.get("converged", 0)), remaining * 100,
+                                "IK witness" if finish.q_hint is not None else "cuRobo IK")
+                    if res.q_traj is not None and len(res.q_traj) > 1:
+                        yield from self.execute_joint_trajectory(self._retime(res.q_traj, steps[: len(res.q_traj) - 1]), arms=[arm])
+                    yield from self.arm_to(arm, pose=finish.pose, q_hint=finish.q_hint, ignore_objects=finish.ignore_objects)
+                    finish.used = True
+                    finish.info = {"stall_m": stall, "remaining_m": remaining, "converged": int(diag.get("converged", 0)), "n_dense": len(dense),
+                                   "by": "witness" if finish.q_hint is not None else "curobo_ik"}
+                    return
+            raise SkillError("plan_failed", f"arm_along({arm}): {res.status}", stage="diff_ik", n_waypoints=len(waypoints), **{k_: v for k_, v in diag.items() if k_ in ("fail_index", "pos_err", "rot_err")})
         yield from self.execute_joint_trajectory(self._retime(res.q_traj, steps), arms=[arm])
 
     # ------------------------------------------------------------------ base
@@ -673,4 +711,4 @@ class Motions:
         yield from self.track_path(base_poses, tracker_cfg=cfg)
 
 
-__all__ = ["SkillError", "MotionsConfig", "Motions", "MOTION_CATEGORIES", "as_world_pose", "as_pose2d"]
+__all__ = ["SkillError", "MotionsConfig", "Motions", "MOTION_CATEGORIES", "as_world_pose", "as_pose2d", "ApproachFinish", "PathTracker"]

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import math
+from types import SimpleNamespace
 import os
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -27,7 +28,7 @@ from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle import execute as EX
 from ispatialgym.oracle import qa as QA
 from ispatialgym.oracle.actions import VOCABULARY, Navigate, Push, BaseFollow
-from ispatialgym.oracle.executor import AGENT_INSTANCE, Executor, ExecutorConfig, apply_goal_override
+from ispatialgym.oracle.executor import AGENT_INSTANCE, Executor, ExecutorConfig, SimState, apply_goal_override
 from ispatialgym.oracle.motions import Motions, MotionsConfig, SkillError, as_world_pose
 from ispatialgym.oracle.programs import expand
 from ispatialgym.oracle.recorder import PHASE_ORACLE, PHASE_SETTLE, Recorder, RecorderConfig, sensor_name
@@ -271,7 +272,12 @@ class FakeBackend:
             return _Res(False, status="differential IK did not converge at waypoint 0 (fake)")
         q = self.q_full() if q_start is None else q_start.clone()
         path = [q.clone()]
-        for wp in waypoints:
+        stall = getattr(self, "stall_ik_after", None)  # (n converged waypoints, pos_err): the real solver's stall shape
+        for i, wp in enumerate(waypoints):
+            if stall is not None and i >= stall[0] and len(waypoints) > 1:
+                self.stall_ik_after = None
+                diag = {"stage": "diff_ik", "fail_index": i, "n_waypoints": len(waypoints), "pos_err": stall[1], "rot_err": 0.001, "at_lower": [], "at_upper": [], "converged": i}
+                return _Res(False, th.stack(path) if len(path) > 1 else None, status=f"differential IK did not converge at waypoint {i}/{len(waypoints)}: pos_err={stall[1]*1000:.1f}mm (fake)", diagnostics=diag)
             for frame, pose in wp.items():
                 arm = M.arm_of_eef_link(frame)
                 q = q.clone()
@@ -425,7 +431,7 @@ class FakeEnv:
                 if r._ag_obj_in_hand[a] is None and not self._refuse[a] and float(r.q[r.gripper_control_idx[a]].max()) < 0.03:
                     ep, _ = r.eef_pose(a)
                     for o in self.objects.values():
-                        if float(th.linalg.norm(o.pos - ep)) < 0.15:
+                        if getattr(o, "graspable", True) and float(th.linalg.norm(o.pos - ep)) < 0.15:
                             r._create_assisted_grasp_joint(a, {"target_obj": o, "target_link_name": "base_link", "joint_type": "FixedJoint"})
                             break
             else:
@@ -444,6 +450,8 @@ class FakeEnv:
         self._current_step += 1
         self.steps += 1
         self.last_action = action.clone()
+        if getattr(self, "after_step", None) is not None:
+            self.after_step(action)  # test hook: scripted world reactions (an object following the pad, spinning, ...)
         return self._obs(), 0.0, False, False, self._info()
 
 
@@ -581,6 +589,199 @@ def test_postcondition_push_no_motion():
     assert EX.check_postcondition(push, St(moved), targets, {"object_pose0": p0}) is None
     far = (goal[0] + th.tensor([0.1, 0.0, 0.0]), goal[1])
     assert EX.check_postcondition(push, St(moved, eef=far), targets, {"object_pose0": p0}) == "execution"
+
+
+def test_push_closure_geometry_residual_and_extension():
+    """The push closure on the pilot's board-game arc: pivot = the object's COM (the sampler's hinge), swept angle
+    = the required rotation; a 10 % under-rotation gives a residual in the push's sense that the arc extension
+    covers; an overshoot or a residual beyond the recorded arc is skipped."""
+    sc = Sidecar.load(os.path.join(SIDECARS, "alignment-axial.json"))
+    push = [a for a in expand(sc.alias, sc) if isinstance(a, Push)][0]
+    wps = push.contact.waypoints
+    geom = EX.push_geometry(wps, push.contact.direction)
+    assert geom.kind == "arc" and geom.radius > 0.03 and abs(geom.angle) > 0.2
+    # the pad's swept angle about the pivot equals the angle between the init and goal radii
+    p0, p1 = wps[0].tensors()[0], wps[-1].tensors()[0]
+    a0 = math.atan2(float(p0[1] - geom.pivot[1]), float(p0[0] - geom.pivot[0]))
+    a1 = math.atan2(float(p1[1] - geom.pivot[1]), float(p1[0] - geom.pivot[0]))
+    assert abs(C.wrap_angle(a1 - a0) - geom.angle) < 1e-6
+    sign = math.copysign(1.0, geom.angle)
+
+    class St:
+        def __init__(self, yaw, target=None):
+            self.q = C.quat_from_yaw(yaw) if hasattr(C, "quat_from_yaw") else th.tensor([0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)])
+            self.target = target
+
+        def object_pose(self, name):
+            return th.tensor([1.0, 2.0, 0.8]), self.q
+
+        def pose_target(self, name):
+            return self.target
+
+    pose0 = (th.tensor([1.0, 2.0, 0.8]), C.IDENTITY_QUAT.clone())
+    # (a) arc-derived: the object rotated 90 % of the arc -> residual = the missing 10 %, in the push's sense
+    r, src = EX.push_residual(geom, St(0.9 * geom.angle), push.contact.object, pose0)
+    assert src == "arc_angle" and abs(r - 0.1 * geom.angle) < 1e-6 and r * sign > 0
+    # (b) goal-derived: a world orientation target 0.08 rad beyond the current yaw wins over the arc
+    tgt = SimpleNamespace(frame="world", orientation=th.tensor([0.0, 0.0, math.sin((geom.angle + 0.08 * sign) / 2), math.cos((geom.angle + 0.08 * sign) / 2)]), orientation_equivalences=[], position=None)
+    r, src = EX.push_residual(geom, St(geom.angle, tgt), push.contact.object, pose0)
+    assert src == "goal_orientation" and abs(abs(r) - 0.08) < 1e-6 and r * sign > 0
+    # (c) the extension continues the circle: every pose keeps the radius, the last one is `residual` further round
+    ext = EX.extend_push(geom, wps[-1], r)
+    for p, q in ext:
+        assert abs(math.hypot(float(p[0] - geom.pivot[0]), float(p[1] - geom.pivot[1])) - geom.radius) < 1e-5
+    a_end = math.atan2(float(ext[-1][0][1] - geom.pivot[1]), float(ext[-1][0][0] - geom.pivot[0]))
+    assert abs(C.wrap_angle(a_end - a1) - r) < 1e-6
+    # the pad orientation turns with the arc (the same yaw change as the position)
+    assert abs(C.wrap_angle(C.yaw_of(ext[-1][1]) - C.yaw_of(wps[-1].tensors()[1])) - r) < 1e-5
+    # (d) the tangent at the goal points along the push sense, perpendicular to the radius
+    t = EX.push_tangent(geom, wps[-1])
+    radial = th.tensor([float(p1[0] - geom.pivot[0]), float(p1[1] - geom.pivot[1]), 0.0])
+    assert abs(float(th.dot(t, radial))) < 1e-6 and abs(float(th.linalg.norm(t)) - 1.0) < 1e-6
+    # (e) a straight push: distance along the direction, extension along it
+    line = EX.push_geometry([wps[0], wps[-1]], push.contact.direction)
+    assert line.kind == "line" and abs(line.distance - float(th.linalg.norm((p1 - p0)[:2]))) < 1e-6
+    ext = EX.extend_push(line, wps[-1], 0.02)
+    assert len(ext) == 1 and abs(float(th.linalg.norm(ext[0][0] - p1)) - 0.02) < 1e-6
+
+
+def test_execute_push_holds_measures_repushes_and_backs_off(tmp_path):
+    """``execute_push`` on a fake world whose pushed object follows the pad at 90 %: after the arc it holds until the
+    object is still, measures the residual, pushes the extension once, backs the pad off along the reversed push
+    direction, and the postcondition checks the eef at that back-off pose."""
+    sc = Sidecar.load(os.path.join(SIDECARS, "alignment-axial.json"))
+    actions = expand(sc.alias, sc)
+    push = [a for a in actions if isinstance(a, Push)][0]
+    geom = EX.push_geometry(push.contact.waypoints, push.contact.direction)
+    init = sc.stance("manipulation")
+    robot = FakeRobot(base=tuple(init.base_pose2d))
+    obj_name = push.contact.object
+    board = FakeObject(obj_name.replace(".", "_"), pos=[float(geom.pivot[0]), float(geom.pivot[1]), 0.8])
+    board.graspable = False  # a pad pushing a face never gets an assisted grasp on it
+    env = FakeEnv(robot, {obj_name: board})
+    backend = FakeBackend(robot)
+    motions = Motions(env, backend, MotionsConfig(settle_steps=5, gripper_steps=5, cartesian_step=0.05, cartesian_rot_step=0.3))
+    state = SimState(env, env.task, robot)
+    # the object rotates about its COM at 90 % of the pad's swept angle (as seen from the pivot)
+    a_init = math.atan2(float(push.contact.init.position[1] - geom.pivot[1]), float(push.contact.init.position[0] - geom.pivot[0]))
+
+    z_contact = float(push.contact.init.position[2])
+    contact = {"on": False}
+
+    def follow(step_action):
+        p = robot.eef_pose("right")[0]
+        if not contact["on"]:
+            contact["on"] = float(th.linalg.norm(p - push.contact.init.tensors()[0])) < 0.01  # the pad reached the init contact
+            return
+        on_circle = abs(math.hypot(float(p[0] - geom.pivot[0]), float(p[1] - geom.pivot[1])) - geom.radius) < 0.02 and abs(float(p[2]) - z_contact) < 0.03
+        if not on_circle:
+            return  # the pad left the object's face: no contact, no rotation
+        a = math.atan2(float(p[1] - geom.pivot[1]), float(p[0] - geom.pivot[0]))
+        swept = C.wrap_angle(a - a_init)
+        if swept * math.copysign(1.0, geom.angle) > 0:
+            yaw = 0.9 * swept
+            board.quat = th.tensor([0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)])
+
+    env.after_step = follow
+    ctx = {}
+    targets = push.targets(sc, state)
+    n = 0
+    for a in EX.run_action(push, motions, state, targets, ctx):
+        env.step(a)
+        n += 1
+    res = ctx["push_residual"]
+    assert res["kind"] == "arc" and res["source"] == "arc_angle"
+    assert abs(res["value"] - 0.1 * geom.angle) < 0.02 and res.get("extended_by") == res["value"]
+    assert abs(res["after"]) < abs(res["value"])  # the extension closed most of the residual
+    assert ctx["push_pivot_offset_m"] < 1e-6
+    # the pad backed off 2 cm along the reversed tangent and the postcondition checks that pose
+    end = state.eef_pose("right")
+    assert abs(float(th.linalg.norm(end[0] - ctx["push_end_pose"][0]))) < 1e-3
+    assert EX.check_postcondition(push, state, targets, ctx) is None
+    assert ctx["push_object_drift_m"] < 1e-6
+
+
+def test_arm_along_finishes_a_stalled_approach_with_arm_to():
+    """A straight approach whose differential IK stalls 7 mm short (no joint limit) is finished: the converged prefix
+    is executed, the last centimetres are planned by ``arm_to`` (to the witness when there is one), the grasp goes on."""
+    sc, env = iors_world()
+    ex, motions, backend, _ = make_executor(env, sc)
+    actions = expand(sc.alias, sc)
+    assert ex.run_action(0, actions[0]) is None
+    grasp = actions[1]
+    backend.stall_ik_after = (2, 0.007)  # the approach's last dense waypoint (3 of 3 at this resolution) stalls 7 mm short
+    n0 = len(backend.calls)
+    assert ex.run_action(1, grasp) is None
+    calls = backend.calls[n0:]
+    assert "plan_pose" in calls and calls.count("solve_ik_path") >= 1
+    rec = ex.action_records[1]
+    assert rec.attempts == [None]
+    assert ex.last_ctx["approach_finish"]["by"] == "curobo_ik" and ex.last_ctx["approach_finish"]["converged"] == 2
+    assert ex.action_records[1].notes["approach_finish"]["stall_m"] == 0.007
+    assert env.robot._ag_obj_in_hand["right"] is env.objects["apple.n.01_1"]
+    # a stall beyond the finish bounds (3 cm short) is still plan_failed
+    sc, env = iors_world()
+    ex, motions, backend, _ = make_executor(env, sc)
+    assert ex.run_action(0, actions[0]) is None
+    backend.stall_ik_after = (2, 0.03)
+    assert ex.run_action(1, expand(sc.alias, sc)[1]) is None  # the retry from the checkpoint succeeds (the fake stall is one-shot)
+    rec = ex.action_records[1]
+    assert rec.attempts[0]["category"] == "plan_failed" and rec.attempts[1] is None and "approach_finish" not in rec.notes
+
+
+def test_epilogue_motion_rule_ignores_rotation_without_an_orientation_target(tmp_path):
+    """Owner rule 2026-09-16: in the epilogue motion window an object's rotation counts only when the goal has an
+    orientation target for it; a spinning near-spherical object with a stable position passes; a second, 2x
+    longer window is the second chance before a not_settled verdict."""
+    sc, env = iors_world()
+    goal = _place_goal(sc)
+    env.evaluate = success_eval("apple.n.01_1", goal, tol=0.08)  # position-only target: orientation_error absent
+    apple = env.objects["apple.n.01_1"]
+
+    def spin(step_action):
+        if env.robot._ag_obj_in_hand["right"] is None and float(th.linalg.norm(apple.pos - th.tensor(goal))) < 0.08:
+            yaw = 0.05 * env._current_step
+            apple.quat = th.tensor([0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)])
+
+    env.after_step = spin
+    ex, *_ = make_executor(env, sc, tmp_path)
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["success"], result["verdict"]
+    assert result["motion_delta"]["apple.n.01_1_rad"] > 0.1 and result["motion_delta"]["apple.n.01_1_m"] < 1e-6
+    assert result["settle_windows"] == [result["settle_window"]]
+    # with an orientation target on the apple the same spin is a not_settled verdict, after the second window
+    sc, env = iors_world()
+
+    def eval_oriented(env_):
+        d = success_eval("apple.n.01_1", goal, tol=0.08)(env_)
+        d["errors"]["pose_errors"]["apple.n.01_1"]["orientation_error"] = 0.0
+        return d
+
+    env.evaluate = eval_oriented
+    apple = env.objects["apple.n.01_1"]
+    env.after_step = spin
+    ex, *_ = make_executor(env, sc, tmp_path / "b")
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["reason"] == "not_settled" and len(result["settle_windows"]) == 2 and result["settle_windows"][1] == 2 * result["settle_windows"][0]
+    assert "first_window" in result["motion_delta"]
+    # a transient (the object stops during the second window) is a success
+    sc, env = iors_world()
+    env.evaluate = eval_oriented
+    apple = env.objects["apple.n.01_1"]
+    stop_at = {"step": None}
+
+    def spin_then_stop(step_action):
+        if env.robot._ag_obj_in_hand["right"] is None and float(th.linalg.norm(apple.pos - th.tensor(goal))) < 0.08:
+            if stop_at["step"] is None:
+                stop_at["step"] = env._current_step + 120  # ~55 steps into the first no-op window
+            if env._current_step < stop_at["step"]:
+                yaw = 0.05 * env._current_step
+                apple.quat = th.tensor([0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)])
+
+    env.after_step = spin_then_stop
+    ex, *_ = make_executor(env, sc, tmp_path / "c")
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["success"] and len(result["settle_windows"]) == 2
 
 
 # ==========================================================================================
@@ -768,7 +969,6 @@ def test_grasp_plans_to_the_recorded_ik_witness_and_closes_the_residual(tmp_path
     sc.extra["ik_witnesses"] = [{"action": 1, "name": "grasp", "stance": "manipulation", "arm": "right", "carried": None,
                                  "targets": {"pre_grasp": {"pose": pre.to_dict(), "q": q28.tolist()}}}]
     assert set(ex.witnesses_for(1)) == {"pre_grasp"} and ex.witnesses_for(0) == {}
-    n_before = len(backend.calls)
     assert ex.run_action(0, actions[0]) is None
     n_after_transition = len(backend.calls)
     assert ex.run_action(1, grasp) is None

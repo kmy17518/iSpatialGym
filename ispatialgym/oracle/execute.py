@@ -44,7 +44,7 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterator, Optional, Protocol, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Optional, Protocol, Sequence, Tuple
 
 import torch as th
 
@@ -64,7 +64,7 @@ from ispatialgym.oracle.actions import (
     VOCABULARY,
 )
 from ispatialgym.oracle import r1pro_model as M
-from ispatialgym.oracle.motions import Motions, SkillError, as_pose2d, as_world_pose
+from ispatialgym.oracle.motions import ApproachFinish, Motions, SkillError, as_pose2d, as_world_pose
 from ispatialgym.robot import conventions as C
 
 log = logging.getLogger(__name__)
@@ -112,6 +112,27 @@ class ExecuteConfig:
     place_settle_steps: int = 60
     follow_settle_steps: int = 45
     set_torso_settle_steps: int = 45
+    #: push closure (owner rule 2026-09-16, execution accuracy): after the recorded arc / line the pad holds in contact
+    #: until the object is still (at least ``push_hold_min_steps``, at most ``push_settle_max_steps``; still = below
+    #: ``push_still_pos`` / ``push_still_rot`` per step for ``push_still_steps`` steps), the residual to the goal is
+    #: measured and pushed once more along the extended arc / line when it lies between ``push_residual_min_*`` and
+    #: ``push_residual_max_fraction`` of the recorded motion; then the pad backs off ``push_backoff_m`` along the
+    #: reversed push direction before the retreat lifts it (a pad rubbing up the face dragged the object 0.004 rad)
+    push_hold_min_steps: int = 10
+    push_settle_max_steps: int = 45
+    push_still_pos: float = 2e-4
+    push_still_rot: float = 1e-3
+    push_still_steps: int = 5
+    push_residual_min_rad: float = 0.02
+    push_residual_min_m: float = 0.005
+    push_residual_max_fraction: float = 0.25
+    push_backoff_m: float = 0.02
+    #: approach / descent finish (owner rule 2026-09-16): when the straight differential-IK segment stalls with a
+    #: residual below ``approach_finish_max_stall`` (m) and no more than ``approach_finish_max_remaining`` (m) of the
+    #: segment left, the converged prefix is executed and the last part is planned by ``arm_to`` to the end pose — to
+    #: the sidecar's IK witness when it has one, else cuRobo's own IK branch — instead of failing ``plan_failed``
+    approach_finish_max_stall: float = 0.015
+    approach_finish_max_remaining: float = 0.06
 
 
 CONFIG = ExecuteConfig()
@@ -299,9 +320,13 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     yield from motions.gripper(arm, close=False)
     yield from motions.arm_to(arm, pose=targets["pre_grasp"], q_hint=_witness(ctx, "pre_grasp"))
     _hook(ctx, "fov")(True)  # from the pre-grasp on the fingertips enter the frame and must stay (recorded grasp pose in frame)
-    yield from motions.arm_along(arm, targets["approach"])
-    yield from motions.gripper(arm, close=True)
     obj = state.object(action.object)
+    cfg = _cfg(ctx)
+    finish = ApproachFinish(targets["grasp"], q_hint=_witness(ctx, "grasp"), ignore_objects=[obj], max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
+    yield from motions.arm_along(arm, targets["approach"], finish=finish)
+    if finish.used:
+        ctx["approach_finish"] = finish.info
+    yield from motions.gripper(arm, close=True)
     held = state.held_object(arm)
     if held is not obj:
         raise SkillError("failed_grasp", f"{action.object} not in the {arm} hand after closing", in_hand=None if held is None else held.name)
@@ -347,7 +372,16 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     _hook(ctx, "fov")(False)  # the transit to the pre-place (10 cm back along a tilted approach) may leave the margin
     yield from motions.arm_to(arm, pose=targets["pre_place"], q_hint=_witness(ctx, "pre_place"))
     _hook(ctx, "fov")(True)  # the descent ends at the recorded (in-frame) place pose
-    yield from motions.arm_along(arm, targets["descent"])
+    on = []
+    if getattr(action, "on", None):
+        try:
+            on = [state.object(action.on)]
+        except KeyError:
+            on = []
+    finish = ApproachFinish(targets["place"], q_hint=_witness(ctx, "place"), ignore_objects=on, max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
+    yield from motions.arm_along(arm, targets["descent"], finish=finish)
+    if finish.used:
+        ctx["descent_finish"] = finish.info
     yield from motions.gripper(arm, close=False)
     _release(motions, state, arm)
     _hook(ctx, "fov")(False)  # the retreat leg is the same as a Retreat action: exempt
@@ -388,19 +422,192 @@ def post_retreat(action: Retreat, state, targets, ctx) -> Optional[str]:
 # ==========================================================================================
 
 
+@dataclass
+class PushGeometry:
+    """The recorded push as a motion of the pad: an ``arc`` about a vertical pivot (the sampler's hinge at the settled
+    COM, spec §6.10) through ``init, mid, goal`` — ``angle`` the signed swept angle about +z, ``radius`` — or a
+    straight ``line`` of ``distance`` along ``direction``."""
+
+    kind: str
+    direction: th.Tensor
+    pivot: Optional[th.Tensor] = None
+    radius: float = 0.0
+    angle: float = 0.0
+    distance: float = 0.0
+
+    @property
+    def total(self) -> float:
+        return abs(self.angle) if self.kind == "arc" else self.distance
+
+
+def _circle_through(p0: th.Tensor, p1: th.Tensor, p2: th.Tensor) -> Optional[Tuple[th.Tensor, float]]:
+    """Circumcentre (xy) and radius of three points, None when they are (nearly) collinear."""
+    ax, ay = float(p0[0]), float(p0[1])
+    bx, by = float(p1[0]), float(p1[1])
+    cx, cy = float(p2[0]), float(p2[1])
+    d = 2.0 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+    chord = math.hypot(cx - ax, cy - ay)
+    if abs(d) < 1e-6 * max(chord, 1e-3):
+        return None
+    ux = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / d
+    uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / d
+    r = math.hypot(ax - ux, ay - uy)
+    if r > 5.0:  # an almost straight arc: treat as a line
+        return None
+    return th.tensor([ux, uy]), r
+
+
+def push_geometry(waypoints: Sequence[Any], direction: Sequence[float]) -> PushGeometry:
+    pts = [as_world_pose(w)[0] for w in waypoints]
+    direction = C.as_tensor(direction).reshape(-1)[:3].float()
+    if len(pts) >= 3:
+        circ = _circle_through(pts[0], pts[len(pts) // 2], pts[-1])
+        if circ is not None:
+            pivot, r = circ
+            angle = 0.0
+            for a, b in zip(pts[:-1], pts[1:]):
+                pa = math.atan2(float(a[1] - pivot[1]), float(a[0] - pivot[0]))
+                pb = math.atan2(float(b[1] - pivot[1]), float(b[0] - pivot[0]))
+                angle += C.wrap_angle(pb - pa)
+            return PushGeometry("arc", direction, pivot=pivot, radius=r, angle=angle)
+    dist = sum(float(th.linalg.norm(b[:2] - a[:2])) for a, b in zip(pts[:-1], pts[1:]))
+    return PushGeometry("line", direction, distance=dist)
+
+
+def _rotate_pose_about(pose, pivot: th.Tensor, angle: float) -> Tuple[th.Tensor, th.Tensor]:
+    """A world pose rotated about the vertical axis through ``pivot`` (xy) by ``angle`` (rad, +z)."""
+    p, q = as_world_pose(pose)
+    c, s = math.cos(angle), math.sin(angle)
+    dx, dy = float(p[0] - pivot[0]), float(p[1] - pivot[1])
+    p2 = th.tensor([float(pivot[0]) + c * dx - s * dy, float(pivot[1]) + s * dx + c * dy, float(p[2])])
+    qz = th.tensor([0.0, 0.0, math.sin(angle / 2.0), math.cos(angle / 2.0)])
+    return p2, C.qmul(qz, q)
+
+
+def _yaw_residual(goal_q: th.Tensor, cur_q: th.Tensor, equivalences: Sequence[Any] = ()) -> float:
+    """Signed rotation about +z from ``cur_q`` to the nearest equivalent of ``goal_q`` (rad)."""
+    best = None
+    for e in [None] + list(equivalences or []):
+        g = goal_q if e is None else C.qmul(goal_q, C.as_tensor(e).float())
+        r = C.wrap_angle(C.yaw_of(g) - C.yaw_of(cur_q))
+        if best is None or abs(r) < abs(best):
+            best = r
+    return float(best)
+
+
+def push_residual(geom: PushGeometry, state, obj: str, pose0) -> Tuple[Optional[float], str]:
+    """How much of the push is still missing, signed in the push's own sense: for an arc the object rotation still
+    needed about +z (rad), for a line the displacement still needed along ``direction`` (m). Measured against the
+    task's **goal** (the TRO pose target of the pushed object, world frame, nearest orientation equivalence) when it
+    has one, else against the recorded motion (swept angle / distance minus what the object did since the push
+    began). Returns ``(residual, source)``; ``(None, reason)`` when nothing can be measured."""
+    p, q = state.object_pose(obj)
+    tgt = getattr(state, "pose_target", lambda name: None)(obj)
+    world = tgt is not None and str(getattr(tgt, "frame", "world")) == "world"
+    if geom.kind == "arc":
+        if world and getattr(tgt, "orientation", None) is not None:
+            return _yaw_residual(C.as_tensor(tgt.orientation).float(), q, getattr(tgt, "orientation_equivalences", ())), "goal_orientation"
+        if pose0 is None:
+            return None, "no_reference"
+        done = C.wrap_angle(C.yaw_of(q) - C.yaw_of(as_world_pose(pose0)[1]))
+        return float(geom.angle - done), "arc_angle"
+    d = geom.direction[:2]
+    d = d / max(float(th.linalg.norm(d)), 1e-9)
+    if world and getattr(tgt, "position", None) is not None:
+        gp = C.as_tensor(tgt.position).float()
+        return float(th.dot(gp[:2] - p[:2], d)), "goal_position"
+    if pose0 is None:
+        return None, "no_reference"
+    done = float(th.dot(p[:2] - as_world_pose(pose0)[0][:2], d))
+    return float(geom.distance - done), "line_distance"
+
+
+def extend_push(geom: PushGeometry, end_pose, residual: float, step: float = 0.05) -> List[Tuple[th.Tensor, th.Tensor]]:
+    """The pad poses that continue the recorded push by ``residual`` (rad for an arc about its pivot, m for a line
+    along its direction) from ``end_pose``; the arc is densified at ``step`` rad so the pad stays on the circle."""
+    if geom.kind == "arc":
+        n = max(1, int(math.ceil(abs(residual) / step)))
+        return [_rotate_pose_about(end_pose, geom.pivot, residual * (i / n)) for i in range(1, n + 1)]
+    p, q = as_world_pose(end_pose)
+    d = geom.direction / max(float(th.linalg.norm(geom.direction)), 1e-9)
+    return [(p + d * residual, q)]
+
+
+def push_tangent(geom: PushGeometry, pose) -> th.Tensor:
+    """Unit push direction of the pad at ``pose`` (the arc's tangent in the swept sense, or the line direction)."""
+    if geom.kind == "arc":
+        p = as_world_pose(pose)[0]
+        rx, ry = float(p[0] - geom.pivot[0]), float(p[1] - geom.pivot[1])
+        sign = 1.0 if geom.angle >= 0 else -1.0
+        t = th.tensor([-ry * sign, rx * sign, 0.0])
+        return t / max(float(th.linalg.norm(t)), 1e-9)
+    d = geom.direction.clone()
+    d[2] = 0.0
+    return d / max(float(th.linalg.norm(d)), 1e-9)
+
+
+def _hold_until_still(motions: Motions, state, obj: str, cfg: ExecuteConfig) -> Iterator[th.Tensor]:
+    """Hold the arm (pad in contact) until the object's pose stops changing between steps."""
+    prev = state.object_pose(obj)
+    still = 0
+    for i in range(int(cfg.push_settle_max_steps)):
+        yield from motions.hold(1)
+        cur = state.object_pose(obj)
+        dp, da = _pose_error(cur, prev)
+        prev = cur
+        still = still + 1 if (dp < cfg.push_still_pos and da < cfg.push_still_rot) else 0
+        if i + 1 >= cfg.push_hold_min_steps and still >= cfg.push_still_steps:
+            return
+
+
 def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
+    cfg = _cfg(ctx)
     arm = action.contact.arm
+    obj = action.contact.object
     _hook(ctx, "fov")(False)
     yield from motions.gripper(arm, close=True)
     yield from motions.arm_to(arm, pose=targets["pre"], q_hint=_witness(ctx, "pre"))
     _hook(ctx, "fov")(True)
-    ctx["object_pose0"] = tuple(x.clone() for x in state.object_pose(action.contact.object))
+    pose0 = tuple(x.clone() for x in state.object_pose(obj))
+    ctx["object_pose0"] = pose0
+    geom = push_geometry(targets["waypoints"], targets["direction"])
+    if geom.kind == "arc":
+        ctx["push_pivot_offset_m"] = float(th.linalg.norm(geom.pivot - pose0[0][:2]))  # the arc's pivot vs the object's COM
     yield from motions.arm_along(arm, targets["waypoints"])
+    # 1. hold with the pad in contact until the object is still, then measure the residual to the goal
+    yield from _hold_until_still(motions, state, obj, cfg)
+    residual, source = push_residual(geom, state, obj, pose0)
+    ctx["push_residual"] = {"kind": geom.kind, "value": residual, "source": source, "recorded": geom.total}
+    end_pose = as_world_pose(targets["waypoints"][-1])
+    # 2. re-push the residual once when it is in the push's sense and the recorded arc / line allows the extension
+    if residual is not None:
+        forward = residual * (1.0 if geom.kind == "line" else math.copysign(1.0, geom.angle)) > 0
+        rmin = cfg.push_residual_min_rad if geom.kind == "arc" else cfg.push_residual_min_m
+        if forward and rmin <= abs(residual) <= cfg.push_residual_max_fraction * geom.total:
+            ext = extend_push(geom, end_pose, residual)
+            log.info("push(%s): residual %.4f %s (%s) -> pushing on along the extended %s", obj, residual, "rad" if geom.kind == "arc" else "m", source, geom.kind)
+            yield from motions.arm_along(arm, ext)
+            yield from _hold_until_still(motions, state, obj, cfg)
+            end_pose = as_world_pose(ext[-1])
+            after, _ = push_residual(geom, state, obj, pose0)
+            ctx["push_residual"]["extended_by"] = residual
+            ctx["push_residual"]["after"] = after
+        elif forward and abs(residual) > cfg.push_residual_max_fraction * geom.total:
+            ctx["push_residual"]["skipped"] = "beyond the recorded arc"
+        elif not forward and abs(residual) >= rmin:
+            ctx["push_residual"]["skipped"] = "overshoot (a pad cannot pull)"
+    # 3. back off along the reversed push direction so the retreat does not rub the pad up the object's face
+    tangent = push_tangent(geom, end_pose)
+    back = (end_pose[0] - tangent * cfg.push_backoff_m, end_pose[1])
+    yield from motions.arm_along(arm, [back])
+    ctx["push_end_pose"] = back
+    p_now = state.object_pose(obj)[0]
+    ctx["push_object_drift_m"] = float(th.linalg.norm(p_now[:2] - pose0[0][:2]))
 
 
 def post_push(action: Push, state, targets, ctx) -> Optional[str]:
     cfg = _cfg(ctx)
-    verdict = _eef_reached(state, action.contact.arm, targets["waypoints"][-1], cfg, "push")
+    verdict = _eef_reached(state, action.contact.arm, ctx.get("push_end_pose", targets["waypoints"][-1]), cfg, "push")
     if verdict is not None:
         return verdict
     before = ctx.get("object_pose0")

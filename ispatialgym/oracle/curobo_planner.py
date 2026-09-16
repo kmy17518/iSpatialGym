@@ -1176,12 +1176,19 @@ class R1ProCuRobo:
                 at_lo = [active[k] for k in range(n) if abs(float(q_cur[aidx[k]] - lo[k])) < 1e-4]
                 at_hi = [active[k] for k in range(n) if abs(float(q_cur[aidx[k]] - hi[k])) < 1e-4]
                 err_f = err.reshape(len(frames), 6)
+                pos_err = float(err_f[:, :3].norm(dim=-1).max())
+                rot_err = float(err_f[:, 3:].norm(dim=-1).max())
                 status = (
                     f"differential IK did not converge at waypoint {wi}/{len(waypoints)}: "
-                    f"pos_err={float(err_f[:, :3].norm(dim=-1).max())*1000:.1f}mm rot_err={float(err_f[:, 3:].norm(dim=-1).max()):.3f}rad "
+                    f"pos_err={pos_err*1000:.1f}mm rot_err={rot_err:.3f}rad "
                     f"at_lower={at_lo} at_upper={at_hi}"
                 )
-                return PlanResult(success=False, status=status, dt=self.control_dt, plan_time=time.time() - t0)
+                # the converged prefix (start + waypoints 0..wi-1) is returned so a caller may execute it and finish
+                # the segment another way (``Motions.arm_along(finish=...)``)
+                partial = th.stack(path) if len(path) > 1 else None
+                diag = {"stage": "diff_ik", "fail_index": wi, "n_waypoints": len(waypoints), "pos_err": pos_err, "rot_err": rot_err,
+                        "at_lower": at_lo, "at_upper": at_hi, "converged": len(path) - 1}
+                return PlanResult(success=False, q_traj=partial, status=status, dt=self.control_dt, plan_time=time.time() - t0, diagnostics=diag)
             jump = float(th.max(th.abs(q_cur[aidx] - path[-1][aidx])))
             if jump > max_joint_step:
                 return PlanResult(success=False, status=f"joint jump {jump:.2f} rad at waypoint {wi}", dt=self.control_dt, plan_time=time.time() - t0)
