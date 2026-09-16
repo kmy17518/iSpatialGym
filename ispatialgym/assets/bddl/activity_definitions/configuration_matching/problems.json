@@ -34,7 +34,7 @@
    "by": "ground_isg 2.0.0",
    "subtask": "configuration_matching-articulation_close_large_scale",
    "iddl": "configuration_matching/articulation_close_large_scale.iddl",
-   "pick": "configuration_matching-articulation_close_large_scale#02",
+   "pick": "configuration_matching-articulation_close_large_scale#05",
    "slot": "representative",
    "mode": "representative"
   },
@@ -56,7 +56,7 @@
    "by": "ground_isg 2.0.0",
    "subtask": "configuration_matching-articulation_close_large_scale",
    "iddl": "configuration_matching/articulation_close_large_scale.iddl",
-   "pick": "configuration_matching-articulation_close_large_scale#04",
+   "pick": "configuration_matching-articulation_close_large_scale#02",
    "slot": "representative",
    "mode": "representative"
   },
@@ -67,7 +67,7 @@
    "by": "ground_isg 2.0.0",
    "subtask": "configuration_matching-articulation_close_large_scale",
    "iddl": "configuration_matching/articulation_close_large_scale.iddl",
-   "pick": "configuration_matching-articulation_close_large_scale#05",
+   "pick": "configuration_matching-articulation_close_large_scale#04",
    "slot": "representative",
    "mode": "representative"
   },
@@ -155,7 +155,7 @@
    "by": "ground_isg 2.0.0",
    "subtask": "configuration_matching-articulation_open_large_scale",
    "iddl": "configuration_matching/articulation_open_large_scale.iddl",
-   "pick": "configuration_matching-articulation_open_large_scale#02",
+   "pick": "configuration_matching-articulation_open_large_scale#05",
    "slot": "representative",
    "mode": "representative"
   },
@@ -177,7 +177,7 @@
    "by": "ground_isg 2.0.0",
    "subtask": "configuration_matching-articulation_open_large_scale",
    "iddl": "configuration_matching/articulation_open_large_scale.iddl",
-   "pick": "configuration_matching-articulation_open_large_scale#04",
+   "pick": "configuration_matching-articulation_open_large_scale#02",
    "slot": "representative",
    "mode": "representative"
   },
@@ -188,7 +188,7 @@
    "by": "ground_isg 2.0.0",
    "subtask": "configuration_matching-articulation_open_large_scale",
    "iddl": "configuration_matching/articulation_open_large_scale.iddl",
-   "pick": "configuration_matching-articulation_open_large_scale#05",
+   "pick": "configuration_matching-articulation_open_large_scale#04",
    "slot": "representative",
    "mode": "representative"
   },
@@ -858,6 +858,28 @@
    "subtask": "configuration_matching-block_design",
    "iddl": "configuration_matching/block_design.iddl",
    "pick": "configuration_matching-block_design#01~T3",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_open_large_scale-top_cabinet",
+   "id": 77,
+   "grounded": "2026-09-16",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_open_large_scale",
+   "iddl": "configuration_matching/articulation_open_large_scale.iddl",
+   "pick": "configuration_matching-articulation_open_large_scale#03",
+   "slot": "representative",
+   "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-articulation_close_large_scale-top_cabinet",
+   "id": 78,
+   "grounded": "2026-09-16",
+   "by": "ground_isg 2.0.0",
+   "subtask": "configuration_matching-articulation_close_large_scale",
+   "iddl": "configuration_matching/articulation_close_large_scale.iddl",
+   "pick": "configuration_matching-articulation_close_large_scale#03",
    "slot": "representative",
    "mode": "representative"
   }

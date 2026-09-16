@@ -1790,6 +1790,7 @@ class Grounder:
                         if outcome:
                             self.report.tests.append(f"{gp.alias} @ {sc}: {outcome}")
             self._supersede_stale_primaries(subtask)
+            self._prune_stale_scene_blocks(subtask)
             if self.opt.reseed_generation:
                 # entries of the subtask this run did not produce (superseded fallbacks) follow the spec number too
                 produced = {gp.alias for gp in self.grounded if gp.subtask == subtask}
@@ -1835,9 +1836,10 @@ class Grounder:
         from ispatialgym.sampling.bddl_from_iddl import ProblemRegistry
 
         registry = ProblemRegistry.load(activity_dir, self.activity_of(iddl))
-        produced = {gp.alias: gp for gp in self.grounded if gp.subtask == subtask and gp.combination.fallback is None}
+        primaries = [gp for gp in self.grounded if gp.subtask == subtask and gp.combination.fallback is None]
+        produced = {gp.alias for gp in primaries}
         by_key: Dict[Tuple[str, str, str], str] = {}
-        for gp in produced.values():
+        for gp in primaries:  # every grounding, not one per alias: two picks may share an alias (same category)
             by_key[(gp.combination.pick, gp.combination.slot, self.opt.mode)] = gp.alias
         for rec in registry.records:
             if rec.get("subtask") != subtask or rec.get("fallback_of") or rec.get("legacy"):
@@ -1850,14 +1852,39 @@ class Grounder:
                 entry.superseded_by = None
                 continue
             newer = by_key.get((rec.get("pick"), rec.get("slot"), rec.get("mode")))
+            if newer is None and rec.get("mode") == self.opt.mode and rec.get("slot") in self.opt.slots and not self.opt.scenes:
+                newer = True  # the pick itself left the selection (no grounding of this pick / slot any more)
             if newer and newer != alias and not entry.superseded_by:
                 entry.superseded_by = newer
-                self.report.notes[subtask].append(f"{alias}: superseded primary (now {newer})")
+                self.report.notes[subtask].append(f"{alias}: superseded primary" + (f" (now {newer})" if newer is not True else " (its pick left the selection)"))
                 for fb_alias in entry.fallbacks:
                     fb = self.customs.entries.get(fb_alias)
                     if fb is not None and not fb.superseded_by:
                         fb.superseded_by = newer
                 entry.fallbacks = []
+
+    def _prune_stale_scene_blocks(self, subtask: str) -> None:
+        """An alias this run produced keeps only the scene blocks its combinations produced: a scene block of an earlier
+        grounding whose scene object left the selection (the crowded kitchen picks of the large-scale articulation)
+        goes -- unless the run was restricted with ``--scene`` (a partial run never drops blocks)."""
+        if self.opt.scenes:
+            return
+        produced: Dict[str, Set[str]] = {}
+        for gp in self.grounded:
+            if gp.subtask == subtask:
+                produced.setdefault(gp.alias, set()).update(gp.combination.scenes)
+        for alias, scenes in produced.items():
+            entry = self.customs.entries.get(alias)
+            if entry is None:
+                continue
+            stale = [sc for sc in entry.scenes if sc not in scenes]
+            for sc in stale:
+                del entry.scenes[sc]
+                self.report.notes[subtask].append(f"{alias}: scene block {sc} dropped (its scene object left the selection)")
+            for key in list(entry.roles.get("target", RoleEntry()).joint):  # scene-object joints of the dropped blocks
+                if "/" in key and key.split("/")[0] in stale:
+                    entry.roles["target"].joint.pop(key, None)
+                    entry.roles["target"].handle_key.pop(key, None)
 
     def _ground_or_skip(self, comb: Combination) -> Optional[GroundedProblem]:
         subtask = comb.subtask

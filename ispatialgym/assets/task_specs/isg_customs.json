@@ -16861,10 +16861,12 @@
      "handle": true
     },
     "joint": {
-     "house_single_floor/bottom_cabinet_fancyy_0": "j_door1"
+     "office_cubicles_right/bottom_cabinet_rvunhj_0": "j_link_2",
+     "Rs_int/bottom_cabinet_bamfsz_0": "j_link_4"
     },
     "handle_key": {
-     "house_single_floor/bottom_cabinet_fancyy_0": "bottom_cabinet__fancyy"
+     "office_cubicles_right/bottom_cabinet_rvunhj_0": "bottom_cabinet__rvunhj",
+     "Rs_int/bottom_cabinet_bamfsz_0": "bottom_cabinet__bamfsz"
     }
    },
    "floor": {
@@ -16872,13 +16874,28 @@
    }
   },
   "scenes": {
-   "house_single_floor": {
+   "office_cubicles_right": {
+    "rooms": [
+     "shared_office_0"
+    ],
+    "bindings": {
+     "target": [
+      "bottom_cabinet_rvunhj_0"
+     ],
+     "floor": {
+      "room": "shared_office_0"
+     }
+    },
+    "whitelist": {},
+    "blacklist": {}
+   },
+   "Rs_int": {
     "rooms": [
      "kitchen_0"
     ],
     "bindings": {
      "target": [
-      "bottom_cabinet_fancyy_0"
+      "bottom_cabinet_bamfsz_0"
      ],
      "floor": {
       "room": "kitchen_0"
@@ -16950,6 +16967,7 @@
  "configuration_matching-articulation_close_large_scale-bottom_cabinet_no_top": {
   "iddl": "configuration_matching/articulation_close_large_scale.iddl",
   "definition_id": 6,
+  "superseded_by": "configuration_matching-articulation_close_large_scale-top_cabinet",
   "roles": {
    "target": {
     "category": "bottom_cabinet_no_top",
@@ -17047,6 +17065,7 @@
  "configuration_matching-articulation_close_large_scale-dishwasher": {
   "iddl": "configuration_matching/articulation_close_large_scale.iddl",
   "definition_id": 9,
+  "superseded_by": true,
   "roles": {
    "target": {
     "category": "dishwasher",
@@ -17144,6 +17163,7 @@
  "configuration_matching-articulation_close_large_scale-door": {
   "iddl": "configuration_matching/articulation_close_large_scale.iddl",
   "definition_id": 4,
+  "superseded_by": "configuration_matching-articulation_close_large_scale-bottom_cabinet",
   "roles": {
    "target": {
     "category": "door",
@@ -17250,10 +17270,10 @@
      "handle": true
     },
     "joint": {
-     "house_single_floor/fridge_dszchb_0": "j_link_0"
+     "restaurant_diner/fridge_jtqazu_1": "j_link_0"
     },
     "handle_key": {
-     "house_single_floor/fridge_dszchb_0": "fridge__dszchb"
+     "restaurant_diner/fridge_jtqazu_1": "fridge__jtqazu"
     }
    },
    "floor": {
@@ -17261,13 +17281,13 @@
    }
   },
   "scenes": {
-   "house_single_floor": {
+   "restaurant_diner": {
     "rooms": [
      "kitchen_0"
     ],
     "bindings": {
      "target": [
-      "fridge_dszchb_0"
+      "fridge_jtqazu_1"
      ],
      "floor": {
       "room": "kitchen_0"
@@ -17365,6 +17385,103 @@
     "bindings": {
      "target": [
       "oven_amblrk_0"
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {},
+    "blacklist": {}
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "revolute": 0.05,
+    "prismatic": 0.01,
+    "joint_fraction": 0.1
+   },
+   "groups": {},
+   "path_buckets": null,
+   "open_fraction_range": [
+    0.5,
+    0.95
+   ],
+   "stable_set_fractions": 7,
+   "stable_hold_steps": 120,
+   "stable_drift_tolerance_fraction": 0.5,
+   "stable_probe_tolerances": {
+    "revolute": 0.1,
+    "prismatic": 0.02
+   },
+   "waypoint_fractions": [
+    0.25,
+    0.5,
+    0.75,
+    1.0
+   ],
+   "require_goal_handle": "auto",
+   "arm": "auto",
+   "arm_side_threshold_m": 0.1,
+   "handle_eef_offset_m": 0.012,
+   "pre_grasp_back_m": 0.1,
+   "pinch_width_range_m": [
+    0.015,
+    0.08
+   ],
+   "direction": "close",
+   "prompt0": {
+    "beta_max_deg": 20.0,
+    "d_min_m": 0.5,
+    "d_max_m": 2.5,
+    "d_scan_max_m": 1.1
+   },
+   "lateral_range_m": {
+    "right": [
+     -0.1,
+     0.6
+    ],
+    "left": [
+     -0.6,
+     0.1
+    ]
+   },
+   "face_patch_half_width_m": 0.1,
+   "pinch_axis_vertical_threshold": 0.7,
+   "path_max_m": 3.0
+  },
+  "constraints": []
+ },
+ "configuration_matching-articulation_close_large_scale-top_cabinet": {
+  "iddl": "configuration_matching/articulation_close_large_scale.iddl",
+  "definition_id": 78,
+  "roles": {
+   "target": {
+    "category": "top_cabinet",
+    "sampleable": false,
+    "require": {
+     "handle": true
+    },
+    "joint": {
+     "house_double_floor_lower/top_cabinet_tynnnw_1": "j_rightdoor"
+    },
+    "handle_key": {
+     "house_double_floor_lower/top_cabinet_tynnnw_1": "top_cabinet__tynnnw"
+    }
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_double_floor_lower": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "target": [
+      "top_cabinet_tynnnw_1"
      ],
      "floor": {
       "room": "kitchen_0"
@@ -19729,10 +19846,12 @@
      "handle": true
     },
     "joint": {
-     "house_single_floor/bottom_cabinet_fancyy_0": "j_door1"
+     "office_cubicles_right/bottom_cabinet_rvunhj_0": "j_link_2",
+     "Rs_int/bottom_cabinet_bamfsz_0": "j_link_4"
     },
     "handle_key": {
-     "house_single_floor/bottom_cabinet_fancyy_0": "bottom_cabinet__fancyy"
+     "office_cubicles_right/bottom_cabinet_rvunhj_0": "bottom_cabinet__rvunhj",
+     "Rs_int/bottom_cabinet_bamfsz_0": "bottom_cabinet__bamfsz"
     }
    },
    "floor": {
@@ -19740,13 +19859,28 @@
    }
   },
   "scenes": {
-   "house_single_floor": {
+   "office_cubicles_right": {
+    "rooms": [
+     "shared_office_0"
+    ],
+    "bindings": {
+     "target": [
+      "bottom_cabinet_rvunhj_0"
+     ],
+     "floor": {
+      "room": "shared_office_0"
+     }
+    },
+    "whitelist": {},
+    "blacklist": {}
+   },
+   "Rs_int": {
     "rooms": [
      "kitchen_0"
     ],
     "bindings": {
      "target": [
-      "bottom_cabinet_fancyy_0"
+      "bottom_cabinet_bamfsz_0"
      ],
      "floor": {
       "room": "kitchen_0"
@@ -19818,6 +19952,7 @@
  "configuration_matching-articulation_open_large_scale-bottom_cabinet_no_top": {
   "iddl": "configuration_matching/articulation_open_large_scale.iddl",
   "definition_id": 17,
+  "superseded_by": "configuration_matching-articulation_open_large_scale-top_cabinet",
   "roles": {
    "target": {
     "category": "bottom_cabinet_no_top",
@@ -19915,6 +20050,7 @@
  "configuration_matching-articulation_open_large_scale-dishwasher": {
   "iddl": "configuration_matching/articulation_open_large_scale.iddl",
   "definition_id": 20,
+  "superseded_by": true,
   "roles": {
    "target": {
     "category": "dishwasher",
@@ -20012,6 +20148,7 @@
  "configuration_matching-articulation_open_large_scale-door": {
   "iddl": "configuration_matching/articulation_open_large_scale.iddl",
   "definition_id": 15,
+  "superseded_by": "configuration_matching-articulation_open_large_scale-bottom_cabinet",
   "roles": {
    "target": {
     "category": "door",
@@ -20118,10 +20255,10 @@
      "handle": true
     },
     "joint": {
-     "house_single_floor/fridge_dszchb_0": "j_link_0"
+     "restaurant_diner/fridge_jtqazu_1": "j_link_0"
     },
     "handle_key": {
-     "house_single_floor/fridge_dszchb_0": "fridge__dszchb"
+     "restaurant_diner/fridge_jtqazu_1": "fridge__jtqazu"
     }
    },
    "floor": {
@@ -20129,13 +20266,13 @@
    }
   },
   "scenes": {
-   "house_single_floor": {
+   "restaurant_diner": {
     "rooms": [
      "kitchen_0"
     ],
     "bindings": {
      "target": [
-      "fridge_dszchb_0"
+      "fridge_jtqazu_1"
      ],
      "floor": {
       "room": "kitchen_0"
@@ -20233,6 +20370,103 @@
     "bindings": {
      "target": [
       "oven_amblrk_0"
+     ],
+     "floor": {
+      "room": "kitchen_0"
+     }
+    },
+    "whitelist": {},
+    "blacklist": {}
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "revolute": 0.05,
+    "prismatic": 0.01,
+    "joint_fraction": 0.1
+   },
+   "groups": {},
+   "path_buckets": null,
+   "open_fraction_range": [
+    0.5,
+    0.95
+   ],
+   "stable_set_fractions": 7,
+   "stable_hold_steps": 120,
+   "stable_drift_tolerance_fraction": 0.5,
+   "stable_probe_tolerances": {
+    "revolute": 0.1,
+    "prismatic": 0.02
+   },
+   "waypoint_fractions": [
+    0.25,
+    0.5,
+    0.75,
+    1.0
+   ],
+   "require_goal_handle": "auto",
+   "arm": "auto",
+   "arm_side_threshold_m": 0.1,
+   "handle_eef_offset_m": 0.012,
+   "pre_grasp_back_m": 0.1,
+   "pinch_width_range_m": [
+    0.015,
+    0.08
+   ],
+   "direction": "open",
+   "prompt0": {
+    "beta_max_deg": 20.0,
+    "d_min_m": 0.5,
+    "d_max_m": 2.5,
+    "d_scan_max_m": 1.1
+   },
+   "lateral_range_m": {
+    "right": [
+     -0.1,
+     0.6
+    ],
+    "left": [
+     -0.6,
+     0.1
+    ]
+   },
+   "face_patch_half_width_m": 0.1,
+   "pinch_axis_vertical_threshold": 0.7,
+   "path_max_m": 3.0
+  },
+  "constraints": []
+ },
+ "configuration_matching-articulation_open_large_scale-top_cabinet": {
+  "iddl": "configuration_matching/articulation_open_large_scale.iddl",
+  "definition_id": 77,
+  "roles": {
+   "target": {
+    "category": "top_cabinet",
+    "sampleable": false,
+    "require": {
+     "handle": true
+    },
+    "joint": {
+     "house_double_floor_lower/top_cabinet_tynnnw_1": "j_rightdoor"
+    },
+    "handle_key": {
+     "house_double_floor_lower/top_cabinet_tynnnw_1": "top_cabinet__tynnnw"
+    }
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_double_floor_lower": {
+    "rooms": [
+     "kitchen_0"
+    ],
+    "bindings": {
+     "target": [
+      "top_cabinet_tynnnw_1"
      ],
      "floor": {
       "room": "kitchen_0"
