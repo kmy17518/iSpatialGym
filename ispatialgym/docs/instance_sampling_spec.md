@@ -1039,13 +1039,16 @@ uniform along the edge minus margins, trunk from the band, uniform draw among su
   ± 1 m at s = 0.45 — 65° off-axis). **Goal cell** = the band
   cell nearest the init pose.
 
-**Visibility per stance (owner decision 2026‑09‑16 10:47, ontop):** A must see the goal region, the init surface and
-the target (above); **B** (the grasp stance at the init surface) needs neither the goal nor the partner — no
-partner‑visibility redraw at B, its target‑in‑frame rule stays, A → B stays a recorded path / transition; **C** keeps a
-goal‑visibility rule (the place happens in frame): for `ontop` the goal cell must be in frame (5 %); the "optical axis
-within 20° of the goal cell" cone stays for `under`, where the target hides beneath the partner. The camera has no
-independent tilt (rigid on the torso; pitch follows the trunk keyframe) and C cannot stand further back than the
-reach band, so visibility failures at C are edge‑selection or yield questions, not tilt questions.
+**Visibility per stance (owner decision 2026‑09‑16 10:47; implemented `31afbc9` / `42a7c3b`):** stance A sees the
+target on the init surface (tabletop Phase 1) and the partner's *relevant region*: ontop — the partner's top‑face patch
+(± 0.10 m) around the goal cell the placement will use and the partner's bottom edge nearest the init pose, both in
+frame (5 %); under — the nearest bottom edge (replaces "≥ 4 of the partner's 8 AABB corners and its centre"). Stance B
+has no partner rule (its target‑in‑frame / Phase‑2 rules stay; A → B stays a recorded path / transition). Stance C,
+ontop: the target at the goal cell in frame (5 %) — **no optical‑axis cone** (the camera is rigid on the torso and the
+stance cannot stand back beyond the band; `[pilot]` sofa: 13/13 candidates in frame and unoccluded at 30–31° off
+axis, so the 20° cone was the blocker). Under (placement variant): the near‑edge bottom line at the goal lane in frame
+and the optical axis within 20° of the hidden goal cell. Push‑under: the drop footprint in frame, optical axis within
+45° (the crouched head hangs over the lane).
 
 Record `placement_stance = {stand_off, lateral, translate, tilt, focus / goal_cell, base_pose2d, grasp}`. B → C path
 per 3.7 (≤ `max_partner_geodesic` + 1 m) with the object attached; transition per 3.8 (with the partner as init
@@ -1058,6 +1061,22 @@ library grasps screened at the goal cell for the target's goal yaw (= its init w
 survivor, then reject). Exact IK at B (pre-grasp + grasp, the init surface ignored for the grasp pose only) and at C
 (pre-place + place at the goal pose; ontop: the partner's top ignored for the place pose only; under: only the floor
 ignored). Record `(yaw, grasp_key, grasp_name)` in both stances.
+
+**Push‑under (large‑scale under; owner decision 2026‑09‑16 06:50 item 7, implemented `25e94d3` … `d7ca530`).** Goal
+cell = a footprint‑edge floor cell with the target centre 5–10 cm inside the partner's footprint (0.07; the `under`
+predicate needs only the centre column), clear height ≥ target height + 3 cm. The place is a **drop** (`place_kind:
+drop`) with the object bottom 10 cm above the floor on a free cell half‑extent + 0.10 m outside the edge (3 cm was
+kinematically out of reach), followed by a **straight floor‑level push** (closed gripper, blade behind the target,
+stand‑off from the finger profile, approach pitched 0–60° toward the push) from the drop position to the goal cell,
+3 waypoints, exact IK from stance C with the floor and the target ignored and the partner present, recorded as
+`contacts.push` (`kind: push_under`, `init` / `mid` / `goal`, `direction`, `distance_m`, `push_height_m`, `pitch_deg`,
+`blade_standoff_m`, `drop_cell`, `goal_cell`). Stance C: base square to the edge (stand‑off 0.5–0.8 m) or **beside the
+lane** facing along the edge with the partner on the right (lane 0.35–0.45 m ahead), floor trunks (translate ≥ 0.75,
+tilt ≤ −0.9), the floor mesh removed from the stance / program checks (the ground slab stays); the deepest trunk is
+tried first. Program: `… → place(drop) → retreat → push → retreat`; the oracle's push may touch floor and target, never
+the partner; `under` is read in the epilogue. `[pilot]`: a floor‑level push is at the edge of the arm's envelope
+(shoulder ≥ 0.79 m at the deepest collision‑free crouch, arm 0.79 m); ground‑like objects with footprints > 15 m²
+(the garden lawn) no longer block floor cells.
 
 **Objects.** Target at B's focus cell (± 5 cm, footprint on the init surface with 2 cm margin; floor init: at c_t)
 with the drawn yaw; no small partner. Goal pose: ontop → target root at the goal cell, init orientation, z = partner
