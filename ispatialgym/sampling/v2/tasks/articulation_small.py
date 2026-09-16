@@ -383,7 +383,10 @@ class ArticulationSmall(SamplerV2):
         bc = RB.BandComputer(world, kit, arms=(self.handle_arm, self.brace_arm))
         stance = bc.stance_at_edge(self.top, support, RB.STAND_OFF, edge.name)
         base_cells, world_cells = bc.lattice_on_cells(stance, self.top.cells(free_only=True))
-        q_values = [self.q_init, self.q_goal]  # the extremes; the instance checks every required q_k with the brace arm locked
+        # the §5.3 required set exactly as the instance checks it (q_init + every q_k up to the passive fraction); B3's brace
+        # bands record n_all_q = 0 for every target at all five fractions, so requiring q_goal itself would empty the band
+        q_values = [self.q_init] + [self.q_init + k * (self.q_goal - self.q_init) for k in self.required]
+        log.info("%s: handle band over q = %s (required fractions %s, passive from %s)", self.gp.alias, [round(v, 3) for v in q_values], self.required, self.passive_from)
         x0, y0, yaw0 = stance["base_pose2d"]
         face_off = C.wrap_angle(self.face_yaw - yaw0)
         trunks = RB.trunk_grid(self.top.z - kit.floor_z)
