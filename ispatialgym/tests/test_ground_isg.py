@@ -58,11 +58,17 @@ def _entries(grounded, subtask):
 def test_every_subtask_produced_problems(grounded):
     for st in SUBTASKS:
         assert grounded.report.problems[st], f"{st}: nothing grounded ({grounded.report.skipped.get(st)})"
-    # the shipped selection: 30 disembedding picks, 6 attachment picks, 1 block design, 17 obstacles
-    assert len(grounded.report.problems["disembedding"]) == 30
-    assert len(grounded.report.problems["configuration_matching-attachment"]) == 6
-    assert len(grounded.report.problems["configuration_matching-block_design"]) == 1
+    # the shipped selection: 30 disembedding picks, 6 attachment picks, 1 block design, 17 obstacles -- each tabletop
+    # pick once per representative support of its support triplets (A3: T1..T3)
+    n_sup = len(grounded.icl.picks["disembedding#01"]["support"]["representative"])
+    assert n_sup >= 1
+    assert len(grounded.report.problems["disembedding"]) == 30 * n_sup
+    assert len(grounded.report.problems["configuration_matching-attachment"]) == 6 * n_sup
+    assert len(grounded.report.problems["configuration_matching-block_design"]) == n_sup
     assert len(grounded.report.problems["camera_relocalization-standard"]) == 1
+    assert len(grounded.report.problems["camera_relocalization-obstructed"]) == 17
+    tokens = {gp.alias.split("-")[-1] for gp in _entries(grounded, "disembedding")}
+    assert tokens == {r["category"] for r in grounded.icl.picks["disembedding#01"]["support"]["representative"]}
     assert grounded.report.text().startswith("ground_isg")
 
 
@@ -237,7 +243,7 @@ def test_wall_support_bindings(grounded):
 
 
 def test_groups(grounded):
-    blocks = _entries(grounded, "configuration_matching-block_design")[0]
+    blocks = next(gp for gp in _entries(grounded, "configuration_matching-block_design") if gp.alias.endswith("-breakfast_table"))
     assert blocks.alias == "configuration_matching-block_design-block_4-breakfast_table"
     assert blocks.entry.generation["groups"]["targets"] == {"size": 4, "draw": "same_model", "members": {"toy_dice": 4}}
     assert blocks.entry.roles["targets"].dataset == "ispatialgym-assets"
@@ -254,7 +260,7 @@ def test_groups(grounded):
         assert token == "_".join(f"{c}_{n}" for c, n in g["members"].items())
         members = gp.problem.groups["distractors_group.n.01_1"]
         assert len(members) == g["size"]
-        sc = gp.entry.scenes["house_single_floor"]
+        sc = next(iter(gp.entry.scenes.values()))
         for cat in g["members"]:
             assert sc.whitelist["distractors"][cat], (gp.alias, cat)
         target = gp.entry.roles["target"]
@@ -396,7 +402,8 @@ def test_legacy_activity_names(tmp_path):
                            options=GI.Options(representative_test=False, legacy_activity_names=True, fallbacks=False))
     grounder.run(["alignment-axial"])
     assert os.path.isdir(tmp_path / "bddl" / "world_alignment")
-    assert P.list_problem_ids("world_alignment", str(tmp_path / "bddl")) == list(range(10))
+    n_sup = len(icl.picks["alignment-axial#01"]["support"]["representative"])
+    assert P.list_problem_ids("world_alignment", str(tmp_path / "bddl")) == list(range(10 * n_sup))
     assert all(gp.activity == "world_alignment" for gp in grounder.grounded)
     assert not grounder.report.fallbacks
 
@@ -531,11 +538,12 @@ def test_scale_fallbacks(grounded, tmp_path):
 
 def test_next_model_fallbacks(grounded):
     small = _entries(grounded, "configuration_matching-articulation_open_small_scale")
-    primaries = {gp.entry.roles["target"].category: gp for gp in small if not gp.entry.is_fallback}
-    assert set(primaries) == {"blender", "hinged_jar", "laptop", "toolbox", "carton"}
-    for cat, gp in primaries.items():
-        fbs = _fallbacks_of(grounded, gp.alias)
-        slots = grounded.icl.picks[gp.combination.pick]["target"]
+    primaries = [gp for gp in small if not gp.entry.is_fallback]
+    assert {gp.entry.roles["target"].category for gp in primaries} == {"blender", "hinged_jar", "laptop", "toolbox", "carton"}
+    for gp in primaries:
+        cat = gp.entry.roles["target"].category
+        fbs = list({g.alias: g for g in _fallbacks_of(grounded, gp.alias)}.values())  # one alias per support triplet (the floor merges them)
+        slots = grounded.icl.picks[gp.combination.pick.split("~")[0]]["target"]
         others = [r for s in GI.NEXT_MODEL_SLOT_ORDER for r in slots.get(s, []) if r["model"] != gp.entry.roles["target"].representative]
         if not others:
             assert fbs == [] and gp.entry.fallbacks == []

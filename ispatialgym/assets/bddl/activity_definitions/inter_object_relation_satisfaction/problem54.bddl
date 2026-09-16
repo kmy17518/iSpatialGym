@@ -1,0 +1,39 @@
+(define (problem inter_object_relation_satisfaction-54)
+    (:domain ispatialgym)
+    (:alias inter_object_relation_satisfaction-nextto-jar_of_spaghetti_sauce-canned_food-conference_table)
+
+    ; ground_isg 2.0.0 2026-09-16: inter_object_relation_satisfaction-nextto-jar_of_spaghetti_sauce-canned_food-conference_table (inter_object_relation_satisfaction/nextto.iddl; inter_object_relation_satisfaction-nextto#05~T3/representative)
+    ; IORS - nextto. Target and partner on the support with an init gap above the NextTo bound; the target is moved to the
+    ; nearest position that satisfies NextTo (gap below mean(dims_a + dims_b)/6, adjacency rays), same orientation.
+
+    (:objects
+        jar__of__spaghetti_sauce.n.01_1 - jar__of__spaghetti_sauce.n.01
+        canned_food.n.01_1 - canned_food.n.01
+        conference_table.n.01_1 - conference_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop jar__of__spaghetti_sauce.n.01_1 conference_table.n.01_1)
+        (ontop canned_food.n.01_1 conference_table.n.01_1)
+        (not (nextto jar__of__spaghetti_sauce.n.01_1 canned_food.n.01_1))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (nextto ?jar__of__spaghetti_sauce.n.01_1 ?canned_food.n.01_1)
+            (not (grasped ?agent.n.01_1 ?jar__of__spaghetti_sauce.n.01_1))
+            (not (grasped ?agent.n.01_1 ?canned_food.n.01_1))
+            (pose_settled ?jar__of__spaghetti_sauce.n.01_1)
+            (pose_settled ?canned_food.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?jar__of__spaghetti_sauce.n.01_1)
+        (pose_reached ?canned_food.n.01_1)
+    )
+)

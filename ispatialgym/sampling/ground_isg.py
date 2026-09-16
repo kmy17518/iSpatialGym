@@ -777,7 +777,12 @@ class Grounder:
                 for role, rs in choices.items():
                     variants = [dict(v, **{role: r}) for v in variants for r in (rs if role in multi else rs[:1])]
                 for i, rows in enumerate(variants):
-                    label = pick if len(variants) == 1 else f"{pick}~{i + 1}"
+                    if len(variants) == 1:
+                        label = pick
+                    else:
+                        # the A3 support triplets carry their index in the ``triplet`` column (T1 = the 2026-09-15 pick)
+                        tags = [f"T{rows[r]['triplet']}" for r in multi if rows[r].get("triplet")]
+                        label = f"{pick}~{'~'.join(tags) if len(tags) == len(multi) else i + 1}"
                     try:
                         out.append(self._build(iddl, label, slot, rows))
                     except Skip as s:

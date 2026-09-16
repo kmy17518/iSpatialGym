@@ -1,0 +1,43 @@
+(define (problem configuration_matching-68)
+    (:domain ispatialgym)
+    (:alias configuration_matching-attachment-light_bulb-table_lamp-conference_table)
+
+    ; ground_isg 2.0.0 2026-09-16: configuration_matching-attachment-light_bulb-table_lamp-conference_table (configuration_matching/attachment.iddl; configuration_matching-attachment#03~T3/representative)
+    ; Configuration matching - attachment. Target = male part (grasped), partner = female part (stands on the support, braced
+    ; by the other gripper while attaching). The assembly group carries the fixed member-to-slot layout target; the
+    ; partner's pose stays as at init. Male / female pairs with matching BEHAVIOR attachment meta-links come from
+    ; roles/constraints_compatible.csv (partner_of, attach_type); the partner brace is computed geometrically (no artefact).
+
+    (:objects
+        light_bulb.n.01_1 - light_bulb.n.01
+        table_lamp.n.01_1 - table_lamp.n.01
+        conference_table.n.01_1 - conference_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:groups
+        light_bulb.n.01_1 table_lamp.n.01_1 - assembly_group.n.01_1
+    )
+
+    (:init
+        (ontop assembly_group.n.01_1 conference_table.n.01_1)
+        (not (attached light_bulb.n.01_1 table_lamp.n.01_1))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (attached ?light_bulb.n.01_1 ?table_lamp.n.01_1)
+            (ontop ?table_lamp.n.01_1 ?conference_table.n.01_1)
+            (layout_reached ?assembly_group.n.01_1)
+            (not (grasped ?agent.n.01_1 ?assembly_group.n.01_1))
+            (pose_settled ?assembly_group.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?assembly_group.n.01_1)
+    )
+)

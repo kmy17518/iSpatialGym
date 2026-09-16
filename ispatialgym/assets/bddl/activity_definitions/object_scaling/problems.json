@@ -4,7 +4,7 @@
   {
    "alias": "object_scaling-beaker",
    "id": 1,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -15,7 +15,7 @@
   {
    "alias": "object_scaling-bottle_of_beer",
    "id": 2,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -26,7 +26,7 @@
   {
    "alias": "object_scaling-bottle_of_medicine",
    "id": 3,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -37,7 +37,7 @@
   {
    "alias": "object_scaling-bottle_of_pop",
    "id": 4,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -48,7 +48,7 @@
   {
    "alias": "object_scaling-apple",
    "id": 5,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -59,7 +59,7 @@
   {
    "alias": "object_scaling-hard_candy",
    "id": 6,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -70,7 +70,7 @@
   {
    "alias": "object_scaling-soda_cup",
    "id": 7,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -81,7 +81,7 @@
   {
    "alias": "object_scaling-pack_of_cigarettes",
    "id": 8,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -92,7 +92,7 @@
   {
    "alias": "object_scaling-bottle_of_water",
    "id": 9,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -103,7 +103,7 @@
   {
    "alias": "object_scaling-bottle_of_wine",
    "id": 10,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -114,7 +114,7 @@
   {
    "alias": "object_scaling-box_of_cereal",
    "id": 11,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -125,7 +125,7 @@
   {
    "alias": "object_scaling-can_of_soda",
    "id": 12,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -136,7 +136,7 @@
   {
    "alias": "object_scaling-cap",
    "id": 13,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -147,7 +147,7 @@
   {
    "alias": "object_scaling-lid",
    "id": 14,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -158,7 +158,7 @@
   {
    "alias": "object_scaling-marker",
    "id": 15,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -169,7 +169,7 @@
   {
    "alias": "object_scaling-wineglass",
    "id": 16,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -180,7 +180,7 @@
   {
    "alias": "object_scaling-lemon",
    "id": 17,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -191,7 +191,7 @@
   {
    "alias": "object_scaling-canned_food",
    "id": 18,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -202,7 +202,7 @@
   {
    "alias": "object_scaling-jar_of_spaghetti_sauce",
    "id": 19,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -213,7 +213,7 @@
   {
    "alias": "object_scaling-shampoo_dispenser",
    "id": 20,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -224,7 +224,7 @@
   {
    "alias": "object_scaling-toy_dice",
    "id": 21,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -235,7 +235,7 @@
   {
    "alias": "object_scaling-beeswax_candle",
    "id": 22,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -246,7 +246,7 @@
   {
    "alias": "object_scaling-bell_pepper",
    "id": 23,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -257,7 +257,7 @@
   {
    "alias": "object_scaling-bottle_of_catsup",
    "id": 24,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -268,7 +268,7 @@
   {
    "alias": "object_scaling-potato",
    "id": 25,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -279,7 +279,7 @@
   {
    "alias": "object_scaling-bar_soap",
    "id": 26,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -290,7 +290,7 @@
   {
    "alias": "object_scaling-beefsteak_tomato",
    "id": 27,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -301,7 +301,7 @@
   {
    "alias": "object_scaling-bottle_of_olive_oil",
    "id": 28,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -312,7 +312,7 @@
   {
    "alias": "object_scaling-bottle_of_sake",
    "id": 29,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",
@@ -323,7 +323,7 @@
   {
    "alias": "object_scaling-cherry_tomato",
    "id": 30,
-   "grounded": "2026-09-15",
+   "grounded": "2026-09-16",
    "by": "ground_isg 2.0.0",
    "subtask": "object_scaling",
    "iddl": "object_scaling/object_scaling.iddl",

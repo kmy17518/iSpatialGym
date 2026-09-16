@@ -1,0 +1,31 @@
+(define (problem alignment-85)
+    (:domain ispatialgym)
+    (:alias alignment-world_horizontal-shelf_s060-walls)
+
+    ; ground_isg 2.0.0 2026-09-16: alignment-world_horizontal-shelf_s060-walls (alignment/world_horizontal.iddl; alignment-world_horizontal#03/representative/fallback1:scale)
+    ; fallback 1 (scale) of alignment-world_horizontal-shelf-walls: scale = 0.6, scale_source = template_meta.scale_hint
+    ; Alignment - world horizontal. Same wall hinge as world vertical (installed by the sampler, spec 5.5); the target is an
+    ; elongated wall item whose long axis / reference edge must end level. Models that look the same upside down carry the
+    ; 180 deg equivalence (symmetric_180, roles/candidates.csv). The support is a wall region (roles/candidates.csv kind scene). Push / brace
+    ; contacts from contacts/<category>__<model>.json; spawn scale from the customs list (roles.target.scale).
+
+    (:objects
+        shelf.n.01_1 - shelf.n.01
+        wall.n.01_1 - wall.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (pose_reached ?shelf.n.01_1)
+            (not (grasped ?agent.n.01_1 ?shelf.n.01_1))
+            (pose_settled ?shelf.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+)

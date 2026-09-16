@@ -2,7 +2,7 @@
     (:domain ispatialgym)
     (:alias mental_rotation-toy_figure)
 
-    ; ground_isg 2.0.0 2026-09-15: mental_rotation-toy_figure (mental_rotation/mental_rotation.iddl; mental_rotation#06/representative)
+    ; ground_isg 2.0.0 2026-09-16: mental_rotation-toy_figure (mental_rotation/mental_rotation.iddl; mental_rotation#06/representative)
     ; Mental rotation. The target is held (right arm, fixed hold pose) at init and at the goal; the goal is a world-frame
     ; orientation of the target, its position unchanged (TRO pose target: orientation_metric = full, equivalences per model).
 

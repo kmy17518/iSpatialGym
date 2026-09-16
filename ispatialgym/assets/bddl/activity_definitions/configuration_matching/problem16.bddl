@@ -2,7 +2,7 @@
     (:domain ispatialgym)
     (:alias configuration_matching-articulation_open_large_scale-bottom_cabinet)
 
-    ; ground_isg 2.0.0 2026-09-15: configuration_matching-articulation_open_large_scale-bottom_cabinet (configuration_matching/articulation_open_large_scale.iddl; configuration_matching-articulation_open_large_scale#02/representative)
+    ; ground_isg 2.0.0 2026-09-16: configuration_matching-articulation_open_large_scale-bottom_cabinet (configuration_matching/articulation_open_large_scale.iddl; configuration_matching-articulation_open_large_scale#02/representative)
     ; Configuration matching - articulation (large-scale, open). The target is a scene articulated object (cabinet, fridge,
     ; oven, drawer, door; roles/candidates.csv kind scene, bound per scene); one joint is chosen (customs list roles.target.joint /
     ; handle_key); closed -> open to a passively stable angle q_goal in S. Handle grasp with the arm on the handle's side;

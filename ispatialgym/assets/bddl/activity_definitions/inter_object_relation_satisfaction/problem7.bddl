@@ -2,7 +2,7 @@
     (:domain ispatialgym)
     (:alias inter_object_relation_satisfaction-inside-quartz-saucepot-breakfast_table)
 
-    ; ground_isg 2.0.0 2026-09-15: inter_object_relation_satisfaction-inside-quartz-saucepot-breakfast_table (inter_object_relation_satisfaction/inside.iddl; inter_object_relation_satisfaction-inside#03/representative)
+    ; ground_isg 2.0.0 2026-09-16: inter_object_relation_satisfaction-inside-quartz-saucepot-breakfast_table (inter_object_relation_satisfaction/inside.iddl; inter_object_relation_satisfaction-inside#03~T1/representative)
     ; IORS - inside. Target lowered into the partner (fillable container) on the support; the target's goal orientation is
     ; whatever settles (TRO orientation_metric null), which also admits flowers stood in vases. Both poses measured. The
     ; insert grasp pipeline (pads on the upper part of the object so the lower body can enter the container; flowers held

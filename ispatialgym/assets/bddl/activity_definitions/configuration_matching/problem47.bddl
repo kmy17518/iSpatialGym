@@ -1,0 +1,37 @@
+(define (problem configuration_matching-47)
+    (:domain ispatialgym)
+    (:alias configuration_matching-articulation_close_small_scale-carton_msfzpz-floor)
+
+    ; ground_isg 2.0.0 2026-09-16: configuration_matching-articulation_close_small_scale-carton_msfzpz-floor (configuration_matching/articulation_close_small_scale.iddl; configuration_matching-articulation_close_small_scale#05~T1/representative/fallback1:next_model)
+    ; fallback 1 (next_model) of configuration_matching-articulation_close_small_scale-carton-floor: model = msfzpz, slot = variation_geometry, primary_model = causya
+    ; Configuration matching - articulation (small-scale, close). Spawned articulated object on the support, one joint open
+    ; at q_init in S -> closed limit. Handle arm + brace arm (brace computed geometrically); root pose measured. Joint from
+    ; the customs list (roles.target.joint / handle_key).
+
+    (:objects
+        carton.n.02_1 - carton.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (open carton.n.02_1)
+        (ontop carton.n.02_1 floor.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (not (open ?carton.n.02_1))
+            (layout_reached ?carton.n.02_1)
+            (ontop ?carton.n.02_1 ?floor.n.01_1)
+            (not (grasped ?agent.n.01_1 ?carton.n.02_1))
+            (pose_settled ?carton.n.02_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?carton.n.02_1)
+    )
+)

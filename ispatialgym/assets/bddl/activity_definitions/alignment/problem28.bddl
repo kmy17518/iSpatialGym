@@ -2,7 +2,7 @@
     (:domain ispatialgym)
     (:alias alignment-world_vertical-wall_clock-walls)
 
-    ; ground_isg 2.0.0 2026-09-15: alignment-world_vertical-wall_clock-walls (alignment/world_vertical.iddl; alignment-world_vertical#06/representative)
+    ; ground_isg 2.0.0 2026-09-16: alignment-world_vertical-wall_clock-walls (alignment/world_vertical.iddl; alignment-world_vertical#06/representative)
     ; Alignment - world vertical. The target hangs on the support (a wall region, roles/candidates.csv kind scene) through a revolute
     ; hinge at its centre of mass (axis = wall normal, TRO constraint installed by the sampler, spec 5.5), starts tilted
     ; 15-45 deg in the wall plane and must be pushed upright (tangential push at the low end + brace at the high end).

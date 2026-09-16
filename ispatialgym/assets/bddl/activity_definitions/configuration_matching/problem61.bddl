@@ -1,0 +1,38 @@
+(define (problem configuration_matching-61)
+    (:domain ispatialgym)
+    (:alias configuration_matching-articulation_open_small_scale-toolbox-conference_table)
+
+    ; ground_isg 2.0.0 2026-09-16: configuration_matching-articulation_open_small_scale-toolbox-conference_table (configuration_matching/articulation_open_small_scale.iddl; configuration_matching-articulation_open_small_scale#04~T3/representative)
+    ; Configuration matching - articulation (small-scale, open). Spawned articulated object (toolbox, carton, hinged jar) on
+    ; the support (floor for objects taller than 0.6 m), facing the robot; closed -> open to q_goal in S. Handle arm + brace
+    ; arm on the base link (brace computed geometrically); the object's root pose is measured (pose_reached in :measure),
+    ; not gated. Joint from the customs list (roles.target.joint / handle_key).
+
+    (:objects
+        toolbox.n.01_1 - toolbox.n.01
+        conference_table.n.01_1 - conference_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (not (open toolbox.n.01_1))
+        (ontop toolbox.n.01_1 conference_table.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (open ?toolbox.n.01_1)
+            (layout_reached ?toolbox.n.01_1)
+            (ontop ?toolbox.n.01_1 ?conference_table.n.01_1)
+            (not (grasped ?agent.n.01_1 ?toolbox.n.01_1))
+            (pose_settled ?toolbox.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?toolbox.n.01_1)
+    )
+)

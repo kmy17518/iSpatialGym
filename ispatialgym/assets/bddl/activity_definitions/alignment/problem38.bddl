@@ -1,0 +1,33 @@
+(define (problem alignment-38)
+    (:domain ispatialgym)
+    (:alias alignment-axial-magazine-countertop)
+
+    ; ground_isg 2.0.0 2026-09-16: alignment-axial-magazine-countertop (alignment/axial.iddl; alignment-axial#02~T2/representative)
+    ; Alignment - axial (former world_alignment-0 / table_surface). The target rests on the support; the sampler installs a
+    ; vertical hinge through its centre of mass (TRO constraint, parent = support; an initialization rule, spec 6.10). It
+    ; starts yawed 20-70 deg off and is pushed at one end (right hand) while the other gripper braces the stop edge, until
+    ; its long axis is aligned with the support edges and its front faces the robot. Orientation-only target. Push ends and
+    ; stop edges come from contacts/<category>__<model>.json; the spawn scale from the customs list (roles.target.scale).
+
+    (:objects
+        magazine.n.02_1 - magazine.n.02
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop magazine.n.02_1 countertop.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (ontop ?magazine.n.02_1 ?countertop.n.01_1)
+            (pose_reached ?magazine.n.02_1)
+            (not (grasped ?agent.n.01_1 ?magazine.n.02_1))
+            (pose_settled ?magazine.n.02_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+)

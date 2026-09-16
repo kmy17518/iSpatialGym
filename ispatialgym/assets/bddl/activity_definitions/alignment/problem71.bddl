@@ -1,0 +1,34 @@
+(define (problem alignment-71)
+    (:domain ispatialgym)
+    (:alias alignment-axial-frying_pan_s070-conference_table)
+
+    ; ground_isg 2.0.0 2026-09-16: alignment-axial-frying_pan_s070-conference_table (alignment/axial.iddl; alignment-axial#08~T3/representative/fallback1:scale)
+    ; fallback 1 (scale) of alignment-axial-frying_pan-conference_table: scale = 0.7, scale_source = default_step
+    ; Alignment - axial (former world_alignment-0 / table_surface). The target rests on the support; the sampler installs a
+    ; vertical hinge through its centre of mass (TRO constraint, parent = support; an initialization rule, spec 6.10). It
+    ; starts yawed 20-70 deg off and is pushed at one end (right hand) while the other gripper braces the stop edge, until
+    ; its long axis is aligned with the support edges and its front faces the robot. Orientation-only target. Push ends and
+    ; stop edges come from contacts/<category>__<model>.json; the spawn scale from the customs list (roles.target.scale).
+
+    (:objects
+        frying_pan.n.01_1 - frying_pan.n.01
+        conference_table.n.01_1 - conference_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop frying_pan.n.01_1 conference_table.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (ontop ?frying_pan.n.01_1 ?conference_table.n.01_1)
+            (pose_reached ?frying_pan.n.01_1)
+            (not (grasped ?agent.n.01_1 ?frying_pan.n.01_1))
+            (pose_settled ?frying_pan.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+)

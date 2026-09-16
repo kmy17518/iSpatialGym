@@ -1,0 +1,40 @@
+(define (problem inter_object_relation_satisfaction-81)
+    (:domain ispatialgym)
+    (:alias inter_object_relation_satisfaction-under_small_scale-french_fries-platter-conference_table)
+
+    ; ground_isg 2.0.0 2026-09-16: inter_object_relation_satisfaction-under_small_scale-french_fries-platter-conference_table (inter_object_relation_satisfaction/under_small_scale.iddl; inter_object_relation_satisfaction-under_small_scale#01~T3/representative)
+    ; IORS - under (small-scale). Both objects on the support; the manipulated target (glass, teacup, fries, bottle) is set
+    ; down centred on the partner (coaster, saucer, platter, tray) so that the PARTNER ends under the target. Argument order
+    ; is therefore (under partner target). Both poses measured.
+
+    (:objects
+        french_fries.n.02_1 - french_fries.n.02
+        platter.n.01_1 - platter.n.01
+        conference_table.n.01_1 - conference_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop french_fries.n.02_1 conference_table.n.01_1)
+        (ontop platter.n.01_1 conference_table.n.01_1)
+        (not (under platter.n.01_1 french_fries.n.02_1))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (under ?platter.n.01_1 ?french_fries.n.02_1)
+            (not (grasped ?agent.n.01_1 ?french_fries.n.02_1))
+            (not (grasped ?agent.n.01_1 ?platter.n.01_1))
+            (pose_settled ?french_fries.n.02_1)
+            (pose_settled ?platter.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?french_fries.n.02_1)
+        (pose_reached ?platter.n.01_1)
+    )
+)
