@@ -105,8 +105,8 @@ timeout, carton 3002 s, ~250 s per trunk vs 60 s on an L40S); brace jobs then ra
 (4) Rounds 3–5 were bootstrapped from the GitHub `survey` branch (at `69e0ffe`, i.e. the **original** `reach_bands.py`
 of `644495e`: 4 pairs per round, no `--scale`, two world re-syncs per round) and were dispatched with `--no-sync`, so
 until 02:10 UTC they ran the original script: `--scale` jobs failed at argparse (re-queued), the others took 40–80 min
-and produced valid but pair-seed-less bands (15 kept, marked "original" in the table; `collect_bands.py` prefers a
-current-script result when both exist). Fixed by `--sync-only` + `--restart-runner --force`. (5) At 04:03 UTC the
+and produced valid but pair-seed-less bands (15; all recomputed with the committed script in round 7 — `collect_bands.py`
+prefers a current-script result when both exist). Fixed by `--sync-only` + `--restart-runner --force`. (5) At 04:03 UTC the
 account-wide `rp.py watchdog` (still running with its default `--cap 200`) terminated every pod of the account
 (`reason=cap`), including the round-6 pods mid-run; the last pull was at 03:56, so at most 3 finished jobs were lost
 (they are in the re-run set). Local runs (`scripts/reach_bands/run_local.sh`, shared RTX 4090, one process at a time,
