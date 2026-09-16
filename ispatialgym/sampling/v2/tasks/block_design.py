@@ -62,6 +62,7 @@ REGION_RADIUS = 0.20
 #: owner 2026-09-16 10:47 ladder: block regions 0.5–0.6 m ahead of the base first, the pitched 30° / 45° picks as the primary
 #: class for every block (straight down last), the pinch 1 mm above the table so the pads get more than ~1 cm of face
 REGION_DEPTH_PREFERRED = 0.55
+MAX_MANIP_TRANSLATE = 0.5  # manipulation trunks deeper than this put the tilted picks' pre-grasps out of reach (PICK_FAILURE 13:20)
 PICK_TILTS_DEG = (30.0, -30.0, 45.0, -45.0, 0.0)
 PICK_TIP_CLEARANCE = 0.001
 
@@ -159,6 +160,12 @@ class BlockDesign(SamplerV2):
                                                       bands=bands, top=self.top, erosion_extra=0.02 + self.edge, focus_z=self.top.z + 0.5 * self.edge)
                 if not cands:
                     raise Reject("no_manipulation_stance", "Phase 2 left no region survivor")
+                # PICK_FAILURE diagnostics (2026-09-16 13:20): every failing pick sat at translate 0.75–0.95 with the pre-grasp of a
+                # tilted pick out of reach (the grasp itself feasible), while the probe passes at (0.5, 0) / (0.75, −0.3):
+                # keep the shallow trunks when Phase 2 offers them
+                shallow = [c for c in cands if float(c.translate) <= MAX_MANIP_TRANSLATE]
+                if shallow:
+                    cands = shallow
                 self.edge_frame, self.init_stance, self.manip_candidates = edge, init, cands
                 break
             except Reject as e:
@@ -479,10 +486,11 @@ class BlockDesign(SamplerV2):
         cands: List[Tuple[str, float, float, float, int]] = []  # (face_pair, tilt_pick, tilt_place, yaw, flip_sign)
         if plan["flips"]:
             pair = plan["face_pair"]
-            for sign in (1, -1):
-                tilt_pick, tilt_place = TT.cube_tilt_pair(theta, sign)
-                for yaw in (table_yaw, table_yaw + math.pi / 2, table_yaw + math.pi, table_yaw - math.pi / 2):
-                    cands.append((pair, tilt_pick, tilt_place, yaw, sign))
+            for th_deg in (theta, 30.0, 60.0):  # §6.5 θ = 45 [pilot] first, the 30 / 60 alternatives widen the pick classes
+                for sign in (1, -1):
+                    tilt_pick, tilt_place = TT.cube_tilt_pair(th_deg, sign)
+                    for yaw in (table_yaw, table_yaw + math.pi / 2, table_yaw + math.pi, table_yaw - math.pi / 2):
+                        cands.append((pair, tilt_pick, tilt_place, yaw, sign))
         else:
             up = TT.up_face(pick_pose[1])
             pairs = [ax for ax in "xyz" if ax != up[1]]
