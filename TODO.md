@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 14:39 PDT — 6/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 15:10 PDT — 7/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -134,8 +134,8 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | CM articulation_open_large_scale | no instance | floor fixed (7 Phase-2 survivors/attempt); step 5: handle [pre, final] exact IK fails (pinch -1) x15, arm reaches j_link_2 only to fraction ≤ 0.11 from d 0.75–0.80 x8 → large-scale (stance distance / opening reach); no blacklist before the verdict (owner) | large-scale |
 | CM articulation_close_large_scale | no instance | same as open | large-scale |
 | alignment-world_vertical | demo run | transition passes now (d03b21d); brace: right wrist camera into the wall from the recorded side_high pose (wall ignored for the whole arm in the sampler's chain) → large-scale: keep the wall for the arm/wrist links, ignore it for the pads only / off-wall pre-contact | large-scale |
-| alignment-world_horizontal | no instance | same brace geometry; decorative_sign push_unreachable | large-scale |
-| alignment-axial | demo run (pre-fix success) | sweep-1 program check rejected push-only instances (core PROGRAM_BLOCKS still required the brace) → fixed 6c3d967, re-running | loop |
+| alignment-world_horizontal | demo run | same brace geometry; decorative_sign push_unreachable | large-scale |
+| alignment-axial | valid demo | sweep-1 program check rejected push-only instances (core PROGRAM_BLOCKS still required the brace) → fixed 6c3d967, re-running | loop |
 | IORS ontop_small_scale | valid demo | - | - |
 | IORS under_small_scale | demo run (pre-fix success) | french_fries: branch problem gone (witness reached, 3.1 mm) → ghost_hand at lift (grasp physics); teacup-saucer: placed_orientation → core release height (item C) then re-run | core |
 | IORS inside | demo run (pre-fix success) | sweep-1 regression: grasp_unreachable x6 'exact IK failed at pose 1 of 2' (the pre-grasp) after the 12:00–14:00 core changes (11:01 run sampled at attempt 0) → core to bisect | core |
