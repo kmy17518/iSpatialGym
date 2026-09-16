@@ -1,0 +1,132 @@
+{
+  "schema": "isg-oracle-v1",
+  "instance_id": "alignment-axial-paperback_book-breakfast_table__house_single_floor__target-paperback_book-jhaltj__push_only__0000",
+  "tro_sha256": "911628006d65c1b3054895b84f31c9d8a09e373d5a51a1baaf4c0ca013158e81",
+  "task_family": "alignment",
+  "alias": "alignment-axial-paperback_book-breakfast_table",
+  "path_bucket_m": null,
+  "stances": {
+    "init": {
+      "base_pose2d": [
+        7.3,
+        2.4545,
+        1.5708
+      ],
+      "translate": 0.5,
+      "tilt": 0.0,
+      "arms": "untucked",
+      "stand_off": 0.45,
+      "edge": "-v"
+    },
+    "manipulation": {
+      "base_pose2d": [
+        7.3,
+        2.5545,
+        1.5708
+      ],
+      "translate": 0.75,
+      "tilt": -0.5,
+      "stand_off": 0.35,
+      "lateral": 0.005,
+      "focus": [
+        7.3,
+        3.1245,
+        0.813
+      ],
+      "arms": [
+        "right",
+        "left"
+      ],
+      "edge": "-v",
+      "deviation_deg": 40.0
+    }
+  },
+  "transitions": [
+    {
+      "from": "init",
+      "to": "manipulation",
+      "stand_off": 0.55,
+      "order": [
+        "drive-back",
+        "trunk",
+        "drive-in"
+      ]
+    }
+  ],
+  "contacts": {
+    "push": {
+      "arm": "right",
+      "object": "paperback_book.n.01_1",
+      "pre": {
+        "position": [
+          7.3804,
+          3.192,
+          0.925
+        ],
+        "orientation": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "init": {
+        "position": [
+          7.3804,
+          3.192,
+          0.825
+        ],
+        "orientation": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "mid": {
+        "position": [
+          7.3987,
+          3.1604,
+          0.825
+        ],
+        "orientation": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "goal": {
+        "position": [
+          7.405,
+          3.1245,
+          0.825
+        ],
+        "orientation": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "direction": [
+        0.642788,
+        -0.766044,
+        0.0
+      ],
+      "distance_m": 0.073
+    }
+  },
+  "language": {
+    "objects": {
+      "paperback_book.n.01_1": {
+        "display_name": "paperback book",
+        "descriptor": "the paperback book"
+      }
+    },
+    "goal_numbers": {
+      "yaw_deg": 40.0
+    }
+  },
+  "waypoint_policy": "checked"
+}

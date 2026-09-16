@@ -820,6 +820,33 @@ def test_from_dict_rejects_structural_errors():
         Sidecar.from_dict(d)
 
 
+def test_axial_is_push_only_without_a_brace_record():
+    """Owner decision 2026-09-16 08:10: ``contacts.brace`` is optional for axial; without it the program is
+    transition → push → retreat (the oracle's push closure is the stop), with it the braced chain as before."""
+    assert "contacts.brace" not in REQUIRED_BLOCKS["alignment-axial"] and "contacts.push" in REQUIRED_BLOCKS["alignment-axial"]
+    with open(os.path.join(DATA, "variants", "alignment-axial__push_only.json")) as f:
+        d = json.load(f)
+    assert "brace" not in d["contacts"]
+    sc = Sidecar.from_dict(d)
+    assert sc.problems() == [] and sc.validate() is sc and not sc.has_block("contacts.brace")
+    actions = expand(sc.alias, sc)
+    assert [a.name for a in actions] == ["transition", "push", "retreat"]
+    assert [(a.name, a.arms, a.objects) for a in actions[1:]] == [
+        ("push", ("right",), ("paperback_book.n.01_1",)),
+        ("retreat", ("right",), ("paperback_book.n.01_1",)),
+    ]
+    assert actions[2].after is actions[1] and actions[2].release is False
+    # the same sidecar with the brace record keeps the braced chain
+    braced = load("alignment-axial")
+    assert [a.name for a in expand(braced.alias, braced)] == _TABLE_IN + _BRACE_PUSH
+    # a left-arm push-only record is still rejected (spec §6.10: the right gripper pushes)
+    d2 = copy.deepcopy(d)
+    d2["contacts"]["push"]["arm"] = "left"
+    problems = Sidecar.from_dict(d2).problems()
+    assert any("right gripper pushes" in p for p in problems), problems
+
+
+
 @pytest.mark.parametrize(
     "subtask,mutate,match",
     [

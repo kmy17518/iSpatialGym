@@ -301,16 +301,24 @@ def program_alignment_wall(sc: Sidecar, axis: str = "vertical") -> List[Action]:
 
 
 def program_alignment_axial(sc: Sidecar) -> List[Action]:
-    """init → manipulation stance → close both grippers → left gripper brace at the recorded stop edge → right gripper
-    push at the long-axis end along the arc to the aligned yaw → retreat both."""
-    push, brace = _push_contact(sc), _brace_contact(sc)
-    if push.arm != "right" or brace.arm != "left":
+    """init → manipulation stance → close the gripper(s) → [left gripper brace at the recorded stop edge, when the
+    sidecar records one] → right gripper push at the long-axis end along the arc to the aligned yaw → retreat.
+
+    Axial is **push-only** (owner decision 2026-09-16 08:10): the sampler records ``contacts.brace`` only when a joint
+    two-arm placement exists; without it the program is ``transition → push → retreat`` and the oracle's push closure
+    (hold at the goal, residual re-push) is the stop."""
+    push = _push_contact(sc)
+    brace = sc.contacts.brace if sc.contacts is not None else None
+    if push.arm != "right" or (brace is not None and brace.arm != "left"):
         raise SidecarError("alignment-axial: the right gripper pushes and the left gripper braces (spec §6.10)")
     if push.mid is None:
         raise SidecarError("contacts.push.mid: the axial push is an arc (δ/2 waypoint required)")
-    if push.object != brace.object:
+    if brace is not None and push.object != brace.object:
         raise SidecarError("contacts: push and brace must act on the same target")
     base_yaw = sc.stance("manipulation").base_pose2d[2]
+    if brace is None:
+        p = Push(contact=push, base_yaw=base_yaw)
+        return _travel(sc, "init", "manipulation") + [p, Retreat(arm=push.arm, object=push.object, after=p)]
     return _travel(sc, "init", "manipulation") + _brace_push_retreat(sc, brace, push, base_yaw)
 
 
