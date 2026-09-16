@@ -283,6 +283,7 @@ class Monitors:
         self.episode_steps = 0
         self.epilogue = False
         self.fov_active = False
+        self.forbidden: set = set()
         self._contact_streak: Counter = Counter()
         self._pause_streak = 0
         self._fov_streak: Counter = Counter()
@@ -292,10 +293,13 @@ class Monitors:
     # ------------------------------------------------------------------ lifecycle
 
     def begin_action(self, action, index: int, attempt: int, intended: Iterable[str] = (), held: Sequence[Any] = (), manipulation: Optional[bool] = None,
-                     fov: Optional[bool] = None) -> None:
+                     fov: Optional[bool] = None, forbidden: Iterable[str] = ()) -> None:
         """``intended``: scene object names the action may touch (its ``objects`` resolved to scene names);
         ``held``: scene objects currently in hand (their contacts are the robot's own); ``fov``: whether the
-        gripper-in-FOV monitor watches this action (default: every manipulation action except ``Retreat``)."""
+        gripper-in-FOV monitor watches this action (default: every manipulation action except ``Retreat``);
+        ``forbidden``: scene objects no link — the acting fingers included — and no held object may touch, whatever
+        the manipulation exemptions (the container of a ``Place(kind="drop")``: a bowl lifted by the opening fingers
+        or nudged by the held object is a ``collision``, never a silent success)."""
         self.action = action
         self.action_index = index
         self.attempt = attempt
@@ -311,6 +315,8 @@ class Monitors:
         self.manipulation = bool(manipulation)
         self.fov_active = bool(fov)
         self.intended = set(intended)
+        self.forbidden = set(forbidden)
+        self.intended -= self.forbidden
         self.held = list(held)
         self.exempt_links = set()
         if self.manipulation:
@@ -331,6 +337,7 @@ class Monitors:
         self.fov_active = False
         self.fov_enabled = True
         self.intended = set()
+        self.forbidden = set()
         self.exempt_links = set()
         self.held = []
         self.arms = ()
@@ -427,19 +434,21 @@ class Monitors:
         for own, other in self._contact_pairs():
             if any(other.startswith(p) for p in own_prefixes):
                 continue  # robot / held object against itself
+            name = self._object_of(other)
+            forbidden = name is not None and name in self.forbidden
             if own.startswith(robot_prefix):
                 own_link = own.rsplit("/", 1)[1]
             elif any(own.startswith(p) for p in held_prefixes):
-                if self.manipulation:
+                if self.manipulation and not forbidden:
                     continue  # a held object touching the world is what manipulation is (placing, pushing with it)
                 own_link = "held:" + own.rsplit("/", 1)[1]
             else:
                 continue  # not one of our bodies
-            name = self._object_of(other)
-            if name is None or name in self.intended:
-                continue
-            if own_link in self.exempt_links:
-                continue
+            if not forbidden:
+                if name is None or name in self.intended:
+                    continue
+                if own_link in self.exempt_links:
+                    continue
             seen[(own_link, name)] += 1
         for key in list(self._contact_streak):
             if key not in seen:

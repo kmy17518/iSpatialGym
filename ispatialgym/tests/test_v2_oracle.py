@@ -29,7 +29,7 @@ import torch as th
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle import execute as EX
 from ispatialgym.oracle import qa as QA
-from ispatialgym.oracle.actions import VOCABULARY, Navigate, Push, BaseFollow
+from ispatialgym.oracle.actions import VOCABULARY, Navigate, Push, BaseFollow, Place
 from ispatialgym.oracle.executor import AGENT_INSTANCE, Executor, ExecutorConfig, SimState, apply_goal_override
 from ispatialgym.oracle.motions import Motions, MotionsConfig, SkillError, as_world_pose
 from ispatialgym.oracle.programs import expand
@@ -1219,6 +1219,68 @@ def test_intended_contacts_and_finger_links_are_exempt(tmp_path):
     result = ex.run_program(expand(sc.alias, sc))
     assert result["success"], result["verdict"]
     assert result["qa"]["stats"]["by_category"] == {} and seen["manip"] > 0
+
+
+def inside_world():
+    """The IORS inside test sidecar as a fake world: robot at the init stance, sprout on the table, bowl at the drop."""
+    sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-inside.json"))
+    init = sc.stance("init")
+    robot = FakeRobot(base=tuple(init.base_pose2d))
+    g = sc.grasps[0]
+    sprout = FakeObject("brussels_sprouts_mbkrxe_0", [g.grasp.position[0], g.grasp.position[1], g.grasp.position[2] - 0.03], category="brussels_sprouts", extent=(0.04, 0.04, 0.04))
+    bowl = FakeObject("bowl_belcml_0", [g.place.position[0], g.place.position[1], g.place.position[2] - 0.12], category="bowl", extent=(0.2, 0.2, 0.08))
+    objects = {"brussels_sprouts.n.01_1": sprout, "bowl.n.01_1": bowl}
+    env = FakeEnv(robot, objects)
+    return sc, env
+
+
+def test_drop_place_forbids_any_contact_with_the_container(tmp_path):
+    """Owner decision 2026-09-16 (IORS inside): the drop releases at the recorded place pose above the rim; the
+    container is not an intended contact — a finger (exempt link during manipulation) or the held object touching
+    the bowl is a ``collision`` verdict, never a silent success; a support place keeps the partner intended."""
+    sc, env = inside_world()
+    actions = expand(sc.alias, sc)
+    place = [a for a in actions if isinstance(a, Place)][0]
+    assert place.kind == "drop" and place.on == "bowl.n.01_1"
+    assert EX.intended_contacts(place) == ("brussels_sprouts.n.01_1",) and EX.forbidden_contacts(place) == ("bowl.n.01_1",)
+    support = Place(kind="support", arm="right", object="a.n.01_1", place=place.place, on="b.n.01_1")
+    assert EX.intended_contacts(support) == ("a.n.01_1", "b.n.01_1") and EX.forbidden_contacts(support) == ()
+    # (a) the opening fingers touch the bowl during the drop -> collision (the finger exemption does not apply)
+    sprout, bowl = env.objects["brussels_sprouts.n.01_1"], env.objects["bowl.n.01_1"]
+    env.evaluate = success_eval("brussels_sprouts.n.01_1", [float(v) for v in place.place.position], tol=0.15)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path, qa_cfg=QA.QAConfig(pause_steps=100000, fov_min_steps=100000, collision_min_steps=2))
+
+    def fingers_on_bowl(step, query):
+        if ex.monitors.action is not None and ex.monitors.action.name == "place":
+            return [(f"{env.robot.prim_path}/right_gripper_finger_link1", f"{bowl.prim_path}/base_link")]
+        return []
+
+    ex.monitors._contact_api = FakeContacts(fingers_on_bowl)
+    result = ex.run_program(actions)
+    assert result["reason"] == "collision" and result["verdict"]["details"]["object"] == bowl.name and result["verdict"]["action"] == "place"
+    # (b) the held sprout brushing the bowl on the way down is a collision too (held-object contacts with the
+    # forbidden container are judged even during manipulation)
+    sc, env = inside_world()
+    sprout, bowl = env.objects["brussels_sprouts.n.01_1"], env.objects["bowl.n.01_1"]
+    env.evaluate = success_eval("brussels_sprouts.n.01_1", [float(v) for v in place.place.position], tol=0.15)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path / "b", qa_cfg=QA.QAConfig(pause_steps=100000, fov_min_steps=100000, collision_min_steps=2))
+
+    def held_on_bowl(step, query):
+        if ex.monitors.action is not None and ex.monitors.action.name == "place" and env.robot._ag_obj_in_hand["right"] is sprout:
+            return [(f"{sprout.prim_path}/base_link", f"{bowl.prim_path}/base_link")]
+        return []
+
+    ex.monitors._contact_api = FakeContacts(held_on_bowl)
+    result = ex.run_program(actions)
+    assert result["reason"] == "collision" and result["verdict"]["details"]["link"] == "held:base_link"
+    # (c) without contacts the drop succeeds: release at the recorded pose, retreat along -a, no settle-on-support check
+    sc, env = inside_world()
+    env.evaluate = success_eval("brussels_sprouts.n.01_1", [float(v) for v in place.place.position], tol=0.15)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path / "c")
+    result = ex.run_program(actions)
+    assert result["success"], result["verdict"]
+    rec_place = result["actions"][[a.name for a in actions].index("place")]
+    assert rec_place["attempts"] == [None] and "object_speed" not in rec_place["notes"]
 
 
 def test_targets_failed_and_error_categories(tmp_path):

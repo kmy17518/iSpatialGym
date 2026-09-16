@@ -108,8 +108,9 @@ class ExecuteConfig:
     moved_rot: float = 0.02
     #: a placed object counts as settled below this linear speed (m/s)
     object_settle_vel: float = 0.05
-    #: settle windows after a place / base-follow (steps)
+    #: settle windows after a place / base-follow (steps); a drop holds this long for the object to come to rest
     place_settle_steps: int = 60
+    drop_settle_steps: int = 30
     follow_settle_steps: int = 45
     set_torso_settle_steps: int = 45
     #: push closure (owner rule 2026-09-16, execution accuracy): after the recorded arc / line the pad holds in contact
@@ -368,14 +369,32 @@ def _release(motions: Motions, state, arm: str) -> None:
     motions.backend.detach_object(arm)
 
 
+def intended_contacts(action: Action) -> Tuple[str, ...]:
+    """The bddl instances an action may touch (the QA collision whitelist): its ``objects``, except that a
+    ``Place(kind="drop")`` must not touch its container (owner decision 2026-09-16: release above the rim)."""
+    objs = tuple(getattr(action, "objects", ()) or ())
+    if isinstance(action, Place) and action.kind == "drop" and action.on:
+        return tuple(o for o in objs if o != action.on)
+    return objs
+
+
+def forbidden_contacts(action: Action) -> Tuple[str, ...]:
+    """Instances no robot link — fingers included — and no held object may touch during the action, whatever the
+    per-link exemptions: the container of a drop (a bowl lifted by the opening fingers is a ``collision``)."""
+    if isinstance(action, Place) and action.kind == "drop" and action.on:
+        return (action.on,)
+    return ()
+
+
 def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     cfg = _cfg(ctx)
     arm = action.arm
+    drop = action.kind == "drop"
     _hook(ctx, "fov")(False)  # the transit to the pre-place (10 cm back along a tilted approach) may leave the margin
     yield from motions.arm_to(arm, pose=targets["pre_place"], q_hint=_witness(ctx, "pre_place"))
     _hook(ctx, "fov")(True)  # the descent ends at the recorded (in-frame) place pose
     on = []
-    if getattr(action, "on", None):
+    if getattr(action, "on", None) and not drop:  # a drop keeps its container in the collision world: it must not be touched
         try:
             on = [state.object(action.on)] + list(getattr(state, "touching", lambda name: [])(action.on))
         except KeyError:
@@ -384,11 +403,17 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     yield from motions.arm_along(arm, targets["descent"], finish=finish)
     if finish.used:
         ctx["descent_finish"] = finish.info
+    # open at the recorded place pose: a drop releases right there (above the rim, no contact with the container), a
+    # support place sets the object down
     yield from motions.gripper(arm, close=False)
     _release(motions, state, arm)
     _hook(ctx, "fov")(False)  # the retreat leg is the same as a Retreat action: exempt
+    # retreat straight back along -a (up for a top-down pose) before any lateral motion
     yield from motions.arm_along(arm, targets["retreat"])
-    yield from motions.settle(max_steps=cfg.place_settle_steps)
+    if drop:
+        yield from motions.hold(cfg.drop_settle_steps)  # the object falls and comes to rest in the container
+    else:
+        yield from motions.settle(max_steps=cfg.place_settle_steps)
 
 
 def post_place(action: Place, state, targets, ctx) -> Optional[str]:
@@ -730,5 +755,6 @@ def coverage() -> Dict[str, bool]:
 __all__ = [
     "PrivilegedState", "ExecuteConfig", "CONFIG", "EXECUTORS", "MANIPULATION_ACTIONS", "FOV_EXEMPT_ACTIONS", "executor_for",
     "is_manipulation", "fov_monitored", "run_action", "check_postcondition", "coverage", "camera_goal", "joint_tolerance",
-    "idle_arm_targets", "move_idle_arms", "posture_q", "IDLE_POSTURES", "IDLE_ARM_TOL",
+    "idle_arm_targets", "move_idle_arms", "posture_q", "IDLE_POSTURES", "IDLE_ARM_TOL", "intended_contacts", "forbidden_contacts",
+    "push_geometry", "push_residual", "extend_push", "push_tangent", "PushGeometry",
 ]
