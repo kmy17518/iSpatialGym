@@ -536,13 +536,17 @@ class Executor:
         return self.epilogue(verdict, n_action_steps)
 
     def run_stream(self, actions: Iterable[th.Tensor], phase: int = PHASE_ORACLE) -> Dict[str, Any]:
-        """Replay / policy modes: step a stream of 23-D actions (no checkpoints, no program), then the epilogue."""
+        """Replay / policy modes: step a stream of 23-D actions (no checkpoints, no program), then the epilogue. The
+        epilogue's no-op window repeats the **last streamed action** with the base stopped (the Layer-1 hold targets
+        are not updated by a stream; holding them would drive the robot back to its initial configuration)."""
         t0 = time.time()
         verdict: Optional[Verdict] = None
         if self.monitors is not None:
             self.monitors.begin_action(_StreamAction(), 0, 0, intended=(), held=self.state.held_objects(), manipulation=False)
         try:
             for a in actions:
+                a = th.as_tensor(a, dtype=th.float32).reshape(-1)
+                self._last_stream_action = a.clone()
                 verdict = self.step(a, phase, 0, 0)
                 if verdict is not None:
                     break
@@ -554,6 +558,21 @@ class Executor:
         self.timings["actions_s"] = time.time() - t0
         return self.epilogue(verdict, self.n)
 
+    def _noop_actions(self, steps: int) -> Iterator[th.Tensor]:
+        """The epilogue's no-op: the Layer-1 hold (program mode) or the last streamed action with the base stopped."""
+        last = getattr(self, "_last_stream_action", None)
+        if last is not None:
+            hold = last.clone()
+            idx = getattr(self.robot, "controller_action_idx", {}).get("base")
+            if idx is not None:
+                hold[idx] = 0.0
+            for _ in range(int(steps)):
+                yield hold.clone()
+        elif self.motions is not None:
+            yield from self.motions.hold(steps)
+        else:
+            yield from _hold_actions(self.robot, steps)
+
     # ------------------------------------------------------------------ epilogue (§3.8 / §6.2)
 
     def epilogue(self, verdict: Optional[Verdict], n_action_steps: int) -> Dict[str, Any]:
@@ -564,8 +583,7 @@ class Executor:
         before = MotionSnapshot(self.robot, self.tracked)
         settle_verdict = None
         if verdict is None or verdict.category != "timeout":
-            gen = self.motions.hold(window) if self.motions is not None else _hold_actions(self.robot, window)
-            settle_verdict = self.run_generator(gen, PHASE_SETTLE)
+            settle_verdict = self.run_generator(self._noop_actions(window), PHASE_SETTLE)
             if self.recorder is not None:
                 self.recorder.commit()
         after = MotionSnapshot(self.robot, self.tracked)

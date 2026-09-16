@@ -872,6 +872,32 @@ def test_epilogue_ordering_not_reached_tolerance_settled_goal_image(tmp_path):
     assert go["intrinsics"]["fx"] == pytest.approx(459.0, abs=1.0)
 
 
+def test_replay_stream_holds_the_last_streamed_configuration(tmp_path):
+    """Replay / policy mode: the epilogue's no-op window must repeat the last streamed action (base stopped), not the
+    Layer-1 hold targets captured at construction (which would drive the robot back to its initial pose)."""
+    sc, env = iors_world()
+    env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path)
+    # record the oracle program's actions, then replay them through a fresh executor on a fresh world
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["success"]
+    actions = [np.asarray(a) for a in rec.rows["action"][: result["n_action_steps"]]]
+    sc2, env2 = iors_world()
+    env2.evaluate = success_eval("apple.n.01_1", _place_goal(sc2), tol=0.08)
+    ex2, motions2, *_ = make_executor(env2, sc2, tmp_path / "replay")
+    q_init = env2.robot.q.clone()
+    result2 = ex2.run_stream(th.as_tensor(a) for a in actions)
+    assert result2["success"], result2["verdict"]
+    assert result2["n_action_steps"] == len(actions) and result2["n_settle_steps"] == max(50, math.ceil(0.2 * len(actions)))
+    # the arm stayed where the stream left it (the initial hold targets were not re-applied)
+    last = th.as_tensor(actions[-1])
+    idx = env2.robot.controller_action_idx
+    assert th.allclose(env2.robot.q[env2.robot.arm_control_idx["right"]], last[idx["arm_right"]], atol=1e-5)
+    assert not th.allclose(env2.robot.q[env2.robot.arm_control_idx["right"]], q_init[env2.robot.arm_control_idx["right"]], atol=1e-3)
+    assert th.equal(env2.last_action[idx["base"]], th.zeros(3))
+    assert result2["qa"]["stats"]["by_category"] == {}
+
+
 def test_checkpoint_restore_fixes_a_broken_ag_roundtrip(tmp_path):
     sc, env = iors_world(ag_roundtrip=False)
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
