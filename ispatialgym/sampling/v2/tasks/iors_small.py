@@ -90,6 +90,8 @@ PARTNER_MAX_ASPECT = 2.5
 RELEASE_CLEARANCE = 0.02
 #: ontop / under (owner item 3): the object is released this far above the actual surface under its footprint centre
 RELEASE_ABOVE_SURFACE = 0.01
+#: a target that rolled more than this while settling gets its grasp re-selected at the settled pose
+REGRASP_AFTER_ROLL_DEG = 10.0
 #: touching brace (axial stop-brace rule): the pads' / blade's outer face this far outside the partner's far face, and the
 #: partner height below which the top-down blade is tried before the pad contacts
 STOP_CLEARANCE = 0.005
@@ -331,6 +333,7 @@ class IORSSmall(SamplerV2):
                                   "manipulation_stance": manip.to_meta(), "pair": self.pair})
                 d.pose_targets[pname] = self._pose_target("partner", p_pose)
                 d.pose_targets[tname] = self._pose_target("target", t_pose)
+                d.summary["target_draft_pose"] = [[float(v) for v in t_pose[0]], [float(v) for v in t_pose[1]]]
                 self.sidecar.describe(tname, self.choice.models["target"].category.replace("_", " "))
                 self.sidecar.describe(pname, self.choice.models["partner"].category.replace("_", " "))
                 return d
@@ -602,9 +605,20 @@ class IORSSmall(SamplerV2):
             grasp.grasp = IK.grasp_pose(draft.object_poses[tname], grasp.eef_in_object)
             grasp.pre_grasp = IK.pre_pose(grasp.grasp)
             manip = self.sidecar.stance("manipulation")
+            settled = self.settle_motion(draft, tname)
+            draft.summary["target_settle"] = settled
             res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, ignore_for_last=self.support_objects(),
                                  scale_key=self.choice.models["target"].scale, cache=False, approached=[self.obj("target")])
-            if not res.ok:
+            ok = res.ok
+            if not ok and settled.get("rotation_deg", 0.0) > float(self.gen("regrasp_after_roll_deg", REGRASP_AFTER_ROLL_DEG)):
+                # a round target rolled while settling: its library grasp now faces the wrong way; re-select among the
+                # library grasps at the settled pose from the same stance (what the oracle would have to grasp anyway)
+                chosen = self.reselect_grasp(draft, grasp, manip, tname)
+                if chosen is not None:
+                    log.info("%s: target rolled %.0f deg while settling; grasp re-selected at the settled pose: %s", self.gp.alias, settled["rotation_deg"], chosen)
+                    draft.summary["grasp"] = {"key": grasp.grasp_key, "name": grasp.grasp_name, "yaw": grasp.yaw, "reselected_after_roll": True}
+                    ok = True
+            if not ok:
                 # diagnostics (inside regression 2026-09-16 14:29: the pre-grasp failed 6/8 at the settled pose): the pre
                 # alone, with the partner removed, with every spawned object removed, and how far the target settled
                 def _ok(r):
@@ -617,7 +631,40 @@ class IORSSmall(SamplerV2):
                 moved = float(th.linalg.norm(G.t(draft.object_poses[tname][0]) - G.t(draft.pose_targets[tname]["position"])))
                 raise Reject(res.code or "grasp_unreachable", f"pre-grasp / grasp at the settled target pose fail the exact IK ({res.reason}; pre alone {_ok(r_pre)}, "
                                                                 f"pre with the partner removed {_ok(r_pre_np)}, pre with every object removed {_ok(r_pre_all)}; target settled "
-                                                                f"{moved * 1000:.1f} mm from its draft; trunk ({manip.translate}, {manip.tilt:.2f}), grasp {grasp.grasp_name} yaw {grasp.yaw:.2f})")
+                                                                f"{settled.get('translation_mm', float('nan')):.1f} mm / {settled.get('rotation_deg', float('nan')):.0f} deg from its draft "
+                                                                f"(goal {moved * 1000:.0f} mm away); trunk ({manip.translate}, {manip.tilt:.2f}), grasp {grasp.grasp_name} yaw {grasp.yaw:.2f})")
+
+    def settle_motion(self, draft: Draft, tname: str) -> Dict[str, float]:
+        """Translation (mm) and rotation (deg) of the target between its drafted pose (``summary.target_draft_pose``) and
+        its settled pose — a round target may roll while settling, which turns its library grasp away."""
+        d = draft.summary.get("target_draft_pose")
+        if not d:
+            return {}
+        p0, q0 = th.tensor(d[0]), th.tensor(d[1])
+        p1, q1 = G.t(draft.object_poses[tname][0]), G.t(draft.object_poses[tname][1])
+        return {"translation_mm": round(float(th.linalg.norm(p1 - p0)) * 1000, 1), "rotation_deg": round(math.degrees(G.quat_angle(q0, q1)), 1)}
+
+    def reselect_grasp(self, draft: Draft, grasp: GraspRecord, manip: Stance, tname: str) -> Optional[str]:
+        """Try the library grasps (``self.grasps``, already filtered for attachability) at the *settled* target pose from
+        the manipulation stance — pre-grasp + grasp exactly, support removed for the grasp, the target removed along the
+        approach — and rewrite the grasp record with the first that passes. Returns its name or None."""
+        t_pose = draft.object_poses[tname]
+        for g in self.grasps:
+            eef_in_object = getattr(g, "pose", None)
+            if eef_in_object is None:
+                continue
+            eef = IK.grasp_pose(t_pose, eef_in_object)
+            pre = IK.pre_pose(eef)
+            res = self.ikc.exact([pre, eef], manip, grasp.arm, ignore_for_last=self.support_objects(), scale_key=self.choice.models["target"].scale,
+                                 cache=False, approached=[self.obj("target")])
+            if not res.ok:
+                continue
+            grasp.grasp_key, grasp.grasp_name = getattr(g, "key", grasp.grasp_key), getattr(g, "name", grasp.grasp_name)
+            grasp.finger_q = list(getattr(g, "finger_q", []) or []) or None
+            grasp.eef_in_object = eef_in_object
+            grasp.grasp, grasp.pre_grasp = eef, pre
+            return str(grasp.grasp_name)
+        return None
 
     def refine_targets_from_goal(self, draft: Draft):
         tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
