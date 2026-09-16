@@ -4,7 +4,8 @@ Everything here resumes without recomputation: the manifests and progress ledger
 
 ## Sampling chunks (wave A, `wave_a/jobs_coverage.json` + `wave_a/jobs_rest.json`)
 - Running at the pause (let finish, results pulled by the C2 pull): see `paused_queues_0700.json` (`running` per pod).
-- Queued and moved aside on the pods (`/root/samp/queue_paused/`): `rest_009__disembedding` (pod `oliefq3ymuexna`).
+- Queued and moved aside on the pods (`/root/samp/queue_paused/`): `rest_009__disembedding` (was on pod `oliefq3ymuexna`, now a pool pod; the chunk file stays under `/root/samp/queue_paused/` there and in `wave_a/jobs_rest.json`).
+- 11:15 PDT: no pod keeps the sampling role (all wave-A chunks finished; `pods_samp.txt` empty). Resume = re-dispatch from the manifests to whichever pods get the role back.
 - Not yet dispatched: none of wave A (all 23 chunks were dispatched; 21 finished or running at 07:00).
 - Resume rule: regenerate the ledger (`scripts/isg/pilot_ledger.py --manifest jobs_sample.json,wave_a/jobs_coverage.json,wave_a/jobs_rest.json`),
   then `scripts/isg/pilot_jobs.py chunks --progress progress.json` (complete aliases excluded) for the coverage wave, then the rest.
