@@ -816,6 +816,61 @@ class ArticulationLarge(SamplerV2):
             self.pose_joint(q_now)
         return reach
 
+    def debug_handle_ik(self, manip: Stance, contact: P0.ContactSpec) -> None:
+        """Diagnostic log when the handle's [pre-grasp, grasp] fails the exact IK from a Phase-2 survivor: the verdict of
+        the grasp pose alone (target ignored), of the pre-grasp alone, of the grasp with every collision object ignored
+        (pure kinematics) and of the other arm; the pad point in base coordinates and the reach-volume verdict."""
+        try:
+            obj = self.target
+            others = [o for o in self.world.scene.objects if o.name in self.world.scene_object_names] if hasattr(self.world, "scene_object_names") else []
+            pre = contact.pre_pose()
+            r_g = self.ikc.exact([contact.pose], manip, self.arm, ignore_for_last=[obj], cache=False)
+            r_p = self.ikc.exact([pre], manip, self.arm, cache=False)
+            with self.ikc.ignoring(others):
+                r_free = self.ikc.exact([contact.pose], manip, self.arm, cache=False)
+            other = "left" if self.arm == "right" else "right"
+            r_o = self.ikc.exact([pre, contact.pose], manip, other, ignore_for_last=[obj], cache=False)
+            p_base = P0.to_base_frame(C.pad_center(contact.pose), manip.base_pose2d, P0.base_z(self))
+            rv_ok = contact.volume_ok(P0.reach_volume(), manip, P0.base_z(self))
+            culprits = self._penetrating_objects(r_free.q, [obj]) if (r_free.ok and r_free.q is not None and not r_g.ok) else None
+            log.info("%s: handle IK debug at %s (arm %s, pinch %+.0f): grasp alone %s, pre alone %s, grasp without the world %s, other arm [pre, grasp] %s; "
+                     "pad in base %s, classes %s, volume %s; the world-free solution penetrates %s", self.gp.alias, self._stance_key(manip), self.arm, self.pinch_sign,
+                     r_g.ok, r_p.ok, r_free.ok, r_o.ok, [round(float(v), 3) for v in p_base.tolist()], list(contact.classes or ()), rv_ok, culprits)
+        except Exception as e:  # noqa: BLE001 — diagnostics never fail the attempt
+            log.info("%s: handle IK debug failed: %s", self.gp.alias, e)
+
+    def _penetrating_objects(self, q: th.Tensor, ignore: Sequence[Any]) -> Dict[str, Any]:
+        """Diagnostic: the robot spheres of configuration ``q`` that penetrate the collision world (``ignore`` removed)
+        and the scene objects whose AABB (inflated 5 cm) contains them — which object blocks a kinematically feasible
+        grasp."""
+        from curobo._src.geom.collision.buffer_collision import CollisionBuffer
+        from curobo._src.robot.kinematics.kinematics_state import KinematicsState
+
+        be = self.kit.backend
+        entry = be.kin_entry("whole_body")
+        dev = be.device_cfg.device
+        with self.ikc.ignoring(list(ignore)):
+            self.kit._ensure_synced()
+            js = be._active_js(entry, q.unsqueeze(0))
+            state = entry.fk.compute_kinematics(js)
+            spheres = state.robot_spheres.reshape(1, 1, -1, 4).contiguous()
+            buf = CollisionBuffer.from_shape(spheres.shape, be.device_cfg)
+            w = th.ones(1, device=dev)
+            d0 = be.checker.get_sphere_collision(KinematicsState(robot_spheres=spheres), buf, w, th.full((1,), float(P0.COLLISION_MARGIN), device=dev)).reshape(-1)
+        sp = spheres.reshape(-1, 4).cpu()
+        rp = be.root_pose()[0].cpu()
+        bad = (d0 > 0).nonzero().flatten().tolist()
+        pts = [sp[i, :3] + rp[:3] for i in bad]
+        hits: Dict[str, int] = {}
+        for p in pts:
+            for o in self.world.scene.objects:
+                if o in ignore or o is self.robot:
+                    continue
+                lo, hi = o.aabb
+                if bool((p >= lo.float() - 0.05).all() and (p <= hi.float() + 0.05).all()):
+                    hits[o.name] = hits.get(o.name, 0) + 1
+        return {"n_penetrating": len(bad), "points": [[round(float(v), 2) for v in p.tolist()] for p in pts[:4]], "objects": dict(sorted(hits.items(), key=lambda kv: -kv[1])[:5])}
+
     def holds_passively(self, q: float) -> bool:
         """A single stable-set probe (§5.3): ``q`` held ``stable_hold_steps`` steps stays within ½ probe tolerance."""
         if any(abs(q - s) <= 1e-6 for s in self.stable):
@@ -841,6 +896,7 @@ class ArticulationLarge(SamplerV2):
         obj = self.target
         sol = P0.exact_contacts(self, manip, [contact], ignore_combined=[obj])
         if not sol.ok:
+            self.debug_handle_ik(manip, contact)
             raise Reject("handle_unreachable", sol.reason)
         q_reach = self.arm_reach_limit(manip, self.lower, sol.q)
         span = max(self.upper - self.lower, 1e-9)

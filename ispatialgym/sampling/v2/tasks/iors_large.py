@@ -458,6 +458,12 @@ class IORSLarge(SamplerV2):
         try:
             rb = RB.ReachBands.load(self.world.scene_model, support, obj, self.grasp_key, under=under, scale=c.scale)
             log.info("%s: reach band %s (%s) from %s", self.gp.alias, support, under or "-", rb.path)
+            # a band computed before the A6 posture retry can be empty (every trunk stance collided with the untucked
+            # arms: the fleet's floor-under bands of the beds) — an empty band is a miss, recomputed with the current script
+            if int(rb.meta.get("n_reachable_total", 1) or 0) == 0 and os.environ.get("ISG_REACH_BANDS_COMPUTE", "1") != "0":
+                log.info("%s: cached reach band %s (%s) is empty (computed with %s arms, no A6 retry): recomputing in-process", self.gp.alias, support, under or "-",
+                         rb.meta.get("arms"))
+                raise FileNotFoundError("empty band")
         except FileNotFoundError:
             if os.environ.get("ISG_REACH_BANDS_COMPUTE", "1") == "0":
                 raise Reject("missing_band", f"no reach band for scene={self.world.scene_model} support={support} object={obj} under={under} scale={c.scale}")
@@ -643,16 +649,29 @@ class IORSLarge(SamplerV2):
         near_c = th.tensor([float(plo[0] + phi[0]) / 2, float(plo[1] + phi[1]) / 2])
         pts = pts[th.linalg.norm(pts - near_c, dim=1) <= max_geo + 1.5]
         anchors = []
+        stats = {"grid": int(len(pts)), "trav_free": 0, "in_rooms": 0, "outside_partner": 0, "outside_objects": 0}
+        blockers: Dict[str, int] = {}
         for p in pts:
-            if not self.kit.trav_free(p) or not P0.in_task_rooms(self, p):
+            if not self.kit.trav_free(p):
                 continue
+            stats["trav_free"] += 1
+            if not P0.in_task_rooms(self, p):
+                continue
+            stats["in_rooms"] += 1
             if bool((p >= plo[:2].float() - half).all() and (p <= phi[:2].float() + half).all()):
                 continue  # inside the partner footprint (the goal must be false at init)
-            if any(bool((p >= a).all() and (p <= b).all()) for a, b in aabbs):
+            stats["outside_partner"] += 1
+            hit = [o.name for o, (a, b) in zip(objs, aabbs) if bool((p >= a).all() and (p <= b).all())]
+            if hit:
+                blockers[hit[0]] = blockers.get(hit[0], 0) + 1
                 continue
+            stats["outside_objects"] += 1
             anchors.append(p)
+        self.template_facts["floor_cells"] = {**stats, "blockers": dict(sorted(blockers.items(), key=lambda kv: -kv[1])[:6]), "floor": floor.name,
+                                              "floor_aabb": [lo[:2].tolist(), hi[:2].tolist()]}
         if not anchors:
-            raise Reject("no_floor_cell", "no free floor cell beside the partner")
+            raise Reject("no_floor_cell", f"no free floor cell beside the partner ({stats}; blocking AABBs {dict(sorted(blockers.items(), key=lambda kv: -kv[1])[:4])}; "
+                                          f"floor {floor.name} aabb {[round(float(v), 2) for v in lo[:2].tolist()]}..{[round(float(v), 2) for v in hi[:2].tolist()]})")
         anchors = th.stack(anchors)
         order = rng.permutation(len(anchors))
         errors = []
@@ -770,31 +789,41 @@ class IORSLarge(SamplerV2):
         laterals = P0.lattice_values(-half_run, half_run, 0.10) if half_run > 0 else [0.0]
         init_xy = th.as_tensor([float(init_xy[0]), float(init_xy[1])])
         goal_cells = self.place["cells"]
+        stats: Dict[str, int] = {"goal_cells": int(len(goal_cells)), "band_trunks": len(trunks), "lattice": 0, "base_ok": 0, "band_cells": 0, "goal_in_band": 0}
         cands: List[Stance] = []
         for so in [float(v) for v in (self.gp.gen("stand_offs_m") or STAND_OFFS)]:
             for lat in laterals:
                 xy = edge.base_xy(so, lat)
+                stats["lattice"] += len(trunks)
                 if not P0.base_ok(self, xy):
                     continue
+                stats["base_ok"] += len(trunks)
                 for tr, ti in trunks:
                     st = Stance("placement", (float(xy[0]), float(xy[1]), edge.yaw), tr, ti, so, edge, None, lat, None, ["right"])
                     cells = self.band_cells_world(rb, st)
                     if rb is not None and len(cells) == 0:
                         continue
+                    stats["band_cells"] += 1
                     pool = goal_cells if rb is None else self._snap(cells, goal_cells, float(rb.meta.get("lattice", RB.LATTICE)))
                     if len(pool) == 0:
                         continue
+                    stats["goal_in_band"] += 1
                     gc = pool[int(th.argmin(th.linalg.norm(pool - init_xy, dim=1)))]
                     st.extras["goal_cell"] = [float(gc[0]), float(gc[1])]
                     cands.append(st)
+        self.template_facts["placement_stats"] = stats
         if not cands:
+            log.info("%s: stance C at %s edge %s: no candidate (%s)", self.gp.alias, partner.name, edge.name, stats)
             return []
         free = P0.body_free(self, cands)
         cands = [st for st, f in zip(cands, free.tolist()) if f]
+        stats["collision_free"] = len(cands)
         if not cands:
+            log.info("%s: stance C at %s edge %s: every candidate collides (%s)", self.gp.alias, partner.name, edge.name, stats)
             return []
         cams = P0.camera_poses(self, cands)
         lo, hi = partner.aabb
+        tangent = th.tensor([-float(edge.inward[1]), float(edge.inward[0])])
         classed = []
         for st, cam in zip(cands, cams):
             gc = st.extras["goal_cell"]
@@ -805,11 +834,17 @@ class IORSLarge(SamplerV2):
                 focus = th.tensor([gc[0], gc[1], self.place["z"] + self.place["height"] / 2])
                 k = P0.angle_class(P0.axis_angle(self, cam, focus))
             else:
-                # the near edge's two bottom AABB corners in frame; the optical axis within 20° of the (hidden) goal cell
+                # the near edge's bottom line where the target passes under it — the two bottom points of the edge at the
+                # goal cell's lateral position ± (half extent + 0.10) — in frame; the optical axis within 20° of the
+                # (hidden) goal cell. (The spec's "two bottom AABB corners" lie ±1 m to the sides of a bed / sofa edge, 65°
+                # off the optical axis at s = 0.45 m — outside the 99° hfov for every stance; wording change proposed.)
                 corners = G.aabb_corners(lo.float(), hi.float())
                 bottom = corners[corners[:, 2] <= float(lo[2]) + 1e-4]
                 d = (bottom[:, :2] - edge.mid) @ edge.inward
-                near = bottom[d.abs() <= float(d.abs().min()) + 0.02]
+                near_line = bottom[d.abs() <= float(d.abs().min()) + 0.02]
+                on_line = near_line[:, :2].mean(dim=0) + tangent * float(th.dot(th.tensor([gc[0], gc[1]]) - near_line[:, :2].mean(dim=0), tangent))
+                span = half + 0.10
+                near = th.stack([th.cat([on_line - tangent * span, lo[2:3].float()]), th.cat([on_line + tangent * span, lo[2:3].float()])])
                 if not P0.in_frame(self, cam, near):
                     continue
                 focus = th.tensor([gc[0], gc[1], self.floor_z + self.place["height"] / 2])
@@ -820,7 +855,10 @@ class IORSLarge(SamplerV2):
             st.focus = focus
             st.extras["angle_class"] = k
             classed.append((st, k))
-        return P0.best_class(classed)
+        stats["visible"] = len(classed)
+        out = P0.best_class(classed)
+        log.info("%s: stance C at %s edge %s: %d survivors (%s)", self.gp.alias, partner.name, edge.name, len(out), stats)
+        return out
 
     @staticmethod
     def _snap(band_world: th.Tensor, goal_cells: th.Tensor, lattice: float) -> th.Tensor:

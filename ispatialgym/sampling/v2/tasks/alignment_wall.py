@@ -745,9 +745,14 @@ class AlignmentWall(SamplerV2):
             if not r_pre_b.ok:
                 why.append(f"{b['kind']}: brace pre-contact")
                 continue
-            res = self.ikc.exact([b["pose"]], manip, brace_arm, ignore_for_last=wall, q_seed=q0, cache=False)
+            # the oracle's Brace approaches along the straight segment pre → contact (``line_waypoints``, 3 poses) and the
+            # program check re-solves those poses (§3.9: screening at the intermediate ones, exact at the ends); the same
+            # chain is solved here exactly, pose by pose, so every pose has a remembered witness solution
+            chain = [tuple(p) for p in C.line_waypoints(b["pre"], b["pose"], 3)]
+            with self.ikc.ignoring(wall):  # the whole approach runs 2 cm off the wall (see above)
+                res = self.ikc.exact(chain, manip, brace_arm, q_seed=q0, cache=False)
             if not res.ok:
-                why.append(f"{b['kind']}: brace contact")
+                why.append(f"{b['kind']}: brace contact / approach ({res.reason})")
                 continue
             arm_b = self.kit.robot.arm_control_idx[brace_arm]
             q_seed = q0.clone()
