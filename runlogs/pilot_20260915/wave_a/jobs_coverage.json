@@ -1,0 +1,203 @@
+[
+ {
+  "id": "cov_000__world_horizo+world_vertic",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 15000 python -m ispatialgym.sampling.sample_isg --alias alignment-world_horizontal-radiator-walls --alias alignment-world_vertical-hanger-walls --alias alignment-world_horizontal-signpost-walls --alias alignment-world_vertical-license_plate-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
+  "weight": 10.0,
+  "world_key": "house_single_floor|living_room_0|",
+  "aliases": [
+   "alignment-world_horizontal-radiator-walls",
+   "alignment-world_vertical-hanger-walls",
+   "alignment-world_horizontal-signpost-walls",
+   "alignment-world_vertical-license_plate-walls"
+  ],
+  "subtasks": [
+   "alignment-world_horizontal",
+   "alignment-world_vertical"
+  ],
+  "minutes": 100.0,
+  "wave": "cov"
+ },
+ {
+  "id": "cov_001__world_horizo+world_vertic",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 15000 python -m ispatialgym.sampling.sample_isg --alias alignment-world_horizontal-towel_rack-walls --alias alignment-world_vertical-picture_frame-walls --alias alignment-world_horizontal-decorative_sign-walls --alias alignment-world_vertical-fire_extinguisher-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
+  "weight": 9.999,
+  "world_key": "house_single_floor|living_room_0|",
+  "aliases": [
+   "alignment-world_horizontal-towel_rack-walls",
+   "alignment-world_vertical-picture_frame-walls",
+   "alignment-world_horizontal-decorative_sign-walls",
+   "alignment-world_vertical-fire_extinguisher-walls"
+  ],
+  "subtasks": [
+   "alignment-world_horizontal",
+   "alignment-world_vertical"
+  ],
+  "minutes": 100.0,
+  "wave": "cov"
+ },
+ {
+  "id": "cov_002__world_horizo+world_vertic",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 7500 python -m ispatialgym.sampling.sample_isg --alias alignment-world_horizontal-hanger-walls --alias alignment-world_vertical-guitar-walls --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
+  "weight": 9.998,
+  "world_key": "house_single_floor|living_room_0|",
+  "aliases": [
+   "alignment-world_horizontal-hanger-walls",
+   "alignment-world_vertical-guitar-walls"
+  ],
+  "subtasks": [
+   "alignment-world_horizontal",
+   "alignment-world_vertical"
+  ],
+  "minutes": 50.0,
+  "wave": "cov"
+ },
+ {
+  "id": "cov_003__articulation",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 12000 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_close_large_scale-bottom_cabinet --alias configuration_matching-articulation_open_large_scale-dishwasher --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
+  "weight": 9.997,
+  "world_key": "house_single_floor|kitchen_0|",
+  "aliases": [
+   "configuration_matching-articulation_close_large_scale-bottom_cabinet",
+   "configuration_matching-articulation_open_large_scale-dishwasher"
+  ],
+  "subtasks": [
+   "configuration_matching-articulation_close_large_scale",
+   "configuration_matching-articulation_open_large_scale"
+  ],
+  "minutes": 80.0,
+  "wave": "cov"
+ },
+ {
+  "id": "cov_004__articulation",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 12000 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_close_large_scale-dishwasher --alias configuration_matching-articulation_open_large_scale-fridge --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
+  "weight": 9.996,
+  "world_key": "house_single_floor|kitchen_0|",
+  "aliases": [
+   "configuration_matching-articulation_close_large_scale-dishwasher",
+   "configuration_matching-articulation_open_large_scale-fridge"
+  ],
+  "subtasks": [
+   "configuration_matching-articulation_close_large_scale",
+   "configuration_matching-articulation_open_large_scale"
+  ],
+  "minutes": 80.0,
+  "wave": "cov"
+ },
+ {
+  "id": "cov_005__articulation",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 12000 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_close_large_scale-fridge --alias configuration_matching-articulation_open_large_scale-bottom_cabinet --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
+  "weight": 9.995,
+  "world_key": "house_single_floor|kitchen_0|",
+  "aliases": [
+   "configuration_matching-articulation_close_large_scale-fridge",
+   "configuration_matching-articulation_open_large_scale-bottom_cabinet"
+  ],
+  "subtasks": [
+   "configuration_matching-articulation_close_large_scale",
+   "configuration_matching-articulation_open_large_scale"
+  ],
+  "minutes": 80.0,
+  "wave": "cov"
+ },
+ {
+  "id": "cov_006__articulation",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 12000 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_close_large_scale-bottom_cabinet_no_top --alias configuration_matching-articulation_open_large_scale-bottom_cabinet_no_top --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
+  "weight": 9.994,
+  "world_key": "house_single_floor|utility_room_0|",
+  "aliases": [
+   "configuration_matching-articulation_close_large_scale-bottom_cabinet_no_top",
+   "configuration_matching-articulation_open_large_scale-bottom_cabinet_no_top"
+  ],
+  "subtasks": [
+   "configuration_matching-articulation_close_large_scale",
+   "configuration_matching-articulation_open_large_scale"
+  ],
+  "minutes": 80.0,
+  "wave": "cov"
+ },
+ {
+  "id": "cov_007__articulation",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 12000 python -m ispatialgym.sampling.sample_isg --alias configuration_matching-articulation_close_large_scale-oven --alias configuration_matching-articulation_open_large_scale-oven --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
+  "weight": 9.993,
+  "world_key": "restaurant_diner|kitchen_0|",
+  "aliases": [
+   "configuration_matching-articulation_close_large_scale-oven",
+   "configuration_matching-articulation_open_large_scale-oven"
+  ],
+  "subtasks": [
+   "configuration_matching-articulation_close_large_scale",
+   "configuration_matching-articulation_open_large_scale"
+  ],
+  "minutes": 80.0,
+  "wave": "cov"
+ },
+ {
+  "id": "cov_008__disembedding+inside+nextto+under_small_",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 13500 python -m ispatialgym.sampling.sample_isg --alias disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table --alias inter_object_relation_satisfaction-inside-ice_cube-beer_glass-breakfast_table --alias inter_object_relation_satisfaction-nextto-pencil-ruler-breakfast_table --alias inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-breakfast_table --alias disembedding-beaker-beaker_2_beer_glass_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
+  "weight": 9.992,
+  "world_key": "house_single_floor|dining_room_0|straight_chair_jgoolz_0,straight_chair_jgoolz_1,straight_chair_jgoolz_2,straight_chair_jgoolz_3,straight_chair_jgoolz_4,straight_chair_jgoolz_5",
+  "aliases": [
+   "disembedding-bar_soap-bar_soap_2_biscuit_1-breakfast_table",
+   "inter_object_relation_satisfaction-inside-ice_cube-beer_glass-breakfast_table",
+   "inter_object_relation_satisfaction-nextto-pencil-ruler-breakfast_table",
+   "inter_object_relation_satisfaction-under_small_scale-beer_glass-coaster-breakfast_table",
+   "disembedding-beaker-beaker_2_beer_glass_1-breakfast_table"
+  ],
+  "subtasks": [
+   "disembedding",
+   "inter_object_relation_satisfaction-inside",
+   "inter_object_relation_satisfaction-nextto",
+   "inter_object_relation_satisfaction-under_small_scale"
+  ],
+  "minutes": 90.0,
+  "wave": "cov"
+ },
+ {
+  "id": "cov_009__disembedding+inside+under_small_",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 14250 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-inside-quartz-saucepot-breakfast_table --alias inter_object_relation_satisfaction-under_small_scale-bottle_of_supplements-tray-breakfast_table --alias disembedding-mug-mug_2_beaker_1-breakfast_table --alias inter_object_relation_satisfaction-inside-sunflower-vase-breakfast_table --alias disembedding-notebook-notebook_2_board_game_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
+  "weight": 9.991,
+  "world_key": "house_single_floor|dining_room_0|straight_chair_jgoolz_0,straight_chair_jgoolz_1,straight_chair_jgoolz_2,straight_chair_jgoolz_3,straight_chair_jgoolz_4,straight_chair_jgoolz_5",
+  "aliases": [
+   "inter_object_relation_satisfaction-inside-quartz-saucepot-breakfast_table",
+   "inter_object_relation_satisfaction-under_small_scale-bottle_of_supplements-tray-breakfast_table",
+   "disembedding-mug-mug_2_beaker_1-breakfast_table",
+   "inter_object_relation_satisfaction-inside-sunflower-vase-breakfast_table",
+   "disembedding-notebook-notebook_2_board_game_1-breakfast_table"
+  ],
+  "subtasks": [
+   "disembedding",
+   "inter_object_relation_satisfaction-inside",
+   "inter_object_relation_satisfaction-under_small_scale"
+  ],
+  "minutes": 95.0,
+  "wave": "cov"
+ },
+ {
+  "id": "cov_010__disembedding",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 3000 python -m ispatialgym.sampling.sample_isg --alias disembedding-bottle_of_medicine-bottle_of_medicine_2_bottle_of_antihistamines_1-breakfast_table --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
+  "weight": 9.99,
+  "world_key": "house_single_floor|dining_room_0|straight_chair_jgoolz_0,straight_chair_jgoolz_1,straight_chair_jgoolz_2,straight_chair_jgoolz_3,straight_chair_jgoolz_4,straight_chair_jgoolz_5",
+  "aliases": [
+   "disembedding-bottle_of_medicine-bottle_of_medicine_2_bottle_of_antihistamines_1-breakfast_table"
+  ],
+  "subtasks": [
+   "disembedding"
+  ],
+  "minutes": 20.0,
+  "wave": "cov"
+ },
+ {
+  "id": "cov_011__ontop_large_",
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 timeout 4500 python -m ispatialgym.sampling.sample_isg --alias inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor --templates 1 --instances-per-template 2 --max-attempts 10 --seed 0 --no-write-back --out \"$OUT\" --log-level INFO",
+  "weight": 9.989,
+  "world_key": "house_single_floor|childs_room_0|",
+  "aliases": [
+   "inter_object_relation_satisfaction-ontop_large_scale-pencil-desk-floor"
+  ],
+  "subtasks": [
+   "inter_object_relation_satisfaction-ontop_large_scale"
+  ],
+  "minutes": 30.0,
+  "wave": "cov"
+ }
+]
