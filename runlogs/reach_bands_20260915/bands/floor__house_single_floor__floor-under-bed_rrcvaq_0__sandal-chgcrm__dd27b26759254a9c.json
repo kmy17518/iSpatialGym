@@ -698,7 +698,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 32,
    "n_pose_pruned": 256,
-   "time_s": 0.15,
+   "time_s": 0.99,
    "posture": "tucked",
    "idle_arm_q": {
     "left": [
@@ -862,7 +862,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 40,
    "n_pose_pruned": 320,
-   "time_s": 0.14,
+   "time_s": 1.18,
    "posture": "untucked",
    "idle_arm_q": {
     "left": [
@@ -903,7 +903,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 82,
    "n_pose_pruned": 656,
-   "time_s": 0.29,
+   "time_s": 2.49,
    "posture": "tucked",
    "idle_arm_q": {
     "left": [
@@ -985,7 +985,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 12,
    "n_pose_pruned": 96,
-   "time_s": 0.05,
+   "time_s": 0.3,
    "posture": "untucked",
    "idle_arm_q": {
     "left": [
@@ -1026,7 +1026,7 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 43,
    "n_pose_pruned": 344,
-   "time_s": 0.15,
+   "time_s": 1.29,
    "posture": "untucked",
    "idle_arm_q": {
     "left": [
@@ -1088,7 +1088,7 @@
  "union_extent": null,
  "n_reachable_total": 0,
  "key": "dd27b26759254a9c",
- "time_s": 125.7,
+ "time_s": 289.3,
  "kit_stats": {
   "ik_calls": 0,
   "ik_s": 0.0,
@@ -1097,6 +1097,6 @@
   "ik_batch_s": 0.0,
   "collision_calls": 43,
   "collision_configs": 43,
-  "collision_s": 0.3639242649078369
+  "collision_s": 0.5494036674499512
  }
 }
