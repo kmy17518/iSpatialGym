@@ -287,9 +287,10 @@ class Disembedding(SamplerV2):
         self.bind_scene_object("support", self.world.obj(names[0]))
 
     def support_objects(self) -> List[Any]:
-        """The table and both trays (ignored for the final grasp / place pose only, §3.6); bound roles only (parking runs
-        before the roles are bound)."""
-        return [self.obj(role) for role in ("support", self.src_role, self.dst_role) if self.bindings.has(role)]
+        """The table only (ignored for the final grasp / place pose, §3.6): the trays stay obstacles for the fingers, as the
+        oracle keeps them (the first demo's grasp witness collided with the source tray the sampler had ignored). Bound
+        roles only (parking runs before the roles are bound)."""
+        return [self.obj("support")] if self.bindings.has("support") else []
 
     def spawn_roles(self):
         # owner decision 2026-09-16 4b: the source tray spawns at ``roles.source.scale`` (D1 writes 1.25; until it lands the
@@ -498,7 +499,7 @@ class Disembedding(SamplerV2):
     def _sample_with(self, rng, init: Stance, manip: Stance, tname: str, sname: str, dname: str, dnames: List[str], k: int) -> Draft:
         d = Draft()
         support = self.obj("support")
-        src, dst, tgt = self.obj(self.src_role), self.obj(self.dst_role), self.obj("target")
+        src, tgt = self.obj(self.src_role), self.obj("target")
         # §4.5 step 5: transition init -> manipulation
         self.record_transition(init, manip)
         # source tray at the focus, aligned with the edge (§4.6 step 1, disembedding)
@@ -509,8 +510,10 @@ class Disembedding(SamplerV2):
         src.keep_still()
         self.kit.sync_world()
         src_w = self.src_floor.at(s_pose)
-        # target inside the tray from F (footprint on the tray floor, 0.5 cm), exact IK with support + tray ignored for the grasp
-        t_pose, grasp = TT.phase3_target(self, manip, rng, self.grasps, self.hull["target"], self.rest["target"], [support, src], top=src_w, support_z=src_w.z,
+        # target inside the tray from F (footprint on the tray floor, 0.5 cm); exact IK with the table ignored for the grasp pose
+        # only — the tray stays an obstacle (its walls and floor are real for the fingers; the first demo's oracle found the
+        # sampler's grasp witness "in collision" because the sampler had ignored the tray while the oracle keeps it)
+        t_pose, grasp = TT.phase3_target(self, manip, rng, self.grasps, self.hull["target"], self.rest["target"], [support], top=src_w, support_z=src_w.z,
                                          margin=float(self.g("tray_footprint_margin_m")), scale_key=self.choice.models["target"].scale, bands=self.bands)
         grasp.place_on = dname
         # destination tray: random side, exactly 4 cm inside the init image, >= 4 cm from the source tray, footprint on the top
@@ -541,7 +544,7 @@ class Disembedding(SamplerV2):
         pre_place = IK.pre_pose(place)
         with TT.posed_in_hand(self, "right", tgt, grasp.eef_in_object):
             with attached(self.kit, "right", tgt):
-                res = self.ikc.exact([pre_place, place], place_st, "right", ignore_for_last=[support, dst], scale_key=self.choice.models["target"].scale)
+                res = self.ikc.exact([pre_place, place], place_st, "right", ignore_for_last=[support], scale_key=self.choice.models["target"].scale)
             if not res.ok:
                 raise Reject("place_unreachable", f"pre-place / place fail the exact IK from the placement stance: {res.reason}")
             grasp.pre_place, grasp.place = pre_place, place
@@ -734,7 +737,7 @@ class Disembedding(SamplerV2):
         tgt = self.obj("target")
         with TT.posed_in_hand(self, "right", tgt, grasp.eef_in_object):
             with attached(self.kit, "right", tgt):
-                res = self.ikc.exact([pre_place, place], place_st, "right", ignore_for_last=[self.obj("support"), self.obj(self.dst_role)],
+                res = self.ikc.exact([pre_place, place], place_st, "right", ignore_for_last=[self.obj("support")],
                                      scale_key=self.choice.models["target"].scale)
         if not res.ok:
             raise Reject("place_unreachable", f"settled goal: pre-place / place fail the exact IK from the placement stance: {res.reason}")
