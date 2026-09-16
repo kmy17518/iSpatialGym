@@ -48,7 +48,7 @@ from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.tro_writer import full_pose_target
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, register
-from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, Stance
+from ispatialgym.sampling.v2.stances import EdgeFrame, Stance
 
 log = logging.getLogger("ispatialgym.sampling.v2")
 
@@ -83,6 +83,8 @@ class ArticulationSmall(SamplerV2):
         self.init_stance: Optional[Stance] = None
         self.manip_candidates: List[Stance] = []
         self.bands = None
+        self.left_bands = None  # the brace arm's contact band (owner 2026-09-16 item 2)
+        self.handle_only_band = False
         self.face_yaw: Optional[float] = None
         #: §5.4 floor support: the customs bind ``support = {"room": R}`` (targets > 0.6 m stand on the room floor)
         self.floor_support = False
@@ -244,7 +246,13 @@ class ArticulationSmall(SamplerV2):
             try:
                 self.face_yaw = C.wrap_angle(math.atan2(float(-edge.inward[1]), float(-edge.inward[0])) - math.atan2(float(self.facing_local[1]), float(self.facing_local[0])))
                 self.bands = self._brace_band(edge, st)
-                init = TT.phase1b_init_trunk(self, st, H_max, bands=self.bands, top=self.top)
+                # owner decision 2026-09-16 item 2: the brace arm's contact band (B3's left contact band of the target's height
+                # class) replaces the empty §5.4 brace band; the brace is a pad contact on a face of the base link
+                if self.brace_arm == "left":
+                    self.left_bands = TT.load_left_contact_band(self, H_max, top=self.top, edge=edge, compute=TT.left_band_compute())
+                    if self.left_bands is None:
+                        log.info("%s: no left contact band for height %.2f: brace by the exact IK alone", self.gp.alias, H_max)
+                init = TT.phase1b_init_trunk(self, st, H_max, bands=self.bands, top=self.top, left_bands=self.left_bands)
                 init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=self.bands)
                 init.name = "init"
                 cands = TT.phase2_manipulation_stance(self, init, w_a, target_height=H_max, in_frame_fn=self._target_in_frame, bands=self.bands, top=self.top,
@@ -349,26 +357,35 @@ class ArticulationSmall(SamplerV2):
         return [wp.pre_grasp, wp.eef]
 
     def _brace_band(self, edge: EdgeFrame, st: Stance) -> RB.ReachBands:
-        """Per trunk of the grid: the band-stance lattice cells (8 cm) on the top, 3 yaws about the face yaw; the handle
-        [pre, grasp] at every required q screened with the handle arm (support ignored for the grasp), the brace
-        candidates [pre, contact] with the brace arm; a cell is in the band when every required q is feasible for a yaw
-        and >= 1 brace kind is; recorded like the CLI's brace mode (``meta.trunks[i].feasible``)."""
+        """Workspace band of the handle arm. B3's brace band (handle + §5.4 brace) when it has cells; else, per trunk of the
+        grid: the band-stance lattice cells (8 cm) on the top, 3 yaws about the face yaw, the handle [pre, grasp] at
+        q_init and q_goal screened with the handle arm (support ignored for the grasp); a cell is in the band when both
+        are feasible for a yaw (``meta.trunks[i].feasible`` like the CLI's brace mode, ``brace_kinds = ["left_band"]``:
+        the brace comes from the left contact band at instance time, owner decision 2026-09-16 item 2)."""
         cache_key = {"scene": self.world.scene_model, "support": self.top.name, "target": f"{self.choice.models[self.role].category}/{self.choice.models[self.role].model}",
                      "joint": self.joint_name}
-        try:
-            return RB.ReachBands.load(self.world.scene_model, self.top.name, target=cache_key["target"], joint=self.joint_name, mode="brace")
-        except FileNotFoundError:
-            pass
+        # B3's brace band (handle + §5.4 brace) when it has cells; the owner's 2026-09-16 item 2 replaces the empty §5.4 brace
+        # rule by the left contact band, so the workspace band is the **handle band** (handle feasible at q_init and q_goal
+        # for a yaw; mode "handle", computed in-process and cached) — the brace comes from the left contact band per instance
+        for mode in ("brace", "handle"):
+            try:
+                b = RB.ReachBands.load(self.world.scene_model, self.top.name, target=cache_key["target"], joint=self.joint_name, mode=mode)
+            except FileNotFoundError:
+                continue
+            if any(len(c) for c in b.cells.values()):
+                log.info("%s: %s band cache hit (%d cells): %s", self.gp.alias, mode, sum(len(c) for c in b.cells.values()), b.path)
+                self.handle_only_band = mode == "handle"
+                return b
+            log.info("%s: B3 %s band %s has no cell (no §5.4 brace is IK-feasible): computing the handle band", self.gp.alias, mode, b.path)
+        self.handle_only_band = True
         kit, world = self.kit, self.world
         support = self._support()
         bc = RB.BandComputer(world, kit, arms=(self.handle_arm, self.brace_arm))
         stance = bc.stance_at_edge(self.top, support, RB.STAND_OFF, edge.name)
         base_cells, world_cells = bc.lattice_on_cells(stance, self.top.cells(free_only=True))
-        q_values = [self.q_init] + [self.q_init + k * (self.q_goal - self.q_init) for k in self.required]
+        q_values = [self.q_init, self.q_goal]  # the extremes; the instance checks every required q_k with the brace arm locked
         x0, y0, yaw0 = stance["base_pose2d"]
         face_off = C.wrap_angle(self.face_yaw - yaw0)
-        brace_side = 1.0 if self.brace_arm == "left" else -1.0
-        hdata = {"handle": self.handle, "base_link": self.base_link_bbox or _base_link_bbox(self.hull, self.jinfo)}
         trunks = RB.trunk_grid(self.top.z - kit.floor_z)
         gen_trunks = self.gen("band_trunks", None)
         if gen_trunks:
@@ -400,41 +417,32 @@ class ArticulationSmall(SamplerV2):
                 for n, (c, k) in enumerate(pre_ok):
                     if bool(ok_g[n]):
                         handle_ok.setdefault(c, []).append(k)
-                surv = [c for c in combos if len(handle_ok.get(c, [])) == len(q_values)]
-                braces = {c: RB.brace_candidates(self.jinfo, hdata, obj_poses[c], q_values, brace_side, _G()) for c in surv}
-                bflat = [(c, kind) for c in surv for kind, _ in braces[c]]
-                bposes = [pose for c in surv for _, pair in braces[c] for pose in pair]
-                ok_b = kit.ik_batch(bposes, q, arm=self.brace_arm, batch_size=bc.IK_BATCH) if bposes else th.zeros(0, dtype=th.bool)
-                brace_ok: Dict[Tuple[int, float], List[str]] = {}
-                for n, (c, kind) in enumerate(bflat):
-                    if bool(ok_b[2 * n]) and bool(ok_b[2 * n + 1]):
-                        brace_ok.setdefault(c, []).append(kind)
                 feasible = []
                 for i in range(len(base_cells)):
                     for dy in (face_off, face_off - 0.1, face_off + 0.1):
                         c = (i, dy)
-                        if c in handle_ok and len(handle_ok[c]) == len(q_values) and c in brace_ok:
-                            feasible.append({"cell": base_cells[i].tolist(), "yaw_offset": dy, "q_feasible": q_values, "brace_kinds": brace_ok[c]})
+                        if c in handle_ok and len(handle_ok[c]) == len(q_values):
+                            feasible.append({"cell": base_cells[i].tolist(), "yaw_offset": dy, "q_feasible": q_values, "brace_kinds": ["left_band"]})
                             break
                 entry.update({"n_reachable": len(feasible), "feasible": feasible})
                 per_trunk.append(entry)
                 cells_out[(tr, ti)] = np.array([f["cell"] for f in feasible], dtype=np.float32).reshape(-1, 2)
-                log.info("brace trunk (%.2f, %+.1f): %d/%d cells feasible", tr, ti, len(feasible), len(base_cells))
+                log.info("handle trunk (%.2f, %+.1f): %d/%d cells feasible", tr, ti, len(feasible), len(base_cells))
         finally:
             scope.__exit__(None, None, None)
             kit.sync_world()
         lat_all = np.concatenate([c[:, 1] for c in cells_out.values() if len(c)]) if any(len(c) for c in cells_out.values()) else np.zeros(0)
         meta = {"scene": world.scene_model, "rooms": list(world.rooms or []), "support": self.top.name, "lattice": bc.lattice, "stand_off": RB.STAND_OFF, "arms": "untucked",
                 "grid": {"translates": list(RB.TRANSLATES), "tilts": list(RB.TILTS), "low_top_tilt": RB.LOW_TOP_TILT}, "seeds": 12, "pre_grasp": RB.PRE_GRASP, "yaws": list(RB.YAWS),
-                "mode": "brace", "smoke": False, "scale": None, "placed_specs": [], "stance": stance, "top": self.top.to_json(), "z_support": self.top.z,
+                "mode": "handle", "smoke": False, "scale": None, "placed_specs": [], "stance": stance, "top": self.top.to_json(), "z_support": self.top.z,
                 "target": cache_key["target"], "joint": self.joint_name, "joint_values": q_values, "face_yaw_offset": face_off, "handle_arm": self.handle_arm,
                 "brace_arm": self.brace_arm, "trunks": per_trunk, "union_extent": [float(lat_all.min()), float(lat_all.max())] if len(lat_all) else None,
                 "n_reachable_total": int(sum(len(c) for c in cells_out.values())), "computed_by": "sampling.v2.tasks.articulation_small"}
-        key = RB._key({**cache_key, "q": q_values, "brace": True, "grid": meta["grid"], "lattice": bc.lattice, "stance": stance["edge"]})
+        key = RB._key({**cache_key, "q": q_values, "handle": True, "grid": meta["grid"], "lattice": bc.lattice, "stance": stance["edge"]})
         meta["key"] = key
         out_dir = RB.cache_root()
         os.makedirs(out_dir, exist_ok=True)
-        name = f"brace__{world.scene_model}__{self.top.name}__{cache_key['target'].replace('/', '-')}__{key}"
+        name = f"handle__{world.scene_model}__{self.top.name}__{cache_key['target'].replace('/', '-')}__{key}"
         np.savez_compressed(os.path.join(out_dir, name + ".npz"), **{RB.trunk_key(tr, ti): c for (tr, ti), c in cells_out.items()})
         with open(os.path.join(out_dir, name + ".json"), "w") as f:
             json.dump(meta, f, indent=1, default=str)
@@ -449,15 +457,44 @@ class ArticulationSmall(SamplerV2):
         if not TT.in_frame(self, cam, pts, float(self.g("view_margin_m"))):
             return False
         wp = C.handle_waypoints(self.handle, self.jinfo, [self.q_init], pose)[0]
-        feas = self.bands.brace_feasible(stance.translate, stance.tilt)
-        kinds = next((f["brace_kinds"] for f in feas if abs(f["cell"][0] - float(stance.world_to_base(focus[:2])[0])) < 0.05
-                      and abs(f["cell"][1] - float(stance.world_to_base(focus[:2])[1])) < 0.05), [])
         pts_b = [wp.contact]
-        for kind, pair in RB.brace_candidates(self.jinfo, {"handle": self.handle, "base_link": self.base_link_bbox or _base_link_bbox(self.hull, self.jinfo)}, pose,
-                                              [self.q_init] + [self.q_init + k * (self.q_goal - self.q_init) for k in self.required], 1.0 if self.brace_arm == "left" else -1.0, _G()):
-            if not kinds or kind in kinds:
-                pts_b.append(pair[1][0])
+        if self.handle_only_band:
+            # the brace is a pad contact on a face of the base link (left contact band classes): every candidate face point in frame
+            pts_b += [pt for _, pt, _, _ in self._body_brace_points(pose, stance)]
+        else:
+            feas = self.bands.brace_feasible(stance.translate, stance.tilt)
+            kinds = next((f["brace_kinds"] for f in feas if abs(f["cell"][0] - float(stance.world_to_base(focus[:2])[0])) < 0.05
+                          and abs(f["cell"][1] - float(stance.world_to_base(focus[:2])[1])) < 0.05), [])
+            for kind, pair in RB.brace_candidates(self.jinfo, {"handle": self.handle, "base_link": self.base_link_bbox or _base_link_bbox(self.hull, self.jinfo)}, pose,
+                                                  [self.q_init] + [self.q_init + k * (self.q_goal - self.q_init) for k in self.required], 1.0 if self.brace_arm == "left" else -1.0, _G()):
+                if not kinds or kind in kinds:
+                    pts_b.append(pair[1][0])
         return TT.in_frame(self, cam, th.stack(pts_b), TT.IN_FRAME_MARGIN)
+
+    def _body_brace_points(self, pose: TT.Pose, stance: Stance) -> List[Tuple[str, th.Tensor, th.Tensor, th.Tensor]]:
+        """Pad contacts of the brace arm on the base link (B3's contact classes): ``(class, point, approach, closing)`` for
+        the faces toward the robot (``near_*``), on the robot's left / right (``left_*`` / ``right_*``) and away from it
+        (``far_*``) at 0.75 of the base link's height, closing axis vertical (``_v``) / horizontal (``_h``); top presses
+        are left out (the moving link sweeps the base link's top, §5.4). Order: the classes B3 measured as passing for
+        table-top bodies first (near, left)."""
+        bl = self.base_link_bbox or _base_link_bbox(self.hull, self.jinfo)
+        bmin, bmax = th.tensor(bl["bbox_min"], dtype=th.float32), th.tensor(bl["bbox_max"], dtype=th.float32)
+        corners = th.stack([th.tensor([x, y, z]) for x in (float(bmin[0]), float(bmax[0])) for y in (float(bmin[1]), float(bmax[1])) for z in (float(bmin[2]), float(bmax[2]))])
+        cw = C.transform_points(pose, corners)
+        centre = cw.mean(dim=0)
+        z_side = float(cw[:, 2].min()) + TT.CONTACT_HEIGHT_FRACTION * float(cw[:, 2].max() - cw[:, 2].min())
+        fwd = th.tensor([float(stance.forward[0]), float(stance.forward[1]), 0.0])
+        left = th.tensor([float(stance.left[0]), float(stance.left[1]), 0.0])
+        z_axis = th.tensor([0.0, 0.0, 1.0])
+        out = []
+        for side, u in (("near", -fwd), ("left", left), ("right", -left), ("far", fwd)):  # u = outward normal of the face touched
+            proj = cw[:, :2] @ u[:2]
+            point = th.tensor([float(centre[0]), float(centre[1]), z_side]) + u * (float(proj.max()) - float(centre[:2] @ u[:2]))
+            a = -u
+            side_h = C.unit(th.cross(z_axis, u, dim=0))
+            for c_axis, suffix in ((z_axis, "v"), (side_h, "h")):
+                out.append((f"{side}_{suffix}", point, a, c_axis))
+        return out
 
     @property
     def _hull_q_init(self) -> th.Tensor:
@@ -512,22 +549,55 @@ class ArticulationSmall(SamplerV2):
         target.keep_still()
         self.kit.sync_world()
         q_values = [self.q_init] + [self.q_init + kk * (self.q_goal - self.q_init) for kk in self.required]
-        hdata = {"handle": self.handle, "base_link": self.base_link_bbox or _base_link_bbox(self.hull, self.jinfo)}
-        cands = RB.brace_candidates(self.jinfo, hdata, pose, q_values, 1.0 if self.brace_arm == "left" else -1.0, _G())
-        kinds_pref = list(self.g("brace_kinds"))
-        cands.sort(key=lambda c: kinds_pref.index(c[0]) if c[0] in kinds_pref else 99)
         wp0 = C.handle_waypoints(self.handle, self.jinfo, [self.q_init], pose)[0]
         grasp_pair = [wp0.pre_grasp, wp0.eef]
+        brace_extras: Dict[str, Any] = {}
+        if self.handle_only_band:
+            # owner decision 2026-09-16 item 2: the brace is a pad contact on a face of the base link, the classes the left
+            # contact band recorded as passing at the target's cell first (A1 joint placement: the brace point within one
+            # lattice cell of a left band cell), then the remaining near / left faces; far / right faces never pass (B3)
+            body = self._body_brace_points(pose, manip)
+            passing = None
+            if self.left_bands is not None:
+                cell = self.left_bands.to_base(np.asarray([[float(pose[0][0]), float(pose[0][1])]], dtype=np.float32), manip.base_pose2d)[0]
+                passing = TT.cell_classes(self.left_bands, manip.translate, manip.tilt, cell) or None
+
+            def rank(item):
+                cls, pt, _, _ = item
+                in_band = TT.in_band(self.left_bands, manip, pt[:2], tol=1.0)[0] if self.left_bands is not None else True
+                return (0 if (passing and cls in passing) else 1, 0 if in_band else 1, 0 if cls.startswith(("near", "left")) else 1)
+
+            body.sort(key=rank)
+            cands = []
+            for cls, pt, a, c_axis in body:
+                if cls.startswith(("far", "right")) and not (passing and cls in passing):
+                    continue  # pulling faces / the robot-right face are out of the left arm's reach (B3 measurements)
+                for c_sign in (1.0, -1.0):
+                    contact = C.contact_eef(pt, a, c_sign * c_axis)
+                    cands.append((f"{cls}{'' if c_sign > 0 else '-'}", (C.pre_pose(contact), contact)))
+            brace_extras = {"pose_classes_passing": passing, "left_band": self.left_bands is not None}
+        else:
+            hdata = {"handle": self.handle, "base_link": self.base_link_bbox or _base_link_bbox(self.hull, self.jinfo)}
+            cands = RB.brace_candidates(self.jinfo, hdata, pose, q_values, 1.0 if self.brace_arm == "left" else -1.0, _G())
+            kinds_pref = list(self.g("brace_kinds"))
+            cands.sort(key=lambda c: kinds_pref.index(c[0]) if c[0] in kinds_pref else 99)
         chosen = None
+        fails = []
         for kind, (b_pre, b_contact) in cands:
-            # brace arm first (contact with the target ignored), then the handle arm with the brace arm locked (support + target ignored for the grasp)
-            res = self.ikc.exact_both_arms((self.brace_arm, [b_pre, b_contact]), (self.handle_arm, grasp_pair), manip, ignore_for_last=[target], ignore_other_last=[support, target])
+            # brace arm first (contact with the target ignored), then the handle arm with the brace arm locked (support + target
+            # ignored for the grasp); the combined check ignores the target both hands touch (``tabletop.brace_second_arm``)
+            res = TT.brace_second_arm(self, manip, self.brace_arm, [b_pre, b_contact], self.handle_arm, grasp_pair, ignore_work_last=[target],
+                                      ignore_brace_last=[support, target])
             if res.ok:
                 chosen = (kind, b_pre, b_contact, res.q)
                 break
+            fails.append(f"{kind}: {res.reason}")
         if chosen is None:
-            raise Reject("contact_unreachable", f"no brace kind of {[c[0] for c in cands]} + handle grasp at q_init passes the exact IK")
+            raise Reject("contact_unreachable", f"no brace of {[c[0] for c in cands][:8]} + handle grasp at q_init passes the exact IK ({sorted(set(fails))[:3]})")
         kind, b_pre, b_contact, q_both = chosen
+        if self.handle_only_band:
+            brace_extras["pose_class"] = kind
+            kind = "body_face"
         # grasp poses at the required waypoints with the target re-posed for each world sync (brace arm locked)
         reach: Dict[str, bool] = {"0.0": True}
         waypoints: Dict[str, Any] = {"0.0": wp0.to_sidecar()}
@@ -563,7 +633,8 @@ class ArticulationSmall(SamplerV2):
         # record
         self.sidecar.add_stance(manip)
         brace_dir = C.approach_axis(b_contact[1])
-        self.sidecar.add_contact(ContactRecord("brace", self.brace_arm, b_pre, b_contact, direction=brace_dir, brace_kind=kind, object=tname))
+        self.sidecar.add_contact(TT.BraceRecord("brace", self.brace_arm, b_pre, b_contact, direction=brace_dir, brace_kind=kind, object=tname,
+                                                extras={"stop_clearance_m": 0.0, **brace_extras}))
         manip.contacts = ["brace"]
         self.sidecar.articulation = {"object": tname, "joint": self.joint_name, "joint_type": self._joint_type(), "q_init": float(self.q_init), "q_goal": float(self.q_goal),
                                      "waypoints": waypoints, "handle_reach": {kk: v for kk, v in reach.items() if kk != "0.0"}, "passive_from": self.passive_from,
