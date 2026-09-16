@@ -771,18 +771,21 @@ class IORSLarge(SamplerV2):
         self.bands = None  # ``TT.ensure_bands`` caches one band per support on the sampler
         half, height = self.target_dims()
         margins = {"w_t": half, "w_p": 0.0, "W_p": 0.0, "D_p_max": 0.0, "safety": 0.02, "relation": self.relation, "g_NT": None, "H_max": height}
-        n_min = int(self.num("partner_corners_in_frame_min", 4))
         # A5 "partner's own top": the partner is the support under the target, so the partner-visibility redraw does not
-        # apply (the target cell in frame is on the partner); stances A / B come from the tabletop phases unchanged
+        # apply (the target cell in frame is on the partner); stances A / B come from the tabletop phases unchanged.
+        # Owner decision 2026‑09‑16 (a)/(d): stance A sees the target (tabletop Phase 1), the init surface (the target's cell
+        # on it) and the partner's RELEVANT REGION (ontop: the top-face patch around the goal cell + the nearest bottom
+        # edge; under: the nearest bottom edge) — no "≥ 4 of 8 AABB corners + centre" any more; (b): stance B (the grasp
+        # stance, Phase 2) has no partner rule — only its target-in-frame rule.
         own_top = support is self.partner
         errors: List[str] = []
         for edge, init in TT.edge_candidates(self, top, rng):
             try:
                 init = TT.phase1b_init_trunk(self, init, height, top=top)
                 chosen = None
-                for _ in range(1 if own_top else 6):  # §5.6: redraw the lateral position (≤ 6) until the partner is visible
+                for _ in range(1 if own_top else 6):  # §5.6: redraw the lateral position (≤ 6) until the goal region is visible
                     st = TT.phase1c_lateral(self, init, margins, rng, top=top)
-                    if own_top or self.partner_visible(st, n_min):
+                    if own_top or self.goal_region_visible(st):
                         chosen = st
                         break
             except Reject as e:
@@ -791,7 +794,7 @@ class IORSLarge(SamplerV2):
                     continue
                 raise
             if chosen is None:
-                errors.append(f"{edge.name}: partner_not_visible (< {n_min}/8 corners or the centre out of frame)")
+                errors.append(f"{edge.name}: goal_region_not_visible (the partner's top patch around the goal cell / nearest bottom edge out of frame)")
                 continue
             chosen.name = "init"
             manip = TT.phase2_manipulation_stance(self, chosen, half, target_height=height, top=top)
@@ -801,6 +804,38 @@ class IORSLarge(SamplerV2):
             self.surface.update({"edge": edge, "init": chosen, "manip": manip, "init_xy": manip[0].focus[:2].clone(), "z": top.z, "band": getattr(self, "bands", None)})
             return
         raise Reject("no_free_edge", f"{support.name}: " + ("; ".join(errors) or "no edge with a free, collision-free stance"))
+
+    def goal_region_points(self, from_xy) -> th.Tensor:
+        """Owner decision 2026‑09‑16 (a)/(d): the **relevant region** of the partner stance A must see — ontop: the top-face
+        patch (± 0.10 m) around the goal cell the placement will use (the goal cell nearest to ``from_xy``, the rule C
+        applies) at the top's height, plus the partner's bottom edge nearest to ``from_xy`` (its two bottom corners and
+        the midpoint); under: the nearest bottom edge only (the goal lies beneath the partner)."""
+        partner = self.partner
+        lo, hi = partner.aabb
+        f = th.as_tensor([float(from_xy[0]), float(from_xy[1])])
+        pts = []
+        if self.relation == "ontop" and len(self.place.get("cells", [])):
+            cells = self.place["cells"]
+            g = cells[int(th.argmin(th.linalg.norm(cells.float() - f, dim=1)))].float()
+            z = float(self.place["z"])
+            r = float(self.num("goal_patch_half_m", 0.10))
+            for dx, dy in ((0, 0), (r, r), (r, -r), (-r, r), (-r, -r)):
+                pts.append(th.tensor([float(g[0]) + dx, float(g[1]) + dy, z]))
+        # nearest bottom edge of the AABB (as seen from ``from_xy``)
+        edges = aabb_edges(lo, hi)
+        edge = nearest_edge(edges, f)
+        half_len = edge.length / 2
+        for t in (-half_len, 0.0, half_len):
+            p = edge.mid + edge.tangent * t
+            pts.append(th.tensor([float(p[0]), float(p[1]), float(lo[2])]))
+        return th.stack(pts)
+
+    def goal_region_visible(self, stance: Stance, from_xy=None) -> bool:
+        """The relevant partner region (:meth:`goal_region_points`) in frame with the 5 % margin from ``stance``."""
+        cam = self.camera_pose_at(stance)
+        if from_xy is None:
+            from_xy = stance.focus[:2] if stance.focus is not None else th.as_tensor(stance.base_pose2d[:2])
+        return P0.in_frame(self, cam, self.goal_region_points(from_xy))
 
     def partner_visible(self, stance: Stance, n_min: int) -> bool:
         cam = self.camera_pose_at(stance)
@@ -924,10 +959,10 @@ class IORSLarge(SamplerV2):
 
     def floor_stance_a(self, c_t: th.Tensor, rng: np.random.Generator, height: float) -> Stance:
         """Stance A of the floor init: base on the eroded map 0.6–1.5 m from c_t facing it, tilt 0, the translate whose
-        optical axis is closest to c_t with the target and the partner (≥ 4/8 corners) in frame, collision-free."""
+        optical axis is closest to c_t with the target and the partner's relevant region (goal patch / nearest bottom
+        edge, owner decision (a)/(d)) in frame, collision-free."""
         fi = dict(self.gp.gen("floor_init") or {})
         d_lo, d_hi = fi.get("distance_range_m", [0.6, 1.5])
-        n_min = int(self.num("partner_corners_in_frame_min", 4))
         focus = th.tensor([float(c_t[0]), float(c_t[1]), self.floor_z + height / 2])
         pts = G.local_points_world(self.hull, (th.tensor([float(c_t[0]), float(c_t[1]), self.floor_z + self.world.bottom_offset(self.hull, self.rest)]), self.rest))
         for _ in range(30):
@@ -941,7 +976,7 @@ class IORSLarge(SamplerV2):
             cams = P0.camera_poses(self, cands)
             feas = []
             for st, cam in zip(cands, cams):
-                if not P0.in_frame(self, cam, pts) or not self.partner_visible(st, n_min):
+                if not P0.in_frame(self, cam, pts) or not self.goal_region_visible(st, from_xy=c_t):
                     continue
                 feas.append((st, P0.axis_angle(self, cam, focus)))
             if not feas:
@@ -1045,7 +1080,65 @@ class IORSLarge(SamplerV2):
         stats["visible"] = len(classed)
         out = P0.best_class(classed)
         log.info("%s: stance C at %s edge %s: %d survivors (%s)", self.gp.alias, partner.name, edge.name, len(out), stats)
+        if not out and cands:
+            self.debug_placement_visibility(cands, cams, edge, init_xy)
         return out
+
+    def _object_of_prim(self, prim_path: str) -> Optional[str]:
+        for o in self.world.scene.objects:
+            for l in o.links.values():
+                if prim_path == l.prim_path or prim_path.startswith(l.prim_path + "/"):
+                    return o.name
+        return None
+
+    def debug_placement_visibility(self, cands: Sequence[Stance], cams: Sequence[Any], edge: EdgeFrame, init_xy) -> None:
+        """Owner decision 2026‑09‑16 (c) diagnosis: for every collision-free stance-C candidate the goal cell's frame test
+        (5 %), its angle to the optical axis, the first object a ray from the camera to the goal point hits (occluder), the
+        trunk / stand-off / lateral; plus the partner edges that were considered and why one was chosen (the edge nearest
+        the init pose is the only one the spec uses)."""
+        try:
+            partner = self.partner
+            z_top = float(self.place["z"])
+            rows = []
+            for st, cam in zip(cands, cams):
+                gc = st.extras.get("goal_cell")
+                if gc is None:
+                    continue
+                if self.relation == "ontop":
+                    focus = th.tensor([gc[0], gc[1], z_top + self.place["height"] / 2])
+                    pose = self.goal_pose_at(gc, self.rest)
+                    corners_in = P0.in_frame(self, cam, self.hull_corners_world(self.hull, pose))
+                else:
+                    focus = th.tensor([gc[0], gc[1], self.floor_z + self.place["height"] / 2])
+                    corners_in = None
+                cell_in = P0.in_frame(self, cam, focus.reshape(1, 3))
+                ang = math.degrees(P0.axis_angle(self, cam, focus))
+                cam_p = G.t(cam[0]).float()
+                hit = self.world.raycast(cam_p.reshape(1, 3), focus.reshape(1, 3))[0]
+                occluder = None
+                if hit.get("hit"):
+                    name = self._object_of_prim(hit.get("rigidBody", ""))
+                    d_hit = float(th.linalg.norm(th.as_tensor(hit["position"]).float() - cam_p))
+                    d_goal = float(th.linalg.norm(focus - cam_p))
+                    if name is not None and name != partner.name and d_hit < d_goal - 0.03:
+                        occluder = f"{name} at {d_hit:.2f} m (goal at {d_goal:.2f} m)"
+                    elif name == partner.name and d_hit < d_goal - 0.05:
+                        occluder = f"{partner.name} itself at {d_hit:.2f} m (goal at {d_goal:.2f} m: armrest / back / cushion in front of the cell)"
+                rows.append({"stand_off": round(float(st.stand_off or 0.0), 2), "lateral": round(float(st.lateral), 2), "trunk": [float(st.translate), round(float(st.tilt), 2)],
+                             "goal_cell": [round(float(v), 2) for v in gc], "goal_in_frame": bool(cell_in), "goal_hull_in_frame": corners_in, "axis_angle_deg": round(ang, 1),
+                             "occluder": occluder, "camera_z": round(float(cam_p[2]), 2)})
+            f = th.as_tensor([float(init_xy[0]), float(init_xy[1])])
+            edges = [{"name": e.name, "length_m": round(float(e.length), 2), "dist_to_init_m": round(float(th.linalg.norm(e.mid - f)), 2), "chosen": e.name == edge.name,
+                      "why": "nearest to the init pose (§5.6: edge = the partner edge nearest the target's init pose)" if e.name == edge.name else "not the nearest edge"}
+                     for e in self.place["edges"]]
+            self.template_facts["placement_visibility_debug"] = {"candidates": rows, "edges": edges}
+            n_in = sum(1 for r in rows if r["goal_in_frame"])
+            n_cone = sum(1 for r in rows if r["axis_angle_deg"] <= P0.AXIS_LOOSE_DEG)
+            n_occ = sum(1 for r in rows if r["occluder"])
+            log.info("%s: stance C visibility debug at %s edge %s: %d candidates — goal cell in frame %d, within the 20° cone %d, occluded %d; edges %s; per candidate %s",
+                     self.gp.alias, partner.name, edge.name, len(rows), n_in, n_cone, n_occ, edges, rows)
+        except Exception as e:  # noqa: BLE001 — diagnostics never fail the attempt
+            log.info("%s: stance C visibility debug failed: %r", self.gp.alias, e)
 
     def push_under_candidates(self, edge: EdgeFrame, init_xy) -> List[Stance]:
         """Stance C of the push-under (owner decision 2026‑09‑16 item 7): base square to the partner's near AABB edge,
