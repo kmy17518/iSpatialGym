@@ -382,8 +382,23 @@ def generate_holonomic_urdf(
 # --------------------------------------------------------------------------------------
 
 #: (link_a, link_b) templates (``{arm}`` placeholder) added to the v1 self-collision ignore list.
+#:
+#: * ``arm_link1 <-> arm_link3`` overlap by 3 mm in the straight-arm pose (cuRobo v2 has no tolerance slack).
+#: * A grasped object (spheres on ``attached_object_<arm>_eef_link``) sits between the pads, i.e. inside the palm's
+#:   and the wrist's collision spheres by construction: the shipped yaml exempts it against the finger links only,
+#:   so every grasp that puts the object deep in the gripper self-collided once attached and every attached check
+#:   (lift, carry, place) failed (owner decision A7, 2026-09-16). As cuRobo's stock configs do (franka:
+#:   ``attached_object`` vs ``panda_hand`` / fingers / ``panda_link7``), the object is exempt against the gripper
+#:   body, the wrist camera and the two wrist links; against everything else (the other arm, the torso, the base,
+#:   the world) it is still checked.
 EXTRA_SELF_COLLISION_IGNORE_PAIRS = (
     ("{arm}_arm_link1", "{arm}_arm_link3"),
+    ("attached_object_{arm}_eef_link", "{arm}_gripper_link"),
+    ("attached_object_{arm}_eef_link", "{arm}_realsense_link"),
+    ("attached_object_{arm}_eef_link", "{arm}_arm_link7"),
+    ("attached_object_{arm}_eef_link", "{arm}_arm_link6"),
+    ("attached_object_{arm}_eef_link", "{arm}_gripper_finger_link1"),
+    ("attached_object_{arm}_eef_link", "{arm}_gripper_finger_link2"),
 )
 
 _V1_KEYS_TO_DROP = {

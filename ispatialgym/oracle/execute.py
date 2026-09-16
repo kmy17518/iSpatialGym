@@ -63,6 +63,7 @@ from ispatialgym.oracle.actions import (
     Transition,
     VOCABULARY,
 )
+from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.motions import Motions, SkillError, as_pose2d, as_world_pose
 from ispatialgym.robot import conventions as C
 
@@ -152,6 +153,54 @@ def _scene_name(state: PrivilegedState, inst: str) -> Optional[str]:
         return None
 
 
+#: recorded idle-arm posture names -> the 7 arm joint values (A6; ``untucked`` is the robot constant)
+IDLE_POSTURES = ("untucked", "tucked", "reset", "ready")
+#: an arm already within this of its recorded posture is not moved (rad)
+IDLE_ARM_TOL = 0.05
+
+
+def posture_q(robot, posture: str, arm: str) -> th.Tensor:
+    if posture == "untucked":
+        return C.as_tensor(robot.untucked_default_joint_pos)[robot.arm_control_idx[arm]].clone()
+    if posture in ("tucked", "reset"):
+        return th.zeros(7)
+    if posture == "ready":
+        return th.tensor(M.ARM_READY_Q[arm], dtype=th.float32)
+    raise ValueError(f"unknown idle-arm posture {posture!r}")
+
+
+def idle_arm_targets(record, state) -> Dict[str, th.Tensor]:
+    """A6: the recorded joint values of the **idle** arms of a stance / goal record — ``arms_q = {arm: [7]}`` written
+    by the sampler (``SamplerV2.annotate_stance_arms``), else the named ``idle_posture`` — for every arm that is not
+    a working arm of the record (a posture-string ``arms`` = both arms idle). Both fields live in the F6 record's
+    ``extra`` until the sidecar dataclass names them; ``{}`` when nothing is recorded."""
+    extra = getattr(record, "extra", None) or {}
+    arms_q = getattr(record, "arms_q", None) or extra.get("arms_q")
+    posture = getattr(record, "idle_posture", None) or extra.get("idle_posture")
+    working = set(getattr(record, "working_arms", []) or [])
+    out: Dict[str, th.Tensor] = {}
+    for arm in M.ARMS:
+        if arm in working:
+            continue
+        if isinstance(arms_q, dict) and arms_q.get(arm) is not None:
+            q = C.as_tensor(arms_q[arm]).reshape(-1)
+            out[arm] = q if q.numel() == 7 else q[state.robot.arm_control_idx[arm]]
+        elif posture and posture != "same":
+            out[arm] = posture_q(state.robot, posture, arm)
+    return out
+
+
+def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any]) -> Iterator[th.Tensor]:
+    """``arm_to`` the idle arms of ``record`` to their recorded posture (A6) — before the trunk motion, so the swept
+    trunk motion is the one the sampler checked with those arm values. Arms already there are left alone."""
+    targets = idle_arm_targets(record, state)
+    q = state.robot.get_joint_positions()
+    move = {arm: qa for arm, qa in targets.items() if float(th.max(th.abs(q[state.robot.arm_control_idx[arm]].float() - qa))) > IDLE_ARM_TOL}
+    ctx["idle_arms_moved"] = sorted(move)
+    if move:
+        yield from motions.arm_to(tuple(sorted(move)), q=move)
+
+
 def camera_goal(targets: Dict[str, Any], cam_in_zed=None) -> Tuple[th.Tensor, th.Tensor]:
     """World head-camera pose of a ``SetTorso`` target (``base`` pose2d + ``trunk`` pair) through the conventions."""
     t, k = targets["trunk"]
@@ -177,6 +226,8 @@ def post_navigate(action: Navigate, state, targets, ctx) -> Optional[str]:
 
 def execute_transition(action: Transition, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     yield from motions.track_path([targets["drive_back"]])
+    # A6: the arriving stance's idle arm(s) to their recorded posture before the trunk moves (at the stand-off)
+    yield from move_idle_arms(motions, state, action.stance_to, ctx)
     t, k = targets["trunk"]
     yield from motions.trunk_to(float(t), float(k))
     yield from motions.track_path([targets["drive_in"]])
@@ -198,6 +249,8 @@ def execute_set_torso(action: SetTorso, motions: Motions, state, targets, ctx) -
     cfg = _cfg(ctx)
     if targets["arms"] == "untucked":
         yield from motions.arm_to(("left", "right"), q=state.robot.untucked_default_joint_pos)
+    else:
+        yield from move_idle_arms(motions, state, action.goal, ctx)  # A6: a recorded idle posture / arms_q on the goal
     t, k = targets["trunk"]
     yield from motions.trunk_to(float(t), float(k))
     goal = camera_goal(targets, getattr(state, "cam_in_zed", None))
@@ -447,4 +500,5 @@ def coverage() -> Dict[str, bool]:
 __all__ = [
     "PrivilegedState", "ExecuteConfig", "CONFIG", "EXECUTORS", "MANIPULATION_ACTIONS", "FOV_EXEMPT_ACTIONS", "executor_for",
     "is_manipulation", "fov_monitored", "run_action", "check_postcondition", "coverage", "camera_goal", "joint_tolerance",
+    "idle_arm_targets", "move_idle_arms", "posture_q", "IDLE_POSTURES", "IDLE_ARM_TOL",
 ]

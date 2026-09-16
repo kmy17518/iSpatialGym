@@ -753,6 +753,46 @@ def test_program_runs_end_to_end_with_retry_from_checkpoint(tmp_path):
     assert rec.actions[-1].step_end == result["n_action_steps"]
 
 
+def test_transition_moves_the_idle_arm_to_its_recorded_posture_before_the_trunk(tmp_path):
+    """A6: the arriving stance records the idle arm's joint values (``arms_q``) / posture (``idle_posture``); the
+    oracle moves that arm there at the stand-off, before the trunk motion (the sampler swept the trunk with it)."""
+    sc, env = iors_world()
+    manip = sc.stance("manipulation")
+    assert manip.working_arms == ["right"]
+    left_q = [0.9, 0.3, -0.7, -1.2, 0.5, 0.2, 0.8]
+    manip.extra["arms_q"] = {"left": left_q, "right": env.robot.q[env.robot.arm_control_idx["right"]].tolist()}
+    manip.extra["idle_posture"] = "ready"
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path)
+    transition = expand(sc.alias, sc)[0]
+    assert transition.name == "transition"
+    targets = EX.idle_arm_targets(manip, ex.state)
+    assert set(targets) == {"left"} and th.allclose(targets["left"], th.tensor(left_q))
+    assert ex.run_action(0, transition) is None
+    rows = rec.rows
+    q = np.asarray(rows["joint_positions"])
+    left_idx = env.robot.arm_control_idx["left"].numpy()
+    trunk_idx = env.robot.trunk_control_idx.numpy()
+    first_arm_move = int(np.argmax(np.abs(q[:, left_idx] - q[0, left_idx]).max(axis=1) > 1e-4))
+    first_trunk_move = int(np.argmax(np.abs(q[:, trunk_idx] - q[0, trunk_idx]).max(axis=1) > 1e-4))
+    assert 0 < first_arm_move < first_trunk_move
+    assert th.allclose(env.robot.q[env.robot.arm_control_idx["left"]], th.tensor(left_q), atol=1e-4)
+    assert ex.action_records[0].attempts == [None]
+    # the working arm is never moved by the transition, and an arm already at its posture is left alone
+    assert th.allclose(env.robot.q[env.robot.arm_control_idx["right"]], th.from_numpy(q[0][env.robot.arm_control_idx["right"].numpy()]), atol=1e-6)
+    ctx = {}
+    list(EX.move_idle_arms(motions, ex.state, manip, ctx))
+    assert ctx["idle_arms_moved"] == []
+    # a posture name alone works too, and a posture-string stance (init) treats both arms as idle
+    init = sc.stance("init")
+    init.extra["idle_posture"] = "tucked"
+    both = EX.idle_arm_targets(init, ex.state)
+    assert set(both) == {"left", "right"} and float(both["right"].abs().max()) == 0.0
+    init.extra["idle_posture"] = "ready"
+    assert th.allclose(EX.idle_arm_targets(init, ex.state)["left"], th.tensor(M.ARM_READY_Q["left"]))
+    del init.extra["idle_posture"]
+    assert EX.idle_arm_targets(init, ex.state) == {}
+
+
 def test_second_failure_fails_the_episode_with_the_action_category(tmp_path):
     sc, env = iors_world()
     env.robot.ag_fail_next = 5
