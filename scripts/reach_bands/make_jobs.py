@@ -19,6 +19,11 @@ the grasp library (joint limits of the small-scale articulation targets). One jo
 ``cmd`` is the pod-side command of ``scripts/runpod/dispatch_samp.py`` (``$OUT`` = the job's output directory); ``args``
 is the same call for a local run. Jobs are deduplicated on the argument list; ``weight`` is the queue priority
 (``dispatch_samp.py`` queues heavier jobs first): brace 4, large-scale IORS bands 3, tabletop 2, disembedding 1.
+
+``--group-by-world N`` additionally writes ``<out stem>_groups.json``: worker jobs for the multi-band mode of
+``reach_bands`` (``python -m ispatialgym.sampling.reach_bands --jobs <out> --ids ID ... --out $OUT``), at most N manifest
+jobs sharing one world key (scene, loaded rooms, removed chairs) each, so that a pod loads the scene once per group
+(wave-1 manifest: 95 jobs -> 8 world keys -> 29 worker jobs of <= 4). The member jobs' own entries are unchanged.
 """
 
 from __future__ import annotations

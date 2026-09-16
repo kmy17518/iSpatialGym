@@ -1567,7 +1567,7 @@ def select_jobs(manifest: Sequence[Dict[str, Any]], ids: Optional[Sequence[str]]
     missing = [i for i in ids if i not in by_id]
     if missing:
         raise KeyError(f"job ids not in the manifest: {missing}")
-    return [by_id[i] for i in ids]
+    return [by_id[i] for i in dict.fromkeys(ids)]  # given order, duplicates dropped
 
 
 def group_by_key(items: Sequence[Any], key_of) -> List[Any]:
@@ -2243,6 +2243,8 @@ def run_jobs(args):
             rc = 1
             log.error("worker: job %s failed", jid, exc_info=True)
             print(f"REACH_BANDS_FAILED {jid}", flush=True)
+            with open(os.path.join(job_dir, "run.log"), "a") as f:  # the marker collect_bands.py looks for (after the logged traceback)
+                f.write(f"REACH_BANDS_FAILED {jid}\n")
             if world is not None:
                 n_bands += 1  # the failed band may have spawned objects: keep the name suffixes unique
                 try:
