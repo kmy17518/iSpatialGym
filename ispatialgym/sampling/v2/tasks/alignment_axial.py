@@ -50,6 +50,8 @@ AXES = {"+x": (1.0, 0.0, 0.0), "-x": (-1.0, 0.0, 0.0), "+y": (0.0, 1.0, 0.0), "-
 #: closed fingers: half thickness of the blade the pushes / stops act with (eef origin this far off the touched face)
 FINGER_HALF_THICKNESS = 0.012
 STOP_CLEARANCE = 0.005  # §5.5 style: the stop face 5 mm outside the goal hull
+PUSH_TIP_CLEARANCE = 0.003  # the closed fingertips this far above the top for the thinnest targets (push / blade stop)
+THIN_TARGET_HEIGHT = 0.04  # below this height the stop brace tries the top-down blade before the side contact classes
 END_INSET = 0.03  # the pushed end lies this far inside the object's long-axis extremity
 BAND_TOLERANCE = 0.5  # an end is "inside the band" within this fraction of the lattice of a band cell
 
@@ -217,8 +219,10 @@ class AlignmentAxial(SamplerV2):
 
     def _push_height(self) -> float:
         """eef origin height of the generic top-down push / stop poses: the band's generic-pinch height (§4.1: eef at
-        max(0.6·h, 0.03) above the top), so the closed fingers' blade spans the object's side face."""
-        return float(self.top.z) + max(0.6 * self.extents["height"], 0.03)
+        0.6·h above the top) with the floor lowered from 3 cm to the fingertip length + 3 mm — at the 3 cm floor the
+        closed fingers' tips (1.88 cm beyond the origin) hover 1.1 cm above the top and never touch a letter / magazine
+        / catalog (h <= 1 cm); with the lower floor the blade spans the side face of every target."""
+        return float(self.top.z) + max(0.6 * self.extents["height"], C.FINGERTIP_LENGTH + PUSH_TIP_CLEARANCE)
 
     # ------------------------------------------------------------------ instance
 
@@ -405,7 +409,9 @@ class AlignmentAxial(SamplerV2):
         r_goal = C.quat_rotate(q_goal, C.quat_rotate(C.qinv(pose[1]), end - TT._t(pose[0]))) + goal_pose[0] - com
         d_stop = spin * th.cross(z_axis, th.tensor([float(r_goal[0]), float(r_goal[1]), 0.0]), dim=0)
         d_stop = d_stop / th.linalg.norm(d_stop)
-        stop_pt = self._extreme_point(goal_pose, d_stop)
+        # the stop face = the goal hull's extreme along d_stop (a whole long face for a box); the brace goes to its point
+        # farthest from the pushed end's arrival so that the two hands do not meet at the same corner
+        stop_pt = self._extreme_point(goal_pose, d_stop, far_from=com + r_goal)
         stop_pt = th.tensor([float(stop_pt[0]), float(stop_pt[1]), float(z_brace)]) + d_stop * STOP_CLEARANCE
         return goal_pose, stop_pt, d_stop
 
@@ -423,21 +429,32 @@ class AlignmentAxial(SamplerV2):
             contact_classes.append((name or f"side_{suffix}", c_axis))
         if passing:
             contact_classes.sort(key=lambda nc: 0 if nc[0] in passing else 1)
-        for name, c_axis in contact_classes:
-            for c_sign in (1.0, -1.0):  # either wrist turn of the same pad contact
-                brace = C.contact_eef(stop_pt, a, c_sign * c_axis)
-                yield C.pre_pose(brace), brace, f"{name}{'' if c_sign > 0 else '-'}"
-        z_push = self._push_height()
-        blade_pt = th.tensor([float(stop_pt[0]), float(stop_pt[1]), z_push]) + d_stop * FINGER_HALF_THICKNESS
-        for pitch in TT.approach_pitch_order(None):
-            a_vec = TT.pitched_approach(pitch, manip.forward)
-            for c_sign in (1.0, -1.0):
-                brace = (blade_pt, C.eef_quat(a_vec, c_sign * d_stop))
-                yield C.pre_pose(brace), brace, f"blade_{pitch:.0f}{'' if c_sign > 0 else '-'}"
 
-    def _extreme_point(self, pose: TT.Pose, direction: th.Tensor, near: Optional[th.Tensor] = None) -> th.Tensor:
+        def side_contacts():
+            for name, c_axis in contact_classes:
+                for c_sign in (1.0, -1.0):  # either wrist turn of the same pad contact
+                    brace = C.contact_eef(stop_pt, a, c_sign * c_axis)
+                    yield C.pre_pose(brace), brace, f"{name}{'' if c_sign > 0 else '-'}"
+
+        def blades():
+            z_push = self._push_height()
+            blade_pt = th.tensor([float(stop_pt[0]), float(stop_pt[1]), z_push]) + d_stop * FINGER_HALF_THICKNESS
+            for pitch in TT.approach_pitch_order(None):
+                a_vec = TT.pitched_approach(pitch, manip.forward)
+                for c_sign in (1.0, -1.0):
+                    brace = (blade_pt, C.eef_quat(a_vec, c_sign * d_stop))
+                    yield C.pre_pose(brace), brace, f"blade_{pitch:.0f}{'' if c_sign > 0 else '-'}"
+
+        # a side contact needs the pads on a face at 0.75·h: below ~4 cm the wrist would lie on the table, so thin
+        # targets (letters, magazines, books) get the top-down blade first
+        order = (blades, side_contacts) if self.extents["height"] < THIN_TARGET_HEIGHT else (side_contacts, blades)
+        for gen in order:
+            yield from gen()
+
+    def _extreme_point(self, pose: TT.Pose, direction: th.Tensor, near: Optional[th.Tensor] = None, far_from: Optional[th.Tensor] = None) -> th.Tensor:
         """Hull point (world) with the largest projection on ``direction`` (xy); with ``near`` only points within 4 cm of
-        that end along the long axis are considered (the face at the pushed end)."""
+        that end along the long axis are considered (the face at the pushed end); with ``far_from`` the point of the
+        extreme face (projection within 3 mm of the maximum) farthest from that xy, 2 cm in from the face's end."""
         pts = C.transform_points(pose, self.hull)
         dxy = th.tensor([float(direction[0]), float(direction[1])])
         dxy = dxy / th.linalg.norm(dxy)
@@ -448,6 +465,17 @@ class AlignmentAxial(SamplerV2):
             if int(sel.sum()) >= 3:
                 pts = pts[sel]
         proj = pts[:, :2] @ dxy
+        if far_from is not None:
+            face = pts[proj >= float(proj.max()) - 0.003]
+            f = TT._t(far_from)[:2]
+            dist = th.linalg.norm(face[:, :2] - f, dim=1)
+            p_far = face[int(th.argmax(dist))]
+            p_near = face[int(th.argmin(dist))]
+            span = float(th.linalg.norm(p_far[:2] - p_near[:2]))
+            if span > 0.06:  # step 2 cm in from the face's far end so the blade stands on the face, not past its corner
+                t = 1.0 - 0.02 / span
+                return p_near + (p_far - p_near) * t
+            return p_far
         i = int(th.argmax(proj))
         return pts[i]
 
