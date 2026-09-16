@@ -12,9 +12,10 @@ manipulation stance.
 Instance: yaw = aligned yaw ± U(20°, 70°) (random sign), the object at the focus (footprint on the top), at least one
 end of the long axis inside the band with its top-down push pose confirmed by the exact IK; push contact at that end
 (closed right gripper beside the end, pushing tangentially), arc waypoints at δ/2 and the goal about the COM (§3.9);
-the **stop edge** braced by the closed left gripper: the target's edge that protrudes most along the pushed end's
-direction of motion at the goal orientation (pre-contact + contact IK with the push arm locked, combined whole-body
-check); every right-hand push pose IK-feasible. After settling a vertical hinge through the COM (parent = support,
+the **stop edge** braced by the closed left gripper **when the joint two-arm placement exists** (push point in the
+right band and stop point in the left contact band at the same trunk, the blade clear of the target's sweep, two-arm IK
+with the push arm locked; owner decision 2026-09-16 08:10: axial is push-only otherwise — the oracle's push closure is
+the stop, ``summary.brace = "present" | "none"``); every right-hand push pose IK-feasible. After settling a vertical hinge through the COM (parent = support,
 anchor 1 mm below the top) is installed and recorded as a TRO constraint (drift ≤ 1 mm / 0.005 rad over 60 steps).
 Goal: position unchanged, orientation = long axis parallel to the front edge, front toward the robot (tolerance
 0.10 rad, equivalences from the customs entry). Sidecar: ``init`` / ``manipulation`` stances (arms right + left),
@@ -82,6 +83,7 @@ class AlignmentAxial(SamplerV2):
         self.band_spec: Optional[TT.BandSpec] = None
         self.bands = None
         self.left_bands = None  # A1: the left arm's contact band (stop-edge brace), None until B3's bands exist
+        self.push_only = False  # the last instance had no stop brace (owner 2026-09-16 08:10: the brace is optional)
         self.hinge: Optional[Hinge] = None
         self.front_axis = th.tensor([1.0, 0.0, 0.0])
         self.long_axis = th.tensor([0.0, 1.0, 0.0])
@@ -261,7 +263,7 @@ class AlignmentAxial(SamplerV2):
         for k in order[:6]:
             cand = self.manip_candidates[int(k)]
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
-            manip.focus, manip.arms = cand.focus, ["right", "left"]
+            manip.focus, manip.arms = cand.focus, ["right"]  # the left arm joins only when a stop brace is recorded
             self.sidecar.reset_instance()
             self.sidecar.add_stance(init)
             for o in self.world.spawned.values():
@@ -328,15 +330,18 @@ class AlignmentAxial(SamplerV2):
                 if not jp["ok"] and left_bands is not None and jp["brace_ok"] and not jp["brace_class_ok"]:
                     jp = TT.joint_placement(bands, left_bands, manip, contact_xy, stop_pt[:2], brace_class=TT.contact_class(manip, -d_stop, th.cross(z_axis, d_stop, dim=0)), tol_brace=BRACE_CELL_TOL)
                 pairs.append((e, jp, goal_pose, stop_pts, d_stop))
-            if not any(jp["ok"] for _, jp, _, _, _ in pairs):
-                for _, jp, _, _, _ in pairs:
-                    fails["work_off_band" if not jp["work_ok"] else "brace_off_band" if not jp["brace_ok"] else "brace_class_failed"] += 1
+            # owner decision 2026-09-16 08:10 (axial = push-only, the stop brace optional): the placement needs the push work
+            # point in the right band; a brace is recorded only when the joint two-arm placement exists for that end
+            if not any(jp["work_ok"] for _, jp, _, _, _ in pairs):
+                fails["work_off_band"] += 1
                 continue
+            for _, jp, _, _, _ in pairs:
+                if jp["work_ok"] and not jp["ok"]:
+                    fails["brace_off_band" if not jp["brace_ok"] else "brace_class_failed"] += 1
             chosen = (pose, yaw0, delta, com, pairs)
             break
         if chosen is None:
-            raise Reject("target_placement", f"no (yaw, position) with an end whose push point and stop point lie in the right / left bands at this trunk ({fails}"
-                                             f"{'' if left_bands is not None else '; no left contact band: brace side by IK only'})")
+            raise Reject("target_placement", f"no (yaw, position) with a long-axis end whose push point lies in the right band at this trunk ({fails})")
         pose, yaw0, delta, com, pairs = chosen
         # target in the world for the checks below
         target.set_position_orientation(*pose)
@@ -363,8 +368,9 @@ class AlignmentAxial(SamplerV2):
             d = spin * th.cross(z_axis, r_xy, dim=0)
             motions.append((e, jp, d / th.linalg.norm(d), r_xy, goal_pose, stop_pts, d_stop))
         motions.sort(key=lambda m: float(th.dot(m[6][:2], manip.inward)))
+        brace_reason = "no_joint_cell"
         for e, jp, d, r_xy, goal_pose, stop_pts, d_stop in motions:
-            if not jp["ok"]:
+            if not jp["work_ok"]:
                 continue
             side_pt = self._extreme_point(pose, -d, near=e)  # the face the end moves away from
             side_pt = th.tensor([float(side_pt[0]), float(side_pt[1]), z_push])
@@ -392,27 +398,30 @@ class AlignmentAxial(SamplerV2):
                         push_fails.append(f"{pitch:.0f}°: {res.reason}")
                         continue
                     n_push_ok += 1
-                    # A1 / §4.6 step 6: the stop-edge brace with the push arm locked at its goal solution (the arc's mid
-                    # waypoint was screened above, §3.9). The brace is checked against the target AT ITS GOAL POSE (not
-                    # ignored, 3 mm margin — owner review of the axial demo): the target is teleported to the goal for the
-                    # brace IK and the brace-arm collision check, the push contact keeps its ignore (the pads touch it)
-                    target.set_position_orientation(*goal_pose)
-                    target.keep_still()
-                    self.kit.sync_world()
-                    try:
-                        for brace_pre, brace, kind, extras in self._brace_candidates(manip, stop_pts, d_stop, jp.get("brace_classes"), pose, com, d_goal):
-                            res_b = TT.brace_second_arm(self, manip, "right", [p_pre, p_goal], "left", [brace_pre, brace], ignore_work_last=[support, target],
-                                                        ignore_brace_last=[support], brace_only_check=([support], TT.BRACE_TARGET_MARGIN))
-                            if res_b.ok:
-                                brace_found = (brace_pre, brace, kind, {**extras, "push_half_thickness_m": push_half_p, "target_checked_at": "goal"})
-                                break
-                            brace_fails.append(f"{kind}: {res_b.reason}")
-                    finally:
-                        target.set_position_orientation(*pose)
+                    # the stop brace is optional (owner decision 2026-09-16 08:10: axial = push-only, the oracle's push closure
+                    # is the stop): tried only when the joint two-arm placement exists for this end (work point in the right
+                    # band AND stop point in the left contact band at this trunk) — A1 / §4.6 step 6 with the push arm locked
+                    # at its goal solution, the target teleported to its GOAL pose (not ignored, 3 mm margin) and the blade
+                    # kept clear of the target's sweep (``_brace_candidates``); a failing brace leaves a push-only instance
+                    if jp["ok"]:
+                        target.set_position_orientation(*goal_pose)
                         target.keep_still()
                         self.kit.sync_world()
-                    if brace_found is None:
-                        continue
+                        try:
+                            for brace_pre, brace, kind, extras in self._brace_candidates(manip, stop_pts, d_stop, jp.get("brace_classes"), pose, com, d_goal):
+                                res_b = TT.brace_second_arm(self, manip, "right", [p_pre, p_goal], "left", [brace_pre, brace], ignore_work_last=[support, target],
+                                                            ignore_brace_last=[support], brace_only_check=([support], TT.BRACE_TARGET_MARGIN))
+                                if res_b.ok:
+                                    brace_found = (brace_pre, brace, kind, {**extras, "push_half_thickness_m": push_half_p, "target_checked_at": "goal"})
+                                    break
+                                brace_fails.append(f"{kind}: {res_b.reason}")
+                        finally:
+                            target.set_position_orientation(*pose)
+                            target.keep_still()
+                            self.kit.sync_world()
+                        brace_reason = "present" if brace_found is not None else ("brace_ik_failed" if brace_fails else "brace_sweep_blocked")
+                    else:
+                        brace_reason = "no_joint_cell" if not jp["brace_ok"] else "brace_class_failed"
                     dist = abs(d_goal) * float(th.linalg.norm(r_xy))
                     push = (p_pre, p_init, p_mid, p_goal, d, dist, e, goal_pose, stop_pts, d_stop, pitch)
                     break
@@ -421,25 +430,32 @@ class AlignmentAxial(SamplerV2):
             if push is not None:
                 break
         if push is None:
-            if n_push_ok:
-                raise Reject("contact_unreachable", f"stop-edge brace with the push arm locked: {n_push_ok} feasible push arcs, brace fails {sorted(set(brace_fails))[:3]}"
-                                                    f" (blade skips {self._blade_skips}; stop at base-frame {[round(float(v), 2) for v in manip.world_to_base(motions[0][5][0][:2]).tolist()]})")
-            raise Reject("grasp_unreachable", f"no long-axis end in both bands has an IK-feasible push arc at any pitch ({sorted(set(push_fails))[:4]})")
+            raise Reject("grasp_unreachable", f"no long-axis end in the right band has an IK-feasible push arc at any pitch ({sorted(set(push_fails))[:4]})")
         p_pre, p_init, p_mid, p_goal, d_push, dist, end, goal_pose, stop_pts, d_stop, pitch = push
-        brace_pre, brace, brace_kind, brace_extras = brace_found
         q_goal = goal_pose[1]
         cam_manip = self.camera_pose_at(manip)
-        for nm, p in (("push init", p_init), ("push goal", p_goal), ("brace", brace)):
+        in_frame_poses = [("push init", p_init), ("push goal", p_goal)] + ([("brace", brace_found[1])] if brace_found is not None else [])
+        for nm, p in in_frame_poses:
             if not self.ikc.eef_in_frame(p, cam_manip):
                 raise Reject("gripper_not_in_frame", f"{nm} eef pose outside the manipulation image (5 %)")
         TT.whole_body_check_at(self, [init, manip], {tname: pose}, require=True, reason="stance_collision")
-        # record
+        # record: the push always, the brace only when the joint placement produced one (push-only otherwise: the
+        # manipulation stance works with the right arm, the left arm idle)
         self.sidecar.add_stance(manip)
         self.sidecar.add_contact(ContactRecord("push", "right", p_pre, p_init, p_mid, p_goal, d_push, dist, object=tname))
-        self.sidecar.add_contact(TT.BraceRecord("brace", "left", brace_pre, brace, direction=-d_stop, brace_kind="stop_edge", object=tname,
-                                                extras={k: (float(v) if isinstance(v, (int, float)) else v) for k, v in brace_extras.items()}))
-        manip.contacts = ["push", "brace"]
-        manip.extras.update({"push_pitch_deg": float(pitch), "brace_class": brace_kind, "left_band": self.left_bands is not None, "brace_geometry": brace_extras})
+        if brace_found is not None:
+            brace_pre, brace, brace_kind, brace_extras = brace_found
+            self.sidecar.add_contact(TT.BraceRecord("brace", "left", brace_pre, brace, direction=-d_stop, brace_kind="stop_edge", object=tname,
+                                                    extras={k: (float(v) if isinstance(v, (int, float)) else v) for k, v in brace_extras.items()}))
+            manip.contacts = ["push", "brace"]
+            manip.arms = ["right", "left"]
+        else:
+            brace_kind, brace_extras = None, {"reason": brace_reason, "brace_fails": sorted(set(brace_fails))[:3], "blade_skips": dict(self._blade_skips)}
+            manip.contacts = ["push"]
+            manip.arms = ["right"]
+        self.push_only = brace_found is None
+        manip.extras.update({"push_pitch_deg": float(pitch), "brace": "present" if brace_found is not None else "none", "brace_class": brace_kind,
+                             "left_band": self.left_bands is not None, "brace_geometry": brace_extras})
         draft.object_poses[tname] = pose
         draft.robot_q = self.stance_q(init)
         draft.base_pose2d = tuple(init.base_pose2d)
@@ -449,6 +465,7 @@ class AlignmentAxial(SamplerV2):
         draft.goal_poses[tname] = goal_pose
         draft.summary.update({"yaw_goal": yaw_goal, "yaw_init": yaw0, "deviation_deg": math.degrees(delta), "push_end": end.tolist(), "push_distance_m": dist,
                           "manipulation_candidate": k, "spin": spin, "push_pitch_deg": float(pitch), "brace_class": brace_kind,
+                          "brace": "present" if brace_found is not None else "none", "brace_reason": brace_reason,
                           "joint_placement": {"left_band": self.left_bands is not None, "fails": fails}})
         self.sidecar.describe(tname, mc.category.replace("_", " "), f"the {mc.category.replace('_', ' ')} on the table")
         self.sidecar.language["goal_numbers"]["rotate_deg"] = math.degrees(d_goal)
@@ -587,6 +604,26 @@ class AlignmentAxial(SamplerV2):
         proj = pts[:, :2] @ dxy
         i = int(th.argmax(proj))
         return pts[i]
+
+    # ------------------------------------------------------------------ program check (push-only sidecars)
+
+    def program_check(self, draft: Draft) -> Dict[str, Any]:
+        """§3.5 program check. A push-only axial (no ``contacts.brace``, owner decision 2026-09-16 08:10) is not yet accepted
+        by the F6 program / ``REQUIRED_BLOCKS`` (the oracle agent is making the brace optional); until that lands, with
+        ``ISG_PROGRAM_CHECK=stub`` set by the caller a rejection that only asks for the brace block is recorded as
+        ``mode: stub-push-only`` instead of rejecting the instance (smoke runs only — the default stays strict)."""
+        try:
+            return super().program_check(draft)
+        except Reject as e:
+            msg = str(e)
+            brace_only = getattr(self, "push_only", False) and "brace" in msg and os.environ.get("ISG_PROGRAM_CHECK", "").lower() == "stub"
+            if not brace_only:
+                raise
+            log.warning("%s: program check asks for contacts.brace on a push-only axial (%s); recorded as stub-push-only (ISG_PROGRAM_CHECK=stub)", self.gp.alias, msg[:200])
+            report = {"mode": "stub-push-only", "problems": [], "note": "brace-less axial not yet accepted by the oracle program; structural check skipped", "error": msg[:300]}
+            self.last_program_check = report
+            draft.summary["program_check"] = report
+            return report
 
     # ------------------------------------------------------------------ goal / hinge (§6.10)
 
