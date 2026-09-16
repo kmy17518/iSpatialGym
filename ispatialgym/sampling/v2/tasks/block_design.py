@@ -209,16 +209,23 @@ class BlockDesign(SamplerV2):
             grid_ok = all(self.top.contains(focus + right * (cc * pitch) + toward * (rr * pitch), 0.5 * self.edge + 0.02) for rr in range(2) for cc in range(2))
             if not grid_ok:
                 continue
-            # A1 joint placement: the goal grid (anchor at the focus; every brace point within two pitches of it) must lie
-            # in a left contact band cell at this trunk as well as in the right band cells the region is made of
-            if self.left_bands is not None:
-                brace_pts = [focus + right * (cc * pitch) + toward * (rr * pitch) for rr in range(2) for cc in range(2)]
-                if not all(TT.in_band(self.left_bands, stance, p, tol=1.0)[0] for p in brace_pts):
-                    self._regions_off_left_band += 1
-                    continue
+            # A1 joint placement: the goal grid is anchored at one of the region's cells (the image-top-left block); its
+            # row-left / column-top brace points must lie in a left contact band cell at this trunk — the region needs
+            # at least one such cell (the right band supplies the pushes / picks)
+            if self.left_bands is not None and not any(self._anchor_braces_in_left_band(c, stance, right, toward) for c in region):
+                self._regions_off_left_band += 1
+                continue
             seen.add(key)
             out.append((focus, {"cells": region}))
         return out
+
+    def _anchor_braces_in_left_band(self, anchor_xy, stance: Stance, right: th.Tensor, toward: th.Tensor) -> bool:
+        """Whether the two brace points of a goal grid anchored at ``anchor_xy`` (the closed left gripper's blade on the
+        anchor's robot-left face and on its far face, half an edge + a finger outside the faces) lie within one lattice
+        cell of the left contact band at the stance's trunk."""
+        off = 0.5 * self.edge + FINGER_HALF_THICKNESS
+        pts = [anchor_xy - right * off, anchor_xy - toward * off]
+        return all(TT.in_band(self.left_bands, stance, p, tol=1.0)[0] for p in pts)
 
     def _region_in_frame(self, s, stance: Stance, cam, focus, info) -> bool:
         cells = info["cells"]
@@ -279,19 +286,35 @@ class BlockDesign(SamplerV2):
         region = manip.extras["focus_info"]["cells"]
         gap = float(self.g("scatter_min_gap_m"))
         # --- cells: one block per region cell, >= 3 cm gaps between footprints ------------------------------------
+        z_c = self.top.z + 0.5 * self.edge
+
+        def img_score(xy) -> float:
+            uv = self.world.camera_model.project(cam_init, th.tensor([[float(xy[0]), float(xy[1]), z_c]]))[0][0]
+            return float(uv[0] + uv[1])
+
         cells = [region[int(i)] for i in rng.permutation(len(region))]
         chosen: List[th.Tensor] = []
+        if self.left_bands is not None:
+            # A1: the goal grid is anchored at the image-top-left block; its row-left / column-top brace points must lie
+            # in a left contact band cell at this trunk — take such a cell as the anchor (the smallest image score among
+            # them) and keep the other blocks below / right of it in the image
+            feas = [xy for xy in cells if self._anchor_braces_in_left_band(xy, manip, right, toward)]
+            if not feas:
+                raise Reject("layout", f"no region cell whose row-left / column-top brace points lie in the left contact band at trunk "
+                                       f"({manip.translate}, {manip.tilt}) ({len(cells)} cells)")
+            anchor_xy = min(feas, key=img_score)
+            chosen.append(anchor_xy)
+            s_anchor = img_score(anchor_xy)
+            cells = [xy for xy in cells if xy is not anchor_xy and img_score(xy) > s_anchor]
         for xy in cells:
             if all(float(th.linalg.norm(xy - c)) >= self.edge * math.sqrt(2) + gap for c in chosen):
                 chosen.append(xy)
             if len(chosen) == n:
                 break
         if len(chosen) < n:
-            raise Reject("layout", f"only {len(chosen)} of {n} region cells keep >= {gap} m gaps")
+            raise Reject("layout", f"only {len(chosen)} of {n} region cells keep >= {gap} m gaps{' below / right of the anchor' if self.left_bands is not None else ''}")
         # --- anchor (top-left in the init image) and slot assignment -----------------------------------------------
-        z_c = self.top.z + 0.5 * self.edge
-        uv = th.stack([self.world.camera_model.project(cam_init, th.tensor([[float(c[0]), float(c[1]), z_c]]))[0][0] for c in chosen])  # cells = block centres
-        score = (uv[:, 0] + uv[:, 1]).tolist()
+        score = [img_score(c) for c in chosen]
         order_img = sorted(range(n), key=lambda i: score[i])  # image order (top-left first)
         anchor_i = order_img[0]
         slot_of = {bi: si for si, bi in enumerate(order_img)}  # block index -> slot index (anchor = slot 0)
@@ -582,10 +605,14 @@ class BlockDesign(SamplerV2):
         face_normal = -dxy if into else dxy  # outward normal of the face touched
         centre = self._centre(pose)[0]
         origin = th.tensor([float(centre[0]), float(centre[1]), self._blade_height()]) + face_normal * (0.5 * self.edge + FINGER_HALF_THICKNESS)
-        for pitch in TT.approach_pitch_order(None):
+        side = th.cross(th.tensor([0.0, 0.0, 1.0]), face_normal, dim=0)
+        # closing axis along the face normal (the pad face pushes) or across it (the finger's side pushes): a top-down
+        # pose with the closing axis lateral to the robot is infeasible at many cells (wrist limits), so both are tried
+        for pitch in (0.0, 30.0):  # the cubes sit 0.5–0.8 m ahead: the 45° / 60° classes are for the far cells
             a_vec = TT.pitched_approach(pitch, manip.forward)
-            for c_sign in (1.0, -1.0):
-                yield (origin, C.eef_quat(a_vec, c_sign * face_normal)), a_vec, f"{prefix}_blade_{pitch:.0f}{'' if c_sign > 0 else '-'}"
+            for c_axis, cname in ((face_normal, "pad"), (side, "side")):
+                for c_sign in (1.0, -1.0):
+                    yield (origin, C.eef_quat(a_vec, c_sign * c_axis)), a_vec, f"{prefix}_blade_{cname}_{pitch:.0f}{'' if c_sign > 0 else '-'}"
 
     def _brace_push(self, rec: Dict[str, Any], kind: str, pushed: str, braced: str, world_poses: Dict[str, TT.Pose], direction: th.Tensor, brace_dir: th.Tensor, manip: Stance):
         """Right-hand push of ``pushed`` along ``direction`` by the place margin while the closed left gripper braces

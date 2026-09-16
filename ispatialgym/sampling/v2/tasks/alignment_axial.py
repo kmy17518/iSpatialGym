@@ -229,7 +229,15 @@ class AlignmentAxial(SamplerV2):
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         init = self.init_stance
         errors = []
-        for k in rng.permutation(len(self.manip_candidates))[:6]:
+        order = [int(k) for k in rng.permutation(len(self.manip_candidates))]
+        if self.left_bands is not None:
+            # A1: the right band ends at λ ≈ +0.08 and the left contact band starts at λ ≈ 0 / −0.16 (B3 measurements on the
+            # pilot support): a two-arm placement sits near the centre line — candidates whose focus lies nearest to the
+            # overlap of both bands first (random order among ties)
+            lo, hi = TT.union_extent(self.bands)[1], TT.union_extent(self.left_bands)[0]
+            mid = 0.5 * (min(lo, hi) + max(lo, hi))
+            order.sort(key=lambda k: abs(self.manip_candidates[k].local(self.manip_candidates[k].focus[:2])[1] - mid))
+        for k in order[:6]:
             cand = self.manip_candidates[int(k)]
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
             manip.focus, manip.arms = cand.focus, ["right", "left"]
@@ -334,10 +342,11 @@ class AlignmentAxial(SamplerV2):
             # generic push poses of §4.1 / §6.10: approach straight down or pitched 30° / 45° / 60° toward the robot's
             # forward (A1: the far cells keep an IK-feasible arc with the pitched classes), the cell's passing classes
             # first (B3's bitmask), closing axis (the blade) along the push direction with either wrist turn
+            side_c = C.unit(th.cross(z_axis, d, dim=0))  # the finger's side pushes when the pad-face wrist yaw is infeasible
             for pitch in TT.approach_pitch_order(jp.get("classes")):
                 a_vec = TT.pitched_approach(pitch, manip.forward)
-                for c_sign in (1.0, -1.0):
-                    quat = C.eef_quat(a_vec, c_sign * d)
+                for c_axis, c_sign in ((d, 1.0), (d, -1.0), (side_c, 1.0), (side_c, -1.0)):
+                    quat = C.eef_quat(a_vec, c_sign * c_axis)
                     p_init = (side_pt - d * FINGER_HALF_THICKNESS, quat)
                     arc = C.arc_waypoints(p_init, th.tensor([float(com[0]), float(com[1]), z_push]), z_axis, d_goal, n=2)
                     p_mid, p_goal = arc[0], arc[1]
