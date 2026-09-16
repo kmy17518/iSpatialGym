@@ -173,6 +173,13 @@ OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.sample_isg --alias <alias> 
 OMNIGIBSON_HEADLESS=1 python -m ispatialgym.sampling.multiply_isg --template <root>/<alias>/<template_id> --instances N [--path-buckets 3:10,5:10,10:5]
 ```
 
+Reach bands: `sample_isg` / `multiply_isg` point `ISPATIALGYM_REACH_BANDS` at `runlogs/reach_bands_20260915/bands/` (the fleet
+results B3 collects) when the directory exists and the variable is unset; `ReachBands.load` searches it first, then the runlog
+root and `~/.cache/ispatialgym/reach_bands` — a hit logs `reach band cache hit ...` in `tabletop.ensure_bands` and skips the
+in-process computation. The BDDL is written both at `<root>/<alias>/activity_definitions/...` (§1) and inside the template
+directory (`run_isg.build_env_config` and `validate_instances` read the latter). The `hold` constraint type written by the
+held-object module is added to `customs.CONSTRAINT_TYPES` by the D1 owner.
+
 `sample_isg` copies the customs list to `<root>/task_custom_lists.json`, writes `<root>/<alias>/activity_definitions/<activity>/problem<N>.bddl`,
 `<root>/<alias>/<template_id>/{template.json, template-partial_rooms.json, template_meta.json, instances/<iid>-tro_state.json,
 <iid>.oracle.json, <iid>.summary.json}` and `<root>/summary.json`, and prints one `SAMPLING_REPORT {...}` line. Blacklists and
