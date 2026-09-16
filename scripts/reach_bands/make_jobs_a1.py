@@ -107,7 +107,11 @@ def brace_objects(slots):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("mode", choices=["contact", "generic", "support-objects", "placed-tray"])
+    ap.add_argument("mode", choices=["contact", "generic", "support-objects", "placed-tray", "under-edge"])
+    ap.add_argument("--partners", nargs="*", default=["house_single_floor/bed_rrcvaq_0"], help="under-edge: scene/partner names")
+    ap.add_argument("--objects", nargs="*", default=["sandal/chgcrm"], help="under-edge: CATEGORY/MODEL pushed under the partner (height -> push z, clearance)")
+    ap.add_argument("--stand-offs", nargs="*", type=float, default=[0.45, 0.6], help="under-edge: band stances (base to the partner's edge)")
+    ap.add_argument("--postures", default="tucked,ready,untucked", help="under-edge: --posture order")
     ap.add_argument("--supports", nargs="*", default=["house_single_floor/breakfast_table_rhjoby_0"], help="scene/support names")
     ap.add_argument("--slots", nargs="*", default=["representative"])
     ap.add_argument("--all-objects", action="store_true", help="support-objects: every tabletop pick object of the slots, not only the picks bound to the support")
@@ -117,7 +121,19 @@ def main():
     args = ap.parse_args()
     heights = object_heights()
     jobs = {}
-    if args.mode == "placed-tray":
+    if args.mode == "under-edge":
+        # owner item 7 (push-under): under-edge floor bands per (partner, object, stand-off) - pitched push classes, closed
+        # gripper, the idle-arm posture order given; the deep floor trunks rank the partner's edges (reach_bands.stance_under)
+        for sp in args.partners:
+            scene, partner = sp.split("/", 1)
+            for obj in args.objects:
+                for so in args.stand_offs:
+                    a = ["--scene", scene, "--support", "floor", "--under", partner, "--under-edge", "--object", obj, "--generic-pinch", "--posture", args.postures,
+                         "--fingers", "0", "--stand-off", f"{so:g}"]
+                    j = job(a, "floor", ["inter_object_relation_satisfaction-under_large_scale"], [], scene, weight=args.weight if args.weight is not None else 2.5)
+                    j["id"] = f"rb__floor__{scene}__floor-under-edge-{partner}__{MJ._slug(obj)}__s{so:g}"
+                    jobs.setdefault(j["id"], j)
+    elif args.mode == "placed-tray":
         spec = PlacedSpec.parse(args.tray_spec).canonical()
         for slot in args.slots:
             for j in MJ.build(slot, ["disembedding"]).jobs.values():

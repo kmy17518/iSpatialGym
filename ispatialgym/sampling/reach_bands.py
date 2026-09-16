@@ -113,8 +113,14 @@ CONTACT_SET = "generic_contact"
 #: pad centre offset along the eef approach axis (conventions.CONTACT_CENTER_Z; negative = behind the origin)
 CONTACT_CENTER_Z = -0.01186
 #: idle-arm postures tried in this order when a trunk is not collision-free (owner decision 2026-09-16 A6: the idle
-#: arm may take any recorded collision-free posture; the band records the posture per trunk)
+#: arm may take any recorded collision-free posture; the band records the posture per trunk); ``--posture`` overrides
 POSTURES = ("untucked", "ready", "tucked")
+#: under-edge floor band (owner decision 2026-09-16 item 7, push-under): floor cells along the partner's near footprint
+#: edge from ``UNDER_EDGE_OUT_M`` outside it (the drop cells: half extent + 10 cm outside the edge) to ``UNDER_EDGE_IN_M``
+#: under it (the goal cells: centre 5-10 cm inside), evaluated from the edge stance with the pitched push classes
+UNDER_EDGE_OUT_M = 0.50
+UNDER_EDGE_IN_M = 0.30
+UNDER_EDGE_CLEARANCE_EXTRA_M = 0.03  # a cell under the partner needs clearance >= object height + this
 STRIP_MAX_DEPTH = 0.95  # m into the support from the edge; deeper cells are never reachable
 STRIP_HALF_WIDTH = 0.80
 CACHE_DEFAULT = os.path.expanduser("~/.cache/ispatialgym/reach_bands")
@@ -363,7 +369,7 @@ class ReachBands:
     def find(scene: str, support: str, object: Optional[str] = None, grasp_key: Optional[str] = None, *, placed: Sequence[str] = (),
              under: Optional[str] = None, scale: Optional[Sequence[float]] = None, target: Optional[str] = None, joint: Optional[str] = None,
              mode: Optional[str] = None, arm: str = "right", contact_set: Optional[str] = None, height: Optional[float] = None,
-             dirs: Optional[Sequence[str]] = None) -> List[str]:
+             under_edge: Optional[bool] = None, dirs: Optional[Sequence[str]] = None) -> List[str]:
         """Paths (``.npz``) of the cached bands matching the given factors, best match first.
 
         ``object`` = ``CATEGORY/MODEL`` (``None`` for object-less generic bands); ``grasp_key`` = the library key,
@@ -374,7 +380,9 @@ class ReachBands:
         (``None`` = canonical); brace bands are selected with ``target`` (+ optional ``joint``); ``arm`` = the band's
         arm (bands without the field are right-arm bands); contact bands (``--generic-contact``) are selected with
         ``contact_set="generic_contact"`` and the object ``height`` (m) - the band whose height class (2 cm bins)
-        contains it, ``height=None`` = any class (nearest to 0.10 m first)."""
+        contains it, ``height=None`` = any class (nearest to 0.10 m first); ``under_edge`` selects the push-under
+        under-edge floor bands (``--under-edge``: strip along the partner's near edge) - ``True`` only those, ``False``
+        only the plain ``--under`` bands (floor under the whole partner), ``None`` either."""
         hits = []
         hcls = height_class(height) if height is not None else None
         placed_req = canonical_placed(placed)
@@ -410,6 +418,8 @@ class ReachBands:
                     continue
                 if (meta.get("under_partner") or None) != (under or None):
                     continue
+                if under_edge is not None and bool(meta.get("under_edge")) != bool(under_edge):
+                    continue
                 hits.append((npz, meta))
         # finest lattice first, then most trunks, then the newest (contact bands with height=None: the class nearest 0.10 m)
         hits.sort(key=lambda h: (abs(float(h[1].get("height_class", 0.1)) - 0.1) if (contact_set and hcls is None) else 0.0, float(h[1].get("lattice", 1.0)),
@@ -420,18 +430,22 @@ class ReachBands:
     def load(scene: str, support: str, object: Optional[str] = None, grasp_key: Optional[str] = None, *, placed: Sequence[str] = (),
              under: Optional[str] = None, scale: Optional[Sequence[float]] = None, target: Optional[str] = None, joint: Optional[str] = None,
              mode: Optional[str] = None, arm: str = "right", contact_set: Optional[str] = None, height: Optional[float] = None,
-             dirs: Optional[Sequence[str]] = None) -> "ReachBands":
+             under_edge: Optional[bool] = None, dirs: Optional[Sequence[str]] = None) -> "ReachBands":
         """Load the cached band for the given factors (see :meth:`find`); ``FileNotFoundError`` on a cache miss.
 
         Left-arm contact band of an object of height ``h`` on ``support``::
 
             ReachBands.load(scene, support, arm="left", contact_set="generic_contact", height=h)
+
+        Push-under under-edge band (pitched push classes along the partner's near edge, closed gripper, tucked idle arm)::
+
+            ReachBands.load(scene, "floor", obj, "generic", under=partner, under_edge=True)
         """
         paths = ReachBands.find(scene, support, object, grasp_key, placed=placed, under=under, scale=scale, target=target, joint=joint, mode=mode, arm=arm,
-                                contact_set=contact_set, height=height, dirs=dirs)
+                                contact_set=contact_set, height=height, under_edge=under_edge, dirs=dirs)
         if not paths:
             raise FileNotFoundError(f"no reach band for scene={scene} support={support} object={object} grasp_key={grasp_key} placed={list(placed)} "
-                                    f"under={under} scale={scale} target={target} joint={joint} arm={arm} contact_set={contact_set} height={height} "
+                                    f"under={under} under_edge={under_edge} scale={scale} target={target} joint={joint} arm={arm} contact_set={contact_set} height={height} "
                                     f"in {list(dirs) if dirs is not None else default_dirs()}")
         if len(paths) > 1:
             log.debug("%d reach bands match (%s ...); using %s", len(paths), object or target or contact_set, paths[0])
@@ -748,17 +762,19 @@ class BandComputer:
         #: stance-relative placed object (:class:`MovingPlaced`, ``--placed ...@focus_centred_edge_aligned``): hidden
         #: during the batched passes, moved to every cell that passed for a per-cell pre-grasp check against it
         self.cell_obstacle: Optional[MovingPlaced] = None
+        #: idle-arm postures tried per trunk, in order (``--posture``; default :data:`POSTURES`)
+        self.postures: Tuple[str, ...] = tuple(POSTURES)
 
     def ignoring(self, objs):
         return self.scope.ignoring(objs) if self.scope is not None else self.kit.ignoring(objs)
 
     # -- postures (owner decision A6) -----------------------------------------------------------------------------
-    def trunk_config(self, translate: float, tilt: float, x0: float, y0: float, yaw0: float, postures: Sequence[str] = POSTURES):
-        """Whole-body collision-free configuration at the trunk with the first posture of ``postures`` that is free
-        (``untucked`` first; ``ready`` / ``tucked`` when the untucked arms self-collide, e.g. translate 0.95 / tilt -1.2):
-        ``(q, posture)`` or ``(None, None)`` when every posture collides."""
+    def trunk_config(self, translate: float, tilt: float, x0: float, y0: float, yaw0: float, postures: Optional[Sequence[str]] = None):
+        """Whole-body collision-free configuration at the trunk with the first posture of ``postures`` (default
+        :attr:`postures`) that is free (``untucked`` first; ``ready`` / ``tucked`` when the untucked arms self-collide,
+        e.g. translate 0.95 / tilt -1.2): ``(q, posture)`` or ``(None, None)`` when every posture collides."""
         kit = self.kit
-        for posture in postures:
+        for posture in (postures if postures is not None else self.postures):
             try:
                 q = kit.q_at_base_pose(kit.q_config(arms=posture, translate=translate, tilt=tilt, fingers=self.fingers), x0, y0, yaw0)
             except (ValueError, KeyError):
@@ -873,30 +889,35 @@ class BandComputer:
         return {"edge": None, "edge_mid": best.tolist(), "inward": inward.tolist(), "tangent": [-float(inward[1]), float(inward[0])],
                 "base_pose2d": [float(best[0]), float(best[1]), yaw], "stand_off": 0.0, "overhang": 0.0, "edge_depth": 0.0}
 
-    def stance_under(self, partner, stand_off: float = STAND_OFF) -> Dict[str, Any]:
-        """IORS under: base square to the partner's near AABB edge (the edge with free floor in front), at ``stand_off``."""
+    def stance_under(self, partner, stand_off: float = STAND_OFF, probe_trunks: Optional[Sequence[Tuple[float, float]]] = None) -> Dict[str, Any]:
+        """IORS under: base square to the partner's near AABB edge (the edge with free floor in front), at ``stand_off``.
+        Edges are ranked by the number of collision-free ``probe_trunks`` (default: trunk (0.5, 0) only), then by length -
+        the under-edge push band passes the deep floor trunks so that the side whose crouches clear the partner wins."""
         kit = self.kit
+        probes = list(probe_trunks) if probe_trunks else [(0.5, 0.0)]
         lo, hi = partner.aabb
         cx, cy = float(lo[0] + hi[0]) / 2, float(lo[1] + hi[1]) / 2
         cands = []
-        for normal, mid, length in ((th.tensor([1.0, 0.0]), th.tensor([float(hi[0]), cy]), float(hi[1] - lo[1])),
-                                    (th.tensor([-1.0, 0.0]), th.tensor([float(lo[0]), cy]), float(hi[1] - lo[1])),
-                                    (th.tensor([0.0, 1.0]), th.tensor([cx, float(hi[1])]), float(hi[0] - lo[0])),
-                                    (th.tensor([0.0, -1.0]), th.tensor([cx, float(lo[1])]), float(hi[0] - lo[0]))):
+        for name, normal, mid, length in (("+x", th.tensor([1.0, 0.0]), th.tensor([float(hi[0]), cy]), float(hi[1] - lo[1])),
+                                          ("-x", th.tensor([-1.0, 0.0]), th.tensor([float(lo[0]), cy]), float(hi[1] - lo[1])),
+                                          ("+y", th.tensor([0.0, 1.0]), th.tensor([cx, float(hi[1])]), float(hi[0] - lo[0])),
+                                          ("-y", th.tensor([0.0, -1.0]), th.tensor([cx, float(lo[1])]), float(hi[0] - lo[0]))):
             base_xy = mid + normal * stand_off
             if not kit.trav_free(base_xy):
                 continue
             inward = -normal
             yaw = math.atan2(float(inward[1]), float(inward[0]))
-            q, _ = self.trunk_config(0.5, 0.0, float(base_xy[0]), float(base_xy[1]), yaw)
-            cands.append((q is not None, length, mid, inward, base_xy, yaw))
+            n_free = sum(1 for tr, ti in probes if self.trunk_config(tr, ti, float(base_xy[0]), float(base_xy[1]), yaw)[0] is not None)
+            cands.append((n_free, length, name, mid, inward, base_xy, yaw))
         if not cands:
             raise RuntimeError(f"no stance around {partner.name}")
-        cands.sort(key=lambda c: (not c[0], -c[1]))
-        _, length, mid, inward, base_xy, yaw = cands[0]
-        return {"edge": "aabb", "edge_mid": mid.tolist(), "inward": inward.tolist(), "tangent": [-float(inward[1]), float(inward[0])], "length_m": length,
+        cands.sort(key=lambda c: (-c[0], -c[1]))
+        n_free, length, name, mid, inward, base_xy, yaw = cands[0]
+        log.info("under stance at %s: AABB edge %s (%d of %d probe trunks free; candidates %s)", partner.name, name, n_free, len(probes),
+                 [(c[2], c[0]) for c in cands])
+        return {"edge": "aabb", "aabb_edge": name, "edge_mid": mid.tolist(), "inward": inward.tolist(), "tangent": [-float(inward[1]), float(inward[0])], "length_m": length,
                 "base_pose2d": [float(base_xy[0]), float(base_xy[1]), yaw], "stand_off": stand_off, "overhang": 0.0,
-                "edge_depth": float(th.dot(mid - base_xy, inward))}
+                "edge_depth": float(th.dot(mid - base_xy, inward)), "probe_trunks_free": n_free}
 
     # -- lattice ------------------------------------------------------------------------------------------------
     def base_frame(self, stance: Dict[str, Any]):
@@ -1038,12 +1059,12 @@ class BandComputer:
             if q is None:
                 entry["collides"] = True
                 entry["time_s"] = round(time.time() - t0, 2)
-                log.info("%strunk (%.2f, %+.1f): collides with every idle-arm posture %s, skipped", tag, tr, ti, list(POSTURES))
+                log.info("%strunk (%.2f, %+.1f): collides with every idle-arm posture %s, skipped", tag, tr, ti, list(self.postures))
                 return (entry,) + empty
             entry["posture"] = posture
             entry["idle_arm_q"] = self.idle_arm_q(q)
-            if posture != "untucked":
-                log.info("%strunk (%.2f, %+.1f): untucked arms collide, using the %s posture", tag, tr, ti, posture)
+            if posture != self.postures[0]:
+                log.info("%strunk (%.2f, %+.1f): %s arms collide, using the %s posture", tag, tr, ti, self.postures[0], posture)
             shoulder, arm_len = self.shoulder_and_reach(q, arm)
             reach = arm_len + max_grasp_offset + PRE_GRASP + 0.05
             entry["shoulder_world"] = [round(float(v), 4) for v in shoulder.tolist()]
@@ -1392,6 +1413,11 @@ def main(argv=None):
                     "MODE 'edge' (default, legacy: fixed tray at the stance line, lattice = its floor) or 'focus_centred_edge_aligned' (stance-relative: "
                     "the tray follows the cell, lattice = the top cells where it fits), e.g. tray/gsxbym*1.25@focus_centred_edge_aligned")
     ap.add_argument("--under", default=None, help="floor mode: partner scene object; lattice = floor under it")
+    ap.add_argument("--under-edge", action="store_true", help="with --under: under-edge floor band (push-under, owner item 7) - lattice = the floor strip along the "
+                    f"partner's near footprint edge from {UNDER_EDGE_OUT_M} m outside (drop cells) to {UNDER_EDGE_IN_M} m under it (goal cells, clearance >= object height + "
+                    f"{UNDER_EDGE_CLEARANCE_EXTRA_M}); use with --generic-pinch (pitched push classes), --posture tucked and --fingers 0 (blade)")
+    ap.add_argument("--posture", default=None, help="idle-arm postures to try per trunk, comma-separated in order (default untucked,ready,tucked; e.g. 'tucked')")
+    ap.add_argument("--fingers", type=float, default=None, help="locked finger opening (default 0.05 open; --generic-contact 0; 0 = closed blade for push bands)")
     ap.add_argument("--target", default=None, help="brace mode: articulated CATEGORY/MODEL")
     ap.add_argument("--handle-key", default=None)
     ap.add_argument("--joint", default=None)
@@ -1443,9 +1469,17 @@ def main(argv=None):
     bc = BandComputer(world, kit, arms=arms, lattice=lattice)
     if args.generic_contact:
         bc.fingers = 0.0  # closed gripper
+    if args.fingers is not None:
+        bc.fingers = float(args.fingers)
+    if args.posture:
+        bc.postures = tuple(p.strip() for p in args.posture.split(",") if p.strip())
+        if any(p not in POSTURES for p in bc.postures):
+            raise SystemExit(f"--posture: unknown posture in {bc.postures}; known {list(POSTURES)}")
+    if args.under_edge and not (floor_mode and args.under):
+        raise SystemExit("--under-edge needs --support floor --under PARTNER")
     meta: Dict[str, Any] = {"scene": args.scene, "rooms": rooms, "support": args.support, "removed_chairs": removed, "lattice": lattice,
                             "stand_off": args.stand_off, "arms": "untucked (ready / tucked per trunk when untucked collides, see trunks[].posture)",
-                            "postures": list(POSTURES), "arm": band_arm, "fingers": bc.fingers,
+                            "postures": list(bc.postures), "arm": band_arm, "fingers": bc.fingers,
                             "grid": {"translates": TRANSLATES, "tilts": TILTS, "low_top_tilt": LOW_TOP_TILT},
                             "seeds": 12, "pre_grasp": PRE_GRASP, "yaws": YAWS, "mode": "brace" if args.brace else ("floor" if floor_mode else "tabletop"),
                             "smoke": bool(args.smoke), "scale": scale, "placed_specs": [PlacedSpec.parse(s).canonical() for s in args.placed],
@@ -1463,11 +1497,15 @@ def main(argv=None):
         # ---- support geometry and stance
         placed_objs = []
         placed_specs = [PlacedSpec.parse(s) for s in args.placed]
+        under_edge_parts = None  # --under-edge: (outside cells, under cells near the edge, their clearances), finalized with the object height
         if floor_mode:
             z_support = world.floor_z
             if args.under:
                 partner = world.obj(args.under)
-                stance = bc.stance_under(partner, args.stand_off)
+                # under-edge push band: rank the partner's edges by the deep floor trunks the band will use (a crouch next to a
+                # bed collides on the cramped side); the plain under band keeps the (0.5, 0) probe
+                deep = trunk_sel or [(tr, ti) for tr in (0.75, 0.95) for ti in (-0.9, -1.2)]
+                stance = bc.stance_under(partner, args.stand_off, probe_trunks=deep if args.under_edge else None)
                 lo, hi = partner.aabb
                 res = 0.02
                 xs = th.arange(float(lo[0]) + res / 2, float(hi[0]), res)
@@ -1485,6 +1523,28 @@ def main(argv=None):
                 meta["under_clearance_m"] = {"min": float(clearance[clear].min()) if int(clear.sum()) else None, "max": float(clearance[clear].max()) if int(clear.sum()) else None}
                 meta["under_partner"] = args.under
                 ignore_grasp = [world.obj(world.floor_of_room(rooms[0]).name)] if rooms else []
+                if args.under_edge:
+                    # under-edge strip (push-under): the free floor in front of the near edge (drop cells, up to UNDER_EDGE_OUT_M
+                    # outside) + the clear cells under the partner within UNDER_EDGE_IN_M of that edge (goal cells; the object
+                    # height filter is applied once the object is spawned). Everything in base coordinates at the edge stance.
+                    origin, fwd, left = bc.base_frame(stance)
+                    inward = th.tensor(stance["inward"])
+                    mid = th.tensor(stance["edge_mid"])
+                    edge_depth = float(stance["edge_depth"])  # distance base -> edge along the inward direction
+                    xs = th.arange(max(0.2, edge_depth - UNDER_EDGE_OUT_M), edge_depth + 1e-6, res)
+                    ls = th.arange(-STRIP_HALF_WIDTH, STRIP_HALF_WIDTH + 1e-6, res)
+                    gx, gl = th.meshgrid(xs, ls, indexing="ij")
+                    outside = origin + gx.flatten().unsqueeze(1) * fwd + gl.flatten().unsqueeze(1) * left
+                    outside = th.stack([c for c in outside if kit.trav_free(c)]) if len(outside) else outside
+                    under_pts = pts[clear]
+                    depth = (under_pts - mid) @ inward
+                    near = (depth >= -res) & (depth <= UNDER_EDGE_IN_M)
+                    under_edge_parts = (outside, under_pts[near], clearance[clear][near])
+                    meta["under_edge"] = {"out_m": UNDER_EDGE_OUT_M, "in_m": UNDER_EDGE_IN_M, "clearance_extra_m": UNDER_EDGE_CLEARANCE_EXTRA_M, "n_outside": int(len(outside)),
+                                          "n_under_near": int(near.sum()), "edge_depth_m": edge_depth,
+                                          "lattice": "free floor strip in front of the partner's near edge (drop cells) + clear floor under it within in_m of the edge (goal cells)"}
+                    log.info("under-edge band at %s: %d free floor cells in front of the edge (%.2f m ahead of the base), %d clear cells under it within %.2f m",
+                             args.under, len(outside), edge_depth, int(near.sum()), UNDER_EDGE_IN_M)
             else:
                 stance = bc.stance_free_floor(args.room)
                 origin, fwd, left = bc.base_frame(stance)
@@ -1752,6 +1812,16 @@ def main(argv=None):
             else:
                 meta.update({"object": None, "grasp_key": None, "generic_pinch": True, "grasp_names": []})
                 h = 0.05
+            if under_edge_parts is not None:
+                # under-edge lattice: the goal cells under the partner need clearance >= object height + extra
+                outside, under_near, under_clear = under_edge_parts
+                need = h + UNDER_EDGE_CLEARANCE_EXTRA_M
+                keep = under_clear >= need
+                lattice_world = th.cat([outside, under_near[keep]]) if len(outside) or int(keep.sum()) else th.zeros(0, 2)
+                meta["under_edge"].update({"object_height_m": round(h, 4), "clearance_needed_m": round(need, 4), "n_under_clear": int(keep.sum()),
+                                           "n_lattice": int(len(lattice_world))})
+                log.info("under-edge band: %d of %d cells under the edge have clearance >= %.3f m (object %.3f m); %d lattice points", int(keep.sum()), len(under_near), need, h,
+                         len(lattice_world))
             if args.generic_contact:
                 # left-arm (brace) contact band: one per object height class; the cell is the contact point on the object's
                 # side face at 3/4 of the class height (top press at the class height); z_support = the top the object stands on
@@ -1783,12 +1853,16 @@ def main(argv=None):
             gset = [(g.key, g.name, g.position.tolist(), g.quat.tolist()) for g in grasps] if grasps else ("contact:" + ",".join(CONTACT_CLASSES_NAMES) if args.generic_contact else "generic:" + ",".join(GENERIC_CLASSES))
             key = _key({"scene": args.scene, "support": args.support, "z": round(z_support, 2), "stance": stance["edge"], "s": args.stand_off, "object": meta.get("object"),
                         "scale": scale, "grasps": gset, "rest": rest_quat.tolist(), "placed": meta["placed_specs"], "under": args.under, "grid": meta["grid"], "lattice": lattice,
-                        "arms": "untucked", "seeds": 12, "arm": band_arm, "height_class": meta.get("height_class"), "postures": list(POSTURES)})
+                        "arms": "untucked", "seeds": 12, "arm": band_arm, "height_class": meta.get("height_class"), "postures": list(bc.postures),
+                        # only non-default extras enter the key (the file names of the existing modes stay stable)
+                        **({"fingers": bc.fingers} if abs(bc.fingers - (0.0 if args.generic_contact else 0.05)) > 1e-9 else {}),
+                        **({"under_edge": meta["under_edge"]} if meta.get("under_edge") else {})})
             oname = f"h{meta['height_class']:.2f}" if args.generic_contact else (args.object.replace("/", "-") if args.object else "generic")
             for ps in placed_specs:
                 oname += f"__placed-{ps.category}-{ps.model}" + (f"-s{ps.scale[0]:g}" if ps.scale else "") + ("-focus" if ps.mode == PLACED_MODE_FOCUS else "")
             mode_name = "contact" if args.generic_contact else meta["mode"]
-            name = f"{mode_name}__{args.scene}__{args.support}{'-under-' + args.under if args.under else ''}__{band_arm if band_arm != 'right' else ''}{'_' if band_arm != 'right' else ''}{oname}__{key}"
+            under_tag = ("-under-edge-" if args.under_edge else "-under-") + args.under if args.under else ""
+            name = f"{mode_name}__{args.scene}__{args.support}{under_tag}__{band_arm if band_arm != 'right' else ''}{'_' if band_arm != 'right' else ''}{oname}__{key}"
             if args.smoke:
                 meta["sanity"] = band_sanity(stance, result, z_eval)
 

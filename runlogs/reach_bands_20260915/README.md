@@ -223,6 +223,28 @@ lattice was the tray floor only, 0.53–0.85 m ahead); the tray rejected 0–1 p
 ≈ 25–35 min on an L40S incl. the scene load. Since core's `7a340e4` (spawn re-parks every earlier spawn) the target
 spawn moved the placed tray to the parking spot; `restore_placed()` puts it back (the `edge` mode is an obstacle again).
 
+**Under-edge floor band (owner item 7, push-under support; started after items 1–2 were queued).** New mode
+`--support floor --under PARTNER --under-edge --generic-pinch [--object C/M] --posture tucked --fingers 0`: the stance is
+the partner-edge stance (`stance_under`: base square to the partner's near AABB edge, facing inward = the push direction,
+`--stand-off` s), the lattice = the free floor strip in front of that edge from `UNDER_EDGE_OUT_M` = 0.50 m outside it
+(the drop cells of the large-scale sampler: half extent + 10 cm outside) to `UNDER_EDGE_IN_M` = 0.30 m under it (goal
+cells, kept when the raycast clearance ≥ object height + 3 cm), the classes = the pitched push set
+(`GENERIC_CLASSES`, eef at the object-centre height `floor + max(0.6 h, 3 cm)`), closed gripper (`--fingers 0`, the
+blade), idle arm tucked (`--posture` = the posture order to try; recorded per trunk). Loader:
+`ReachBands.load(scene, "floor", obj, "generic", under=partner, under_edge=True)` (`under_edge=False` = the plain
+`--under` bands, `None` = either); file `floor__<scene>__floor-under-edge-<partner>__<obj>__<key>`; meta `under_edge`
+= `{out_m, in_m, clearance_extra_m, n_outside, n_under_near, n_under_clear, object_height_m, edge_depth_m, n_lattice}`.
+
+*Measured (local, `sandal/chgcrm` under `bed_rrcvaq_0`, the pilot's under-large pick, 8 cm, trunks (0.5/0.75/0.95,
+−0.9/−1.2))*: at s = 0.45 the band is **empty** — (0.95, ·) collide with the bed at every posture, (0.75, −0.9) and
+(0.5, −1.2) have every push pose farther than arm length + 3 cm from the shoulder (eef 4.3 cm above the floor), (0.75,
+−1.2) screens 152 poses on 84 cells and none is IK-feasible (the crouched torso over the 0.49 m bed edge). The s = 0.65
+run (the large-scale agent's stance range 0.5–0.7, all postures) is reported below this table when it finishes. The
+push-under record's blade poses (`iors_large._push_under_chain`: eef at `floor + clamp(h/2, 4.5, 8 cm)`, approach pitched
+0–60° toward the push, ±wrist) have the same eef height as the band's push classes, so the band is the right screen once
+a stance with reachable floor cells exists; the finding matches §5.6's note (floor init / under placement need a bent
+posture or a closer stand-off) — for the demo the large-scale agent's exact-IK chain per candidate stance stays the path.
+
 ## Smoke (local RTX 4090, `--smoke`: 16 cm lattice, trunks (0.5, 0) and (0.25, −0.3))
 
 * **Shoulder-FK fix verified**: the band computation's shoulder position (cuRobo FK of `torso_link4` + the constant

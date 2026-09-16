@@ -1,0 +1,122 @@
+[
+ {
+  "id": "rb__floor__house_single_floor__floor-under-edge-bed_rrcvaq_0__briefcase-lwbctq__s0.45",
+  "kind": "floor",
+  "subtasks": [
+   "inter_object_relation_satisfaction-under_large_scale"
+  ],
+  "picks": [],
+  "slot": "a1",
+  "scene": "house_single_floor",
+  "weight": 2.5,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "floor",
+   "--under",
+   "bed_rrcvaq_0",
+   "--under-edge",
+   "--object",
+   "briefcase/lwbctq",
+   "--generic-pinch",
+   "--posture",
+   "tucked,ready,untucked",
+   "--fingers",
+   "0",
+   "--stand-off",
+   "0.45"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support floor --under bed_rrcvaq_0 --under-edge --object briefcase/lwbctq --generic-pinch --posture tucked,ready,untucked --fingers 0 --stand-off 0.45 --out $OUT"
+ },
+ {
+  "id": "rb__floor__house_single_floor__floor-under-edge-bed_rrcvaq_0__briefcase-lwbctq__s0.6",
+  "kind": "floor",
+  "subtasks": [
+   "inter_object_relation_satisfaction-under_large_scale"
+  ],
+  "picks": [],
+  "slot": "a1",
+  "scene": "house_single_floor",
+  "weight": 2.5,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "floor",
+   "--under",
+   "bed_rrcvaq_0",
+   "--under-edge",
+   "--object",
+   "briefcase/lwbctq",
+   "--generic-pinch",
+   "--posture",
+   "tucked,ready,untucked",
+   "--fingers",
+   "0",
+   "--stand-off",
+   "0.6"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support floor --under bed_rrcvaq_0 --under-edge --object briefcase/lwbctq --generic-pinch --posture tucked,ready,untucked --fingers 0 --stand-off 0.6 --out $OUT"
+ },
+ {
+  "id": "rb__floor__house_single_floor__floor-under-edge-bed_rrcvaq_0__sandal-chgcrm__s0.45",
+  "kind": "floor",
+  "subtasks": [
+   "inter_object_relation_satisfaction-under_large_scale"
+  ],
+  "picks": [],
+  "slot": "a1",
+  "scene": "house_single_floor",
+  "weight": 2.5,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "floor",
+   "--under",
+   "bed_rrcvaq_0",
+   "--under-edge",
+   "--object",
+   "sandal/chgcrm",
+   "--generic-pinch",
+   "--posture",
+   "tucked,ready,untucked",
+   "--fingers",
+   "0",
+   "--stand-off",
+   "0.45"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support floor --under bed_rrcvaq_0 --under-edge --object sandal/chgcrm --generic-pinch --posture tucked,ready,untucked --fingers 0 --stand-off 0.45 --out $OUT"
+ },
+ {
+  "id": "rb__floor__house_single_floor__floor-under-edge-bed_rrcvaq_0__sandal-chgcrm__s0.6",
+  "kind": "floor",
+  "subtasks": [
+   "inter_object_relation_satisfaction-under_large_scale"
+  ],
+  "picks": [],
+  "slot": "a1",
+  "scene": "house_single_floor",
+  "weight": 2.5,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "floor",
+   "--under",
+   "bed_rrcvaq_0",
+   "--under-edge",
+   "--object",
+   "sandal/chgcrm",
+   "--generic-pinch",
+   "--posture",
+   "tucked,ready,untucked",
+   "--fingers",
+   "0",
+   "--stand-off",
+   "0.6"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support floor --under bed_rrcvaq_0 --under-edge --object sandal/chgcrm --generic-pinch --posture tucked,ready,untucked --fingers 0 --stand-off 0.6 --out $OUT"
+ }
+]
