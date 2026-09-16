@@ -246,6 +246,18 @@ def _pre(C, pose: Pose, dist: float) -> Pose:
     return _as_pose(C.pre_pose(pose.tensors(), dist))
 
 
+def block_centre_pose(state: Any, block: BlockRecord) -> Pose:
+    """The block's **geometric centre** pose ``root_pose ∘ (centre_offset, I)`` at its current pose — the frame the cube
+    grasp and the in-hand flip pivot are defined in (``blocks[].centre_offset``, the offset of the centre from the
+    root link in the block frame, written by the block-design sampler; the root pose when absent)."""
+    root = _state_pose(state, block.instance)
+    off = block.extra.get("centre_offset") if isinstance(block.extra, dict) else None
+    if off is None:
+        return root
+    C = _conventions()
+    return _as_pose(C.compose(root.tensors(), (_tensor(off), _tensor([0.0, 0.0, 0.0, 1.0]))))
+
+
 def yaw_align_deg(block: BlockRecord) -> float:
     """ψ (degrees) of a block record: the smallest yaw that aligns the block with the table axes (``R_z(ψ) ∘ q_block``,
     the sampler's ``cube_flip_plan``), written by the block-design sampler as ``yaw_align_deg`` **next to** the wrist
@@ -528,8 +540,8 @@ class Grasp(Action):
             return _as_pose(C.grasp_pose(obj.tensors(), g.grasp_key, g.grasp_name))
         if self.kind == "cube":
             b = self.block
-            obj = _state_pose(state, self.object)
-            cube = C.cube_grasp(obj.tensors(), face_pair=b.face_pair, tilt_pick_deg=float(b.tilt_pick_deg), yaw=math.radians(b.yaw_deg))
+            centre = block_centre_pose(state, b)  # the cube grasp is defined about the block's centre, not its root link
+            cube = C.cube_grasp(centre.tensors(), face_pair=b.face_pair, tilt_pick_deg=float(b.tilt_pick_deg), yaw=math.radians(b.yaw_deg))
             return _as_pose(cube.eef)
         art = self.articulation
         return _handle_eef(C, art.waypoints[art.key_at(0.0)])
@@ -668,7 +680,9 @@ class Reorient(Action):
         return None
 
     def _pivot(self, sidecar, state, start: Pose) -> List[float]:
-        obj = _state_pose(state, self.object)
+        """The in-hand rotation pivot: the object's centre — for a block ``root ∘ centre_offset`` — carried to where
+        the lifted eef holds it (``start`` vs the grasp eef pose at the object's current pose)."""
+        obj = block_centre_pose(state, self.block) if self.block is not None else _state_pose(state, self.object)
         grasp = self._grasp_pose(sidecar, state)
         if grasp is None:
             return list(obj.position)
@@ -1026,5 +1040,5 @@ ACTION_NAMES: Tuple[str, ...] = tuple(cls.__dataclass_fields__["name"].default f
 __all__ = [
     "PRE_DIST", "RETREAT_DIST", "RETREAT_LITTLE", "N_WAYPOINTS", "N_INHAND", "N_YAW_ALIGN", "N_FLIP", "QA_FAILED_GRASP",
     "State", "Action", "Navigate", "Transition", "SetTorso", "Grasp", "Lift", "Reorient", "Place", "Push", "Brace",
-    "BaseFollow", "Retreat", "VOCABULARY", "ACTION_NAMES", "direction_word", "yaw_align_deg", "block_reorients",
+    "BaseFollow", "Retreat", "VOCABULARY", "ACTION_NAMES", "direction_word", "yaw_align_deg", "block_reorients", "block_centre_pose",
 ]

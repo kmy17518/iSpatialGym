@@ -598,7 +598,8 @@ def test_cube_grasp_uses_the_wrist_yaw_in_radians_and_the_pick_tilt_in_degrees()
     assert grasps and all(a.kind == "cube" for a in grasps)
     for grasp in grasps:
         b = grasp.block
-        cube = C.cube_grasp(state.object_pose(b.instance), b.face_pair, b.tilt_pick_deg, math.radians(b.yaw_deg))
+        centre = A.block_centre_pose(state, b).tensors()  # root pose ∘ (centre_offset, I)
+        cube = C.cube_grasp(centre, b.face_pair, b.tilt_pick_deg, math.radians(b.yaw_deg))
         assert _same_pose(grasp.grasp_pose(sc, state), cube.eef)
         assert cube.tilt_deg == b.tilt_pick_deg and cube.face_pair == b.face_pair and cube.downward
         # F5 snaps the wrist yaw to the nearer admissible value (eef +x ⊥ the pinch axis)
@@ -607,6 +608,39 @@ def test_cube_grasp_uses_the_wrist_yaw_in_radians_and_the_pick_tilt_in_degrees()
         assert _close(C.closing_axis(cube.eef[1]).abs(), C.quat_rotate(state.object_pose(b.instance)[1], th.tensor(face_axis)).abs())  # pads close across the face pair
         _, numbers = grasp.annotate(sc)
         assert f"wrist yaw {b.yaw_deg:.0f}°" in numbers and f"pick tilt {b.tilt_pick_deg:.0f}°" in numbers
+
+
+@needs_conventions
+def test_block_centre_offset_moves_the_cube_grasp_and_the_flip_pivot():
+    """``blocks[].centre_offset`` (the cube centre in the root frame, written by the block-design sampler): the cube
+    grasp is built about ``root ∘ (centre_offset, I)`` and the in-hand flip pivots there, not at the root link."""
+    sc = load("configuration_matching-block_design")
+    state = StubState()
+    actions = expand(sc.alias, sc)
+    grasp = [a for a in actions if a.name == "grasp"][0]
+    reorient = [a for a in actions if a.name == "reorient" and a.block is not None][0]
+    b = grasp.block
+    root = state.object_pose(b.instance)
+    off = [0.01, -0.02, 0.03]
+    plain = grasp.grasp_pose(sc, state)
+    plain_pivot = reorient.targets(sc, state)["pivot"]
+    saved = dict(b.extra), dict(reorient.block.extra)
+    off0 = th.tensor(b.extra.get("centre_offset", [0.0, 0.0, 0.0]))
+    b.extra["centre_offset"] = off
+    reorient.block.extra["centre_offset"] = list(off)
+    centre = A.block_centre_pose(state, b)
+    assert _close(th.tensor(centre.position), root[0] + C.quat_rotate(root[1], th.tensor(off))) and _close(th.tensor(centre.orientation), root[1])
+    shift = C.quat_rotate(root[1], th.tensor(off) - off0)
+    shifted = grasp.grasp_pose(sc, state)
+    assert _close(th.tensor(shifted.position) - th.tensor(plain.position), shift, tol=1e-5)
+    assert _close(th.tensor(shifted.orientation), th.tensor(plain.orientation))
+    pivot = reorient.targets(sc, state)["pivot"]
+    assert _close(th.tensor(pivot) - th.tensor(plain_pivot), shift, tol=1e-5)
+    b.extra.clear(), b.extra.update(saved[0])
+    reorient.block.extra.clear(), reorient.block.extra.update(saved[1])
+    assert _same_pose(grasp.grasp_pose(sc, state), plain.tensors())
+    # every block record carries yaw_align_deg and centre_offset now (the sampler writes them on every record)
+    assert all("yaw_align_deg" in blk.extra and "centre_offset" in blk.extra for blk in sc.blocks)
 
 
 @needs_conventions

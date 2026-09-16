@@ -87,7 +87,13 @@
           0.0
         ]
       },
-      "carry_height": 0.1
+      "carry_height": 0.1,
+      "yaw_align_deg": 0.0,
+      "centre_offset": [
+        0.0,
+        0.0,
+        0.0125
+      ]
     },
     {
       "instance": "toy_dice.n.01_3",
@@ -213,7 +219,13 @@
           0.0
         ],
         "distance_m": 0.008
-      }
+      },
+      "yaw_align_deg": 0.0,
+      "centre_offset": [
+        0.0,
+        0.0,
+        0.0125
+      ]
     },
     {
       "instance": "toy_dice.n.01_2",
@@ -335,7 +347,13 @@
           0.0
         ],
         "distance_m": 0.008
-      }
+      },
+      "yaw_align_deg": 0.0,
+      "centre_offset": [
+        0.0,
+        0.0,
+        0.0125
+      ]
     },
     {
       "instance": "toy_dice.n.01_4",
@@ -546,7 +564,13 @@
           0.0
         ],
         "distance_m": 0.008
-      }
+      },
+      "yaw_align_deg": 0.0,
+      "centre_offset": [
+        0.0,
+        0.0,
+        0.0125
+      ]
     }
   ],
   "language": {
