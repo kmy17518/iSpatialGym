@@ -26,7 +26,11 @@ the placed objects. Neither key contains the base pose: a different stand‑off 
 Modes::
 
     python -m ispatialgym.sampling.reach_bands --scene S --support T --object CATEGORY/MODEL [--grasp-key K] [--scale sx,sy,sz]
-    python -m ispatialgym.sampling.reach_bands ... --placed tray/gsxbym            # disembedding: lattice = source tray floor
+    python -m ispatialgym.sampling.reach_bands ... --placed tray/gsxbym            # disembedding (legacy): fixed tray, lattice = its floor
+    python -m ispatialgym.sampling.reach_bands ... --placed 'tray/gsxbym*1.25@focus_centred_edge_aligned'
+        # disembedding, stance-relative (owner item 9): the tray (spawn scale 1.25) is centred on every lattice cell
+        # of the top with its long axis along the edge, the object stands on its floor at the cell; one band per
+        # (support, object, tray spec) serves every template (see PlacedSpec / placed_spec())
     python -m ispatialgym.sampling.reach_bands ... --generic-pinch                 # blocks / pushes, no library grasps
     python -m ispatialgym.sampling.reach_bands --scene S --support floor --room R --object C/M [--under PARTNER]
     python -m ispatialgym.sampling.reach_bands --scene S --support T --target toolbox/redmtl --handle-key toolbox__redmtl \
@@ -165,6 +169,112 @@ def parse_scale(s: Optional[str]) -> Optional[List[float]]:
     return [round(v, 4) for v in vals]
 
 
+# ----------------------------------------------------------------------------------------------- placed objects
+
+#: ``--placed`` modes (owner decision 2026-09-16 item 9). ``edge``: the legacy placement - the object centred on the
+#: stance line with its near edge 8 cm behind the front edge of the top, long axis along the edge; the lattice is its
+#: inner floor (a band valid for that one tray pose only). ``focus_centred_edge_aligned``: **stance-relative** - for
+#: every lattice cell of the top (= the focus the sampler's Phase 2 picks) the placed object is centred on the cell
+#: (its inner-floor centroid on the cell) with its long axis along the edge, the grasped object stands on its floor at
+#: the cell; the band therefore holds for every template and the sampler places the tray exactly so
+#: (``sampling.v2.tasks.disembedding``). Spec string: ``CATEGORY/MODEL[*SCALE][@MODE]``, e.g.
+#: ``tray/gsxbym*1.25@focus_centred_edge_aligned`` (``SCALE`` = one number or ``sx,sy,sz``; no ``@MODE`` = ``edge``).
+PLACED_MODE_EDGE = "edge"
+PLACED_MODE_FOCUS = "focus_centred_edge_aligned"
+PLACED_MODES = (PLACED_MODE_EDGE, PLACED_MODE_FOCUS)
+#: margin of the "placed object fits on the top" count recorded per band (§3.2, the sampler's ``SUPPORT_MARGIN``) - a
+#: diagnostic only: the lattice is not filtered by it (the sampler's stance may stand closer than the band stance)
+PLACED_FIT_MARGIN = 0.02
+#: legacy ``edge`` placement: near edge of the placed object this far behind the front edge of the top
+PLACED_EDGE_SETBACK = 0.08
+
+
+@dataclass(frozen=True)
+class PlacedSpec:
+    """One ``--placed`` object: ``category/model``, optional spawn scale and the placement mode (:data:`PLACED_MODES`).
+
+    ``PlacedSpec.parse`` accepts the spec string, a ``(object, scale, mode)`` tuple / list (the owner's
+    ``("tray/gsxbym", 1.25, "focus_centred_edge_aligned")``), a dict with those keys or a PlacedSpec; ``canonical()`` is
+    the normalised string the band metas store (``placed_specs``) and :meth:`ReachBands.find` compares - every form of
+    the same placement maps to the same string (uniform scale as one number, scale 1 dropped, the mode always written).
+    Unknown modes are kept verbatim so that bands written by another module round-trip through the loader."""
+
+    category: str
+    model: str
+    scale: Optional[Tuple[float, float, float]] = None
+    mode: str = PLACED_MODE_EDGE
+
+    @property
+    def object(self) -> str:
+        return f"{self.category}/{self.model}"
+
+    @staticmethod
+    def parse(spec) -> "PlacedSpec":
+        if isinstance(spec, PlacedSpec):
+            return spec
+        if isinstance(spec, dict):
+            obj = spec.get("object") or f"{spec.get('category')}/{spec.get('model')}"
+            return PlacedSpec.parse((obj, spec.get("scale"), spec.get("mode") or PLACED_MODE_EDGE))
+        if isinstance(spec, (tuple, list)):
+            obj = str(spec[0])
+            scale = spec[1] if len(spec) > 1 else None
+            mode = str(spec[2]) if len(spec) > 2 and spec[2] else PLACED_MODE_EDGE
+            s = f"{obj}"
+            if scale is not None:
+                s += "*" + (",".join(str(float(v)) for v in scale) if isinstance(scale, (list, tuple)) else str(float(scale)))
+            return PlacedSpec.parse(s + "@" + mode)
+        s = str(spec).strip()
+        mode = PLACED_MODE_EDGE
+        if "@" in s:
+            s, mode = s.split("@", 1)
+            mode = mode.strip() or PLACED_MODE_EDGE
+        scale = None
+        if "*" in s:
+            s, sc = s.split("*", 1)
+            vals = parse_scale(sc)
+            if vals and any(abs(v - 1.0) > 1e-6 for v in vals):
+                scale = tuple(vals)
+        if "/" not in s:
+            raise ValueError(f"placed spec {spec!r}: expected CATEGORY/MODEL[*SCALE][@MODE]")
+        cat, model = s.split("/", 1)
+        if mode not in PLACED_MODES:
+            log.warning("placed spec %r: unknown mode %r (known: %s); kept verbatim", spec, mode, list(PLACED_MODES))
+        return PlacedSpec(cat.strip(), model.strip(), scale, mode)
+
+    def scale_list(self) -> Optional[List[float]]:
+        return list(self.scale) if self.scale is not None else None
+
+    def canonical(self) -> str:
+        s = self.object
+        if self.scale is not None:
+            sx, sy, sz = self.scale
+            s += "*" + (f"{sx:g}" if abs(sx - sy) < 1e-6 and abs(sx - sz) < 1e-6 else f"{sx:g},{sy:g},{sz:g}")
+        return s + "@" + self.mode
+
+    def to_json(self) -> Dict[str, Any]:
+        return {"category": self.category, "model": self.model, "scale": self.scale_list(), "mode": self.mode, "spec": self.canonical()}
+
+
+def placed_spec(obj: str, scale=None, mode: str = PLACED_MODE_FOCUS) -> str:
+    """Canonical ``--placed`` spec string of ``obj`` (``CATEGORY/MODEL``) at ``scale`` (number or ``[sx, sy, sz]``, None =
+    canonical size) in ``mode`` - what the sampler passes as ``placed=[...]`` to :meth:`ReachBands.load`::
+
+        placed_spec("tray/gsxbym", 1.25)   # 'tray/gsxbym*1.25@focus_centred_edge_aligned'
+    """
+    return PlacedSpec.parse((obj, scale, mode)).canonical()
+
+
+def canonical_placed(specs) -> List[str]:
+    """Sorted canonical spec strings of a ``placed`` request or of a band meta (``placed_specs``, else the ``placed``
+    entries' category / model / scale / mode)."""
+    if isinstance(specs, dict):  # a band meta
+        items = specs.get("placed_specs")
+        if items is None:
+            items = [{"category": p.get("category"), "model": p.get("model"), "scale": p.get("scale"), "mode": p.get("mode")} for p in specs.get("placed") or []]
+        specs = items
+    return sorted(PlacedSpec.parse(s).canonical() for s in (specs or []))
+
+
 # ----------------------------------------------------------------------------------------------- result container
 
 
@@ -258,13 +368,16 @@ class ReachBands:
 
         ``object`` = ``CATEGORY/MODEL`` (``None`` for object-less generic bands); ``grasp_key`` = the library key,
         ``"generic"`` for ``--generic-pinch`` bands, ``None`` = any grasp set; ``placed`` = the ``--placed`` objects
-        (order-insensitive); ``under`` = the IORS partner of ``--support floor --under``; ``scale`` = the spawn scale
+        (order-insensitive; spec strings ``CATEGORY/MODEL[*SCALE][@MODE]`` or ``(object, scale, mode)`` tuples, compared
+        through :class:`PlacedSpec` - ``"tray/gsxbym"`` is the legacy ``edge`` placement, the disembedding sampler asks for
+        :func:`placed_spec`\ ``("tray/gsxbym", 1.25)``); ``under`` = the IORS partner of ``--support floor --under``; ``scale`` = the spawn scale
         (``None`` = canonical); brace bands are selected with ``target`` (+ optional ``joint``); ``arm`` = the band's
         arm (bands without the field are right-arm bands); contact bands (``--generic-contact``) are selected with
         ``contact_set="generic_contact"`` and the object ``height`` (m) - the band whose height class (2 cm bins)
         contains it, ``height=None`` = any class (nearest to 0.10 m first)."""
         hits = []
         hcls = height_class(height) if height is not None else None
+        placed_req = canonical_placed(placed)
         for d in (dirs if dirs is not None else default_dirs()):
             for npz, meta in _index(d):
                 if meta.get("scene") != scene or meta.get("support") != support:
@@ -293,7 +406,7 @@ class ReachBands:
                         continue
                     if not _same_scale(scale, meta.get("scale")):
                         continue
-                if sorted(placed) != sorted(p.get("category", "") + "/" + p.get("model", "") for p in meta.get("placed", [])) and sorted(placed) != sorted(meta.get("placed_specs", [])):
+                if placed_req != canonical_placed(meta):
                     continue
                 if (meta.get("under_partner") or None) != (under or None):
                     continue
@@ -507,6 +620,98 @@ class ObstacleScope:
         return _Ctx()
 
 
+class MovingPlaced:
+    """A placed object (the disembedding source tray in the ``focus_centred_edge_aligned`` mode) whose cuRobo collision
+    meshes follow the evaluated cell: hidden during the batched IK passes (the tray moves with the cell, so no single
+    pose serves every cell), moved to the cell's tray pose for the per-cell pre-grasp verification (:meth:`place`) and
+    hidden again (:meth:`hide`). Only the mesh poses in the collision checker change (``_mesh_update_pose``, no world
+    re-sync); the simulated body stays where it was measured. ``pose_at(world_xy)`` = the tray pose whose inner-floor
+    centroid is at the cell (the rule the sampler follows), ``rel`` = mesh poses in the tray's root frame."""
+
+    def __init__(self, kit, world, obj, pose0, pose_at):
+        from ispatialgym.sampling import geometry as G
+
+        self.kit, self.world, self.obj, self.pose_at = kit, world, obj, pose_at
+        self.G = G
+        be = kit.backend
+        prefix = obj.prim_path + "/"
+        self.names = [n for n in be._world_mesh_names if n.startswith(prefix)]
+        self.rel: Dict[str, Any] = {}
+        p0 = (G.t(pose0[0]).float(), G.t(pose0[1]).float())
+        for link in obj.links.values():
+            for cm in link.collision_meshes.values():
+                if cm.prim_path in self.names:
+                    mp, mq = cm.get_position_orientation()
+                    self.rel[cm.prim_path] = G.relative((mp.float(), mq.float()), p0)
+        self.n_placed = 0
+        self.visible = True
+
+    def hide(self):
+        be = self.kit.backend
+        for n in self.names:
+            be._mesh_enable(n, False)
+        self.visible = False
+
+    def show(self):
+        be = self.kit.backend
+        for n in self.names:
+            be._mesh_enable(n, True)
+        self.visible = True
+
+    def place(self, world_xy):
+        """Move the collision meshes to the tray pose of the cell and enable them."""
+        import omnigibson.utils.transform_utils as T
+        from curobo.types import Pose as CuPose
+        from ispatialgym.oracle.poses import quat_xyzw_to_wxyz
+
+        G, be = self.G, self.kit.backend
+        pose = self.pose_at(world_xy)
+        pose = (G.t(pose[0]).float(), G.t(pose[1]).float())
+        rp, rq = be.root_pose()
+        dev = be.device_cfg.device
+        for n, rel in self.rel.items():
+            mp, mq = G.compose(pose, rel)
+            p, q = T.relative_pose_transform(mp, mq, rp, rq)
+            be._mesh_update_pose(n, CuPose(position=p.reshape(1, 3).to(dev), quaternion=quat_xyzw_to_wxyz(q).reshape(1, 4).to(dev)))
+        if not self.visible:
+            self.show()
+        self.n_placed += 1
+
+    def self_check(self, cell_world) -> Dict[str, Any]:
+        """Smoke check of the moving-mesh geometry: teleport the simulated body to ``pose_at(cell_world)``, read every
+        collision mesh's world pose back from the simulator and compare it with the pose this class feeds the collision
+        checker (``compose(pose_at(cell), rel)``); the body is put back afterwards. Returns the largest position /
+        orientation error (m / rad); ``ok`` when both are within 5 mm / 0.5 deg (measured 3.0 mm / 0.02 deg on the
+        1.25 tray: the render-side transform read lags the teleport by the settle; the checker margin is 1 cm)."""
+        import omnigibson.utils.transform_utils as T
+
+        G = self.G
+        p_saved, q_saved = self.obj.get_position_orientation()
+        pose = self.pose_at(cell_world)
+        pose = (G.t(pose[0]).float(), G.t(pose[1]).float())
+        err_p, err_r = 0.0, 0.0
+        try:
+            self.obj.set_position_orientation(pose[0], pose[1])
+            self.world.sync_render_transforms()
+            for link in self.obj.links.values():
+                for cm in link.collision_meshes.values():
+                    if cm.prim_path not in self.rel:
+                        continue
+                    sp, sq = cm.get_position_orientation()
+                    mp, mq = G.compose(pose, self.rel[cm.prim_path])
+                    err_p = max(err_p, float(th.linalg.norm(sp.float() - mp)))
+                    dq = T.quat_distance(sq.float(), mq)
+                    err_r = max(err_r, abs(float(T.quat2axisangle(dq).norm())))
+        finally:
+            self.obj.set_position_orientation(p_saved, q_saved)
+            self.world.sync_render_transforms()
+        rec = {"cell_world": [round(float(v), 3) for v in G.t(cell_world).tolist()], "n_meshes": len(self.rel), "max_pos_err_m": round(err_p, 5),
+               "max_rot_err_rad": round(err_r, 5), "ok": err_p < 0.005 and err_r < math.radians(0.5)}
+        (log.info if rec["ok"] else log.warning)("placed-object self check at cell %s: %d meshes, simulator vs moved-mesh pose error %.1f mm / %.2f deg -> %s",
+                                                 rec["cell_world"], rec["n_meshes"], err_p * 1000, math.degrees(err_r), "ok" if rec["ok"] else "MISMATCH")
+        return rec
+
+
 class BandComputer:
     #: (yaw, grasp) pairs per round (one batched pre-grasp + grasp IK pass over the open cells)
     CHUNK = 8
@@ -540,6 +745,9 @@ class BandComputer:
         #: contact-band mode: object height class (m) -> the generic CONTACT set replaces the generic pinch in
         #: :meth:`compute` (``grasp_sets=None``); ``None`` = pinch / library grasps
         self.contact_height: Optional[float] = None
+        #: stance-relative placed object (:class:`MovingPlaced`, ``--placed ...@focus_centred_edge_aligned``): hidden
+        #: during the batched passes, moved to every cell that passed for a per-cell pre-grasp check against it
+        self.cell_obstacle: Optional[MovingPlaced] = None
 
     def ignoring(self, objs):
         return self.scope.ignoring(objs) if self.scope is not None else self.kit.ignoring(objs)
@@ -780,13 +988,41 @@ class BandComputer:
         common = (stance, z_support, pose_fn, grasp_sets, ignore_for_grasp, arm, max_grasp_offset, yaw_order, yaw_index, grasp_index, fwd, left)
         self.scope = ObstacleScope(kit, self.world, (x0, y0), drop_ground=(z_support - self.world.floor_z) >= 0.55).__enter__()
         try:
+            if self.cell_obstacle is not None:
+                self.cell_obstacle.hide()  # the stance-relative placed object enters per cell (_verify_with_placed)
             for tr, ti in trunks:
                 results.append(self._trunk(tr, ti, base_cells, world_cells, *common))
         finally:
             self.scope.__exit__(None, None, None)
             self.scope = None
+            if self.cell_obstacle is not None:
+                self.cell_obstacle.show()
         return {"trunks": [e for e, _, _, _ in results], "cells": {(e["translate"], e["tilt"]): c for e, c, _, _ in results},
                 "pairs": {(e["translate"], e["tilt"]): p for e, _, p, _ in results}, "classes": {(e["translate"], e["tilt"]): m for e, _, _, m in results}}
+
+    def _verify_with_placed(self, hits: List[int], pairs, index, q: th.Tensor, arm: str, world_cells, entry: Dict[str, Any]) -> List[int]:
+        """Per-cell pre-grasp verification against the stance-relative placed object (:attr:`cell_obstacle`): for every
+        cell with a hit this round, the object is moved to the cell's pose and the hit pairs' pre-grasps are screened
+        again with it enabled; pairs whose pre-grasp collides with it are dropped (``entry["n_placed_rejected_pairs"]``
+        / ``n_placed_rejected_cells`` count them). Returns the surviving indices into ``pairs``."""
+        by_cell: Dict[int, List[int]] = {}
+        for k in hits:
+            by_cell.setdefault(index[k], []).append(k)
+        keep: List[int] = []
+        t0 = time.time()
+        try:
+            for i, ks in by_cell.items():
+                self.cell_obstacle.place(world_cells[i])
+                ok_pre = self.ik_screen([pairs[k][0] for k in ks], q, arm)
+                surv = [k for k, s in zip(ks, ok_pre.tolist()) if s]
+                keep.extend(surv)
+                entry["n_placed_rejected_pairs"] = entry.get("n_placed_rejected_pairs", 0) + (len(ks) - len(surv))
+                if not surv:
+                    entry["n_placed_rejected_cells"] = entry.get("n_placed_rejected_cells", 0) + 1
+        finally:
+            self.cell_obstacle.hide()
+        entry["placed_verify_s"] = round(entry.get("placed_verify_s", 0.0) + time.time() - t0, 2)
+        return keep
 
     def _trunk(self, tr, ti, base_cells, world_cells, stance, z_support, pose_fn, grasp_sets, ignore_for_grasp, arm, max_grasp_offset, yaw_order, yaw_index,
                grasp_index, fwd, left, tag: str = ""):
@@ -855,13 +1091,18 @@ class BandComputer:
                     sel = [k for k, s in enumerate(ok_pre.tolist()) if s]
                     for k in sel:
                         pre_seen[index[k]] = True
+                    hits: List[int] = []  # indices into ``pairs`` feasible at pre-grasp and grasp this round
                     if sel:
                         with self.ignoring(ignore_for_grasp):
                             ok_g = self.ik_screen([pairs[k][1] for k in sel], q, arm)
-                        for k, s in zip(sel, ok_g.tolist()):
-                            if s:
-                                ok[index[k]] = True
-                                found.append((index[k], spec_of[k][0], spec_of[k][1]))
+                        hits = [k for k, s in zip(sel, ok_g.tolist()) if s]
+                    if hits and self.cell_obstacle is not None:
+                        # stance-relative placed object: the batched passes ran without it; verify the pre-grasps of every
+                        # passing cell with the object placed at that cell (the grasp pose ignores it, spec 3.6)
+                        hits = self._verify_with_placed(hits, pairs, index, q, arm, world_cells, entry)
+                    for k in hits:
+                        ok[index[k]] = True
+                        found.append((index[k], spec_of[k][0], spec_of[k][1]))
                 entry["rounds"] += 1
                 todo = [i for i in todo if not bool(ok[i])]
                 if self.MAX_ROUNDS_WITHOUT_PRE and entry["rounds"] >= self.MAX_ROUNDS_WITHOUT_PRE:
@@ -881,9 +1122,11 @@ class BandComputer:
             entry["n_reachable"] = len(sel_cells)
             entry["n_pairs"] = int(len(pairs_arr))
             entry["time_s"] = round(time.time() - t0, 2)
-            log.info("%strunk (%.2f, %+.1f): %d lattice, %d after prune, %d reachable (%d pairs), %d rounds (%d cells dropped without pre-grasp, %d poses pruned), %.1fs%s",
+            placed_note = (f", placed object rejected {entry.get('n_placed_rejected_pairs', 0)} pairs / {entry.get('n_placed_rejected_cells', 0)} cells in "
+                           f"{entry.get('placed_verify_s', 0.0):.1f}s" if self.cell_obstacle is not None else "")
+            log.info("%strunk (%.2f, %+.1f): %d lattice, %d after prune, %d reachable (%d pairs), %d rounds (%d cells dropped without pre-grasp, %d poses pruned), %.1fs%s%s",
                      tag, tr, ti, len(base_cells), entry["n_after_prune"], entry["n_reachable"], entry["n_pairs"], entry["rounds"], entry["n_dropped_no_pre"],
-                     entry["n_pose_pruned"], entry["time_s"], f" classes {entry['class_counts']}" if "class_counts" in entry else "")
+                     entry["n_pose_pruned"], entry["time_s"], f" classes {entry['class_counts']}" if "class_counts" in entry else "", placed_note)
             return entry, cells, pairs_arr, classes_arr
 
 
@@ -1145,7 +1388,9 @@ def main(argv=None):
     ap.add_argument("--arm", default="right", choices=["right", "left"], help="arm of the band (default right; the brace arm's contact bands use --arm left)")
     ap.add_argument("--generic-contact", action="store_true", help="generic CONTACT set (closed gripper, side faces at 3/4 height + top press) for --arm left; one band per object height class")
     ap.add_argument("--height", type=float, default=None, help="object height (m) of the contact band (else measured from --object); binned to the 2 cm height class")
-    ap.add_argument("--placed", nargs="*", default=[], help="objects placed before the target, CATEGORY/MODEL (disembedding source tray: lattice = its floor)")
+    ap.add_argument("--placed", nargs="*", default=[], help="objects placed before the target, CATEGORY/MODEL[*SCALE][@MODE] (disembedding source tray; "
+                    "MODE 'edge' (default, legacy: fixed tray at the stance line, lattice = its floor) or 'focus_centred_edge_aligned' (stance-relative: "
+                    "the tray follows the cell, lattice = the top cells where it fits), e.g. tray/gsxbym*1.25@focus_centred_edge_aligned")
     ap.add_argument("--under", default=None, help="floor mode: partner scene object; lattice = floor under it")
     ap.add_argument("--target", default=None, help="brace mode: articulated CATEGORY/MODEL")
     ap.add_argument("--handle-key", default=None)
@@ -1203,7 +1448,7 @@ def main(argv=None):
                             "postures": list(POSTURES), "arm": band_arm, "fingers": bc.fingers,
                             "grid": {"translates": TRANSLATES, "tilts": TILTS, "low_top_tilt": LOW_TOP_TILT},
                             "seeds": 12, "pre_grasp": PRE_GRASP, "yaws": YAWS, "mode": "brace" if args.brace else ("floor" if floor_mode else "tabletop"),
-                            "smoke": bool(args.smoke), "scale": scale, "placed_specs": list(args.placed),
+                            "smoke": bool(args.smoke), "scale": scale, "placed_specs": [PlacedSpec.parse(s).canonical() for s in args.placed],
                             "schedule": {"chunk": BandComputer.CHUNK, "ik_batch": BandComputer.IK_BATCH, "max_rounds_without_pre": BandComputer.MAX_ROUNDS_WITHOUT_PRE, "coarse": BandComputer.COARSE,
                                          "pose_prune": "eef and pre-grasp origin within arm_len + 0.03 of the shoulder", "obstacle_radius_m": ObstacleScope.RADIUS,
                                          "obstacle_z_above_m": ObstacleScope.Z_ABOVE}}
@@ -1217,6 +1462,7 @@ def main(argv=None):
             kit.sync_world()
         # ---- support geometry and stance
         placed_objs = []
+        placed_specs = [PlacedSpec.parse(s) for s in args.placed]
         if floor_mode:
             z_support = world.floor_z
             if args.under:
@@ -1257,11 +1503,15 @@ def main(argv=None):
             lattice_world = top.cells(free_only=True)
             ignore_grasp = [support]
             top_json = top.to_json()
-            # objects placed before the target (disembedding source tray): centred on the stance line, near edge 8 cm behind
-            # the front edge, long axis along the edge; the lattice becomes the placed object's inner floor
-            for spec in args.placed:
-                cat, model = spec.split("/", 1)
-                obj = world.spawn(f"placed_{cat}_{model}", cat, model)
+            # objects placed before the target (disembedding source tray), long axis along the edge. ``edge`` mode (legacy):
+            # centred on the stance line, near edge PLACED_EDGE_SETBACK behind the front edge, the lattice = its inner
+            # floor. ``focus_centred_edge_aligned`` (owner item 9, stance-relative): the tray is measured at that pose,
+            # then follows the cell - inner-floor centroid on the cell -, the lattice = the top cells where it fits and
+            # its collision meshes are checked per cell (MovingPlaced); the grasped object stands on its floor at the cell.
+            moving_placed = []
+            for ps in placed_specs:
+                cat, model = ps.category, ps.model
+                obj = world.spawn(f"placed_{cat}_{model}", cat, model, dataset=_dataset_of(cat, model, None), scale=ps.scale_list())
                 hull = world.local_hull(obj)
                 ext = hull.max(dim=0).values - hull.min(dim=0).values
                 tangent = th.tensor(stance["tangent"])
@@ -1272,12 +1522,14 @@ def main(argv=None):
                 fp0 = world.footprint(hull, (th.zeros(3), quat))
                 half_depth = float((fp0 @ inward).abs().max())
                 mid = th.tensor(stance["edge_mid"])
-                xy = mid + inward * (0.08 + half_depth)
+                xy = mid + inward * (PLACED_EDGE_SETBACK + half_depth)
                 pos = th.tensor([float(xy[0]), float(xy[1]), top.z + world.bottom_offset(hull, quat) + 0.003])
                 obj.set_position_orientation(pos, quat)
                 world.activate(obj)
                 world.step_physics(30, still=[world.robot])
-                placed_objs.append(obj)
+                p0, q0 = obj.get_position_orientation()
+                pose0 = (p0.float(), q0.float())
+                placed_objs.append((obj, pose0))
                 # inner floor raster of the placed object (lowest inner level hit by downward rays)
                 lo, hi = obj.aabb
                 res = 0.01
@@ -1293,12 +1545,60 @@ def main(argv=None):
                 valid = zs[~th.isnan(zs)]
                 floor_z = float(th.quantile(valid, 0.10))
                 keep = (~th.isnan(zs)) & ((zs - floor_z).abs() < 0.004)
-                lattice_world = starts[keep][:, :2]
+                floor_cells = starts[keep][:, :2]
                 z_support = floor_z
-                ignore_grasp.append(obj)
-                meta.setdefault("placed", []).append({"category": cat, "model": model, "pose": [pos.tolist(), quat.tolist()], "floor_z": floor_z, "n_floor_cells": int(keep.sum())})
+                c_w = floor_cells.mean(dim=0)
+                c_local = G.relative((th.tensor([float(c_w[0]), float(c_w[1]), floor_z]), G.IDENTITY_QUAT), pose0)[0]
+                rec = dict(ps.to_json(), pose=[pos.tolist(), quat.tolist()], pose_settled=[pose0[0].tolist(), pose0[1].tolist()], floor_z=floor_z,
+                           n_floor_cells=int(keep.sum()), floor_centre_local=[round(float(v), 4) for v in c_local.tolist()], yaw=yaw,
+                           hull_extent=[round(float(v), 4) for v in ext.tolist()],
+                           yaw_rule="long footprint axis along the edge tangent: yaw = tangent_yaw if extent_x >= extent_y else tangent_yaw - pi/2")
+                if ps.mode == PLACED_MODE_FOCUS:
+                    off = (c_w - pose0[0][:2]).clone()  # root -> inner-floor centroid, world xy at this yaw
+                    z0 = float(pose0[0][2])
+
+                    def pose_at(world_xy, _off=off, _z=z0, _q=pose0[1]):
+                        return th.tensor([float(world_xy[0]) - float(_off[0]), float(world_xy[1]) - float(_off[1]), _z]), _q
+
+                    # the lattice is the whole near strip of the top (as for the plain bands): the band is relative to the base, the
+                    # sampler shifts it with its own stand-off and checks the tray's fit on the top / in the frame itself (a cell
+                    # near the front edge is the stance-relative geometry of a closer stance, so it is not filtered here)
+                    _, world_c = bc.lattice_on_cells(stance, top.cells(free_only=True))
+                    lattice_world = world_c
+                    fit = th.tensor([top.polygon_supported(fp0 + pose_at(c)[0][:2], margin=PLACED_FIT_MARGIN) for c in world_c], dtype=th.bool) if len(world_c) else th.zeros(0, dtype=th.bool)
+                    moving_placed.append((obj, pose0, pose_at))
+                    rec.update({"lattice": "near strip of the top (the tray follows every cell; its fit on the top is the sampler's check at its stance)",
+                                "n_lattice_top": int(len(world_c)), "n_lattice_fit_at_band_stance": int(fit.sum()), "fit_margin": PLACED_FIT_MARGIN,
+                                "pose_rule": "root xy = cell - (floor centroid - root) at the edge-aligned yaw, z = top + bottom_offset(hull, quat) + 0.003; "
+                                             "the grasped object stands on the floor (z_support) at the cell; collision meshes checked per cell for the pre-grasp, "
+                                             "ignored for the grasp pose"})
+                    log.info("placed %s (%s): floor z %.3f, %d floor cells, centroid offset from the root %s; %d top lattice cells (%d admit the tray at the band stance)",
+                             ps.canonical(), ps.mode, floor_z, int(keep.sum()), [round(float(v), 3) for v in off.tolist()], len(world_c), int(fit.sum()))
+                else:
+                    lattice_world = floor_cells
+                    ignore_grasp.append(obj)
+                meta.setdefault("placed", []).append(rec)
             kit.sync_world()
+            if len(moving_placed) > 1:
+                raise SystemExit("at most one --placed object in the focus_centred_edge_aligned mode")
+            for obj, pose0, pose_at in moving_placed:
+                bc.cell_obstacle = MovingPlaced(kit, world, obj, pose0, pose_at)
+                if not bc.cell_obstacle.names:
+                    raise RuntimeError(f"placed object {obj.name}: no collision meshes in the cuRobo world")
+                if args.smoke:  # moved-mesh geometry against the simulator at a cell of the reachable strip (0.56 m ahead, 8 cm right)
+                    origin, fwd, left = bc.base_frame(stance)
+                    meta["placed"][-1]["self_check"] = bc.cell_obstacle.self_check(origin + 0.56 * fwd - 0.08 * left)
         meta.update({"stance": stance, "top": top_json, "z_support": z_support})
+
+        def restore_placed():
+            """``world.spawn`` (of the grasped object) re-parks every object spawned before it: put the placed objects back
+            at their measured poses so that they are obstacles again (the ``edge`` mode's fixed tray; the focus mode moves
+            its collision meshes itself but keeps the body where the meshes were measured)."""
+            for po, p0 in placed_objs:
+                po.set_position_orientation(p0[0], p0[1])
+                world.activate(po)
+            if placed_objs:
+                world.step_physics(5, still=[world.robot])
 
         # ---- object / grasp set
         if args.brace:
@@ -1317,6 +1617,8 @@ def main(argv=None):
             obj = world.spawn(f"target_{cat}_{model}", cat, model, dataset=_dataset_of(cat, model, args.dataset), scale=scale)
             hull = world.local_hull(obj)
             world.park(obj, len(world.spawned) - 1)
+            restore_placed()
+            kit.sync_world()
             # facing direction: moving face outward normal (lids: from the hinge line to the centre) points at the robot
             outward = th.tensor(jinfo.get("outward_normal", [1.0, 0.0, 0.0]), dtype=th.float32)
             if abs(float(outward[2])) > 0.9:
@@ -1473,15 +1775,18 @@ def main(argv=None):
                 def pose_fn(world_xy, yaw, _hull=hull, _rq=rest_quat):
                     return bc.object_pose_at(world_xy, yaw, z_support, _hull, _rq)
                 z_eval = z_support
+            restore_placed()
             kit.sync_world()
             trunks = trunk_sel or (SMOKE_TRUNKS if args.smoke else trunk_grid(z_support - world.floor_z))
             result = bc.compute(stance, lattice_world, z_eval, pose_fn, grasps if not (args.generic_pinch or args.generic_contact) else None, ignore_grasp,
                                 arm=band_arm, trunks=trunks, max_grasp_offset=max_off)
             gset = [(g.key, g.name, g.position.tolist(), g.quat.tolist()) for g in grasps] if grasps else ("contact:" + ",".join(CONTACT_CLASSES_NAMES) if args.generic_contact else "generic:" + ",".join(GENERIC_CLASSES))
             key = _key({"scene": args.scene, "support": args.support, "z": round(z_support, 2), "stance": stance["edge"], "s": args.stand_off, "object": meta.get("object"),
-                        "scale": scale, "grasps": gset, "rest": rest_quat.tolist(), "placed": args.placed, "under": args.under, "grid": meta["grid"], "lattice": lattice,
+                        "scale": scale, "grasps": gset, "rest": rest_quat.tolist(), "placed": meta["placed_specs"], "under": args.under, "grid": meta["grid"], "lattice": lattice,
                         "arms": "untucked", "seeds": 12, "arm": band_arm, "height_class": meta.get("height_class"), "postures": list(POSTURES)})
             oname = f"h{meta['height_class']:.2f}" if args.generic_contact else (args.object.replace("/", "-") if args.object else "generic")
+            for ps in placed_specs:
+                oname += f"__placed-{ps.category}-{ps.model}" + (f"-s{ps.scale[0]:g}" if ps.scale else "") + ("-focus" if ps.mode == PLACED_MODE_FOCUS else "")
             mode_name = "contact" if args.generic_contact else meta["mode"]
             name = f"{mode_name}__{args.scene}__{args.support}{'-under-' + args.under if args.under else ''}__{band_arm if band_arm != 'right' else ''}{'_' if band_arm != 'right' else ''}{oname}__{key}"
             if args.smoke:

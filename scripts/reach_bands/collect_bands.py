@@ -85,7 +85,7 @@ def scan_job_dir(jdir: str) -> dict:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--manifest", nargs="+", required=True)
+    ap.add_argument("--manifest", nargs="+", action="extend", required=True, help="manifests (several values and / or the flag repeated - both accumulate)")
     ap.add_argument("--pulled", default=os.path.join(REPO, "runlogs", "runpod", "rb"))
     ap.add_argument("--extra", nargs="*", default=[], help="extra job directories (local runs): <job id>=<dir>")
     ap.add_argument("--out", default=os.path.join(REPO, "runlogs", "reach_bands_20260915"))

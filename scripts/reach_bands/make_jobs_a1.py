@@ -4,6 +4,7 @@
     python scripts/reach_bands/make_jobs_a1.py contact --supports house_single_floor/breakfast_table_rhjoby_0 --out <jobs.json>
     python scripts/reach_bands/make_jobs_a1.py generic --out <jobs.json>              # re-run of the generic pinch / push bands (pitched classes)
     python scripts/reach_bands/make_jobs_a1.py support-objects --supports <scene/support> ... --out <jobs.json>   # A3 supports: right-hand bands per object
+    python scripts/reach_bands/make_jobs_a1.py placed-tray --supports <scene/support> --tray-spec 'tray/gsxbym*1.25@focus_centred_edge_aligned' --out <jobs.json>
 
 ``contact``: one left-arm generic CONTACT band per (support, object height class) for the brace-task objects (axial
 alignment, block design, attachment targets, touching targets of the ``representative`` slot; ``--slots`` widens it);
@@ -11,7 +12,9 @@ heights come from the committed right-hand bands' ``object_extent`` (fallback: t
 ``generic``: every generic-pinch job of the manifests (axial / block objects) - the pitched approach classes change the
 cache key, so the old bands are replaced. ``support-objects``: the right-hand grasp bands of every manifest object on
 the given supports (the picks whose support slot names them, or - with ``--all-objects`` - every tabletop pick object),
-plus the left contact bands of their height classes.
+plus the left contact bands of their height classes. ``placed-tray`` (owner items 9 / 4b): the disembedding right-arm
+bands of the slots' picks on the given supports with the source tray placed per ``--tray-spec`` (stance-relative
+``focus_centred_edge_aligned`` mode at spawn scale 1.25; ``reach_bands.PlacedSpec``), replacing the legacy fixed-tray bands.
 """
 
 from __future__ import annotations
@@ -29,7 +32,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, REPO)
 sys.path.insert(0, HERE)
-from ispatialgym.sampling.reach_bands import height_class  # noqa: E402
+from ispatialgym.sampling.reach_bands import PLACED_MODE_FOCUS, PlacedSpec, height_class  # noqa: E402
 import make_jobs as MJ  # noqa: E402
 
 BANDS = os.path.join(REPO, "runlogs", "reach_bands_20260915", "bands")
@@ -83,7 +86,8 @@ def job(args, kind, subtasks, picks, scene, weight=2.0):
     if "--generic-pinch" in a:
         parts.append("gp")
     if "--placed" in a:
-        parts.append("placed-" + MJ._slug(a["--placed"]))
+        ps = PlacedSpec.parse(a["--placed"])
+        parts.append("placed-" + MJ._slug(ps.object) + (f"-s{ps.scale[0]:g}" if ps.scale else "") + ("-focus" if ps.mode == PLACED_MODE_FOCUS else ""))
     if "--scale" in a:
         parts.append("scaled")
     if "--arm" in a and a["--arm"] != "right":
@@ -103,15 +107,29 @@ def brace_objects(slots):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("mode", choices=["contact", "generic", "support-objects"])
+    ap.add_argument("mode", choices=["contact", "generic", "support-objects", "placed-tray"])
     ap.add_argument("--supports", nargs="*", default=["house_single_floor/breakfast_table_rhjoby_0"], help="scene/support names")
     ap.add_argument("--slots", nargs="*", default=["representative"])
     ap.add_argument("--all-objects", action="store_true", help="support-objects: every tabletop pick object of the slots, not only the picks bound to the support")
+    ap.add_argument("--tray-spec", default="tray/gsxbym*1.25@focus_centred_edge_aligned", help="placed-tray: the --placed spec of the source tray")
+    ap.add_argument("--weight", type=float, default=None, help="queue weight of every job (default per mode)")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
     heights = object_heights()
     jobs = {}
-    if args.mode == "contact":
+    if args.mode == "placed-tray":
+        spec = PlacedSpec.parse(args.tray_spec).canonical()
+        for slot in args.slots:
+            for j in MJ.build(slot, ["disembedding"]).jobs.values():
+                a = _argmap(j["args"])
+                if not any(a.get("--scene") == s.split("/", 1)[0] and a.get("--support") == s.split("/", 1)[1] for s in args.supports):
+                    continue
+                new_args = list(j["args"])
+                new_args[new_args.index("--placed") + 1] = spec
+                jj = job(new_args, "tabletop", j["subtasks"], j["picks"], j["scene"], weight=args.weight if args.weight is not None else 9.0)
+                jj["slot"] = slot
+                jobs.setdefault(jj["id"], jj)
+    elif args.mode == "contact":
         per_class = defaultdict(list)
         for (pick, slot), o in brace_objects(args.slots).items():
             h = heights.get(o["object"])

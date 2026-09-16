@@ -26,10 +26,13 @@ from collections import Counter, defaultdict
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, REPO)
-from ispatialgym.sampling.reach_bands import ReachBands  # noqa: E402
+from ispatialgym.sampling.reach_bands import PLACED_MODE_FOCUS, ReachBands, placed_spec  # noqa: E402
 
 GRASPS_CSV = os.path.join(REPO, "ispatialgym", "assets", "icl", "require", "grasps.csv")
 SOURCE_TRAY = "tray/gsxbym"
+#: owner decision 2026-09-16 item 4b: the disembedding source tray spawns at scale 1.25 (``roles.source.scale``); the
+#: customs value wins when present, this is the default until D1 writes it
+SOURCE_TRAY_SCALE = 1.25
 POD_PREFIX = ("cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && "
               "OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands ")
 
@@ -51,6 +54,20 @@ def grasp_keys():
     return out
 
 
+def normalize_scale(scale, obj: str):
+    """Customs ``scale`` field -> ``[sx, sy, sz]`` or None: a list, a scalar (uniform), or a per-model dict
+    (``{"cat/model": 0.7, "default": 0.7}`` of the D1 fallback aliases) whose entry for ``obj`` (else ``default``, else
+    the first value) is taken."""
+    if isinstance(scale, dict):
+        scale = scale.get(obj, scale.get("default", next(iter(scale.values()), None)))
+    if scale is None:
+        return None
+    if isinstance(scale, (int, float)):
+        return [float(scale)] * 3
+    vals = [float(v) for v in scale]
+    return vals * 3 if len(vals) == 1 else vals
+
+
 def subtask_of(alias: str, customs: dict) -> str:
     """Subtask id from the customs ``iddl`` path (``alignment/axial.iddl`` -> ``alignment-axial``, ``disembedding/disembedding.iddl``
     -> ``disembedding``)."""
@@ -65,6 +82,9 @@ def main():
     ap.add_argument("--customs", default=os.path.join(REPO, "ispatialgym", "assets", "task_specs", "isg_customs.json"))
     ap.add_argument("--out", default=os.path.join(REPO, "runlogs", "reach_bands_20260915", "coverage.json"))
     ap.add_argument("--jobs-out", default=None)
+    ap.add_argument("--tray-mode", default=PLACED_MODE_FOCUS, help="placed mode of the disembedding source tray the sampler asks for (item 9: "
+                    "focus_centred_edge_aligned; 'edge' = the legacy fixed-tray bands)")
+    ap.add_argument("--tray-scale", type=float, default=None, help=f"source tray spawn scale when the customs give none (default {SOURCE_TRAY_SCALE}, item 4b)")
     args = ap.parse_args()
     customs = json.load(open(args.customs))
     keys = grasp_keys()
@@ -89,9 +109,7 @@ def main():
             continue
         tgt = roles[trole]
         cat, model = tgt["category"], tgt.get("representative")
-        scale = tgt.get("scale")
-        if isinstance(scale, dict):
-            scale = next(iter(scale.values()), None)
+        scale = normalize_scale(tgt.get("scale"), f"{cat}/{model}")
         scale_arg = ",".join(str(round(float(v), 4)) for v in scale) if scale else None
         for scene, sc in c.get("scenes", {}).items():
             b = sc.get("bindings", {})
@@ -104,7 +122,7 @@ def main():
             if sub in GENERIC:
                 for s in supports:
                     needs.append((f"{s}:generic", dict(scene=scene, support=s, object=obj, grasp_key="generic", scale=scale),
-                                  ["--scene", scene, "--support", s, "--object", obj, "--generic-pinch"]))
+                                  ["--scene", scene, "--support", s, "--object", obj, "--generic-pinch"] + (["--scale", scale_arg] if scale_arg else [])))
             elif sub in BRACE:
                 joint = tgt.get("joint")
                 if isinstance(joint, dict):
@@ -114,8 +132,13 @@ def main():
             elif sub in PIPELINE:
                 pipe = PIPELINE[sub]
                 gk = keys.get((cat, model), {}).get(pipe) or keys.get((cat, model), {}).get("tabletop")
-                placed = [SOURCE_TRAY] if sub == "disembedding" else []
-                base_args = ["--object", obj] + (["--grasp-key", gk] if gk else []) + (["--scale", scale_arg] if scale_arg else []) + (["--placed", SOURCE_TRAY] if placed else [])
+                placed = []
+                if sub == "disembedding":
+                    src = roles.get("source") or {}
+                    tray = f"{src.get('category', 'tray')}/{src.get('representative', SOURCE_TRAY.split('/')[1])}"
+                    tray_scale = normalize_scale(src.get("scale"), tray) or [args.tray_scale if args.tray_scale is not None else SOURCE_TRAY_SCALE] * 3
+                    placed = [placed_spec(tray, tray_scale, args.tray_mode)]
+                base_args = ["--object", obj] + (["--grasp-key", gk] if gk else []) + (["--scale", scale_arg] if scale_arg else []) + (["--placed", placed[0]] if placed else [])
                 if sub.endswith("large_scale"):
                     rel = "under" if "under" in sub else "ontop"
                     for p in partners:

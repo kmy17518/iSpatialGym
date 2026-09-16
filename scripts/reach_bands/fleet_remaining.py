@@ -26,20 +26,29 @@ import rp  # noqa: E402
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--manifest", nargs="+", required=True)
+    ap.add_argument("--manifest", nargs="+", action="extend", required=True, help="manifests (several values and / or the flag repeated - both accumulate)")
     ap.add_argument("--pods-file", default=os.path.join(REPO, "runlogs", "runpod", "rb", "pods.txt"))
     ap.add_argument("--local", nargs="*", default=[], help="local runner output roots (jobs with a .npz there count as done)")
     ap.add_argument("--pulled", nargs="*", default=[], help="pulled fleet roots (<root>/<pod>/<job>/*.npz), for pods that are gone")
     ap.add_argument("--out", required=True)
     ap.add_argument("--only-kinds", nargs="*", default=None)
+    ap.add_argument("--weights", nargs="*", type=float, default=None,
+                    help="queue weight per manifest (same order as --manifest; overrides the jobs' weights) - the merged output is sorted by weight, then "
+                         "manifest order, which is the order dispatch_samp.py writes the queue files in")
     args = ap.parse_args()
+    if args.weights and len(args.weights) != len(args.manifest):
+        raise SystemExit("--weights needs one value per --manifest")
     jobs = []
     seen = set()
-    for m in args.manifest:
+    for k, m in enumerate(args.manifest):
         for j in json.load(open(m)):
             if j["id"] not in seen:
                 seen.add(j["id"])
+                if args.weights:
+                    j = dict(j, weight=args.weights[k])
                 jobs.append(j)
+    if args.weights:
+        jobs.sort(key=lambda j: -float(j.get("weight", 1.0)))  # stable: manifest order within a weight
     api = rp.Api(rp.load_env()["RUNPOD_API_KEY"])
     fleet = rp.load_fleet()
     live = {p["id"] for p in api.myself()["pods"]}
