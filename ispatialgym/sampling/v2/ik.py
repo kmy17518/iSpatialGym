@@ -702,7 +702,12 @@ class IKChecker:
         return self.kit.world.camera_model.all_inside(camera_pose, th.stack(pts), margin)
 
     def camera_pose(self, stance: Stance) -> Pose:
-        return self.kit.camera_pose(self.q_locked(stance))
+        """Head-camera pose at a stance through the shared FK (``conventions.camera_pose``, base on the measured floor, the
+        kit's measured sensor offset) — the same model the oracle's FOV monitor projects with."""
+        q = self.q_locked(stance)
+        x, y, yaw = (float(v) for v in stance.base_pose2d)
+        base = (th.tensor([x, y, float(self.kit.floor_z) + C.NOMINAL_BASE_Z]), G.quat_from_yaw(yaw))
+        return C.camera_pose(q, base_pose=base, cam_in_zed=self.kit.cam_in_zed)
 
     # -- bands: feasible sets ------------------------------------------------------------------------------------
     def feasible_sets(self, cells: Sequence[Any], yaws: Sequence[float], grasps: Sequence[Any], pose_at: Callable[[Any, float], Pose], stance: Stance,

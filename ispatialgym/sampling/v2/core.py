@@ -486,7 +486,14 @@ class SamplerV2(TaskSampler):
         return self.sidecar.add_path(p)
 
     def camera_pose_at(self, stance: Stance) -> G.Pose:
-        return self.kit.camera_pose(self.stance_q(stance))
+        """Head-camera pose at a stance through the **shared** camera FK (``conventions.camera_pose``: torso chain from the
+        stance's trunk joints, base at the stance pose on the measured floor, the kit's measured sensor offset in
+        ``zed_link``) — the model the oracle's gripper-in-FOV monitor projects with (owner 2026-09-16 10:15 item 1b), so a
+        pre-pose that passes here is not flagged at execution."""
+        q = self.stance_q(stance)
+        x, y, yaw = (float(v) for v in stance.base_pose2d)
+        base = (th.tensor([x, y, float(self.kit.floor_z) + C.NOMINAL_BASE_Z]), G.quat_from_yaw(yaw))
+        return C.camera_pose(q, base_pose=base, cam_in_zed=self.kit.cam_in_zed)
 
     # ------------------------------------------------------------------ program check (§3.5)
 

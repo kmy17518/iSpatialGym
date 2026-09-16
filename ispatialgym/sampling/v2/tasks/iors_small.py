@@ -639,12 +639,20 @@ class IORSSmall(SamplerV2):
         if not r_lift.ok:
             raise Reject(r_lift.code or "lift_unreachable", f"lift ({grasp.carry_height:.2f} m above the grasp) fails with the object attached: {r_lift.reason}")
         cam = self.camera_pose_at(manip)
-        if not self.ikc.eef_in_frame(grasp.grasp, cam):
-            raise Reject("gripper_not_in_frame", "grasp eef pose outside the manipulation image (5 %)")
-        if not self.ikc.eef_in_frame(place, cam):
-            raise Reject("gripper_not_in_frame", "place eef pose outside the manipulation image (5 %)")
+        # the pre-poses join the check (owner 2026-09-16 10:15 item 1b): the oracle's FOV monitor arms from the pre-pose
+        self.require_in_frame(cam, {"pre-grasp": grasp.pre_grasp, "grasp": grasp.grasp, "pre-place": pre_place, "place": place})
         if self.relation == "touching":
             self.touching_contacts(draft, manip)
+            c = self.sidecar.contacts
+            self.require_in_frame(cam, {"push pre-contact": c["push"].pre, "push contact": c["push"].contact, "push goal": c["push"].goal,
+                                        "brace pre-contact": c["brace"].pre, "brace contact": c["brace"].contact})
+
+    def require_in_frame(self, cam: G.Pose, poses: Dict[str, Optional[G.Pose]]):
+        """Every given eef pose must project inside the manipulation image with the 5 % margin (``IKChecker.eef_in_frame``
+        with the shared camera FK of ``camera_pose_at``); ``Reject("gripper_not_in_frame")`` names the first that does not."""
+        for what, pose in poses.items():
+            if pose is not None and not self.ikc.eef_in_frame(pose, cam):
+                raise Reject("gripper_not_in_frame", f"{what} eef pose outside the manipulation image (5 %)")
 
     def touching_contacts(self, draft: Draft, manip: Stance):
         """§6.11 touching: push contact on the target's right face (right arm) toward the partner, brace pre-contact +
