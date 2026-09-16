@@ -118,12 +118,12 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 06:57 PDT — 0/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 07:26 PDT — 1/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
 | camera_relocalization-standard | demo run (pre-fix success) | - | - |
-| camera_relocalization-obstructed | demo run (pre-fix success) | tracker corner fix d4a1745 not yet re-demoed | oracle |
+| camera_relocalization-obstructed | valid demo | tracker corner fix d4a1745 not yet re-demoed | oracle |
 | object_scaling | demo run (pre-fix success) | - | - |
 | mental_rotation | demo run (pre-fix success) | - | - |
 | disembedding | no instance | 4a distractor budget (D1), 4b tray 1.25 (D1+tabletop), 9 band keying (bands) | D1 / tabletop / bands |
