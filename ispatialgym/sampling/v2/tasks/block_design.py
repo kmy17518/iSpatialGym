@@ -557,7 +557,11 @@ class BlockDesign(SamplerV2):
         c_axis_b = th.tensor([float(-brace_dir[1]), float(brace_dir[0]), 0.0])
         brace = C.contact_eef(brace_point, brace_a, c_axis_b)
         brace_pre = C.pre_pose(brace)
-        res = TT.brace_second_arm(self, manip, "right", [push_pre, push_init, push_goal], "left", [brace_pre, brace], ignore_work_last=[support, self.objects[pushed]],
+        # the push init / goal touch the block: init is exact-IK-checked with the block ignored, then pre + goal with the brace arm
+        r_init = self.ikc.exact([push_pre, push_init], manip, "right", ignore_for_last=[support, self.objects[pushed]], cache=False)
+        if not r_init.ok:
+            raise Reject("contact_unreachable", f"{kind} push init of {pushed}: {r_init.reason}")
+        res = TT.brace_second_arm(self, manip, "right", [push_pre, push_goal], "left", [brace_pre, brace], ignore_work_last=[support, self.objects[pushed]],
                                   ignore_brace_last=[support, self.objects[braced]])
         if not res.ok:
             raise Reject("contact_unreachable", f"{kind} brace / push of {pushed}: {res.reason}")

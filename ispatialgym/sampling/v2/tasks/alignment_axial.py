@@ -265,9 +265,16 @@ class AlignmentAxial(SamplerV2):
             long_w = C.quat_rotate(pose[1], self.long_axis)
             ends = [com + long_w * s * half_len for s in (1.0, -1.0)]
             cells = TT.band_cells_world(bands, manip)
+            d_goal0 = C.wrap_angle(yaw_goal - yaw0)
             in_band = []
             for e in ends:
-                dist = float(th.linalg.norm(cells - e[:2], dim=1).min()) if len(cells) else float("inf")
+                # the blade stands beside the end on the face it moves away from: that contact point must lie in the band
+                r_xy = th.tensor([float(e[0] - com[0]), float(e[1] - com[1]), 0.0])
+                d = (1.0 if d_goal0 > 0 else -1.0) * th.cross(th.tensor([0.0, 0.0, 1.0]), r_xy, dim=0)
+                d = d / th.linalg.norm(d)
+                side_pt = self._extreme_point(pose, -d, near=e)
+                contact_xy = side_pt[:2] - d[:2] * FINGER_HALF_THICKNESS
+                dist = float(th.linalg.norm(cells - contact_xy, dim=1).min()) if len(cells) else float("inf")
                 in_band.append(dist <= BAND_TOLERANCE * float(bands.meta.get("lattice", 0.08)))
             if not any(in_band):
                 fails["band"] += 1
@@ -344,7 +351,7 @@ class AlignmentAxial(SamplerV2):
                 brace = (stop_pt + d_stop * FINGER_HALF_THICKNESS, quat_b)
                 brace_pre = C.pre_pose(brace)
                 # the push arm locked at its goal solution; the arc's mid waypoint was screened above (§3.9)
-                res = TT.brace_second_arm(self, manip, "right", [p_pre, p_init, p_goal], "left", [brace_pre, brace], ignore_work_last=[support, target],
+                res = TT.brace_second_arm(self, manip, "right", [p_pre, p_goal], "left", [brace_pre, brace], ignore_work_last=[support, target],
                                           ignore_brace_last=[support])
                 if res.ok:
                     break
