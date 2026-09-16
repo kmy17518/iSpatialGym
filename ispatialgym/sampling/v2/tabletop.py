@@ -974,7 +974,7 @@ def in_band(bands: Optional[RB.ReachBands], stance: Stance, xy, tol: float = CEL
 
 
 def joint_placement(bands_right: RB.ReachBands, bands_left: Optional[RB.ReachBands], stance: Stance, work_xy, brace_xy, tol: float = CELL_TOLERANCE,
-                    brace_class: Optional[str] = None) -> Dict[str, Any]:
+                    brace_class: Optional[str] = None, tol_brace: Optional[float] = None) -> Dict[str, Any]:
     """A1 placement test for a candidate (target pose → work point of the right arm, brace point of the left arm):
     ``work_xy`` ∈ a right band cell AND ``brace_xy`` ∈ a left contact band cell **at the same trunk** (the stance's);
     with ``brace_class`` (B3 contact class of the intended brace pose, ``contact_class``) and a band that records the
@@ -992,7 +992,7 @@ def joint_placement(bands_right: RB.ReachBands, bands_left: Optional[RB.ReachBan
         bx, bl = (float(v) for v in stance.world_to_base(_t(brace_xy)[:2]).tolist())
         brace_ok, brace_cell = (BRACE_PROXY_X[0] <= bx <= BRACE_PROXY_X[1] and abs(bl) <= BRACE_PROXY_LATERAL), None
     else:
-        brace_ok, brace_cell = in_band(bands_left, stance, brace_xy, tol)
+        brace_ok, brace_cell = in_band(bands_left, stance, brace_xy, tol if tol_brace is None else tol_brace)
         if brace_ok:
             brace_classes = cell_classes(bands_left, stance.translate, stance.tilt, brace_cell)
             if brace_class is not None and brace_classes is not None:

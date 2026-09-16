@@ -53,6 +53,9 @@ AXES = {"+x": (1.0, 0.0, 0.0), "-x": (-1.0, 0.0, 0.0), "+y": (0.0, 1.0, 0.0), "-
 STOP_CLEARANCE = 0.005  # §5.5 style: the blade's outer face 5 mm outside the goal hull
 PUSH_TIP_CLEARANCE = 0.003  # the closed fingertips this far above the top for the thinnest targets (push / blade stop)
 THIN_TARGET_HEIGHT = 0.04  # below this height the stop brace tries the top-down blade before the side contact classes
+#: the stop point may lie within one lattice cell of a left contact band cell (the blade stands beside the cell; the left band
+#: of a flat target starts at λ = 0.08 on the pilot support while the right band ends at 0.0 — the exact two-arm IK decides)
+BRACE_CELL_TOL = 1.0
 END_INSET = 0.03  # the pushed end lies this far inside the object's long-axis extremity
 BAND_TOLERANCE = 0.5  # an end is "inside the band" within this fraction of the lattice of a band cell
 
@@ -321,9 +324,9 @@ class AlignmentAxial(SamplerV2):
                 contact_xy = side_pt[:2] - d[:2] * push_half
                 goal_pose, stop_pts, d_stop = self._stop_geometry(pose, e, com, spin0, yaw_goal, z_brace)
                 stop_pt = stop_pts[0]  # the band test uses the corner-side point (the brace candidates run along the face)
-                jp = TT.joint_placement(bands, left_bands, manip, contact_xy, stop_pt[:2], brace_class=TT.contact_class(manip, -d_stop, z_axis))
+                jp = TT.joint_placement(bands, left_bands, manip, contact_xy, stop_pt[:2], brace_class=TT.contact_class(manip, -d_stop, z_axis), tol_brace=BRACE_CELL_TOL)
                 if not jp["ok"] and left_bands is not None and jp["brace_ok"] and not jp["brace_class_ok"]:
-                    jp = TT.joint_placement(bands, left_bands, manip, contact_xy, stop_pt[:2], brace_class=TT.contact_class(manip, -d_stop, th.cross(z_axis, d_stop, dim=0)))
+                    jp = TT.joint_placement(bands, left_bands, manip, contact_xy, stop_pt[:2], brace_class=TT.contact_class(manip, -d_stop, th.cross(z_axis, d_stop, dim=0)), tol_brace=BRACE_CELL_TOL)
                 pairs.append((e, jp, goal_pose, stop_pts, d_stop))
             if not any(jp["ok"] for _, jp, _, _, _ in pairs):
                 for _, jp, _, _, _ in pairs:
