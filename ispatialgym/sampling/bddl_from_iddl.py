@@ -451,7 +451,11 @@ def write_problem(
     activity_dir = os.path.join(bddl_root, activity)
     registry = ProblemRegistry.load(activity_dir, activity)
     written_alias = bddl_alias(alias)
-    definition_id = registry.allocate(alias, written_alias, grounded=_dt.date.today().isoformat(), by=GROUNDER, **(meta or {}))
+    existing = registry.record(alias)
+    # ``grounded`` = the first grounding date of the alias (a re-grounding keeps it, so the registry only changes
+    # where the grounding changed)
+    grounded = existing.get("grounded") if existing else None
+    definition_id = registry.allocate(alias, written_alias, grounded=grounded or _dt.date.today().isoformat(), by=GROUNDER, **(meta or {}))
     rendered = render(iddl, groundings, definition_id, alias, activity, comment=comment)
     if not dry_run:
         os.makedirs(activity_dir, exist_ok=True)

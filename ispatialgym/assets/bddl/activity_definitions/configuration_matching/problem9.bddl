@@ -2,7 +2,7 @@
     (:domain ispatialgym)
     (:alias configuration_matching-articulation_close_large_scale-dishwasher)
 
-    ; ground_isg 2.0.0 2026-09-16: configuration_matching-articulation_close_large_scale-dishwasher (configuration_matching/articulation_close_large_scale.iddl; configuration_matching-articulation_close_large_scale#06/representative)
+    ; ground_isg 2.0.0: configuration_matching-articulation_close_large_scale-dishwasher (configuration_matching/articulation_close_large_scale.iddl; configuration_matching-articulation_close_large_scale#06/representative)
     ; Configuration matching - articulation (large-scale, close). Scene articulated object (roles/candidates.csv kind scene, bound per
     ; scene; joint from the customs list roles.target.joint / handle_key), one joint open at q_init in S (must satisfy Open)
     ; -> closed limit. Handle grasp in this direction too; base / trunk primary, arm secondary.

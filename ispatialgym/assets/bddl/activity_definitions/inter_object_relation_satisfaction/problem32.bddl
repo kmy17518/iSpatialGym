@@ -2,7 +2,7 @@
     (:domain ispatialgym)
     (:alias inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table)
 
-    ; ground_isg 2.0.0 2026-09-16: inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table (inter_object_relation_satisfaction/under_small_scale.iddl; inter_object_relation_satisfaction-under_small_scale#02~T1/representative)
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table (inter_object_relation_satisfaction/under_small_scale.iddl; inter_object_relation_satisfaction-under_small_scale#02~T1/representative)
     ; IORS - under (small-scale). Both objects on the support; the manipulated target (glass, teacup, fries, bottle) is set
     ; down centred on the partner (coaster, saucer, platter, tray) so that the PARTNER ends under the target. Argument order
     ; is therefore (under partner target). Both poses measured.

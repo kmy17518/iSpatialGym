@@ -2,7 +2,7 @@
     (:domain ispatialgym)
     (:alias disembedding-cellulose_tape-biscuit_1_butter_cookie_1_cap_1-breakfast_table)
 
-    ; ground_isg 2.0.0 2026-09-16: disembedding-cellulose_tape-biscuit_1_butter_cookie_1_cap_1-breakfast_table (disembedding/disembedding.iddl; disembedding#18~T1/representative)
+    ; ground_isg 2.0.0: disembedding-cellulose_tape-biscuit_1_butter_cookie_1_cap_1-breakfast_table (disembedding/disembedding.iddl; disembedding#18~T1/representative)
     ; Disembedding. Target and distractors on the source tray, destination tray beside it on the support; the target ends on
     ; the destination tray (centre, init orientation), no distractor does. Distractor categories come from the icl pools
     ; (roles/constraints_compatible.csv same-category / other-category), the member count (1-3) from the customs list

@@ -2,7 +2,7 @@
     (:domain ispatialgym)
     (:alias alignment-axial-paperback_book-breakfast_table)
 
-    ; ground_isg 2.0.0 2026-09-16: alignment-axial-paperback_book-breakfast_table (alignment/axial.iddl; alignment-axial#01~T1/representative)
+    ; ground_isg 2.0.0: alignment-axial-paperback_book-breakfast_table (alignment/axial.iddl; alignment-axial#01~T1/representative)
     ; Alignment - axial (former world_alignment-0 / table_surface). The target rests on the support; the sampler installs a
     ; vertical hinge through its centre of mass (TRO constraint, parent = support; an initialization rule, spec 6.10). It
     ; starts yawed 20-70 deg off and is pushed at one end (right hand) while the other gripper braces the stop edge, until

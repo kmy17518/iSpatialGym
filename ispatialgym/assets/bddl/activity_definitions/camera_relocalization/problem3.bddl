@@ -2,7 +2,7 @@
     (:domain ispatialgym)
     (:alias camera_relocalization-obstructed-public_trash_can_1)
 
-    ; ground_isg 2.0.0 2026-09-16: camera_relocalization-obstructed-public_trash_can_1 (camera_relocalization/obstructed.iddl; camera_relocalization-obstructed#03/representative)
+    ; ground_isg 2.0.0: camera_relocalization-obstructed-public_trash_can_1 (camera_relocalization/obstructed.iddl; camera_relocalization-obstructed#03/representative)
     ; Camera relocalization - obstructed. As standard, plus an obstacle group placed on the eroded shortest path so that the
     ; shortest path changes; the obstacle must be in the head camera's view at a waypoint of the new path *before* the path
     ; departs from the unobstructed shortest path (owner decision 2026-09-15; spec 6.2); the new path must stay inside the

@@ -2,7 +2,7 @@
     (:domain ispatialgym)
     (:alias alignment-world_vertical-wall_clock_s070-walls)
 
-    ; ground_isg 2.0.0 2026-09-16: alignment-world_vertical-wall_clock_s070-walls (alignment/world_vertical.iddl; alignment-world_vertical#06/representative/fallback1:scale)
+    ; ground_isg 2.0.0: alignment-world_vertical-wall_clock_s070-walls (alignment/world_vertical.iddl; alignment-world_vertical#06/representative/fallback1:scale)
     ; fallback 1 (scale) of alignment-world_vertical-wall_clock-walls: scale = 0.7, scale_source = default_step
     ; Alignment - world vertical. The target hangs on the support (a wall region, roles/candidates.csv kind scene) through a revolute
     ; hinge at its centre of mass (axis = wall normal, TRO constraint installed by the sampler, spec 5.5), starts tilted

@@ -2,7 +2,7 @@
     (:domain ispatialgym)
     (:alias camera_relocalization-standard)
 
-    ; ground_isg 2.0.0 2026-09-16: camera_relocalization-standard (camera_relocalization/standard.iddl; camera_relocalization-standard#00/representative)
+    ; ground_isg 2.0.0: camera_relocalization-standard (camera_relocalization/standard.iddl; camera_relocalization-standard#00/representative)
     ; Camera relocalization - standard. Navigate from a random init pose to the base / trunk configuration whose head-camera
     ; pose is the goal (goal image). No manipulated object. Path length buckets (MAX LENGTH 3 / 5 / 10 m) are a generation
     ; parameter of the customs list (generation.path_buckets), not part of the alias. The scene / room is bounded by the

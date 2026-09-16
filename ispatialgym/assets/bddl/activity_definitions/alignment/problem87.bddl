@@ -2,7 +2,7 @@
     (:domain ispatialgym)
     (:alias alignment-world_horizontal-wall_mounted_tv_s080-walls)
 
-    ; ground_isg 2.0.0 2026-09-16: alignment-world_horizontal-wall_mounted_tv_s080-walls (alignment/world_horizontal.iddl; alignment-world_horizontal#05/representative/fallback1:scale)
+    ; ground_isg 2.0.0: alignment-world_horizontal-wall_mounted_tv_s080-walls (alignment/world_horizontal.iddl; alignment-world_horizontal#05/representative/fallback1:scale)
     ; fallback 1 (scale) of alignment-world_horizontal-wall_mounted_tv-walls: scale = 0.8, scale_source = template_meta.scale_hint
     ; Alignment - world horizontal. Same wall hinge as world vertical (installed by the sampler, spec 5.5); the target is an
     ; elongated wall item whose long axis / reference edge must end level. Models that look the same upside down carry the

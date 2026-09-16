@@ -2,7 +2,7 @@
     (:domain ispatialgym)
     (:alias inter_object_relation_satisfaction-ontop_small_scale-pickle-cutting_board-breakfast_table)
 
-    ; ground_isg 2.0.0 2026-09-16: inter_object_relation_satisfaction-ontop_small_scale-pickle-cutting_board-breakfast_table (inter_object_relation_satisfaction/ontop_small_scale.iddl; inter_object_relation_satisfaction-ontop_small_scale#04~T1/representative)
+    ; ground_isg 2.0.0: inter_object_relation_satisfaction-ontop_small_scale-pickle-cutting_board-breakfast_table (inter_object_relation_satisfaction/ontop_small_scale.iddl; inter_object_relation_satisfaction-ontop_small_scale#04~T1/representative)
     ; IORS - ontop (small-scale). Target and partner both on the support; the target ends centred on top of the partner with
     ; its init orientation; the partner stays where it was. Both poses measured.
 

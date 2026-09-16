@@ -1189,7 +1189,8 @@ class Grounder:
                 groundings[role] = RoleGrounding(role, "scene", rp.category, same_as=rp.same_as)
             else:
                 groundings[role] = RoleGrounding(role, "scene", rp.category, self._synset(rp.category))
-        comment = f"{GROUNDER} {self.today}: {alias} ({I.relative_path(iddl.path, self.iddl_root) if iddl.path else iddl.subtask}; {comb.label})"
+        # no date in the file header: a re-grounding rewrites identical text (the registry keeps the grounding date)
+        comment = f"{GROUNDER}: {alias} ({I.relative_path(iddl.path, self.iddl_root) if iddl.path else iddl.subtask}; {comb.label})"
         if comb.fallback is not None:
             comment += f"\nfallback {comb.fallback.rank} ({comb.fallback.kind}) of {comb.fallback.primary}"
             if comb.fallback.params:

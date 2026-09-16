@@ -2,7 +2,7 @@
     (:domain ispatialgym)
     (:alias alignment-axial-keyboard_s070-breakfast_table)
 
-    ; ground_isg 2.0.0 2026-09-16: alignment-axial-keyboard_s070-breakfast_table (alignment/axial.iddl; alignment-axial#09~T1/representative/fallback1:scale)
+    ; ground_isg 2.0.0: alignment-axial-keyboard_s070-breakfast_table (alignment/axial.iddl; alignment-axial#09~T1/representative/fallback1:scale)
     ; fallback 1 (scale) of alignment-axial-keyboard-breakfast_table: scale = 0.7, scale_source = default_step
     ; Alignment - axial (former world_alignment-0 / table_surface). The target rests on the support; the sampler installs a
     ; vertical hinge through its centre of mass (TRO constraint, parent = support; an initialization rule, spec 6.10). It

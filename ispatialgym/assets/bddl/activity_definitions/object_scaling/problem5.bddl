@@ -2,7 +2,7 @@
     (:domain ispatialgym)
     (:alias object_scaling-apple)
 
-    ; ground_isg 2.0.0 2026-09-16: object_scaling-apple (object_scaling/object_scaling.iddl; object_scaling#05/representative)
+    ; ground_isg 2.0.0: object_scaling-apple (object_scaling/object_scaling.iddl; object_scaling#05/representative)
     ; Object scaling. The target is held (right arm, fixed hold pose) at init and at the goal; the goal is a depth change of
     ; the target along the head-camera optical axis (TRO pose target: frame = head camera, position_metric = depth).
 

@@ -2,7 +2,7 @@
     (:domain ispatialgym)
     (:alias configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table)
 
-    ; ground_isg 2.0.0 2026-09-16: configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table (configuration_matching/articulation_open_small_scale.iddl; configuration_matching-articulation_open_small_scale#01~T1/representative/fallback1:next_model)
+    ; ground_isg 2.0.0: configuration_matching-articulation_open_small_scale-blender_eyedvd-breakfast_table (configuration_matching/articulation_open_small_scale.iddl; configuration_matching-articulation_open_small_scale#01~T1/representative/fallback1:next_model)
     ; fallback 1 (next_model) of configuration_matching-articulation_open_small_scale-blender-breakfast_table: model = eyedvd, slot = variation_geometry, primary_model = cwkvib
     ; Configuration matching - articulation (small-scale, open). Spawned articulated object (toolbox, carton, hinged jar) on
     ; the support (floor for objects taller than 0.6 m), facing the robot; closed -> open to q_goal in S. Handle arm + brace
