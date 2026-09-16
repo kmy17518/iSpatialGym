@@ -39,6 +39,7 @@ from ispatialgym.oracle.sidecar import Sidecar
 from ispatialgym.robot import conventions as C
 
 SIDECARS = os.path.join(os.path.dirname(__file__), "data", "sidecars")
+VARIANTS = os.path.join(os.path.dirname(__file__), "data", "sidecar_variants")
 CAM_KEY = "robot_r1:zed_link:Camera:0"
 DT = 1.0 / 30.0
 ARM_OFFSET = {"left": th.tensor([0.3, 0.2, 0.5]), "right": th.tensor([0.3, -0.2, 0.5])}
@@ -568,7 +569,7 @@ def test_executors_cover_every_action_class():
 
 
 def test_every_test_sidecar_program_dispatches():
-    paths = sorted(glob.glob(os.path.join(SIDECARS, "*.json")) + glob.glob(os.path.join(SIDECARS, "variants", "*.json")))
+    paths = sorted(glob.glob(os.path.join(SIDECARS, "*.json")) + glob.glob(os.path.join(VARIANTS, "*.json")))
     assert len(paths) >= 22
     for path in paths:
         sc = Sidecar.load(path)
@@ -1367,7 +1368,7 @@ def inside_world():
 def test_push_under_contacts_floor_and_target_allowed_partner_forbidden():
     """Item 7: for the push-under push the floor and the target are intended contacts, the partner is forbidden
     (fingers / held object included); the preceding drop on the floor forbids the partner too."""
-    sc = Sidecar.load(os.path.join(SIDECARS, "variants", "inter_object_relation_satisfaction-under_large_scale__push_under.json"))
+    sc = Sidecar.load(os.path.join(VARIANTS, "inter_object_relation_satisfaction-under_large_scale__push_under.json"))
     actions = expand(sc.alias, sc)
     place = [a for a in actions if isinstance(a, Place)][0]
     push = [a for a in actions if isinstance(a, Push)][0]

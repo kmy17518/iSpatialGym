@@ -32,6 +32,7 @@ from ispatialgym.oracle.sidecar import (
 )
 
 DATA = os.path.join(os.path.dirname(__file__), "data", "sidecars")
+VARIANTS = os.path.join(os.path.dirname(__file__), "data", "sidecar_variants")  # variant fixtures (push-only axial, push-under, ...)
 
 try:
     import torch as th
@@ -858,7 +859,7 @@ def test_under_large_push_under_chain():
     """Owner decision 2026-09-16 item 7: ``grasps[0].place_kind == "drop"`` + ``contacts.push`` of kind ``push_under``
     turn the under-large chain into … → place(drop on the floor) → retreat → push (along the floor, partner forbidden)
     → retreat; without the push record the sidecar is invalid."""
-    with open(os.path.join(DATA, "variants", "inter_object_relation_satisfaction-under_large_scale__push_under.json")) as f:
+    with open(os.path.join(VARIANTS, "inter_object_relation_satisfaction-under_large_scale__push_under.json")) as f:
         d = json.load(f)
     sc = Sidecar.from_dict(d)
     assert sc.problems() == [] and sc.contacts.push.kind == "push_under"
@@ -892,7 +893,7 @@ def test_axial_is_push_only_without_a_brace_record():
     """Owner decision 2026-09-16 08:10: ``contacts.brace`` is optional for axial; without it the program is
     transition → push → retreat (the oracle's push closure is the stop), with it the braced chain as before."""
     assert "contacts.brace" not in REQUIRED_BLOCKS["alignment-axial"] and "contacts.push" in REQUIRED_BLOCKS["alignment-axial"]
-    with open(os.path.join(DATA, "variants", "alignment-axial__push_only.json")) as f:
+    with open(os.path.join(VARIANTS, "alignment-axial__push_only.json")) as f:
         d = json.load(f)
     assert "brace" not in d["contacts"]
     sc = Sidecar.from_dict(d)
