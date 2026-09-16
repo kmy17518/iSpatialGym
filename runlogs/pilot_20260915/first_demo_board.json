@@ -75,8 +75,8 @@
   "last_change": "2026-09-16 04:37 PDT"
  },
  "inter_object_relation_satisfaction-under_small_scale": {
-  "blocking": "french_fries: approach_untrackable x8 (branch-consistent rule rejects all grasps); second alias teacup-saucer running",
-  "owner": "core / loop"
+  "blocking": "-",
+  "owner": "-"
  },
  "inter_object_relation_satisfaction-inside": {
   "blocking": "re-sample after 160c518 (release height) + drop executor",
@@ -90,12 +90,12 @@
   "last_change": "2026-09-16 04:37 PDT"
  },
  "inter_object_relation_satisfaction-touching": {
-  "blocking": "carton_of_milk: place_unreachable 4 + approach_untrackable 4; second alias teacup-teapot running",
-  "owner": "core / loop"
+  "blocking": "carton_of_milk: IK; teacup-teapot: target_not_pushable (yield); third alias box_of_sanitary_napkins running",
+  "owner": "loop / core"
  },
  "inter_object_relation_satisfaction-ontop_large_scale": {
-  "blocking": "floor-class alias running on the local GPU (owner 08:19); floor cells in-process if the band is empty",
-  "owner": "coordinator (local)"
+  "blocking": "floor class failed locally (floor band 0 cells even in-process \u2192 B unreachable; path_collision / no_transition / empty F_init); now box_of_shampoo-sofa-bar locally (C at the sofa seat 0.40 m needs a placement band: in-process compute); countertop pair needs the visibility-rule relaxation (decision)",
+  "owner": "coordinator (local) / large-scale"
  },
  "inter_object_relation_satisfaction-under_large_scale": {
   "blocking": "push-under: sampler landed (25e94d3/8140025/032d849), program + executor (oracle) pending",

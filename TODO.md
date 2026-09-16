@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 09:08 PDT — 7/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 09:44 PDT — 8/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -137,11 +137,11 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | alignment-world_horizontal | no instance | demo loop running (picture_s070) | loop |
 | alignment-axial | valid demo | - | - |
 | IORS ontop_small_scale | valid demo | - | - |
-| IORS under_small_scale | demo run | french_fries: approach_untrackable x8 (branch-consistent rule rejects all grasps); second alias teacup-saucer running | core / loop |
+| IORS under_small_scale | valid demo | - | - |
 | IORS inside | demo run (pre-fix success) | re-sample after 160c518 (release height) + drop executor | core / oracle |
 | IORS nextto | valid demo | near-side goal 160c518 (future sampling) | - |
-| IORS touching | no instance | carton_of_milk: place_unreachable 4 + approach_untrackable 4; second alias teacup-teapot running | core / loop |
-| IORS ontop_large_scale | no instance | floor-class alias running on the local GPU (owner 08:19); floor cells in-process if the band is empty | coordinator (local) |
+| IORS touching | no instance | carton_of_milk: IK; teacup-teapot: target_not_pushable (yield); third alias box_of_sanitary_napkins running | loop / core |
+| IORS ontop_large_scale | no instance | floor class failed locally (floor band 0 cells even in-process → B unreachable; path_collision / no_transition / empty F_init); now box_of_shampoo-sofa-bar locally (C at the sofa seat 0.40 m needs a placement band: in-process compute); countertop pair needs the visibility-rule relaxation (decision) | coordinator (local) / large-scale |
 | IORS under_large_scale | no instance | push-under: sampler landed (25e94d3/8140025/032d849), program + executor (oracle) pending | large-scale / oracle |
 <!-- /first-demo-board -->
 
@@ -258,3 +258,4 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026‑09‑16 09:05 PDT agent-e2e: owner note 08:45 — killed B3's two stuck local band waiters (pids 3003199 / 3823256; their `while pgrep -f` patterns matched their own command lines, no `run_local.sh` ever started); their queued job lists saved (`/tmp/waiter1_jobs.txt` 17 breakfast‑table jobs incl. 6 legacy placed‑tray bands, `/tmp/waiter2_jobs.txt` 14 `desk_xhjsub_0` / sofa A6 jobs) and handed to the bands agent for a coverage check (placed‑tray ones superseded by the 1.25 stance‑relative bands; missing desk bands queued on the fleet, not locally). Same self‑match bug in the watchdog's idle check (`isg_boot/bench.sh`) fixed with the bracket trick; no other `while pgrep` waiters found in `scripts/` or as processes. Local GPU stays reserved for the ontop‑large demo.
 - 2026‑09‑16 09:10 PDT agent-e2e: coverage of the two killed local band queues confirmed by the bands agent — the 10 right‑hand / generic / scaled breakfast‑table bands exist with cells; the 6 legacy placed‑tray bands are superseded by the 1.25 stance‑relative bands already in `w11` (all 30 by ≈ 10:15 PDT, `pencil_case` ≈ 10:45); the 13 `desk_xhjsub_0` init bands exist but are empty by geometry (the desk's 0.66 m overhang puts the Phase‑1a stance in the bathroom furniture; A6 re‑runs queued but expected to stay empty unless the stance rule changes); the sofa band now has 31 cells. Nothing queued, nothing local.
 - 2026‑09‑16 09:20 PDT agent-e2e: **board 7/21 valid** — camera standard, camera obstructed, object scaling, mental rotation, IORS ontop‑small, IORS nextto and **axial (push‑only, `282dafe`)** re‑sampled + demoed on commits that contain every fix affecting them (board validity = commit ⊇ fixes; the pool syncs the working tree, so the `dirty` flag is provenance only). Running: inside re‑run, wall v/h (`painting_s080`, `picture_s070`), attachment, block design, disembedding (`chili`), under‑small (`teacup-saucer`; `french_fries` now rejected `approach_untrackable` ×8 by the branch‑consistent rule), touching (`teacup-teapot`; `carton_of_milk` failed place/approach IK), ontop‑large floor class locally (B stance `path_collision` / `no_transition` so far). Large articulation on the roomy `rvunhj_0`: Phase 1 finds ~1000 (d, t) with the target in frame but 0 collision‑free → scene‑specific suspicion (floor height / ceiling / room‑spanning object), diagnostic agent 79dce47f on the pool.
+- 2026‑09‑16 09:50 PDT agent-e2e: board **8/21 valid** (+ IORS under‑small on `teacup-saucer`, `85a0ed4`; `french_fries` is rejected `approach_untrackable` by design now, one `teacup` run slipped in the hand → `ghost_hand` at lift). Ontop‑large floor class on the local GPU: **0/8** — the floor band for `bed_rrcvaq_0` is empty even when computed in‑process (0 cells, 36 s: the floor 0.45–0.9 m ahead is beyond the arm at every collision‑free trunk), so stance B fails (`path_collision` / `no_transition` / empty F_init) → the floor‑class fallback cannot produce an init stance for small floor objects; next candidate `box_of_shampoo-sofa-bar` running locally (A/B passed on the bar in the pilot; C needs a band at the sofa seat 0.40 m); the countertop pair needs the partner‑visibility relaxation (decision). Touching: `carton_of_milk` IK failures, `teacup-teapot` `target_not_pushable` (yield) → third alias running.
