@@ -1,0 +1,757 @@
+[
+ {
+  "id": "rb__brace__house_single_floor__breakfast_table_rhjoby_0__blender-cwkvib-j_lid",
+  "kind": "brace",
+  "subtasks": [
+   "configuration_matching-articulation_close_small_scale",
+   "configuration_matching-articulation_open_small_scale"
+  ],
+  "picks": [
+   "configuration_matching-articulation_close_small_scale#01",
+   "configuration_matching-articulation_open_small_scale#01"
+  ],
+  "slot": "representative",
+  "scene": "house_single_floor",
+  "weight": 1.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "breakfast_table_rhjoby_0",
+   "--target",
+   "blender/cwkvib",
+   "--handle-key",
+   "blender__cwkvib",
+   "--joint",
+   "j_lid",
+   "--joint-values",
+   "0.0000,0.4363,0.6545,0.8290,0.8727",
+   "--brace"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support breakfast_table_rhjoby_0 --target blender/cwkvib --handle-key blender__cwkvib --joint j_lid --joint-values 0.0000,0.4363,0.6545,0.8290,0.8727 --brace --out $OUT",
+  "wave": 1,
+  "reason": "missing"
+ },
+ {
+  "id": "rb__brace__house_single_floor__breakfast_table_rhjoby_0__carton-causya-j_link_2",
+  "kind": "brace",
+  "subtasks": [
+   "configuration_matching-articulation_close_small_scale",
+   "configuration_matching-articulation_open_small_scale"
+  ],
+  "picks": [
+   "configuration_matching-articulation_close_small_scale#05",
+   "configuration_matching-articulation_open_small_scale#05"
+  ],
+  "slot": "representative",
+  "scene": "house_single_floor",
+  "weight": 1.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "breakfast_table_rhjoby_0",
+   "--target",
+   "carton/causya",
+   "--handle-key",
+   "carton__causya",
+   "--joint",
+   "j_link_2",
+   "--joint-values",
+   "0.0000,1.5621,2.3431,2.9679,3.1241",
+   "--brace"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support breakfast_table_rhjoby_0 --target carton/causya --handle-key carton__causya --joint j_link_2 --joint-values 0.0000,1.5621,2.3431,2.9679,3.1241 --brace --out $OUT",
+  "wave": 1,
+  "reason": "missing"
+ },
+ {
+  "id": "rb__brace__house_single_floor__countertop_ikwqer_0__blender-eyedvd-j_lid",
+  "kind": "brace",
+  "subtasks": [
+   "configuration_matching-articulation_close_small_scale",
+   "configuration_matching-articulation_open_small_scale"
+  ],
+  "picks": [
+   "configuration_matching-articulation_close_small_scale#01",
+   "configuration_matching-articulation_open_small_scale#01"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 1.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--target",
+   "blender/eyedvd",
+   "--handle-key",
+   "blender__eyedvd",
+   "--joint",
+   "j_lid",
+   "--joint-values",
+   "0.0000,1.0717,1.6076,2.0363,2.1435",
+   "--brace"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --target blender/eyedvd --handle-key blender__eyedvd --joint j_lid --joint-values 0.0000,1.0717,1.6076,2.0363,2.1435 --brace --out $OUT",
+  "wave": 2,
+  "reason": "missing"
+ },
+ {
+  "id": "rb__brace__house_single_floor__countertop_ikwqer_0__carton-msfzpz-j_link_0",
+  "kind": "brace",
+  "subtasks": [
+   "configuration_matching-articulation_close_small_scale",
+   "configuration_matching-articulation_open_small_scale"
+  ],
+  "picks": [
+   "configuration_matching-articulation_close_small_scale#05",
+   "configuration_matching-articulation_open_small_scale#05"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 1.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--target",
+   "carton/msfzpz",
+   "--handle-key",
+   "carton__msfzpz",
+   "--joint",
+   "j_link_0",
+   "--joint-values",
+   "0.0000,1.4835,2.2253,2.8187,2.9671",
+   "--brace"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --target carton/msfzpz --handle-key carton__msfzpz --joint j_link_0 --joint-values 0.0000,1.4835,2.2253,2.8187,2.9671 --brace --out $OUT",
+  "wave": 2,
+  "reason": "missing"
+ },
+ {
+  "id": "rb__brace__house_single_floor__countertop_ikwqer_0__hinged_jar-vzwhbg-j_rb1",
+  "kind": "brace",
+  "subtasks": [
+   "configuration_matching-articulation_close_small_scale",
+   "configuration_matching-articulation_open_small_scale"
+  ],
+  "picks": [
+   "configuration_matching-articulation_close_small_scale#02",
+   "configuration_matching-articulation_open_small_scale#02"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 1.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--target",
+   "hinged_jar/vzwhbg",
+   "--handle-key",
+   "hinged_jar__vzwhbg",
+   "--joint",
+   "j_rb1",
+   "--joint-values",
+   "0.0000,1.5621,2.3431,2.9680,3.1242",
+   "--brace"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --target hinged_jar/vzwhbg --handle-key hinged_jar__vzwhbg --joint j_rb1 --joint-values 0.0000,1.5621,2.3431,2.9680,3.1242 --brace --out $OUT",
+  "wave": 2,
+  "reason": "missing"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-inside"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-inside#05"
+  ],
+  "slot": "representative",
+  "scene": "house_single_floor",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "breakfast_table_rhjoby_0",
+   "--object",
+   "sunflower/dkajbh",
+   "--grasp-key",
+   "sunflower__dkajbh"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support breakfast_table_rhjoby_0 --object sunflower/dkajbh --grasp-key sunflower__dkajbh --out $OUT",
+  "wave": 1,
+  "reason": "old-code re-run (pair seeds)"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-touching"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-touching#02"
+  ],
+  "slot": "representative",
+  "scene": "house_single_floor",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "breakfast_table_rhjoby_0",
+   "--object",
+   "teacup/oxfzfe",
+   "--grasp-key",
+   "teacup__oxfzfe__t"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support breakfast_table_rhjoby_0 --object teacup/oxfzfe --grasp-key teacup__oxfzfe__t --out $OUT",
+  "wave": 1,
+  "reason": "old-code re-run (pair seeds)"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-under_small_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-under_small_scale#02"
+  ],
+  "slot": "representative",
+  "scene": "house_single_floor",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "breakfast_table_rhjoby_0",
+   "--object",
+   "teacup/wopjex",
+   "--grasp-key",
+   "teacup__wopjex__t"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support breakfast_table_rhjoby_0 --object teacup/wopjex --grasp-key teacup__wopjex__t --out $OUT",
+  "wave": 1,
+  "reason": "old-code re-run (pair seeds)"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#30"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "bar_soap/feqemg",
+   "--grasp-key",
+   "bar_soap__feqemg",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object bar_soap/feqemg --grasp-key bar_soap__feqemg --placed tray/gsxbym --out $OUT",
+  "wave": 2,
+  "reason": "old-code re-run (pair seeds)"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-under_small_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-under_small_scale#04"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "beer_glass/rxscji",
+   "--grasp-key",
+   "beer_glass__rxscji"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object beer_glass/rxscji --grasp-key beer_glass__rxscji --out $OUT",
+  "wave": 2,
+  "reason": "old-code re-run (pair seeds)"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#17"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "box_of_rice/fvulow",
+   "--grasp-key",
+   "box_of_rice__fvulow__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object box_of_rice/fvulow --grasp-key box_of_rice__fvulow__t --placed tray/gsxbym --out $OUT",
+  "wave": 2,
+  "reason": "old-code re-run (pair seeds)"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#04"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "box_of_sanitary_napkins/acaivd",
+   "--grasp-key",
+   "box_of_sanitary_napkins__acaivd",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object box_of_sanitary_napkins/acaivd --grasp-key box_of_sanitary_napkins__acaivd --placed tray/gsxbym --out $OUT",
+  "wave": 2,
+  "reason": "old-code re-run (pair seeds)"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#01"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "box_of_shampoo/nijidu",
+   "--grasp-key",
+   "box_of_shampoo__nijidu",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object box_of_shampoo/nijidu --grasp-key box_of_shampoo__nijidu --placed tray/gsxbym --out $OUT",
+  "wave": 2,
+  "reason": "old-code re-run (pair seeds)"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-inside"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-inside#01"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "brussels_sprouts/siodbb",
+   "--grasp-key",
+   "brussels_sprouts__siodbb__i"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object brussels_sprouts/siodbb --grasp-key brussels_sprouts__siodbb__i --out $OUT",
+  "wave": 2,
+  "reason": "old-code re-run (pair seeds)"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-atyqub__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#13"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "carton_of_milk/atyqub",
+   "--grasp-key",
+   "carton_of_milk__atyqub",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object carton_of_milk/atyqub --grasp-key carton_of_milk__atyqub --placed tray/gsxbym --out $OUT",
+  "wave": 2,
+  "reason": "missing"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-touching"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-touching#03"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "carton_of_milk/kszoro",
+   "--grasp-key",
+   "carton_of_milk__kszoro"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object carton_of_milk/kszoro --grasp-key carton_of_milk__kszoro --out $OUT",
+  "wave": 2,
+  "reason": "old-code re-run (pair seeds)"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#14"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "chili/rafkbt",
+   "--grasp-key",
+   "chili__rafkbt",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object chili/rafkbt --grasp-key chili__rafkbt --placed tray/gsxbym --out $OUT",
+  "wave": 2,
+  "reason": "old-code re-run (pair seeds)"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#19"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "conditioner_dispenser/uncljo",
+   "--grasp-key",
+   "conditioner_dispenser__uncljo__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object conditioner_dispenser/uncljo --grasp-key conditioner_dispenser__uncljo__t --placed tray/gsxbym --out $OUT",
+  "wave": 2,
+  "reason": "old-code re-run (pair seeds)"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun",
+  "kind": "tabletop",
+  "subtasks": [
+   "configuration_matching-attachment"
+  ],
+  "picks": [
+   "configuration_matching-attachment#01"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "dip_candle/ghctun",
+   "--grasp-key",
+   "dip_candle__ghctun"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object dip_candle/ghctun --grasp-key dip_candle__ghctun --out $OUT",
+  "wave": 2,
+  "reason": "old-code re-run (pair seeds)"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__frying_pan-sfbdjn__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#08"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "frying_pan/sfbdjn",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object frying_pan/sfbdjn --generic-pinch --out $OUT",
+  "wave": 2,
+  "reason": "missing"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-ontop_small_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-ontop_small_scale#05"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "half_bagel/hsvakn",
+   "--grasp-key",
+   "half_bagel__hsvakn__t"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object half_bagel/hsvakn --grasp-key half_bagel__hsvakn__t --out $OUT",
+  "wave": 2,
+  "reason": "old-code re-run (pair seeds)"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__gp",
+  "kind": "tabletop",
+  "subtasks": [
+   "alignment-axial"
+  ],
+  "picks": [
+   "alignment-axial#05"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "hardback/agbqsy",
+   "--generic-pinch"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object hardback/agbqsy --generic-pinch --out $OUT",
+  "wave": 2,
+  "reason": "old-code re-run (pair seeds)"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__mouse-pljjtu__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#28"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "mouse/pljjtu",
+   "--grasp-key",
+   "mouse__pljjtu__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object mouse/pljjtu --grasp-key mouse__pljjtu__t --placed tray/gsxbym --out $OUT",
+  "wave": 2,
+  "reason": "missing"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__pencil-rzscao__scaled",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-nextto"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-nextto#01"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "pencil/rzscao",
+   "--grasp-key",
+   "pencil__rzscao__s",
+   "--scale",
+   "1.0,3.867,5.113"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object pencil/rzscao --grasp-key pencil__rzscao__s --scale 1.0,3.867,5.113 --out $OUT",
+  "wave": 2,
+  "reason": "missing"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__soap_dispenser-cgxrwd__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#09"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "soap_dispenser/cgxrwd",
+   "--grasp-key",
+   "soap_dispenser__cgxrwd__t",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object soap_dispenser/cgxrwd --grasp-key soap_dispenser__cgxrwd__t --placed tray/gsxbym --out $OUT",
+  "wave": 2,
+  "reason": "missing"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__desk_xhjsub_0__pen-hiyeki",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-ontop_large_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-ontop_large_scale#01"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "desk_xhjsub_0",
+   "--object",
+   "pen/hiyeki",
+   "--grasp-key",
+   "pen__hiyeki"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support desk_xhjsub_0 --object pen/hiyeki --grasp-key pen__hiyeki --out $OUT",
+  "wave": 2,
+  "reason": "missing"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__sofa_wnzdke_0__box_of_shampoo-nijidu",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-ontop_large_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-ontop_large_scale#04"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "sofa_wnzdke_0",
+   "--object",
+   "box_of_shampoo/nijidu",
+   "--grasp-key",
+   "box_of_shampoo__nijidu"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support sofa_wnzdke_0 --object box_of_shampoo/nijidu --grasp-key box_of_shampoo__nijidu --out $OUT",
+  "wave": 2,
+  "reason": "missing"
+ }
+]

@@ -84,26 +84,46 @@ with the source tray placed, 1 block design, 6 attachment targets, 10 axial targ
 targets —, 5 small-scale articulation brace jobs, 20 large-scale IORS bands: 5 placement bands with the partner as the
 support, 5 `--support floor --under` bands, 10 init bands (7 tabletop supports, 3 floor rooms)), `jobs_w2.json` (90
 jobs, `variation_geometry` slot, mostly `countertop_ikwqer_0`), `jobs_w3_heldout.json` (77 jobs, `heldout` slot, mostly
-`desk_pfsjbc_0` in `office_cubicles_right`). Pods: round 1 = 5 × A40 + 3 × L40S (3 h TTL), round 2 = 5 × A40 + 2 ×
-L40S, rounds 3–5 = L40S only (A40 hosts at load average 30–50 took 2–4× longer per job); ≤ 15 live at a time after the
-first TTL cliff, one process per pod, `dispatch_samp.py` queues (`w01_` representative, `w04_` variation, `w05_` heldout,
-`w09_` brace on L40S only), `scripts/reach_bands/redistribute.sh` re-balanced the queues after every TTL cliff
-(`fleet_remaining.py`: a job is done when a `.npz` exists on some pod or in the pulled copies), `pull_loop.sh` rsynced
-`/root/samp` every 8–10 min so that nothing was lost when a pod self-terminated.
+`desk_pfsjbc_0` in `office_cubicles_right`). Pods (all SECURE, one process each, 2.5–3 h TTL): round 1 = 5 × A40 +
+3 × L40S (21:20–00:20), round 2 = 5 × A40 + 2 × L40S (22:20–01:20), round 3 = 3 × L40S (23:07–02:07), round 4 = 4 × L40S
+(00:40–03:10), round 5 = 3 × L40S (01:07–03:37), round 6 = 1 × L40S + 2 × RTX 6000 Ada (02:18, killed 04:03), round 7 =
+6 × L40S (04:17, the leftovers of waves 1–2); ≤ 15 live at a time after the first TTL cliff (A40 hosts at load average
+30–50 took 2–4× longer per job, so later rounds were L40S only). `dispatch_samp.py` queues (`w01_` representative,
+`w04_` variation, `w05_` heldout, `w08_` re-runs, `w09_` brace on L40S only), `scripts/reach_bands/redistribute.sh`
+re-balanced the queues after every TTL cliff (`fleet_remaining.py`: a job is done when a `.npz` exists on some pod or
+in the pulled copies), `pull_loop.sh` rsynced `/root/samp` every 8–10 min so that little was lost when a pod
+self-terminated. The pulled copies live in the git-ignored `runlogs/runpod/rb/<pod name>/<job id>/` (+ `rb_local/`).
 
 Incidents: (1) the first dispatch ran **stale code** on the pods — `dispatch_samp.py` did not sync the new
 `ispatialgym/robot/` package that `robot_utils.py` imports since F5 — and all 95 wave-1 jobs died with `ImportError`
 after 10–19 s (89 recorded in `done.txt`, 6 still queued); the package was pushed by hand, the dispatcher fixed by the
-coordinator (`7384318`), and every job re-queued (95 re-runs). (2) The first brace run crashed in
+coordinator (`7384318`), and every job re-queued (**95 re-runs**). (2) The first brace run crashed in
 `brace_candidates` (`G.rotate` on an `(8, 3)` corner array, fixed in `fc5eadf`; the same commit records per cell the set
 of joint values whose handle poses are feasible and the longest joint-value prefix the brace contact is valid for,
 instead of requiring every joint value). (3) Two brace jobs on A40 pods hit the 50 min `timeout` (blender 1613 s +
-timeout, carton 3002 s, ~250 s per trunk vs 60 s on an L40S); the remaining brace jobs run on L40S only with a 90 min
-timeout. Local runs (`scripts/reach_bands/run_local.sh`, shared RTX 4090, one process at a time, < 12 GB rule) did the
-`desk_xhjsub_0` / countertop / sofa init bands.
+timeout, carton 3002 s, ~250 s per trunk vs 60 s on an L40S); brace jobs then ran on L40S only with a 90 min timeout.
+(4) Rounds 3–5 were bootstrapped from the GitHub `survey` branch (at `69e0ffe`, i.e. the **original** `reach_bands.py`
+of `644495e`: 4 pairs per round, no `--scale`, two world re-syncs per round) and were dispatched with `--no-sync`, so
+until 02:10 UTC they ran the original script: `--scale` jobs failed at argparse (re-queued), the others took 40–80 min
+and produced valid but pair-seed-less bands (15 kept, marked "original" in the table; `collect_bands.py` prefers a
+current-script result when both exist). Fixed by `--sync-only` + `--restart-runner --force`. (5) At 04:03 UTC the
+account-wide `rp.py watchdog` (still running with its default `--cap 200`) terminated every pod of the account
+(`reason=cap`), including the round-6 pods mid-run; the last pull was at 03:56, so at most 3 finished jobs were lost
+(they are in the re-run set). Local runs (`scripts/reach_bands/run_local.sh`, shared RTX 4090, one process at a time,
+< 12 GB rule) did the `desk_xhjsub_0` / countertop / sofa init bands.
 
-Timing per job (wall incl. the scene load): L40S tabletop median 9 min (7–22), A40 tabletop median 18.5 min (12–40),
-floor / under bands 5 min (L40S) – 10 min (A40) (few cells survive the shoulder prune), brace 19–24 min (L40S).
+Timing per job (wall incl. the scene load): L40S tabletop median 8.7 min (4–32), RTX 6000 Ada 8 min, A40 tabletop
+median 17.8 min (12–40), floor / under bands 5 min (L40S) – 10 min (A40) (few cells survive the shoulder prune), brace
+24 min (19–34, L40S). Fleet spend for the reach bands ≈ $75 (39 pods created over 7 rounds, 7 terminated unused within
+minutes: slow-network hosts, the fleet cap, one L40 outside the allowed GPU list).
+
+**Outcome (2026-09-16 06:45 UTC)**: 262 manifest jobs → **218 bands** (179 with cells, 39 empty): the `representative`
+slot 95 / 95 (77 with cells; the 18 empty ones are the 5 brace bands, 7 floor / under bands and the 6 `desk_xhjsub_0` /
+`sofa_lugrhk_1` bands explained below), the `variation_geometry` slot 90 / 90 (74 with cells), the `heldout` slot 33 / 77
+(28 with cells) — the remaining 44 heldout jobs (41 tabletop on `desk_pfsjbc_0` in `office_cubicles_right`, 3 floor
+bands) were queued when the account-wide cap termination hit and were not re-run (`jobs_remaining_w3.json` lists them;
+`sample_isg` computes a missing band on the fly, spec §4.1). Every committed band comes from the committed script
+(`meta.schedule` present); the 15 bands first produced by the original script were recomputed in round 7.
 
 ## Findings for the spec (measured)
 
@@ -144,18 +164,18 @@ floor / under bands 5 min (L40S) – 10 min (A40) (few cells survive the shoulde
 
 ## Results per job (regenerated by `scripts/reach_bands/collect_bands.py`)
 
-Status: {'failed': 2, 'empty band': 33, 'not run': 54, 'ok': 173}
+Status: {'empty band': 39, 'ok': 179, 'not run': 44}
 
 | job | kind | status | pod | wall s | trunks free/total | cells | union extent [λmin, λmax] | note |
 |---|---|---|---|---|---|---|---|---|
-| `rb__brace__house_single_floor__breakfast_table_rhjoby_0__blender-cwkvib-j_lid` | brace | failed | rb-a40-0 | 3002 | / |  |  | rc=124 |
-| `rb__brace__house_single_floor__breakfast_table_rhjoby_0__carton-causya-j_link_2` | brace | failed | rb-a40-1 | 3002 | / |  |  | rc=124 |
+| `rb__brace__house_single_floor__breakfast_table_rhjoby_0__blender-cwkvib-j_lid` | brace | empty band | rb7-l40s-4 | 2012 | 13/20 | 0 | null |  |
+| `rb__brace__house_single_floor__breakfast_table_rhjoby_0__carton-causya-j_link_2` | brace | empty band | rb7-l40s-5 | 2004 | 13/20 | 0 | null |  |
 | `rb__brace__house_single_floor__breakfast_table_rhjoby_0__hinged_jar-gqtsam-j_cap` | brace | empty band | rb-l40s-0 | 1141 | 13/20 | 0 | null |  |
 | `rb__brace__house_single_floor__breakfast_table_rhjoby_0__laptop-nvulcs-j_link_0` | brace | empty band | rb-l40s-1 | 1167 | 13/20 | 0 | null |  |
 | `rb__brace__house_single_floor__breakfast_table_rhjoby_0__toolbox-redmtl-j_lid` | brace | empty band | rb-l40s-2 | 1443 | 13/20 | 0 | null |  |
-| `rb__brace__house_single_floor__countertop_ikwqer_0__blender-eyedvd-j_lid` | brace | not run |  |  | / |  |  |  |
-| `rb__brace__house_single_floor__countertop_ikwqer_0__carton-msfzpz-j_link_0` | brace | not run |  |  | / |  |  |  |
-| `rb__brace__house_single_floor__countertop_ikwqer_0__hinged_jar-vzwhbg-j_rb1` | brace | not run |  |  | / |  |  |  |
+| `rb__brace__house_single_floor__countertop_ikwqer_0__blender-eyedvd-j_lid` | brace | empty band | rb7-l40s-3 | 1820 | 9/20 | 0 | null |  |
+| `rb__brace__house_single_floor__countertop_ikwqer_0__carton-msfzpz-j_link_0` | brace | empty band | rb7-l40s-4 | 1460 | 9/20 | 0 | null |  |
+| `rb__brace__house_single_floor__countertop_ikwqer_0__hinged_jar-vzwhbg-j_rb1` | brace | empty band | rb7-l40s-5 | 1371 | 9/20 | 0 | null |  |
 | `rb__floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd` | floor | empty band | rb2-l40s-0 | 243 | 18/25 | 0 | null |  |
 | `rb__floor__Rs_int__floor-under-bed_zrumze_0__sandal-spcddb` | floor | empty band | rb2-a40-0 | 327 | 18/25 | 0 | null |  |
 | `rb__floor__house_double_floor_lower__floor-under-sofa_frlxgz_0__pencil-vpzhth__scaled` | floor | empty band | rb-l40s-0 | 308 | 0/25 | 0 | null |  |
@@ -256,10 +276,10 @@ Status: {'failed': 2, 'empty band': 33, 'not run': 54, 'ok': 173}
 | `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__quartz-vfuilh` | tabletop | ok | rb2-l40sb-0 | 798 | 13/20 | 558 | [-0.5600000023841858, 0.07999999821186066] |  |
 | `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__skateboard_wheel_assembly-jljqtt` | tabletop | ok | rb2-a40c | 1482 | 13/20 | 354 | [-0.5600000023841858, 0.0] |  |
 | `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__soap_dispenser-zwudcz__placed-tray-gsxbym` | tabletop | ok | rb2-a40b-0 | 837 | 13/20 | 76 | [-0.1599999964237213, 0.0] |  |
-| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh` | tabletop | ok | rb3-l40s-0 | 3912 | 13/20 | 693 | [-0.5600000023841858, 0.1599999964237213] | original (exhaustive rounds, no pair seeds) |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh` | tabletop | ok | rb7-l40s-4 | 637 | 13/20 | 479 | [-0.5600000023841858, 0.07999999821186066] |  |
 | `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__tablefork-pqrtkc__placed-tray-gsxbym` | tabletop | ok | rb2-a40b-1 | 958 | 13/20 | 127 | [-0.1599999964237213, 0.07999999821186066] |  |
-| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe` | tabletop | ok | rb3-l40s-1 | 3804 | 13/20 | 480 | [-0.5600000023841858, 0.07999999821186066] | original (exhaustive rounds, no pair seeds) |
-| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex` | tabletop | ok | rb3-l40s-3 | 3936 | 13/20 | 626 | [-0.5600000023841858, 0.1599999964237213] | original (exhaustive rounds, no pair seeds) |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe` | tabletop | ok | rb7-l40s-5 | 756 | 13/20 | 479 | [-0.5600000023841858, 0.07999999821186066] |  |
+| `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex` | tabletop | ok | rb7-l40s-3 | 885 | 13/20 | 553 | [-0.5600000023841858, 0.07999999821186066] |  |
 | `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teaspoon-qdepdj__placed-tray-gsxbym` | tabletop | ok | rb-a40b-2 | 1001 | 13/20 | 128 | [-0.1599999964237213, 0.07999999821186066] |  |
 | `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__toy_dice-hbkqqp__placed-tray-gsxbym` | tabletop | ok | rb2-l40s-0 | 567 | 13/20 | 80 | [-0.1599999964237213, 0.0] |  |
 | `rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__toy_dice-isgblk__gp` | tabletop | ok | rb2-a40-0 | 1036 | 13/20 | 441 | [-0.5600000023841858, 0.0] |  |
@@ -267,9 +287,9 @@ Status: {'failed': 2, 'empty band': 33, 'not run': 54, 'ok': 173}
 | `rb__tabletop__house_single_floor__countertop_fjkase_0__shampoo_dispenser-zoyyia` | tabletop | ok | local | None | 7/20 | 361 | [-0.800000011920929, 0.07999999821186066] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__apple-netbsb` | tabletop | ok | rb4-l40s-1 | 659 | 9/20 | 290 | [-0.800000011920929, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__bag_of_chips-bryahw__gp` | tabletop | ok | rb-l40s-1 | 535 | 9/20 | 387 | [-0.800000011920929, 0.0] |  |
-| `rb__tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__placed-tray-gsxbym` | tabletop | ok | rb3-l40s-0 | 1313 | 9/20 | 115 | [-0.1599999964237213, 0.07999999821186066] | original (exhaustive rounds, no pair seeds) |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__placed-tray-gsxbym` | tabletop | ok | rb7-l40s-4 | 378 | 9/20 | 75 | [-0.1599999964237213, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__beaker-sfvswx__placed-tray-gsxbym` | tabletop | ok | rb2-a40-0 | 821 | 9/20 | 92 | [-0.1599999964237213, 0.07999999821186066] |  |
-| `rb__tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji` | tabletop | ok | rb4-l40s-2 | 3187 | 9/20 | 524 | [-0.800000011920929, 0.07999999821186066] | original (exhaustive rounds, no pair seeds) |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji` | tabletop | ok | rb7-l40s-5 | 897 | 9/20 | 512 | [-0.800000011920929, 0.07999999821186066] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__board_game-eoywpy__gp` | tabletop | ok | rb4-l40s-0 | 513 | 9/20 | 379 | [-0.800000011920929, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__bottle_of_beer-dcwvkg__placed-tray-gsxbym` | tabletop | ok | rb2-a40-1 | 779 | 9/20 | 51 | [-0.1599999964237213, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__bottle_of_medicine-egondf__placed-tray-gsxbym` | tabletop | ok | rb2-l40s-0 | 522 | 9/20 | 53 | [-0.1599999964237213, 0.0] |  |
@@ -281,29 +301,29 @@ Status: {'failed': 2, 'empty band': 33, 'not run': 54, 'ok': 173}
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_cane_sugar-qvjiti__placed-tray-gsxbym` | tabletop | ok | rb2-a40b-1 | 781 | 9/20 | 55 | [-0.1599999964237213, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_cereal-ykuyqb__placed-tray-gsxbym` | tabletop | ok | rb2-l40sb-0 | 401 | 9/20 | 52 | [-0.1599999964237213, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_cookies-dlhqft__placed-tray-gsxbym` | tabletop | ok | rb2-a40c | 854 | 9/20 | 57 | [-0.1599999964237213, 0.0] |  |
-| `rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__placed-tray-gsxbym` | tabletop | ok | rb3-l40s-0 | 1150 | 9/20 | 138 | [-0.1599999964237213, 0.1599999964237213] | original (exhaustive rounds, no pair seeds) |
-| `rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym` | tabletop | ok | rb3-l40s-1 | 1009 | 9/20 | 57 | [-0.1599999964237213, 0.0] | original (exhaustive rounds, no pair seeds) |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__placed-tray-gsxbym` | tabletop | ok | rb7-l40s-3 | 424 | 9/20 | 51 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym` | tabletop | ok | rb7-l40s-4 | 367 | 9/20 | 54 | [-0.1599999964237213, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-zqinib` | tabletop | ok | rb2-l40s-0 | 811 | 9/20 | 265 | [-0.800000011920929, 0.0] |  |
-| `rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__placed-tray-gsxbym` | tabletop | ok | rb3-l40s-3 | 947 | 9/20 | 54 | [-0.1599999964237213, 0.0] | original (exhaustive rounds, no pair seeds) |
-| `rb__tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb` | tabletop | ok | rb3-l40s-0 | 2716 | 9/20 | 438 | [-0.800000011920929, 0.07999999821186066] | original (exhaustive rounds, no pair seeds) |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__placed-tray-gsxbym` | tabletop | ok | rb7-l40s-5 | 372 | 9/20 | 45 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb` | tabletop | ok | rb7-l40s-3 | 727 | 9/20 | 322 | [-0.800000011920929, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__can_of_soda-evcxlr__placed-tray-gsxbym` | tabletop | ok | rb2-l40sb-0 | 388 | 9/20 | 53 | [-0.1599999964237213, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__cap-hbafeb` | tabletop | ok | rb5-l40s-1 | 780 | 9/20 | 294 | [-0.800000011920929, 0.0] |  |
-| `rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-atyqub__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
-| `rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro` | tabletop | ok | rb3-l40s-3 | 2998 | 9/20 | 284 | [-0.800000011920929, 0.0] | original (exhaustive rounds, no pair seeds) |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-atyqub__placed-tray-gsxbym` | tabletop | ok | rb7-l40s-3 | 430 | 9/20 | 53 | [-0.1599999964237213, 0.0] |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro` | tabletop | ok | rb7-l40s-4 | 686 | 9/20 | 263 | [-0.800000011920929, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__catalog-uilzqm__gp` | tabletop | ok | rb2-a40b-1 | 1029 | 9/20 | 384 | [-0.800000011920929, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__cellulose_tape-gchdhk__placed-tray-gsxbym` | tabletop | ok | rb5-l40s-1 | 485 | 9/20 | 103 | [-0.1599999964237213, 0.07999999821186066] |  |
-| `rb__tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__placed-tray-gsxbym` | tabletop | ok | rb5-l40s-1 | 1415 | 9/20 | 122 | [-0.1599999964237213, 0.07999999821186066] | original (exhaustive rounds, no pair seeds) |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__placed-tray-gsxbym` | tabletop | ok | rb7-l40s-5 | 397 | 9/20 | 86 | [-0.1599999964237213, 0.07999999821186066] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__cinnamon_stick-kdaxdy__scaled` | tabletop | ok | rb2-l40sb-0 | 694 | 9/20 | 383 | [-0.800000011920929, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__coffee_cup-ckkwmj` | tabletop | ok | rb2-a40c | 1608 | 9/20 | 387 | [-0.800000011920929, 0.07999999821186066] |  |
-| `rb__tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__placed-tray-gsxbym` | tabletop | ok | rb4-l40s-1 | 1090 | 9/20 | 61 | [-0.1599999964237213, 0.0] | original (exhaustive rounds, no pair seeds) |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__placed-tray-gsxbym` | tabletop | ok | rb7-l40s-3 | 421 | 9/20 | 54 | [-0.1599999964237213, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__cork-ncxgpe` | tabletop | ok | rb2-l40s-0 | 951 | 9/20 | 451 | [-0.800000011920929, 0.07999999821186066] |  |
-| `rb__tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun` | tabletop | ok | rb4-l40s-0 | 3039 | 9/20 | 482 | [-0.800000011920929, 0.07999999821186066] | original (exhaustive rounds, no pair seeds) |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun` | tabletop | ok | rb7-l40s-4 | 847 | 9/20 | 479 | [-0.800000011920929, 0.07999999821186066] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__french_fries-xshwvn__scaled` | tabletop | ok | rb5-l40s-0 | 757 | 9/20 | 308 | [-0.800000011920929, 0.0] |  |
-| `rb__tabletop__house_single_floor__countertop_ikwqer_0__frying_pan-sfbdjn__gp` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__frying_pan-sfbdjn__gp` | tabletop | ok | rb7-l40s-4 | 495 | 9/20 | 387 | [-0.800000011920929, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__gym_shoe-qxecbh__gp` | tabletop | ok | rb2-l40sb-0 | 517 | 9/20 | 402 | [-0.800000011920929, 0.0] |  |
-| `rb__tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn` | tabletop | ok | rb4-l40s-3 | 3092 | 9/20 | 607 | [-0.800000011920929, 0.1599999964237213] | original (exhaustive rounds, no pair seeds) |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn` | tabletop | ok | rb7-l40s-5 | 835 | 9/20 | 606 | [-0.800000011920929, 0.1599999964237213] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__hard_candy-yuatcg` | tabletop | ok | rb4-l40s-3 | 879 | 9/20 | 466 | [-0.800000011920929, 0.07999999821186066] |  |
-| `rb__tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__gp` | tabletop | ok | rb4-l40s-3 | 634 | 9/20 | 381 | [-0.800000011920929, 0.0] | original (exhaustive rounds, no pair seeds) |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__gp` | tabletop | ok | rb7-l40s-3 | 522 | 9/20 | 379 | [-0.800000011920929, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__ice_cube-tqsquu` | tabletop | ok | rb4-l40s-1 | 734 | 9/20 | 389 | [-0.800000011920929, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__jar_of_spaghetti_sauce-fyocnu` | tabletop | ok | rb4-l40s-2 | 1472 | 9/20 | 265 | [-0.800000011920929, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__keyboard-jtdyix__gp` | tabletop | ok | rb4-l40s-1 | 485 | 9/20 | 379 | [-0.800000011920929, 0.0] |  |
@@ -312,14 +332,14 @@ Status: {'failed': 2, 'empty band': 33, 'not run': 54, 'ok': 173}
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__light_bulb-sxkjea` | tabletop | ok | rb6-l40s-0 | 1155 | 9/20 | 340 | [-0.800000011920929, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__magazine-zfeoeu__gp` | tabletop | ok | rb4-l40s-1 | 1156 | 9/20 | 379 | [-0.800000011920929, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__marker-kjxpdi` | tabletop | ok | rb2-a40b-1 | 1506 | 9/20 | 451 | [-0.800000011920929, 0.07999999821186066] |  |
-| `rb__tabletop__house_single_floor__countertop_ikwqer_0__mouse-pljjtu__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__mouse-pljjtu__placed-tray-gsxbym` | tabletop | ok | rb7-l40s-5 | 386 | 9/20 | 78 | [-0.1599999964237213, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__mug-waqrdy__placed-tray-gsxbym` | tabletop | ok | rb4-l40s-3 | 398 | 9/20 | 80 | [-0.1599999964237213, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__notebook-yibctu__placed-tray-gsxbym` | tabletop | ok | rb5-l40s-0 | 414 | 9/20 | 63 | [-0.1599999964237213, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__pack_of_cigarettes-qabdgg__placed-tray-gsxbym` | tabletop | ok | rb2-l40s-0 | 499 | 9/20 | 54 | [-0.1599999964237213, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__pack_of_kielbasa-femhoz` | tabletop | ok | rb2-l40sb-0 | 808 | 9/20 | 407 | [-0.800000011920929, 0.07999999821186066] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__paperback_book-aubynm__gp` | tabletop | ok | rb2-a40c | 1069 | 9/20 | 384 | [-0.800000011920929, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__parsnip-invznw` | tabletop | ok | rb4-l40s-0 | 1492 | 9/20 | 458 | [-0.800000011920929, 0.07999999821186066] |  |
-| `rb__tabletop__house_single_floor__countertop_ikwqer_0__pencil-rzscao__scaled` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__pencil-rzscao__scaled` | tabletop | ok | rb7-l40s-3 | 717 | 9/20 | 313 | [-0.800000011920929, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__pencil_case-cqxkgl__placed-tray-gsxbym` | tabletop | ok | rb2-l40sb-0 | 397 | 9/20 | 55 | [-0.1599999964237213, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__pickle-ifterk` | tabletop | ok | rb5-l40s-0 | 1560 | 9/20 | 461 | [-0.800000011920929, 0.07999999821186066] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__quartz-poplsu` | tabletop | ok | rb4-l40s-3 | 739 | 9/20 | 490 | [-0.800000011920929, 0.07999999821186066] |  |
@@ -327,7 +347,7 @@ Status: {'failed': 2, 'empty band': 33, 'not run': 54, 'ok': 173}
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__shampoo_dispenser-ndrvvm` | tabletop | not run |  |  | / |  |  |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__shampoo_dispenser-zoyyia` | tabletop | ok | local | None | 9/20 | 474 | [-0.800000011920929, 0.07999999821186066] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__skateboard_wheel_assembly-acmbvb` | tabletop | ok | rb6-6000ada-0 | 1532 | 9/20 | 529 | [-0.800000011920929, 0.07999999821186066] |  |
-| `rb__tabletop__house_single_floor__countertop_ikwqer_0__soap_dispenser-cgxrwd__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__countertop_ikwqer_0__soap_dispenser-cgxrwd__placed-tray-gsxbym` | tabletop | ok | rb7-l40s-4 | 370 | 9/20 | 49 | [-0.1599999964237213, 0.0] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__sunflower-mdpoct` | tabletop | ok | rb5-l40s-2 | 1948 | 9/20 | 519 | [-0.800000011920929, 0.07999999821186066] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__tablefork-uodzrq__placed-tray-gsxbym` | tabletop | ok | rb4-l40s-3 | 452 | 9/20 | 88 | [-0.1599999964237213, 0.07999999821186066] |  |
 | `rb__tabletop__house_single_floor__countertop_ikwqer_0__teacup-tfzfam` | tabletop | ok | rb6-6000ada-1 | 1689 | 9/20 | 523 | [-0.800000011920929, 0.07999999821186066] |  |
@@ -345,13 +365,13 @@ Status: {'failed': 2, 'empty band': 33, 'not run': 54, 'ok': 173}
 | `rb__tabletop__house_single_floor__desk_xhjsub_0__briefcase-uquevd` | tabletop | empty band | rb5-l40s-0 | 347 | 0/20 | 0 | null |  |
 | `rb__tabletop__house_single_floor__desk_xhjsub_0__pen-gqwdor` | tabletop | not run |  |  | / |  |  |  |
 | `rb__tabletop__house_single_floor__desk_xhjsub_0__pen-gzrbrx` | tabletop | empty band | local | None | 0/20 | 0 | null |  |
-| `rb__tabletop__house_single_floor__desk_xhjsub_0__pen-hiyeki` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__desk_xhjsub_0__pen-hiyeki` | tabletop | empty band | rb7-l40s-5 | 253 | 0/20 | 0 | null |  |
 | `rb__tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__scaled` | tabletop | empty band | local | None | 0/20 | 0 | null |  |
 | `rb__tabletop__house_single_floor__desk_xhjsub_0__sandal-chgcrm` | tabletop | empty band | local | None | 0/20 | 0 | null |  |
 | `rb__tabletop__house_single_floor__desk_xhjsub_0__sandal-shdahi` | tabletop | not run |  |  | / |  |  |  |
 | `rb__tabletop__house_single_floor__desk_xhjsub_0__sandal-spcddb` | tabletop | empty band | rb5-l40s-2 | 386 | 0/20 | 0 | null |  |
 | `rb__tabletop__house_single_floor__sofa_lugrhk_1__box_of_shampoo-bclpiq` | tabletop | empty band | local | None | 16/25 | 0 | null |  |
-| `rb__tabletop__house_single_floor__sofa_wnzdke_0__box_of_shampoo-nijidu` | tabletop | not run |  |  | / |  |  |  |
+| `rb__tabletop__house_single_floor__sofa_wnzdke_0__box_of_shampoo-nijidu` | tabletop | ok | rb7-l40s-3 | 781 | 15/20 | 342 | [-0.5600000023841858, 0.0] |  |
 | `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__apple-bwteqh` | tabletop | ok | rb6-l40s-0 | 611 | 13/20 | 561 | [-0.800000011920929, 0.07999999821186066] |  |
 | `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__bag_of_chips-ennnjj__gp` | tabletop | ok | rb6-6000ada-0 | 495 | 13/20 | 496 | [-0.800000011920929, 0.0] |  |
 | `rb__tabletop__office_cubicles_right__desk_pfsjbc_0__bar_soap-utgixp__placed-tray-gsxbym` | tabletop | not run |  |  | / |  |  |  |

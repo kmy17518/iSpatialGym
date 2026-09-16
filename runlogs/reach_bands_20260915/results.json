@@ -5,32 +5,32 @@
    "kind": "brace",
    "wave": 1,
    "subtasks": "configuration_matching-articulation_close_small_scale;configuration_matching-articulation_open_small_scale",
-   "status": "failed",
-   "pod": "rb-a40-0",
-   "wall_s": 3002,
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
-   "error": "rc=124",
-   "script": ""
+   "status": "empty band",
+   "pod": "rb7-l40s-4",
+   "wall_s": 2012,
+   "trunks_free": 13,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "brace__house_single_floor__breakfast_table_rhjoby_0__blender-cwkvib__f03a8bdbdb08ee25",
+   "error": "",
+   "script": "current"
   },
   {
    "id": "rb__brace__house_single_floor__breakfast_table_rhjoby_0__carton-causya-j_link_2",
    "kind": "brace",
    "wave": 1,
    "subtasks": "configuration_matching-articulation_close_small_scale;configuration_matching-articulation_open_small_scale",
-   "status": "failed",
-   "pod": "rb-a40-1",
-   "wall_s": 3002,
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
-   "error": "rc=124",
-   "script": ""
+   "status": "empty band",
+   "pod": "rb7-l40s-5",
+   "wall_s": 2004,
+   "trunks_free": 13,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "brace__house_single_floor__breakfast_table_rhjoby_0__carton-causya__cd5da0469f3c743d",
+   "error": "",
+   "script": "current"
   },
   {
    "id": "rb__brace__house_single_floor__breakfast_table_rhjoby_0__hinged_jar-gqtsam-j_cap",
@@ -85,48 +85,48 @@
    "kind": "brace",
    "wave": 2,
    "subtasks": "configuration_matching-articulation_close_small_scale;configuration_matching-articulation_open_small_scale",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "rb7-l40s-3",
+   "wall_s": 1820,
+   "trunks_free": 9,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "brace__house_single_floor__countertop_ikwqer_0__blender-eyedvd__b893f43bd7e3d020",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__brace__house_single_floor__countertop_ikwqer_0__carton-msfzpz-j_link_0",
    "kind": "brace",
    "wave": 2,
    "subtasks": "configuration_matching-articulation_close_small_scale;configuration_matching-articulation_open_small_scale",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "rb7-l40s-4",
+   "wall_s": 1460,
+   "trunks_free": 9,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "brace__house_single_floor__countertop_ikwqer_0__carton-msfzpz__699b0c62ee51edc9",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__brace__house_single_floor__countertop_ikwqer_0__hinged_jar-vzwhbg-j_rb1",
    "kind": "brace",
    "wave": 2,
    "subtasks": "configuration_matching-articulation_close_small_scale;configuration_matching-articulation_open_small_scale",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "rb7-l40s-5",
+   "wall_s": 1371,
+   "trunks_free": 9,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "brace__house_single_floor__countertop_ikwqer_0__hinged_jar-vzwhbg__4a38eb7cdbc9dfdf",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__floor__Rs_int__floor-under-bed_zrumze_0__briefcase-uquevd",
@@ -1734,15 +1734,15 @@
    "wave": 1,
    "subtasks": "inter_object_relation_satisfaction-inside",
    "status": "ok",
-   "pod": "rb3-l40s-0",
-   "wall_s": 3912,
+   "pod": "rb7-l40s-4",
+   "wall_s": 637,
    "trunks_free": 13,
    "trunks_total": 20,
-   "cells_total": 693,
-   "union_extent": "[-0.5600000023841858, 0.1599999964237213]",
-   "band_file": "tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh__7b1b274a260c3c78",
+   "cells_total": 479,
+   "union_extent": "[-0.5600000023841858, 0.07999999821186066]",
+   "band_file": "tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh__a8aa39aa7e05b88d",
    "error": "",
-   "script": "original (exhaustive rounds, no pair seeds)"
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__tablefork-pqrtkc__placed-tray-gsxbym",
@@ -1766,15 +1766,15 @@
    "wave": 1,
    "subtasks": "inter_object_relation_satisfaction-touching",
    "status": "ok",
-   "pod": "rb3-l40s-1",
-   "wall_s": 3804,
+   "pod": "rb7-l40s-5",
+   "wall_s": 756,
    "trunks_free": 13,
    "trunks_total": 20,
-   "cells_total": 480,
+   "cells_total": 479,
    "union_extent": "[-0.5600000023841858, 0.07999999821186066]",
-   "band_file": "tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe__c426464c8b0392ba",
+   "band_file": "tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe__56797ec53554456f",
    "error": "",
-   "script": "original (exhaustive rounds, no pair seeds)"
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex",
@@ -1782,15 +1782,15 @@
    "wave": 1,
    "subtasks": "inter_object_relation_satisfaction-under_small_scale",
    "status": "ok",
-   "pod": "rb3-l40s-3",
-   "wall_s": 3936,
+   "pod": "rb7-l40s-3",
+   "wall_s": 885,
    "trunks_free": 13,
    "trunks_total": 20,
-   "cells_total": 626,
-   "union_extent": "[-0.5600000023841858, 0.1599999964237213]",
-   "band_file": "tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex__5b1e533122dee68b",
+   "cells_total": 553,
+   "union_extent": "[-0.5600000023841858, 0.07999999821186066]",
+   "band_file": "tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex__b53f90b8b94db0c3",
    "error": "",
-   "script": "original (exhaustive rounds, no pair seeds)"
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teaspoon-qdepdj__placed-tray-gsxbym",
@@ -1910,15 +1910,15 @@
    "wave": 2,
    "subtasks": "disembedding",
    "status": "ok",
-   "pod": "rb3-l40s-0",
-   "wall_s": 1313,
+   "pod": "rb7-l40s-4",
+   "wall_s": 378,
    "trunks_free": 9,
    "trunks_total": 20,
-   "cells_total": 115,
-   "union_extent": "[-0.1599999964237213, 0.07999999821186066]",
-   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__946c2d8573a0464d",
+   "cells_total": 75,
+   "union_extent": "[-0.1599999964237213, 0.0]",
+   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__3c19a14c96660ea7",
    "error": "",
-   "script": "original (exhaustive rounds, no pair seeds)"
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__beaker-sfvswx__placed-tray-gsxbym",
@@ -1942,15 +1942,15 @@
    "wave": 2,
    "subtasks": "inter_object_relation_satisfaction-under_small_scale",
    "status": "ok",
-   "pod": "rb4-l40s-2",
-   "wall_s": 3187,
+   "pod": "rb7-l40s-5",
+   "wall_s": 897,
    "trunks_free": 9,
    "trunks_total": 20,
-   "cells_total": 524,
+   "cells_total": 512,
    "union_extent": "[-0.800000011920929, 0.07999999821186066]",
-   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji__ed9e0042137d7822",
+   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji__a27b6b6270daf525",
    "error": "",
-   "script": "original (exhaustive rounds, no pair seeds)"
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__board_game-eoywpy__gp",
@@ -2134,15 +2134,15 @@
    "wave": 2,
    "subtasks": "disembedding",
    "status": "ok",
-   "pod": "rb3-l40s-0",
-   "wall_s": 1150,
+   "pod": "rb7-l40s-3",
+   "wall_s": 424,
    "trunks_free": 9,
    "trunks_total": 20,
-   "cells_total": 138,
-   "union_extent": "[-0.1599999964237213, 0.1599999964237213]",
-   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__4577558da840fc2d",
+   "cells_total": 51,
+   "union_extent": "[-0.1599999964237213, 0.0]",
+   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__835d9fa1170636f2",
    "error": "",
-   "script": "original (exhaustive rounds, no pair seeds)"
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym",
@@ -2150,15 +2150,15 @@
    "wave": 2,
    "subtasks": "disembedding",
    "status": "ok",
-   "pod": "rb3-l40s-1",
-   "wall_s": 1009,
+   "pod": "rb7-l40s-4",
+   "wall_s": 367,
    "trunks_free": 9,
    "trunks_total": 20,
-   "cells_total": 57,
+   "cells_total": 54,
    "union_extent": "[-0.1599999964237213, 0.0]",
-   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__97f2b3c6e0ee38ce",
+   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__8a37f57ae4ac48ea",
    "error": "",
-   "script": "original (exhaustive rounds, no pair seeds)"
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-zqinib",
@@ -2182,15 +2182,15 @@
    "wave": 2,
    "subtasks": "disembedding",
    "status": "ok",
-   "pod": "rb3-l40s-3",
-   "wall_s": 947,
+   "pod": "rb7-l40s-5",
+   "wall_s": 372,
    "trunks_free": 9,
    "trunks_total": 20,
-   "cells_total": 54,
+   "cells_total": 45,
    "union_extent": "[-0.1599999964237213, 0.0]",
-   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__836ea6e60422307c",
+   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__6531933fe63ce4b6",
    "error": "",
-   "script": "original (exhaustive rounds, no pair seeds)"
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb",
@@ -2198,15 +2198,15 @@
    "wave": 2,
    "subtasks": "inter_object_relation_satisfaction-inside",
    "status": "ok",
-   "pod": "rb3-l40s-0",
-   "wall_s": 2716,
+   "pod": "rb7-l40s-3",
+   "wall_s": 727,
    "trunks_free": 9,
    "trunks_total": 20,
-   "cells_total": 438,
-   "union_extent": "[-0.800000011920929, 0.07999999821186066]",
-   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb__852bd300db3c3f0b",
+   "cells_total": 322,
+   "union_extent": "[-0.800000011920929, 0.0]",
+   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb__84299a6267e16667",
    "error": "",
-   "script": "original (exhaustive rounds, no pair seeds)"
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__can_of_soda-evcxlr__placed-tray-gsxbym",
@@ -2245,16 +2245,16 @@
    "kind": "tabletop",
    "wave": 2,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "rb7-l40s-3",
+   "wall_s": 430,
+   "trunks_free": 9,
+   "trunks_total": 20,
+   "cells_total": 53,
+   "union_extent": "[-0.1599999964237213, 0.0]",
+   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-atyqub__5242708678a68276",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro",
@@ -2262,15 +2262,15 @@
    "wave": 2,
    "subtasks": "inter_object_relation_satisfaction-touching",
    "status": "ok",
-   "pod": "rb3-l40s-3",
-   "wall_s": 2998,
+   "pod": "rb7-l40s-4",
+   "wall_s": 686,
    "trunks_free": 9,
    "trunks_total": 20,
-   "cells_total": 284,
+   "cells_total": 263,
    "union_extent": "[-0.800000011920929, 0.0]",
-   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro__70866f22e0ba1989",
+   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro__b359a12f598f89a3",
    "error": "",
-   "script": "original (exhaustive rounds, no pair seeds)"
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__catalog-uilzqm__gp",
@@ -2310,15 +2310,15 @@
    "wave": 2,
    "subtasks": "disembedding",
    "status": "ok",
-   "pod": "rb5-l40s-1",
-   "wall_s": 1415,
+   "pod": "rb7-l40s-5",
+   "wall_s": 397,
    "trunks_free": 9,
    "trunks_total": 20,
-   "cells_total": 122,
+   "cells_total": 86,
    "union_extent": "[-0.1599999964237213, 0.07999999821186066]",
-   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__c36c31cd2420fffb",
+   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__b6ad4d674cbc532e",
    "error": "",
-   "script": "original (exhaustive rounds, no pair seeds)"
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__cinnamon_stick-kdaxdy__scaled",
@@ -2358,15 +2358,15 @@
    "wave": 2,
    "subtasks": "disembedding",
    "status": "ok",
-   "pod": "rb4-l40s-1",
-   "wall_s": 1090,
+   "pod": "rb7-l40s-3",
+   "wall_s": 421,
    "trunks_free": 9,
    "trunks_total": 20,
-   "cells_total": 61,
+   "cells_total": 54,
    "union_extent": "[-0.1599999964237213, 0.0]",
-   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__156fbfd1c69bf213",
+   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__da1de64387417250",
    "error": "",
-   "script": "original (exhaustive rounds, no pair seeds)"
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__cork-ncxgpe",
@@ -2390,15 +2390,15 @@
    "wave": 2,
    "subtasks": "configuration_matching-attachment",
    "status": "ok",
-   "pod": "rb4-l40s-0",
-   "wall_s": 3039,
+   "pod": "rb7-l40s-4",
+   "wall_s": 847,
    "trunks_free": 9,
    "trunks_total": 20,
-   "cells_total": 482,
+   "cells_total": 479,
    "union_extent": "[-0.800000011920929, 0.07999999821186066]",
-   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun__d9f56a0df0a73fbe",
+   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun__ad06cf312cd24891",
    "error": "",
-   "script": "original (exhaustive rounds, no pair seeds)"
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__french_fries-xshwvn__scaled",
@@ -2421,16 +2421,16 @@
    "kind": "tabletop",
    "wave": 2,
    "subtasks": "alignment-axial",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "rb7-l40s-4",
+   "wall_s": 495,
+   "trunks_free": 9,
+   "trunks_total": 20,
+   "cells_total": 387,
+   "union_extent": "[-0.800000011920929, 0.0]",
+   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__frying_pan-sfbdjn__58f5641626f487c3",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__gym_shoe-qxecbh__gp",
@@ -2454,15 +2454,15 @@
    "wave": 2,
    "subtasks": "inter_object_relation_satisfaction-ontop_small_scale",
    "status": "ok",
-   "pod": "rb4-l40s-3",
-   "wall_s": 3092,
+   "pod": "rb7-l40s-5",
+   "wall_s": 835,
    "trunks_free": 9,
    "trunks_total": 20,
-   "cells_total": 607,
+   "cells_total": 606,
    "union_extent": "[-0.800000011920929, 0.1599999964237213]",
-   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn__08ebea79d95fa567",
+   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn__bcafbc71d50bd01a",
    "error": "",
-   "script": "original (exhaustive rounds, no pair seeds)"
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__hard_candy-yuatcg",
@@ -2486,15 +2486,15 @@
    "wave": 2,
    "subtasks": "alignment-axial",
    "status": "ok",
-   "pod": "rb4-l40s-3",
-   "wall_s": 634,
+   "pod": "rb7-l40s-3",
+   "wall_s": 522,
    "trunks_free": 9,
    "trunks_total": 20,
-   "cells_total": 381,
+   "cells_total": 379,
    "union_extent": "[-0.800000011920929, 0.0]",
-   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__94c3bd8aa6f9f37c",
+   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__c1b5b3b566e21563",
    "error": "",
-   "script": "original (exhaustive rounds, no pair seeds)"
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__ice_cube-tqsquu",
@@ -2629,16 +2629,16 @@
    "kind": "tabletop",
    "wave": 2,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "rb7-l40s-5",
+   "wall_s": 386,
+   "trunks_free": 9,
+   "trunks_total": 20,
+   "cells_total": 78,
+   "union_extent": "[-0.1599999964237213, 0.0]",
+   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__mouse-pljjtu__07ef18ac17a7e5b3",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__mug-waqrdy__placed-tray-gsxbym",
@@ -2741,16 +2741,16 @@
    "kind": "tabletop",
    "wave": 2,
    "subtasks": "inter_object_relation_satisfaction-nextto",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "rb7-l40s-3",
+   "wall_s": 717,
+   "trunks_free": 9,
+   "trunks_total": 20,
+   "cells_total": 313,
+   "union_extent": "[-0.800000011920929, 0.0]",
+   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__pencil-rzscao__8a3e237a8abf5b49",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__pencil_case-cqxkgl__placed-tray-gsxbym",
@@ -2869,16 +2869,16 @@
    "kind": "tabletop",
    "wave": 2,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "rb7-l40s-4",
+   "wall_s": 370,
+   "trunks_free": 9,
+   "trunks_total": 20,
+   "cells_total": 49,
+   "union_extent": "[-0.1599999964237213, 0.0]",
+   "band_file": "tabletop__house_single_floor__countertop_ikwqer_0__soap_dispenser-cgxrwd__0d44f2c88b3abbc6",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__sunflower-mdpoct",
@@ -3157,16 +3157,16 @@
    "kind": "tabletop",
    "wave": 2,
    "subtasks": "inter_object_relation_satisfaction-ontop_large_scale",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "rb7-l40s-5",
+   "wall_s": 253,
+   "trunks_free": 0,
+   "trunks_total": 20,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "tabletop__house_single_floor__desk_xhjsub_0__pen-hiyeki__92b5f996a828ce1b",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__desk_xhjsub_0__pencil-gbzzcg__scaled",
@@ -3253,16 +3253,16 @@
    "kind": "tabletop",
    "wave": 2,
    "subtasks": "inter_object_relation_satisfaction-ontop_large_scale",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "rb7-l40s-3",
+   "wall_s": 781,
+   "trunks_free": 15,
+   "trunks_total": 20,
+   "cells_total": 342,
+   "union_extent": "[-0.5600000023841858, 0.0]",
+   "band_file": "tabletop__house_single_floor__sofa_wnzdke_0__box_of_shampoo-nijidu__6ff30f8ec513f78f",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__office_cubicles_right__desk_pfsjbc_0__apple-bwteqh",
@@ -4195,14 +4195,166 @@
  ],
  "raw": {
   "rb__brace__house_single_floor__breakfast_table_rhjoby_0__blender-cwkvib-j_lid": {
-   "dir": "runlogs/runpod/rb/rb-a40-0/rb__brace__house_single_floor__breakfast_table_rhjoby_0__blender-cwkvib-j_lid",
-   "files": [],
+   "dir": "runlogs/runpod/rb/rb7-l40s-4/rb__brace__house_single_floor__breakfast_table_rhjoby_0__blender-cwkvib-j_lid",
+   "files": [
+    "runlogs/runpod/rb/rb7-l40s-4/rb__brace__house_single_floor__breakfast_table_rhjoby_0__blender-cwkvib-j_lid/brace__house_single_floor__breakfast_table_rhjoby_0__blender-cwkvib__f03a8bdbdb08ee25"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__brace__house_single_floor__breakfast_table_rhjoby_0__blender-cwkvib-j_lid/brace__house_single_floor__breakfast_table_rhjoby_0__blender-cwkvib__f03a8bdbdb08ee25.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      137.4
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      false,
+      97.72
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      false,
+      129.78
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      false,
+      125.45
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      false,
+      92.4
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      false,
+      106.18
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      false,
+      118.48
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      false,
+      95.83
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      false,
+      112.95
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      false,
+      119.39
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      false,
+      97.13
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      false,
+      107.58
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      88.59
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.0
+     ]
+    ],
+    "time_s": 1997.5
+   },
    "error": null,
-   "pod": "rb-a40-0",
-   "rc": 124,
-   "wall_s": 3002,
-   "band_files": [],
-   "current_code": null
+   "pod": "rb7-l40s-4",
+   "rc": 0,
+   "wall_s": 2012,
+   "band_files": [
+    "brace__house_single_floor__breakfast_table_rhjoby_0__blender-cwkvib__f03a8bdbdb08ee25"
+   ],
+   "current_code": true
   },
   "rb__floor__house_single_floor__floor-childs_room_0__pencil-gbzzcg__scaled": {
    "dir": "runlogs/runpod/rb/rb-a40-1/rb__floor__house_single_floor__floor-childs_room_0__pencil-gbzzcg__scaled",
@@ -6646,14 +6798,166 @@
    "current_code": true
   },
   "rb__brace__house_single_floor__breakfast_table_rhjoby_0__carton-causya-j_link_2": {
-   "dir": "runlogs/runpod/rb/rb-a40-1/rb__brace__house_single_floor__breakfast_table_rhjoby_0__carton-causya-j_link_2",
-   "files": [],
+   "dir": "runlogs/runpod/rb/rb7-l40s-5/rb__brace__house_single_floor__breakfast_table_rhjoby_0__carton-causya-j_link_2",
+   "files": [
+    "runlogs/runpod/rb/rb7-l40s-5/rb__brace__house_single_floor__breakfast_table_rhjoby_0__carton-causya-j_link_2/brace__house_single_floor__breakfast_table_rhjoby_0__carton-causya__cd5da0469f3c743d"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__brace__house_single_floor__breakfast_table_rhjoby_0__carton-causya-j_link_2/brace__house_single_floor__breakfast_table_rhjoby_0__carton-causya__cd5da0469f3c743d.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      117.92
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      false,
+      91.78
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      false,
+      102.58
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      false,
+      145.33
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      false,
+      86.13
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      false,
+      106.83
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      false,
+      111.09
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      false,
+      105.92
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      false,
+      106.38
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      false,
+      112.81
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      false,
+      95.3
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      false,
+      106.2
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      88.79
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.0
+     ]
+    ],
+    "time_s": 1987.3
+   },
    "error": null,
-   "pod": "rb-a40-1",
-   "rc": 124,
-   "wall_s": 3002,
-   "band_files": [],
-   "current_code": null
+   "pod": "rb7-l40s-5",
+   "rc": 0,
+   "wall_s": 2004,
+   "band_files": [
+    "brace__house_single_floor__breakfast_table_rhjoby_0__carton-causya__cd5da0469f3c743d"
+   ],
+   "current_code": true
   },
   "rb__floor__house_single_floor__floor-under-bed_rrcvaq_0__briefcase-lwbctq": {
    "dir": "runlogs/runpod/rb/rb-l40s-0/rb__floor__house_single_floor__floor-under-bed_rrcvaq_0__briefcase-lwbctq",
@@ -10188,148 +10492,169 @@
    "current_code": true
   },
   "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh": {
-   "dir": "runlogs/runpod/rb/rb3-l40s-0/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh",
+   "dir": "runlogs/runpod/rb/rb7-l40s-4/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh",
    "files": [
-    "runlogs/runpod/rb/rb3-l40s-0/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh/tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh__7b1b274a260c3c78"
+    "runlogs/runpod/rb/rb7-l40s-4/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh/tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh__a8aa39aa7e05b88d"
    ],
    "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh/tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh__7b1b274a260c3c78.npz",
+    "file": "/root/samp/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh/tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh__a8aa39aa7e05b88d.npz",
     "union_extent": [
      -0.5600000023841858,
-     0.1599999964237213
+     0.07999999821186066
     ],
-    "n_reachable_total": 693,
+    "n_reachable_total": 479,
     "trunks": [
      [
       0.0,
       0.0,
-      23,
-      false
+      22,
+      false,
+      50.61
      ],
      [
       0.0,
       -0.3,
-      42,
-      false
+      36,
+      false,
+      21.67
      ],
      [
       0.0,
       -0.6,
-      62,
-      false
+      45,
+      false,
+      27.87
      ],
      [
       0.0,
       -0.9,
-      79,
-      false
+      49,
+      false,
+      35.22
      ],
      [
       0.25,
       0.0,
-      34,
-      false
+      28,
+      false,
+      18.38
      ],
      [
       0.25,
       -0.3,
-      53,
-      false
+      40,
+      false,
+      23.56
      ],
      [
       0.25,
       -0.6,
-      70,
-      false
-     ],
-     [
-      0.25,
-      -0.9,
-      0,
-      true
-     ],
-     [
-      0.5,
-      0.0,
-      43,
-      false
-     ],
-     [
-      0.5,
-      -0.3,
-      61,
-      false
-     ],
-     [
-      0.5,
-      -0.6,
-      74,
-      false
-     ],
-     [
-      0.5,
-      -0.9,
-      0,
-      true
-     ],
-     [
-      0.75,
-      0.0,
       46,
-      false
+      false,
+      32.04
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      0.0,
+      31,
+      false,
+      21.19
+     ],
+     [
+      0.5,
+      -0.3,
+      44,
+      false,
+      27.57
+     ],
+     [
+      0.5,
+      -0.6,
+      46,
+      false,
+      33.4
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      0.0,
+      30,
+      false,
+      22.94
      ],
      [
       0.75,
       -0.3,
-      63,
-      false
+      40,
+      false,
+      29.7
      ],
      [
       0.75,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       0.0,
-      43,
-      false
+      22,
+      false,
+      21.38
      ],
      [
       0.95,
       -0.3,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ]
-    ]
+    ],
+    "time_s": 622.5
    },
    "error": null,
-   "pod": "rb3-l40s-0",
+   "pod": "rb7-l40s-4",
    "rc": 0,
-   "wall_s": 3912,
+   "wall_s": 637,
    "band_files": [
-    "tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh__7b1b274a260c3c78"
+    "tabletop__house_single_floor__breakfast_table_rhjoby_0__sunflower-dkajbh__a8aa39aa7e05b88d"
    ],
-   "current_code": false
+   "current_code": true
   },
   "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__toy_dice-hbkqqp__placed-tray-gsxbym": {
    "dir": "runlogs/runpod/rb/rb2-l40s-0/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__toy_dice-hbkqqp__placed-tray-gsxbym",
@@ -12506,148 +12831,169 @@
    "current_code": true
   },
   "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe": {
-   "dir": "runlogs/runpod/rb/rb3-l40s-1/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe",
+   "dir": "runlogs/runpod/rb/rb7-l40s-5/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe",
    "files": [
-    "runlogs/runpod/rb/rb3-l40s-1/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe/tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe__c426464c8b0392ba"
+    "runlogs/runpod/rb/rb7-l40s-5/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe/tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe__56797ec53554456f"
    ],
    "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe/tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe__c426464c8b0392ba.npz",
+    "file": "/root/samp/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe/tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe__56797ec53554456f.npz",
     "union_extent": [
      -0.5600000023841858,
      0.07999999821186066
     ],
-    "n_reachable_total": 480,
+    "n_reachable_total": 479,
     "trunks": [
      [
       0.0,
       0.0,
       19,
-      false
+      false,
+      59.13
      ],
      [
       0.0,
       -0.3,
       31,
-      false
+      false,
+      39.96
      ],
      [
       0.0,
       -0.6,
       46,
-      false
+      false,
+      40.04
      ],
      [
       0.0,
       -0.9,
       50,
-      false
+      false,
+      43.68
      ],
      [
       0.25,
       0.0,
       25,
-      false
+      false,
+      28.59
      ],
      [
       0.25,
       -0.3,
       40,
-      false
+      false,
+      36.52
      ],
      [
       0.25,
       -0.6,
       49,
-      false
+      false,
+      39.28
      ],
      [
       0.25,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       0.0,
       31,
-      false
+      false,
+      25.69
      ],
      [
       0.5,
       -0.3,
-      45,
-      false
+      44,
+      false,
+      35.31
      ],
      [
       0.5,
       -0.6,
       48,
-      false
+      false,
+      40.82
      ],
      [
       0.5,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       0.0,
       31,
-      false
+      false,
+      24.8
      ],
      [
       0.75,
       -0.3,
       43,
-      false
+      false,
+      35.23
      ],
      [
       0.75,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       0.0,
       22,
-      false
+      false,
+      24.49
      ],
      [
       0.95,
       -0.3,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ]
-    ]
+    ],
+    "time_s": 739.8
    },
    "error": null,
-   "pod": "rb3-l40s-1",
+   "pod": "rb7-l40s-5",
    "rc": 0,
-   "wall_s": 3804,
+   "wall_s": 756,
    "band_files": [
-    "tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe__c426464c8b0392ba"
+    "tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-oxfzfe__56797ec53554456f"
    ],
-   "current_code": false
+   "current_code": true
   },
   "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__video_game-ceaxsd__placed-tray-gsxbym": {
    "dir": "runlogs/runpod/rb/rb2-a40-0/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__video_game-ceaxsd__placed-tray-gsxbym",
@@ -26651,732 +26997,507 @@
    "current_code": true
   },
   "rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__placed-tray-gsxbym": {
-   "dir": "runlogs/runpod/rb/rb3-l40s-0/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__placed-tray-gsxbym",
+   "dir": "runlogs/runpod/rb/rb7-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__placed-tray-gsxbym",
    "files": [
-    "runlogs/runpod/rb/rb3-l40s-0/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__4577558da840fc2d"
+    "runlogs/runpod/rb/rb7-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__835d9fa1170636f2"
    ],
    "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__4577558da840fc2d.npz",
-    "union_extent": [
-     -0.1599999964237213,
-     0.1599999964237213
-    ],
-    "n_reachable_total": 138,
-    "trunks": [
-     [
-      0.0,
-      0.0,
-      12,
-      false
-     ],
-     [
-      0.0,
-      -0.3,
-      17,
-      false
-     ],
-     [
-      0.0,
-      -0.6,
-      18,
-      false
-     ],
-     [
-      0.0,
-      -0.9,
-      0,
-      true
-     ],
-     [
-      0.25,
-      0.0,
-      14,
-      false
-     ],
-     [
-      0.25,
-      -0.3,
-      18,
-      false
-     ],
-     [
-      0.25,
-      -0.6,
-      18,
-      false
-     ],
-     [
-      0.25,
-      -0.9,
-      0,
-      true
-     ],
-     [
-      0.5,
-      0.0,
-      14,
-      false
-     ],
-     [
-      0.5,
-      -0.3,
-      18,
-      false
-     ],
-     [
-      0.5,
-      -0.6,
-      0,
-      true
-     ],
-     [
-      0.5,
-      -0.9,
-      0,
-      true
-     ],
-     [
-      0.75,
-      0.0,
-      9,
-      false
-     ],
-     [
-      0.75,
-      -0.3,
-      0,
-      true
-     ],
-     [
-      0.75,
-      -0.6,
-      0,
-      true
-     ],
-     [
-      0.75,
-      -0.9,
-      0,
-      true
-     ],
-     [
-      0.95,
-      0.0,
-      0,
-      true
-     ],
-     [
-      0.95,
-      -0.3,
-      0,
-      true
-     ],
-     [
-      0.95,
-      -0.6,
-      0,
-      true
-     ],
-     [
-      0.95,
-      -0.9,
-      0,
-      true
-     ]
-    ]
-   },
-   "error": null,
-   "pod": "rb3-l40s-0",
-   "rc": 0,
-   "wall_s": 1150,
-   "band_files": [
-    "tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__4577558da840fc2d"
-   ],
-   "current_code": false
-  },
-  "rb__tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb": {
-   "dir": "runlogs/runpod/rb/rb3-l40s-0/rb__tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb",
-   "files": [
-    "runlogs/runpod/rb/rb3-l40s-0/rb__tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb/tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb__852bd300db3c3f0b"
-   ],
-   "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb/tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb__852bd300db3c3f0b.npz",
-    "union_extent": [
-     -0.800000011920929,
-     0.07999999821186066
-    ],
-    "n_reachable_total": 438,
-    "trunks": [
-     [
-      0.0,
-      0.0,
-      28,
-      false
-     ],
-     [
-      0.0,
-      -0.3,
-      47,
-      false
-     ],
-     [
-      0.0,
-      -0.6,
-      65,
-      false
-     ],
-     [
-      0.0,
-      -0.9,
-      0,
-      true
-     ],
-     [
-      0.25,
-      0.0,
-      36,
-      false
-     ],
-     [
-      0.25,
-      -0.3,
-      55,
-      false
-     ],
-     [
-      0.25,
-      -0.6,
-      68,
-      false
-     ],
-     [
-      0.25,
-      -0.9,
-      0,
-      true
-     ],
-     [
-      0.5,
-      0.0,
-      41,
-      false
-     ],
-     [
-      0.5,
-      -0.3,
-      61,
-      false
-     ],
-     [
-      0.5,
-      -0.6,
-      0,
-      true
-     ],
-     [
-      0.5,
-      -0.9,
-      0,
-      true
-     ],
-     [
-      0.75,
-      0.0,
-      37,
-      false
-     ],
-     [
-      0.75,
-      -0.3,
-      0,
-      true
-     ],
-     [
-      0.75,
-      -0.6,
-      0,
-      true
-     ],
-     [
-      0.75,
-      -0.9,
-      0,
-      true
-     ],
-     [
-      0.95,
-      0.0,
-      0,
-      true
-     ],
-     [
-      0.95,
-      -0.3,
-      0,
-      true
-     ],
-     [
-      0.95,
-      -0.6,
-      0,
-      true
-     ],
-     [
-      0.95,
-      -0.9,
-      0,
-      true
-     ]
-    ]
-   },
-   "error": null,
-   "pod": "rb3-l40s-0",
-   "rc": 0,
-   "wall_s": 2716,
-   "band_files": [
-    "tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb__852bd300db3c3f0b"
-   ],
-   "current_code": false
-  },
-  "rb__tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__placed-tray-gsxbym": {
-   "dir": "runlogs/runpod/rb/rb3-l40s-0/rb__tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__placed-tray-gsxbym",
-   "files": [
-    "runlogs/runpod/rb/rb3-l40s-0/rb__tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__946c2d8573a0464d"
-   ],
-   "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__946c2d8573a0464d.npz",
-    "union_extent": [
-     -0.1599999964237213,
-     0.07999999821186066
-    ],
-    "n_reachable_total": 115,
-    "trunks": [
-     [
-      0.0,
-      0.0,
-      7,
-      false
-     ],
-     [
-      0.0,
-      -0.3,
-      13,
-      false
-     ],
-     [
-      0.0,
-      -0.6,
-      16,
-      false
-     ],
-     [
-      0.0,
-      -0.9,
-      0,
-      true
-     ],
-     [
-      0.25,
-      0.0,
-      9,
-      false
-     ],
-     [
-      0.25,
-      -0.3,
-      15,
-      false
-     ],
-     [
-      0.25,
-      -0.6,
-      16,
-      false
-     ],
-     [
-      0.25,
-      -0.9,
-      0,
-      true
-     ],
-     [
-      0.5,
-      0.0,
-      12,
-      false
-     ],
-     [
-      0.5,
-      -0.3,
-      15,
-      false
-     ],
-     [
-      0.5,
-      -0.6,
-      0,
-      true
-     ],
-     [
-      0.5,
-      -0.9,
-      0,
-      true
-     ],
-     [
-      0.75,
-      0.0,
-      12,
-      false
-     ],
-     [
-      0.75,
-      -0.3,
-      0,
-      true
-     ],
-     [
-      0.75,
-      -0.6,
-      0,
-      true
-     ],
-     [
-      0.75,
-      -0.9,
-      0,
-      true
-     ],
-     [
-      0.95,
-      0.0,
-      0,
-      true
-     ],
-     [
-      0.95,
-      -0.3,
-      0,
-      true
-     ],
-     [
-      0.95,
-      -0.6,
-      0,
-      true
-     ],
-     [
-      0.95,
-      -0.9,
-      0,
-      true
-     ]
-    ]
-   },
-   "error": null,
-   "pod": "rb3-l40s-0",
-   "rc": 0,
-   "wall_s": 1313,
-   "band_files": [
-    "tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__946c2d8573a0464d"
-   ],
-   "current_code": false
-  },
-  "rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym": {
-   "dir": "runlogs/runpod/rb/rb3-l40s-1/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym",
-   "files": [
-    "runlogs/runpod/rb/rb3-l40s-1/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__97f2b3c6e0ee38ce"
-   ],
-   "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__97f2b3c6e0ee38ce.npz",
+    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__835d9fa1170636f2.npz",
     "union_extent": [
      -0.1599999964237213,
      0.0
     ],
-    "n_reachable_total": 57,
+    "n_reachable_total": 51,
     "trunks": [
      [
       0.0,
       0.0,
-      3,
-      false
+      4,
+      false,
+      35.62
      ],
      [
       0.0,
       -0.3,
-      7,
-      false
+      9,
+      false,
+      18.2
      ],
      [
       0.0,
       -0.6,
-      10,
-      false
+      8,
+      false,
+      10.14
      ],
      [
       0.0,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.25,
       0.0,
       4,
-      false
+      false,
+      7.96
      ],
      [
       0.25,
       -0.3,
       9,
-      false
+      false,
+      9.75
      ],
      [
       0.25,
       -0.6,
       8,
-      false
+      false,
+      10.62
      ],
      [
       0.25,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       0.0,
-      5,
-      false
+      3,
+      false,
+      7.89
      ],
      [
       0.5,
       -0.3,
-      9,
-      false
+      6,
+      false,
+      10.56
      ],
      [
       0.5,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       0.0,
-      2,
-      false
+      0,
+      false,
+      7.85
      ],
      [
       0.75,
       -0.3,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       0.0,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       -0.3,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ]
-    ]
+    ],
+    "time_s": 411.5
    },
    "error": null,
-   "pod": "rb3-l40s-1",
+   "pod": "rb7-l40s-3",
    "rc": 0,
-   "wall_s": 1009,
+   "wall_s": 424,
    "band_files": [
-    "tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__97f2b3c6e0ee38ce"
+    "tabletop__house_single_floor__countertop_ikwqer_0__box_of_rice-fvulow__835d9fa1170636f2"
    ],
-   "current_code": false
+   "current_code": true
   },
-  "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex": {
-   "dir": "runlogs/runpod/rb/rb3-l40s-3/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex",
+  "rb__tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb": {
+   "dir": "runlogs/runpod/rb/rb7-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb",
    "files": [
-    "runlogs/runpod/rb/rb3-l40s-3/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex/tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex__5b1e533122dee68b"
+    "runlogs/runpod/rb/rb7-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb/tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb__84299a6267e16667"
    ],
    "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex/tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex__5b1e533122dee68b.npz",
+    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb/tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb__84299a6267e16667.npz",
     "union_extent": [
-     -0.5600000023841858,
-     0.1599999964237213
+     -0.800000011920929,
+     0.0
     ],
-    "n_reachable_total": 626,
+    "n_reachable_total": 322,
     "trunks": [
      [
       0.0,
       0.0,
-      26,
-      false
+      24,
+      false,
+      58.86
      ],
      [
       0.0,
       -0.3,
       41,
-      false
+      false,
+      40.54
      ],
      [
       0.0,
       -0.6,
-      59,
-      false
+      45,
+      false,
+      55.52
      ],
      [
       0.0,
       -0.9,
-      67,
-      false
+      0,
+      true,
+      0.01
      ],
      [
       0.25,
       0.0,
-      32,
-      false
+      30,
+      false,
+      30.96
      ],
      [
       0.25,
       -0.3,
-      49,
-      false
+      40,
+      false,
+      48.37
      ],
      [
       0.25,
       -0.6,
-      67,
-      false
+      50,
+      false,
+      63.34
      ],
      [
       0.25,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       0.0,
-      39,
-      false
+      30,
+      false,
+      36.6
      ],
      [
       0.5,
       -0.3,
-      56,
-      false
+      41,
+      false,
+      54.41
      ],
      [
       0.5,
       -0.6,
-      64,
-      false
+      0,
+      true,
+      0.01
      ],
      [
       0.5,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       0.0,
-      39,
-      false
+      21,
+      false,
+      38.39
      ],
      [
       0.75,
       -0.3,
-      53,
-      false
+      0,
+      true,
+      0.01
      ],
      [
       0.75,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       0.0,
-      34,
-      false
+      0,
+      true,
+      0.01
      ],
      [
       0.95,
       -0.3,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ]
-    ]
+    ],
+    "time_s": 714.0
    },
    "error": null,
-   "pod": "rb3-l40s-3",
+   "pod": "rb7-l40s-3",
    "rc": 0,
-   "wall_s": 3936,
+   "wall_s": 727,
    "band_files": [
-    "tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex__5b1e533122dee68b"
+    "tabletop__house_single_floor__countertop_ikwqer_0__brussels_sprouts-siodbb__84299a6267e16667"
    ],
-   "current_code": false
+   "current_code": true
   },
-  "rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__placed-tray-gsxbym": {
-   "dir": "runlogs/runpod/rb/rb3-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__placed-tray-gsxbym",
+  "rb__tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/rb7-l40s-4/rb__tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__placed-tray-gsxbym",
    "files": [
-    "runlogs/runpod/rb/rb3-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__836ea6e60422307c"
+    "runlogs/runpod/rb/rb7-l40s-4/rb__tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__3c19a14c96660ea7"
    ],
    "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__836ea6e60422307c.npz",
+    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__3c19a14c96660ea7.npz",
+    "union_extent": [
+     -0.1599999964237213,
+     0.0
+    ],
+    "n_reachable_total": 75,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      5,
+      false,
+      35.03
+     ],
+     [
+      0.0,
+      -0.3,
+      9,
+      false,
+      19.49
+     ],
+     [
+      0.0,
+      -0.6,
+      11,
+      false,
+      12.01
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.25,
+      0.0,
+      6,
+      false,
+      8.95
+     ],
+     [
+      0.25,
+      -0.3,
+      11,
+      false,
+      11.51
+     ],
+     [
+      0.25,
+      -0.6,
+      11,
+      false,
+      11.86
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      0.0,
+      6,
+      false,
+      8.78
+     ],
+     [
+      0.5,
+      -0.3,
+      11,
+      false,
+      11.75
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      0.0,
+      5,
+      false,
+      8.76
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.0
+     ]
+    ],
+    "time_s": 365.1
+   },
+   "error": null,
+   "pod": "rb7-l40s-4",
+   "rc": 0,
+   "wall_s": 378,
+   "band_files": [
+    "tabletop__house_single_floor__countertop_ikwqer_0__bar_soap-feqemg__3c19a14c96660ea7"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/rb7-l40s-4/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/rb7-l40s-4/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__8a37f57ae4ac48ea"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__8a37f57ae4ac48ea.npz",
     "union_extent": [
      -0.1599999964237213,
      0.0
@@ -27386,421 +27507,814 @@
      [
       0.0,
       0.0,
-      5,
-      false
+      3,
+      false,
+      33.01
      ],
      [
       0.0,
       -0.3,
-      9,
-      false
+      7,
+      false,
+      23.68
      ],
      [
       0.0,
       -0.6,
-      9,
-      false
+      8,
+      false,
+      10.4
      ],
      [
       0.0,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.25,
       0.0,
-      5,
-      false
+      4,
+      false,
+      8.14
      ],
      [
       0.25,
       -0.3,
       9,
-      false
+      false,
+      9.97
      ],
      [
       0.25,
       -0.6,
       8,
-      false
+      false,
+      10.87
      ],
      [
       0.25,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       0.0,
+      4,
+      false,
+      7.43
+     ],
+     [
+      0.5,
+      -0.3,
+      9,
+      false,
+      10.77
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      0.0,
+      2,
+      false,
+      8.69
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.0
+     ]
+    ],
+    "time_s": 353.6
+   },
+   "error": null,
+   "pod": "rb7-l40s-4",
+   "rc": 0,
+   "wall_s": 367,
+   "band_files": [
+    "tabletop__house_single_floor__countertop_ikwqer_0__box_of_sanitary_napkins-acaivd__8a37f57ae4ac48ea"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex": {
+   "dir": "runlogs/runpod/rb/rb7-l40s-3/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex",
+   "files": [
+    "runlogs/runpod/rb/rb7-l40s-3/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex/tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex__b53f90b8b94db0c3"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex/tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex__b53f90b8b94db0c3.npz",
+    "union_extent": [
+     -0.5600000023841858,
+     0.07999999821186066
+    ],
+    "n_reachable_total": 553,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      26,
+      false,
+      67.6
+     ],
+     [
+      0.0,
+      -0.3,
+      41,
+      false,
+      42.57
+     ],
+     [
+      0.0,
+      -0.6,
+      53,
+      false,
+      39.08
+     ],
+     [
+      0.0,
+      -0.9,
+      54,
+      false,
+      45.51
+     ],
+     [
+      0.25,
+      0.0,
+      31,
+      false,
+      27.49
+     ],
+     [
+      0.25,
+      -0.3,
+      43,
+      false,
+      33.16
+     ],
+     [
+      0.25,
+      -0.6,
+      54,
+      false,
+      38.42
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      0.0,
+      36,
+      false,
+      29.75
+     ],
+     [
+      0.5,
+      -0.3,
+      48,
+      false,
+      38.27
+     ],
+     [
+      0.5,
+      -0.6,
+      55,
+      false,
+      43.19
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      0.0,
+      36,
+      false,
+      30.74
+     ],
+     [
+      0.75,
+      -0.3,
+      48,
+      false,
+      39.68
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.95,
+      0.0,
+      28,
+      false,
+      25.5
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01
+     ]
+    ],
+    "time_s": 870.8
+   },
+   "error": null,
+   "pod": "rb7-l40s-3",
+   "rc": 0,
+   "wall_s": 885,
+   "band_files": [
+    "tabletop__house_single_floor__breakfast_table_rhjoby_0__teacup-wopjex__b53f90b8b94db0c3"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/rb7-l40s-5/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/rb7-l40s-5/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__6531933fe63ce4b6"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__6531933fe63ce4b6.npz",
+    "union_extent": [
+     -0.1599999964237213,
+     0.0
+    ],
+    "n_reachable_total": 45,
+    "trunks": [
+     [
+      0.0,
+      0.0,
       3,
-      false
+      false,
+      29.99
+     ],
+     [
+      0.0,
+      -0.3,
+      8,
+      false,
+      20.07
+     ],
+     [
+      0.0,
+      -0.6,
+      7,
+      false,
+      10.03
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.25,
+      0.0,
+      4,
+      false,
+      6.67
+     ],
+     [
+      0.25,
+      -0.3,
+      8,
+      false,
+      9.63
+     ],
+     [
+      0.25,
+      -0.6,
+      7,
+      false,
+      10.47
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      0.0,
+      2,
+      false,
+      16.95
      ],
      [
       0.5,
       -0.3,
       6,
-      false
+      false,
+      9.1
      ],
      [
       0.5,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       0.0,
       0,
-      false
+      false,
+      7.77
      ],
      [
       0.75,
       -0.3,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       -0.6,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.75,
       -0.9,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       0.0,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       -0.3,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       -0.6,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       -0.9,
       0,
-      true
+      true,
+      0.0
      ]
-    ]
+    ],
+    "time_s": 358.6
    },
    "error": null,
-   "pod": "rb3-l40s-3",
+   "pod": "rb7-l40s-5",
    "rc": 0,
-   "wall_s": 947,
+   "wall_s": 372,
    "band_files": [
-    "tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__836ea6e60422307c"
+    "tabletop__house_single_floor__countertop_ikwqer_0__box_of_shampoo-nijidu__6531933fe63ce4b6"
    ],
-   "current_code": false
+   "current_code": true
   },
   "rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro": {
-   "dir": "runlogs/runpod/rb/rb3-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro",
+   "dir": "runlogs/runpod/rb/rb7-l40s-4/rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro",
    "files": [
-    "runlogs/runpod/rb/rb3-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro/tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro__70866f22e0ba1989"
+    "runlogs/runpod/rb/rb7-l40s-4/rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro/tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro__b359a12f598f89a3"
    ],
    "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro/tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro__70866f22e0ba1989.npz",
+    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro/tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro__b359a12f598f89a3.npz",
     "union_extent": [
      -0.800000011920929,
      0.0
     ],
-    "n_reachable_total": 284,
+    "n_reachable_total": 263,
     "trunks": [
      [
       0.0,
       0.0,
       24,
-      false
+      false,
+      53.18
      ],
      [
       0.0,
-      -0.3,
-      38,
-      false
-     ],
-     [
-      0.0,
-      -0.6,
-      45,
-      false
-     ],
-     [
-      0.0,
-      -0.9,
-      0,
-      true
-     ],
-     [
-      0.25,
-      0.0,
-      30,
-      false
-     ],
-     [
-      0.25,
-      -0.3,
-      41,
-      false
-     ],
-     [
-      0.25,
-      -0.6,
-      43,
-      false
-     ],
-     [
-      0.25,
-      -0.9,
-      0,
-      true
-     ],
-     [
-      0.5,
-      0.0,
-      23,
-      false
-     ],
-     [
-      0.5,
       -0.3,
       36,
-      false
+      false,
+      40.61
+     ],
+     [
+      0.0,
+      -0.6,
+      42,
+      false,
+      56.85
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.25,
+      0.0,
+      28,
+      false,
+      42.12
+     ],
+     [
+      0.25,
+      -0.3,
+      36,
+      false,
+      48.25
+     ],
+     [
+      0.25,
+      -0.6,
+      39,
+      false,
+      60.47
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      0.0,
+      22,
+      false,
+      38.61
+     ],
+     [
+      0.5,
+      -0.3,
+      32,
+      false,
+      64.54
      ],
      [
       0.5,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       -0.9,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.75,
       0.0,
       4,
-      false
+      false,
+      36.41
      ],
      [
       0.75,
       -0.3,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       -0.6,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.75,
       -0.9,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       0.0,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       -0.3,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       -0.6,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ]
-    ]
+    ],
+    "time_s": 671.7
    },
    "error": null,
-   "pod": "rb3-l40s-3",
+   "pod": "rb7-l40s-4",
    "rc": 0,
-   "wall_s": 2998,
+   "wall_s": 686,
    "band_files": [
-    "tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro__70866f22e0ba1989"
+    "tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-kszoro__b359a12f598f89a3"
    ],
-   "current_code": false
+   "current_code": true
   },
   "rb__tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun": {
-   "dir": "runlogs/runpod/rb/rb4-l40s-0/rb__tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun",
+   "dir": "runlogs/runpod/rb/rb7-l40s-4/rb__tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun",
    "files": [
-    "runlogs/runpod/rb/rb4-l40s-0/rb__tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun/tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun__d9f56a0df0a73fbe"
+    "runlogs/runpod/rb/rb7-l40s-4/rb__tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun/tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun__ad06cf312cd24891"
    ],
    "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun/tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun__d9f56a0df0a73fbe.npz",
+    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun/tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun__ad06cf312cd24891.npz",
     "union_extent": [
      -0.800000011920929,
      0.07999999821186066
     ],
-    "n_reachable_total": 482,
+    "n_reachable_total": 479,
     "trunks": [
      [
       0.0,
       0.0,
       32,
-      false
+      false,
+      90.52
      ],
      [
       0.0,
       -0.3,
       52,
-      false
+      false,
+      58.46
      ],
      [
       0.0,
       -0.6,
       73,
-      false
+      false,
+      78.7
      ],
      [
       0.0,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.25,
       0.0,
       40,
-      false
+      false,
+      42.04
      ],
      [
       0.25,
       -0.3,
       61,
-      false
+      false,
+      68.74
      ],
      [
       0.25,
       -0.6,
-      73,
-      false
+      72,
+      false,
+      85.61
      ],
      [
       0.25,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       0.0,
       46,
-      false
+      false,
+      47.41
      ],
      [
       0.5,
       -0.3,
       63,
-      false
+      false,
+      76.04
      ],
      [
       0.5,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       0.0,
-      42,
-      false
+      40,
+      false,
+      51.38
      ],
      [
       0.75,
       -0.3,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       -0.9,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       0.0,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       -0.3,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ]
-    ]
+    ],
+    "time_s": 834.3
    },
    "error": null,
-   "pod": "rb4-l40s-0",
+   "pod": "rb7-l40s-4",
    "rc": 0,
-   "wall_s": 3039,
+   "wall_s": 847,
    "band_files": [
-    "tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun__d9f56a0df0a73fbe"
+    "tabletop__house_single_floor__countertop_ikwqer_0__dip_candle-ghctun__ad06cf312cd24891"
    ],
-   "current_code": false
+   "current_code": true
   },
   "rb__tabletop__house_single_floor__countertop_ikwqer_0__parsnip-invznw": {
    "dir": "runlogs/runpod/rb/rb4-l40s-0/rb__tabletop__house_single_floor__countertop_ikwqer_0__parsnip-invznw",
@@ -28495,148 +29009,169 @@
    "current_code": true
   },
   "rb__tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__placed-tray-gsxbym": {
-   "dir": "runlogs/runpod/rb/rb4-l40s-1/rb__tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__placed-tray-gsxbym",
+   "dir": "runlogs/runpod/rb/rb7-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__placed-tray-gsxbym",
    "files": [
-    "runlogs/runpod/rb/rb4-l40s-1/rb__tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__156fbfd1c69bf213"
+    "runlogs/runpod/rb/rb7-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__da1de64387417250"
    ],
    "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__156fbfd1c69bf213.npz",
+    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__da1de64387417250.npz",
     "union_extent": [
      -0.1599999964237213,
      0.0
     ],
-    "n_reachable_total": 61,
+    "n_reachable_total": 54,
     "trunks": [
      [
       0.0,
       0.0,
-      5,
-      false
+      4,
+      false,
+      26.67
      ],
      [
       0.0,
       -0.3,
       9,
-      false
+      false,
+      18.28
      ],
      [
       0.0,
       -0.6,
       9,
-      false
+      false,
+      10.22
      ],
      [
       0.0,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.25,
       0.0,
-      6,
-      false
+      5,
+      false,
+      8.01
      ],
      [
       0.25,
       -0.3,
-      10,
-      false
+      9,
+      false,
+      9.82
      ],
      [
       0.25,
       -0.6,
-      9,
-      false
-     ],
-     [
-      0.25,
-      -0.9,
-      0,
-      true
-     ],
-     [
-      0.5,
-      0.0,
-      5,
-      false
-     ],
-     [
-      0.5,
-      -0.3,
       8,
-      false
+      false,
+      10.68
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      0.0,
+      3,
+      false,
+      14.82
+     ],
+     [
+      0.5,
+      -0.3,
+      7,
+      false,
+      10.63
      ],
      [
       0.5,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       0.0,
       0,
-      false
+      false,
+      7.89
      ],
      [
       0.75,
       -0.3,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       0.0,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       -0.3,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ]
-    ]
+    ],
+    "time_s": 407.5
    },
    "error": null,
-   "pod": "rb4-l40s-1",
+   "pod": "rb7-l40s-3",
    "rc": 0,
-   "wall_s": 1090,
+   "wall_s": 421,
    "band_files": [
-    "tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__156fbfd1c69bf213"
+    "tabletop__house_single_floor__countertop_ikwqer_0__conditioner_dispenser-uncljo__da1de64387417250"
    ],
-   "current_code": false
+   "current_code": true
   },
   "rb__tabletop__house_single_floor__countertop_ikwqer_0__magazine-zfeoeu__gp": {
    "dir": "runlogs/runpod/rb/rb4-l40s-1/rb__tabletop__house_single_floor__countertop_ikwqer_0__magazine-zfeoeu__gp",
@@ -29299,148 +29834,169 @@
    "current_code": true
   },
   "rb__tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji": {
-   "dir": "runlogs/runpod/rb/rb4-l40s-2/rb__tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji",
+   "dir": "runlogs/runpod/rb/rb7-l40s-5/rb__tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji",
    "files": [
-    "runlogs/runpod/rb/rb4-l40s-2/rb__tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji/tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji__ed9e0042137d7822"
+    "runlogs/runpod/rb/rb7-l40s-5/rb__tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji/tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji__a27b6b6270daf525"
    ],
    "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji/tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji__ed9e0042137d7822.npz",
+    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji/tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji__a27b6b6270daf525.npz",
     "union_extent": [
      -0.800000011920929,
      0.07999999821186066
     ],
-    "n_reachable_total": 524,
+    "n_reachable_total": 512,
     "trunks": [
      [
       0.0,
       0.0,
-      38,
-      false
+      37,
+      false,
+      65.75
      ],
      [
       0.0,
       -0.3,
       56,
-      false
+      false,
+      74.44
      ],
      [
       0.0,
       -0.6,
-      74,
-      false
+      68,
+      false,
+      87.78
      ],
      [
       0.0,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.25,
       0.0,
       45,
-      false
+      false,
+      54.34
      ],
      [
       0.25,
       -0.3,
-      62,
-      false
+      61,
+      false,
+      76.77
      ],
      [
       0.25,
       -0.6,
-      80,
-      false
+      76,
+      false,
+      93.89
      ],
      [
       0.25,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       0.0,
       50,
-      false
+      false,
+      65.93
      ],
      [
       0.5,
       -0.3,
       70,
-      false
+      false,
+      81.01
      ],
      [
       0.5,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       -0.9,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.75,
       0.0,
       49,
-      false
+      false,
+      49.97
      ],
      [
       0.75,
       -0.3,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       -0.6,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.75,
       -0.9,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       0.0,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       -0.3,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       -0.6,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       -0.9,
       0,
-      true
+      true,
+      0.0
      ]
-    ]
+    ],
+    "time_s": 884.0
    },
    "error": null,
-   "pod": "rb4-l40s-2",
+   "pod": "rb7-l40s-5",
    "rc": 0,
-   "wall_s": 3187,
+   "wall_s": 897,
    "band_files": [
-    "tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji__ed9e0042137d7822"
+    "tabletop__house_single_floor__countertop_ikwqer_0__beer_glass-rxscji__a27b6b6270daf525"
    ],
-   "current_code": false
+   "current_code": true
   },
   "rb__tabletop__house_single_floor__countertop_ikwqer_0__teaspoon-piqabk__placed-tray-gsxbym": {
    "dir": "runlogs/runpod/rb/rb4-l40s-2/rb__tabletop__house_single_floor__countertop_ikwqer_0__teaspoon-piqabk__placed-tray-gsxbym",
@@ -29773,292 +30329,334 @@
    "current_code": true
   },
   "rb__tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn": {
-   "dir": "runlogs/runpod/rb/rb4-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn",
+   "dir": "runlogs/runpod/rb/rb7-l40s-5/rb__tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn",
    "files": [
-    "runlogs/runpod/rb/rb4-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn/tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn__08ebea79d95fa567"
+    "runlogs/runpod/rb/rb7-l40s-5/rb__tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn/tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn__bcafbc71d50bd01a"
    ],
    "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn/tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn__08ebea79d95fa567.npz",
+    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn/tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn__bcafbc71d50bd01a.npz",
     "union_extent": [
      -0.800000011920929,
      0.1599999964237213
     ],
-    "n_reachable_total": 607,
+    "n_reachable_total": 606,
     "trunks": [
      [
       0.0,
       0.0,
       44,
-      false
+      false,
+      80.86
      ],
      [
       0.0,
       -0.3,
       64,
-      false
+      false,
+      52.71
      ],
      [
       0.0,
       -0.6,
       86,
-      false
+      false,
+      79.57
      ],
      [
       0.0,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.25,
       0.0,
       52,
-      false
+      false,
+      45.65
      ],
      [
       0.25,
       -0.3,
       73,
-      false
+      false,
+      63.51
      ],
      [
       0.25,
       -0.6,
-      91,
-      false
+      90,
+      false,
+      79.17
      ],
      [
       0.25,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       0.0,
       60,
-      false
+      false,
+      55.77
      ],
      [
       0.5,
       -0.3,
       77,
-      false
+      false,
+      72.98
      ],
      [
       0.5,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       -0.9,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.75,
       0.0,
       60,
-      false
+      false,
+      66.02
      ],
      [
       0.75,
       -0.3,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       -0.6,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.75,
       -0.9,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       0.0,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       -0.3,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       -0.6,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ]
-    ]
+    ],
+    "time_s": 822.1
    },
    "error": null,
-   "pod": "rb4-l40s-3",
+   "pod": "rb7-l40s-5",
    "rc": 0,
-   "wall_s": 3092,
+   "wall_s": 835,
    "band_files": [
-    "tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn__08ebea79d95fa567"
+    "tabletop__house_single_floor__countertop_ikwqer_0__half_bagel-hsvakn__bcafbc71d50bd01a"
    ],
-   "current_code": false
+   "current_code": true
   },
   "rb__tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__gp": {
-   "dir": "runlogs/runpod/rb/rb4-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__gp",
+   "dir": "runlogs/runpod/rb/rb7-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__gp",
    "files": [
-    "runlogs/runpod/rb/rb4-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__gp/tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__94c3bd8aa6f9f37c"
+    "runlogs/runpod/rb/rb7-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__gp/tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__c1b5b3b566e21563"
    ],
    "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__gp/tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__94c3bd8aa6f9f37c.npz",
+    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__gp/tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__c1b5b3b566e21563.npz",
     "union_extent": [
      -0.800000011920929,
      0.0
     ],
-    "n_reachable_total": 381,
+    "n_reachable_total": 379,
     "trunks": [
      [
       0.0,
       0.0,
-      29,
-      false
+      27,
+      false,
+      25.43
      ],
      [
       0.0,
       -0.3,
       39,
-      false
+      false,
+      34.03
      ],
      [
       0.0,
       -0.6,
       49,
-      false
+      false,
+      36.95
      ],
      [
       0.0,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.25,
       0.0,
       34,
-      false
+      false,
+      15.81
      ],
      [
       0.25,
       -0.3,
       46,
-      false
+      false,
+      22.47
      ],
      [
       0.25,
       -0.6,
       54,
-      false
+      false,
+      30.62
      ],
      [
       0.25,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       0.0,
       40,
-      false
+      false,
+      19.04
      ],
      [
       0.5,
       -0.3,
       50,
-      false
+      false,
+      26.92
      ],
      [
       0.5,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       0.0,
       40,
-      false
+      false,
+      23.12
      ],
      [
       0.75,
       -0.3,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       0.0,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       -0.3,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.95,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ]
-    ]
+    ],
+    "time_s": 509.4
    },
    "error": null,
-   "pod": "rb4-l40s-3",
+   "pod": "rb7-l40s-3",
    "rc": 0,
-   "wall_s": 634,
+   "wall_s": 522,
    "band_files": [
-    "tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__94c3bd8aa6f9f37c"
+    "tabletop__house_single_floor__countertop_ikwqer_0__hardback-agbqsy__c1b5b3b566e21563"
    ],
-   "current_code": false
+   "current_code": true
   },
   "rb__tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai": {
    "dir": "runlogs/runpod/rb/rb4-l40s-3/rb__tabletop__house_single_floor__desk_xhjsub_0__beaker-dtjmai",
@@ -32597,148 +33195,169 @@
    "current_code": true
   },
   "rb__tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__placed-tray-gsxbym": {
-   "dir": "runlogs/runpod/rb/rb5-l40s-1/rb__tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__placed-tray-gsxbym",
+   "dir": "runlogs/runpod/rb/rb7-l40s-5/rb__tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__placed-tray-gsxbym",
    "files": [
-    "runlogs/runpod/rb/rb5-l40s-1/rb__tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__c36c31cd2420fffb"
+    "runlogs/runpod/rb/rb7-l40s-5/rb__tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__b6ad4d674cbc532e"
    ],
    "summary": {
-    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__c36c31cd2420fffb.npz",
+    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__b6ad4d674cbc532e.npz",
     "union_extent": [
      -0.1599999964237213,
      0.07999999821186066
     ],
-    "n_reachable_total": 122,
+    "n_reachable_total": 86,
     "trunks": [
      [
       0.0,
       0.0,
+      6,
+      false,
+      38.46
+     ],
+     [
+      0.0,
+      -0.3,
+      11,
+      false,
+      22.58
+     ],
+     [
+      0.0,
+      -0.6,
+      13,
+      false,
+      13.78
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.25,
+      0.0,
       8,
-      false
-     ],
-     [
-      0.0,
-      -0.3,
-      13,
-      false
-     ],
-     [
-      0.0,
-      -0.6,
-      16,
-      false
-     ],
-     [
-      0.0,
-      -0.9,
-      0,
-      true
+      false,
+      11.53
      ],
      [
       0.25,
-      0.0,
+      -0.3,
       12,
-      false
-     ],
-     [
-      0.25,
-      -0.3,
-      15,
-      false
+      false,
+      12.93
      ],
      [
       0.25,
       -0.6,
-      16,
-      false
+      11,
+      false,
+      11.51
      ],
      [
       0.25,
       -0.9,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       0.0,
-      13,
-      false
+      8,
+      false,
+      12.29
      ],
      [
       0.5,
       -0.3,
-      16,
-      false
+      11,
+      false,
+      11.52
      ],
      [
       0.5,
       -0.6,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.5,
       -0.9,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.75,
       0.0,
-      13,
-      false
+      6,
+      false,
+      9.33
      ],
      [
       0.75,
       -0.3,
       0,
-      true
+      true,
+      0.01
      ],
      [
       0.75,
       -0.6,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.75,
       -0.9,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       0.0,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       -0.3,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       -0.6,
       0,
-      true
+      true,
+      0.0
      ],
      [
       0.95,
       -0.9,
       0,
-      true
+      true,
+      0.0
      ]
-    ]
+    ],
+    "time_s": 384.1
    },
    "error": null,
-   "pod": "rb5-l40s-1",
+   "pod": "rb7-l40s-5",
    "rc": 0,
-   "wall_s": 1415,
+   "wall_s": 397,
    "band_files": [
-    "tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__c36c31cd2420fffb"
+    "tabletop__house_single_floor__countertop_ikwqer_0__chili-rafkbt__b6ad4d674cbc532e"
    ],
-   "current_code": false
+   "current_code": true
   },
   "rb__tabletop__house_single_floor__countertop_ikwqer_0__shampoo_dispenser-kkbhzw": {
    "dir": "runlogs/runpod/rb/rb5-l40s-1/rb__tabletop__house_single_floor__countertop_ikwqer_0__shampoo_dispenser-kkbhzw",
@@ -38640,6 +39259,1644 @@
    "wall_s": 273,
    "band_files": [
     "tabletop__office_cubicles_right__desk_pfsjbc_0__notebook-dlhxxl__fcb7114e0506f331"
+   ],
+   "current_code": true
+  },
+  "rb__brace__house_single_floor__countertop_ikwqer_0__blender-eyedvd-j_lid": {
+   "dir": "runlogs/runpod/rb/rb7-l40s-3/rb__brace__house_single_floor__countertop_ikwqer_0__blender-eyedvd-j_lid",
+   "files": [
+    "runlogs/runpod/rb/rb7-l40s-3/rb__brace__house_single_floor__countertop_ikwqer_0__blender-eyedvd-j_lid/brace__house_single_floor__countertop_ikwqer_0__blender-eyedvd__b893f43bd7e3d020"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__brace__house_single_floor__countertop_ikwqer_0__blender-eyedvd-j_lid/brace__house_single_floor__countertop_ikwqer_0__blender-eyedvd__b893f43bd7e3d020.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      148.82
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      false,
+      138.74
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      false,
+      126.9
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      false,
+      112.72
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      false,
+      127.41
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      false,
+      123.36
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      false,
+      110.32
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      false,
+      123.66
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      false,
+      120.82
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.0
+     ]
+    ],
+    "time_s": 1805.6
+   },
+   "error": null,
+   "pod": "rb7-l40s-3",
+   "rc": 0,
+   "wall_s": 1820,
+   "band_files": [
+    "brace__house_single_floor__countertop_ikwqer_0__blender-eyedvd__b893f43bd7e3d020"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-atyqub__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/rb7-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-atyqub__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/rb7-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-atyqub__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-atyqub__5242708678a68276"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-atyqub__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-atyqub__5242708678a68276.npz",
+    "union_extent": [
+     -0.1599999964237213,
+     0.0
+    ],
+    "n_reachable_total": 53,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      3,
+      false,
+      38.06
+     ],
+     [
+      0.0,
+      -0.3,
+      9,
+      false,
+      22.42
+     ],
+     [
+      0.0,
+      -0.6,
+      8,
+      false,
+      10.41
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.25,
+      0.0,
+      4,
+      false,
+      8.17
+     ],
+     [
+      0.25,
+      -0.3,
+      9,
+      false,
+      10.01
+     ],
+     [
+      0.25,
+      -0.6,
+      8,
+      false,
+      10.87
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      0.0,
+      4,
+      false,
+      8.72
+     ],
+     [
+      0.5,
+      -0.3,
+      8,
+      false,
+      10.81
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      false,
+      8.04
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01
+     ]
+    ],
+    "time_s": 418.2
+   },
+   "error": null,
+   "pod": "rb7-l40s-3",
+   "rc": 0,
+   "wall_s": 430,
+   "band_files": [
+    "tabletop__house_single_floor__countertop_ikwqer_0__carton_of_milk-atyqub__5242708678a68276"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__countertop_ikwqer_0__pencil-rzscao__scaled": {
+   "dir": "runlogs/runpod/rb/rb7-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__pencil-rzscao__scaled",
+   "files": [
+    "runlogs/runpod/rb/rb7-l40s-3/rb__tabletop__house_single_floor__countertop_ikwqer_0__pencil-rzscao__scaled/tabletop__house_single_floor__countertop_ikwqer_0__pencil-rzscao__8a3e237a8abf5b49"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__pencil-rzscao__scaled/tabletop__house_single_floor__countertop_ikwqer_0__pencil-rzscao__8a3e237a8abf5b49.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.0
+    ],
+    "n_reachable_total": 313,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      24,
+      false,
+      59.15
+     ],
+     [
+      0.0,
+      -0.3,
+      40,
+      false,
+      40.69
+     ],
+     [
+      0.0,
+      -0.6,
+      46,
+      false,
+      55.05
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.25,
+      0.0,
+      29,
+      false,
+      31.09
+     ],
+     [
+      0.25,
+      -0.3,
+      41,
+      false,
+      47.86
+     ],
+     [
+      0.25,
+      -0.6,
+      46,
+      false,
+      61.35
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      0.0,
+      28,
+      false,
+      34.7
+     ],
+     [
+      0.5,
+      -0.3,
+      39,
+      false,
+      53.07
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      0.0,
+      20,
+      false,
+      38.48
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01
+     ]
+    ],
+    "time_s": 703.9
+   },
+   "error": null,
+   "pod": "rb7-l40s-3",
+   "rc": 0,
+   "wall_s": 717,
+   "band_files": [
+    "tabletop__house_single_floor__countertop_ikwqer_0__pencil-rzscao__8a3e237a8abf5b49"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__sofa_wnzdke_0__box_of_shampoo-nijidu": {
+   "dir": "runlogs/runpod/rb/rb7-l40s-3/rb__tabletop__house_single_floor__sofa_wnzdke_0__box_of_shampoo-nijidu",
+   "files": [
+    "runlogs/runpod/rb/rb7-l40s-3/rb__tabletop__house_single_floor__sofa_wnzdke_0__box_of_shampoo-nijidu/tabletop__house_single_floor__sofa_wnzdke_0__box_of_shampoo-nijidu__6ff30f8ec513f78f"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__sofa_wnzdke_0__box_of_shampoo-nijidu/tabletop__house_single_floor__sofa_wnzdke_0__box_of_shampoo-nijidu__6ff30f8ec513f78f.npz",
+    "union_extent": [
+     -0.5600000023841858,
+     0.0
+    ],
+    "n_reachable_total": 342,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      19,
+      false,
+      51.8
+     ],
+     [
+      0.0,
+      -0.3,
+      29,
+      false,
+      38.03
+     ],
+     [
+      0.0,
+      -0.6,
+      27,
+      false,
+      30.3
+     ],
+     [
+      0.0,
+      -0.9,
+      23,
+      false,
+      26.71
+     ],
+     [
+      0.25,
+      0.0,
+      21,
+      false,
+      27.46
+     ],
+     [
+      0.25,
+      -0.3,
+      29,
+      false,
+      30.38
+     ],
+     [
+      0.25,
+      -0.6,
+      25,
+      false,
+      30.4
+     ],
+     [
+      0.25,
+      -0.9,
+      21,
+      false,
+      29.58
+     ],
+     [
+      0.5,
+      0.0,
+      26,
+      false,
+      24.61
+     ],
+     [
+      0.5,
+      -0.3,
+      28,
+      false,
+      26.89
+     ],
+     [
+      0.5,
+      -0.6,
+      24,
+      false,
+      28.3
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      0.0,
+      20,
+      false,
+      25.0
+     ],
+     [
+      0.75,
+      -0.3,
+      27,
+      false,
+      33.03
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.95,
+      0.0,
+      8,
+      false,
+      22.89
+     ],
+     [
+      0.95,
+      -0.3,
+      15,
+      false,
+      25.8
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01
+     ]
+    ],
+    "time_s": 768.0
+   },
+   "error": null,
+   "pod": "rb7-l40s-3",
+   "rc": 0,
+   "wall_s": 781,
+   "band_files": [
+    "tabletop__house_single_floor__sofa_wnzdke_0__box_of_shampoo-nijidu__6ff30f8ec513f78f"
+   ],
+   "current_code": true
+  },
+  "rb__brace__house_single_floor__countertop_ikwqer_0__carton-msfzpz-j_link_0": {
+   "dir": "runlogs/runpod/rb/rb7-l40s-4/rb__brace__house_single_floor__countertop_ikwqer_0__carton-msfzpz-j_link_0",
+   "files": [
+    "runlogs/runpod/rb/rb7-l40s-4/rb__brace__house_single_floor__countertop_ikwqer_0__carton-msfzpz-j_link_0/brace__house_single_floor__countertop_ikwqer_0__carton-msfzpz__699b0c62ee51edc9"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__brace__house_single_floor__countertop_ikwqer_0__carton-msfzpz-j_link_0/brace__house_single_floor__countertop_ikwqer_0__carton-msfzpz__699b0c62ee51edc9.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      147.39
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      false,
+      116.6
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      false,
+      130.33
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      false,
+      115.32
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      false,
+      123.49
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      false,
+      132.37
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      false,
+      131.98
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      false,
+      146.07
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      false,
+      136.77
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.0
+     ]
+    ],
+    "time_s": 1447.1
+   },
+   "error": null,
+   "pod": "rb7-l40s-4",
+   "rc": 0,
+   "wall_s": 1460,
+   "band_files": [
+    "brace__house_single_floor__countertop_ikwqer_0__carton-msfzpz__699b0c62ee51edc9"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__countertop_ikwqer_0__frying_pan-sfbdjn__gp": {
+   "dir": "runlogs/runpod/rb/rb7-l40s-4/rb__tabletop__house_single_floor__countertop_ikwqer_0__frying_pan-sfbdjn__gp",
+   "files": [
+    "runlogs/runpod/rb/rb7-l40s-4/rb__tabletop__house_single_floor__countertop_ikwqer_0__frying_pan-sfbdjn__gp/tabletop__house_single_floor__countertop_ikwqer_0__frying_pan-sfbdjn__58f5641626f487c3"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__frying_pan-sfbdjn__gp/tabletop__house_single_floor__countertop_ikwqer_0__frying_pan-sfbdjn__58f5641626f487c3.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.0
+    ],
+    "n_reachable_total": 387,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      29,
+      false,
+      26.8
+     ],
+     [
+      0.0,
+      -0.3,
+      42,
+      false,
+      29.12
+     ],
+     [
+      0.0,
+      -0.6,
+      50,
+      false,
+      38.34
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.25,
+      0.0,
+      37,
+      false,
+      16.34
+     ],
+     [
+      0.25,
+      -0.3,
+      46,
+      false,
+      23.01
+     ],
+     [
+      0.25,
+      -0.6,
+      54,
+      false,
+      30.54
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      0.0,
+      40,
+      false,
+      29.11
+     ],
+     [
+      0.5,
+      -0.3,
+      50,
+      false,
+      29.76
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      0.0,
+      39,
+      false,
+      23.19
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.0
+     ]
+    ],
+    "time_s": 482.1
+   },
+   "error": null,
+   "pod": "rb7-l40s-4",
+   "rc": 0,
+   "wall_s": 495,
+   "band_files": [
+    "tabletop__house_single_floor__countertop_ikwqer_0__frying_pan-sfbdjn__58f5641626f487c3"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__countertop_ikwqer_0__soap_dispenser-cgxrwd__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/rb7-l40s-4/rb__tabletop__house_single_floor__countertop_ikwqer_0__soap_dispenser-cgxrwd__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/rb7-l40s-4/rb__tabletop__house_single_floor__countertop_ikwqer_0__soap_dispenser-cgxrwd__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__soap_dispenser-cgxrwd__0d44f2c88b3abbc6"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__soap_dispenser-cgxrwd__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__soap_dispenser-cgxrwd__0d44f2c88b3abbc6.npz",
+    "union_extent": [
+     -0.1599999964237213,
+     0.0
+    ],
+    "n_reachable_total": 49,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      3,
+      false,
+      39.37
+     ],
+     [
+      0.0,
+      -0.3,
+      7,
+      false,
+      24.2
+     ],
+     [
+      0.0,
+      -0.6,
+      8,
+      false,
+      10.94
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.25,
+      0.0,
+      4,
+      false,
+      8.6
+     ],
+     [
+      0.25,
+      -0.3,
+      9,
+      false,
+      10.32
+     ],
+     [
+      0.25,
+      -0.6,
+      8,
+      false,
+      11.25
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      0.0,
+      3,
+      false,
+      7.72
+     ],
+     [
+      0.5,
+      -0.3,
+      7,
+      false,
+      11.13
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      false,
+      8.32
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.0
+     ]
+    ],
+    "time_s": 356.5
+   },
+   "error": null,
+   "pod": "rb7-l40s-4",
+   "rc": 0,
+   "wall_s": 370,
+   "band_files": [
+    "tabletop__house_single_floor__countertop_ikwqer_0__soap_dispenser-cgxrwd__0d44f2c88b3abbc6"
+   ],
+   "current_code": true
+  },
+  "rb__brace__house_single_floor__countertop_ikwqer_0__hinged_jar-vzwhbg-j_rb1": {
+   "dir": "runlogs/runpod/rb/rb7-l40s-5/rb__brace__house_single_floor__countertop_ikwqer_0__hinged_jar-vzwhbg-j_rb1",
+   "files": [
+    "runlogs/runpod/rb/rb7-l40s-5/rb__brace__house_single_floor__countertop_ikwqer_0__hinged_jar-vzwhbg-j_rb1/brace__house_single_floor__countertop_ikwqer_0__hinged_jar-vzwhbg__4a38eb7cdbc9dfdf"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__brace__house_single_floor__countertop_ikwqer_0__hinged_jar-vzwhbg-j_rb1/brace__house_single_floor__countertop_ikwqer_0__hinged_jar-vzwhbg__4a38eb7cdbc9dfdf.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      134.34
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      false,
+      119.9
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      false,
+      124.91
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      false,
+      98.04
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      false,
+      115.18
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      false,
+      133.95
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      false,
+      111.71
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      false,
+      123.92
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      false,
+      132.42
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.0
+     ]
+    ],
+    "time_s": 1358.1
+   },
+   "error": null,
+   "pod": "rb7-l40s-5",
+   "rc": 0,
+   "wall_s": 1371,
+   "band_files": [
+    "brace__house_single_floor__countertop_ikwqer_0__hinged_jar-vzwhbg__4a38eb7cdbc9dfdf"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__countertop_ikwqer_0__mouse-pljjtu__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/rb7-l40s-5/rb__tabletop__house_single_floor__countertop_ikwqer_0__mouse-pljjtu__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/rb7-l40s-5/rb__tabletop__house_single_floor__countertop_ikwqer_0__mouse-pljjtu__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__mouse-pljjtu__07ef18ac17a7e5b3"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__countertop_ikwqer_0__mouse-pljjtu__placed-tray-gsxbym/tabletop__house_single_floor__countertop_ikwqer_0__mouse-pljjtu__07ef18ac17a7e5b3.npz",
+    "union_extent": [
+     -0.1599999964237213,
+     0.0
+    ],
+    "n_reachable_total": 78,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      5,
+      false,
+      38.37
+     ],
+     [
+      0.0,
+      -0.3,
+      10,
+      false,
+      24.69
+     ],
+     [
+      0.0,
+      -0.6,
+      11,
+      false,
+      12.03
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.25,
+      0.0,
+      6,
+      false,
+      9.55
+     ],
+     [
+      0.25,
+      -0.3,
+      11,
+      false,
+      11.55
+     ],
+     [
+      0.25,
+      -0.6,
+      11,
+      false,
+      11.03
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      0.0,
+      8,
+      false,
+      11.66
+     ],
+     [
+      0.5,
+      -0.3,
+      11,
+      false,
+      10.9
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      0.0,
+      5,
+      false,
+      8.11
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.0
+     ]
+    ],
+    "time_s": 372.8
+   },
+   "error": null,
+   "pod": "rb7-l40s-5",
+   "rc": 0,
+   "wall_s": 386,
+   "band_files": [
+    "tabletop__house_single_floor__countertop_ikwqer_0__mouse-pljjtu__07ef18ac17a7e5b3"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__desk_xhjsub_0__pen-hiyeki": {
+   "dir": "runlogs/runpod/rb/rb7-l40s-5/rb__tabletop__house_single_floor__desk_xhjsub_0__pen-hiyeki",
+   "files": [
+    "runlogs/runpod/rb/rb7-l40s-5/rb__tabletop__house_single_floor__desk_xhjsub_0__pen-hiyeki/tabletop__house_single_floor__desk_xhjsub_0__pen-hiyeki__92b5f996a828ce1b"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__desk_xhjsub_0__pen-hiyeki/tabletop__house_single_floor__desk_xhjsub_0__pen-hiyeki__92b5f996a828ce1b.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      true,
+      0.0
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.0
+     ]
+    ],
+    "time_s": 238.5
+   },
+   "error": null,
+   "pod": "rb7-l40s-5",
+   "rc": 0,
+   "wall_s": 253,
+   "band_files": [
+    "tabletop__house_single_floor__desk_xhjsub_0__pen-hiyeki__92b5f996a828ce1b"
    ],
    "current_code": true
   },
