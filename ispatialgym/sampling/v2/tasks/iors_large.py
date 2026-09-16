@@ -87,7 +87,8 @@ SUPPORT_MARGIN = 0.02
 # footprint edge and a straight floor-level push of the target under the edge ------------------------------------------------
 PUSH_UNDER_INSIDE_M = 0.07          # goal = the target centre this far inside the footprint edge (5–10 cm; ``under`` needs the centre column)
 PUSH_UNDER_DROP_EXTRA_M = 0.10      # drop centre = half extent along the push + this outside the edge
-PUSH_UNDER_DROP_HEIGHT_M = 0.03     # object bottom above the floor at the release (≥ 2 cm)
+PUSH_UNDER_DROP_HEIGHT_M = 0.10     # object bottom above the floor at the release (≥ 2 cm; 10 cm keeps the release eef ≈ 0.1 m above the floor —
+                                    # the sandal's side pinches sit 1 cm above its sole, and z < 0.08 m is out of the arm's reach even at translate 0.95)
 PUSH_UNDER_STAND_OFFS = (0.5, 0.55, 0.6, 0.65, 0.7)  # base stand-off from the edge: the drop cell 0.25–0.6 m ahead (B3: the floor is reachable 0.24–0.64 m ahead)
 PUSH_UNDER_DROP_AHEAD_M = (0.25, 0.60)
 PUSH_UNDER_CLEARANCE_M = 0.005      # blade clearance to the target's back face at the push start

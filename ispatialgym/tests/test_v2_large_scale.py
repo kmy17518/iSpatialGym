@@ -426,7 +426,7 @@ def test_push_under_record_and_geometry_constants():
     pc = SC.PushContact.from_dict(d, "contacts.push")
     assert pc.extra["kind"] == "push_under" and pc.mid is not None and len(pc.waypoints) == 3
     # geometry: the goal centre 5-10 cm inside the edge, the drop half + 10 cm outside, the drop cell 0.25-0.6 m ahead of the base
-    assert 0.05 <= IL.PUSH_UNDER_INSIDE_M <= 0.10 and IL.PUSH_UNDER_DROP_EXTRA_M == pytest.approx(0.10) and IL.PUSH_UNDER_DROP_HEIGHT_M >= 0.02
+    assert 0.05 <= IL.PUSH_UNDER_INSIDE_M <= 0.10 and IL.PUSH_UNDER_DROP_EXTRA_M == pytest.approx(0.10) and 0.02 <= IL.PUSH_UNDER_DROP_HEIGHT_M <= 0.15
     for so in IL.PUSH_UNDER_STAND_OFFS:
         assert IL.PUSH_UNDER_DROP_AHEAD_M[0] <= so - (0.05 + 0.10) or so - (0.12 + 0.10) <= IL.PUSH_UNDER_DROP_AHEAD_M[1]
     assert all(t >= 0.75 and k <= -0.9 for t, k in IL.FLOOR_TRUNKS)
