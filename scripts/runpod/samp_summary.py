@@ -41,10 +41,18 @@ def pull(api, pid: str, name: str) -> None:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-pull", action="store_true")
-    ap.add_argument("--md", default=os.path.join(rp.REPO, "runlogs", "runpod", "samp", "summary.md"))
+    ap.add_argument("--purpose", default="samp")
+    ap.add_argument("--jobs", default=None, help="job manifest (default: the isg_reps jobs.json)")
+    ap.add_argument("--md", default=None)
     args = ap.parse_args()
+    global LIVE, JOBS
+    LIVE = os.path.join(rp.REPO, "runlogs", "runpod", args.purpose, "live")
+    if args.jobs:
+        JOBS = args.jobs
+    if args.md is None:
+        args.md = os.path.join(rp.REPO, "runlogs", "runpod", args.purpose, "summary.md")
     fleet = rp.load_fleet()
-    pods = {pid: info for pid, info in fleet["pods"].items() if info.get("purpose") == "samp"}
+    pods = {pid: info for pid, info in fleet["pods"].items() if info.get("purpose") == args.purpose}
     if not args.no_pull:
         api = rp.Api(rp.load_env()["RUNPOD_API_KEY"])
         live = {p["id"] for p in api.myself()["pods"]}
