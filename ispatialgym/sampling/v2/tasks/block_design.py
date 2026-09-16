@@ -62,6 +62,7 @@ REGION_RADIUS = 0.20
 #: owner 2026-09-16 10:47 ladder: block regions 0.5–0.6 m ahead of the base first, the pitched 30° / 45° picks as the primary
 #: class for every block (straight down last), the pinch 1 mm above the table so the pads get more than ~1 cm of face
 REGION_DEPTH_PREFERRED = 0.55
+RELEASE_ABOVE_SURFACE = 0.01  # owner item 3: release 1 cm above the actual surface under the slot (surface_z_under)
 MAX_MANIP_TRANSLATE = 0.5  # manipulation trunks deeper than this put the tilted picks' pre-grasps out of reach (PICK_FAILURE 13:20)
 PICK_TILTS_DEG = (30.0, -30.0, 45.0, -45.0, 0.0)
 PICK_TIP_CLEARANCE = 0.001
@@ -86,6 +87,7 @@ class BlockDesign(SamplerV2):
         self.bands = None
         self.left_bands = None  # A1: the left arm's contact band (row-left / column-top braces), None until B3's bands exist
         self.braces_missing = False  # the last instance has a block without a brace / push tail (owner 2026-09-16 11:08)
+        self.slot_surface_z: Dict[int, float] = {}  # raycast surface under each goal slot (release height, owner item 3)
 
     def g(self, key: str):
         return self.gen(key, self.defaults.get(key))
@@ -346,8 +348,12 @@ class BlockDesign(SamplerV2):
             options = [f for f in faces if f != TT.opposite_face(goal_face[bi]) and f not in up_of.values()]
             if not options:
                 raise Reject("layout", "no distinct up face left that is not the opposite of the goal face")
-            # prefer showing the goal face on top when it is still free (visible-face rule, first clause)
-            up_of[bi] = goal_face[bi] if goal_face[bi] in options and rng.random() < 0.5 else options[int(rng.integers(len(options)))]
+            # prefer showing the goal face on top when it is still free (visible-face rule, first clause). Prepared, off by
+            # default (owner 2026-09-16 14:38): ``generation.block_no_flip: true`` makes that preference certain — with
+            # a pattern of distinct colours no block flips, every pick / place uses the same pitched tilt (the in-hand
+            # flip's place approach is the open decision item)
+            p_goal_up = 1.0 if self.gen("block_no_flip", False) else float(self.gen("goal_face_up_prob", 0.5))
+            up_of[bi] = goal_face[bi] if goal_face[bi] in options and rng.random() < p_goal_up else options[int(rng.integers(len(options)))]
         poses: Dict[int, TT.Pose] = {}
         coarse_yaw: Dict[int, float] = {}
         for bi in range(n):
@@ -400,6 +406,16 @@ class BlockDesign(SamplerV2):
             slots[f"slot_{si}"] = {"position": [float(v) for v in goal_pose[bi][0]], "orientation": [float(v) for v in q_goal]}
         # §4.6 step 5: whole-body checks at init and manipulation with the blocks placed
         TT.whole_body_check_at(self, [init, manip], objects, require=True, reason="stance_collision")
+        # owner item 3 (release height, core 2c59893): the actual surface under every slot (a downward raycast with the
+        # blocks ignored) — the place eef releases RELEASE_ABOVE_SURFACE above it (the slot target itself stays on the top)
+        self.slot_surface_z = {}
+        if hasattr(self.world, "surface_z_under"):
+            blocks_all = [self.objects[names[bi]] for bi in range(n)]
+            for bi in range(n):
+                c_xy = self._centre(goal_pose[bi])[0][:2]
+                hit = self.world.surface_z_under(c_xy, float(self.top.z) + 0.20, ignore=blocks_all)
+                if hit is not None and float(self.top.z) - 0.02 <= float(hit["z"]) <= float(self.top.z) + 0.02:
+                    self.slot_surface_z[bi] = float(hit["z"])
         # --- cube grasps, flips and brace points per block in placement order ---------------------------------------
         order = sorted(range(n), key=lambda bi: slot_of[bi])  # anchor first, then the slots in order
         records = []
@@ -490,6 +506,13 @@ class BlockDesign(SamplerV2):
         world_poses = {names[o]: (goal_pose[o] if j < step else poses[o]) for j, o in enumerate(order)}
         self._teleport(world_poses)
         pick_pose, place_pose = poses[bi], goal_pose[bi]
+        # release pose: the slot pose lifted so the block bottom sits RELEASE_ABOVE_SURFACE above the raycast surface (the
+        # goal target keeps the on-top pose; without a surface hit the 1 mm drop of the slot pose stays)
+        surface_z = getattr(self, "slot_surface_z", {}).get(bi)
+        if surface_z is not None:
+            bottom = float(place_pose[0][2]) - self.world.bottom_offset(self.hull, place_pose[1])
+            dz = max(0.0, surface_z + RELEASE_ABOVE_SURFACE - bottom)
+            place_pose = (place_pose[0] + th.tensor([0.0, 0.0, dz]), place_pose[1])
         # candidate grasps: face pair (∥ flip axis for a flipping block; either horizontal pair otherwise) x wrist yaw x tilt pair
         cands: List[Tuple[str, float, float, float, int]] = []  # (face_pair, tilt_pick, tilt_place, yaw, flip_sign)
         if plan["flips"]:
@@ -577,7 +600,7 @@ class BlockDesign(SamplerV2):
                                "flip_axis": None if plan["flip_axis"] is None else [float(v) for v in plan["flip_axis"]],
                                "flip_sign": int(plan["flip_sign"]), "pick": pose_to_sidecar(g_pick.eef), "pre_pick": pose_to_sidecar(pre_pick),
                                "place": pose_to_sidecar(place_eef), "pre_place": pose_to_sidecar(pre_place), "carry_height": float(self._carry_height()),
-                               "goal_face": TT.up_face(goal_pose[bi][1]), "slot": step,
+                               "goal_face": TT.up_face(goal_pose[bi][1]), "slot": step, "release_surface_z": None if surface_z is None else round(float(surface_z), 4),
                                # the cube's geometric centre in the block's root frame (m): the ``isgblk`` root origin is
                                # off-centre; ``cube_grasp`` / the flip pivot take the centre pose = root pose ∘ (centre_offset, I)
                                "centre_offset": [float(v) for v in self.c_local.tolist()]}

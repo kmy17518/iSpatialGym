@@ -62,6 +62,8 @@ REST_TILT_MAX_DEG = 3.0
 FLOOR_BAND = 0.004
 FLOOR_QUANTILE = 0.10
 FLOOR_MIN_CELLS = 40
+#: owner item 3 (2026-09-16 10:15): release this far above the actual surface under the footprint centre (``surface_z_under``)
+RELEASE_ABOVE_SURFACE = 0.01
 
 
 def repark_spawned(s) -> None:
@@ -262,6 +264,7 @@ class Disembedding(SamplerV2):
         self.band_spec: Optional[TT.BandSpec] = None
         self.bands = None
         self.placed_key: Optional[str] = None  # band key of the stance-relative source tray (item 9)
+        self.release_surface_z: Optional[float] = None  # raycast surface under the destination goal (owner item 3)
 
     # ------------------------------------------------------------------ parameters (§2.3: numbers from generation)
 
@@ -545,6 +548,7 @@ class Disembedding(SamplerV2):
             if not res.ok:
                 raise Reject("place_unreachable", f"pre-place / place fail the exact IK from the placement stance: {res.reason}")
             grasp.pre_place, grasp.place = pre_place, place
+            grasp.extras["release_surface_z"] = None if self.release_surface_z is None else round(float(self.release_surface_z), 4)
             # carry height: object bottom >= tallest distractor + tray rim + 3 cm above the source floor
             rim_h = src_w.rim_z - src_w.z
             tallest = max([self.height[n] for n in dnames] + [rim_h])
@@ -590,9 +594,20 @@ class Disembedding(SamplerV2):
         return f"the {(b.category or name).replace('_', ' ')} at the {row} {col} of the source tray"
 
     def _goal_pose(self, t_pose: TT.Pose, dst_w: TrayFloorWorld) -> TT.Pose:
-        """§6.4 goal: the target at the destination floor centre with its init orientation."""
+        """§6.4 goal: the target at the destination floor centre with its init orientation, released
+        ``release_above_surface_m`` (1 cm) above the **actual** surface under the footprint centre — a downward raycast
+        (``SimWorld.surface_z_under``, core `2c59893`, the target ignored) from above the destination rim; the raster floor
+        level + 3 mm when the ray misses or hits outside the tray's floor band (tray parked, ray through a slot)."""
         quat = TT._t(t_pose[1])
-        pos = th.tensor([float(dst_w.centre[0]), float(dst_w.centre[1]), dst_w.z + self.world.bottom_offset(self.hull["target"], quat) + TT.Z_OFFSET])
+        xy = th.tensor([float(dst_w.centre[0]), float(dst_w.centre[1])])
+        surface = None
+        if hasattr(self.world, "surface_z_under"):
+            hit = self.world.surface_z_under(xy, dst_w.z + self.dst_floor.rim_local + 0.30, ignore=[self.obj("target")])
+            if hit is not None and dst_w.z - 0.01 <= float(hit["z"]) <= dst_w.z + 0.02:
+                surface = float(hit["z"])
+        self.release_surface_z = surface
+        base_z = dst_w.z + TT.Z_OFFSET if surface is None else surface + float(self.gen("release_above_surface_m", RELEASE_ABOVE_SURFACE))
+        pos = th.tensor([float(xy[0]), float(xy[1]), base_z + self.world.bottom_offset(self.hull["target"], quat)])
         return pos, quat
 
     def _place_destination(self, rng, init: Stance, manip: Stance, cam, s_pose: TT.Pose):
@@ -708,6 +723,10 @@ class Disembedding(SamplerV2):
         goal = self._goal_pose(draft.object_poses[tname], dst_w)
         draft.goal_poses[tname] = goal
         draft.pose_targets[tname] = full_pose_target(goal[0], goal[1], self.tol("position", 0.03), self.tol("orientation", 0.20))
+        g = self.sidecar.grasp_of(tname)
+        if g is not None:
+            g.extras["release_surface_z"] = None if self.release_surface_z is None else round(float(self.release_surface_z), 4)
+        draft.summary["release_surface_z"] = None if self.release_surface_z is None else round(float(self.release_surface_z), 4)
 
     def extra_checks(self, draft: Draft):
         """After settling: the occlusion measured again (the loader re-measures it after its deterministic settle)."""

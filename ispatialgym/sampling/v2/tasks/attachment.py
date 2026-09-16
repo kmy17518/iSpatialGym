@@ -425,6 +425,15 @@ class Attachment(SamplerV2):
         grasp.carry_height = float(carry)
         grasp.waypoints = wps
         grasp.pre_place, grasp.place = pre_attach, attach
+        # owner item 3 (release height): the attach pose is fixed by the mating links (no release above a surface), but the
+        # surface under the male's footprint centre at the goal (the female's mating face) is recorded for the audit
+        grasp.extras["release_surface_z"] = None
+        if hasattr(self.world, "surface_z_under"):
+            m_hull_goal = C.transform_points(goal, self.hull[self.t_role])
+            hit = self.world.surface_z_under(m_hull_goal[:, :2].mean(dim=0), float(m_hull_goal[:, 2].max()) + 0.05, ignore=[male])
+            if hit is not None:
+                grasp.extras["release_surface_z"] = round(float(hit["z"]), 4)
+                grasp.extras["release_surface_body"] = hit.get("body")
         manip.arms = ["right", "left"]
         self.sidecar.add_stance(manip)
         self.sidecar.add_grasp(grasp)
