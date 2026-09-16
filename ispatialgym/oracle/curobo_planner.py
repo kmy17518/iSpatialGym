@@ -199,7 +199,7 @@ class R1ProCuRobo:
         orientation_tolerance: float = 0.05,
         num_ik_seeds: int = 32,
         num_trajopt_seeds: int = 4,
-        mesh_cache_size: int = 2048,
+        mesh_cache_size: int = 4096,  # the kitchen / living-room scope of house_single_floor exceeds 2048 meshes (pilot: "Cannot add mesh, cache is full")
         cuboid_cache_size: int = 16,
         prebuild: Sequence[str] = ("right_arm", "base"),
         use_cuda_graph: bool = True,
