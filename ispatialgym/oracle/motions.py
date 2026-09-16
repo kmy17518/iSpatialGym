@@ -162,6 +162,8 @@ class ApproachFinish:
     ignore_objects: Sequence[Any] = ()
     max_stall: float = 0.015
     max_remaining: float = 0.06
+    #: largest joint change the finishing plan may make when cuRobo picks the branch (no witness); rad
+    max_excursion: float = 0.6
     used: bool = False
     info: Optional[Dict[str, Any]] = None
 
@@ -423,7 +425,8 @@ class Motions:
     def _emb_for(arms: Sequence[str]) -> str:
         return "both_arms" if len(arms) == 2 else f"{arms[0]}_arm"
 
-    def arm_to(self, arms: Union[str, Sequence[str]], pose: Any = None, q: Any = None, ignore_objects=(), q_hint: Any = None) -> Iterator[th.Tensor]:
+    def arm_to(self, arms: Union[str, Sequence[str]], pose: Any = None, q: Any = None, ignore_objects=(), q_hint: Any = None,
+               max_excursion: Optional[float] = None) -> Iterator[th.Tensor]:
         """cuRobo trajopt of the arm(s) with the trunk locked, then streamed. Exactly one of ``pose`` (a world pose
         for one arm, or ``{arm: pose}``) or ``q`` (a 28-D vector, ``{joint_name: value}`` or ``{arm: q7}``) is the
         target. Raises ``plan_failed`` when no trajectory is found (the sampler proved the key poses, not the
@@ -432,7 +435,9 @@ class Motions:
         ``q_hint`` (a 28-D configuration, the sampler's IK witness of ``pose``): the arm is planned in **joint space**
         to the witness's arm joints — the IK branch the sampler validated the following approach / descent from —
         and the residual to ``pose`` (the object settled a few mm away from its recorded pose) is closed with a short
-        ``arm_along``. Without a hint cuRobo picks its own IK branch for the pose goal."""
+        ``arm_along``. Without a hint cuRobo picks its own IK branch for the pose goal; ``max_excursion`` (rad) then
+        bounds the largest joint change of the plan — a finishing motion of a few centimetres must not become an elbow
+        flip (the pilot's french-fries finish swung the hand out of the camera frame)."""
         arms = (arms,) if isinstance(arms, str) else tuple(arms)
         emb = self._emb_for(arms)
         self.backend.update_world(ignore_objects=ignore_objects)
@@ -477,6 +482,12 @@ class Motions:
             what = "joint"
         if not res.success:
             raise SkillError("plan_failed", f"arm_to({','.join(arms)}, {what}): {res.status}", diagnostics=dict(res.diagnostics), stage="trajopt")
+        if max_excursion is not None:
+            idx = th.cat([self.robot.arm_control_idx[a] for a in arms])
+            exc = float(th.max(th.abs(res.q_traj[:, idx] - q_start[idx])))
+            if exc > float(max_excursion):
+                raise SkillError("plan_failed", f"arm_to({','.join(arms)}, {what}): the plan swings a joint by {exc:.2f} rad (> {max_excursion:.2f} allowed for a finishing motion; "
+                                 f"cuRobo's IK branch differs from the current one, no IK witness in the sidecar)", stage="trajopt", excursion=exc)
         log.info("arm_to(%s): %d waypoints (%.1fs), planned in %.2fs", ",".join(arms), len(res.q_traj), res.duration, res.plan_time)
         yield from self.execute_joint_trajectory(res.q_traj, arms=arms)
 
@@ -544,7 +555,7 @@ class Motions:
                                 "IK witness" if finish.q_hint is not None else "cuRobo IK")
                     if res.q_traj is not None and len(res.q_traj) > 1:
                         yield from self.execute_joint_trajectory(self._retime(res.q_traj, steps[: len(res.q_traj) - 1]), arms=[arm])
-                    yield from self.arm_to(arm, pose=finish.pose, q_hint=finish.q_hint, ignore_objects=finish.ignore_objects)
+                    yield from self.arm_to(arm, pose=finish.pose, q_hint=finish.q_hint, ignore_objects=finish.ignore_objects, max_excursion=finish.max_excursion)
                     finish.used = True
                     finish.info = {"stall_m": stall, "remaining_m": remaining, "converged": int(diag.get("converged", 0)), "n_dense": len(dense),
                                    "by": "witness" if finish.q_hint is not None else "curobo_ik"}
