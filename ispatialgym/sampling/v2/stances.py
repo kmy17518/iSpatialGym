@@ -402,6 +402,7 @@ class GraspRecord:
     stance: str = "manipulation"
     place_on: Optional[str] = None  # bddl instance the object is placed on / into / attached to (F6 programs)
     waypoints: Optional[List[Pose]] = None  # in-hand motion key poses (held-object tasks, attachment), last = end pose
+    extras: Dict[str, Any] = field(default_factory=dict)  # diagnostics / task facts (F6 keeps unknown keys in ``extra``)
 
     def to_sidecar(self) -> Dict[str, Any]:
         d = {"object": self.object, "arm": self.arm, "grasp_key": self.grasp_key, "grasp_name": self.grasp_name, "yaw": float(self.yaw),
@@ -418,6 +419,9 @@ class GraspRecord:
             d["finger_q"] = [float(v) for v in self.finger_q]
         if self.eef_in_object is not None:
             d["eef_in_object"] = pose_to_sidecar(self.eef_in_object)
+        for k, v in self.extras.items():
+            if k not in d and not str(k).startswith("_"):
+                d[k] = v
         return d
 
 
@@ -607,6 +611,19 @@ def brace_placement_admissible(work_point_base, brace_point_base, right_cells, l
     brace point of the left arm in the **left** contact band *of the same trunk*; the exact two-arm IK of §4.6 step 6
     follows. Used by touching (partner far side), axial (stop edge), attachment (partner brace), block design (braces)."""
     return in_band(work_point_base, right_cells, tol) and in_band(brace_point_base, left_cells, tol)
+
+
+def nearer_side_lateral(lat_init: float, partner_lat: Tuple[float, float], target_lat: Tuple[float, float], gap: float) -> Tuple[str, float]:
+    """§6.11 nextto / touching goal (owner review 2026-09-16): the target goes on the partner side that **faces its init
+    position**, so it is never lifted over the partner. Laterals are along the stance tangent (+ = robot's left):
+    ``partner_lat`` = (min, max) of the partner hull about the base, ``target_lat`` = (min, max) of the target hull about
+    its own origin, ``gap`` = the AABB gap to leave. Returns ``("left" | "right", lateral of the target origin)``: the
+    target's near face sits ``gap`` outside the partner's facing face."""
+    p_min, p_max = float(partner_lat[0]), float(partner_lat[1])
+    t_min, t_max = float(target_lat[0]), float(target_lat[1])
+    if float(lat_init) > 0.5 * (p_min + p_max):
+        return "left", p_max + float(gap) - t_min
+    return "right", p_min - float(gap) - t_max
 
 
 def _jsonable(x):

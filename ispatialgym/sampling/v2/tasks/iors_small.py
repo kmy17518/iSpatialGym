@@ -6,7 +6,8 @@ adds the §6.11 rules only: pair admissibility per template, the partner side / 
 relation, the place / pre-place IK from the manipulation stance after the goal settled, the touching push + brace, the
 constraints it learned. Every number comes from the customs ``generation`` block (D1 ``generation_defaults``):
 ``partner_footprint_margin_m``, ``footprint_gap_min_m``, ``partner_gap_extra_m``, ``partner_moved_max_m``, ``goal_drop_m``,
-``fit_tiers``, ``opening_margin_m`` / ``drop_height_m`` / ``max_protrusion_fraction`` (inside), ``tolerances``.
+``fit_tiers``, ``opening_margin_m`` / ``drop_height_m`` (floor) / ``release_clearance_m`` / ``max_protrusion_fraction``
+(inside), ``tolerances``.
 """
 
 from __future__ import annotations
@@ -51,7 +52,7 @@ def _tabletop():
 # A1 (owner decision 2026-09-16): joint placement of a work point (right arm) and a brace point (left arm)
 # ----------------------------------------------------------------------------------------------------------------
 
-from ispatialgym.sampling.v2.stances import BAND_CELL_TOL, brace_placement_admissible, in_band  # noqa: E402,F401  (pure band gate, tested there)
+from ispatialgym.sampling.v2.stances import BAND_CELL_TOL, brace_placement_admissible, in_band, nearer_side_lateral  # noqa: E402,F401  (pure rules, tested there)
 
 
 def left_contact_band_cells(s, trunk: Tuple[float, float], height: float):
@@ -87,6 +88,28 @@ PUSH_MAX_PINCH = 0.089
 PUSH_MAX_LONG = 0.30
 PUSH_MAX_HEIGHT = 0.30
 PARTNER_MAX_ASPECT = 2.5
+#: inside (owner decision 2026-09-16): the open gripper's lowest point clears the partner's rim by this at the release
+RELEASE_CLEARANCE = 0.02
+#: R1Pro finger envelope beyond the pad faces (m): pad / finger thickness outward of the open pads along ±c, finger
+#: half width along eef x (conservative; only the open-gripper lowest point is derived from them)
+FINGER_THICKNESS = 0.012
+FINGER_HALF_WIDTH = 0.012
+
+
+def gripper_corners_world(eef: G.Pose, open_width: float = C.GRIPPER_OPEN_M, thickness: float = FINGER_THICKNESS,
+                          half_width: float = FINGER_HALF_WIDTH) -> th.Tensor:
+    """World corners (8, 3) of the open gripper's finger envelope for an eef pose: ``PAD_Z_RANGE[0]`` .. ``FINGERTIP_LENGTH``
+    along the approach axis a, ±(``open_width`` / 2 + ``thickness``) along the closing axis c, ±``half_width`` along eef x.
+    ``min(..., 2)`` is the lowest point of the open gripper (release-height rule of §6.11 inside)."""
+    pos, quat = G.t(eef[0]), G.t(eef[1])
+    R = C.quat_to_mat(quat)
+    a, c, x = R[:, 2], R[:, 1], R[:, 0]
+    pts = []
+    for za in (float(C.PAD_Z_RANGE[0]), float(C.FINGERTIP_LENGTH)):
+        for sc in (-1.0, 1.0):
+            for sx in (-1.0, 1.0):
+                pts.append(pos + za * a + sc * (0.5 * float(open_width) + float(thickness)) * c + sx * float(half_width) * x)
+    return th.stack(pts, dim=0)
 
 
 @register(*RELATION_OF_SUBTASK)
@@ -108,6 +131,8 @@ class IORSSmall(SamplerV2):
         self.manip_candidates: List[Stance] = []
         self.pair: Dict[str, Any] = {}
         self.bands = None
+        self.goal_side: Optional[str] = None  # nextto / touching: partner side the target goes to ("left" / "right", robot frame)
+        self.release: Optional[Dict[str, Any]] = None  # inside: release-height facts of :meth:`release_pose`
 
     # ------------------------------------------------------------------ numbers (customs generation)
 
@@ -407,6 +432,8 @@ class IORSSmall(SamplerV2):
         goal = self.goal_pose(draft.object_poses[tname], draft.object_poses[pname])
         draft.goal_poses[tname] = goal
         self._set_target_goal(draft, tname, goal)
+        if self.goal_side is not None:
+            draft.summary["goal_side"] = self.goal_side
         manip = self.sidecar.stance("manipulation")
         self.sidecar.set_goal(manip.base_pose2d, manip.translate, manip.tilt, arms="same")
 
@@ -418,26 +445,68 @@ class IORSSmall(SamplerV2):
 
     def goal_pose(self, t_pose: G.Pose, p_pose: G.Pose) -> G.Pose:
         """§6.11 goal: ontop / under(small) -> centred on the partner, z = partner top + bottom offset + goal_drop; inside
-        -> centred on the fillable centroid, dropped from the rim + drop_height; nextto / touching -> the position closest
-        to the init pose that satisfies the predicate (nextto: AABB gap < g_NT; touching: contact, nudged in the goal check)."""
+        -> the **release pose**: centred on the fillable centroid, high enough above the rim that the open gripper never
+        touches the partner (:meth:`release_pose`; the drop test of the goal check settles it, the settled pose is the
+        recorded goal); nextto / touching -> the position closest to the init pose that satisfies the predicate: the
+        target goes on the partner **side facing its init position** (nextto: AABB gap < g_NT; touching: contact,
+        nudged in the goal check). ``self.goal_side`` = ``"left"`` / ``"right"`` (robot frame) records the chosen side."""
         t_quat = t_pose[1]
         t_hull = G.local_points_world(self.hull["target"], (th.zeros(3), t_quat))
         p_hull_w = self.world.hull_at(self.hull["partner"], p_pose)
         st = self.sidecar.stance("manipulation")
+        self.goal_side = None
         if self.relation in ("ontop", "under"):
             z = float(p_hull_w[:, 2].max()) - float(t_hull[:, 2].min()) + self.goal_drop
             xy = (p_hull_w[:, :2].max(dim=0).values + p_hull_w[:, :2].min(dim=0).values) / 2
             return th.tensor([float(xy[0]), float(xy[1]), z]), t_quat
         if self.relation == "inside":
-            centre, drop_z = self._container_volume(self.obj("partner"), p_pose)
-            return th.tensor([float(centre[0]), float(centre[1]), drop_z - float(t_hull[:, 2].min())]), t_quat
+            return self.release_pose(t_quat, t_hull, p_hull_w, p_pose)
         gap = 0.0 if self.relation == "touching" else max(0.0, float(self.pair["g_NT"]) - 0.01)
-        p_lat_min = float(((p_hull_w[:, :2] - st.base_xy) @ st.tangent).min())
-        t_lat_max = float((t_hull[:, :2] @ st.tangent).max())
-        lat = p_lat_min - gap - t_lat_max
+        p_lat = (p_hull_w[:, :2] - st.base_xy) @ st.tangent
+        t_lat = t_hull[:, :2] @ st.tangent  # the target's own lateral extent about its origin
+        _, lat_init = st.local(t_pose[0])
+        # owner review 2026-09-16: the partner side that faces the target's init position (no lift over the partner)
+        self.goal_side, lat = nearer_side_lateral(lat_init, (float(p_lat.min()), float(p_lat.max())), (float(t_lat.min()), float(t_lat.max())), gap)
+        if self.relation == "touching" and self.goal_side != "right":
+            # §4.6 step 2 puts the partner on the robot's left of the target: the push goes toward +tangent into the
+            # partner's right face, the brace holds its left face; a target starting left of the partner contradicts that
+            raise Reject("touching_side", f"target init lateral {lat_init:+.2f} is left of the partner centre {0.5 * float(p_lat.min() + p_lat.max()):+.2f}")
         depth_t, _ = st.local(t_pose[0])
         xy = st.world(depth_t, lat)
         return th.tensor([float(xy[0]), float(xy[1]), float(t_pose[0][2])]), t_quat
+
+    def release_pose(self, t_quat: th.Tensor, t_hull: th.Tensor, p_hull_w: th.Tensor, p_pose: G.Pose) -> G.Pose:
+        """§6.11 inside, owner decision 2026-09-16: release just above the partner's rim so the gripper never contacts it.
+        The object is centred on the container and raised until the lowest point of the **open** gripper (finger corners:
+        ``PAD_Z_RANGE[0]`` .. ``FINGERTIP_LENGTH`` along a, ±(``GRIPPER_OPEN_M`` / 2 + finger thickness) along c,
+        ±finger half width along x, from the drawn grasp's ``eef_in_object``) clears the rim ``p_hull_w[:, 2].max()`` by
+        ``release_clearance_m`` (default 0.02); ``drop_height_m`` stays the floor of the object's bottom above the rim.
+        The target footprint at the release pose must lie within the opening (outer extents minus ``opening_margin_m``),
+        else ``Reject("does_not_fit_inside")``. Facts for the sidecar / summary in ``self.release``."""
+        tname = self.bindings.one("target").name
+        centre, rim_z = self._container_volume(self.obj("partner"), p_pose)
+        t_min = float(t_hull[:, 2].min())
+        drop_floor = float(self.gen("drop_height_m", 0.005))
+        clearance = float(self.gen("release_clearance_m", RELEASE_CLEARANCE))
+        pos = th.tensor([float(centre[0]), float(centre[1]), rim_z + drop_floor - t_min])
+        grasp = self.sidecar.grasp_of(tname)
+        finger_low = None
+        if grasp is not None and grasp.eef_in_object is not None:
+            eef = IK.grasp_pose((pos, t_quat), grasp.eef_in_object)
+            finger_low = float(gripper_corners_world(eef, open_width=C.GRIPPER_OPEN_M)[:, 2].min())
+            lift = max(0.0, rim_z + clearance - finger_low)
+            pos = pos + th.tensor([0.0, 0.0, lift])
+            finger_low += lift
+        # lateral fit of the target at the release pose inside the opening (outer extents minus the margin per side)
+        om = float(self.gen("opening_margin_m", 0.01))
+        t_xy = self.world.hull_at(self.hull["target"], (pos, t_quat))[:, :2]
+        p_lo, p_hi = p_hull_w[:, :2].min(dim=0).values, p_hull_w[:, :2].max(dim=0).values
+        if bool((t_xy.min(dim=0).values < p_lo + om / 2).any()) or bool((t_xy.max(dim=0).values > p_hi - om / 2).any()):
+            raise Reject("does_not_fit_inside", f"target footprint {[round(float(v), 3) for v in (t_xy.max(dim=0).values - t_xy.min(dim=0).values)]} at the release "
+                                                f"pose leaves the opening {[round(float(v), 3) for v in (p_hi - p_lo)]} (margin {om:.3f})")
+        self.release = {"place_kind": "drop", "rim_z": round(rim_z, 4), "drop_height_m": round(float(pos[2]) + t_min - rim_z, 4),
+                        "finger_clearance_m": None if finger_low is None else round(finger_low - rim_z, 4), "release_clearance_m": clearance}
+        return pos, t_quat
 
     def after_settle(self, draft: Draft):
         tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
@@ -464,17 +533,40 @@ class IORSSmall(SamplerV2):
         super().refine_targets_from_goal(draft)
         if self.relation == "inside":
             self._check_inside_protrusion(tname, pname)
+        if self.relation == "nextto":
+            # the nearer-side goal must still satisfy the predicate after the settle: AABB gap < g_NT (PhysX poses + hulls;
+            # ``obj.aabb`` reads the render-side transform, which physics-only steps leave stale)
+            gap = self._aabb_gap(tname, pname)
+            draft.summary["nextto_gap_m"] = round(gap, 4)
+            if gap >= float(self.pair["g_NT"]):
+                raise Reject("goal_infeasible", f"nextto AABB gap {gap:.3f} >= g_NT {float(self.pair['g_NT']):.3f} after the settle")
         p, _ = self.obj("partner").get_position_orientation()
         tgt = draft.pose_targets[pname]
         moved = float(th.linalg.norm(p - th.tensor(tgt["position"])))
         if moved > float(self.gen("partner_moved_max_m", 0.005)):
             raise Reject("goal_partner_moved", f"partner moved {moved:.3f} m at the goal")
 
+    def _aabb_gap(self, tname: str, pname: str) -> float:
+        """Norm of the per-axis separation vector between the two objects' hull AABBs at their current PhysX poses (0 when
+        they overlap on every axis) — the distance OmniGibson's ``NextTo`` compares with g_NT = mean(dims_a + dims_b) / 6."""
+        boxes = []
+        for role, name in (("target", tname), ("partner", pname)):
+            p, q = self.objects[name].get_position_orientation()
+            h = self.world.hull_at(self.hull[role], (p.float(), q.float()))
+            boxes.append((h.min(dim=0).values, h.max(dim=0).values))
+        (a_lo, a_hi), (b_lo, b_hi) = boxes
+        sep = th.clamp(th.maximum(a_lo - b_hi, b_lo - a_hi), min=0.0)
+        return float(th.linalg.norm(sep))
+
     def _check_inside_protrusion(self, tname: str, pname: str):
-        """§6.11 inside drop test: after the settle the target protrudes above the partner's rim by at most half its height."""
-        t, p = self.objects[tname], self.objects[pname]
-        t_lo, t_hi = t.aabb
-        p_lo, p_hi = p.aabb
+        """§6.11 inside drop test: after the settle the target protrudes above the partner's rim by at most half its height
+        (hull AABBs at the PhysX poses; ``obj.aabb`` reads the render-side transform, stale after physics-only steps)."""
+        boxes = {}
+        for role, name in (("target", tname), ("partner", pname)):
+            p, q = self.objects[name].get_position_orientation()
+            h = self.world.hull_at(self.hull[role], (p.float(), q.float()))
+            boxes[role] = (h.min(dim=0).values, h.max(dim=0).values)
+        (t_lo, t_hi), (_, p_hi) = boxes["target"], boxes["partner"]
         protrusion = float(t_hi[2] - p_hi[2])
         if protrusion > float(self.gen("max_protrusion_fraction", 0.5)) * float(t_hi[2] - t_lo[2]):
             raise Reject("does_not_fit_inside", f"target protrudes {protrusion:.3f} m above the rim")
@@ -488,9 +580,26 @@ class IORSSmall(SamplerV2):
         manip = self.sidecar.stance("manipulation")
         goal_pos = th.tensor(draft.pose_targets[tname]["position"])
         goal_quat = draft.goal_poses[tname][1] if draft.pose_targets[tname].get("orientation") is None else th.tensor(draft.pose_targets[tname]["orientation"])
-        place = IK.grasp_pose((goal_pos, goal_quat), grasp.eef_in_object)
-        pre_place = IK.pre_pose(place)
-        ignore = self.support_objects() + [self.obj("partner")]
+        if self.relation == "inside":
+            # the place is the release above the rim (``draft.goal_poses`` = the release pose of :meth:`release_pose`); the
+            # recorded goal is what the drop settled to. The gripper never reaches into the partner, so it is not ignored.
+            rel_pos, rel_quat = draft.goal_poses[tname]
+            place = IK.grasp_pose((G.t(rel_pos), G.t(rel_quat)), grasp.eef_in_object)
+            pre_place = IK.pre_pose(place)
+            ignore = self.support_objects()
+            rim_z = float(self.release["rim_z"]) if getattr(self, "release", None) else None
+            low = float(gripper_corners_world(place)[:, 2].min())
+            if rim_z is not None and low < rim_z + 0.5 * float(self.gen("release_clearance_m", RELEASE_CLEARANCE)):
+                raise Reject("release_too_low", f"open gripper lowest point {low:.3f} vs rim {rim_z:.3f} at the recorded place")
+            grasp.extras.update(self.release or {})
+            grasp.extras["place_lowest_finger_z"] = round(low, 4)
+            draft.summary["release"] = dict(self.release or {}, place_lowest_finger_z=round(low, 4), settled_goal_z=round(float(goal_pos[2]), 4))
+        else:
+            place = IK.grasp_pose((goal_pos, goal_quat), grasp.eef_in_object)
+            pre_place = IK.pre_pose(place)
+            ignore = self.support_objects() + [self.obj("partner")]
+        if self.goal_side is not None:
+            draft.summary["goal_side"] = self.goal_side
         with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
             res = self.ikc.exact([pre_place, place], manip, grasp.arm, ignore_for_last=ignore, scale_key=self.choice.models["target"].scale, cache=False)
         if not res.ok:
@@ -592,13 +701,21 @@ class IORSSmall(SamplerV2):
     # ------------------------------------------------------------------ helpers
 
     def _container_volume(self, obj, p_pose: G.Pose) -> Tuple[th.Tensor, float]:
+        """(container centre — the fillable meta link's xy when the model has one, else the hull centre —, rim z = the
+        partner hull's highest point at ``p_pose``)."""
         from omnigibson.macros import macros
 
         p_hull = self.world.hull_at(self.hull["partner"], p_pose)
         centre = (p_hull.max(dim=0).values + p_hull.min(dim=0).values) / 2
         for link in obj.links.values():
             if link.is_meta_link and link.meta_link_type in macros.object_states.contains.CONTAINER_META_LINK_TYPES:
+                # the meta link's offset in the root frame from the current sim poses, applied at ``p_pose`` (the partner may
+                # still be parked when the goal is first computed)
+                root = obj.get_position_orientation()
                 p, _ = link.get_position_orientation()
-                centre = th.tensor([float(p[0]), float(p[1]), float(centre[2])])
+                local = G.invert((G.t(root[0]), G.t(root[1])))
+                p_local = C.transform_points(local, G.t(p).unsqueeze(0))[0]
+                p_world = C.transform_points((G.t(p_pose[0]), G.t(p_pose[1])), p_local.unsqueeze(0))[0]
+                centre = th.tensor([float(p_world[0]), float(p_world[1]), float(centre[2])])
                 break
-        return centre, float(p_hull[:, 2].max()) + float(self.gen("drop_height_m", 0.005))
+        return centre, float(p_hull[:, 2].max())

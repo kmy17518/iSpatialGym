@@ -337,6 +337,40 @@ def test_a1_joint_band_gate_with_a_synthetic_band():
     assert not IS.brace_placement_admissible((0.9, -0.18), (0.6, 0.3), right, left)  # work point outside the right band
 
 
+def test_nextto_goal_takes_the_partner_side_facing_the_init():
+    """Owner review 2026-09-16: jar (target) at lateral 0.00, can (partner) at -0.16 (robot's right) -> the goal is on the
+    can's left (facing the jar), not lifted over it to -0.28."""
+    from ispatialgym.sampling.v2.stances import nearer_side_lateral
+
+    partner = (-0.16 - 0.04, -0.16 + 0.04)  # 8 cm wide can centred at -0.16
+    target = (-0.04, 0.04)  # 8 cm wide jar about its origin
+    side, lat = nearer_side_lateral(0.0, partner, target, gap=0.02)
+    assert side == "left" and abs(lat - (-0.12 + 0.02 + 0.04)) < 1e-9  # near face 2 cm off the can's left face, at -0.06
+    side, lat = nearer_side_lateral(-0.40, partner, target, gap=0.02)
+    assert side == "right" and abs(lat - (-0.20 - 0.02 - 0.04)) < 1e-9
+    # touching (gap 0): partner on the robot's left of the target -> the target goes on the partner's right side
+    side, lat = nearer_side_lateral(0.0, (0.10, 0.18), target, gap=0.0)
+    assert side == "right" and abs(lat - (0.10 - 0.04)) < 1e-9
+
+
+def test_open_gripper_lowest_point_for_top_down_and_side_grasps():
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling.v2.tasks.iors_small import FINGER_THICKNESS, gripper_corners_world
+
+    # top-down: approach a = -z -> the fingertips are the lowest points, FINGERTIP_LENGTH below the eef origin
+    q_down = C.eef_quat(th.tensor([0.0, 0.0, -1.0]), th.tensor([0.0, 1.0, 0.0]))
+    low = float(gripper_corners_world((th.tensor([0.0, 0.0, 1.0]), q_down))[:, 2].min())
+    assert abs(low - (1.0 - C.FINGERTIP_LENGTH)) < 1e-6
+    # side grasp with a vertical closing axis: the lower open finger is (open / 2 + thickness) below the origin
+    q_side = C.eef_quat(th.tensor([1.0, 0.0, 0.0]), th.tensor([0.0, 0.0, 1.0]))
+    low = float(gripper_corners_world((th.tensor([0.0, 0.0, 1.0]), q_side))[:, 2].min())
+    assert abs(low - (1.0 - 0.5 * C.GRIPPER_OPEN_M - FINGER_THICKNESS)) < 1e-6
+    # grasp record extras reach the sidecar block
+    g = GraspRecord("obj", "right", "k", "n", 0.0, grasp=(th.zeros(3), th.tensor([0.0, 0.0, 0.0, 1.0])), extras={"place_kind": "drop", "rim_z": 0.8})
+    d = g.to_sidecar()
+    assert d["place_kind"] == "drop" and d["rim_z"] == 0.8
+
+
 def test_stance_idle_posture_and_world_key_string():
     from ispatialgym.sampling.sample_isg import world_key_str
 

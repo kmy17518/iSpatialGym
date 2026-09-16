@@ -286,6 +286,24 @@ reach-band cache hits for apple and marker. Sidecars carry `idle_posture` / `arm
 - `--log-level` of the CLIs now wins over `ISPATIALGYM_LOG_LEVEL` (`sample_isg.configure_logging`: the `ispatialgym` logger and
   its stdout handler are re-levelled; third-party loggers stay at INFO).
 
+### IORS small-scale goal rules (owner review 2026-09-16)
+
+- **nextto / touching goal side** (`stances.nearer_side_lateral`, used by `iors_small.goal_pose`): the target goes on the
+  partner side that faces its init position (never lifted over the partner); `summary.goal_side` = `left` / `right`
+  (robot frame). Touching keeps §4.6 step 2 (partner on the robot's left → target on the partner's right, push toward
+  +tangent, brace on the partner's left face); a target starting left of the partner is `Reject("touching_side")`. After the
+  goal settle the nextto AABB gap (OmniGibson `NextTo` distance, PhysX poses + hulls) is recorded as `summary.nextto_gap_m`
+  and must be `< g_NT`.
+- **inside release height** (`iors_small.release_pose`): the recorded `place` is the release above the rim — the object is
+  centred on the container and raised until the lowest point of the *open* gripper (`gripper_corners_world`: finger
+  envelope `PAD_Z_RANGE[0]..FINGERTIP_LENGTH` along a, ±(`GRIPPER_OPEN_M`/2 + 1.2 cm) along c) clears `p_hull_w[:, 2].max()`
+  by `release_clearance_m` (default 0.02); `drop_height_m` (default 5 mm) stays the floor of the object's bottom above the
+  rim. `goal_poses` = the release pose (the goal check drops from there), the recorded goal = the settled pose, `pre_place`
+  = 10 cm back along −a, both re-solved by the program check with the partner **not** ignored. The target footprint at the
+  release must lie in the opening (outer extents − `opening_margin_m`) else `Reject("does_not_fit_inside")`. Facts in
+  `grasps[].{place_kind: "drop", rim_z, drop_height_m, finger_clearance_m, place_lowest_finger_z}` and `summary.release`.
+  The oracle side (`Place(kind="drop")`: open at the recorded pose, retreat straight up along −a) is the oracle agent's.
+
 ## Status (D2 / D4, 2026-09-15) and gaps
 
 Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,
