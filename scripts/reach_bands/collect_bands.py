@@ -125,6 +125,30 @@ def main():
             n_copied += 1
         rec["band_files"] = [os.path.basename(b) for b in rec["files"]]
         rec["current_code"] = _current_code(rec) if rec["files"] else None
+    # one band per factor set: a recomputation (new cache key, e.g. the pitched classes or the posture retry) supersedes
+    # the older file of the same factors
+    groups: Dict[tuple, List[str]] = defaultdict(list)
+    for js in glob.glob(os.path.join(bands_dir, "*.json")):
+        try:
+            m = json.load(open(js))
+        except ValueError:
+            continue
+        key = (m.get("scene"), m.get("support"), m.get("object"), m.get("grasp_key"), bool(m.get("generic_pinch")), tuple(sorted(m.get("placed_specs") or [])),
+               m.get("under_partner"), json.dumps(m.get("scale")), m.get("arm", "right"), m.get("contact_set"), m.get("height_class"), m.get("target"), m.get("joint"),
+               m.get("mode"))
+        groups[key].append(js)
+    n_superseded = 0
+    for key, files in groups.items():
+        if len(files) < 2:
+            continue
+        files.sort(key=lambda p: ("postures" in json.load(open(p)), os.path.getmtime(p)))  # newest / posture-aware last
+        for old in files[:-1]:
+            for ext in (".json", ".npz"):
+                if os.path.exists(old[:-5] + ext):
+                    os.remove(old[:-5] + ext)
+            n_superseded += 1
+    if n_superseded:
+        print(f"{n_superseded} superseded band files removed from {bands_dir}")
     # table rows
     rows = []
     for jid, job in sorted(jobs.items()):
