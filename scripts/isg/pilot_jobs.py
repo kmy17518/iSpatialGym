@@ -44,6 +44,11 @@ def subtask_of(entry: dict) -> str:
     }.get(iddl, entry.get("subtask") or "")
 
 
+def _superseded(e: dict) -> bool:
+    """D1: a replaced entry carries a top-level ``superseded_by`` (older files: ``fallback_params.superseded_by``); it is dormant."""
+    return bool(e.get("superseded_by") or (e.get("fallback_params") or {}).get("superseded_by"))
+
+
 def load_entries(path: str):
     with open(path) as f:
         data = json.load(f)
@@ -159,7 +164,7 @@ def cmd_chunks(args):
     progress = json.load(open(args.progress))["aliases"] if args.progress else {}
     requested = args.instances
     complete = {a for a, r in progress.items() if r.get("n_written", 0) >= requested}
-    fallback_ids = {a for a, (st, e) in entries.items() if e.get("fallback_of") or (e.get("fallback_params") or {}).get("superseded_by")}
+    fallback_ids = {a for a, (st, e) in entries.items() if e.get("fallback_of") or _superseded(e)}
     import re as _re
 
     excl = _re.compile(args.exclude_alias_regex) if args.exclude_alias_regex else None
@@ -236,11 +241,11 @@ def cmd_fallbacks(args):
         live = e.get("fallbacks")
         if live:
             for r, fb in enumerate(live, 1):
-                if fb in entries and not (entries[fb][1].get("fallback_params") or {}).get("superseded_by"):
+                if fb in entries and not _superseded(entries[fb][1]):
                     ranks[a].append((r, fb))
     for a, (st, e) in entries.items():  # entries without a ``fallbacks`` list: fall back to fallback_of / fallback_rank
         if e.get("fallback_of") and e["fallback_of"] in entries and not entries[e["fallback_of"]][1].get("fallbacks") \
-                and not (e.get("fallback_params") or {}).get("superseded_by"):
+                and not _superseded(e):
             ranks[e["fallback_of"]].append((int(e.get("fallback_rank", 1)), a))
     todo = []
     for primary, fbs in ranks.items():

@@ -167,7 +167,8 @@ def cmd_run(args):
     out_dir = os.path.join(FD, st, run_id)
     commit, dirty = git("rev-parse", "HEAD"), bool(git("status", "--porcelain", "--", "ispatialgym", "scripts"))
     t0 = time.time()
-    cmd = (f"python -m ispatialgym.sampling.sample_isg --alias {args.alias} --templates 1 --instances-per-template 1 --max-attempts {args.max_attempts} "
+    scene = f" --scene {args.scene}" if args.scene else ""
+    cmd = (f"python -m ispatialgym.sampling.sample_isg --alias {args.alias}{scene} --templates 1 --instances-per-template 1 --max-attempts {args.max_attempts} "
            f"--seed {args.seed} --no-write-back --out $SMOKE_OUT/inst --log-level INFO; echo SAMPLE_EXIT $?; "
            f"tro=$(ls $SMOKE_OUT/inst/*/*/instances/*-tro_state.json 2>/dev/null | head -1); "
            f"if [ -n \"$tro\" ]; then echo TRO=$tro; python -m ispatialgym.oracle.run_isg --instance \"$tro\" --mode oracle --out $SMOKE_OUT/demo --video --video-size 540; echo DEMO_EXIT $?; fi")
@@ -308,6 +309,7 @@ def main():
     s = sub.add_parser("run")
     s.add_argument("--alias", required=True)
     s.add_argument("--max-attempts", type=int, default=8)
+    s.add_argument("--scene", default=None, help="restrict sample_isg to one candidate scene")
     s.add_argument("--seed", type=int, default=0)
     s.add_argument("--timeout", type=int, default=5400)
     s.add_argument("--note", default="")
