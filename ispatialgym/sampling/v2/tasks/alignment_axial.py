@@ -26,7 +26,7 @@ from __future__ import annotations
 import logging
 import math
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch as th
@@ -47,9 +47,10 @@ log = logging.getLogger("ispatialgym.sampling.v2")
 
 SUBTASK = "alignment-axial"
 AXES = {"+x": (1.0, 0.0, 0.0), "-x": (-1.0, 0.0, 0.0), "+y": (0.0, 1.0, 0.0), "-y": (0.0, -1.0, 0.0), "+z": (0.0, 0.0, 1.0), "-z": (0.0, 0.0, -1.0)}
-#: closed fingers: half thickness of the blade the pushes / stops act with (eef origin this far off the touched face)
-FINGER_HALF_THICKNESS = 0.012
-STOP_CLEARANCE = 0.005  # §5.5 style: the stop face 5 mm outside the goal hull
+#: closed fingers: the blade half thickness beside a face comes from the measured finger profile (``tabletop.
+#: FINGER_PROFILE``: 8.4 mm over the fingertip section, 18 mm above it, no blade at the palm) over the height the face
+#: spans above the fingertips — the former 12 mm slab is gone (owner review of the axial demo, 2026-09-16)
+STOP_CLEARANCE = 0.005  # §5.5 style: the blade's outer face 5 mm outside the goal hull
 PUSH_TIP_CLEARANCE = 0.003  # the closed fingertips this far above the top for the thinnest targets (push / blade stop)
 THIN_TARGET_HEIGHT = 0.04  # below this height the stop brace tries the top-down blade before the side contact classes
 END_INSET = 0.03  # the pushed end lies this far inside the object's long-axis extremity
@@ -266,6 +267,13 @@ class AlignmentAxial(SamplerV2):
         z_brace = TT.contact_height(self.top.z, self.extents["height"])
         half_len = 0.5 * self.extents["long"] - END_INSET
         z_axis = th.tensor([0.0, 0.0, 1.0])
+        # closed-finger half thickness beside the target's face for a straight-down blade (the band test uses it; the
+        # pitched pushes recompute theirs): targets whose faces reach the palm section cannot be pushed with a blade
+        geo0 = self._blade_geometry(0.0, 0.0)
+        if geo0 is None:
+            raise Reject("target_placement", f"target {self.extents['height']:.2f} m tall: its face reaches the palm section of the closed fingers, no blade push")
+        push_half = geo0[1]
+        self._blade_skips = {}
         chosen = None
         fails = {"support": 0, "frame": 0, "work_off_band": 0, "brace_off_band": 0, "brace_class_failed": 0}
         for _ in range(12):
@@ -293,12 +301,13 @@ class AlignmentAxial(SamplerV2):
                 d = spin0 * th.cross(z_axis, r_xy, dim=0)
                 d = d / th.linalg.norm(d)
                 side_pt = self._extreme_point(pose, -d, near=e)  # the face the end moves away from
-                contact_xy = side_pt[:2] - d[:2] * FINGER_HALF_THICKNESS
-                goal_pose, stop_pt, d_stop = self._stop_geometry(pose, e, com, spin0, yaw_goal, z_brace)
+                contact_xy = side_pt[:2] - d[:2] * push_half
+                goal_pose, stop_pts, d_stop = self._stop_geometry(pose, e, com, spin0, yaw_goal, z_brace)
+                stop_pt = stop_pts[0]  # the band test uses the corner-side point (the brace candidates run along the face)
                 jp = TT.joint_placement(bands, left_bands, manip, contact_xy, stop_pt[:2], brace_class=TT.contact_class(manip, -d_stop, z_axis))
                 if not jp["ok"] and left_bands is not None and jp["brace_ok"] and not jp["brace_class_ok"]:
                     jp = TT.joint_placement(bands, left_bands, manip, contact_xy, stop_pt[:2], brace_class=TT.contact_class(manip, -d_stop, th.cross(z_axis, d_stop, dim=0)))
-                pairs.append((e, jp, goal_pose, stop_pt, d_stop))
+                pairs.append((e, jp, goal_pose, stop_pts, d_stop))
             if not any(jp["ok"] for _, jp, _, _, _ in pairs):
                 for _, jp, _, _, _ in pairs:
                     fails["work_off_band" if not jp["work_ok"] else "brace_off_band" if not jp["brace_ok"] else "brace_class_failed"] += 1
@@ -329,12 +338,12 @@ class AlignmentAxial(SamplerV2):
         # is the near long face (reachable for the left arm); the other end's stop face is the far side (x ≈ 0.9–1.1 m
         # from the base, beyond every band) — try the near-stop end first
         motions = []
-        for e, jp, goal_pose, stop_pt, d_stop in pairs:
+        for e, jp, goal_pose, stop_pts, d_stop in pairs:
             r_xy = th.tensor([float(e[0] - com[0]), float(e[1] - com[1]), 0.0])
             d = spin * th.cross(z_axis, r_xy, dim=0)
-            motions.append((e, jp, d / th.linalg.norm(d), r_xy, goal_pose, stop_pt, d_stop))
+            motions.append((e, jp, d / th.linalg.norm(d), r_xy, goal_pose, stop_pts, d_stop))
         motions.sort(key=lambda m: float(th.dot(m[6][:2], manip.inward)))
-        for e, jp, d, r_xy, goal_pose, stop_pt, d_stop in motions:
+        for e, jp, d, r_xy, goal_pose, stop_pts, d_stop in motions:
             if not jp["ok"]:
                 continue
             side_pt = self._extreme_point(pose, -d, near=e)  # the face the end moves away from
@@ -346,8 +355,15 @@ class AlignmentAxial(SamplerV2):
             for pitch in TT.approach_pitch_order(jp.get("classes")):
                 a_vec = TT.pitched_approach(pitch, manip.forward)
                 for c_axis, c_sign in ((d, 1.0), (d, -1.0), (side_c, 1.0), (side_c, -1.0)):
+                    # the closed fingers' half thickness beside the pushed face at this pitch: the pad face (closing axis
+                    # along the push) or the finger's side (closing axis across it), from the measured finger profile
+                    geo = self._blade_geometry(pitch, 0.0, side=c_axis is side_c)
+                    if geo is None:
+                        push_fails.append(f"{pitch:.0f}°: face reaches the palm section")
+                        continue
+                    push_half_p = geo[1]
                     quat = C.eef_quat(a_vec, c_sign * c_axis)
-                    p_init = (side_pt - d * FINGER_HALF_THICKNESS, quat)
+                    p_init = (side_pt - d * push_half_p, quat)
                     arc = C.arc_waypoints(p_init, th.tensor([float(com[0]), float(com[1]), z_push]), z_axis, d_goal, n=2)
                     p_mid, p_goal = arc[0], arc[1]
                     p_pre = C.pre_pose(p_init)
@@ -357,21 +373,28 @@ class AlignmentAxial(SamplerV2):
                         continue
                     n_push_ok += 1
                     # A1 / §4.6 step 6: the stop-edge brace with the push arm locked at its goal solution (the arc's mid
-                    # waypoint was screened above, §3.9) — B3's contact classes on the stop face first (pads on the
-                    # face, fingers stacked / side by side), then the legacy top-down blade beside the stop edge
-                    for brace_pre, brace, kind in self._brace_candidates(manip, stop_pt, d_stop, jp.get("brace_classes")):
-                        # the contact pose touches the target (pads on its face / the blade against its edge) and stands
-                        # on the top: both are ignored for the contact pose only, as the target is for the push (§3.6)
-                        res_b = TT.brace_second_arm(self, manip, "right", [p_pre, p_goal], "left", [brace_pre, brace], ignore_work_last=[support, target],
-                                                    ignore_brace_last=[support, target])
-                        if res_b.ok:
-                            brace_found = (brace_pre, brace, kind)
-                            break
-                        brace_fails.append(f"{kind}: {res_b.reason}")
+                    # waypoint was screened above, §3.9). The brace is checked against the target AT ITS GOAL POSE (not
+                    # ignored, 3 mm margin — owner review of the axial demo): the target is teleported to the goal for the
+                    # brace IK and the brace-arm collision check, the push contact keeps its ignore (the pads touch it)
+                    target.set_position_orientation(*goal_pose)
+                    target.keep_still()
+                    self.kit.sync_world()
+                    try:
+                        for brace_pre, brace, kind, extras in self._brace_candidates(manip, stop_pts, d_stop, jp.get("brace_classes"), pose, com, d_goal):
+                            res_b = TT.brace_second_arm(self, manip, "right", [p_pre, p_goal], "left", [brace_pre, brace], ignore_work_last=[support, target],
+                                                        ignore_brace_last=[support], brace_only_check=([support], TT.BRACE_TARGET_MARGIN))
+                            if res_b.ok:
+                                brace_found = (brace_pre, brace, kind, {**extras, "push_half_thickness_m": push_half_p, "target_checked_at": "goal"})
+                                break
+                            brace_fails.append(f"{kind}: {res_b.reason}")
+                    finally:
+                        target.set_position_orientation(*pose)
+                        target.keep_still()
+                        self.kit.sync_world()
                     if brace_found is None:
                         continue
                     dist = abs(d_goal) * float(th.linalg.norm(r_xy))
-                    push = (p_pre, p_init, p_mid, p_goal, d, dist, e, goal_pose, stop_pt, d_stop, pitch)
+                    push = (p_pre, p_init, p_mid, p_goal, d, dist, e, goal_pose, stop_pts, d_stop, pitch)
                     break
                 if push is not None:
                     break
@@ -380,10 +403,10 @@ class AlignmentAxial(SamplerV2):
         if push is None:
             if n_push_ok:
                 raise Reject("contact_unreachable", f"stop-edge brace with the push arm locked: {n_push_ok} feasible push arcs, brace fails {sorted(set(brace_fails))[:3]}"
-                                                    f" (stop at base-frame {[round(float(v), 2) for v in manip.world_to_base(motions[0][5][:2]).tolist()]})")
+                                                    f" (blade skips {self._blade_skips}; stop at base-frame {[round(float(v), 2) for v in manip.world_to_base(motions[0][5][0][:2]).tolist()]})")
             raise Reject("grasp_unreachable", f"no long-axis end in both bands has an IK-feasible push arc at any pitch ({sorted(set(push_fails))[:4]})")
-        p_pre, p_init, p_mid, p_goal, d_push, dist, end, goal_pose, stop_pt, d_stop, pitch = push
-        brace_pre, brace, brace_kind = brace_found
+        p_pre, p_init, p_mid, p_goal, d_push, dist, end, goal_pose, stop_pts, d_stop, pitch = push
+        brace_pre, brace, brace_kind, brace_extras = brace_found
         q_goal = goal_pose[1]
         cam_manip = self.camera_pose_at(manip)
         for nm, p in (("push init", p_init), ("push goal", p_goal), ("brace", brace)):
@@ -393,9 +416,10 @@ class AlignmentAxial(SamplerV2):
         # record
         self.sidecar.add_stance(manip)
         self.sidecar.add_contact(ContactRecord("push", "right", p_pre, p_init, p_mid, p_goal, d_push, dist, object=tname))
-        self.sidecar.add_contact(ContactRecord("brace", "left", brace_pre, brace, direction=-d_stop, brace_kind="stop_edge", object=tname))
+        self.sidecar.add_contact(TT.BraceRecord("brace", "left", brace_pre, brace, direction=-d_stop, brace_kind="stop_edge", object=tname,
+                                                extras={k: (float(v) if isinstance(v, (int, float)) else v) for k, v in brace_extras.items()}))
         manip.contacts = ["push", "brace"]
-        manip.extras.update({"push_pitch_deg": float(pitch), "brace_class": brace_kind, "left_band": self.left_bands is not None})
+        manip.extras.update({"push_pitch_deg": float(pitch), "brace_class": brace_kind, "left_band": self.left_bands is not None, "brace_geometry": brace_extras})
         draft.object_poses[tname] = pose
         draft.robot_q = self.stance_q(init)
         draft.base_pose2d = tuple(init.base_pose2d)
@@ -420,17 +444,63 @@ class AlignmentAxial(SamplerV2):
         r_goal = C.quat_rotate(q_goal, C.quat_rotate(C.qinv(pose[1]), end - TT._t(pose[0]))) + goal_pose[0] - com
         d_stop = spin * th.cross(z_axis, th.tensor([float(r_goal[0]), float(r_goal[1]), 0.0]), dim=0)
         d_stop = d_stop / th.linalg.norm(d_stop)
-        # the stop face = the goal hull's extreme along d_stop (a whole long face for a box); the brace goes to its point
-        # farthest from the pushed end's arrival so that the two hands do not meet at the same corner
-        stop_pt = self._extreme_point(goal_pose, d_stop, far_from=com + r_goal)
-        stop_pt = th.tensor([float(stop_pt[0]), float(stop_pt[1]), float(z_brace)]) + d_stop * STOP_CLEARANCE
-        return goal_pose, stop_pt, d_stop
+        # the stop face = the goal hull's extreme along d_stop (a whole long face for a box). Only the part of that face
+        # near the pushed end's arrival is free of the object before the goal (the rest of the face rises through the
+        # blade's position while the object turns: ``tabletop.blade_sweep_clear`` — the pilot's blocked demo had its
+        # blade on the swept part). Candidates run from 2 cm inside that corner toward the far end; the first one whose
+        # blade clears the sweep is used. Points are ON the goal hull's face (no clearance): every brace pose adds its own
+        # stand-off along d_stop. Returns ``(goal_pose, stop_pts (nearest the pushed end first), d_stop)``.
+        stop_pts = self._stop_face_points(goal_pose, d_stop, near=com + r_goal, z=z_brace)
+        return goal_pose, stop_pts, d_stop
 
-    def _brace_candidates(self, manip: Stance, stop_pt: th.Tensor, d_stop: th.Tensor, passing: Optional[List[str]]):
-        """Brace poses of the closed left gripper on the stop face, in the order to try: B3's contact classes with the
-        pads on the face (approach −d_stop into the face; closing axis vertical ``_v`` then horizontal ``_h``; the classes
-        the left band recorded as passing at the cell first), then the legacy top-down blade beside the stop edge
-        (straight down / pitched, either wrist turn). Yields ``(pre, contact, kind)``."""
+    def _stop_face_points(self, goal_pose: TT.Pose, d_stop: th.Tensor, near: th.Tensor, z: float, fractions=(0.08, 0.2, 0.35, 0.5, 0.65, 0.8)) -> List[th.Tensor]:
+        """Points of the goal hull's face extreme along ``d_stop`` (projection within 3 mm of the maximum) at the given
+        fractions of the face's span from the end nearest ``near`` (the pushed end's arrival) to the far end, at height
+        ``z``; a face shorter than 6 cm yields its midpoint only."""
+        pts = C.transform_points(goal_pose, self.hull)
+        dxy = th.tensor([float(d_stop[0]), float(d_stop[1])])
+        dxy = dxy / th.linalg.norm(dxy)
+        proj = pts[:, :2] @ dxy
+        face = pts[proj >= float(proj.max()) - 0.003]
+        f = TT._t(near)[:2]
+        dist = th.linalg.norm(face[:, :2] - f, dim=1)
+        p_near, p_far = face[int(th.argmin(dist))], face[int(th.argmax(dist))]
+        span = float(th.linalg.norm(p_far[:2] - p_near[:2]))
+        if span < 0.06:
+            mid = 0.5 * (p_near + p_far)
+            return [th.tensor([float(mid[0]), float(mid[1]), float(z)])]
+        out = []
+        for t in fractions:
+            p = p_near + (p_far - p_near) * t
+            out.append(th.tensor([float(p[0]), float(p[1]), float(z)]))
+        return out
+
+    def _face_z_range(self) -> Tuple[float, float]:
+        """World z range of the target's side faces (standing on the top)."""
+        return float(self.top.z), float(self.top.z) + float(self.extents["height"])
+
+    def _blade_geometry(self, pitch: float, clearance: float, side: bool = False) -> Optional[Tuple[float, float, float]]:
+        """``(stand-off, finger half thickness, tip z)`` of a top-down blade beside the target's face at the push
+        height for the approach ``pitch`` (deg): the fingertips sit ``FINGERTIP_LENGTH·cos(pitch)`` below the eef
+        origin; the half thickness is the finger profile's maximum over the face height above the tips (``tabletop.
+        blade_standoff``). None when the face reaches the palm section."""
+        z_push = self._push_height()
+        z_tip = z_push - C.FINGERTIP_LENGTH * math.cos(math.radians(float(pitch)))
+        so = TT.blade_standoff(self._face_z_range(), z_tip, pitch, clearance, side=side)
+        if so is None:
+            return None
+        return so[0], so[1], z_tip
+
+    def _brace_candidates(self, manip: Stance, stop_pts: List[th.Tensor], d_stop: th.Tensor, passing: Optional[List[str]], pose_init: TT.Pose, com: th.Tensor, d_goal: float):
+        """Brace poses of the closed left gripper at the stop face (``stop_pts`` on the goal hull, the pushed end's
+        corner side first), in the order to try: B3's contact classes with the pads on the face (approach −d_stop into
+        the face, pad centre ``STOP_CLEARANCE`` outside it; closing axis vertical ``_v`` then horizontal ``_h``; the
+        classes the left band recorded as passing at the cell first), and the top-down blade beside the stop face
+        (straight down / pitched, either wrist turn) whose eef origin stands ``finger half thickness (profile over the
+        face height above the tips) + STOP_CLEARANCE`` outside the face and which stays clear of the target's footprint
+        over the whole rotation from the init pose to the goal (``tabletop.blade_sweep_clear``; a point of the face that
+        the turning object sweeps through is skipped). Yields ``(pre, contact, kind, extras)``; thin targets (< 4 cm) get
+        the blade first (a side contact at ¾ of their height puts the wrist on the table)."""
         z_axis = th.tensor([0.0, 0.0, 1.0])
         a = -d_stop  # into the stop face
         side_h = C.unit(th.cross(z_axis, d_stop, dim=0))
@@ -440,32 +510,51 @@ class AlignmentAxial(SamplerV2):
             contact_classes.append((name or f"side_{suffix}", c_axis))
         if passing:
             contact_classes.sort(key=lambda nc: 0 if nc[0] in passing else 1)
+        r_side = TT.finger_half_thickness(0.0, side=True) or 0.007
 
         def side_contacts():
-            for name, c_axis in contact_classes:
-                for c_sign in (1.0, -1.0):  # either wrist turn of the same pad contact
-                    brace = C.contact_eef(stop_pt, a, c_sign * c_axis)
-                    yield C.pre_pose(brace), brace, f"{name}{'' if c_sign > 0 else '-'}"
+            for i, stop_pt in enumerate(stop_pts):
+                point = stop_pt + d_stop * STOP_CLEARANCE  # pad centre 5 mm outside the goal face
+                # the pads' footprint (a finger's width across, a finger's thickness deep) must be clear of the sweep too
+                ok, gap = TT.blade_sweep_clear(self.hull, pose_init, com[:2], d_goal, (point + d_stop * r_side)[:2], r_side, STOP_CLEARANCE)
+                if not ok:
+                    self._blade_skips["sweep"] = self._blade_skips.get("sweep", 0) + 1
+                    continue
+                for name, c_axis in contact_classes:
+                    for c_sign in (1.0, -1.0):  # either wrist turn of the same pad contact
+                        brace = C.contact_eef(point, a, c_sign * c_axis)
+                        yield C.pre_pose(brace), brace, f"{name}{'' if c_sign > 0 else '-'}", {"stop_clearance_m": STOP_CLEARANCE, "pose_class": name,
+                                                                                               "stop_face_fraction": i, "sweep_min_gap_m": gap}
 
         def blades():
             z_push = self._push_height()
-            blade_pt = th.tensor([float(stop_pt[0]), float(stop_pt[1]), z_push]) + d_stop * FINGER_HALF_THICKNESS
             for pitch in TT.approach_pitch_order(None):
+                geo = self._blade_geometry(pitch, STOP_CLEARANCE)
+                if geo is None:
+                    self._blade_skips["palm"] = self._blade_skips.get("palm", 0) + 1
+                    continue
+                standoff, half, z_tip = geo
                 a_vec = TT.pitched_approach(pitch, manip.forward)
-                for c_sign in (1.0, -1.0):
-                    brace = (blade_pt, C.eef_quat(a_vec, c_sign * d_stop))
-                    yield C.pre_pose(brace), brace, f"blade_{pitch:.0f}{'' if c_sign > 0 else '-'}"
+                for i, stop_pt in enumerate(stop_pts):
+                    origin = th.tensor([float(stop_pt[0]), float(stop_pt[1]), z_push]) + d_stop * standoff
+                    # the blade must not meet the rotating target before the goal (the face rising through it, a corner)
+                    ok, gap = TT.blade_sweep_clear(self.hull, pose_init, com[:2], d_goal, origin[:2], max(half, r_side), STOP_CLEARANCE)
+                    if not ok:
+                        self._blade_skips["sweep"] = self._blade_skips.get("sweep", 0) + 1
+                        continue
+                    for c_sign in (1.0, -1.0):
+                        brace = (origin, C.eef_quat(a_vec, c_sign * d_stop))
+                        yield C.pre_pose(brace), brace, f"blade_{pitch:.0f}{'' if c_sign > 0 else '-'}", {
+                            "blade_half_thickness_m": half, "stop_clearance_m": STOP_CLEARANCE, "blade_standoff_m": standoff, "fingertip_z": z_tip,
+                            "sweep_min_gap_m": gap, "pose_class": f"blade_{pitch:.0f}", "stop_face_fraction": i}
 
-        # a side contact needs the pads on a face at 0.75·h: below ~4 cm the wrist would lie on the table, so thin
-        # targets (letters, magazines, books) get the top-down blade first
         order = (blades, side_contacts) if self.extents["height"] < THIN_TARGET_HEIGHT else (side_contacts, blades)
         for gen in order:
             yield from gen()
 
-    def _extreme_point(self, pose: TT.Pose, direction: th.Tensor, near: Optional[th.Tensor] = None, far_from: Optional[th.Tensor] = None) -> th.Tensor:
+    def _extreme_point(self, pose: TT.Pose, direction: th.Tensor, near: Optional[th.Tensor] = None) -> th.Tensor:
         """Hull point (world) with the largest projection on ``direction`` (xy); with ``near`` only points within 4 cm of
-        that end along the long axis are considered (the face at the pushed end); with ``far_from`` the point of the
-        extreme face (projection within 3 mm of the maximum) farthest from that xy, 2 cm in from the face's end."""
+        that end along the long axis are considered (the face at the pushed end)."""
         pts = C.transform_points(pose, self.hull)
         dxy = th.tensor([float(direction[0]), float(direction[1])])
         dxy = dxy / th.linalg.norm(dxy)
@@ -476,17 +565,6 @@ class AlignmentAxial(SamplerV2):
             if int(sel.sum()) >= 3:
                 pts = pts[sel]
         proj = pts[:, :2] @ dxy
-        if far_from is not None:
-            face = pts[proj >= float(proj.max()) - 0.003]
-            f = TT._t(far_from)[:2]
-            dist = th.linalg.norm(face[:, :2] - f, dim=1)
-            p_far = face[int(th.argmax(dist))]
-            p_near = face[int(th.argmin(dist))]
-            span = float(th.linalg.norm(p_far[:2] - p_near[:2]))
-            if span > 0.06:  # step 2 cm in from the face's far end so the blade stands on the face, not past its corner
-                t = 1.0 - 0.02 / span
-                return p_near + (p_far - p_near) * t
-            return p_far
         i = int(th.argmax(proj))
         return pts[i]
 

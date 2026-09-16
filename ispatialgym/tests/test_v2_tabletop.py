@@ -647,3 +647,68 @@ def test_block_record_extras_survive_the_f6_sidecar():
 
     assert yaw_align_deg(b) == 0.0 and not block_reorients(b)
     assert b.brace_row.extra["pose_class"] == "side_v"
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# closed-finger profile, blade stand-offs and the swept-region test (owner review of the axial demo, 2026-09-16)
+# ----------------------------------------------------------------------------------------------------------------
+
+
+def test_finger_profile_and_blade_standoff():
+    assert TT.finger_half_thickness(0.0) == pytest.approx(0.0084) and TT.finger_half_thickness(0.03) == pytest.approx(0.0084)
+    assert TT.finger_half_thickness(0.031) == pytest.approx(0.018) and TT.finger_half_thickness(0.07) == pytest.approx(0.018)
+    assert TT.finger_half_thickness(0.08) is None  # the palm / mounting bracket
+    assert TT.finger_half_thickness(0.0, side=True) == pytest.approx(0.007)
+    top = 0.8125
+    # the pilot board game (2.5 cm tall) with the fingertips 11.3 mm above the top: the face stays in the tip section
+    assert TT.blade_standoff((top, top + 0.0252), top + 0.0113, 0.0, 0.005) == (pytest.approx(0.0134), pytest.approx(0.0084))
+    # a 6 cm object reaches the 18 mm section: the blade moves outward to 23 mm
+    assert TT.blade_standoff((top, top + 0.06), top + 0.003, 0.0, 0.005) == (pytest.approx(0.023), pytest.approx(0.018))
+    # pitched 45°: the finger-axis distance grows by 1/cos -> the same 6 cm face reaches the palm -> no blade
+    assert TT.blade_standoff((top, top + 0.06), top + 0.003, 45.0, 0.005) is None
+    assert TT.blade_standoff((top, top + 0.10), top + 0.003, 0.0, 0.005) is None
+    assert TT.blade_standoff((top, top + 0.002), top + 0.003, 0.0, 0.005) is None  # face entirely below the tips
+    # the 2.5 cm cube push (contact, no clearance): 8.4 mm pad face, 7 mm finger side
+    assert TT.blade_standoff((top, top + 0.025), top + 0.003, 0.0, 0.0)[0] == pytest.approx(0.0084)
+    assert TT.blade_standoff((top, top + 0.025), top + 0.003, 0.0, 0.0, side=True)[0] == pytest.approx(0.007)
+
+
+def test_blade_sweep_clear_rejects_a_corner_stop_and_accepts_a_face_stop():
+    # a 0.255 x 0.133 box (the pilot board game) rotating CCW by 57° about its centre toward the goal (long axis along x)
+    hull = th.tensor([[x, y, z] for x in (-0.1275, 0.1275) for y in (-0.0667, 0.0667) for z in (0.0, 0.025)])
+    delta = math.radians(57.0)
+    pose_init = (th.tensor([1.0, 0.0, 0.8]), C.quat_from_yaw(-delta))  # rotated back from the goal by δ
+    com = th.tensor([1.0, 0.0])
+    # CCW toward the goal: the left end (x < 0) descends onto the near long face's line (y = -0.0667, d_stop = -y) — a blade
+    # 13.4 mm outside that face near the descending end is met only at the goal ...
+    ok, gap = TT.blade_sweep_clear(hull, pose_init, com, delta, th.tensor([1.0 - 0.10, -0.0667 - 0.0134]), 0.0084, 0.005)
+    assert ok and gap >= 0.005
+    # ... while the face's middle and its other half rise through the blade's position before the goal (the pilot's
+    # blocked demo: the blade stood on the swept part of the face)
+    for x in (0.0, 0.06, 0.1275):
+        ok_x, gap_x = TT.blade_sweep_clear(hull, pose_init, com, delta, th.tensor([1.0 + x, -0.0667 - 0.0134]), 0.0084, 0.005)
+        assert not ok_x and gap_x < 0.005
+    # the mirror case (CW rotation) frees the other end
+    pose_cw = (th.tensor([1.0, 0.0, 0.8]), C.quat_from_yaw(delta))
+    assert TT.blade_sweep_clear(hull, pose_cw, com, -delta, th.tensor([1.0 + 0.10, -0.0667 - 0.0134]), 0.0084, 0.005)[0]
+    assert not TT.blade_sweep_clear(hull, pose_cw, com, -delta, th.tensor([1.0 - 0.10, -0.0667 - 0.0134]), 0.0084, 0.005)[0]
+    # a blade far from the object never meets it
+    assert TT.blade_sweep_clear(hull, pose_init, com, delta, th.tensor([1.0, -0.5]), 0.0084, 0.005)[0]
+
+
+def test_brace_record_extras_reach_the_f6_sidecar():
+    sd, init, manip = _draft("alignment-axial-board_game-breakfast_table", "alignment")
+    manip.arms = ["right", "left"]
+    q = C.eef_quat(th.tensor([0.0, 0.0, -1.0]), th.tensor([1.0, 0.0, 0.0]))
+    from ispatialgym.sampling.v2.stances import ContactRecord
+
+    sd.add_contact(ContactRecord("push", "right", _pose(1.0, -0.1, 0.95, q), _pose(1.0, -0.1, 0.84, q), _pose(1.02, -0.05, 0.84, q), _pose(1.05, 0.0, 0.84, q),
+                                 th.tensor([0.0, 1.0, 0.0]), 0.1, object="board_game.n.01_1"))
+    sd.add_contact(TT.BraceRecord("brace", "left", _pose(1.0, 0.2, 0.95, q), _pose(1.0, 0.2, 0.84, q), direction=th.tensor([0.0, -1.0, 0.0]), brace_kind="stop_edge",
+                                  object="board_game.n.01_1", extras={"blade_half_thickness_m": 0.0084, "stop_clearance_m": 0.005, "pose_class": "blade_0", "skip": None}))
+    sd.describe("board_game.n.01_1", "board game")
+    d = sd.to_dict()
+    assert d["contacts"]["brace"]["blade_half_thickness_m"] == 0.0084 and d["contacts"]["brace"]["stop_clearance_m"] == 0.005 and "skip" not in d["contacts"]["brace"]
+    sc = _f6(sd)
+    assert sc.problems(check_program=True) == []
+    assert sc.contacts.brace.extra["blade_half_thickness_m"] == 0.0084 and sc.contacts.brace.extra["pose_class"] == "blade_0"

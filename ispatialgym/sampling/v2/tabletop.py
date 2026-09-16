@@ -45,7 +45,7 @@ import torch as th
 
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import reach_bands as RB
-from ispatialgym.sampling.v2.stances import EdgeFrame, GraspRecord, Pose, Stance
+from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Pose, Stance
 
 log = logging.getLogger("ispatialgym.sampling.v2")
 
@@ -1025,6 +1025,97 @@ def joint_two_arm_placement(s, stance: Stance, bands_right: RB.ReachBands, bands
     return bool(res.ok), info
 
 
+# ----------------------------------------------------------------------------------------------------------------
+# closed-finger profile and blade stand-offs (owner review 2026-09-16 of the axial demo: the closed finger is a wedge,
+# not a 24 mm slab — measured on r1pro/urdf/meshes/left_gripper_finger_link1.obj in the closed configuration)
+# ----------------------------------------------------------------------------------------------------------------
+
+#: outer face of the closed fingers from the closing plane (the eef origin along the closing axis) as a function of the
+#: distance along the finger above the fingertip: ``(dz_max, half thickness)`` rows, the last row ends where the palm /
+#: mounting bracket begins (far wider: no blade contact possible above it)
+FINGER_PROFILE: Tuple[Tuple[float, float], ...] = ((0.03, 0.0084), (0.07, 0.018))
+#: the fingers' half width across the closing axis (the finger's side pushes when the closing axis is set across the
+#: push direction), same sections
+FINGER_SIDE_PROFILE: Tuple[Tuple[float, float], ...] = ((0.03, 0.007), (0.07, 0.014))
+PALM_FROM_TIP = FINGER_PROFILE[-1][0]
+#: margin of the brace configuration against the target at its goal pose (§4.6 step 6 with the target not ignored)
+BRACE_TARGET_MARGIN = 0.003
+
+
+def finger_half_thickness(dz: float, side: bool = False) -> Optional[float]:
+    """Half thickness of the closed fingers ``dz`` m above the fingertip along the finger (outer face from the closing
+    plane; ``side``: half width across the closing axis); None at / above the palm section."""
+    prof = FINGER_SIDE_PROFILE if side else FINGER_PROFILE
+    if dz < 0.0:
+        dz = 0.0
+    for dz_max, half in prof:
+        if dz <= dz_max + 1e-9:
+            return float(half)
+    return None
+
+
+def blade_standoff(face_z_range: Tuple[float, float], tip_z: float, pitch_deg: float = 0.0, clearance: float = 0.0, side: bool = False) -> Optional[Tuple[float, float]]:
+    """Stand-off of a blade contact (closed gripper beside an object face, approach from above pitched ``pitch_deg``):
+    the eef origin sits ``half + clearance`` outside the face along the closing axis, ``half`` = the largest finger half
+    thickness over the height range the face spans above the fingertip (finger-axis distance = height / cos pitch).
+    Returns ``(stand-off, half)``; None when the face reaches the palm section (no blade contact — use a side contact)."""
+    z0, z1 = float(min(face_z_range)), float(max(face_z_range))
+    if z1 <= tip_z:
+        return None  # the face lies entirely below the fingertip: nothing to touch
+    c = max(math.cos(math.radians(float(pitch_deg))), 1e-3)
+    dz_lo, dz_hi = max(0.0, z0 - float(tip_z)) / c, (z1 - float(tip_z)) / c
+    prof = FINGER_SIDE_PROFILE if side else FINGER_PROFILE
+    half = None
+    for dz_max, h in prof:
+        if dz_lo <= dz_max + 1e-9:
+            half = float(h) if half is None else max(half, float(h))
+        if dz_hi <= dz_max + 1e-9:
+            break
+    else:
+        if dz_hi > prof[-1][0] + 1e-9:
+            return None
+    if half is None:
+        return None
+    return half + float(clearance), half
+
+
+def blade_sweep_clear(hull: th.Tensor, pose_init: Pose, com_xy, delta: float, blade_xy, radius: float, clearance: float, n: int = 12) -> Tuple[bool, float]:
+    """Whether a blade (disc of ``radius`` at ``blade_xy``) stays ``clearance`` clear of the object's footprint while it
+    rotates about ``com_xy`` from ``pose_init`` by ``delta`` (rad, about +z) — sampled at ``n`` angles short of the goal
+    (the goal contact itself is the designed stop). Returns ``(ok, min gap before the goal)``."""
+    from ispatialgym.sampling import geometry as G
+
+    pts = C.transform_points(pose_init, hull)[:, :2]
+    c = th.tensor([float(com_xy[0]), float(com_xy[1])])
+    b = th.tensor([float(blade_xy[0]), float(blade_xy[1])])
+    square = th.stack([b + th.tensor([sx * radius, sy * radius]) for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))])
+    worst = math.inf
+    for k in range(n):
+        th_k = float(delta) * (k / n)  # 0 ... (n-1)/n of the rotation: strictly before the goal
+        cs, sn = math.cos(th_k), math.sin(th_k)
+        rel = pts - c
+        rot = th.stack([cs * rel[:, 0] - sn * rel[:, 1], sn * rel[:, 0] + cs * rel[:, 1]], dim=1) + c
+        gap = polygon_gap(G.convex_hull_2d(rot), square)
+        worst = min(worst, gap)
+        if gap < clearance:
+            return False, worst
+    return True, worst
+
+
+@dataclass
+class BraceRecord(ContactRecord):
+    """A brace ``ContactRecord`` with the blade / stop geometry the oracle and the audit need (spec §7 extras):
+    ``blade_half_thickness_m`` (finger profile value used), ``stop_clearance_m``, ``pose_class``, ... — merged into the
+    sidecar dict (the F6 ``BraceContact.extra`` keeps unknown keys)."""
+
+    extras: Dict[str, Any] = field(default_factory=dict)
+
+    def to_sidecar(self) -> Dict[str, Any]:
+        d = super().to_sidecar()
+        d.update({k: v for k, v in self.extras.items() if v is not None})
+        return d
+
+
 def union_extent(*bands: Optional[RB.ReachBands]) -> Optional[Tuple[float, float]]:
     """§4.4 (A1): the lateral extent [λ_min, λ_max] of the union of the given bands (the right grasp band and the left
     contact band), None when none has cells."""
@@ -1548,13 +1639,17 @@ def whole_body_check_at(s, stances: Sequence[Stance], objects: Dict[str, Pose], 
 
 
 def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose], brace_arm: str, brace_poses: Sequence[Pose], *,
-                     ignore_work_last: Sequence[Any] = (), ignore_brace_last: Sequence[Any] = (), fingers: Optional[float] = None):
+                     ignore_work_last: Sequence[Any] = (), ignore_brace_last: Sequence[Any] = (), fingers: Optional[float] = None,
+                     brace_only_check: Optional[Tuple[Sequence[Any], float]] = None):
     """§4.6 step 6: the working arm's poses first (exact IK), then the other arm's [pre-contact, contact] with the working
     arm locked at its solution, combined whole-body check of the final configuration. Same steps as
     ``IKChecker.exact_both_arms``, except that the combined check ignores the objects the two final poses touch
     (``ignore_work_last`` ∪ ``ignore_brace_last``: the support and the pushed / braced object — §3.6 "ignored for the
     contact pose only"); with them in the world every pad-on-face contact reads "combined configuration collides".
-    Returns the ``IKResult``."""
+    ``brace_only_check = (ignored objects, margin)``: an extra check of the brace arm's final configuration with the
+    working arm back at the stance posture against everything but the ignored objects at ``margin`` — the way to test
+    a stop blade against the target at its goal pose (teleported there by the caller) while the push hand, which
+    touches the target, is not in the picture. Returns the ``IKResult``."""
     IK = _ik()
     ikc = s.ikc
     r1 = ikc.exact(list(work_poses), stance, work_arm, list(ignore_work_last), cache=False, fingers=fingers)
@@ -1568,6 +1663,15 @@ def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose
         free = bool(s.kit.collision_free(r2.q, margin=0.01)[0])
     if not free:
         return IK.IKResult(False, None, "combined configuration collides")
+    if brace_only_check is not None:
+        ignored, margin = brace_only_check
+        q_b = ikc.q_locked(stance, fingers=fingers).clone()
+        idx = s.kit.robot.arm_control_idx[brace_arm]
+        q_b[idx] = r2.q[idx]
+        with ikc.ignoring(list(ignored)):
+            ok_b = bool(s.kit.collision_free(q_b, margin=float(margin))[0])
+        if not ok_b:
+            return IK.IKResult(False, None, f"{brace_arm} (brace) intersects the target at its goal pose (margin {float(margin) * 1000:.0f} mm)")
     return IK.IKResult(True, r2.q, "", len(work_poses) + len(brace_poses))
 
 
