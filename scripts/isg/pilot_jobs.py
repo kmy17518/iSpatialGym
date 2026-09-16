@@ -115,6 +115,145 @@ def cmd_demo(args):
     print(f"{len(all_jobs)} demo jobs on {len(per_pod)} pods")
 
 
+#: expected minutes per alias at 10 attempts (pilot medians incl. the per-alias share of the scene load; C5 decision)
+MINUTES = {"alignment-axial": 35.0, "alignment-world_vertical": 25.0, "alignment-world_horizontal": 25.0, "camera_relocalization-standard": 15.0,
+           "camera_relocalization-obstructed": 15.0, "mental_rotation": 8.0, "object_scaling": 7.0, "disembedding": 20.0,
+           "configuration_matching-block_design": 45.0, "configuration_matching-attachment": 30.0,
+           "configuration_matching-articulation_open_small_scale": 20.0, "configuration_matching-articulation_close_small_scale": 20.0,
+           "configuration_matching-articulation_open_large_scale": 40.0, "configuration_matching-articulation_close_large_scale": 40.0,
+           "inter_object_relation_satisfaction-ontop_small_scale": 15.0, "inter_object_relation_satisfaction-under_small_scale": 15.0,
+           "inter_object_relation_satisfaction-inside": 20.0, "inter_object_relation_satisfaction-nextto": 15.0,
+           "inter_object_relation_satisfaction-touching": 25.0, "inter_object_relation_satisfaction-ontop_large_scale": 30.0,
+           "inter_object_relation_satisfaction-under_large_scale": 30.0}
+CHUNK_CMD = ("cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && "
+             "OMNIGIBSON_HEADLESS=1 timeout {timeout} python -m ispatialgym.sampling.sample_isg {aliases} --templates {templates} "
+             "--instances-per-template {instances} --max-attempts {max_attempts} --seed {seed} --no-write-back --out \"$OUT\" --log-level INFO")
+
+
+def world_keys(aliases):
+    """``sample_isg``'s WorldPool key per alias without the simulator: (scene, task rooms, removed chairs)."""
+    import json as _json
+
+    from ispatialgym.sampling import sample_isg as S
+    from ispatialgym.sampling.sim_utils import stable_scene_path
+    from ispatialgym.sampling.v2.problem import GroundedProblem
+
+    stables, keys = {}, {}
+    for a in aliases:
+        try:
+            gp = GroundedProblem.load(a)
+            sc = gp.scene_names()[0]
+            if sc not in stables:
+                stables[sc] = _json.load(open(stable_scene_path(sc)))
+            rooms = S.rooms_for(gp, sc, stables[sc])
+            removed = S.chairs_to_remove(gp, sc, stables[sc], rooms)
+            keys[a] = f"{sc}|{','.join(sorted(rooms))}|{','.join(sorted(removed))}"
+        except Exception as e:  # noqa: BLE001
+            keys[a] = f"unknown|{type(e).__name__}"
+    return keys
+
+
+def cmd_chunks(args):
+    """C5 manifests: aliases not complete, grouped by world key, chunked (mixed subtasks, time budget), coverage wave first."""
+    entries = load_entries(args.customs)
+    progress = json.load(open(args.progress))["aliases"] if args.progress else {}
+    requested = args.instances
+    complete = {a for a, r in progress.items() if r.get("n_written", 0) >= requested}
+    fallback_ids = {a for a, (st, e) in entries.items() if e.get("fallback_of")}
+    todo = [a for a in entries if a not in complete and a not in fallback_ids and (not args.subtasks or entries[a][0] in args.subtasks)]
+    keys = world_keys(todo)
+    by_st = collections.defaultdict(list)
+    for a in todo:
+        by_st[entries[a][0]].append(a)
+    done_per_st = collections.Counter(entries[a][0] for a in complete if a in entries)
+    # coverage wave: up to (coverage - complete) aliases per subtask; prefer aliases that never ran, then zero / crashed / killed
+    order = {"never_started": 0, "killed": 1, "partial": 2, "zero": 3, "crashed": 4}
+    coverage, rest = [], []
+    for st, als in by_st.items():
+        als = sorted(als, key=lambda a: order.get(progress.get(a, {}).get("state", "never_started"), 5))
+        need = max(0, args.coverage - done_per_st.get(st, 0))
+        coverage += als[:need]
+        rest += als[need:]
+
+    def chunk(aliases, tag):
+        groups = collections.defaultdict(list)
+        for a in aliases:
+            groups[keys[a]].append(a)
+        jobs = []
+        for key, als in groups.items():
+            # round-robin over subtasks so every chunk mixes subtasks
+            per = collections.defaultdict(collections.deque)
+            for a in als:
+                per[entries[a][0]].append(a)
+            queue = []
+            while any(per.values()):
+                for st in list(per):
+                    if per[st]:
+                        queue.append(per[st].popleft())
+            cur, cur_min = [], 0.0
+            for a in queue:
+                m = MINUTES.get(entries[a][0], 20.0)
+                if cur and (cur_min + m > args.chunk_minutes or len(cur) >= args.chunk_max):
+                    jobs.append((key, cur, cur_min))
+                    cur, cur_min = [], 0.0
+                cur.append(a)
+                cur_min += m
+            if cur:
+                jobs.append((key, cur, cur_min))
+        out = []
+        for i, (key, als, mins) in enumerate(jobs):
+            jid = f"{tag}_{i:03d}__" + "+".join(sorted({entries[a][0].split('-')[-1][:12] for a in als}))[:60]
+            out.append({"id": jid, "cmd": CHUNK_CMD.format(aliases=" ".join("--alias " + a for a in als), templates=args.templates, instances=requested,
+                                                           max_attempts=args.max_attempts, seed=args.seed, timeout=int(max(1800, mins * 60 * 2.5))),
+                        "weight": 10.0 - i * 1e-3, "world_key": key, "aliases": als, "subtasks": sorted({entries[a][0] for a in als}), "minutes": mins,
+                        "wave": tag})
+        return out
+
+    cov_jobs, rest_jobs = chunk(coverage, "cov"), chunk(rest, "rest")
+    os.makedirs(args.out, exist_ok=True)
+    for name, js in (("jobs_coverage.json", cov_jobs), ("jobs_rest.json", rest_jobs)):
+        with open(os.path.join(args.out, name), "w") as f:
+            json.dump(js, f, indent=1)
+    with open(os.path.join(args.out, "world_keys.json"), "w") as f:
+        json.dump(keys, f, indent=1)
+    print(f"{len(todo)} aliases to run ({len(complete)} complete excluded, {len(fallback_ids)} fallbacks deferred); "
+          f"coverage {len(coverage)} aliases in {len(cov_jobs)} chunks ({sum(j['minutes'] for j in cov_jobs):.0f} min), "
+          f"rest {len(rest)} aliases in {len(rest_jobs)} chunks ({sum(j['minutes'] for j in rest_jobs):.0f} min); world keys: "
+          + ", ".join(f"{k.split('|')[1] or k}: {v}" for k, v in collections.Counter(keys.values()).items()))
+
+
+def cmd_fallbacks(args):
+    """Fallback aliases (customs ``fallback_of``) whose primary yielded nothing so far -> one chunk manifest."""
+    entries = load_entries(args.customs)
+    progress = json.load(open(args.progress))["aliases"]
+    ranks = collections.defaultdict(list)
+    for a, (st, e) in entries.items():
+        if e.get("fallback_of"):
+            ranks[e["fallback_of"]].append((int(e.get("fallback_rank", 1)), a))
+    todo = []
+    for primary, fbs in ranks.items():
+        chain = [primary] + [a for _, a in sorted(fbs)]
+        # the first alias of the chain without a result that has not yielded yet
+        for prev, nxt in zip(chain, chain[1:]):
+            r = progress.get(prev)
+            if r is None or r.get("state") in ("never_started", "killed"):
+                break  # the primary / earlier fallback has not run yet
+            if r.get("n_written", 0) > 0:
+                break  # yielded: no fallback needed
+            if progress.get(nxt) is None:
+                todo.append(nxt)
+                break
+    args.subtasks = None
+    keys = world_keys(todo)
+    jobs = [{"id": f"fb__{a[:110]}", "cmd": SAMPLE_CMD.format(alias=a, templates=args.templates, instances=args.instances, seed=args.seed,
+                                                              timeout=args.timeout, max_attempts=args.max_attempts),
+             "weight": 5.0, "subtask": entries[a][0], "alias": a, "slot": "fallback", "world_key": keys[a]} for a in todo]
+    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
+    with open(args.out, "w") as f:
+        json.dump(jobs, f, indent=1)
+    print(f"{len(jobs)} fallback jobs -> {args.out}")
+
+
 def cmd_merge_constraints(args):
     """Append the blacklists / constraints of every pulled ``task_custom_lists.json`` copy to the source customs file."""
     import glob
@@ -167,6 +306,29 @@ def main():
     s.add_argument("--out", required=True, help="directory for the per-pod demo manifests")
     s.add_argument("--skip", nargs="*", default=None, help="earlier demo manifests whose jobs are already dispatched")
     s.set_defaults(fn=cmd_demo)
+    s = sub.add_parser("chunks", help="C5: world-key chunks, coverage wave first, complete aliases excluded")
+    s.add_argument("--customs", default=CUSTOMS)
+    s.add_argument("--progress", default=None, help="runlogs/pilot_<date>/progress.json (states from the ledger)")
+    s.add_argument("--subtasks", nargs="*", default=None)
+    s.add_argument("--templates", type=int, default=1)
+    s.add_argument("--instances", type=int, default=2)
+    s.add_argument("--seed", type=int, default=0)
+    s.add_argument("--max-attempts", type=int, default=10)
+    s.add_argument("--coverage", type=int, default=5, help="templates (aliases) per subtask in the coverage wave")
+    s.add_argument("--chunk-minutes", type=float, default=100.0)
+    s.add_argument("--chunk-max", type=int, default=6)
+    s.add_argument("--out", required=True, help="directory for jobs_coverage.json / jobs_rest.json / world_keys.json")
+    s.set_defaults(fn=cmd_chunks)
+    s = sub.add_parser("fallbacks", help="B: fallback aliases whose primary yielded nothing")
+    s.add_argument("--customs", default=CUSTOMS)
+    s.add_argument("--progress", required=True)
+    s.add_argument("--templates", type=int, default=1)
+    s.add_argument("--instances", type=int, default=2)
+    s.add_argument("--seed", type=int, default=0)
+    s.add_argument("--max-attempts", type=int, default=10)
+    s.add_argument("--timeout", type=int, default=5400)
+    s.add_argument("--out", required=True)
+    s.set_defaults(fn=cmd_fallbacks)
     s = sub.add_parser("merge-constraints")
     s.add_argument("--customs", default=CUSTOMS)
     s.add_argument("--pulled-root", required=True, help="e.g. runlogs/runpod/pilot")
