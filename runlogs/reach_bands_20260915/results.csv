@@ -7,7 +7,7 @@ rb__brace__house_single_floor__breakfast_table_rhjoby_0__toolbox-redmtl-j_lid,br
 rb__brace__house_single_floor__countertop_ikwqer_0__blender-eyedvd-j_lid,brace,2,configuration_matching-articulation_close_small_scale;configuration_matching-articulation_open_small_scale,empty band,rb7-l40s-3,1820,9,20,0,null,brace__house_single_floor__countertop_ikwqer_0__blender-eyedvd__b893f43bd7e3d020,,current
 rb__brace__house_single_floor__countertop_ikwqer_0__carton-msfzpz-j_link_0,brace,2,configuration_matching-articulation_close_small_scale;configuration_matching-articulation_open_small_scale,empty band,rb7-l40s-4,1460,9,20,0,null,brace__house_single_floor__countertop_ikwqer_0__carton-msfzpz__699b0c62ee51edc9,,current
 rb__brace__house_single_floor__countertop_ikwqer_0__hinged_jar-vzwhbg-j_rb1,brace,2,configuration_matching-articulation_close_small_scale;configuration_matching-articulation_open_small_scale,empty band,rb7-l40s-5,1371,9,20,0,null,brace__house_single_floor__countertop_ikwqer_0__hinged_jar-vzwhbg__4a38eb7cdbc9dfdf,,current
-rb__contact__house_single_floor__bar_udatjt_0__h0.02__left,contact,,brace,not run,,,,,,,,,
+rb__contact__house_single_floor__bar_udatjt_0__h0.02__left,contact,,brace,ok,pilot2-a40-11,2828,12,20,301,"[0.07999999821186066, 0.800000011920929]",contact__house_single_floor__bar_udatjt_0__left_h0.02__7b04d20a9431f818,,current
 rb__contact__house_single_floor__bar_udatjt_0__h0.04__left,contact,,brace,not run,,,,,,,,,
 rb__contact__house_single_floor__bar_udatjt_0__h0.06__left,contact,,brace,not run,,,,,,,,,
 rb__contact__house_single_floor__bar_udatjt_0__h0.08__left,contact,,brace,not run,,,,,,,,,
@@ -42,11 +42,11 @@ rb__contact__office_cubicles_right__conference_table_fpkmyw_0__h0.22__left,conta
 rb__contact__office_cubicles_right__desk_mdhelw_1__h0.02__left,contact,,brace,not run,,,,,,,,,
 rb__contact__office_cubicles_right__desk_mdhelw_1__h0.04__left,contact,,brace,not run,,,,,,,,,
 rb__contact__office_cubicles_right__desk_mdhelw_1__h0.06__left,contact,,brace,not run,,,,,,,,,
-rb__contact__office_cubicles_right__desk_mdhelw_1__h0.08__left,contact,,brace,not run,,,,,,,,,
-rb__contact__office_cubicles_right__desk_mdhelw_1__h0.10__left,contact,,brace,not run,,,,,,,,,
+rb__contact__office_cubicles_right__desk_mdhelw_1__h0.08__left,contact,,brace,ok,pilot2-a40-4,2695,17,20,878,"[-0.1599999964237213, 0.800000011920929]",contact__office_cubicles_right__desk_mdhelw_1__left_h0.08__66ca961a417653b9,,current
+rb__contact__office_cubicles_right__desk_mdhelw_1__h0.10__left,contact,,brace,ok,pilot2-a40-5,2709,17,20,905,"[-0.1599999964237213, 0.800000011920929]",contact__office_cubicles_right__desk_mdhelw_1__left_h0.10__fb1167a9fffc0e23,,current
 rb__contact__office_cubicles_right__desk_mdhelw_1__h0.12__left,contact,,brace,ok,pilot2-l40s-7,764,17,20,991,"[-0.1599999964237213, 0.800000011920929]",contact__office_cubicles_right__desk_mdhelw_1__left_h0.12__836c8b0efc3ee03e,,current
 rb__contact__office_cubicles_right__desk_mdhelw_1__h0.14__left,contact,,brace,not run,,,,,,,,,
-rb__contact__office_cubicles_right__desk_mdhelw_1__h0.18__left,contact,,brace,not run,,,,,,,,,
+rb__contact__office_cubicles_right__desk_mdhelw_1__h0.18__left,contact,,brace,ok,pilot2-a40-8,2971,17,20,1003,"[-0.1599999964237213, 0.800000011920929]",contact__office_cubicles_right__desk_mdhelw_1__left_h0.18__0f7d469e9def9978,,current
 rb__contact__restaurant_diner__bar_xxftww_0__h0.02__left,contact,,brace,not run,,,,,,,,,
 rb__contact__restaurant_diner__bar_xxftww_0__h0.04__left,contact,,brace,not run,,,,,,,,,
 rb__contact__restaurant_diner__bar_xxftww_0__h0.10__left,contact,,brace,not run,,,,,,,,,
@@ -86,8 +86,8 @@ rb__tabletop__house_double_floor_upper__desk_aduafr_0__pencil-fnlbpu__scaled,tab
 rb__tabletop__house_double_floor_upper__desk_aduafr_0__pencil-lykqoh__scaled,tabletop,1,inter_object_relation_satisfaction-under_large_scale,ok,rb-a40b-0,785,7,20,231,"[-0.7200000286102295, 0.07999999821186066]",tabletop__house_double_floor_upper__desk_aduafr_0__pencil-lykqoh__c373d64b1f69bf4d,,current
 rb__tabletop__house_double_floor_upper__desk_aduafr_0__pencil-vpzhth__scaled,tabletop,2,inter_object_relation_satisfaction-under_large_scale,ok,rb2-l40s-0,485,7,20,232,"[-0.7200000286102295, 0.07999999821186066]",tabletop__house_double_floor_upper__desk_aduafr_0__pencil-vpzhth__343a677e821206f2,,current
 rb__tabletop__house_double_floor_upper__sofa_ukfaaz_0__box_of_shampoo-tzghev,tabletop,3,inter_object_relation_satisfaction-ontop_large_scale,empty band,rb5-l40s-0,233,22,25,0,null,tabletop__house_double_floor_upper__sofa_ukfaaz_0__box_of_shampoo-tzghev__c889c6c821c1938f,,current
-rb__tabletop__house_single_floor__bar_udatjt_0__apple-netbsb,tabletop,,inter_object_relation_satisfaction-ontop_small_scale,not run,,,,,,,,,
-rb__tabletop__house_single_floor__bar_udatjt_0__bag_of_chips-bryahw__gp,tabletop,,alignment-axial,not run,,,,,,,,,
+rb__tabletop__house_single_floor__bar_udatjt_0__apple-netbsb,tabletop,,inter_object_relation_satisfaction-ontop_small_scale,ok,pilot2-a40-9,2850,12,20,299,"[-0.800000011920929, 0.0]",tabletop__house_single_floor__bar_udatjt_0__apple-netbsb__0c424408b1484e21,,current
+rb__tabletop__house_single_floor__bar_udatjt_0__bag_of_chips-bryahw__gp,tabletop,,alignment-axial,ok,pilot2-a40-10,2922,12,20,656,"[-0.800000011920929, 0.0]",tabletop__house_single_floor__bar_udatjt_0__bag_of_chips-bryahw__8b6c19ad4a07845c,,current
 rb__tabletop__house_single_floor__bar_udatjt_0__bar_soap-feqemg__placed-tray-gsxbym,tabletop,,disembedding,not run,,,,,,,,,
 rb__tabletop__house_single_floor__bar_udatjt_0__beaker-sfvswx__placed-tray-gsxbym,tabletop,,disembedding,not run,,,,,,,,,
 rb__tabletop__house_single_floor__bar_udatjt_0__beer_glass-rxscji,tabletop,,inter_object_relation_satisfaction-under_small_scale,not run,,,,,,,,,
