@@ -814,6 +814,15 @@ def contact_height(top_z: float, height: float) -> float:
     return float(top_z) + CONTACT_HEIGHT_FRACTION * float(height)
 
 
+def margins_union() -> bool:
+    """§4.4 / A1 "margins use the union of both bands' extents": measured on the pilot support the union
+    ([−0.56, +0.56] on `breakfast_table_rhjoby_0`) makes every two-arm task ``edge_too_short`` (block design m_R + m_L
+    = 1.21 m, axial 1.46 m > L = 1.16 m), while the object is placed at right-band cells only — the left band decides
+    which of those placements are valid (joint test), it does not widen where objects go. Default: the right band's
+    extent; ``ISG_MARGIN_UNION=1`` applies the union as decided (owner to confirm)."""
+    return os.environ.get("ISG_MARGIN_UNION", "0").strip().lower() in ("1", "true", "yes")
+
+
 def left_band_compute() -> bool:
     """Whether a missing left contact band is computed in-process (15–25 min per support / height class on an L40S):
     ``ISG_LEFT_BAND_COMPUTE=1``; default off — until B3's left bands exist the brace side is decided by the exact two-arm
@@ -1154,7 +1163,11 @@ def phase1b_init_trunk(s, init: Stance, H_max: float, *, bands: Optional[RB.Reac
         if len(ws_l["cells_world"]):
             ws["lam_min_right"], ws["lam_max_right"] = ws["lam_min"], ws["lam_max"]
             ws["lam_min_left"], ws["lam_max_left"] = ws_l["lam_min"], ws_l["lam_max"]
-            ws["lam_min"], ws["lam_max"] = min(ws["lam_min"], ws_l["lam_min"]), max(ws["lam_max"], ws_l["lam_max"])
+            if margins_union():
+                ws["lam_min"], ws["lam_max"] = min(ws["lam_min"], ws_l["lam_min"]), max(ws["lam_max"], ws_l["lam_max"])
+            else:
+                log.info("phase 1b: λ of the right band %s kept for the margins (left band %s; ISG_MARGIN_UNION=1 for the union)",
+                         [round(ws["lam_min"], 2), round(ws["lam_max"], 2)], [round(ws_l["lam_min"], 2), round(ws_l["lam_max"], 2)])
         else:
             log.info("phase 1b: the left contact band has no cell on %s at edge %s; λ from the right band alone", top.name, init.edge.name)
     h = float(top.z) - float(s.kit.floor_z)
