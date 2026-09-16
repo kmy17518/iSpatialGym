@@ -304,6 +304,22 @@ reach-band cache hits for apple and marker. Sidecars carry `idle_posture` / `arm
   `grasps[].{place_kind: "drop", rim_z, drop_height_m, finger_clearance_m, place_lowest_finger_z}` and `summary.release`.
   The oracle side (`Place(kind="drop")`: open at the recorded pose, retreat straight up along −a) is the oracle agent's.
 
+### Program check ignore sets, transition re-sweep, screening witnesses (large-scale A4/A5/A8, 2026-09-16)
+
+- `program_check._ignore_for`: **brace** removes the supports (wall / stop) for **every** waypoint of the approach chain
+  (as `push` does — the chain runs 2 cm along the wall); the braced object is removed at the contact pose only. A module
+  may record exactly what it ignored on the contact / grasp record (`ignore_every` / `ignore_last`: bddl instance names
+  or the token `"supports"`); the program check then uses those lists verbatim.
+- `navigation.transition`: at each candidate s_T the trunk sweep **and the drive-in s_T → s** (strides at the arriving
+  trunk) are checked with the *arriving* stance's arms (as `prompt0.connect`); `min_standoff` keeps a re-sweep from
+  lowering the recorded s_T; `path_end_standoff` (where the recorded path ends — `core.path_end_standoff`) adds the extra
+  drive-back from the path's end at the *departing* trunk and arms when s_T grows. `check_stances_with_objects` re-sweeps
+  with both (the recorded path is never left ending beyond the transition's drive-back pose).
+- `IKChecker.screen`: a remembered solution of the same pose (the sampler's exact solve) is verified as a witness before
+  the 12-seed batch; misses are retried seeded from the nearest remembered solution and from the caller's `seeds`.
+  `waypoints_ok` now solves the endpoints first and screens the intermediate waypoints seeded from them; the found
+  screening solutions are remembered (deterministic re-check in the program check / `validate_instances`).
+
 ## Status (D2 / D4, 2026-09-15) and gaps
 
 Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,

@@ -410,17 +410,34 @@ class SamplerV2(TaskSampler):
                         bad.append(st.name)
         if bad:
             raise Reject("stance_collision_with_objects", f"stances {bad} collide with the objects placed (trunks {[(s.translate, round(s.tilt, 2)) for s in stances if s.name in bad]})")
-        # §3.8 with the objects placed: the recorded transitions are swept again (the smallest free s_T may change)
+        # §3.8 with the objects placed: the recorded transitions are swept again — trunk sweep and drive-in with the
+        # arriving arms — starting at the *recorded* s_T (never lowered: the recorded path ends at its drive-back pose when
+        # ``prompt0.connect`` planned it; a larger s_T adds a drive-back from the path's end, checked at the departing trunk)
         for i, tr in enumerate(list(self.sidecar.transitions)):
             frm, to = self.sidecar.stances.get(tr.frm), self.sidecar.stances.get(tr.to)
             if frm is None or to is None:
                 continue
             obj, arm, eef_in_object = self.carried_attachment(to.carried)
             with self.ikc.ignoring([obj] if obj is not None else []):
-                new = NAV.transition(self.kit, frm, to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object)
+                new = NAV.transition(self.kit, frm, to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object,
+                                     min_standoff=tr.stand_off, path_end_standoff=self.path_end_standoff(frm, to))
             if new is None:
-                raise Reject("no_transition", f"{tr.frm} -> {tr.to}: no swept-free s_T with the objects placed")
+                raise Reject("no_transition", f"{tr.frm} -> {tr.to}: no swept-free s_T >= the recorded {tr.stand_off:.2f} with the objects placed")
+            if abs(new.stand_off - tr.stand_off) > 1e-6:
+                log.info("%s -> %s: transition stand-off %.2f -> %.2f with the objects placed", tr.frm, tr.to, tr.stand_off, new.stand_off)
             self.sidecar.transitions[i] = new
+
+    def path_end_standoff(self, frm: Stance, to: Stance) -> float:
+        """Stand-off at which the recorded path ``frm -> to`` ends: the stance's own ``s`` when the path reaches the
+        stance, ``s + back`` when it ends at a drive-back pose along -inward (``prompt0.connect``)."""
+        s = float(to.stand_off if to.stand_off is not None else 0.0)
+        for p in self.sidecar.paths:
+            if p.frm == frm.name and p.to == to.name and p.waypoints:
+                end = p.waypoints[-1]
+                dx, dy = float(to.base_pose2d[0]) - float(end[0]), float(to.base_pose2d[1]) - float(end[1])
+                back = dx * float(to.inward[0]) + dy * float(to.inward[1])  # positive: the path ends behind the stance
+                return s + max(0.0, back)
+        return s
 
     # ------------------------------------------------------------------ stances / transitions / paths helpers
 

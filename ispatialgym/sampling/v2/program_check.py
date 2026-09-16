@@ -298,8 +298,14 @@ def _ignore_for(action, sampler, carried: Optional[str]) -> Tuple[List[Any], Lis
     objs = sampler.objects
     last: List[Any] = []
     every: List[Any] = []
-    if name in ("grasp", "brace"):
-        last += supports  # the final grasp / contact pose only
+    # a module may record exactly what it ignored while solving a chain (names of bddl instances or "supports") on the
+    # sidecar record the action carries: ``ignore_every`` / ``ignore_last`` in ``contacts.*`` / ``grasps[]`` extras
+    rec = getattr(action, "contact", None) or getattr(action, "grasp", None)
+    explicit = _explicit_ignores(rec, sampler)
+    if explicit is not None:
+        return explicit
+    if name == "grasp":
+        last += supports  # the final grasp pose only
     if name == "lift":
         every += supports  # the lift starts at the grasp pose (object resting on the support) and goes up
     if name == "place":
@@ -314,6 +320,10 @@ def _ignore_for(action, sampler, carried: Optional[str]) -> Tuple[List[Any], Lis
             every.append(objs[obj])  # the pushed object moves with the pads
         every += supports
     if name == "brace":
+        # the support(s) are removed along the *whole* approach chain, as for a push: a wall / stop brace approaches
+        # along the wall 2 cm off it (the sampler solves the chain with the wall ignored — alignment_wall._solve_from);
+        # the braced object stays in the world except at the contact pose
+        every += supports
         obj = getattr(getattr(action, "contact", None), "object", None)
         if obj in objs:
             last.append(objs[obj])
@@ -323,6 +333,29 @@ def _ignore_for(action, sampler, carried: Optional[str]) -> Tuple[List[Any], Lis
             every.append(objs[obj])  # the retreat starts with the pads around the released object
         every += supports
     return last, every
+
+
+def _explicit_ignores(rec, sampler) -> Optional[Tuple[List[Any], List[Any]]]:
+    """``(last, every)`` from a record's explicit ``ignore_last`` / ``ignore_every`` lists (bddl instance names, or the
+    token ``"supports"``), when the module recorded them; None otherwise."""
+    if rec is None:
+        return None
+    src = getattr(rec, "extra", None) or getattr(rec, "extras", None) or {}
+    if not isinstance(src, dict) or not ("ignore_every" in src or "ignore_last" in src):
+        return None
+    objs = sampler.objects
+    supports = list(sampler.support_objects())
+
+    def _resolve(names) -> List[Any]:
+        out: List[Any] = []
+        for n in names or []:
+            if n == "supports":
+                out += supports
+            elif n in objs:
+                out.append(objs[n])
+        return out
+
+    return _resolve(src.get("ignore_last")), _resolve(src.get("ignore_every"))
 
 
 def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, stance_name: str, carried: Optional[str]) -> Tuple[int, Dict[str, Any]]:

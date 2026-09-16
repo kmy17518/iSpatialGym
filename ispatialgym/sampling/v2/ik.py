@@ -228,18 +228,19 @@ class IKChecker:
         (3 cm, 0.15 rad) — the same pose, or the same pose after the settle moved the object by a few mm (the other
         joints stay ``q0``'s: the base virtual joints must belong to the current robot root)."""
         p, q = G.t(pose[0]), G.t(pose[1])
-        best, best_d = None, None
-        for (a, key), q_rec in self.solutions.items():
-            if a != arm:
-                continue
-            kp, kq = th.tensor(key[:3]), th.tensor(key[3:])
-            d = float(th.linalg.norm(kp - p))
-            if d > self.SEED_POS_TOL or G.quat_angle(kq, q) > self.SEED_ANG_TOL:
-                continue
-            if best_d is None or d < best_d:
-                best, best_d = q_rec, d
-        if best is None:
+        items = [(key, q_rec) for (a, key), q_rec in self.solutions.items() if a == arm]
+        if not items:
             return q0
+        keys = th.tensor([k for k, _ in items], dtype=th.float32)  # (M, 7): position + quaternion (vectorised search)
+        d = th.linalg.norm(keys[:, :3] - p, dim=1)
+        kq = keys[:, 3:] / th.linalg.norm(keys[:, 3:], dim=1, keepdim=True).clamp(min=1e-9)
+        dots = th.clamp((kq * (q / th.linalg.norm(q).clamp(min=1e-9))).sum(dim=1).abs(), max=1.0)
+        ang = 2.0 * th.acos(dots)
+        ok = (d <= self.SEED_POS_TOL) & (ang <= self.SEED_ANG_TOL)
+        if not bool(ok.any()):
+            return q0
+        d = th.where(ok, d, th.full_like(d, float("inf")))
+        best = items[int(th.argmin(d))][1]
         out = q0.clone()
         idx = self.kit.robot.arm_control_idx[arm]
         out[idx] = best[idx]
@@ -312,15 +313,54 @@ class IKChecker:
 
     # -- screening / exact --------------------------------------------------------------------------------------
     def screen(self, poses: Sequence[Pose], stance: Stance, arm: str = "right", ignore: Sequence[Any] = (), q_seed: Optional[th.Tensor] = None,
-               fingers: Optional[float] = None) -> th.Tensor:
+               fingers: Optional[float] = None, seeds: Sequence[th.Tensor] = (), witnesses: bool = True) -> th.Tensor:
         """12-seed batched IK per pose from the stance (locked joints = the stance's recorded configuration / posture at
         its trunk, ``fingers`` overrides the opening: closed for push / brace contacts); ``ignore`` objects are removed
-        from the world for *these* poses (callers pass the support for grasp poses only)."""
+        from the world for *these* poses (callers pass the support for grasp poses only).
+
+        Before the solver is asked, a **remembered solution** of the same pose (the sampler's exact solve of that
+        waypoint) is verified as a witness — FK + collision, deterministic — and counts as a pass; the 12 random seeds
+        around a tucked / ready seed otherwise miss poses the 32-seed exact IK finds (the wall brace chain, 2 cm off the
+        wall). Poses the batched solve still misses are retried seeded from the nearest remembered solution and from
+        ``seeds`` (callers pass the endpoint solutions of a waypoint chain). Solutions found are remembered."""
         if len(poses) == 0:
             return th.zeros(0, dtype=th.bool)
         q0 = self.q_locked(stance, fingers=fingers) if q_seed is None else q_seed
+        poses = list(poses)
+        out = th.zeros(len(poses), dtype=th.bool)
+        idx = self.kit.robot.arm_control_idx[arm]
         with self.ignoring(ignore):
-            return self.kit.ik_batch(list(poses), q0, arm=arm)
+            todo: List[int] = []
+            for i, p in enumerate(poses):
+                q_near = self._seeded(q0, p, arm) if witnesses else q0
+                if not th.equal(q_near, q0) and self._witness_ok(q_near, p, arm):
+                    out[i] = True
+                else:
+                    todo.append(i)
+            if todo:
+                ok, qs = self.kit.ik_batch_solve([poses[i] for i in todo], q0, arm=arm)
+                for j, i in enumerate(todo):
+                    if bool(ok[j]):
+                        out[i] = True
+                        self.solutions[(arm, self._pose_key(poses[i]))] = qs[j].clone()
+            for i in [i for i in todo if not bool(out[i])]:
+                # alternative seeds: the nearest remembered solution (a neighbouring waypoint), then the caller's seeds
+                cands: List[th.Tensor] = []
+                q_near = self._seeded(q0, poses[i], arm)
+                if not th.equal(q_near, q0):
+                    cands.append(q_near)
+                for s in seeds:
+                    if s is not None:
+                        q_s = q0.clone()
+                        q_s[idx] = G.t(s)[idx]
+                        cands.append(q_s)
+                for q_s in cands:
+                    ok1, q1 = self.kit.ik_batch_solve([poses[i]], q_s, arm=arm)
+                    if bool(ok1[0]):
+                        out[i] = True
+                        self.solutions[(arm, self._pose_key(poses[i]))] = q1[0].clone()
+                        break
+        return out
 
     def screen_pairs(self, pairs: Sequence[Sequence[Pose]], stance: Stance, arm: str = "right", ignore_for_last: Sequence[Any] = (),
                      q_seed: Optional[th.Tensor] = None, fingers: Optional[float] = None) -> th.Tensor:
@@ -411,18 +451,20 @@ class IKChecker:
         wps = list(waypoints)
         if len(wps) < 2:
             return self.exact(wps, stance, arm, ignore_for_last, q_seed=q_seed, scale_key=scale_key, cache=cache, fingers=fingers)
-        mids = wps[1:-1]
-        if mids:
-            ok = self.screen(mids, stance, arm, ignore=list(ignore_all), q_seed=q_seed, fingers=fingers)
-            if not bool(ok.all()):
-                bad = [i + 1 for i, s in enumerate(ok.tolist()) if not s]
-                return IKResult(False, None, f"waypoints {bad} of {len(wps)} fail the screening IK", len(wps))
+        # endpoints first (exact): their solutions seed the screening of the intermediate waypoints, which otherwise
+        # misses poses near the ends that the 32-seed solver finds (the wall brace chain)
         r0 = self.exact([wps[0]], stance, arm, list(ignore_all), q_seed=q_seed, scale_key=scale_key, cache=cache, fingers=fingers)
         if not r0.ok:
             return IKResult(False, None, "first waypoint fails the exact IK", len(wps))
         r1 = self.exact([wps[-1]], stance, arm, list(ignore_for_last) + list(ignore_all), q_seed=q_seed, scale_key=scale_key, cache=cache, fingers=fingers)
         if not r1.ok:
             return IKResult(False, None, "last waypoint fails the exact IK", len(wps))
+        mids = wps[1:-1]
+        if mids:
+            ok = self.screen(mids, stance, arm, ignore=list(ignore_all), q_seed=q_seed, fingers=fingers, seeds=[r0.q, r1.q])
+            if not bool(ok.all()):
+                bad = [i + 1 for i, s in enumerate(ok.tolist()) if not s]
+                return IKResult(False, None, f"waypoints {bad} of {len(wps)} fail the screening IK", len(wps))
         return IKResult(True, r1.q, policy, len(wps))
 
     # -- attached objects ---------------------------------------------------------------------------------------

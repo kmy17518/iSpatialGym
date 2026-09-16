@@ -287,6 +287,60 @@ def test_program_check_target_extraction():
     assert set(found) == {"pre_grasp", "approach", "nested.place"} and len(found["approach"]) == 3
 
 
+def test_program_check_ignore_sets_mirror_the_sampler():
+    """Large-scale A4/A5/A8: a brace approach runs along the wall -> the supports are removed for every waypoint (as for a
+    push), the braced object only at the contact; explicit ``ignore_every`` / ``ignore_last`` on the record win."""
+
+    class Obj:
+        def __init__(self, name):
+            self.name = name
+
+    wall, target, partner = Obj("wall"), Obj("painting"), Obj("can")
+
+    class Sampler:
+        objects = {"painting": target, "can": partner}
+
+        @staticmethod
+        def support_objects():
+            return [wall]
+
+    class Contact:
+        def __init__(self, obj, extra=None):
+            self.object = obj
+            self.extra = extra or {}
+
+    class Action:
+        def __init__(self, name, contact):
+            self.name, self.contact = name, contact
+
+    last, every = PC._ignore_for(Action("brace", Contact("painting")), Sampler, None)
+    assert every == [wall] and last == [target]
+    last, every = PC._ignore_for(Action("push", Contact("painting")), Sampler, None)
+    assert target in every and wall in every and last == []
+    # a module that recorded what it ignored while solving (names or the token "supports")
+    last, every = PC._ignore_for(Action("brace", Contact("painting", {"ignore_every": ["supports", "can"], "ignore_last": []})), Sampler, None)
+    assert every == [wall, partner] and last == []
+
+
+def test_transition_resweep_never_lowers_the_recorded_standoff():
+    """The re-sweep with the objects placed starts at the recorded s_T; the path's end gives the extra drive-back start."""
+    from ispatialgym.sampling.v2 import navigation as NAV
+    from ispatialgym.sampling.v2.core import SamplerV2
+
+    assert NAV.transition_standoffs(0.4) == [0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    edge = EdgeFrame("south", th.tensor([1.5, 1.0]), th.tensor([0.0, 1.0]), 2.0)  # inward = +y: the robot stands at y < 1 facing +y
+    to = Stance("manipulation", (1.5, 0.5, math.pi / 2), 0.5, 0.0, 0.5, edge=edge)  # base 0.5 m in front of the edge
+
+    class Fake:
+        sidecar = SidecarDraft("alias", "alignment")
+
+    # no path recorded: the path ends at the stance -> s
+    assert SamplerV2.path_end_standoff(Fake, Stance("init", (0.0, 0.0, 0.0), 0.5), to) == 0.5
+    # prompt0.connect planned the path to the drive-back pose 0.2 m behind the stance (along -inward = -y)
+    Fake.sidecar.add_path(PathRecord("init", "manipulation", "local", [(0.0, 0.0, 0.0), (1.5, 0.3, math.pi / 2)], 1.0, "untucked", None))
+    assert abs(SamplerV2.path_end_standoff(Fake, Stance("init", (0.0, 0.0, 0.0), 0.5), to) - 0.7) < 1e-6
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # CLIs (§9): path buckets, whitelist pruning after a failed template, exclusion of produced templates
 # ----------------------------------------------------------------------------------------------------------------
