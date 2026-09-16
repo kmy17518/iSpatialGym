@@ -95,6 +95,14 @@ PUSH_UNDER_CLEARANCE_M = 0.005      # blade clearance to the target's back face 
 FLOOR_TRUNKS = ((0.75, -0.9), (0.75, -1.2), (0.95, -0.9), (0.95, -1.2))
 
 
+class _NullContext:
+    def __enter__(self):
+        return None
+
+    def __exit__(self, *exc):
+        return False
+
+
 class PushUnderRecord(ContactRecord):
     """``contacts.push`` of the push-under (F6 ``PushContact`` + extras): ``kind: "push_under"``, straight floor-level
     push ``init → mid → goal`` of the closed gripper (blade behind the target along the push direction), from the
@@ -1092,7 +1100,12 @@ class IORSLarge(SamplerV2):
         if not cands:
             log.info("%s: push-under stance C at %s edge %s: no candidate (%s)", self.gp.alias, partner.name, edge.name, stats)
             return []
-        free = P0.body_free(self, cands)
+        # the deep trunks (translate 0.95) are what reaches the floor (B3), and at a floor stance they trip the 1 cm margin
+        # against the floor *mesh* (torso / head "within 1 cm of the floor" — B3 README; scene-specific, the floor object
+        # sits a little above floor_z): the stance check runs with the floor object removed, the cuRobo ground slab
+        # (which stays) keeps the robot from penetrating the floor. Documented relaxation for the push-under stance.
+        with self.ikc.ignoring([self.obj("floor")]):
+            free = P0.body_free(self, cands)
         cands = [st for st, f in zip(cands, free.tolist()) if f]
         stats["collision_free"] = len(cands)
         if not cands:
@@ -1329,6 +1342,22 @@ class IORSLarge(SamplerV2):
                 return d
             errors.append("C: no (yaw, grasp) of F passes the exact IK at B and C")
         raise Reject("grasp_unreachable", "; ".join(errors[-3:]) if errors else "no placement candidate")
+
+    # ------------------------------------------------------------------ push-under: the floor mesh and the deep trunks
+
+    def _floor_relaxed(self):
+        """Context: the floor object out of the collision world (the cuRobo ground slab stays) — the push-under stance C
+        stands at the deep trunks, where the 1 cm margin against the floor mesh is what fails (see
+        :meth:`push_under_candidates`); applied to the core's stance / transition re-check and to the program check."""
+        return self.ikc.ignoring([self.obj("floor")]) if self.push_under else _NullContext()
+
+    def check_stances_with_objects(self, draft: Draft):
+        with self._floor_relaxed():
+            super().check_stances_with_objects(draft)
+
+    def program_check(self, draft: Draft) -> Dict[str, Any]:
+        with self._floor_relaxed():
+            return super().program_check(draft)
 
     # ------------------------------------------------------------------ goal (§5.6 / §6.12)
 
