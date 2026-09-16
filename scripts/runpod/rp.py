@@ -7,7 +7,8 @@ spend is tracked in ``runlogs/runpod/billing.log`` (balance samples, RECHARGE ev
 
 Guard rails (the account has an auto-recharge card, so runaway pods cost real money):
 
-* every pod gets a TTL; ``watchdog`` terminates pods past their TTL and pods that report idle for too long,
+* every pod gets a TTL; ``watchdog`` terminates pods past their TTL and pods that report idle for too long
+  (never for budget reasons unless started with ``--enforce-cap``: the balance / RECHARGE lines are the budget signal),
 * the pod itself arms a self-terminate timer in ``bootstrap.sh`` (``runpodctl remove pod`` at TTL),
 * ``create`` refuses to start a pod when the projected spend (spent so far + fleet cost until TTL) exceeds ``--cap``.
 
@@ -418,7 +419,8 @@ def cmd_terminate(api: Api, args):
 
 def cmd_watchdog(api: Api, args):
     """Enforce TTLs / idleness and log the balance until stopped (or until no pods remain and --exit-when-empty)."""
-    print(f"watchdog: interval {args.interval}s, idle-terminate after {args.idle_min} min of <{args.idle_util}% GPU (pods marked ours only)")
+    print(f"watchdog: interval {args.interval}s, idle-terminate after {args.idle_min} min of <{args.idle_util}% GPU (pods marked ours only); "
+          f"spend cap {'ENFORCED at $%.0f' % args.cap if args.enforce_cap else 'not enforced (logging only)'}")
     idle_since: Dict[str, float] = {}
     while True:
         fleet = load_fleet()
@@ -457,7 +459,10 @@ def cmd_watchdog(api: Api, args):
                         reason = reason or "idle"
                 else:
                     idle_since.pop(p["id"], None)
-            if spent_so_far(fleet) > args.cap:
+            # spend-cap termination is opt-in (`--enforce-cap`): on 2026-09-15 the $200 default cap killed a whole
+            # sampling fleet mid-run (owner decision 21:27 PDT: the watchdog never terminates for budget reasons;
+            # the balance / RECHARGE lines in billing.log stay the budget signal, `create` still refuses over the cap)
+            if args.enforce_cap and spent_so_far(fleet) > args.cap:
                 reason = reason or "cap"
             if reason:
                 try:
@@ -497,6 +502,7 @@ def main():
     s = sub.add_parser("watchdog"); s.add_argument("--interval", type=int, default=300); s.add_argument("--idle-min", type=int, default=20)
     s.add_argument("--idle-util", type=float, default=3.0); s.add_argument("--idle-grace-min", type=int, default=45, help="no idle check before the install has had time to finish")
     s.add_argument("--exit-when-empty", action="store_true")
+    s.add_argument("--enforce-cap", action="store_true", help="terminate pods when spent_total exceeds --cap (OFF by default since 2026-09-15: the cap killed a fleet mid-run)")
     args = ap.parse_args()
     api = Api(load_env()["RUNPOD_API_KEY"])
     {"balance": cmd_balance, "stock": cmd_stock, "create": cmd_create, "list": cmd_list, "wait-ssh": cmd_wait_ssh, "run": cmd_run,
