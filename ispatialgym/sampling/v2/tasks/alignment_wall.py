@@ -368,12 +368,15 @@ class AlignmentWall(SamplerV2):
             B, a = brace_point(pts_l, kind, side_l, high_sign, C_l, band)
             B = on_plane(B, mid_plane, n)
             eef = C.fingertip_eef(B, a, closing=n, clearance=float(self.param("brace_offset_m", 0.005)))
-            # brace pre-contact 10 cm OFF THE WALL (along +n, the room side) instead of 10 cm back along −a: the approach
-            # segment pre → contact then comes in normal to the wall and the pads are within 2 cm of the wall only at
-            # the contact itself (wall ignored there, §3.6); an approach sliding along the wall at 2 cm has every
-            # intermediate pose flagged by the 1 cm-margin sphere model (the pilot's program-check rejections).
-            # Spec §5.5 wording change proposed: "brace pre-contact = eef + 0.10·n".
-            pre = (eef[0] + float(self.param("pre_dist_m", C.PRE_DIST)) * n, eef[1])
+            # brace pre-contact = eef − 0.10·a + 0.08·n: back along the approach axis (from outside the hull, as the spec
+            # has it) AND off the wall toward the room, so the straight approach pre → contact is within the wall's 1 cm
+            # check margin only at the contact itself (wall ignored there, §3.6). An approach sliding along the wall at
+            # 2 cm has every intermediate pose flagged by the sphere model (the pilot's program-check rejections); an
+            # approach normal to the wall at B passes through the tilted target's plane region (wall08f smoke).
+            # Spec §5.5 wording change proposed: "brace pre-contact = eef − 0.10·a + 0.08·n".
+            off_wall = float(self.param("brace_pre_offset_wall_m", 0.08))
+            pre_a = C.pre_pose(eef)
+            pre = (pre_a[0] + off_wall * n, pre_a[1])
             braces.append({"kind": kind, "B": B, "a": a, "pose": eef, "pre": pre})
         push_arm = push_arm_of(E_low, C_, th.tensor([float(n[1]), -float(n[0]), 0.0]))
         return {"pose_tilted": pose_t, "pose_level": pose_l, "hull_tilted": pts_t, "hull_level": pts_l, "C": C_, "E_low": E_low, "E_high": E_high,
