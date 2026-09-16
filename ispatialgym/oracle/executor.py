@@ -129,7 +129,7 @@ TASK_TRACKING_ATTRS = ("_first_success_step", "_first_settled_success_step", "_e
 
 
 #: ctx keys the execute functions write for the record (meta.json ``actions[].notes``)
-NOTE_KEYS = ("push_residual", "push_pivot_offset_m", "push_object_drift_m", "approach_finish", "descent_finish", "idle_arms_moved", "arms_posture", "fingers_set", "object_motion",
+NOTE_KEYS = ("push_residual", "push_pivot_offset_m", "push_object_drift_m", "approach_finish", "descent_finish", "idle_arms_moved", "arms_posture", "fingers_set", "plan_ignored", "object_motion",
              "camera_error_before_correction", "camera_error", "attached")
 
 
@@ -228,6 +228,32 @@ class SimState:
                 continue
             try:
                 if bool(obj.states[Touching].get_value(ent)):
+                    out.append(ent)
+            except Exception:  # noqa: BLE001
+                continue
+        return out
+
+    #: structural categories a target rests against without a contact report (a painting attached to its wall)
+    STRUCTURE_CATEGORIES = ("walls", "floors", "ceilings", "window", "door")
+
+    def contact_supports(self, name: str, margin: float = 0.10) -> List[Any]:
+        """The objects ``name`` rests in / on / against — what the sampler ignores for that object's contact poses
+        (spec §3.6 "support ignored for the grasp pose", the source tray of disembedding, the wall along the whole
+        brace chain of wall alignment): the ``touching`` objects plus the structural task-scope objects (walls,
+        floors, ...) whose AABB lies within ``margin`` of the object's. ``[]`` without the simulator."""
+        out = list(self.touching(name))
+        try:
+            obj = self.object(name)
+            lo, hi = obj.aabb
+        except Exception:  # noqa: BLE001
+            return out
+        for inst, ent in (getattr(self.task, "object_scope", None) or {}).items():
+            if ent is obj or ent is self.robot or any(ent is o for o in out) or str(getattr(ent, "category", "")) not in self.STRUCTURE_CATEGORIES:
+                continue
+            try:
+                lo2, hi2 = ent.aabb
+                gap = th.maximum(th.as_tensor(lo2).float() - th.as_tensor(hi).float(), th.as_tensor(lo).float() - th.as_tensor(hi2).float())
+                if float(gap.max()) <= margin:
                     out.append(ent)
             except Exception:  # noqa: BLE001
                 continue

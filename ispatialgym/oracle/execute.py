@@ -152,6 +152,30 @@ def _cfg(ctx: Dict[str, Any]) -> ExecuteConfig:
     return ctx.get("cfg") or CONFIG
 
 
+def contact_ignores(state, name: str, extra: Sequence[str] = ()) -> List[Any]:
+    """Scene objects left out of the planner's collision world for the pre-pose / finishing plans of a contact
+    action on ``name`` (the sampler's own rule, spec §3.6 / owner 2026-09-16): the container or support the object
+    rests in / on / against (``SimState.contact_supports``: the source tray of disembedding, the table, the wall a
+    painting hangs on) plus the instances in ``extra`` (a recorded ``grasps[].grasp_from``, the place ``on``)."""
+    out: List[Any] = []
+    getter = getattr(state, "contact_supports", None) or getattr(state, "touching", None)
+    if getter is not None:
+        try:
+            out.extend(getter(name))
+        except Exception:  # noqa: BLE001
+            pass
+    for inst in extra:
+        if not inst:
+            continue
+        try:
+            o = state.object(inst)
+        except Exception:  # noqa: BLE001
+            continue
+        if not any(o is x for x in out):
+            out.append(o)
+    return out
+
+
 def _hook(ctx: Dict[str, Any], name: str):
     """An executor hook (``ctx["hooks"][name]``; a no-op without an executor): ``fov(enabled)`` enables / disables
     the gripper-in-FOV monitor around the checked segment of the action (``qa.Monitors`` arming rule)."""
@@ -356,12 +380,16 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     arm = action.arm
     _hook(ctx, "fov")(False)  # the idle posture / the transit to the pre-grasp are not the sampler's to guarantee
     yield from motions.gripper(arm, close=False)
-    yield from motions.arm_to(arm, pose=targets["pre_grasp"], q_hint=_witness(ctx, "pre_grasp"))
+    # the container / support the object rests in (the source tray of disembedding, the table; ``grasps[].grasp_from``
+    # when recorded) leaves the collision world for the grasp poses, like the sampler's check (spec §3.6)
+    grasp_from = (getattr(action.grasp, "extra", None) or {}).get("grasp_from") if action.grasp is not None else None
+    supports = contact_ignores(state, action.object, extra=(grasp_from,) if grasp_from else ())
+    ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in supports]
+    yield from motions.arm_to(arm, pose=targets["pre_grasp"], q_hint=_witness(ctx, "pre_grasp"), ignore_objects=supports)
     _hook(ctx, "fov")(True)  # from the pre-grasp on the fingertips enter the frame and must stay (recorded grasp pose in frame)
     obj = state.object(action.object)
     cfg = _cfg(ctx)
-    touching = getattr(state, "touching", lambda name: [])(action.object)  # the support / partner it rests on
-    finish = ApproachFinish(targets["grasp"], q_hint=_witness(ctx, "grasp"), ignore_objects=[obj] + list(touching), max_stall=cfg.approach_finish_max_stall,
+    finish = ApproachFinish(targets["grasp"], q_hint=_witness(ctx, "grasp"), ignore_objects=[obj] + list(supports), max_stall=cfg.approach_finish_max_stall,
                             max_remaining=cfg.approach_finish_max_remaining)
     yield from motions.arm_along(arm, targets["approach"], finish=finish)
     if finish.used:
@@ -448,14 +476,12 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     arm = action.arm
     drop = action.kind == "drop"
     _hook(ctx, "fov")(False)  # the transit to the pre-place (10 cm back along a tilted approach) may leave the margin
-    yield from motions.arm_to(arm, pose=targets["pre_place"], q_hint=_witness(ctx, "pre_place"))
-    _hook(ctx, "fov")(True)  # the descent ends at the recorded (in-frame) place pose
     on = []
     if getattr(action, "on", None) and not drop:  # a drop keeps its container in the collision world: it must not be touched
-        try:
-            on = [state.object(action.on)] + list(getattr(state, "touching", lambda name: [])(action.on))
-        except KeyError:
-            on = []
+        on = contact_ignores(state, action.on, extra=(action.on,))  # the destination container / support and what it rests on
+    ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in on]
+    yield from motions.arm_to(arm, pose=targets["pre_place"], q_hint=_witness(ctx, "pre_place"), ignore_objects=on)
+    _hook(ctx, "fov")(True)  # the descent ends at the recorded (in-frame) place pose
     finish = ApproachFinish(targets["place"], q_hint=_witness(ctx, "place"), ignore_objects=on, max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
     yield from motions.arm_along(arm, targets["descent"], finish=finish)
     if finish.used:
@@ -650,7 +676,9 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     obj = action.contact.object
     _hook(ctx, "fov")(False)
     yield from motions.gripper(arm, close=True)
-    yield from motions.arm_to(arm, pose=targets["pre"], q_hint=_witness(ctx, "pre"))
+    supports = contact_ignores(state, obj)  # the wall / table the target rests against: ignored along the contact chain (sampler rule)
+    ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in supports]
+    yield from motions.arm_to(arm, pose=targets["pre"], q_hint=_witness(ctx, "pre"), ignore_objects=supports)
     _hook(ctx, "fov")(True)
     pose0 = tuple(x.clone() for x in state.object_pose(obj))
     ctx["object_pose0"] = pose0
@@ -708,7 +736,9 @@ def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Itera
     arm = action.contact.arm
     _hook(ctx, "fov")(False)
     yield from motions.gripper(arm, close=True)
-    yield from motions.arm_to(arm, pose=targets["pre"], q_hint=_witness(ctx, "pre"))
+    supports = contact_ignores(state, action.contact.object)  # the wall / table the braced object rests against
+    ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in supports]
+    yield from motions.arm_to(arm, pose=targets["pre"], q_hint=_witness(ctx, "pre"), ignore_objects=supports)
     _hook(ctx, "fov")(True)
     yield from motions.arm_along(arm, targets["approach"])
 
@@ -814,6 +844,6 @@ def coverage() -> Dict[str, bool]:
 __all__ = [
     "PrivilegedState", "ExecuteConfig", "CONFIG", "EXECUTORS", "MANIPULATION_ACTIONS", "FOV_EXEMPT_ACTIONS", "executor_for",
     "is_manipulation", "fov_monitored", "run_action", "check_postcondition", "coverage", "camera_goal", "joint_tolerance",
-    "idle_arm_targets", "stance_arm_targets", "move_idle_arms", "stance_fingers", "posture_q", "IDLE_POSTURES", "IDLE_ARM_TOL", "intended_contacts", "forbidden_contacts", "offset_brace",
+    "idle_arm_targets", "stance_arm_targets", "move_idle_arms", "stance_fingers", "posture_q", "contact_ignores", "IDLE_POSTURES", "IDLE_ARM_TOL", "intended_contacts", "forbidden_contacts", "offset_brace",
     "push_geometry", "push_residual", "extend_push", "push_tangent", "PushGeometry",
 ]
