@@ -26,7 +26,7 @@ not repeated here.
 from __future__ import annotations
 
 import copy
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Sequence
 
 #: §2.3 example: template and instance counts (``sample_isg`` N = min(#valid model combinations, templates_max)).
 COMMON: Dict[str, Any] = {
@@ -72,7 +72,9 @@ ARTICULATION_COMMON: Dict[str, Any] = {
 ALIGNMENT_WALL_COMMON: Dict[str, Any] = {
     "hang_height_m": 1.45,  # §5.5 centre at height 1.45 m
     "wall_offset_extra_m": 0.01,  # §5.5 thickness/2 + 0.01 off the wall
-    "deviation_range_deg": [15.0, 45.0],  # §5.5 init in-plane angle δ = sign · U(15°, 45°)
+    "deviation_range_deg": [15.0, 25.0],  # §5.5 δ = sign · U(15°, 25°) (owner decision 2026-09-16 A8; was U(15°, 45°))
+    "max_deviation_deg": 25.0,  # §5.5 A8: |δ| > 25° is beyond the one-stroke push (two-stroke push = later, D list)
+    "stance_arm_posture": "tucked",  # §5.5 A6: the two-arm manipulation stance is checked / driven in with hanging arms, closed pads
     "hinge_drift_max_rad": 0.03,  # §5.5 hinge drift ≤ 0.03 rad after settling
     "min_visible_objects": 5,  # §5.5 ≥ 5 objects with ≥ 200 px in the init render
     "min_object_pixels": 200,  # §5.5
@@ -89,7 +91,7 @@ ALIGNMENT_WALL_COMMON: Dict[str, Any] = {
     "brace_offset_m": 0.005,  # §5.5 fingertip face 5 mm from B
     "brace_clearance_m": 0.02,  # §5.5 brace hand ≥ 2 cm clear of the tilted hull at init
     "brace_kinds": ["below_high", "above_low", "side_high"],  # §5.5 candidates in order, first reachable wins
-    "template_filter_deviation_deg": 30.0,  # §5.5 a spot is kept when steps 1–3 pass for δ = ±30°
+    "template_filter_deviation_deg": 25.0,  # §5.5 a spot is kept when steps 1–3 pass for δ = ±25° (A8; was ±30°)
     "scale_hint_steps": [0.9, 0.8, 0.7, 0.6, 0.5],  # §5.5 diagnostic pass s ∈ {0.9 … 0.5}, never applied automatically
     "settle_free": [],  # §5.5
 }
@@ -413,18 +415,28 @@ def defaults_for(subtask: str) -> Dict[str, Any]:
     return copy.deepcopy(DEFAULTS[subtask])
 
 
-def seed_generation(subtask: str, existing_entry: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def seed_generation(subtask: str, existing_entry: Optional[Dict[str, Any]] = None, reseed: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     """The ``generation`` block of a customs entry (§2.3 "Seeding").
 
     Copied from ``existing_entry["generation"]`` when the alias was grounded before (the tuned numbers survive a
     re-grounding), otherwise :func:`defaults_for`. Keys the defaults have and the existing block lacks are added
-    (a spec number introduced after the entry was created), existing values are never overwritten.
+    (a spec number introduced after the entry was created), existing values are never overwritten -- except the
+    keys named in ``reseed`` (``ground_isg --reseed-generation KEY,...``: a spec number the owner changed, e.g.
+    ``deviation_range_deg`` after A8), which take the default again; ``reseed = ["*"]`` re-seeds the whole block
+    (the group sizes are re-derived from the alias anyway).
     """
     seed = defaults_for(subtask)
     if existing_entry and isinstance(existing_entry.get("generation"), dict):
+        if reseed and "*" in reseed:
+            return seed
         gen = copy.deepcopy(existing_entry["generation"])
         for k, v in seed.items():
             gen.setdefault(k, v)
+        for k in reseed or ():
+            if k in seed:
+                gen[k] = copy.deepcopy(seed[k])
+            else:
+                gen.pop(k, None)  # a key the defaults no longer have
         return gen
     return seed
 

@@ -1265,6 +1265,20 @@
    "fallback_of": "alignment-world_vertical-guitar-walls",
    "fallback_rank": 1,
    "fallback_kind": "scale"
+  },
+  {
+   "alias": "alignment-world_vertical-painting_s080-walls",
+   "id": 103,
+   "grounded": "2026-09-16",
+   "by": "ground_isg 2.0.0",
+   "subtask": "alignment-world_vertical",
+   "iddl": "alignment/world_vertical.iddl",
+   "pick": "alignment-world_vertical#02",
+   "slot": "representative",
+   "mode": "representative",
+   "fallback_of": "alignment-world_vertical-painting-walls",
+   "fallback_rank": 1,
+   "fallback_kind": "scale"
   }
  ]
 }

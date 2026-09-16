@@ -45,9 +45,11 @@ plus ``fallback_of`` (the primary alias), ``fallback_rank`` (1 = tried first aft
 ``fallback_kind`` (``init_surface`` — large-scale IORS init surface class under: support → partner's own top → floor,
 ontop: support → floor; ``scale`` — wall / axial alignment target spawned at ``roles.target.scale``; ``next_model`` —
 small-scale articulation: the next candidate model of the category) and ``fallback_params`` (kind-specific facts, e.g.
-``{"scale": 0.7, "scale_source": "template_meta.scale_hint"}``). The primary lists its fallbacks in rank order under
-``fallbacks``. A scheduler queues a fallback job only after the primary produced nothing; the sampler itself never
-falls back (spec principle 2).
+``{"scale": 0.7, "scale_source": "template_meta.scale_hint" | "override" | "default_step"}``). The primary lists its
+**live** fallbacks in rank order under ``fallbacks``; a fallback entry an earlier grounding produced and the current one
+does not (another scale after a new hint) keeps its entry / id / BDDL but carries ``fallback_params.superseded_by``
+(the alias that replaced it, or ``true``) and leaves the primary's list. A scheduler queues the aliases of
+``primary.fallbacks`` only after the primary produced nothing; the sampler itself never falls back (spec principle 2).
 
 Dataclasses here are thin, typed views over that JSON; :class:`Customs` loads / saves the file and hands out entries.
 """

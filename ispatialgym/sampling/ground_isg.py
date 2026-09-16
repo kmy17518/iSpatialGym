@@ -32,7 +32,8 @@ Run::
     python -m ispatialgym.sampling.ground_isg [--representative-only | --test-only | --all] [--subtask ID ...]
         [--slots representative,variation_geometry,...] [--out-bddl DIR] [--customs FILE] [--scene S ...]
         [--full-whitelists] [--distractors same:2,other:1] [--legacy-activity-names] [--dry-run]
-        [--no-fallbacks] [--fallback-scale 0.7] [--scale-hints GLOB|none]
+        [--no-fallbacks] [--fallback-scale 0.7] [--scale-hints GLOB|none] [--scale-hint ALIAS=SCALE ...]
+        [--reseed-generation KEY,...|*]
 
 Decisions taken where the docs leave room (all reported by the CLI, see ``--help`` and the run report):
 
@@ -608,6 +609,8 @@ class Options:
     fallbacks: bool = True  # emit the fallback aliases (owner decision 2026-09-16 B)
     fallback_scale: float = DEFAULT_FALLBACK_SCALE  # scale fallback step when the pilot recorded no scale_hint
     scale_hints: Dict[str, float] = field(default_factory=dict)  # primary alias -> pilot template_meta.scale_hint
+    scale_overrides: Dict[str, float] = field(default_factory=dict)  # primary alias -> scale (--scale-hint alias=s; persisted in the customs)
+    reseed_generation: Tuple[str, ...] = ()  # generation keys re-seeded from the defaults ("*" = the whole block)
 
 
 @dataclass
@@ -1288,17 +1291,32 @@ class Grounder:
             out.append(fb)
         return out
 
+    def scale_for(self, alias: str) -> Tuple[float, str]:
+        """The scale of the scale fallback of ``alias`` and its source, in priority order: a ``--scale-hint alias=s``
+        override of this run (``override``), an override persisted in the customs by an earlier run (the existing
+        ``scale`` fallback entry of the alias with ``scale_source = override``), the pilot's ``template_meta.scale_hint``
+        (``template_meta.scale_hint``), else :attr:`Options.fallback_scale` (``default_step``)."""
+        if alias in self.opt.scale_overrides:
+            return float(self.opt.scale_overrides[alias]), "override"
+        for e in self.customs.entries.values():
+            if e.fallback_of == alias and e.fallback_kind == "scale" and e.fallback_params.get("scale_source") == "override" \
+                    and not e.fallback_params.get("superseded_by"):
+                return float(e.fallback_params["scale"]), "override"
+        hint = self.opt.scale_hints.get(alias)
+        if hint:
+            return float(hint), "template_meta.scale_hint"
+        return float(self.opt.fallback_scale), "default_step"
+
     def _scale_fallbacks(self, comb: Combination, alias: str) -> List[Combination]:
         """§5.5 / §6.10 ``scale_hint``: the target spawned at the pilot's hint (else :attr:`Options.fallback_scale`);
-        the same models (variation / held-out included) run at that scale."""
+        the same models (variation / held-out included) run at that scale. Alias token ``<target>_sNNN``."""
         target = comb.roles.get("target")
         if target is None or target.kind != "sampleable" or "target" in comb.scale:
             return []
-        hint = self.opt.scale_hints.get(alias)
-        scale = float(hint) if hint else float(self.opt.fallback_scale)
+        scale, source = self.scale_for(alias)
         if scale <= 0 or scale >= 1.0:
             return []
-        params = {"scale": round(scale, 3), "scale_source": "template_meta.scale_hint" if hint else "default_step"}
+        params = {"scale": round(scale, 3), "scale_source": source}
         fb = self._derive(comb, alias, 1, "scale", params)
         fb.scale["target"] = round(scale, 3)
         fb.scenes, fb.rooms, fb.floor_room = list(comb.scenes), dict(comb.rooms), dict(comb.floor_room)
@@ -1357,7 +1375,7 @@ class Grounder:
         existing = self.customs.entries.get(alias)
         existing_dict = existing.to_dict() if existing is not None else None
         entry = self.customs.get_or_create_entry(alias, iddl=I.relative_path(iddl.path, self.iddl_root) if iddl.path else None, definition_id=definition_id)
-        entry.generation = G.seed_generation(subtask, existing_dict)
+        entry.generation = G.seed_generation(subtask, existing_dict, reseed=self.opt.reseed_generation or None)
         if comb.fallback is not None:
             entry.set_fallback(comb.fallback.primary, comb.fallback.rank, comb.fallback.kind, comb.fallback.params)
         else:
@@ -1635,10 +1653,8 @@ class Grounder:
                     fgp = self._ground_or_skip(fb)
                     if fgp is not None and fgp.alias not in fallback_aliases:
                         fallback_aliases.append(fgp.alias)
-                if fallback_aliases or gp.entry.fallbacks:
-                    merged = [a for a in gp.entry.fallbacks if a in self.customs.entries and self.customs.entries[a].fallback_of == gp.alias]
-                    merged += [a for a in fallback_aliases if a not in merged]
-                    gp.entry.fallbacks = sorted(merged, key=lambda a: (self.customs.entries[a].fallback_rank or 0, a))
+                if self.opt.fallbacks:
+                    self._update_fallback_list(gp, fallback_aliases)
                 if self.opt.representative_test and not self.opt.dry_run:
                     for sc in comb.scenes:
                         outcome = run_representative_test(gp, self.customs, sc)
@@ -1647,6 +1663,29 @@ class Grounder:
             if not self.opt.dry_run:
                 self.customs.save()
         return self.report
+
+    def _update_fallback_list(self, gp: GroundedProblem, produced: List[str]) -> None:
+        """``primary.fallbacks`` = the fallbacks produced by this run (rank order). A fallback entry of an earlier run
+        that this run no longer produces (another scale after a new hint, another next model) is **superseded**: it
+        keeps its entry, id and BDDL (ids are never reused) but leaves the primary's list and is marked
+        ``fallback_params.superseded_by = <the new alias of its kind>`` (or ``true``), so a scheduler iterating
+        ``primary.fallbacks`` never queues it."""
+        kinds = {a: self.customs.entries[a].fallback_kind for a in produced if a in self.customs.entries}
+        for alias, e in self.customs.entries.items():
+            if e.fallback_of != gp.alias or alias in produced:
+                continue
+            if e.fallback_params.get("superseded_by"):
+                continue
+            newer = next((a for a, k in kinds.items() if k == e.fallback_kind), None)
+            e.fallback_params["superseded_by"] = newer or True
+            self.report.notes[gp.subtask].append(f"{alias}: superseded fallback of {gp.alias}" + (f" (now {newer})" if newer else ""))
+        # a superseded fallback that this run produces again (a hint went back) is live again
+        for a in produced:
+            e = self.customs.entries.get(a)
+            if e is not None:
+                e.fallback_params.pop("superseded_by", None)
+        live = [a for a in produced if a in self.customs.entries]
+        gp.entry.fallbacks = sorted(live, key=lambda a: (self.customs.entries[a].fallback_rank or 0, a))
 
     def _ground_or_skip(self, comb: Combination) -> Optional[GroundedProblem]:
         subtask = comb.subtask
@@ -1760,6 +1799,12 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--scale-hints", default=None,
                     help=f"glob of pilot template_meta.json files whose scale_hint sets the fallback scale per alias (default {DEFAULT_SCALE_HINT_GLOB}; "
                          "'none' = ignore the pilot)")
+    ap.add_argument("--scale-hint", action="append", default=None, metavar="ALIAS=SCALE",
+                    help="fallback scale of one primary alias (repeatable; wins over the pilot hint and is persisted in the customs entry as "
+                         "scale_source = override, so later re-groundings keep it)")
+    ap.add_argument("--reseed-generation", default=None, metavar="KEY[,KEY...]|*",
+                    help="re-seed these generation keys of every re-grounded entry from generation_defaults.py (a spec number the owner "
+                         "changed); '*' = the whole block")
     ap.add_argument("--dry-run", action="store_true", help="ground and report, write nothing")
     ap.add_argument("--report", default=None, help="also write the report (markdown) to this path; .json alongside")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -1778,6 +1823,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if not args.no_fallbacks and (args.scale_hints or "").lower() != "none":
         hints = load_scale_hints(args.scale_hints)
         log.info("scale hints from the pilot: %d aliases%s", len(hints), f" ({', '.join(f'{a}={s}' for a, s in sorted(hints.items()))})" if hints else "")
+    overrides: Dict[str, float] = {}
+    for item in args.scale_hint or []:
+        alias, _, value = item.partition("=")
+        try:
+            s = float(value)
+        except ValueError:
+            s = -1.0
+        if not alias or not (0.0 < s < 1.0):
+            print(f"--scale-hint expects ALIAS=SCALE with 0 < SCALE < 1, got {item!r}", file=sys.stderr)
+            return 2
+        overrides[alias.strip()] = s
+    reseed = tuple(k.strip() for k in (args.reseed_generation or "").split(",") if k.strip())
     opt = Options(
         mode=args.mode,
         slots=slots,
@@ -1791,6 +1848,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         fallbacks=not args.no_fallbacks,
         fallback_scale=args.fallback_scale,
         scale_hints=hints,
+        scale_overrides=overrides,
+        reseed_generation=reseed,
     )
     iddls = I.load_all(args.iddl)
     icl = ICL(args.icl)

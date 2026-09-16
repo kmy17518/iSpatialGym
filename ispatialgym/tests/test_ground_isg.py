@@ -534,6 +534,40 @@ def test_scale_fallbacks(grounded, tmp_path):
     assert letter.alias == "alignment-axial-letter_s080-breakfast_table" and letter.entry.fallback_params == {"scale": 0.8, "scale_source": "template_meta.scale_hint"}
     other = next(g for a, g in fbs.items() if a != "alignment-axial-letter-breakfast_table")
     assert other.alias.split("-")[2].endswith("_s075") and other.entry.fallback_params["scale_source"] == "default_step"
+    # a --scale-hint override wins, is persisted in the customs (later runs without the flag keep it) and supersedes
+    # the earlier fallback of its kind (which keeps entry, id and BDDL but leaves the primary's live list)
+    g4 = GI.Grounder(IDDLS, grounded.icl, C.Customs.load(str(tmp_path / "c.json")), bddl_root=str(tmp_path / "bddl"),
+                     options=GI.Options(representative_test=False, scale_hints=hints, fallback_scale=0.75,
+                                        scale_overrides={"alignment-axial-letter-breakfast_table": 0.9}))
+    g4.run(["alignment-axial"])
+    primary = g4.customs.entries["alignment-axial-letter-breakfast_table"]
+    assert primary.fallbacks == ["alignment-axial-letter_s090-breakfast_table"]
+    new = g4.customs.entries["alignment-axial-letter_s090-breakfast_table"]
+    assert new.fallback_params == {"scale": 0.9, "scale_source": "override"} and new.roles["target"].scale["default"] == 0.9
+    old = g4.customs.entries["alignment-axial-letter_s080-breakfast_table"]
+    assert old.fallback_params["superseded_by"] == "alignment-axial-letter_s090-breakfast_table" and old.definition_id != new.definition_id
+    assert P.list_problem_ids("alignment", str(tmp_path / "bddl"))  # the superseded problem file stays (ids are never reused)
+    g5 = GI.Grounder(IDDLS, grounded.icl, C.Customs.load(str(tmp_path / "c.json")), bddl_root=str(tmp_path / "bddl"),
+                     options=GI.Options(representative_test=False, scale_hints=hints, fallback_scale=0.75))
+    g5.run(["alignment-axial"])
+    assert g5.customs.entries["alignment-axial-letter-breakfast_table"].fallbacks == ["alignment-axial-letter_s090-breakfast_table"]
+    assert g5.customs.entries["alignment-axial-letter_s090-breakfast_table"].fallback_params["scale_source"] == "override"
+    assert g5.scale_for("alignment-axial-letter-breakfast_table") == (0.9, "override")
+
+
+def test_wall_deviation_defaults_and_reseed():
+    # owner decision 2026-09-16 A8: delta = sign * U(15, 25) deg, template filter +-25 deg; A6 tucked two-arm stance posture
+    for st in ("alignment-world_vertical", "alignment-world_horizontal"):
+        gen = G.defaults_for(st)
+        assert gen["deviation_range_deg"] == [15.0, 25.0] and gen["max_deviation_deg"] == 25.0
+        assert gen["template_filter_deviation_deg"] == 25.0 and gen["stance_arm_posture"] == "tucked"
+    assert G.defaults_for("alignment-axial")["deviation_range_deg"] == [20.0, 70.0]  # §6.10 unchanged
+    old = {"generation": {"deviation_range_deg": [15.0, 45.0], "templates_max": 3, "legacy_key": 1}}
+    kept = G.seed_generation("alignment-world_vertical", old)
+    assert kept["deviation_range_deg"] == [15.0, 45.0] and kept["templates_max"] == 3 and kept["legacy_key"] == 1  # copy semantics
+    reseeded = G.seed_generation("alignment-world_vertical", old, reseed=["deviation_range_deg", "legacy_key"])
+    assert reseeded["deviation_range_deg"] == [15.0, 25.0] and reseeded["templates_max"] == 3 and "legacy_key" not in reseeded
+    assert G.seed_generation("alignment-world_vertical", old, reseed=["*"]) == G.defaults_for("alignment-world_vertical")
 
 
 def test_next_model_fallbacks(grounded):
