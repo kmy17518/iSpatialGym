@@ -259,8 +259,9 @@ def main():
                 line = "\t".join([j["id"], "CMD", j["cmd"], ""])
             else:
                 line = "\t".join([j["id"], j["spec"], j["problem"], extra.strip()])
-            # deterministic file name per job id: re-dispatching the same job overwrites instead of duplicating
-            script.append(f"printf '%s\\n' {shlex.quote(line)} > /root/samp/queue/w{args.wave:02d}_{j['id'][:120]}.job")
+            # deterministic file name per job id (re-dispatching the same job overwrites instead of duplicating); the runner
+            # takes the queue in file-name order, so the wave and the manifest position (weight order) prefix the id
+            script.append(f"printf '%s\\n' {shlex.quote(line)} > /root/samp/queue/w{args.wave:02d}_{k:03d}_{j['id'][:110]}.job")
         script.append(f"printf '%s' {shlex.quote(args.ref)} > /root/samp/ref.txt")
         rp.ssh_run(*ep, "bash -s", timeout=120, stdin_text="\n".join(script) + "\n")
         rp.ssh_run(*ep, "cat > /root/samp/run_jobs.sh && chmod +x /root/samp/run_jobs.sh", timeout=60, stdin_text=RUNNER)
