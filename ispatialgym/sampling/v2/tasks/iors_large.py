@@ -551,12 +551,15 @@ class IORSLarge(SamplerV2):
         return float(proj.max() - proj.min()) / 2
 
     def push_height(self, pitch_deg: float) -> Tuple[float, float]:
-        """``(z_push, z_tip)`` of the floor blade: the eef origin at half the target height (clamped to 4.5–8 cm above the
-        floor) with the fingertips ≥ 5 mm above the floor."""
+        """``(z_push, z_tip)`` of the floor blade: the eef origin at ¾ of the target height, clamped to 6–9 cm above the
+        floor (``push_height_min_m``): the fingertips then sit ≥ 4 cm above the floor — the cuRobo ground slab (which the
+        floor-ignore does not remove) flags fingertip spheres closer than that (first-demo loop 2026‑09‑16: every push
+        pre-pose failed the IK at z_push = 4.5 cm while the drop grasp 11 cm up was feasible from the same stance)."""
         height = float(self.place["height"])
-        z_push = self.floor_z + min(max(0.5 * height, 0.045), 0.08)
+        z_min = float(self.num("push_height_min_m", 0.06))
+        z_push = self.floor_z + min(max(0.75 * height, z_min), 0.09)
         drop = C.FINGERTIP_LENGTH * math.cos(math.radians(float(pitch_deg)))
-        z_push = max(z_push, self.floor_z + 0.005 + drop)
+        z_push = max(z_push, self.floor_z + 0.04 + drop)
         return z_push, z_push - drop
 
     def _push_under_chain(self, place: Stance, quat, drop_xy, goal_xy, d2) -> Optional[Dict[str, Any]]:
