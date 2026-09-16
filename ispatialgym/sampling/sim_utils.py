@@ -87,7 +87,11 @@ class SimWorld:
     """One OmniGibson environment (scene + R1Pro) plus the helpers every task sampler needs."""
 
     def __init__(self, scene_model: str, rooms: Optional[Sequence[str]], robot_name: str = "robot_r1", image_size: int = IMAGE_SIZE,
-                 load_adjacent: Optional[bool] = None, scene_variant: Optional[dict] = None):
+                 load_adjacent: Optional[bool] = None, scene_variant: Optional[dict] = None, cameras: bool = True):
+        """``cameras=False``: the robot carries no vision sensor (``obs_modalities=["proprio"]`` - OmniGibson creates a
+        ``VisionSensor`` only for requested vision modalities), so no 1080^2 rgb + seg_instance buffers, annotators or
+        per-frame synthetic-data graph exist; ``cam_key`` / ``cam`` / ``camera_model`` are ``None`` and the render /
+        segmentation helpers raise. For the stages that never read pixels (reach bands: kinematics, raycasts, cuRobo)."""
         # macros lock once they have been read (second SimWorld in one process after og.clear())
         for name, value in (("ENABLE_OBJECT_STATES", True), ("USE_GPU_DYNAMICS", False), ("ENABLE_TRANSITION_RULES", False)):
             if getattr(gm, name) != value:
@@ -127,8 +131,8 @@ class SimWorld:
             "robots": [
                 M.joylo_robot_config(
                     robot_name,
-                    obs_modalities=["rgb", "seg_instance"],
-                    sensor_config={"VisionSensor": {"sensor_kwargs": {"image_height": image_size, "image_width": image_size}}},
+                    obs_modalities=["rgb", "seg_instance"] if cameras else ["proprio"],
+                    sensor_config={"VisionSensor": {"sensor_kwargs": {"image_height": image_size, "image_width": image_size}}} if cameras else {},
                     position=PARK_POSITION.tolist(),
                 )
             ],
@@ -138,10 +142,13 @@ class SimWorld:
         self._set_measurement_render_settings()
         self.scene = self.env.scene
         self.robot = self.env.robots[0]
-        self.cam_key = [k for k in self.robot.sensors if k.endswith(M.HEAD_CAMERA_SENSOR_SUFFIX)][0]
-        self.cam = self.robot.sensors[self.cam_key]
-        self.cam.horizontal_aperture = HEAD_APERTURE_MM
-        self.camera_model = G.CameraModel.from_sensor(float(self.cam.focal_length), HEAD_APERTURE_MM, image_size, image_size)
+        self.cameras = cameras
+        self.cam_key = self.cam = self.camera_model = None
+        if cameras:
+            self.cam_key = [k for k in self.robot.sensors if k.endswith(M.HEAD_CAMERA_SENSOR_SUFFIX)][0]
+            self.cam = self.robot.sensors[self.cam_key]
+            self.cam.horizontal_aperture = HEAD_APERTURE_MM
+            self.camera_model = G.CameraModel.from_sensor(float(self.cam.focal_length), HEAD_APERTURE_MM, image_size, image_size)
         for obj in self.scene.objects:
             obj.keep_still()
         self.n_scene_objects = len(self.scene.objects)
@@ -154,6 +161,14 @@ class SimWorld:
 
             n_freed = patch_trav_map(self.scene, self.scene_variant["freed_footprints"])
             log.info("traversability map patched for the scene variant: %d cells freed", n_freed)
+        #: the simulation state right after the environment's last rendering step: what the render side (Fabric transforms:
+        #: ``aabb``, ``collision_boundary_points_world``, the collision-mesh poses cuRobo reads) keeps showing while only
+        #: physics steps follow (``park_robot``'s five). A process that reuses this world for several independent
+        #: computations restores it, then the parked state, before each one (``reach_bands.reset_world_between_bands``), so
+        #: that every computation sees exactly the render-side and physics-side poses of a fresh process (measured
+        #: 2026-09-16: without it the support table had crept by ~4e-6 m after two more rendering steps and 7 of 111
+        #: (yaw, grasp) pairs of a band changed).
+        self.initial_state = og.sim.dump_state()
         self.robot_park_xy = self.park_robot(floor_z=self.floor_z)
         self.scene.update_initial_file()
         # ``ISG_HIDE_CATEGORY_SUBSTRINGS`` (comma separated category substrings, default none): emergency override that
@@ -472,6 +487,10 @@ class SimWorld:
         for _ in range(n):
             og.sim.render()
 
+    def _require_camera(self):
+        if self.cam is None:
+            raise RuntimeError("this SimWorld was created with cameras=False (no head camera): renders / segmentation / camera poses are unavailable")
+
     #: frames rendered per measurement: at least this many (see ``seg_instance``), at most ``SEG_MAX_RENDERS``
     SEG_MIN_RENDERS = 4
     SEG_MAX_RENDERS = 8
@@ -479,6 +498,7 @@ class SimWorld:
     def _raw_seg_instance(self) -> th.Tensor:
         """The head camera's instance-segmentation buffer as the annotator currently holds it (unremapped ids, a
         copy); a cheap fetch (no rgb / semantic read, no remapping) used to detect when the buffer has settled."""
+        self._require_camera()
         raw = self.cam._annotators["seg_instance"].get_data(device=og.sim.device)
         data = raw["data"] if isinstance(raw, dict) else raw
         seg = self.cam._preprocess_cpu_obs(data, "seg_instance") if og.sim.device == "cpu" else self.cam._preprocess_gpu_obs(data, "seg_instance")
@@ -496,6 +516,7 @@ class SimWorld:
         renders at least ``max(n_renders, SEG_MIN_RENDERS)`` frames and keeps rendering one frame at a time until two
         consecutive fetches of the raw buffer are identical (the scene is static during a measurement, so a settled
         buffer repeats exactly), up to ``SEG_MAX_RENDERS``; then the remapped observation is read."""
+        self._require_camera()
         n_min = max(int(n_renders), self.SEG_MIN_RENDERS)
         self.render(n_min - 2)
         prev = self._raw_seg_instance()
@@ -788,6 +809,7 @@ class SimWorld:
         return 0.0
 
     def camera_pose(self) -> G.Pose:
+        self._require_camera()
         p, q = self.cam.get_position_orientation()
         return p.float(), q.float()
 

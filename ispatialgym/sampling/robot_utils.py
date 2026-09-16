@@ -43,7 +43,8 @@ class RobotKit:
         if hasattr(world, "obstacle_filter"):
             self.backend.obstacle_filter = world.obstacle_filter
         self.jidx = self.backend._jidx
-        self.cam_in_zed = camera_offset_in_zed(self.robot, world.cam_key)
+        # a camera-less world (SimWorld(cameras=False)) has no sensor to measure: the USD constant (camera_pose / solve_view are not used there)
+        self.cam_in_zed = camera_offset_in_zed(self.robot, world.cam_key) if getattr(world, "cam_key", None) is not None else camera_offset_in_zed(None)
         idx = self.robot.trunk_control_idx
         self.trunk_limits = (self.robot.joint_lower_limits[idx].clone(), self.robot.joint_upper_limits[idx].clone())
         self._trav_cache: Dict[int, th.Tensor] = {}
