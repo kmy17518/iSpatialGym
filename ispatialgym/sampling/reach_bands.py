@@ -77,7 +77,40 @@ LOW_TOP_TILT = -1.2  # added to the grid when the top is below 0.6 m (floor, low
 LOW_TOP_Z = 0.60
 YAWS = [k * math.pi / 4 for k in range(8)]
 N_YAWS_GENERIC = 2
-TILTS_GENERIC = (0.0, 30.0)
+#: generic push / pinch approach pitches (deg, approach vector tilted from straight down toward the robot's forward
+#: direction, i.e. the hand comes from the robot's side): owner decision 2026-09-16 A1 added 45 and 60 so that far cells
+#: (0.9-1.0 m) keep an IK-feasible push arc. Class order = ``RobotKit.grasp_candidates_at`` (pitch-major, yaw-minor).
+TILTS_GENERIC = (0.0, 30.0, 45.0, 60.0)
+YAWS_GENERIC_DEG = (0, 90)
+GENERIC_CLASSES = [f"p{int(t):02d}_y{y}" for t in TILTS_GENERIC for y in YAWS_GENERIC_DEG]
+#: generic CONTACT pose set of the brace arm (owner decision 2026-09-16 A1): closed gripper, pads on a vertical face of
+#: the object at ``CONTACT_HEIGHT_FRACTION`` of its height with a horizontal approach ``a`` (base frame: ``near`` = pads
+#: on the face toward the robot pushing away, ``far`` = on the far face pulling toward the robot, ``left`` / ``right`` =
+#: on the robot-left / robot-right face pushing across), closing axis ``c`` vertical (``_v``: fingers stacked) or
+#: horizontal (``_h``: fingers side by side), plus the top press (``a`` = down, two wrist yaws) on the object's top.
+#: eef origin = contact - CONTACT_CENTER_Z·a (pad centre on the point, conventions ``contact_eef``), pre-contact 10 cm
+#: back along -a. One band per object height class (``HEIGHT_BIN``); the cell = the contact point (x ahead, lateral).
+CONTACT_HEIGHT_FRACTION = 0.75
+HEIGHT_BIN = 0.02
+CONTACT_CLASSES: List[Dict[str, Any]] = [
+    {"name": "near_v", "a": (1.0, 0.0, 0.0), "c": (0.0, 0.0, 1.0), "z": "side"},
+    {"name": "near_h", "a": (1.0, 0.0, 0.0), "c": (0.0, 1.0, 0.0), "z": "side"},
+    {"name": "far_v", "a": (-1.0, 0.0, 0.0), "c": (0.0, 0.0, 1.0), "z": "side"},
+    {"name": "far_h", "a": (-1.0, 0.0, 0.0), "c": (0.0, 1.0, 0.0), "z": "side"},
+    {"name": "left_v", "a": (0.0, -1.0, 0.0), "c": (0.0, 0.0, 1.0), "z": "side"},
+    {"name": "left_h", "a": (0.0, -1.0, 0.0), "c": (1.0, 0.0, 0.0), "z": "side"},
+    {"name": "right_v", "a": (0.0, 1.0, 0.0), "c": (0.0, 0.0, 1.0), "z": "side"},
+    {"name": "right_h", "a": (0.0, 1.0, 0.0), "c": (1.0, 0.0, 0.0), "z": "side"},
+    {"name": "top_y0", "a": (0.0, 0.0, -1.0), "c": (0.0, 1.0, 0.0), "z": "top"},
+    {"name": "top_y90", "a": (0.0, 0.0, -1.0), "c": (1.0, 0.0, 0.0), "z": "top"},
+]
+CONTACT_CLASSES_NAMES = [c["name"] for c in CONTACT_CLASSES]
+CONTACT_SET = "generic_contact"
+#: pad centre offset along the eef approach axis (conventions.CONTACT_CENTER_Z; negative = behind the origin)
+CONTACT_CENTER_Z = -0.01186
+#: idle-arm postures tried in this order when a trunk is not collision-free (owner decision 2026-09-16 A6: the idle
+#: arm may take any recorded collision-free posture; the band records the posture per trunk)
+POSTURES = ("untucked", "ready", "tucked")
 STRIP_MAX_DEPTH = 0.95  # m into the support from the edge; deeper cells are never reachable
 STRIP_HALF_WIDTH = 0.80
 CACHE_DEFAULT = os.path.expanduser("~/.cache/ispatialgym/reach_bands")
@@ -115,6 +148,11 @@ def trunk_grid(top_z_above_floor: float) -> List[Tuple[float, float]]:
 
 def trunk_key(translate: float, tilt: float) -> str:
     return f"t{translate:.2f}_k{tilt:+.1f}"
+
+
+def height_class(h: float, step: float = HEIGHT_BIN) -> float:
+    """Object height class (bin centre) of ``h``: 2 cm bins, the class value is the rounded height (``round(h / step) * step``)."""
+    return round(max(1, int(round(float(h) / step))) * step, 4)
 
 
 def parse_scale(s: Optional[str]) -> Optional[List[float]]:
@@ -177,13 +215,21 @@ class ReachBands:
     * ``pairs[(translate, tilt)]`` -> ``(M, 3)`` int array ``[cell index, yaw index, grasp index]`` (``yaw index`` into
       :data:`YAWS` = object yaw offset relative to the base yaw; ``grasp index`` into ``meta["grasp_names"]``, or, for the
       generic pinch, into the ``grasp_candidates_at`` order with ``yaw index = -1``);
-    * brace mode (``meta["mode"] == "brace"``): ``meta["trunks"][i]["feasible"]`` lists ``{cell, yaw_offset, brace_kinds}``.
+    * ``classes[(translate, tilt)]`` -> ``(N,)`` int bitmask per cell (bit k = pose class ``meta["classes"][k]`` passed):
+      generic pinch / push bands (:data:`GENERIC_CLASSES`, pitch x wrist yaw) and left-arm contact bands
+      (:data:`CONTACT_CLASSES`); empty for library-grasp bands;
+    * brace mode (``meta["mode"] == "brace"``): ``meta["trunks"][i]["feasible"]`` lists ``{cell, yaw_offset, q_feasible,
+      brace_kinds, brace_q_prefix}``;
+    * ``meta["trunks"][i]["posture"]`` = the idle-arm posture the trunk was computed with (``untucked`` / ``ready`` /
+      ``tucked``, owner decision A6) and ``idle_arm_q`` its joint values per arm; ``meta["arm"]`` (default ``right``),
+      ``meta["contact_set"]`` / ``meta["height_class"]`` for contact bands.
     """
 
     meta: Dict[str, Any]
     cells: Dict[Tuple[float, float], np.ndarray] = field(default_factory=dict)  # (translate, tilt) -> (N, 2) reachable cells
     pairs: Dict[Tuple[float, float], np.ndarray] = field(default_factory=dict)  # (translate, tilt) -> (M, 3) int [cell, yaw, grasp]
     path: Optional[str] = None
+    classes: Dict[Tuple[float, float], np.ndarray] = field(default_factory=dict)  # (translate, tilt) -> (N,) int class bitmask
 
     # -- loading --------------------------------------------------------------------------------------------------
     @staticmethod
@@ -191,7 +237,7 @@ class ReachBands:
         d = np.load(path_npz, allow_pickle=False)
         with open(path_npz[:-4] + ".json") as f:
             meta = json.load(f)
-        cells, pairs = {}, {}
+        cells, pairs, classes = {}, {}, {}
         for t in meta["trunks"]:
             if t.get("collides"):
                 continue
@@ -199,26 +245,42 @@ class ReachBands:
             key = (float(t["translate"]), float(t["tilt"]))
             cells[key] = d[k] if k in d.files else np.zeros((0, 2))
             pairs[key] = d[k + "__pairs"] if (k + "__pairs") in d.files else np.zeros((0, 3), dtype=np.int32)
-        return ReachBands(meta, cells, pairs, path_npz)
+            if (k + "__classes") in d.files:
+                classes[key] = d[k + "__classes"]
+        return ReachBands(meta, cells, pairs, path_npz, classes)
 
     @staticmethod
     def find(scene: str, support: str, object: Optional[str] = None, grasp_key: Optional[str] = None, *, placed: Sequence[str] = (),
              under: Optional[str] = None, scale: Optional[Sequence[float]] = None, target: Optional[str] = None, joint: Optional[str] = None,
-             mode: Optional[str] = None, dirs: Optional[Sequence[str]] = None) -> List[str]:
+             mode: Optional[str] = None, arm: str = "right", contact_set: Optional[str] = None, height: Optional[float] = None,
+             dirs: Optional[Sequence[str]] = None) -> List[str]:
         """Paths (``.npz``) of the cached bands matching the given factors, best match first.
 
         ``object`` = ``CATEGORY/MODEL`` (``None`` for object-less generic bands); ``grasp_key`` = the library key,
         ``"generic"`` for ``--generic-pinch`` bands, ``None`` = any grasp set; ``placed`` = the ``--placed`` objects
         (order-insensitive); ``under`` = the IORS partner of ``--support floor --under``; ``scale`` = the spawn scale
-        (``None`` = canonical); brace bands are selected with ``target`` (+ optional ``joint``)."""
+        (``None`` = canonical); brace bands are selected with ``target`` (+ optional ``joint``); ``arm`` = the band's
+        arm (bands without the field are right-arm bands); contact bands (``--generic-contact``) are selected with
+        ``contact_set="generic_contact"`` and the object ``height`` (m) - the band whose height class (2 cm bins)
+        contains it, ``height=None`` = any class (nearest to 0.10 m first)."""
         hits = []
+        hcls = height_class(height) if height is not None else None
         for d in (dirs if dirs is not None else default_dirs()):
             for npz, meta in _index(d):
                 if meta.get("scene") != scene or meta.get("support") != support:
                     continue
                 if mode is not None and meta.get("mode") != mode:
                     continue
-                if target is not None:
+                if meta.get("arm", "right") != arm:
+                    continue
+                if contact_set is not None:
+                    if meta.get("contact_set") != contact_set:
+                        continue
+                    if hcls is not None and abs(float(meta.get("height_class", -1.0)) - hcls) > 1e-6:
+                        continue
+                elif meta.get("contact_set"):
+                    continue
+                elif target is not None:
                     if meta.get("target") != target or (joint is not None and meta.get("joint") != joint):
                         continue
                 else:
@@ -236,21 +298,30 @@ class ReachBands:
                 if (meta.get("under_partner") or None) != (under or None):
                     continue
                 hits.append((npz, meta))
-        # finest lattice first, then most trunks, then the newest
-        hits.sort(key=lambda h: (float(h[1].get("lattice", 1.0)), -len(h[1].get("trunks", [])), -os.path.getmtime(h[0])))
+        # finest lattice first, then most trunks, then the newest (contact bands with height=None: the class nearest 0.10 m)
+        hits.sort(key=lambda h: (abs(float(h[1].get("height_class", 0.1)) - 0.1) if (contact_set and hcls is None) else 0.0, float(h[1].get("lattice", 1.0)),
+                                 -len(h[1].get("trunks", [])), -os.path.getmtime(h[0])))
         return [h[0] for h in hits]
 
     @staticmethod
     def load(scene: str, support: str, object: Optional[str] = None, grasp_key: Optional[str] = None, *, placed: Sequence[str] = (),
              under: Optional[str] = None, scale: Optional[Sequence[float]] = None, target: Optional[str] = None, joint: Optional[str] = None,
-             mode: Optional[str] = None, dirs: Optional[Sequence[str]] = None) -> "ReachBands":
-        """Load the cached band for the given factors (see :meth:`find`); ``FileNotFoundError`` on a cache miss."""
-        paths = ReachBands.find(scene, support, object, grasp_key, placed=placed, under=under, scale=scale, target=target, joint=joint, mode=mode, dirs=dirs)
+             mode: Optional[str] = None, arm: str = "right", contact_set: Optional[str] = None, height: Optional[float] = None,
+             dirs: Optional[Sequence[str]] = None) -> "ReachBands":
+        """Load the cached band for the given factors (see :meth:`find`); ``FileNotFoundError`` on a cache miss.
+
+        Left-arm contact band of an object of height ``h`` on ``support``::
+
+            ReachBands.load(scene, support, arm="left", contact_set="generic_contact", height=h)
+        """
+        paths = ReachBands.find(scene, support, object, grasp_key, placed=placed, under=under, scale=scale, target=target, joint=joint, mode=mode, arm=arm,
+                                contact_set=contact_set, height=height, dirs=dirs)
         if not paths:
             raise FileNotFoundError(f"no reach band for scene={scene} support={support} object={object} grasp_key={grasp_key} placed={list(placed)} "
-                                    f"under={under} scale={scale} target={target} joint={joint} in {list(dirs) if dirs is not None else default_dirs()}")
+                                    f"under={under} scale={scale} target={target} joint={joint} arm={arm} contact_set={contact_set} height={height} "
+                                    f"in {list(dirs) if dirs is not None else default_dirs()}")
         if len(paths) > 1:
-            log.debug("%d reach bands match (%s ...); using %s", len(paths), object or target, paths[0])
+            log.debug("%d reach bands match (%s ...); using %s", len(paths), object or target or contact_set, paths[0])
         return ReachBands.from_files(paths[0])
 
     # -- queries --------------------------------------------------------------------------------------------------
@@ -298,6 +369,42 @@ class ReachBands:
             else:
                 out.append((YAWS[int(yi)], names[int(gi)] if int(gi) < len(names) else int(gi)))
         return out
+
+    @property
+    def class_names(self) -> List[str]:
+        """Pose class names of the ``classes`` bitmask (generic pinch / push pitch x yaw classes, or the contact classes)."""
+        return list(self.meta.get("classes") or [])
+
+    def classes_at(self, translate: float, tilt: float, cell) -> List[str]:
+        """Pose classes that passed at the band cell nearest to ``cell`` (generic / contact bands; ``[]`` for library-grasp
+        bands or when the cell is not in the band). Placement prefers a class from this list (e.g. the shallowest pitch)."""
+        k = self.nearest_trunk(translate, tilt)
+        i = self.cell_index(translate, tilt, cell)
+        m = self.classes.get(k) if k is not None else None
+        if i is None or m is None or i >= len(m):
+            return []
+        bits = int(m[i])
+        return [n for b, n in enumerate(self.class_names) if bits & (1 << b)]
+
+    def band_for_class(self, translate: float, tilt: float, class_name: str) -> np.ndarray:
+        """Cells of the trunk (same translate, nearest tilt) at which the given pose class passed."""
+        k = self.nearest_trunk(translate, tilt)
+        if k is None or k not in self.classes or class_name not in self.class_names:
+            return np.zeros((0, 2))
+        b = self.class_names.index(class_name)
+        m = self.classes[k]
+        return self.cells[k][(m & (1 << b)) != 0] if len(m) == len(self.cells[k]) else np.zeros((0, 2))
+
+    def posture(self, translate: float, tilt: float) -> Optional[Dict[str, Any]]:
+        """Idle-arm posture recorded for the trunk (same translate, nearest tilt): ``{"posture": name, "idle_arm_q": {arm: [7]}}``
+        (``posture`` = ``untucked`` for bands computed before A6, which skipped colliding trunks)."""
+        k = self.nearest_trunk(translate, tilt)
+        if k is None:
+            return None
+        for t in self.meta.get("trunks", []):
+            if abs(float(t["translate"]) - k[0]) < 1e-6 and abs(float(t["tilt"]) - k[1]) < 1e-6:
+                return {"posture": t.get("posture", "untucked"), "idle_arm_q": t.get("idle_arm_q")}
+        return None
 
     def brace_feasible(self, translate: float, tilt: float) -> List[Dict[str, Any]]:
         """Brace mode: ``[{cell, yaw_offset, brace_kinds}]`` of the trunk (same translate, nearest tilt)."""
@@ -428,9 +535,60 @@ class BandComputer:
         self.lattice = lattice
         self.seeds = seeds
         self.scope: Optional[ObstacleScope] = None
+        #: gripper opening of the locked finger joints (open for grasp bands, closed for the contact bands)
+        self.fingers: float = 0.05
+        #: contact-band mode: object height class (m) -> the generic CONTACT set replaces the generic pinch in
+        #: :meth:`compute` (``grasp_sets=None``); ``None`` = pinch / library grasps
+        self.contact_height: Optional[float] = None
 
     def ignoring(self, objs):
         return self.scope.ignoring(objs) if self.scope is not None else self.kit.ignoring(objs)
+
+    # -- postures (owner decision A6) -----------------------------------------------------------------------------
+    def trunk_config(self, translate: float, tilt: float, x0: float, y0: float, yaw0: float, postures: Sequence[str] = POSTURES):
+        """Whole-body collision-free configuration at the trunk with the first posture of ``postures`` that is free
+        (``untucked`` first; ``ready`` / ``tucked`` when the untucked arms self-collide, e.g. translate 0.95 / tilt -1.2):
+        ``(q, posture)`` or ``(None, None)`` when every posture collides."""
+        kit = self.kit
+        for posture in postures:
+            try:
+                q = kit.q_at_base_pose(kit.q_config(arms=posture, translate=translate, tilt=tilt, fingers=self.fingers), x0, y0, yaw0)
+            except (ValueError, KeyError):
+                continue
+            if bool(kit.collision_free(q, margin=0.01)[0]):
+                return q, posture
+        return None, None
+
+    def idle_arm_q(self, q: th.Tensor) -> Dict[str, List[float]]:
+        return {arm: [round(float(v), 4) for v in q[self.world.robot.arm_control_idx[arm]].tolist()] for arm in self.M.ARMS}
+
+    # -- generic contact set (owner decision A1) --------------------------------------------------------------------
+    def contact_candidates_at(self, xy_world, z_top: float, height: float, fwd, left) -> List[Tuple[int, List[Tuple[th.Tensor, th.Tensor]]]]:
+        """[(class index, [pre-contact, contact])] of :data:`CONTACT_CLASSES` for a contact point at ``xy_world``: side
+        classes at ``z_top + CONTACT_HEIGHT_FRACTION * height``, top presses at ``z_top + height``; approach / closing axes
+        given in the base frame (``fwd``, ``left``, up); eef origin = point - CONTACT_CENTER_Z·a, pre = eef - PRE_GRASP·a."""
+        import omnigibson.utils.transform_utils as T
+
+        fx, fy = float(fwd[0]), float(fwd[1])
+        lx, ly = float(left[0]), float(left[1])
+
+        def world_vec(v):
+            return th.tensor([v[0] * fx + v[1] * lx, v[0] * fy + v[1] * ly, v[2]], dtype=th.float32)
+
+        out = []
+        for k, cls in enumerate(CONTACT_CLASSES):
+            a = world_vec(cls["a"])
+            c = world_vec(cls["c"])
+            a = a / th.linalg.norm(a)
+            c = c - th.dot(c, a) * a
+            c = c / th.linalg.norm(c)
+            x = th.cross(c, a, dim=0)
+            quat = T.mat2quat(th.stack([x, c, a], dim=1))
+            z = z_top + (height if cls["z"] == "top" else CONTACT_HEIGHT_FRACTION * height)
+            point = th.tensor([float(xy_world[0]), float(xy_world[1]), z], dtype=th.float32)
+            eef = point - CONTACT_CENTER_Z * a
+            out.append((k, [(eef - a * PRE_GRASP, quat), (eef, quat)]))
+        return out
 
     #: batched IK solver sizes (one cuRobo solver per size, built once); the last chunk uses the smallest size that fits
     #: so that the padded problems (cuRobo solves full batches) stay few
@@ -468,8 +626,8 @@ class BandComputer:
             yaw = math.atan2(float(inward[1]), float(inward[0]))
             if not kit.trav_free(base_xy):
                 continue
-            q = kit.q_at_base_pose(kit.q_config(arms="untucked", translate=0.5), float(base_xy[0]), float(base_xy[1]), yaw)
-            free = bool(kit.collision_free(q, margin=0.01)[0])
+            q, posture = self.trunk_config(0.5, 0.0, float(base_xy[0]), float(base_xy[1]), yaw)
+            free = q is not None
             cands.append((free, length, name, mid, inward, base_xy, yaw, overhang))
         if not cands:
             raise RuntimeError(f"no stance on free floor around {top.name}")
@@ -495,8 +653,8 @@ class BandComputer:
                 xy = centre + th.tensor([r * math.cos(a), r * math.sin(a)])
                 if not kit.trav_free(xy, eroded=True):
                     continue
-                q = kit.q_at_base_pose(kit.q_config(arms="untucked", translate=0.5), float(xy[0]), float(xy[1]), yaw)
-                if bool(kit.collision_free(q, margin=0.01)[0]):
+                q, _ = self.trunk_config(0.5, 0.0, float(xy[0]), float(xy[1]), yaw)
+                if q is not None:
                     best = xy
                     break
             if best is not None:
@@ -522,8 +680,8 @@ class BandComputer:
                 continue
             inward = -normal
             yaw = math.atan2(float(inward[1]), float(inward[0]))
-            q = kit.q_at_base_pose(kit.q_config(arms="untucked", translate=0.5), float(base_xy[0]), float(base_xy[1]), yaw)
-            cands.append((bool(kit.collision_free(q, margin=0.01)[0]), length, mid, inward, base_xy, yaw))
+            q, _ = self.trunk_config(0.5, 0.0, float(base_xy[0]), float(base_xy[1]), yaw)
+            cands.append((q is not None, length, mid, inward, base_xy, yaw))
         if not cands:
             raise RuntimeError(f"no stance around {partner.name}")
         cands.sort(key=lambda c: (not c[0], -c[1]))
@@ -603,10 +761,12 @@ class BandComputer:
     def compute(self, stance: Dict[str, Any], lattice_world: th.Tensor, z_support: float, pose_fn, grasp_sets, ignore_for_grasp, arm: str = "right",
                 trunks: Optional[Sequence[Tuple[float, float]]] = None, max_grasp_offset: float = 0.0) -> Dict[str, Any]:
         """``pose_fn(world_xy, yaw) -> obj_pose`` and ``grasp_sets`` = list of grasps (with ``.pose``; rank order = library
-        order) or ``None`` for the generic pinch. Returns the per‑trunk results: ``trunks`` (entries), ``cells``
-        ((translate, tilt) -> (N, 2) reachable cells) and ``pairs`` ((translate, tilt) -> (M, 3) int
-        ``[cell index, yaw index into YAWS (-1 generic), grasp index]`` = the (yaw, grasp) pairs found feasible for a cell
-        in the round that marked it; the seed of the feasible set F)."""
+        order) or ``None`` for the generic set (the generic pinch / push classes, or - with ``self.contact_height`` set -
+        the generic CONTACT classes of the brace arm). Returns the per-trunk results: ``trunks`` (entries, incl. the
+        idle-arm ``posture`` used), ``cells`` ((translate, tilt) -> (N, 2) reachable cells), ``pairs`` ((translate, tilt)
+        -> (M, 3) int ``[cell index, yaw index into YAWS (-1 generic), grasp / class index]`` = the pairs found feasible
+        for a cell in the round that marked it; the seed of the feasible set F) and ``classes`` ((translate, tilt) ->
+        (N,) int bitmask of the generic / contact classes that passed per cell; zeros for library grasps)."""
         kit, G = self.kit, self.G
         base_cells, world_cells = self.lattice_on_cells(stance, lattice_world)
         trunks = list(trunks) if trunks is not None else trunk_grid(z_support - self.world.floor_z)
@@ -617,59 +777,37 @@ class BandComputer:
         yaw_order = sorted(YAWS, key=lambda y: abs(G.wrap_angle(y - math.pi)))
         yaw_index = {y: k for k, y in enumerate(YAWS)}
         grasp_index = {g.name: k for k, g in enumerate(grasp_sets)} if grasp_sets is not None else {}
-        coarse = self.COARSE if (self.COARSE and self.lattice < self.COARSE - 1e-6) else None
-        if coarse:
-            fine_lattice = self.lattice
-            self.lattice = coarse
-            base_c, world_c = self.lattice_on_cells(stance, lattice_world)
-            self.lattice = fine_lattice
-        common = (stance, z_support, pose_fn, grasp_sets, ignore_for_grasp, arm, max_grasp_offset, yaw_order, yaw_index, grasp_index, fwd)
+        common = (stance, z_support, pose_fn, grasp_sets, ignore_for_grasp, arm, max_grasp_offset, yaw_order, yaw_index, grasp_index, fwd, left)
         self.scope = ObstacleScope(kit, self.world, (x0, y0), drop_ground=(z_support - self.world.floor_z) >= 0.55).__enter__()
         try:
             for tr, ti in trunks:
-                if not coarse:
-                    results.append(self._trunk(tr, ti, base_cells, world_cells, *common))
-                    continue
-                e_c, cells_c, _ = self._trunk(tr, ti, base_c, world_c, *common, tag="coarse ")
-                if e_c["collides"]:
-                    e_c["n_lattice"] = int(len(base_cells))
-                    results.append((e_c, cells_c, np.zeros((0, 3), dtype=np.int32)))
-                    continue
-                if len(cells_c):
-                    d = th.cdist(base_cells, th.as_tensor(cells_c, dtype=th.float32))
-                    keep = d.min(dim=1).values <= coarse * 1.5 + 1e-6
-                else:
-                    keep = th.zeros(len(base_cells), dtype=th.bool)
-                if int(keep.sum()):
-                    e, cells, pairs = self._trunk(tr, ti, base_cells[keep], world_cells[keep], *common)
-                else:
-                    e, cells, pairs = dict(e_c, n_after_prune=0, n_reachable=0, rounds=0, n_pairs=0, n_dropped_no_pre=0, n_pose_pruned=0, time_s=0.0), np.zeros((0, 2)), np.zeros((0, 3), dtype=np.int32)
-                e["coarse"] = {"lattice": coarse, "n_lattice": e_c["n_lattice"], "n_after_prune": e_c["n_after_prune"], "n_reachable": e_c["n_reachable"], "time_s": e_c["time_s"]}
-                e["n_lattice"] = int(len(base_cells))
-                e["n_refined"] = int(keep.sum())
-                e["time_s"] = round(e["time_s"] + e_c["time_s"], 2)
-                results.append((e, cells, pairs))
+                results.append(self._trunk(tr, ti, base_cells, world_cells, *common))
         finally:
             self.scope.__exit__(None, None, None)
             self.scope = None
-        return {"trunks": [e for e, _, _ in results], "cells": {(e["translate"], e["tilt"]): c for e, c, _ in results},
-                "pairs": {(e["translate"], e["tilt"]): p for e, _, p in results}}
+        return {"trunks": [e for e, _, _, _ in results], "cells": {(e["translate"], e["tilt"]): c for e, c, _, _ in results},
+                "pairs": {(e["translate"], e["tilt"]): p for e, _, p, _ in results}, "classes": {(e["translate"], e["tilt"]): m for e, _, _, m in results}}
 
     def _trunk(self, tr, ti, base_cells, world_cells, stance, z_support, pose_fn, grasp_sets, ignore_for_grasp, arm, max_grasp_offset, yaw_order, yaw_index,
-               grasp_index, fwd, tag: str = ""):
-        """One trunk of :meth:`compute` over the given cells; returns ``(entry, cells (N, 2), pairs (M, 3))``."""
+               grasp_index, fwd, left, tag: str = ""):
+        """One trunk of :meth:`compute` over the given cells; returns ``(entry, cells (N, 2), pairs (M, 3), classes (N,))``."""
         kit = self.kit
         x0, y0, yaw0 = stance["base_pose2d"]
+        empty = (np.zeros((0, 2)), np.zeros((0, 3), dtype=np.int32), np.zeros((0,), dtype=np.int32))
         if True:
             t0 = time.time()
-            q = kit.q_at_base_pose(kit.q_config(arms="untucked", translate=tr, tilt=ti), x0, y0, yaw0)
             entry = {"translate": tr, "tilt": ti, "collides": False, "n_lattice": int(len(base_cells)), "n_after_prune": 0, "n_reachable": 0, "rounds": 0,
-                     "n_pairs": 0, "n_dropped_no_pre": 0, "n_pose_pruned": 0, "time_s": 0.0}
-            if not bool(kit.collision_free(q, margin=0.01)[0]):
+                     "n_pairs": 0, "n_dropped_no_pre": 0, "n_pose_pruned": 0, "time_s": 0.0, "posture": None}
+            q, posture = self.trunk_config(tr, ti, x0, y0, yaw0)
+            if q is None:
                 entry["collides"] = True
                 entry["time_s"] = round(time.time() - t0, 2)
-                log.info("%strunk (%.2f, %+.1f): collides, skipped", tag, tr, ti)
-                return entry, np.zeros((0, 2)), np.zeros((0, 3), dtype=np.int32)
+                log.info("%strunk (%.2f, %+.1f): collides with every idle-arm posture %s, skipped", tag, tr, ti, list(POSTURES))
+                return (entry,) + empty
+            entry["posture"] = posture
+            entry["idle_arm_q"] = self.idle_arm_q(q)
+            if posture != "untucked":
+                log.info("%strunk (%.2f, %+.1f): untucked arms collide, using the %s posture", tag, tr, ti, posture)
             shoulder, arm_len = self.shoulder_and_reach(q, arm)
             reach = arm_len + max_grasp_offset + PRE_GRASP + 0.05
             entry["shoulder_world"] = [round(float(v), 4) for v in shoulder.tolist()]
@@ -696,7 +834,10 @@ class BandComputer:
                 specs = pair_specs[r0:r0 + chunk]
                 pairs, index, spec_of = [], [], []
                 for i in todo:
-                    if grasp_sets is None:
+                    if grasp_sets is None and self.contact_height is not None:
+                        # generic CONTACT set: the cell is the contact point; z_support = the top the object stands on
+                        cands = [((-1, ci), pair) for ci, pair in self.contact_candidates_at(world_cells[i], z_support, self.contact_height, fwd, left)]
+                    elif grasp_sets is None:
                         centre = th.tensor([float(world_cells[i][0]), float(world_cells[i][1]), z_support])
                         cands = [((-1, ci), pair) for ci, pair in enumerate(kit.grasp_candidates_at(centre, [yaw0, yaw0 + math.pi / 2][:N_YAWS_GENERIC], TILTS_GENERIC, fwd))]
                     else:
@@ -732,13 +873,18 @@ class BandComputer:
             remap = {i: n for n, i in enumerate(sel_cells)}
             cells = base_cells[ok].numpy() if sel_cells else np.zeros((0, 2))
             pairs_arr = np.array([(remap[c], yi, gi) for c, yi, gi in found], dtype=np.int32).reshape(-1, 3)
+            classes_arr = np.zeros(len(sel_cells), dtype=np.int32)
+            if grasp_sets is None:  # generic pinch / contact classes: bit k = class k passed at the cell
+                for c, yi, gi in found:
+                    classes_arr[remap[c]] |= 1 << int(gi)
+                entry["class_counts"] = {n: int(((classes_arr >> b) & 1).sum()) for b, n in enumerate(CONTACT_CLASSES_NAMES if self.contact_height is not None else GENERIC_CLASSES)}
             entry["n_reachable"] = len(sel_cells)
             entry["n_pairs"] = int(len(pairs_arr))
             entry["time_s"] = round(time.time() - t0, 2)
-            log.info("%strunk (%.2f, %+.1f): %d lattice, %d after prune, %d reachable (%d pairs), %d rounds (%d cells dropped without pre-grasp, %d poses pruned), %.1fs",
+            log.info("%strunk (%.2f, %+.1f): %d lattice, %d after prune, %d reachable (%d pairs), %d rounds (%d cells dropped without pre-grasp, %d poses pruned), %.1fs%s",
                      tag, tr, ti, len(base_cells), entry["n_after_prune"], entry["n_reachable"], entry["n_pairs"], entry["rounds"], entry["n_dropped_no_pre"],
-                     entry["n_pose_pruned"], entry["time_s"])
-            return entry, cells, pairs_arr
+                     entry["n_pose_pruned"], entry["time_s"], f" classes {entry['class_counts']}" if "class_counts" in entry else "")
+            return entry, cells, pairs_arr, classes_arr
 
 
 # ----------------------------------------------------------------------------------------------- articulation (brace mode)
@@ -775,6 +921,16 @@ def handle_pose_at_q(joint_info: Dict[str, Any], handle: Dict[str, Any], q: floa
     quat = T.mat2quat(th.stack([x, y, z], dim=1))
     eef = c_w - z * 0.012
     return [(eef - z * PRE_GRASP, quat), (eef, quat)]
+
+
+class BraceCandidate(tuple):
+    """``(kind, [pre, contact])`` (unpacks like the 2-tuple the v2 articulation module expects) with the number of leading
+    joint values the contact is valid for as ``q_prefix``."""
+
+    def __new__(cls, kind: str, pair, q_prefix: int):
+        self = super().__new__(cls, (kind, pair))
+        self.q_prefix = q_prefix
+        return self
 
 
 def brace_candidates(joint_info: Dict[str, Any], handle_data: Dict[str, Any], obj_pose, q_values: Sequence[float], brace_side: float, G):
@@ -851,7 +1007,7 @@ def brace_candidates(joint_info: Dict[str, Any], handle_data: Dict[str, Any], ob
         x = th.cross(y, z, dim=0)
         quat = T.mat2quat(th.stack([x, y, z], dim=1))
         eef = c_w - z * 0.012
-        poses.append((kind, [(eef - z * PRE_GRASP, quat), (eef, quat)], q_prefix))
+        poses.append(BraceCandidate(kind, [(eef - z * PRE_GRASP, quat), (eef, quat)], q_prefix))
     return poses
 
 
@@ -985,7 +1141,10 @@ def main(argv=None):
     ap.add_argument("--rooms", nargs="*", default=None, help="rooms to load (default: the support's rooms)")
     ap.add_argument("--object", default=None, help="CATEGORY/MODEL of the grasped object")
     ap.add_argument("--grasp-key", default=None)
-    ap.add_argument("--generic-pinch", action="store_true", help="no library grasps: generic top-down pinch (blocks, pushes)")
+    ap.add_argument("--generic-pinch", action="store_true", help="no library grasps: generic top-down pinch / push classes (blocks, axial targets)")
+    ap.add_argument("--arm", default="right", choices=["right", "left"], help="arm of the band (default right; the brace arm's contact bands use --arm left)")
+    ap.add_argument("--generic-contact", action="store_true", help="generic CONTACT set (closed gripper, side faces at 3/4 height + top press) for --arm left; one band per object height class")
+    ap.add_argument("--height", type=float, default=None, help="object height (m) of the contact band (else measured from --object); binned to the 2 cm height class")
     ap.add_argument("--placed", nargs="*", default=[], help="objects placed before the target, CATEGORY/MODEL (disembedding source tray: lattice = its floor)")
     ap.add_argument("--under", default=None, help="floor mode: partner scene object; lattice = floor under it")
     ap.add_argument("--target", default=None, help="brace mode: articulated CATEGORY/MODEL")
@@ -1029,13 +1188,20 @@ def main(argv=None):
         variant, removed = _chairs_variant(args.scene, args.support, rooms, os.path.join(out_dir, "scene_variants"))
     t_load = time.time()
     world = SimWorld(args.scene, rooms, scene_variant=variant)
-    arms = ("right", "left") if args.brace else ("right",)
+    band_arm = args.arm
+    if args.generic_contact and args.brace:
+        raise SystemExit("--generic-contact and --brace are exclusive")
+    arms = ("right", "left") if args.brace else (band_arm,)
     kit = RobotKit(world, prebuild=tuple(f"{a}_arm" for a in arms))
     kit.sync_world()
     log.info("scene %s rooms %s loaded in %.0fs (chairs removed: %s)", args.scene, rooms, time.time() - t_load, removed)
     bc = BandComputer(world, kit, arms=arms, lattice=lattice)
+    if args.generic_contact:
+        bc.fingers = 0.0  # closed gripper
     meta: Dict[str, Any] = {"scene": args.scene, "rooms": rooms, "support": args.support, "removed_chairs": removed, "lattice": lattice,
-                            "stand_off": args.stand_off, "arms": "untucked", "grid": {"translates": TRANSLATES, "tilts": TILTS, "low_top_tilt": LOW_TOP_TILT},
+                            "stand_off": args.stand_off, "arms": "untucked (ready / tucked per trunk when untucked collides, see trunks[].posture)",
+                            "postures": list(POSTURES), "arm": band_arm, "fingers": bc.fingers,
+                            "grid": {"translates": TRANSLATES, "tilts": TILTS, "low_top_tilt": LOW_TOP_TILT},
                             "seeds": 12, "pre_grasp": PRE_GRASP, "yaws": YAWS, "mode": "brace" if args.brace else ("floor" if floor_mode else "tabletop"),
                             "smoke": bool(args.smoke), "scale": scale, "placed_specs": list(args.placed),
                             "schedule": {"chunk": BandComputer.CHUNK, "ik_batch": BandComputer.IK_BATCH, "max_rounds_without_pre": BandComputer.MAX_ROUNDS_WITHOUT_PRE, "coarse": BandComputer.COARSE,
@@ -1183,14 +1349,16 @@ def main(argv=None):
             bc.scope = ObstacleScope(kit, world, (x0, y0), drop_ground=(z_support - world.floor_z) >= 0.55).__enter__()
             for tr, ti in trunks:
                 t0 = time.time()
-                q = kit.q_at_base_pose(kit.q_config(arms="untucked", translate=tr, tilt=ti), x0, y0, yaw0)
-                entry = {"translate": tr, "tilt": ti, "collides": False, "n_lattice": int(len(base_cells)), "n_reachable": 0, "time_s": 0.0, "feasible": []}
-                if not bool(kit.collision_free(q, margin=0.01)[0]):
+                entry = {"translate": tr, "tilt": ti, "collides": False, "n_lattice": int(len(base_cells)), "n_reachable": 0, "time_s": 0.0, "feasible": [], "posture": None}
+                q, posture = bc.trunk_config(tr, ti, x0, y0, yaw0)
+                if q is None:
                     entry["collides"] = True
                     per_trunk.append(entry)
                     cells_out[(tr, ti)] = np.zeros((0, 2))
-                    log.info("brace trunk (%.2f, %+.1f): collides, skipped", tr, ti)
+                    log.info("brace trunk (%.2f, %+.1f): collides with every idle-arm posture, skipped", tr, ti)
                     continue
+                entry["posture"] = posture
+                entry["idle_arm_q"] = bc.idle_arm_q(q)
                 # 3 yaws about the facing yaw (offsets relative to the base yaw). Per (cell, yaw) the handle [pre-grasp, grasp]
                 # is screened at every listed joint value (spec 5.4: the output is the SET of joint values whose handle poses
                 # are feasible; the sampler requires its direction's waypoints to be a subset), then the brace [pre, contact]
@@ -1217,9 +1385,9 @@ def main(argv=None):
                         handle_ok.setdefault(c, []).append(k)
                 surv = [c for c in combos if c in handle_ok]
                 braces = {c: brace_candidates(jinfo, hdata, obj_poses[c], q_values, brace_side, G) for c in surv}
-                bflat = [(c, kind) for c in surv for kind, _, _ in braces[c]]
-                bposes = [pose for c in surv for _, pair, _ in braces[c] for pose in pair]
-                brace_prefix = {c: (braces[c][0][2] if braces[c] else 0) for c in surv}
+                bflat = [(c, kind) for c in surv for kind, _ in braces[c]]
+                bposes = [pose for c in surv for _, pair in braces[c] for pose in pair]
+                brace_prefix = {c: (braces[c][0].q_prefix if braces[c] else 0) for c in surv}
                 ok_b = bc.ik_screen(bposes, q, brace_arm)
                 brace_ok: Dict[Tuple[int, float], List[str]] = {}
                 for n, (c, kind) in enumerate(bflat):
@@ -1282,25 +1450,42 @@ def main(argv=None):
             else:
                 meta.update({"object": None, "grasp_key": None, "generic_pinch": True, "grasp_names": []})
                 h = 0.05
-            if args.generic_pinch or grasps is None:
+            if args.generic_contact:
+                # left-arm (brace) contact band: one per object height class; the cell is the contact point on the object's
+                # side face at 3/4 of the class height (top press at the class height); z_support = the top the object stands on
+                h_obj = float(args.height) if args.height is not None else h
+                hcls = height_class(h_obj)
+                bc.contact_height = hcls
+                pose_fn, grasps, max_off = None, None, 0.0
+                meta.update({"object": None if args.height is not None else args.object, "grasp_key": None, "generic_pinch": False, "grasp_names": [],
+                             "contact_set": CONTACT_SET, "height_class": hcls, "height_measured": round(h_obj, 4), "classes": CONTACT_CLASSES_NAMES,
+                             "contact_spec": {"classes": CONTACT_CLASSES, "height_fraction": CONTACT_HEIGHT_FRACTION, "height_bin": HEIGHT_BIN,
+                                              "eef_origin": "point - CONTACT_CENTER_Z * a", "pre_contact": PRE_GRASP, "fingers": bc.fingers,
+                                              "support_ignored_for": "contact pose only"}})
+                z_eval = z_support
+            elif args.generic_pinch or grasps is None:
                 pose_fn = None
                 meta["generic_pinch_spec"] = {"n_yaws": N_YAWS_GENERIC, "tilts_deg": list(TILTS_GENERIC), "z_above_support": round(max(0.6 * h, 0.03), 4),
-                                             "order": "tilt-major, yaw-minor (RobotKit.grasp_candidates_at)"}
+                                             "order": "tilt-major, yaw-minor (RobotKit.grasp_candidates_at)", "classes": GENERIC_CLASSES}
+                meta["classes"] = GENERIC_CLASSES
+                z_eval = z_support + max(0.6 * h, 0.03)
             else:
                 def pose_fn(world_xy, yaw, _hull=hull, _rq=rest_quat):
                     return bc.object_pose_at(world_xy, yaw, z_support, _hull, _rq)
+                z_eval = z_support
             kit.sync_world()
             trunks = trunk_sel or (SMOKE_TRUNKS if args.smoke else trunk_grid(z_support - world.floor_z))
-            result = bc.compute(stance, lattice_world, z_support if grasps is not None else (z_support + max(0.6 * h, 0.03)), pose_fn,
-                                grasps if not args.generic_pinch else None, ignore_grasp, arm="right", trunks=trunks, max_grasp_offset=max_off)
-            gset = [(g.key, g.name, g.position.tolist(), g.quat.tolist()) for g in grasps] if grasps else "generic"
-            key = _key({"scene": args.scene, "support": args.support, "z": round(z_support, 2), "stance": stance["edge"], "s": args.stand_off, "object": args.object,
+            result = bc.compute(stance, lattice_world, z_eval, pose_fn, grasps if not (args.generic_pinch or args.generic_contact) else None, ignore_grasp,
+                                arm=band_arm, trunks=trunks, max_grasp_offset=max_off)
+            gset = [(g.key, g.name, g.position.tolist(), g.quat.tolist()) for g in grasps] if grasps else ("contact:" + ",".join(CONTACT_CLASSES_NAMES) if args.generic_contact else "generic:" + ",".join(GENERIC_CLASSES))
+            key = _key({"scene": args.scene, "support": args.support, "z": round(z_support, 2), "stance": stance["edge"], "s": args.stand_off, "object": meta.get("object"),
                         "scale": scale, "grasps": gset, "rest": rest_quat.tolist(), "placed": args.placed, "under": args.under, "grid": meta["grid"], "lattice": lattice,
-                        "arms": "untucked", "seeds": 12})
-            oname = args.object.replace("/", "-") if args.object else "generic"
-            name = f"{meta['mode']}__{args.scene}__{args.support}{'-under-' + args.under if args.under else ''}__{oname}__{key}"
+                        "arms": "untucked", "seeds": 12, "arm": band_arm, "height_class": meta.get("height_class"), "postures": list(POSTURES)})
+            oname = f"h{meta['height_class']:.2f}" if args.generic_contact else (args.object.replace("/", "-") if args.object else "generic")
+            mode_name = "contact" if args.generic_contact else meta["mode"]
+            name = f"{mode_name}__{args.scene}__{args.support}{'-under-' + args.under if args.under else ''}__{band_arm if band_arm != 'right' else ''}{'_' if band_arm != 'right' else ''}{oname}__{key}"
             if args.smoke:
-                meta["sanity"] = band_sanity(stance, result, z_support if grasps is not None else (z_support + max(0.6 * h, 0.03)))
+                meta["sanity"] = band_sanity(stance, result, z_eval)
 
         # ---- write
         lat_all = np.concatenate([c[:, 1] for c in result["cells"].values() if len(c)]) if any(len(c) for c in result["cells"].values()) else np.zeros(0)
@@ -1310,11 +1495,15 @@ def main(argv=None):
         arrays = {trunk_key(tr, ti): np.asarray(c, dtype=np.float32).reshape(-1, 2) for (tr, ti), c in result["cells"].items()}
         for (tr, ti), p in result.get("pairs", {}).items():
             arrays[trunk_key(tr, ti) + "__pairs"] = np.asarray(p, dtype=np.int32).reshape(-1, 3)
+        for (tr, ti), m in result.get("classes", {}).items():
+            if meta.get("classes"):
+                arrays[trunk_key(tr, ti) + "__classes"] = np.asarray(m, dtype=np.int32).reshape(-1)
         np.savez_compressed(os.path.join(out_dir, name + ".npz"), **arrays)
         with open(os.path.join(out_dir, name + ".json"), "w") as f:
             json.dump(meta, f, indent=1, default=str)
         summary = {"file": os.path.join(out_dir, name + ".npz"), "union_extent": meta["union_extent"], "n_reachable_total": meta["n_reachable_total"],
-                   "trunks": [(t["translate"], t["tilt"], t["n_reachable"], t["collides"], t.get("time_s")) for t in result["trunks"]], "time_s": meta["time_s"]}
+                   "trunks": [(t["translate"], t["tilt"], t["n_reachable"], t["collides"], t.get("time_s"), t.get("posture")) for t in result["trunks"]],
+                   "time_s": meta["time_s"]}
         if args.smoke:
             summary["shoulder_fk_check"] = [(r["translate"], r["tilt"], r["shoulder_err_mm"]) for r in meta.get("shoulder_fk_check", [])]
             summary["sanity"] = meta.get("sanity")

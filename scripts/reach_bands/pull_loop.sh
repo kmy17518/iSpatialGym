@@ -3,7 +3,9 @@
 # pod hits its TTL with jobs still queued (collect.py only pulls after JOB_DONE, i.e. after --close + an empty queue).
 #   nohup scripts/reach_bands/pull_loop.sh runlogs/runpod/rb/pods.txt 600 > runlogs/runpod/rb/pull_loop.log 2>&1 &
 set -uo pipefail
-pods_file=$1; interval=${2:-600}
+pods_file=$1; interval=${2:-600}; only_rb=${3:-}
+# third argument "rb_only": pull only the reach-band job directories (/root/samp/rb__*) and done.txt - for shared pods
+# whose /root/samp holds other artefacts (the pilot pods)
 cd "$(dirname "$0")/../.." || exit 1
 source ~/miniconda3/etc/profile.d/conda.sh && conda activate ispatialgym
 while true; do
@@ -12,7 +14,15 @@ while true; do
     term=$(python3 -c "import json; print(json.load(open('runlogs/runpod/fleet.json'))['pods'].get('$p', {}).get('terminated_at') or '')")
     [ -n "$term" ] && continue
     mkdir -p "runlogs/runpod/rb/$name"
-    if timeout 600 python scripts/runpod/rp.py pull "$p" /root/samp/ "runlogs/runpod/rb/$name/" > /dev/null 2>&1; then
+    if [ "$only_rb" = "rb_only" ]; then
+      ok=1
+      timeout 600 python scripts/runpod/rp.py pull "$p" "/root/samp/rb__*" "runlogs/runpod/rb/$name/" > /dev/null 2>&1 || ok=0
+      timeout 120 python scripts/runpod/rp.py pull "$p" /root/samp/done.txt "runlogs/runpod/rb/$name/done.txt" > /dev/null 2>&1 || ok=0
+      [ "$ok" = 1 ]
+    else
+      timeout 600 python scripts/runpod/rp.py pull "$p" /root/samp/ "runlogs/runpod/rb/$name/" > /dev/null 2>&1
+    fi
+    if [ $? -eq 0 ]; then
       echo "$(date -u +%FT%TZ) pulled $name ($(ls runlogs/runpod/rb/$name/*/*.npz 2>/dev/null | wc -l) band files)"
     else
       echo "$(date -u +%FT%TZ) pull failed for $name"
