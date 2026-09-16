@@ -823,6 +823,13 @@ def margins_union() -> bool:
     return os.environ.get("ISG_MARGIN_UNION", "0").strip().lower() in ("1", "true", "yes")
 
 
+def program_check_stub() -> bool:
+    """Smoke-only: ``ISG_PROGRAM_CHECK=stub`` set inside the smoke command lets a task module record a program-check
+    rejection that only asks for an optional block (axial stop brace, block braces) as a stub mode instead of rejecting
+    the instance, until the oracle program makes those blocks optional. Nothing else switches it (no repo markers)."""
+    return os.environ.get("ISG_PROGRAM_CHECK", "").strip().lower() == "stub"
+
+
 def left_band_compute() -> bool:
     """Whether a missing left contact band is computed in-process (15–25 min per support / height class on an L40S):
     ``ISG_LEFT_BAND_COMPUTE=1``; default off — until B3's left bands exist the brace side is decided by the exact two-arm

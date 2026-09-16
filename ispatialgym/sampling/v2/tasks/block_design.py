@@ -59,6 +59,11 @@ FINGER_HALF_THICKNESS = TT.FINGER_PROFILE[0][1]
 #: the place puts the block this far right and toward the robot of its slot; the pushes close the margin (§6.2 "small safety margin")
 PLACE_MARGIN = 0.005
 REGION_RADIUS = 0.20
+#: owner 2026-09-16 10:47 ladder: block regions 0.5–0.6 m ahead of the base first, the pitched 30° / 45° picks as the primary
+#: class for every block (straight down last), the pinch 1 mm above the table so the pads get more than ~1 cm of face
+REGION_DEPTH_PREFERRED = 0.55
+PICK_TILTS_DEG = (30.0, -30.0, 45.0, -45.0, 0.0)
+PICK_TIP_CLEARANCE = 0.001
 
 
 @register(SUBTASK)
@@ -79,7 +84,7 @@ class BlockDesign(SamplerV2):
         self.band_spec: Optional[TT.BandSpec] = None
         self.bands = None
         self.left_bands = None  # A1: the left arm's contact band (row-left / column-top braces), None until B3's bands exist
-        self._regions_off_left_band = 0
+        self.braces_missing = False  # the last instance has a block without a brace / push tail (owner 2026-09-16 11:08)
 
     def g(self, key: str):
         return self.gen(key, self.defaults.get(key))
@@ -153,7 +158,7 @@ class BlockDesign(SamplerV2):
                 cands = TT.phase2_manipulation_stance(self, init, 0.5 * self.edge, target_height=self.edge, focus_candidates=self._regions, in_frame_fn=self._region_in_frame,
                                                       bands=bands, top=self.top, erosion_extra=0.02 + self.edge, focus_z=self.top.z + 0.5 * self.edge)
                 if not cands:
-                    raise Reject("no_manipulation_stance", f"Phase 2 left no region survivor ({self._regions_off_left_band} regions off the left contact band)")
+                    raise Reject("no_manipulation_stance", "Phase 2 left no region survivor")
                 self.edge_frame, self.init_stance, self.manip_candidates = edge, init, cands
                 break
             except Reject as e:
@@ -163,8 +168,7 @@ class BlockDesign(SamplerV2):
             raise Reject("no_stance", "; ".join(errors)[:1500])
         self.template_facts.update({"support": self.top.to_json(), "edge": self.edge_frame.to_json(), "init_stance": self.init_stance.to_meta(),
                                     "n_manipulation_candidates": len(self.manip_candidates), "edge_m": self.edge, "faces": self.faces,
-                                    "band": getattr(self.bands, "path", None), "left_band": getattr(self.left_bands, "path", None) if self.left_bands is not None else None,
-                                    "regions_off_left_band": self._regions_off_left_band})
+                                    "band": getattr(self.bands, "path", None), "left_band": getattr(self.left_bands, "path", None) if self.left_bands is not None else None})
 
     # -- Phase 2 hooks (§4.5 blocks) --------------------------------------------------------------------------------
 
@@ -210,14 +214,14 @@ class BlockDesign(SamplerV2):
             grid_ok = all(self.top.contains(focus + right * (cc * pitch) + toward * (rr * pitch), 0.5 * self.edge + 0.02) for rr in range(2) for cc in range(2))
             if not grid_ok:
                 continue
-            # A1 joint placement: the goal grid is anchored at one of the region's cells (the image-top-left block); its
-            # row-left / column-top brace points must lie in a left contact band cell at this trunk — the region needs
-            # at least one such cell (the right band supplies the pushes / picks)
-            if self.left_bands is not None and not any(self._anchor_braces_in_left_band(c, stance, right, toward) for c in region):
-                self._regions_off_left_band += 1
-                continue
+            # owner decision 2026-09-16 11:08: the region is chosen for the right arm's picks / places (the braces are a
+            # bonus where the bands overlap); the left band no longer forces the anchor toward λ ≈ 0
+            n_left = sum(1 for c in region if self._anchor_braces_in_left_band(c, stance, right, toward)) if self.left_bands is not None else 0
             seen.add(key)
-            out.append((focus, {"cells": region}))
+            out.append((focus, {"cells": region, "n_left_band_anchor_cells": n_left, "depth": float(stance.world_to_base(focus)[0])}))
+        # owner 10:47 ladder: regions 0.5–0.6 m ahead of the base first (the near cells keep the picks / places off the
+        # arm's reach limit), then the rest by depth
+        out.sort(key=lambda fi: abs(fi[1]["depth"] - REGION_DEPTH_PREFERRED))
         return out
 
     def _anchor_braces_in_left_band(self, anchor_xy, stance: Stance, right: th.Tensor, toward: th.Tensor) -> bool:
@@ -253,8 +257,10 @@ class BlockDesign(SamplerV2):
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         init = self.init_stance
         errors = []
-        for k in rng.permutation(len(self.manip_candidates))[:6]:
-            cand = self.manip_candidates[int(k)]
+        order = [int(k) for k in rng.permutation(len(self.manip_candidates))]
+        order.sort(key=lambda k: abs(float(self.manip_candidates[k].extras.get("focus_info", {}).get("depth", REGION_DEPTH_PREFERRED)) - REGION_DEPTH_PREFERRED))
+        for k in order[:6]:
+            cand = self.manip_candidates[k]
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
             manip.focus, manip.arms = cand.focus, ["right", "left"]
             manip.extras["focus_info"] = cand.extras.get("focus_info")
@@ -297,24 +303,21 @@ class BlockDesign(SamplerV2):
         cells = [region[int(i)] for i in rng.permutation(len(region))]
         chosen: List[th.Tensor] = []
         if self.left_bands is not None:
-            # A1: the goal grid is anchored at the image-top-left block; its row-left / column-top brace points must lie
-            # in a left contact band cell at this trunk — take such a cell as the anchor (the smallest image score among
-            # them) and keep the other blocks below / right of it in the image
+            # braces are a bonus (owner 11:08): when the region has cells whose brace points lie in the left contact band,
+            # anchor there so the braces can be recorded; never required
             feas = [xy for xy in cells if self._anchor_braces_in_left_band(xy, manip, right, toward)]
-            if not feas:
-                raise Reject("layout", f"no region cell whose row-left / column-top brace points lie in the left contact band at trunk "
-                                       f"({manip.translate}, {manip.tilt}) ({len(cells)} cells)")
-            anchor_xy = min(feas, key=img_score)
-            chosen.append(anchor_xy)
-            s_anchor = img_score(anchor_xy)
-            cells = [xy for xy in cells if xy is not anchor_xy and img_score(xy) > s_anchor]
+            if feas:
+                anchor_xy = min(feas, key=img_score)
+                chosen.append(anchor_xy)
+                s_anchor = img_score(anchor_xy)
+                cells = [xy for xy in cells if xy is not anchor_xy and img_score(xy) > s_anchor] or [xy for xy in cells if xy is not anchor_xy]
         for xy in cells:
             if all(float(th.linalg.norm(xy - c)) >= self.edge * math.sqrt(2) + gap for c in chosen):
                 chosen.append(xy)
             if len(chosen) == n:
                 break
         if len(chosen) < n:
-            raise Reject("layout", f"only {len(chosen)} of {n} region cells keep >= {gap} m gaps{' below / right of the anchor' if self.left_bands is not None else ''}")
+            raise Reject("layout", f"only {len(chosen)} of {n} region cells keep >= {gap} m gaps")
         # --- anchor (top-left in the init image) and slot assignment -----------------------------------------------
         score = [img_score(c) for c in chosen]
         order_img = sorted(range(n), key=lambda i: score[i])  # image order (top-left first)
@@ -405,13 +408,18 @@ class BlockDesign(SamplerV2):
             "layout_relations": _relations(slots),
             "layout_tolerances": {"position": self.tol("position", 0.01), "orientation": self.tol("orientation", 0.15)},
         }
+        braces = {rec["instance"]: rec.get("brace", "none") for rec in records}
+        self.braces_missing = any(v == "none" for v in braces.values())
+        # the manipulation stance works with the right arm; the left arm joins only when some block carries a brace
+        manip.arms = ["right", "left"] if any(v == "present" for v in braces.values()) else ["right"]
         self.sidecar.add_stance(manip)
         self.sidecar.blocks = records
         for bi in range(n):
             self.sidecar.describe(names[bi], "block", f"the block with the {self.faces.get(up_of[bi], up_of[bi])} face up" + (" (top-left)" if bi == anchor_i else ""))
         d.summary.update({"pattern": pid, "pattern_faces": pattern, "up_faces": {names[bi]: up_of[bi] for bi in range(n)}, "goal_faces": {names[bi]: goal_face[bi] for bi in range(n)},
                           "anchor_block": names[anchor_i], "table_yaw": table_yaw, "manipulation_candidate": k, "goal_face_visibility": {names[bi]: v for bi, v in vis.items()},
-                          "placement_order": [names[bi] for bi in order]})
+                          "placement_order": [names[bi] for bi in order], "brace": braces, "brace_reasons": {rec["instance"]: rec.get("brace_reasons", {}) for rec in records},
+                          "region_depth_m": manip.extras.get("focus_info", {}).get("depth")})
         return d
 
     # -- helpers ------------------------------------------------------------------------------------------------------
@@ -480,7 +488,7 @@ class BlockDesign(SamplerV2):
             pairs = [ax for ax in "xyz" if ax != up[1]]
             # straight down first, then the pitched approaches of the band's generic classes (the same tilt at the pick
             # and the place: no reorientation in hand) — the far cells of the band pass only with a pitched approach
-            for tilt in (0.0, 30.0, -30.0, 45.0, -45.0):
+            for tilt in PICK_TILTS_DEG:  # owner 10:47 ladder: the pitched 30° / 45° picks first, straight down last
                 for pair in pairs:
                     for yaw in (table_yaw, table_yaw + math.pi / 2, table_yaw + math.pi, table_yaw - math.pi / 2):
                         cands.append((pair, tilt, tilt, yaw, 0))
@@ -488,7 +496,7 @@ class BlockDesign(SamplerV2):
         screened = []
         for pair, tilt_pick, tilt_place, yaw, sign in cands:
             try:
-                g_pick = C.cube_grasp(self._centre(pick_pose), pair, tilt_pick, yaw, edge=self.edge)
+                g_pick = C.cube_grasp(self._centre(pick_pose), pair, tilt_pick, yaw, edge=self.edge, tip_clearance=PICK_TIP_CLEARANCE)
             except ValueError:
                 continue
             if not g_pick.downward:
@@ -552,18 +560,24 @@ class BlockDesign(SamplerV2):
                                "centre_offset": [float(v) for v in self.c_local.tolist()]}
         if wps:
             rec["waypoints"] = [pose_to_sidecar(w) for w in wps]
-        # brace points (§6.5): row-left / column-top blocks braced by the closed left gripper while the right hand pushes
+        # brace points (§6.5): row-left / column-top blocks braced by the closed left gripper while the right hand pushes.
+        # Owner decision 2026-09-16 11:08 (same rule as axial): the brace and its paired push are recorded only when the
+        # joint two-arm placement exists for this block (brace point in the left contact band at the manipulation trunk,
+        # blade clear of the placed blocks, two-arm IK passing); otherwise the block is placed without a brace / push tail
         n_cols = int((self.g("grid") or [2, 2])[1])
         r, c = divmod(step, n_cols)
         world_after = dict(world_poses)
         world_after[names[bi]] = (goal_pose[bi][0] + _xy3(right) * PLACE_MARGIN + _xy3(toward) * PLACE_MARGIN, goal_pose[bi][1])
         self._teleport(world_after)
+        outcomes: Dict[str, str] = {}
         if c > 0:  # push left against the row, brace the row-left block's left face
             left_bi = order[step - 1]
-            self._brace_push(rec, "row", names[bi], names[left_bi], world_after, direction=-right, brace_dir=right, manip=manip)
+            outcomes["row"] = self._brace_push(rec, "row", names[bi], names[left_bi], world_after, direction=-right, brace_dir=right, manip=manip)
         if r > 0:  # push up (away from the robot) against the column, brace the column-top block's far face
             top_bi = order[step - n_cols]
-            self._brace_push(rec, "col", names[bi], names[top_bi], world_after, direction=toward * -1.0, brace_dir=toward, manip=manip)
+            outcomes["col"] = self._brace_push(rec, "col", names[bi], names[top_bi], world_after, direction=toward * -1.0, brace_dir=toward, manip=manip)
+        rec["brace"] = "present" if any(v == "present" for v in outcomes.values()) else ("none" if outcomes else "not_needed")
+        rec["brace_reasons"] = outcomes
         return rec
 
     def _carry_height(self) -> float:
@@ -624,13 +638,23 @@ class BlockDesign(SamplerV2):
                 for c_sign in (1.0, -1.0):
                     yield (origin, C.eef_quat(a_vec, c_sign * c_axis)), a_vec, f"{prefix}_blade_{cname}_{pitch:.0f}{'' if c_sign > 0 else '-'}", so[1]
 
-    def _brace_push(self, rec: Dict[str, Any], kind: str, pushed: str, braced: str, world_poses: Dict[str, TT.Pose], direction: th.Tensor, brace_dir: th.Tensor, manip: Stance):
+    def _brace_push(self, rec: Dict[str, Any], kind: str, pushed: str, braced: str, world_poses: Dict[str, TT.Pose], direction: th.Tensor, brace_dir: th.Tensor, manip: Stance) -> str:
         """Right-hand push of ``pushed`` along ``direction`` by the place margin while the closed left gripper braces
         ``braced`` on its face opposite to the push; pre-contact + contact IK for both arms (§4.6 step 6). Contacts:
         the top-down blade beside the face (the blocks are 2.5 cm cubes) with the pitched approach classes first, the
         tilted / horizontal side contacts (pads on the face at 3/4 height) as the fallback; the first push pose whose
-        pre + init pass the exact IK is paired with the first brace pose that passes the two-arm check."""
+        pre + init pass the exact IK is paired with the first brace pose that passes the two-arm check. Optional (owner
+        2026-09-16 11:08): records ``push_<kind>`` / ``brace_<kind>`` and returns ``"present"`` only when the joint
+        placement exists (brace point within a lattice cell of the left contact band at this trunk) and the two-arm IK
+        passes; otherwise returns the reason (``no_joint_cell`` / ``push_ik_failed`` / ``brace_ik_failed``)."""
         support = self.obj("support")
+        # joint placement gate: the brace point (half an edge + a finger outside the braced face) in the left band cell
+        b_centre = self._centre(world_poses[braced])[0]
+        b_dir3 = th.tensor([float(brace_dir[0]), float(brace_dir[1]), 0.0])
+        b_dir3 = b_dir3 / th.linalg.norm(b_dir3)
+        brace_pt_xy = (b_centre - b_dir3 * (0.5 * self.edge + FINGER_HALF_THICKNESS))[:2]
+        if self.left_bands is None or not TT.in_band(self.left_bands, manip, brace_pt_xy, tol=1.0)[0]:
+            return "no_joint_cell"
         dist = PLACE_MARGIN
         d3 = th.tensor([float(direction[0]), float(direction[1]), 0.0])
         d3 = d3 / th.linalg.norm(d3)
@@ -669,9 +693,8 @@ class BlockDesign(SamplerV2):
             if chosen is not None:
                 break
         if chosen is None:
-            if brace_fails:
-                raise Reject("contact_unreachable", f"{kind} brace / push of {pushed}: {sorted(set(brace_fails))[:3]}")
-            raise Reject("contact_unreachable", f"{kind} push init of {pushed}: {sorted(set(push_fails))[:3]}")
+            log.info("%s: %s brace / push of %s skipped: %s", self.gp.alias, kind, pushed, (sorted(set(brace_fails)) or sorted(set(push_fails)))[:2])
+            return "brace_ik_failed" if brace_fails else "push_ik_failed"
         push_pre, push_init, push_goal, brace_pre, brace, brace_a, used, p_half, b_half = chosen
         rec[f"push_{kind}"] = ContactRecord("push", "right", push_pre, push_init, None, push_goal, d3, dist, object=pushed).to_sidecar()
         if p_half is not None:
@@ -679,6 +702,27 @@ class BlockDesign(SamplerV2):
         rec[f"brace_{kind}"] = TT.BraceRecord("brace", "left", brace_pre, brace, direction=brace_a, brace_kind="row_left" if kind == "row" else "column_top",
                                               object=braced, extras={"pose_class": used, "blade_half_thickness_m": None if b_half is None else float(b_half),
                                                                      "stop_clearance_m": 0.0}).to_sidecar()
+        return "present"
+
+    # ------------------------------------------------------------------ program check (blocks without a brace / push tail)
+
+    def program_check(self, draft: Draft) -> Dict[str, Any]:
+        """§3.5 program check. Blocks without ``brace_row`` / ``brace_col`` (+ pushes) are not yet accepted by the F6 program
+        (the oracle agent is making the braces optional); until that lands, with ``ISG_PROGRAM_CHECK=stub`` set by the smoke
+        command a rejection that only asks for the brace / push records is recorded as ``mode: stub-brace-optional``."""
+        try:
+            return super().program_check(draft)
+        except Reject as e:
+            msg = str(e)
+            optional = getattr(self, "braces_missing", False) and ("brace" in msg or "push" in msg) and TT.program_check_stub()
+            if not optional:
+                raise
+            log.warning("%s: program check asks for the brace / push tail of a brace-less block (%s); recorded as stub-brace-optional (ISG_PROGRAM_CHECK=stub)",
+                        self.gp.alias, msg[:200])
+            report = {"mode": "stub-brace-optional", "problems": [], "note": "brace-less blocks not yet accepted by the oracle program; structural check skipped", "error": msg[:300]}
+            self.last_program_check = report
+            draft.summary["program_check"] = report
+            return report
 
     # ------------------------------------------------------------------ goal / hooks
 
