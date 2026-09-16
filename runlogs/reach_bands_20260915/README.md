@@ -251,6 +251,19 @@ have the same eef height as the band's push classes, so the band is the right sc
 cells exists; the finding matches §5.6's note (floor init / under placement need a bent posture or a closer stand-off) —
 for the demo the large-scale agent's exact-IK chain per candidate stance stays the path.
 
+**Coverage of B3's two local queues that never ran (owner note 08:45 PDT; killed, nothing runs locally).** Waiter 1
+(17 `jobs.json` breakfast-table jobs): the 10 right-hand / generic / scaled bands (paperback_book gp, parsnip, pencil
+scaled, pickle, quartz, skateboard_wheel_assembly, sunflower, teacup ×2, toy_dice/isgblk gp) are committed with 354–699
+cells; the 6 legacy placed-tray jobs (pencil_case, soap_dispenser, tablefork, teaspoon, toy_dice/hbkqqp, video_game) are
+superseded — their legacy bands exist (76–128 cells) and their `tray/gsxbym*1.25@focus_centred_edge_aligned` bands are
+the 4th `w11` job of pods 0/1/2/3/4/7 (ETA ≈ 17:15 UTC, pencil_case on pod 0 ≈ 17:45); the truncated `desk…` id = the 5
+`desk_xhjsub_0` init bands, committed but **empty** (every Phase-1a stance collides, see Findings), A6 re-runs queued
+(`w12` / `w13`). Waiter 2 (`jobs_a6_desk.json`, 14): all 13 `desk_xhjsub_0` bands committed and empty (same cause; 5 A6,
+8 pre-A6 with re-runs in `w12` / `w13`), `sofa_lugrhk_1` box_of_shampoo **31 cells** with the A6 posture retry (was 0).
+Nothing missing → nothing new queued. (`fleet_remaining.py` was run without `--local runlogs/runpod/rb_local`, so 6 A6
+desk / sofa jobs whose only copy was the local run were re-queued and re-ran on the A40 pods at 15:10 — ≈ 30 min of A40
+time, no other effect.)
+
 *First fleet result of the disembedding recompute (15:41 UTC, `bottle_of_milk/mrejrs`, L40S, 1612 s)*: 536 cells over
 17 of 20 trunks (13 untucked, 3 `ready`, 1 `tucked`; (0.75, −0.9), (0.95, −0.6), (0.95, −0.9) collide), λ ∈ [−0.56, 0] —
 vs 100 cells in the legacy fixed-tray band of the same object.
