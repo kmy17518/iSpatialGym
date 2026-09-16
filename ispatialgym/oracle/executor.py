@@ -47,8 +47,9 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tupl
 
 import torch as th
 
-from ispatialgym.oracle.actions import Action
-from ispatialgym.oracle.execute import check_postcondition, forbidden_contacts, fov_monitored, intended_contacts, is_manipulation, run_action
+from ispatialgym.oracle import r1pro_model as M
+from ispatialgym.oracle.actions import Action, Brace, Push
+from ispatialgym.oracle.execute import check_postcondition, forbidden_contacts, fov_monitored, intended_contacts, is_manipulation, offset_brace, run_action
 from ispatialgym.oracle.motions import Motions, SkillError
 from ispatialgym.oracle.qa import CameraModel, Monitors, QAStats, Verdict, category_of
 from ispatialgym.oracle.recorder import PHASE_GOAL, PHASE_ORACLE, PHASE_SETTLE, Recorder, to_uint8_rgb
@@ -84,6 +85,10 @@ class ExecutorConfig:
     #: goal image
     goal_image: bool = False
     goal_image_renders: int = 10
+    #: brace retry ladder (owner 2026-09-16 05:26 / 05:39): retries of a braced push whose residual is out of tolerance,
+    #: with the brace moved by these offsets (m) outward (short) / inward (overshoot) along its recorded direction
+    brace_retries: int = 2
+    brace_retry_offsets_m: Tuple[float, ...] = (0.005, 0.010)
     #: renders after a checkpoint restore before the (recorded) hold step, so no frame of the rolled-back attempt
     #: survives in the video / dataset (the renderer trails ``load_state`` by 1-2 frames)
     restore_renders: int = 3
@@ -308,6 +313,8 @@ class Executor:
         self.stats: QAStats = monitors.stats if monitors is not None else QAStats()
         self.action_records: List[ActionRecord] = []
         self.last_ctx: Dict[str, Any] = {}
+        self._defer_commit = False
+        self.brace_retries: List[Dict[str, Any]] = []
         self.checkpoint_reports: List[Dict[str, Any]] = []
         self.timings: Dict[str, float] = {}
         self.result: Dict[str, Any] = {}
@@ -519,8 +526,9 @@ class Executor:
                 out.add(inst)
         return out
 
-    def attempt(self, index: int, action: Action, attempt: int) -> Tuple[Optional[Verdict], Dict[str, Any]]:
-        """Execute ``action`` once under the monitors and check its postcondition."""
+    def attempt(self, index: int, action: Action, attempt: int, watch: Sequence[Tuple[Sequence[str], str]] = ()) -> Tuple[Optional[Verdict], Dict[str, Any]]:
+        """Execute ``action`` once under the monitors and check its postcondition. ``watch``: contact pairs the
+        monitors log for the caller (``ctx["watch_hits"]``, episode steps)."""
         ctx: Dict[str, Any] = {}
         try:
             targets = action.targets(self.sidecar, self.state)
@@ -534,10 +542,13 @@ class Executor:
         if self.monitors is not None:
             ctx["hooks"] = {"fov": self.monitors.set_fov_enabled}
             self.monitors.begin_action(action, index, attempt, intended=self._scene_names(intended_contacts(action)), held=self.state.held_objects(),
-                                       manipulation=is_manipulation(action), fov=fov_monitored(action), forbidden=self._scene_names(forbidden_contacts(action)))
+                                       manipulation=is_manipulation(action), fov=fov_monitored(action), forbidden=self._scene_names(forbidden_contacts(action)),
+                                       watch=[(links, next(iter(self._scene_names([obj])))) for links, obj in watch])
         try:
             gen = run_action(action, self.motions, self.state, targets, ctx)
             v = self.run_generator(gen, PHASE_ORACLE, index, attempt)
+            if self.monitors is not None:
+                ctx["watch_hits"] = list(getattr(self.monitors, "watch_hits", []))
             if v is not None:
                 return v, ctx
             cat = check_postcondition(action, self.state, targets, ctx)
@@ -560,7 +571,12 @@ class Executor:
             if self.monitors is not None:
                 self.monitors.end_action()
 
-    def run_action(self, index: int, action: Action) -> Optional[Verdict]:
+    def _commit(self) -> None:
+        """Commit the recorder's pending segment unless a group (braced push) defers commits to its end."""
+        if self.recorder is not None and not self._defer_commit:
+            self.recorder.commit()
+
+    def run_action(self, index: int, action: Action, watch: Sequence[Tuple[Sequence[str], str]] = ()) -> Optional[Verdict]:
         """Checkpoint → attempt → (restore → retry) → annotate. Returns the verdict that fails the episode, or None."""
         rec = ActionRecord(index=index, name=action.name, step_start=self.n)
         self.action_records.append(rec)
@@ -574,24 +590,24 @@ class Executor:
         if self.recorder is not None:
             self.recorder.begin_action_annotation(index, action, fine, numbers)
         cp = self.checkpoint(index)
+        mark = self.recorder.mark() if self.recorder is not None else 0  # pending steps of an enclosing group stay
         verdict: Optional[Verdict] = None
         for k in range(self.cfg.retries + 1):
             t0 = time.time()
-            verdict, ctx = self.attempt(index, action, k)
+            verdict, ctx = self.attempt(index, action, k, watch=watch)
             self.last_ctx = ctx
             rec.targets_keys = ctx.get("targets_keys", [])
             rec.notes = {key: val for key, val in ctx.items() if key in NOTE_KEYS}
             rec.attempts.append(None if verdict is None else verdict.to_dict())
             if verdict is None:
-                if self.recorder is not None:
-                    self.recorder.commit()
+                self._commit()
                 log.info("action %d %s ok in %d steps (%.1fs)", index, action.summary() if hasattr(action, "summary") else action.name, self.n - rec.step_start, time.time() - t0)
                 break
             log.warning("action %d %s attempt %d failed: %s", index, action.name, k, verdict)
             if k < self.cfg.retries:
                 # roll back: the failed attempt leaves no trace in the demo (kept under rollbacks), retry from the checkpoint
                 if self.recorder is not None:
-                    self.recorder.rollback(index, k, verdict.to_dict(), state_before=cp.sim_state)
+                    self.recorder.rollback(index, k, verdict.to_dict(), state_before=cp.sim_state, mark=mark)
                     self.recorder.note_rollback(verdict.to_dict())
                 self.restore(cp, index, k + 1)
             elif self.recorder is not None:
@@ -609,13 +625,105 @@ class Executor:
         t0 = time.time()
         actions = list(actions)
         verdict: Optional[Verdict] = None
-        for i, action in enumerate(actions):
-            verdict = self.run_action(i, action)
+        i = 0
+        while i < len(actions):
+            action = actions[i]
+            if isinstance(action, Brace) and i + 1 < len(actions) and isinstance(actions[i + 1], Push) and self.cfg.brace_retries > 0:
+                verdict = self.run_braced_push(i, action, actions[i + 1])
+                i += 2
+            else:
+                verdict = self.run_action(i, action)
+                i += 1
             if verdict is not None:
                 break
         self.timings["actions_s"] = time.time() - t0
         n_action_steps = self.n
         return self.epilogue(verdict, n_action_steps)
+
+    # ------------------------------------------------------------------ braced push: the brace retry ladder
+
+    def push_outcome(self, push: Push, ctx: Dict[str, Any]) -> Dict[str, Any]:
+        """How the push ended against the task goal: ``residual`` (signed in the push sense: > 0 short, < 0
+        overshoot), ``tolerance`` (the TRO target's, None when the object has no gating target of the push's kind),
+        ``in_tolerance``, ``brace_hits`` (steps the watched brace fingers touched the target before the goal first
+        held) and the ladder ``reason``: ``"short"`` (out of tolerance, short, the target touched the stop before the
+        goal), ``"overshoot"`` (out of tolerance, the residual flipped sign) or None."""
+        res = ctx.get("push_residual") or {}
+        value = res.get("after", res.get("value"))
+        kind = res.get("kind", "line")
+        tgt = self.state.pose_target(push.contact.object) if hasattr(self.state, "pose_target") else None
+        tol = None
+        if tgt is not None:
+            tol = getattr(tgt, "orientation_tolerance", None) if kind == "arc" else getattr(tgt, "position_tolerance", None)
+        out: Dict[str, Any] = {"residual": value, "kind": kind, "tolerance": tol, "in_tolerance": None, "brace_hits": 0, "reason": None}
+        if value is None or tol is None:
+            return out
+        signed = float(value) * (1.0 if kind == "line" else math.copysign(1.0, float(res.get("angle_sign", 1.0))))
+        out["residual"] = signed
+        out["in_tolerance"] = abs(signed) <= float(tol)
+        first = int(self.isg.get("first_success_step", -1) or -1)
+        hits = [h for h in (ctx.get("watch_hits") or []) if first < 0 or h < first]
+        out["brace_hits"] = len(hits)
+        if out["in_tolerance"]:
+            return out
+        if signed < 0:
+            out["reason"] = "overshoot"
+        elif hits:
+            out["reason"] = "short"
+        return out
+
+    def run_braced_push(self, index: int, brace: Brace, push: Push) -> Optional[Verdict]:
+        """``brace`` then ``push`` as one group with the **brace retry ladder** (owner decisions 2026-09-16 05:26 /
+        05:39): when the push ends outside the goal tolerance and (a) the target touched the brace finger before the
+        goal (``short``: the stop too close) the group is rolled back to the checkpoint taken before the brace and
+        re-run with the brace +5 mm then +10 mm outward along −``direction``; (b) the signed residual flipped
+        (``overshoot``: the stop too far) → −5 mm then −10 mm (inward); two retries at most, then the epilogue's
+        ``tolerance`` verdict. Recorded in ``meta.brace_retry``."""
+        cp = self.checkpoint(index)
+        mark = self.recorder.mark() if self.recorder is not None else 0
+        first_record = len(self.action_records)
+        ladder = {"short": self.cfg.brace_retry_offsets_m, "overshoot": tuple(-o for o in self.cfg.brace_retry_offsets_m)}
+        retries: List[Dict[str, Any]] = []
+        offset = 0.0
+        verdict: Optional[Verdict] = None
+        self._defer_commit = True
+        try:
+            for k in range(self.cfg.brace_retries + 1):
+                brace_k = brace if offset == 0.0 else offset_brace(brace, offset)
+                verdict = self.run_action(index, brace_k)
+                if verdict is not None:
+                    break
+                watch = [(list(M.FINGER_LINKS[brace.contact.arm]) + [M.GRIPPER_LINK[brace.contact.arm]], push.contact.object)]
+                verdict = self.run_action(index + 1, push, watch=watch)
+                if verdict is not None:
+                    break
+                outcome = self.push_outcome(push, self.last_ctx)
+                self.action_records[-1].notes["push_outcome"] = outcome
+                if outcome["reason"] is None or k == self.cfg.brace_retries:
+                    if outcome["reason"] is not None:
+                        log.warning("braced push: %s residual %.4f > tolerance %.4f after %d brace retries; the epilogue decides", outcome["reason"], outcome["residual"], outcome["tolerance"], k)
+                    break
+                new_offset = float(ladder[outcome["reason"]][k])
+                log.warning("braced push: %s (residual %.4f, tolerance %.4f, brace hits %d) -> re-brace at %+.0f mm along the brace direction and re-push",
+                            outcome["reason"], outcome["residual"], outcome["tolerance"], outcome["brace_hits"], -new_offset * 1000)
+                dropped = [r.to_dict() for r in self.action_records[first_record:]]
+                del self.action_records[first_record:]
+                retries.append({"attempt": k, "offset_m": offset, "reason": outcome["reason"], "residual": outcome["residual"], "tolerance": outcome["tolerance"],
+                                "brace_hits": outcome["brace_hits"], "actions": dropped, "next_offset_m": new_offset})
+                if self.recorder is not None:
+                    self.recorder.rollback(index, k, {"category": "tolerance", "message": f"braced push {outcome['reason']}: residual {outcome['residual']:.4f}"}, state_before=cp.sim_state, mark=mark)
+                    self.recorder.note_rollback({"category": "tolerance", "brace_retry": outcome["reason"]})
+                self.restore(cp, index, k + 1)
+                offset = new_offset
+        finally:
+            self._defer_commit = False
+        if retries:
+            self.brace_retries.append({"action_index": index, "retries": retries, "final_offset_m": offset,
+                                       "final": (self.action_records[-1].notes.get("push_outcome") if len(self.action_records) > first_record else None),
+                                       "verdict": None if verdict is None else verdict.to_dict()})
+        if verdict is None:
+            self._commit()
+        return verdict
 
     def run_stream(self, actions: Iterable[th.Tensor], phase: int = PHASE_ORACLE) -> Dict[str, Any]:
         """Replay / policy modes: step a stream of 23-D actions (no checkpoints, no program), then the epilogue. The
@@ -732,7 +840,15 @@ class Executor:
         if verdict is None and settle_verdict is not None:
             verdict = settle_verdict
         if verdict is None and not (binary_ever or binary_final):
-            verdict = Verdict("not_reached", "binary goal not reached; unsatisfied: " + ", ".join(_unsatisfied(isg)), step=self.n)
+            unsatisfied = _unsatisfied(isg)
+            # a goal that never held only because gating pose targets are outside their tolerance is a tolerance
+            # failure (the brace retry ladder ends there), not a relation that was never established
+            only_tolerance = bool(out_of_tol) and all(_pose_reached_of(c) in out_of_tol for c in unsatisfied)
+            if only_tolerance:
+                verdict = Verdict("tolerance", "measured error above tolerance for " + ", ".join(out_of_tol) + " (the goal never held)", step=self.n,
+                                  details={"targets": out_of_tol, "never_reached": True})
+            else:
+                verdict = Verdict("not_reached", "binary goal not reached; unsatisfied: " + ", ".join(unsatisfied), step=self.n)
             self.stats.record(verdict)
         if verdict is None and out_of_tol:
             verdict = Verdict("tolerance", "measured error above tolerance for " + ", ".join(out_of_tol), step=self.n, details={"targets": out_of_tol})
@@ -785,6 +901,7 @@ class Executor:
             "actions": [r.to_dict() for r in self.action_records],
             "qa": self.monitors.report() if self.monitors is not None else {"stats": self.stats.to_dict()},
             "checkpoint_reports": list(self.checkpoint_reports),
+            "brace_retry": _jsonable(self.brace_retries),
             "goal_observation": goal_obs,
             "timings": dict(self.timings),
         }
@@ -970,6 +1087,14 @@ def _hold_actions(robot, steps: int) -> Iterator[th.Tensor]:
 
 def _unsatisfied(isg: Dict[str, Any]) -> List[str]:
     return [c.get("bddl", "?") for c in (isg.get("conditions") or []) if c.get("kind") == "binary" and not c.get("satisfied")]
+
+
+def _pose_reached_of(bddl: str) -> Optional[str]:
+    """The target instance of a ``(pose_reached ?x)`` atom (``?`` and parentheses stripped), None for any other atom."""
+    s = str(bddl).strip().strip("()").split()
+    if len(s) == 2 and s[0] == "pose_reached":
+        return s[1].lstrip("?")
+    return None
 
 
 def _out_of_tolerance(isg: Dict[str, Any]) -> List[str]:

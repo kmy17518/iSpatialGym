@@ -30,7 +30,7 @@ import torch as th
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle import execute as EX
 from ispatialgym.oracle import qa as QA
-from ispatialgym.oracle.actions import VOCABULARY, Navigate, Push, BaseFollow, Place
+from ispatialgym.oracle.actions import VOCABULARY, Navigate, Push, BaseFollow, Place, Brace as QA_Brace
 from ispatialgym.oracle.executor import AGENT_INSTANCE, Executor, ExecutorConfig, SimState, apply_goal_override
 from ispatialgym.oracle.motions import Motions, MotionsConfig, SkillError, as_world_pose
 from ispatialgym.oracle.programs import expand
@@ -737,6 +737,112 @@ def test_execute_push_holds_measures_repushes_and_backs_off(tmp_path):
     assert abs(float(th.linalg.norm(end[0] - ctx["push_end_pose"][0]))) < 1e-3
     assert EX.check_postcondition(push, state, targets, ctx) is None
     assert ctx["push_object_drift_m"] < 1e-6
+
+
+def axial_world(gain=1.0, stop=None, tol=0.10):
+    """The braced axial fixture as a fake world: the board at the arc pivot rotates ``gain`` × the pad's swept angle,
+    never back, and never beyond the stop ``stop(offset)`` × the arc angle (``offset`` = how far the brace stands
+    outward of its recorded contact; None = no stop); the task has a world orientation target on the board."""
+    sc = Sidecar.load(os.path.join(SIDECARS, "alignment-axial.json"))
+    actions = expand(sc.alias, sc)
+    push = [a for a in actions if isinstance(a, Push)][0]
+    brace = [a for a in actions if isinstance(a, QA_Brace)][0]
+    geom = EX.push_geometry(push.contact.waypoints, push.contact.direction)
+    robot = FakeRobot(base=tuple(sc.stance("manipulation").base_pose2d))
+    obj = push.contact.object
+    board = FakeObject("board_0", pos=[float(geom.pivot[0]), float(geom.pivot[1]), 0.8])
+    board.graspable = False
+    env = FakeEnv(robot, {obj: board})
+    goal_q = th.tensor([0.0, 0.0, math.sin(geom.angle / 2), math.cos(geom.angle / 2)])  # the arc's full swept angle
+    env.task._tro = SimpleNamespace(meta=SimpleNamespace(pose_targets={obj: SimpleNamespace(frame="world", orientation=goal_q, orientation_tolerance=tol, position=None,
+                                                                                                position_tolerance=None, orientation_equivalences=[])}))
+
+    def evaluate(env_):
+        err = C.quat_angle(goal_q, board.quat)
+        return {"binary_success": err < tol, "settled": True, "errors": {"pose_errors": {obj: {"orientation_error": err, "within_tolerance": err < tol, "gating": True}}}}
+
+    env.evaluate = evaluate
+    a_init = math.atan2(float(push.contact.init.position[1] - geom.pivot[1]), float(push.contact.init.position[0] - geom.pivot[0]))
+    z_contact = float(push.contact.init.position[2])
+    d_brace = th.tensor(brace.contact.direction[:3]).float()
+    c_brace = brace.contact.contact.tensors()[0]
+    sign = math.copysign(1.0, geom.angle)
+    contact = {"on": False, "yaw": 0.0}
+
+    def brace_offset():
+        return float(th.dot(c_brace - robot.eef_pose("left")[0], d_brace))
+
+    def follow(step_action):
+        p = robot.eef_pose("right")[0]
+        if not contact["on"]:
+            contact["on"] = float(th.linalg.norm(p - push.contact.init.tensors()[0])) < 0.01
+            return
+        on_circle = abs(math.hypot(float(p[0] - geom.pivot[0]), float(p[1] - geom.pivot[1])) - geom.radius) < 0.02 and abs(float(p[2]) - z_contact) < 0.03
+        if not on_circle:
+            return
+        swept = C.wrap_angle(math.atan2(float(p[1] - geom.pivot[1]), float(p[0] - geom.pivot[0])) - a_init)
+        if swept * sign <= 0:
+            return
+        target = gain * abs(swept)
+        if stop is not None:
+            target = min(target, stop(brace_offset()) * abs(geom.angle))
+        contact["yaw"] = min(contact["yaw"], abs(C.yaw_of(board.quat)) + 1e-6)  # a checkpoint restore resets the board
+        contact["yaw"] = max(contact["yaw"], target)  # a pushed object does not come back
+        yaw = sign * contact["yaw"]
+        board.quat = th.tensor([0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)])
+
+    env.after_step = follow
+    return sc, env, actions, board, brace, push, geom
+
+
+def test_brace_retry_ladder_short_and_overshoot(tmp_path):
+    """Owner decisions 2026-09-16 05:26 / 05:39: a braced push ending out of tolerance is re-run from the checkpoint
+    before the brace with the brace +5 / +10 mm outward when the target touched the brace finger before the goal
+    (short), −5 / −10 mm inward when the residual flipped sign (overshoot); two retries, then ``tolerance``."""
+    # (a) short: the stop blocks the board at 80 % of the arc with the recorded brace, at 100 % once it stands 5 mm further out
+    sc, env, actions, board, brace, push, geom = axial_world(gain=1.0, stop=lambda off: 0.8 + 40.0 * off)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path)
+
+    def brace_touch(step, query):
+        if ex.monitors.action is not None and ex.monitors.action.name == "push":
+            return [(f"{env.robot.prim_path}/left_gripper_finger_link1", f"{board.prim_path}/base_link")]
+        return []
+
+    ex.monitors._contact_api = FakeContacts(brace_touch)
+    result = ex.run_program(actions)
+    assert result["success"], result["verdict"]
+    assert len(result["brace_retry"]) == 1
+    br = result["brace_retry"][0]
+    assert [r["reason"] for r in br["retries"]] == ["short"] and br["retries"][0]["next_offset_m"] == 0.005 and br["final_offset_m"] == 0.005
+    assert br["retries"][0]["brace_hits"] > 0 and br["retries"][0]["residual"] > 0.10
+    assert br["final"]["in_tolerance"] and [a["name"] for a in result["actions"]] == ["transition", "brace", "push", "retreat", "retreat"]
+    # the re-run brace stood 5 mm outward along -direction of the recorded contact (offset_brace geometry)
+    moved = EX.offset_brace(brace, 0.005)
+    assert abs(float(th.dot(brace.contact.contact.tensors()[0] - moved.contact.contact.tensors()[0], th.tensor(brace.contact.direction[:3]).float())) - 0.005) < 1e-6
+    assert moved.contact.extra["retry_offset_m"] == 0.005 and moved.contact.pre.position != brace.contact.pre.position
+    # the record is consistent: committed rows = committed steps, the rolled-back group kept aside
+    assert len(rec.rows["step"]) == result["n_steps"] and np.all(np.diff(np.asarray(rec.rows["step"])) == 1)
+    assert any(r["attempt"] == 0 and r["action_index"] == 1 for r in rec.rollbacks)
+    # (b) overshoot: the board over-rotates 15 % and the recorded stop stands too far to catch it; 5 mm inward it does
+    sc, env, actions, board, brace, push, geom = axial_world(gain=1.15, stop=lambda off: 1.15 + 30.0 * off)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path / "b")
+    result = ex.run_program(actions)
+    assert result["success"], result["verdict"]
+    br = result["brace_retry"][0]
+    assert [r["reason"] for r in br["retries"]] == ["overshoot"] and br["retries"][0]["next_offset_m"] == -0.005 and br["retries"][0]["residual"] < -0.10
+    # (c) hopeless: the stop blocks at 60 % whatever the brace does -> two short retries (+5, +10 mm), then tolerance
+    sc, env, actions, board, brace, push, geom = axial_world(gain=1.0, stop=lambda off: 0.6)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path / "c")
+    ex.monitors._contact_api = FakeContacts(lambda step, query: [(f"{env.robot.prim_path}/left_gripper_finger_link2", f"{board.prim_path}/base_link")] if ex.monitors.action is not None and ex.monitors.action.name == "push" else [])
+    result = ex.run_program(actions)
+    assert result["reason"] == "tolerance"
+    br = result["brace_retry"][0]
+    assert [r["next_offset_m"] for r in br["retries"]] == [0.005, 0.010] and br["final_offset_m"] == 0.010 and br["final"]["reason"] == "short"
+    # (d) short without a brace contact (the board just slips) is not the brace's fault: no ladder, straight to tolerance
+    sc, env, actions, board, brace, push, geom = axial_world(gain=0.6)
+    ex, motions, backend, rec = make_executor(env, sc, tmp_path / "d")
+    result = ex.run_program(actions)
+    assert result["reason"] == "tolerance" and result["brace_retry"] == []
 
 
 def test_arm_along_finishes_a_stalled_approach_with_arm_to():

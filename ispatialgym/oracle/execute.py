@@ -43,7 +43,7 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Callable, Dict, Iterator, List, Optional, Protocol, Sequence, Tuple
 
 import torch as th
@@ -65,6 +65,7 @@ from ispatialgym.oracle.actions import (
 )
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.motions import ApproachFinish, Motions, SkillError, as_pose2d, as_world_pose
+from ispatialgym.oracle.sidecar import Pose
 from ispatialgym.robot import conventions as C
 
 log = logging.getLogger(__name__)
@@ -369,6 +370,23 @@ def _release(motions: Motions, state, arm: str) -> None:
     motions.backend.detach_object(arm)
 
 
+def offset_brace(brace: Brace, offset_m: float) -> Brace:
+    """The brace with its ``pre`` / ``contact`` poses moved ``offset_m`` **outward** along −``direction`` (the recorded
+    approach points into the face): +5 / +10 mm let a short target rotate further, −5 / −10 mm stop an overshoot
+    earlier (the brace retry ladder, owner 2026-09-16)."""
+    c = brace.contact
+    d = C.as_tensor(c.direction).reshape(-1)[:3].float()
+    d = d / max(float(th.linalg.norm(d)), 1e-9)
+    shift = -d * float(offset_m)
+
+    def moved(pose):
+        p, q = as_world_pose(pose)
+        return Pose(position=[float(v) for v in (p + shift).tolist()], orientation=[float(v) for v in q.tolist()])
+
+    contact = replace(c, pre=moved(c.pre), contact=moved(c.contact), extra={**c.extra, "retry_offset_m": float(offset_m)})
+    return Brace(contact=contact, base_yaw=brace.base_yaw)
+
+
 def intended_contacts(action: Action) -> Tuple[str, ...]:
     """The bddl instances an action may touch (the QA collision whitelist): its ``objects`` plus ``touches`` (the floor
     of a push-under), except that a ``Place(kind="drop")`` must not touch its container (owner decision 2026-09-16:
@@ -607,11 +625,13 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     # 1. hold with the pad in contact until the object is still, then measure the residual to the goal
     yield from _hold_until_still(motions, state, obj, cfg)
     residual, source = push_residual(geom, state, obj, pose0)
-    ctx["push_residual"] = {"kind": geom.kind, "value": residual, "source": source, "recorded": geom.total}
+    ctx["push_residual"] = {"kind": geom.kind, "value": residual, "source": source, "recorded": geom.total,
+                            "angle_sign": (math.copysign(1.0, geom.angle) if geom.kind == "arc" else 1.0)}
     end_pose = as_world_pose(targets["waypoints"][-1])
     # 2. re-push the residual once when it is in the push's sense and the recorded arc / line allows the extension
     if residual is not None:
         forward = residual * (1.0 if geom.kind == "line" else math.copysign(1.0, geom.angle)) > 0
+        ctx["push_residual"]["short"] = bool(forward)
         rmin = cfg.push_residual_min_rad if geom.kind == "arc" else cfg.push_residual_min_m
         if forward and rmin <= abs(residual) <= cfg.push_residual_max_fraction * geom.total:
             ext = extend_push(geom, end_pose, residual)
@@ -758,6 +778,6 @@ def coverage() -> Dict[str, bool]:
 __all__ = [
     "PrivilegedState", "ExecuteConfig", "CONFIG", "EXECUTORS", "MANIPULATION_ACTIONS", "FOV_EXEMPT_ACTIONS", "executor_for",
     "is_manipulation", "fov_monitored", "run_action", "check_postcondition", "coverage", "camera_goal", "joint_tolerance",
-    "idle_arm_targets", "move_idle_arms", "posture_q", "IDLE_POSTURES", "IDLE_ARM_TOL", "intended_contacts", "forbidden_contacts",
+    "idle_arm_targets", "move_idle_arms", "posture_q", "IDLE_POSTURES", "IDLE_ARM_TOL", "intended_contacts", "forbidden_contacts", "offset_brace",
     "push_geometry", "push_residual", "extend_push", "push_tangent", "PushGeometry",
 ]

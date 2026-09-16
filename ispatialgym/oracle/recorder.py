@@ -451,19 +451,34 @@ class Recorder:
         self._clear_pending()
         return n
 
-    def rollback(self, action_index: int, attempt: int, verdict: Optional[Dict[str, Any]] = None, state_before: Optional[th.Tensor] = None) -> int:
-        """Drop the pending segment (a failed attempt); kept under ``rollbacks`` when configured (``state_before`` =
-        the checkpoint state, so the stored segment keeps the BEHAVIOR pairing state[i] before action[i])."""
-        n = self.n_pending
+    def mark(self) -> int:
+        """Position in the pending segment (number of pending steps) a later ``rollback(mark=...)`` truncates to."""
+        return self.n_pending
+
+    def rollback(self, action_index: int, attempt: int, verdict: Optional[Dict[str, Any]] = None, state_before: Optional[th.Tensor] = None, mark: int = 0) -> int:
+        """Drop the pending steps recorded after ``mark`` (a failed attempt; the whole pending segment by default);
+        kept under ``rollbacks`` when configured (``state_before`` = the checkpoint state, so the stored segment keeps
+        the BEHAVIOR pairing state[i] before action[i]). Steps before ``mark`` (an earlier, deferred-commit action of
+        the same group — the brace of a braced push) stay pending."""
+        mark = max(0, min(int(mark), self.n_pending))
+        n = self.n_pending - mark
         if n and self.cfg.keep_rollbacks:
-            states = list(self._pending_states)
+            states = list(self._pending_states[mark:])
             if state_before is not None:
                 states = [th.as_tensor(state_before).detach().cpu().float().clone()] + states
             self.rollbacks.append({
                 "action_index": int(action_index), "attempt": int(attempt), "verdict": verdict, "n_steps": n,
-                "rows": {k: list(v) for k, v in self._pending_rows.items()}, "states": states,
+                "rows": {k: list(v[mark:]) for k, v in self._pending_rows.items()}, "states": states,
             })
-        self._clear_pending()
+        if mark == 0:
+            self._clear_pending()
+        else:
+            for k in list(self._pending_rows):
+                del self._pending_rows[k][mark:]
+            del self._pending_states[mark:]
+            for k in list(self._pending_frames):
+                del self._pending_frames[k][mark:]
+            del self._pending_lerobot[mark:]
         self._last_obs_lerobot = None  # re-armed by the executor with the checkpoint observation (set_observation)
         return n
 
