@@ -9,7 +9,14 @@
  ],
  "lattice": 0.08,
  "stand_off": 0.45,
- "arms": "untucked",
+ "arms": "untucked (ready / tucked per trunk when untucked collides, see trunks[].posture)",
+ "postures": [
+  "untucked",
+  "ready",
+  "tucked"
+ ],
+ "arm": "right",
+ "fingers": 0.05,
  "grid": {
   "translates": [
    0.0,
@@ -126,7 +133,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.03,
+   "posture": null
   },
   {
    "translate": 0.0,
@@ -139,7 +147,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.0,
@@ -152,7 +161,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.0,
@@ -165,7 +175,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.25,
@@ -178,7 +189,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.25,
@@ -191,7 +203,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.25,
@@ -204,7 +217,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.25,
@@ -217,7 +231,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.5,
@@ -230,7 +245,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.5,
@@ -243,7 +259,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.5,
@@ -256,7 +273,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.5,
@@ -269,7 +287,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.75,
@@ -282,7 +301,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.75,
@@ -295,7 +315,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.75,
@@ -308,7 +329,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.75,
@@ -321,7 +343,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.95,
@@ -334,7 +357,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.95,
@@ -347,7 +371,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.95,
@@ -360,7 +385,8 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   },
   {
    "translate": 0.95,
@@ -373,21 +399,22 @@
    "n_pairs": 0,
    "n_dropped_no_pre": 0,
    "n_pose_pruned": 0,
-   "time_s": 0.01
+   "time_s": 0.02,
+   "posture": null
   }
  ],
  "union_extent": null,
  "n_reachable_total": 0,
- "key": "b485683f48dc16f8",
- "time_s": 370.0,
+ "key": "c9d2d7413edb26d9",
+ "time_s": 341.1,
  "kit_stats": {
   "ik_calls": 0,
   "ik_s": 0.0,
   "ik_batch_calls": 0,
   "ik_batch_problems": 0,
   "ik_batch_s": 0.0,
-  "collision_calls": 23,
-  "collision_configs": 23,
-  "collision_s": 0.7526230812072754
+  "collision_calls": 69,
+  "collision_configs": 69,
+  "collision_s": 0.9417464733123779
  }
 }
