@@ -275,6 +275,10 @@ def test_groups(grounded):
         target = gp.entry.roles["target"]
         assert target.representative not in sc.whitelist["distractors"].get(target.category, [])
         assert ["ontop", "distractors_group.n.01_1", gp.rendered.instances["source"]] in gp.problem.raw_init
+        # owner decision 2026-09-16 4b: the source tray spawns at 1.25 (uniform), the destination tray at 1.0
+        src, dst = gp.entry.roles["source"], gp.entry.roles["destination"]
+        assert src.scale == {"tray/gsxbym": 1.25, "default": 1.25} and dst.scale == {}
+        assert gp.entry.generation["source_tray_scale"] == 1.25
     assert {b["n_distractors"] for b in budgets} == {1, 2, 3}  # the shipped picks span the whole 3 -> 2 -> 1 range
     assert any(b["dropped"] for b in budgets) and any(b["footprint_rule"] == "rectangle" for b in budgets)
     attachment = _entries(grounded, "configuration_matching-attachment")[0]

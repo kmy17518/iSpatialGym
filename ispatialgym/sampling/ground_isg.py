@@ -1656,8 +1656,14 @@ class Grounder:
                             se.rooms.append(room)
             entry.scenes[sc] = se
 
-        # ---- scale fallbacks: every whitelisted model of the role spawns at the fallback scale (§5.5 dict form) ----
-        for role, s in comb.scale.items():
+        # ---- role scales (§5.5 dict form, per whitelisted model + "default"): the scale fallbacks of the target and the
+        # disembedding source tray at generation.source_tray_scale (owner decision 2026-09-16 4b; the destination stays 1.0)
+        role_scales = dict(comb.scale)
+        if subtask == "disembedding" and "source" in entry.roles:
+            tray_scale = entry.generation.get("source_tray_scale")
+            if tray_scale not in (None, 1, 1.0):
+                role_scales["source"] = float(tray_scale)
+        for role, s in role_scales.items():
             re_ = entry.roles.get(role)
             if re_ is None:
                 continue

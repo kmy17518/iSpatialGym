@@ -24092,7 +24092,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -24262,7 +24266,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -24432,7 +24440,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -24600,7 +24612,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -24771,7 +24787,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -24942,7 +24962,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -25108,7 +25132,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -25274,7 +25302,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -25440,7 +25472,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -26065,7 +26101,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -26233,7 +26273,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -26401,7 +26445,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -26566,7 +26614,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -26728,7 +26780,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -26890,7 +26946,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -27493,7 +27553,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -27655,7 +27719,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -27817,7 +27885,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -28405,7 +28477,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -28584,7 +28660,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -28763,7 +28843,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -29451,7 +29535,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -29614,7 +29702,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -29777,7 +29869,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -30385,7 +30481,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -30544,7 +30644,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -30703,7 +30807,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -31294,7 +31402,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -31463,7 +31575,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -31632,7 +31748,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -32272,7 +32392,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -32439,7 +32563,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -32606,7 +32734,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -33232,7 +33364,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -33386,7 +33522,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -33540,7 +33680,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -34150,7 +34294,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -34319,7 +34467,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -34488,7 +34640,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -34657,7 +34813,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -34827,7 +34987,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -34997,7 +35161,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -35167,7 +35335,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -35330,7 +35502,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -35493,7 +35669,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -36093,7 +36273,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -36268,7 +36452,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -36443,7 +36631,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -36616,7 +36808,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -36785,7 +36981,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -36954,7 +37154,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -37577,7 +37781,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -37753,7 +37961,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -37929,7 +38141,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -38098,7 +38314,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -38254,7 +38474,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -38410,7 +38634,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -39014,7 +39242,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -39181,7 +39413,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -39348,7 +39584,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -39511,7 +39751,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -39672,7 +39916,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -39833,7 +40081,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -40450,7 +40702,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -40627,7 +40883,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -40804,7 +41064,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -40978,7 +41242,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -41148,7 +41416,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -41318,7 +41590,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -41965,7 +42241,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -42143,7 +42423,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -42321,7 +42605,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -42496,7 +42784,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -42652,7 +42944,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -42808,7 +43104,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -43401,7 +43701,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -43564,7 +43868,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -43727,7 +44035,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -44329,7 +44641,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -44489,7 +44805,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -44649,7 +44969,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -45241,7 +45565,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -45402,7 +45730,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -45563,7 +45895,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -46159,7 +46495,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -46324,7 +46664,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -46489,7 +46833,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -47119,7 +47467,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -47295,7 +47647,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
@@ -47471,7 +47827,11 @@
    "source": {
     "category": "tray",
     "sampleable": true,
-    "representative": "gsxbym"
+    "representative": "gsxbym",
+    "scale": {
+     "tray/gsxbym": 1.25,
+     "default": 1.25
+    }
    },
    "destination": {
     "category": "tray",
