@@ -1315,6 +1315,33 @@ def test_transition_moves_the_idle_arm_to_its_recorded_posture_before_the_trunk(
     assert ctx["fingers_set"] == {"arms": ["left"], "closed": False} and not motions.gripper_closed("left") and motions.gripper_closed("right")
     env.robot._ag_obj_in_hand["right"] = None
     del manip.extra["fingers"]
+    # owner 10:47: a two-arm stance (both arms working, ``arm_posture: tucked`` + arms_q for both) puts BOTH arms into
+    # the recorded posture before the drive-in; an arm carrying an object keeps its grasp and its joints
+    manip.arms = ["left", "right"]
+    manip.extra["arm_posture"] = "tucked"
+    manip.extra["arms_q"] = {"left": [0.0] * 7, "right": [0.0] * 7}
+    manip.extra.pop("idle_posture", None)
+    assert set(EX.stance_arm_targets(manip, ex.state)) == {"left", "right"} and EX.idle_arm_targets(manip, ex.state) == {}
+    ctx = {}
+    for a in EX.move_idle_arms(motions, ex.state, manip, ctx):
+        env.step(a)
+    assert ctx["arms_posture"] == {"moved": ["left", "right"], "kept_holding": [], "source": "arms_q"}
+    assert float(env.robot.q[env.robot.arm_control_idx["left"]].abs().max()) < 1e-3 and float(env.robot.q[env.robot.arm_control_idx["right"]].abs().max()) < 1e-3
+    env.robot.q[env.robot.arm_control_idx["right"]] = th.tensor([0.5] * 7)
+    env.robot._ag_obj_in_hand["right"] = env.objects["apple.n.01_1"]
+    ctx = {}
+    for a in EX.move_idle_arms(motions, ex.state, manip, ctx):
+        env.step(a)
+    assert ctx["arms_posture"] == {"moved": [], "kept_holding": ["right"], "source": "arms_q"}
+    assert float(env.robot.q[env.robot.arm_control_idx["right"]].min()) > 0.4
+    env.robot._ag_obj_in_hand["right"] = None
+    # without arms_q the posture name applies to every arm
+    del manip.extra["arms_q"]
+    ctx = {}
+    for a in EX.move_idle_arms(motions, ex.state, manip, ctx):
+        env.step(a)
+    assert ctx["arms_posture"]["moved"] == ["right"] and ctx["arms_posture"]["source"] == "tucked"
+    assert float(env.robot.q[env.robot.arm_control_idx["right"]].abs().max()) < 1e-3
     # a posture name alone works too, and a posture-string stance (init) treats both arms as idle
     init = sc.stance("init")
     init.extra["idle_posture"] = "tucked"

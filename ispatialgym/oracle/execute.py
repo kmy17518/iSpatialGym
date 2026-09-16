@@ -204,18 +204,20 @@ def posture_q(robot, posture: str, arm: str) -> th.Tensor:
     raise ValueError(f"unknown idle-arm posture {posture!r}")
 
 
-def idle_arm_targets(record, state) -> Dict[str, th.Tensor]:
-    """A6: the recorded joint values of the **idle** arms of a stance / goal record — ``arms_q = {arm: [7]}`` written
-    by the sampler (``SamplerV2.annotate_stance_arms``), else the named ``idle_posture`` — for every arm that is not
-    a working arm of the record (a posture-string ``arms`` = both arms idle). Both fields live in the F6 record's
-    ``extra`` until the sidecar dataclass names them; ``{}`` when nothing is recorded."""
+def stance_arm_targets(record, state, include_working: bool = True) -> Dict[str, th.Tensor]:
+    """The recorded arm joint values of a stance / goal record — ``arms_q = {arm: [7]}`` written by the sampler
+    (``SamplerV2.annotate_stance_arms``), else the named posture (``arm_posture`` / ``idle_posture``: untucked /
+    tucked / reset / ready) — for every arm (owner decision 2026-09-16 10:47: the working arms too — the wall two-arm
+    stance records ``arm_posture: tucked`` for both arms and the drive-in must happen in that posture; the working arm
+    reaches its pre-pose from there in the next action), or only for the idle arms with ``include_working=False``.
+    The fields live in the F6 record's ``extra``; ``{}`` when nothing is recorded."""
     extra = getattr(record, "extra", None) or {}
     arms_q = getattr(record, "arms_q", None) or extra.get("arms_q")
-    posture = getattr(record, "idle_posture", None) or extra.get("idle_posture")
+    posture = getattr(record, "idle_posture", None) or extra.get("arm_posture") or extra.get("idle_posture")
     working = set(getattr(record, "working_arms", []) or [])
     out: Dict[str, th.Tensor] = {}
     for arm in M.ARMS:
-        if arm in working:
+        if arm in working and not include_working:
             continue
         if isinstance(arms_q, dict) and arms_q.get(arm) is not None:
             q = C.as_tensor(arms_q[arm]).reshape(-1)
@@ -223,6 +225,11 @@ def idle_arm_targets(record, state) -> Dict[str, th.Tensor]:
         elif posture and posture != "same":
             out[arm] = posture_q(state.robot, posture, arm)
     return out
+
+
+def idle_arm_targets(record, state) -> Dict[str, th.Tensor]:
+    """The recorded joint values of the **idle** arms only (see :func:`stance_arm_targets`)."""
+    return stance_arm_targets(record, state, include_working=False)
 
 
 def stance_fingers(record) -> Optional[float]:
@@ -236,25 +243,31 @@ def stance_fingers(record) -> Optional[float]:
 
 
 def move_idle_arms(motions: Motions, state, record, ctx: Dict[str, Any]) -> Iterator[th.Tensor]:
-    """Put the arms into the stance's recorded drive-in posture before the trunk motion (A6): ``arm_to`` the idle
-    arms to their recorded joints, and set the recorded finger opening (``fingers``: closed pads for the wall two-arm
-    stance) on every arm that holds nothing — so the swept trunk motion is the one the sampler checked. Arms already
-    there are left alone."""
+    """Put the arms into the stance's recorded drive-in posture before the trunk motion / drive-in (A6 + owner
+    decision 2026-09-16 10:47): the recorded finger opening (``fingers``: closed pads for the wall two-arm stance) and
+    the recorded joints (``arms_q`` / ``arm_posture``) on **every arm that holds nothing** — working arms included —
+    so the swept trunk motion and the drive-in happen in the posture the sampler checked (the wall stance at
+    d = 0.55 m was rejected untucked and recorded tucked). A carried object keeps its grasp and its arm. Arms already
+    there are left alone. Notes: ``arms_posture`` = {moved, kept (holding), source}, ``fingers_set``."""
+    holding = [arm for arm in M.ARMS if state.held_object(arm) is not None]
     fingers = stance_fingers(record)
     set_fingers = []
     if fingers is not None:
         want_close = fingers <= 0.5 * float(C.FINGER_OPEN)
         for arm in M.ARMS:
-            if state.held_object(arm) is not None:
+            if arm in holding:
                 continue  # a carried object keeps its grasp
             if motions.gripper_closed(arm) != want_close:
                 set_fingers.append(arm)
                 yield from motions.gripper(arm, close=want_close)
     ctx["fingers_set"] = {"arms": set_fingers, "closed": (fingers is not None and fingers <= 0.5 * float(C.FINGER_OPEN))} if fingers is not None else None
-    targets = idle_arm_targets(record, state)
+    targets = stance_arm_targets(record, state, include_working=True)
     q = state.robot.get_joint_positions()
-    move = {arm: qa for arm, qa in targets.items() if float(th.max(th.abs(q[state.robot.arm_control_idx[arm]].float() - qa))) > IDLE_ARM_TOL}
-    ctx["idle_arms_moved"] = sorted(move)
+    move = {arm: qa for arm, qa in targets.items() if arm not in holding and float(th.max(th.abs(q[state.robot.arm_control_idx[arm]].float() - qa))) > IDLE_ARM_TOL}
+    extra = getattr(record, "extra", None) or {}
+    source = "arms_q" if extra.get("arms_q") else (extra.get("arm_posture") or extra.get("idle_posture") or None)
+    ctx["arms_posture"] = {"moved": sorted(move), "kept_holding": [a for a in holding if a in targets], "source": source}
+    ctx["idle_arms_moved"] = sorted(a for a in move if a not in set(getattr(record, "working_arms", []) or []))
     if move:
         yield from motions.arm_to(tuple(sorted(move)), q=move)
 
@@ -801,6 +814,6 @@ def coverage() -> Dict[str, bool]:
 __all__ = [
     "PrivilegedState", "ExecuteConfig", "CONFIG", "EXECUTORS", "MANIPULATION_ACTIONS", "FOV_EXEMPT_ACTIONS", "executor_for",
     "is_manipulation", "fov_monitored", "run_action", "check_postcondition", "coverage", "camera_goal", "joint_tolerance",
-    "idle_arm_targets", "move_idle_arms", "stance_fingers", "posture_q", "IDLE_POSTURES", "IDLE_ARM_TOL", "intended_contacts", "forbidden_contacts", "offset_brace",
+    "idle_arm_targets", "stance_arm_targets", "move_idle_arms", "stance_fingers", "posture_q", "IDLE_POSTURES", "IDLE_ARM_TOL", "intended_contacts", "forbidden_contacts", "offset_brace",
     "push_geometry", "push_residual", "extend_push", "push_tangent", "PushGeometry",
 ]
