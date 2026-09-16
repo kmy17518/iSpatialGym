@@ -677,8 +677,10 @@ class IORSSmall(SamplerV2):
         if self.goal_side is not None:
             draft.summary["goal_side"] = self.goal_side
         with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
+            # along the whole descent: the placed-on partner (owner A) and — as the program check's ``place`` rule and the
+            # oracle's descent — the supports (the carried object's sphere fit reaches the table 4-6 cm above the place)
             res = self.ikc.exact([pre_place, place], manip, grasp.arm, ignore_for_last=ignore, scale_key=self.choice.models["target"].scale, cache=False,
-                                 approached=[self.obj("partner")] if self.relation != "inside" else [])
+                                 approached=(self.support_objects() + [self.obj("partner")]) if self.relation != "inside" else self.support_objects())
         if not res.ok and res.code:
             raise Reject(res.code, f"pre-place -> place descent from the manipulation stance with the object attached: {res.reason}")
         if not res.ok:
@@ -741,27 +743,33 @@ class IORSSmall(SamplerV2):
         direction = th.tensor([float(tangent[0]), float(tangent[1]), 0.0])  # toward the partner = robot's left
         p_init, b_point = self.touching_points(t_pose, p_pose, manip)
         dist = self.push_distance()
-        push_init = IK.contact_eef(p_init, direction)
-        push_goal = (push_init[0] + direction * dist, push_init[1])
-        push_pre = IK.pre_pose(push_init)
         p_hull = self.world.hull_at(self.hull["partner"], p_pose)
         face_z = (float(p_hull[:, 2].min()), float(p_hull[:, 2].max()))
-        # closed pads for both contacts (§3.6); the push arm first, then the brace with the push arm locked (§4.6 step 6),
-        # brace candidates in order (pads on the far face / top-down blade beside it, ``touching_brace_candidates``)
+        # closed pads for both contacts (§3.6); the push arm first, then the brace with the push arm locked (§4.6 step 6).
+        # Push candidates: the pads closing horizontally (default) then vertically (the other wrist roll — the horizontal
+        # one put the right pre-contact out of reach on 5/8 attempts of the sanitary-napkins loop); brace candidates in
+        # order (pads on the far face / top-down blade beside it, ``touching_brace_candidates``)
         why: List[str] = []
         chosen = None
-        for pre, contact, kind, extras in self.touching_brace_candidates(manip, b_point, face_z, -direction):
-            res = self.ikc.exact_both_arms(("right", [push_pre, push_init, push_goal]), ("left", [pre, contact]), manip,
-                                           self.support_objects() + [self.obj("target")], self.support_objects() + [self.obj("partner")], fingers=IK.FINGER_CLOSED)
-            if res.ok:
-                chosen = (pre, contact, kind, extras)
+        pushes = [("push_h", IK.contact_eef(p_init, direction)), ("push_v", IK.contact_eef(p_init, direction, closing=th.tensor([0.0, 0.0, 1.0])))]
+        for push_kind, push_init in pushes:
+            push_goal = (push_init[0] + direction * dist, push_init[1])
+            push_pre = IK.pre_pose(push_init)
+            for pre, contact, kind, extras in self.touching_brace_candidates(manip, b_point, face_z, -direction):
+                res = self.ikc.exact_both_arms(("right", [push_pre, push_init, push_goal]), ("left", [pre, contact]), manip,
+                                               self.support_objects() + [self.obj("target")], self.support_objects() + [self.obj("partner")], fingers=IK.FINGER_CLOSED)
+                if res.ok:
+                    chosen = (push_kind, push_pre, push_init, push_goal, pre, contact, kind, extras)
+                    break
+                why.append(f"{push_kind}/{kind}: {res.reason}")
+                if res.reason.startswith("right"):
+                    break  # the push chain itself fails: no brace candidate can change that
+            if chosen is not None:
                 break
-            why.append(f"{kind}: {res.reason}")
-            if res.reason.startswith("right"):
-                break  # the push chain itself fails: no brace candidate can change that
         if chosen is None:
             raise Reject("contact_unreachable", f"touching push / brace: {'; '.join(why[-3:]) or 'no brace candidate (partner face reaches the palm section)'}")
-        pre, contact, kind, extras = chosen
+        push_kind, push_pre, push_init, push_goal, pre, contact, kind, extras = chosen
+        draft.summary.setdefault("touching", {})["push_kind"] = push_kind
         self.sidecar.add_contact(ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname))
         self.sidecar.add_contact(TT.BraceRecord("brace", "left", pre, contact, direction=-direction, brace_kind=kind, object=pname, extras=extras))
         draft.summary["brace"] = {"kind": kind, **{k: v for k, v in extras.items() if v is not None}}
