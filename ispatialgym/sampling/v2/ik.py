@@ -278,6 +278,36 @@ class IKChecker:
         out[idx] = best[idx]
         return out
 
+    #: wide radius for *seeding* (not witnessing) a re-solve: the chain's other pose (PRE_DIST 0.10 away), an earlier draw
+    RETRY_SEED_POS_TOL = 0.20
+    RETRY_SEED_ANG_TOL = 0.8
+
+    def _retry_seeds(self, q0: th.Tensor, pose: Pose, arm: str, chain: Sequence[th.Tensor] = ()) -> List[th.Tensor]:
+        """Seeds for a re-solve after the random seeds missed ``pose``: the configurations found earlier in the same chain
+        (nearest pose first) and the remembered solutions of ``arm`` within the wide radius, nearest first, up to 4."""
+        p, q = G.t(pose[0]), G.t(pose[1])
+        idx = self.kit.robot.arm_control_idx[arm]
+        out: List[th.Tensor] = []
+        for q_c in reversed(list(chain)):
+            q_s = q0.clone()
+            q_s[idx] = G.t(q_c)[idx]
+            out.append(q_s)
+        items = [(key, q_rec) for (a, key), q_rec in self.solutions.items() if a == arm]
+        if items:
+            keys = th.tensor([k for k, _ in items], dtype=th.float32)
+            d = th.linalg.norm(keys[:, :3] - p, dim=1)
+            kq = keys[:, 3:] / th.linalg.norm(keys[:, 3:], dim=1, keepdim=True).clamp(min=1e-9)
+            ang = 2.0 * th.acos(th.clamp((kq * (q / th.linalg.norm(q).clamp(min=1e-9))).sum(dim=1).abs(), max=1.0))
+            ok = (d <= self.RETRY_SEED_POS_TOL) & (ang <= self.RETRY_SEED_ANG_TOL)
+            order = th.argsort(th.where(ok, d, th.full_like(d, float("inf"))))
+            for j in order.tolist():
+                if not bool(ok[j]) or len(out) >= 4:
+                    break
+                q_s = q0.clone()
+                q_s[idx] = items[j][1][idx]
+                out.append(q_s)
+        return out
+
     # -- configurations -----------------------------------------------------------------------------------------
     POSTURES = {"untucked": "untucked", "tucked": "tucked", "reset": "tucked", "ready": "ready"}
     #: A6 (owner decision 2026-09-16): the idle arm of a manipulation stance may take any recorded collision-free posture;
@@ -440,8 +470,15 @@ class IKChecker:
                 q_hit = None if hit.get("q") is None else th.tensor(hit["q"])
                 if q_hit is not None:
                     self.solutions[(arm, self._pose_key(poses[-1]))] = q_hit.clone()
+                # every pose of the chain keeps its witness (entries written before 2026-09-16 14:45 carry the last only):
+                # without them a later re-solve of the pre pose at the settled object pose starts from cold seeds
+                for p_i, q_i in zip(poses, hit.get("qs") or []):
+                    if q_i is not None:
+                        self.solutions[(arm, self._pose_key(p_i))] = th.tensor(q_i)
+                log.debug("exact IK cache hit (%d poses, arm %s, witnesses for %d)", len(poses), arm, len(hit.get("qs") or []))
                 return IKResult(bool(hit["ok"]), q_hit, "cache", len(poses))
         q = None
+        qs: List[Optional[th.Tensor]] = []
         n = len(poses)
         why = "exact IK failed"
         for i, p in enumerate(poses):
@@ -455,6 +492,9 @@ class IKChecker:
                 q, why = self.track_approach(q, poses[i - 1], p, arm, ignore_end=ign, ignore_mid=near, q_hint=q0)
                 if q is None:
                     break
+                qs.append(q)
+                if qs and len(qs) >= 2:
+                    qs[-2] = self._last_track_start.clone()
                 self.solutions[(arm, self._pose_key(poses[i - 1]))] = self._last_track_start.clone()
             else:
                 with self.ignoring(ign):
@@ -465,13 +505,22 @@ class IKChecker:
                         q = q_near
                     else:
                         q = self.kit.ik(p, q_near, arm=arm)
+                    if q is None:
+                        # the 32 random seeds missed: retry seeded from the nearest remembered solution within the wide
+                        # radius (the chain's other pose 10 cm away, an earlier draw of the same grasp) and from the
+                        # solutions already found in this chain
+                        for q_alt in self._retry_seeds(q0, p, arm, [x for x in qs if x is not None]):
+                            q = self.kit.ik(p, q_alt, arm=arm)
+                            if q is not None:
+                                break
                 if q is None:
                     why = f"exact IK failed at pose {i + 1} of {n}"
                     break
+            qs.append(q)
             self.solutions[(arm, self._pose_key(p))] = q.clone()
         res = IKResult(q is not None, q, "" if q is not None else why, len(poses))
         if key is not None and res.ok:  # a failure may be a random miss of the solver: only witnesses are cached
-            cache_put(key, {"ok": True, "q": q.tolist()})
+            cache_put(key, {"ok": True, "q": q.tolist(), "qs": [None if x is None else x.tolist() for x in qs]})
         return res
 
     # -- straight approaches (branch consistency) -----------------------------------------------------------------

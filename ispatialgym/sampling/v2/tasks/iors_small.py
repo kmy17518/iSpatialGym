@@ -605,7 +605,19 @@ class IORSSmall(SamplerV2):
             res = self.ikc.exact([grasp.pre_grasp, grasp.grasp], manip, grasp.arm, ignore_for_last=self.support_objects(),
                                  scale_key=self.choice.models["target"].scale, cache=False, approached=[self.obj("target")])
             if not res.ok:
-                raise Reject(res.code or "grasp_unreachable", f"pre-grasp / grasp at the settled target pose fail the exact IK ({res.reason})")
+                # diagnostics (inside regression 2026-09-16 14:29: the pre-grasp failed 6/8 at the settled pose): the pre
+                # alone, with the partner removed, with every spawned object removed, and how far the target settled
+                def _ok(r):
+                    return "ok" if r.ok else "fail"
+
+                everything = list(self.world.spawned.values())
+                r_pre = self.ikc.exact([grasp.pre_grasp], manip, grasp.arm, cache=False)
+                r_pre_np = self.ikc.exact([grasp.pre_grasp], manip, grasp.arm, ignore_for_last=[self.obj("partner")], cache=False)
+                r_pre_all = self.ikc.exact([grasp.pre_grasp], manip, grasp.arm, ignore_for_last=everything + self.support_objects(), cache=False)
+                moved = float(th.linalg.norm(G.t(draft.object_poses[tname][0]) - G.t(draft.pose_targets[tname]["position"])))
+                raise Reject(res.code or "grasp_unreachable", f"pre-grasp / grasp at the settled target pose fail the exact IK ({res.reason}; pre alone {_ok(r_pre)}, "
+                                                                f"pre with the partner removed {_ok(r_pre_np)}, pre with every object removed {_ok(r_pre_all)}; target settled "
+                                                                f"{moved * 1000:.1f} mm from its draft; trunk ({manip.translate}, {manip.tilt:.2f}), grasp {grasp.grasp_name} yaw {grasp.yaw:.2f})")
 
     def refine_targets_from_goal(self, draft: Draft):
         tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
