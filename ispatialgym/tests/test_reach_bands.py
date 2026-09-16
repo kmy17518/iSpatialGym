@@ -67,3 +67,93 @@ def test_find_matches_placed_specs_through_canonical_form():
             RB.ReachBands.load("s", "t", "mug/ycbmug", "mug__ycbmug__t", placed=["tray/hvlfig"], dirs=[d])
         rb = RB.ReachBands.load("s", "t", "mug/ycbmug", "mug__ycbmug__t", placed=[RB.placed_spec("tray/gsxbym", 1.25)], dirs=[d])
         assert rb.meta["placed"][0]["mode"] == FOCUS
+
+
+# ----------------------------------------------------------------------------------------------- --jobs worker (no simulator)
+
+#: a stable-scene stub: the ``in_rooms`` of the supports decide the loaded rooms; the chair models are unknown to the
+#: bddl bounding-box table, so ``chairs_near_tables`` removes nothing (the removal geometry is tested with the real data)
+_STABLE = {"objects_info": {"init_info": {"table_a": {"args": {"category": "breakfast_table", "model": "zzzz", "in_rooms": ["dining_room_0"]}},
+                                          "table_b": {"args": {"category": "desk", "model": "zzzz", "in_rooms": ["living_room_0"]}},
+                                          "shelf_c": {"args": {"category": "shelf", "model": "zzzz", "in_rooms": ["dining_room_0"]}}}},
+           "state": {"registry": {"object_registry": {}}}}
+
+
+def _job(jid, *args):
+    return {"id": jid, "args": list(args)}
+
+
+def test_select_jobs_and_group_by_key():
+    manifest = [_job("a", "--scene", "s", "--support", "table_a"), _job("b", "--scene", "s", "--support", "table_b"), _job("c", "--scene", "s", "--support", "shelf_c")]
+    assert [j["id"] for j in RB.select_jobs(manifest, None)] == ["a", "b", "c"]
+    assert [j["id"] for j in RB.select_jobs(manifest, ["c", "a"])] == ["c", "a"]
+    with pytest.raises(KeyError):
+        RB.select_jobs(manifest, ["a", "nope"])
+    # groups keep the order of their first item and the given order inside a group
+    items = [("a", 1), ("b", 2), ("c", 1), ("d", 3), ("e", 2)]
+    assert [i[0] for i in RB.group_by_key(items, lambda it: it[1])] == ["a", "c", "b", "e", "d"]
+
+
+def test_band_world_key_groups_supports_of_one_room():
+    ap = RB.build_parser()
+    key = lambda *a: RB.band_world_key(ap.parse_args(list(a)), stable=_STABLE)  # noqa: E731
+    ka = key("--scene", "s", "--support", "table_a")
+    kc = key("--scene", "s", "--support", "shelf_c", "--object", "mug/ycbmug")
+    kb = key("--scene", "s", "--support", "table_b")
+    assert ka == ("s", ("dining_room_0",), ())
+    assert ka == kc and kb != ka  # same room, no chairs to remove -> one world; the other room -> another
+    assert key("--scene", "s", "--support", "table_a", "--rooms", "living_room_0") == kb  # --rooms overrides the support's rooms
+    assert key("--scene", "s", "--support", "floor", "--room", "dining_room_0") == ka  # floor mode: the room, no chair removal
+    under = ap.parse_args(["--scene", "s", "--support", "floor", "--under", "table_b"])
+    assert RB.band_world_key(under, stable=_STABLE) == kb
+    assert under.room == "living_room_0"  # floor-under: the lattice floor's room is the partner's first room
+    with pytest.raises(SystemExit):
+        key("--scene", "s", "--support", "floor")
+    with pytest.raises(SystemExit):
+        key("--scene", "s", "--support", "not_there")
+    assert RB.band_arms(ap.parse_args(["--scene", "s", "--support", "t", "--arm", "left"])) == ("left",)
+    assert RB.band_arms(ap.parse_args(["--scene", "s", "--support", "t", "--brace"])) == ("right", "left")
+    with pytest.raises(SystemExit):
+        RB.band_arms(ap.parse_args(["--scene", "s", "--support", "t", "--brace", "--generic-contact"]))
+
+
+def _obj(name, category, model, pos, rooms, joints=False, scale=None):
+    init = {"class_module": "omnigibson.objects.dataset_object", "class_name": "DatasetObject",
+            "args": {"name": name, "category": category, "model": model, "scale": scale or [1.0, 1.0, 1.0], "in_rooms": rooms}}
+    state = {"root_link": {"pos": list(pos), "ori": [0.0, 0.0, 0.0, 1.0]}}
+    if joints:
+        state["joint_pos"] = [0.0]
+    return init, state
+
+
+def test_slim_drop_list_keeps_every_possible_obstacle(monkeypatch):
+    """--slim-load: objects of the loaded neighbour rooms (and the always-loaded structures) are dropped only when their json box,
+    grown by the safety margin, cannot meet the task rooms' floor box + the obstacle margin; task-room objects, unknown boxes,
+    articulated objects near the boundary and supports of kept objects stay."""
+    from ispatialgym.sampling import knowledge as K
+    from ispatialgym.sampling import scene_variants as SV
+
+    boxes = {"floor": [4.0, 4.0, 0.2], "cube": [0.5, 0.5, 0.5], "wall": [0.2, 4.0, 3.0], "door": [0.2, 1.0, 2.2], "plank": [3.0, 0.3, 0.05]}
+    monkeypatch.setattr(K, "canonical_bbox", lambda model: list(boxes[model]) if model in boxes else None)
+    monkeypatch.setattr(SV, "_metadata", lambda category, model: {"base_link_offset": [0.0, 0.0, 0.0]})
+    objs = [
+        _obj("floor_task", "floors", "floor", (0.0, 0.0, -0.1), ["task"]),
+        _obj("floor_next", "floors", "floor", (4.0, 0.0, -0.1), ["next"]),  # touches the task floor: kept
+        _obj("cube_task_far", "box", "cube", (30.0, 0.0, 0.25), ["task"]),  # task room: never dropped
+        _obj("cube_near", "box", "cube", (3.5, 0.0, 0.25), ["next"]),  # within the margins: kept
+        _obj("cube_far", "box", "cube", (9.0, 0.0, 0.25), ["next"]),  # 7 m from the floor box edge (2 m): dropped
+        _obj("cube_unknown", "box", "nomodel", (9.0, 0.0, 0.25), ["next"]),  # unknown box: kept
+        _obj("cube_other_room", "box", "cube", (9.0, 0.0, 0.25), ["elsewhere"]),  # not loaded at all: not listed
+        _obj("wall_far", "walls", "wall", (12.0, 0.0, 1.5), []),  # always loaded structure, far: dropped
+        _obj("wall_near", "walls", "wall", (2.5, 0.0, 1.5), []),  # always loaded structure, near: kept
+        _obj("door_far", "door", "door", (12.0, 3.0, 1.1), []),  # always loaded door, far: dropped
+        _obj("door_edge", "door", "door", (5.2, 0.0, 1.1), [], joints=True),  # articulated: +2.2 m extent reaches the bounds -> kept
+        _obj("plank", "board", "plank", (4.6, 0.0, 0.6), ["next"]),  # kept (within margins) and rests on ...
+        _obj("stool_far", "stool", "cube", (5.9, 0.0, 0.325), ["next"]),  # ... this: its top (0.575 + margin) meets the plank's bottom -> kept by the closure
+    ]
+    stable = {"objects_info": {"init_info": {i["args"]["name"]: i for i, _ in objs}}, "state": {"registry": {"object_registry": {i["args"]["name"]: s for i, s in objs}}}}
+    dropped = RB._slim_drop_list(stable, ["task"], ["task", "next"], obstacle_margin=1.0, margin=0.5)
+    assert dropped == ["cube_far", "door_far", "wall_far"]
+    # a larger obstacle margin keeps more; nothing is ever dropped from the task rooms
+    assert RB._slim_drop_list(stable, ["task"], ["task", "next"], obstacle_margin=6.0, margin=0.5) == ["door_far", "wall_far"]
+    assert "cube_task_far" not in RB._slim_drop_list(stable, ["task"], ["task", "next"], obstacle_margin=0.0, margin=0.0)

@@ -370,9 +370,12 @@ class R1ProCuRobo:
         return T.pose_transform(rp, rq, as_tensor(pose[0]), as_tensor(pose[1]))
 
     def _cu_pose_from_world(self, poses: Sequence[Pose]) -> CuPose:
+        # one simulator read of the root pose for the whole batch (it was read per pose: 128 PhysX view reads = 40 ms of a
+        # 128-pose batched IK call, measured 2026-09-16); the per-pose arithmetic is unchanged, so results are identical
+        root_p, root_q = self.root_pose()
         pos, quat = [], []
         for p in poses:
-            rp, rq = self.world_to_root(p)
+            rp, rq = T.relative_pose_transform(as_tensor(p[0]), as_tensor(p[1]), root_p, root_q)
             pos.append(rp)
             quat.append(quat_xyzw_to_wxyz(rq))
         return CuPose(
