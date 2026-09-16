@@ -20,11 +20,14 @@ import json
 import os
 import re
 import shutil
+import sys
 from collections import defaultdict
 from typing import Dict, List, Optional
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
+sys.path.insert(0, REPO)
+from ispatialgym.sampling.reach_bands import canonical_placed  # noqa: E402
 
 
 def _done_lines(pod_dir: str) -> Dict[str, dict]:
@@ -133,7 +136,7 @@ def main():
             m = json.load(open(js))
         except ValueError:
             continue
-        key = (m.get("scene"), m.get("support"), m.get("object"), m.get("grasp_key"), bool(m.get("generic_pinch")), tuple(sorted(m.get("placed_specs") or [])),
+        key = (m.get("scene"), m.get("support"), m.get("object"), m.get("grasp_key"), bool(m.get("generic_pinch")), tuple(canonical_placed(m)),
                m.get("under_partner"), json.dumps(m.get("scale")), m.get("arm", "right"), m.get("contact_set"), m.get("height_class"), m.get("target"), m.get("joint"),
                m.get("mode"))
         groups[key].append(js)
