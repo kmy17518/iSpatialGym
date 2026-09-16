@@ -124,11 +124,14 @@ def main(argv=None):
         raise
     finally:
         report["finished"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+        report["n_written"] = sum(int(e.get("n_written", 0)) for temps in report["problems"].values() for e in temps.values())
         with open(os.path.join(template_dir, f"multiply_summary_{int(time.time())}.json"), "w") as f:
             json.dump(report, f, indent=2, default=str)
-        print("SAMPLING_REPORT " + json.dumps({"sampler_version": SAMPLER_VERSION, "problems": {a: {t: {k: v for k, v in e.items() if k in ('n_written', 'time_s', 'rejections', 'error')}
-                                                                                                        for t, e in ts.items()} for a, ts in report["problems"].items()}}, default=str), flush=True)
+        print("SAMPLING_REPORT " + json.dumps({"sampler_version": SAMPLER_VERSION, "n_written": report["n_written"],
+                                              "problems": {a: {t: {k: v for k, v in e.items() if k in ('n_written', 'time_s', 'rejections', 'error')}
+                                                               for t, e in ts.items()} for a, ts in report["problems"].items()}}, default=str), flush=True)
         og.shutdown()
+    sys.exit(0 if report["n_written"] > 0 else 2)
 
 
 if __name__ == "__main__":

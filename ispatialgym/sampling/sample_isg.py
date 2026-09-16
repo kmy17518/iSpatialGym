@@ -297,10 +297,13 @@ def main(argv=None):
         raise
     finally:
         report["finished"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+        report["n_written"] = sum(int(e.get("n_written", 0)) for temps in report["problems"].values() for e in temps.values())
         with open(os.path.join(args.out, "summary.json"), "w") as f:
             json.dump(report, f, indent=2, default=str)
         print("SAMPLING_REPORT " + json.dumps(_compact(report), default=str), flush=True)
         og.shutdown()
+    # exit code: 0 when at least one instance was written, 2 when every template failed (chains / job runners stop)
+    sys.exit(0 if report["n_written"] > 0 else 2)
 
 
 def _existing_templates(out_root: str, gp: GroundedProblem, scene: str) -> List[Dict[str, str]]:
@@ -327,7 +330,7 @@ def _existing_templates(out_root: str, gp: GroundedProblem, scene: str) -> List[
 
 
 def _compact(report: Dict[str, Any]) -> Dict[str, Any]:
-    out = {"sampler_version": report["sampler_version"], "problems": {}, "errors": report.get("errors", [])}
+    out = {"sampler_version": report["sampler_version"], "n_written": report.get("n_written", 0), "problems": {}, "errors": report.get("errors", [])}
     for alias, temps in report["problems"].items():
         out["problems"][alias] = {t: {k: v for k, v in e.items() if k in ("n_written", "time_s", "rejections", "error", "blacklisted")} for t, e in temps.items()}
     return out
