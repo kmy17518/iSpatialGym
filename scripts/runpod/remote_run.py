@@ -116,6 +116,20 @@ def main():
                   f"timeout {int(args.timeout)} bash -c {shlex.quote(cmd)}")
         r = subprocess.run(rp.ssh_base(*ep) + [remote], stdin=subprocess.DEVNULL)
         rc = r.returncode
+        # one job per pod also when the command backgrounded itself (nohup … &): hold the lock until every process that
+        # references this run's directory is gone (owner rule 2026-09-16 11:05: no pool pod runs two simulators)
+        t_wait = time.time()
+        while time.time() - t_wait < args.timeout:
+            try:
+                chk = rp.ssh_run(*ep, f"pgrep -fc '/root/smoke/{run_id}' || true", capture=True, timeout=45)
+                n = int((chk.stdout or "0").strip().split()[0] or 0)
+            except Exception:
+                n = 0
+            if n == 0:
+                break
+            if time.time() - t_wait < 5:
+                print(f"remote_run: {n} process(es) of run {run_id} still alive on {pid} after the command returned; holding the pod lock", file=sys.stderr, flush=True)
+            time.sleep(30)
         if args.pull:
             remote_path = args.pull[0].replace("$SMOKE_OUT", f"/root/smoke/{run_id}")
             os.makedirs(args.pull[1], exist_ok=True)
