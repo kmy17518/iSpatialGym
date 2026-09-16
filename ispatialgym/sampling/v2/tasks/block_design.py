@@ -221,11 +221,12 @@ class BlockDesign(SamplerV2):
 
     def _anchor_braces_in_left_band(self, anchor_xy, stance: Stance, right: th.Tensor, toward: th.Tensor) -> bool:
         """Whether the two brace points of a goal grid anchored at ``anchor_xy`` (the closed left gripper's blade on the
-        anchor's robot-left face and on its far face, half an edge + a finger outside the faces) lie within one lattice
-        cell of the left contact band at the stance's trunk."""
+        anchor's robot-left face and on its far face, half an edge + a finger outside the faces) lie within 1.25 lattice
+        cells (10 cm) of a left contact band cell at the stance's trunk (the blade stands beside the cell, the bands overlap
+        only at λ ≈ 0 on the pilot support)."""
         off = 0.5 * self.edge + FINGER_HALF_THICKNESS
         pts = [anchor_xy - right * off, anchor_xy - toward * off]
-        return all(TT.in_band(self.left_bands, stance, p, tol=1.0)[0] for p in pts)
+        return all(TT.in_band(self.left_bands, stance, p, tol=1.25)[0] for p in pts)
 
     def _region_in_frame(self, s, stance: Stance, cam, focus, info) -> bool:
         cells = info["cells"]

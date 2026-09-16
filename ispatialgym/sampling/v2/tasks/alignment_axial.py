@@ -161,7 +161,7 @@ class AlignmentAxial(SamplerV2):
                 self.left_bands = TT.load_left_contact_band(self, ez, top=self.top, edge=edge, compute=TT.left_band_compute())
                 init0 = TT.phase1b_init_trunk(self, st, ez, bands=bands, top=self.top, left_bands=self.left_bands)
                 init = None
-                for _ in range(4):  # §6.10: retry the next lateral position before the next edge
+                for _ in range(8):  # §6.10: retry the next lateral position before the next edge (8 draws: the rule is sensitive to the lateral)
                     cand = TT.phase1c_lateral(self, init0, margins, rng, top=self.top, bands=bands)
                     cand.name = "init"
                     n_vis = self._edge_visible_points(cand, self.camera_pose_at(cand), 0.0, None)
@@ -170,7 +170,7 @@ class AlignmentAxial(SamplerV2):
                         break
                     log.info("%s: edge %s lateral %.2f: reference edge %d/%d points visible from init", self.gp.alias, edge.name, cand.lateral, n_vis, int(ev.get("points", 9)))
                 if init is None:
-                    raise Reject("edge_not_visible", "the front edge is not visible from the init stance at 4 lateral draws")
+                    raise Reject("edge_not_visible", "the front edge is not visible from the init stance at 8 lateral draws")
                 cands = TT.phase2_manipulation_stance(self, init, w_diag, target_height=ez, bands=bands, top=self.top, focus_z=self.top.z + 0.5 * ez)
                 cands = [c for c in cands if self._edge_visible_points(c, self.camera_pose_at(c), c.local(c.focus[:2])[1], None) >= int(ev.get("min_visible", 3))]
                 if not cands:
