@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 09:46 PDT — 8/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 10:11 PDT — 8/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -126,22 +126,22 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | camera_relocalization-obstructed | valid demo | tracker corner fix d4a1745 not yet re-demoed | oracle |
 | object_scaling | valid demo | - | - |
 | mental_rotation | valid demo | - | - |
-| disembedding | demo run | 4a/4b landed (D1 d455b77/b4ab9f9), tray band keying (634f423/8bd1012); per-role scale spawn (core) pending; bands computing (1.25 tray) | core / tabletop / bands |
-| CM block_design | no instance | left band 0.02 available; 10.1 cm spacing; loop running | loop / tabletop |
+| disembedding | demo run | chili: empty feasible set F at the focus (tray 1.25 bands landing ≈10:15; in-process band used?) | tabletop / bands |
+| CM block_design | no instance | target_placement x8: no pick passes the screening IK / place + flip exact IK / row brace | tabletop |
 | CM attachment | no instance | left bands available (all classes); loop running (cap-lemonade_bottle) | loop / tabletop |
-| CM articulation_open_small_scale | no instance | left band wiring in articulation_small (tabletop item 2) → then loop (laptop) | tabletop |
+| CM articulation_open_small_scale | no instance | hinged_jar run hit the core's in-progress floor_z edit (park_cell) → re-run after the core commit; toolbox no_workspace, laptop target_placement | tabletop / core |
 | CM articulation_close_small_scale | no instance | same as open | tabletop |
 | CM articulation_open_large_scale | no instance | floor_z = 0 vs the room floor at +7 mm → wheels penetrate, every stance collides (diag 79dce47f); core fixing SimWorld.floor_z, then loop | core |
 | CM articulation_close_large_scale | no instance | same as open | core |
-| alignment-world_vertical | demo run | first instance written (4074359); demo loop running (painting_s080) | core / loop |
-| alignment-world_horizontal | no instance | demo loop running (picture_s070) | loop |
+| alignment-world_vertical | demo run | instance OK (painting_s080); demo collision left finger vs wall during transition (before fingers fix f52d882) → re-run | loop / oracle |
+| alignment-world_horizontal | no instance | picture_s070: no wall spot at ±25°; decorative_sign running | loop |
 | alignment-axial | valid demo | - | - |
 | IORS ontop_small_scale | valid demo | - | - |
 | IORS under_small_scale | valid demo | - | - |
 | IORS inside | demo run (pre-fix success) | re-sample after 160c518 (release height) + drop executor | core / oracle |
 | IORS nextto | valid demo | near-side goal 160c518 (future sampling) | - |
-| IORS touching | no instance | carton_of_milk: IK; teacup-teapot: target_not_pushable (yield); third alias box_of_sanitary_napkins running | loop / core |
-| IORS ontop_large_scale | no instance | floor class failed locally (floor band 0 cells even in-process → B unreachable; path_collision / no_transition / empty F_init); now box_of_shampoo-sofa-bar locally (C at the sofa seat 0.40 m needs a placement band: in-process compute); countertop pair needs the visibility-rule relaxation (decision) | coordinator (local) / large-scale |
+| IORS touching | no instance | approach_untrackable (intermediate waypoint collides with the target itself) + place_unreachable → core: ignore the target along the approach segment | core |
+| IORS ontop_large_scale | no instance | floor class: floor band empty; sofa-bar: stance C 0 survivors (visibility stage) → large-scale; countertop pair needs the visibility relaxation (decision) | large-scale / owner |
 | IORS under_large_scale | no instance | push-under: sampler landed (25e94d3/8140025/032d849), program + executor (oracle) pending | large-scale / oracle |
 <!-- /first-demo-board -->
 

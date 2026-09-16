@@ -28,20 +28,20 @@
   "last_change": "2026-09-16 03:00 PDT"
  },
  "disembedding": {
-  "blocking": "4a/4b landed (D1 d455b77/b4ab9f9), tray band keying (634f423/8bd1012); per-role scale spawn (core) pending; bands computing (1.25 tray)",
-  "owner": "core / tabletop / bands"
+  "blocking": "chili: empty feasible set F at the focus (tray 1.25 bands landing \u224810:15; in-process band used?)",
+  "owner": "tabletop / bands"
  },
  "configuration_matching-block_design": {
-  "blocking": "left band 0.02 available; 10.1 cm spacing; loop running",
-  "owner": "loop / tabletop"
+  "blocking": "target_placement x8: no pick passes the screening IK / place + flip exact IK / row brace",
+  "owner": "tabletop"
  },
  "configuration_matching-attachment": {
   "blocking": "left bands available (all classes); loop running (cap-lemonade_bottle)",
   "owner": "loop / tabletop"
  },
  "configuration_matching-articulation_open_small_scale": {
-  "blocking": "left band wiring in articulation_small (tabletop item 2) \u2192 then loop (laptop)",
-  "owner": "tabletop"
+  "blocking": "hinged_jar run hit the core's in-progress floor_z edit (park_cell) \u2192 re-run after the core commit; toolbox no_workspace, laptop target_placement",
+  "owner": "tabletop / core"
  },
  "configuration_matching-articulation_close_small_scale": {
   "blocking": "same as open",
@@ -56,11 +56,11 @@
   "owner": "core"
  },
  "alignment-world_vertical": {
-  "blocking": "first instance written (4074359); demo loop running (painting_s080)",
-  "owner": "core / loop"
+  "blocking": "instance OK (painting_s080); demo collision left finger vs wall during transition (before fingers fix f52d882) \u2192 re-run",
+  "owner": "loop / oracle"
  },
  "alignment-world_horizontal": {
-  "blocking": "demo loop running (picture_s070)",
+  "blocking": "picture_s070: no wall spot at \u00b125\u00b0; decorative_sign running",
   "owner": "loop"
  },
  "alignment-axial": {
@@ -90,12 +90,12 @@
   "last_change": "2026-09-16 04:37 PDT"
  },
  "inter_object_relation_satisfaction-touching": {
-  "blocking": "carton_of_milk: IK; teacup-teapot: target_not_pushable (yield); third alias box_of_sanitary_napkins running",
-  "owner": "loop / core"
+  "blocking": "approach_untrackable (intermediate waypoint collides with the target itself) + place_unreachable \u2192 core: ignore the target along the approach segment",
+  "owner": "core"
  },
  "inter_object_relation_satisfaction-ontop_large_scale": {
-  "blocking": "floor class failed locally (floor band 0 cells even in-process \u2192 B unreachable; path_collision / no_transition / empty F_init); now box_of_shampoo-sofa-bar locally (C at the sofa seat 0.40 m needs a placement band: in-process compute); countertop pair needs the visibility-rule relaxation (decision)",
-  "owner": "coordinator (local) / large-scale"
+  "blocking": "floor class: floor band empty; sofa-bar: stance C 0 survivors (visibility stage) \u2192 large-scale; countertop pair needs the visibility relaxation (decision)",
+  "owner": "large-scale / owner"
  },
  "inter_object_relation_satisfaction-under_large_scale": {
   "blocking": "push-under: sampler landed (25e94d3/8140025/032d849), program + executor (oracle) pending",
