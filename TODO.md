@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 10:21 PDT — 8/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 10:43 PDT — 5/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -128,18 +128,18 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | mental_rotation | valid demo | - | - |
 | disembedding | demo run | chili: empty feasible set F at the focus (tray 1.25 bands landing ≈10:15; in-process band used?) | tabletop / bands |
 | CM block_design | no instance | target_placement x8: no pick passes the screening IK / place + flip exact IK / row brace | tabletop |
-| CM attachment | no instance | left bands available (all classes); loop running (cap-lemonade_bottle) | loop / tabletop |
+| CM attachment | no instance | one attempt took 1457 s (brace candidates) → remote_run timeout; needs the attempt budget cut | tabletop |
 | CM articulation_open_small_scale | no instance | hinged_jar run hit the core's in-progress floor_z edit (park_cell) → re-run after the core commit; toolbox no_workspace, laptop target_placement | tabletop / core |
 | CM articulation_close_small_scale | no instance | same as open | tabletop |
-| CM articulation_open_large_scale | no instance | floor_z fix (core, in flight) → loop on rvunhj_0 with untucked init at t ≤ 0.25; no blacklist before the verdict (owner 10:15 item 5) | core |
-| CM articulation_close_large_scale | no instance | same as open | core |
-| alignment-world_vertical | demo run | instance OK (painting_s080); demo collision left finger vs wall during transition (before fingers fix f52d882) → re-run | loop / oracle |
-| alignment-world_horizontal | no instance | picture_s070: no wall spot at ±25°; decorative_sign running | loop |
+| CM articulation_open_large_scale | no instance | floor_z fixed (Phase 1 passes now); handle_unreachable x8 on rvunhj_0 (edge-door pinch 0.69 m, arm-only class) → large-scale | large-scale |
+| CM articulation_close_large_scale | no instance | same as open | large-scale |
+| alignment-world_vertical | demo run | instance OK; demo: transition drive-in with untucked arms hits the wall — the stance records arm_posture tucked + arms_q for BOTH arms but the oracle's move_idle_arms moves idle arms only (idle_arms_moved: []) → oracle: apply arms_q to every free arm before the drive-in | oracle |
+| alignment-world_horizontal | no instance | decorative_sign: push_unreachable x8; picture_s070: no spot → next alias / scale fallback | loop / large-scale |
 | alignment-axial | valid demo | - | - |
-| IORS ontop_small_scale | valid demo | - | - |
-| IORS under_small_scale | valid demo | owner 10:15: FOV loophole (fov_idle_out 249, 0 verdicts) + placed-orientation gating (cup fell 0.46 rad, run passed) + release height from the raycast surface → re-run after items 1-3 land | oracle / core |
+| IORS ontop_small_scale | demo run (pre-fix success) | - | - |
+| IORS under_small_scale | demo run (pre-fix success) | honest fail now: placed_orientation (cup falls at release) → core item 3 release height from the raycast surface, then re-run | core |
 | IORS inside | demo run (pre-fix success) | re-sample after 160c518 (release height) + drop executor | core / oracle |
-| IORS nextto | valid demo | near-side goal 160c518 (future sampling) | - |
+| IORS nextto | demo run (pre-fix success) | near-side goal 160c518 (future sampling) | - |
 | IORS touching | no instance | approach_untrackable (intermediate waypoint collides with the target itself) + place_unreachable → core: ignore the target along the approach segment | core |
 | IORS ontop_large_scale | no instance | floor class: floor band empty; sofa-bar: stance C 0 survivors (visibility stage) → large-scale; countertop pair needs the visibility relaxation (decision) | large-scale / owner |
 | IORS under_large_scale | no instance | push-under: sampler landed (25e94d3/8140025/032d849), program + executor (oracle) pending | large-scale / oracle |
