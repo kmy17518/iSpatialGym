@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import logging
 import math
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -48,6 +49,11 @@ from omnigibson.object_states import AttachedTo  # noqa: E402
 log = logging.getLogger("ispatialgym.sampling.v2")
 
 SUBTASK = "configuration_matching-attachment"
+#: per-attempt budget (owner 2026-09-16 10:47 item 3): the pilot's cap-lemonade attempt spent 1457 s in the per-cell exact
+#: IK with the attached male; a candidate now screens every admissible partner cell in one batch and solves exactly at most
+#: PARTNER_EXACT_CAP of them, the attempt stops at ATTEMPT_BUDGET_S (``generation.attempt_budget_s`` overrides)
+ATTEMPT_BUDGET_S = 240.0
+PARTNER_EXACT_CAP = 6
 
 
 @register(SUBTASK)
@@ -265,7 +271,11 @@ class Attachment(SamplerV2):
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         init = self.init_stance
         errors = []
+        self._deadline = time.time() + float(self.gen("attempt_budget_s", ATTEMPT_BUDGET_S))
         for k in rng.permutation(len(self.manip_candidates))[:6]:
+            if time.time() > self._deadline:
+                errors.append(f"attempt budget of {self.gen('attempt_budget_s', ATTEMPT_BUDGET_S):.0f} s spent")
+                break
             cand = self.manip_candidates[int(k)]
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
             manip.focus, manip.arms = cand.focus, ["right"]
@@ -280,6 +290,12 @@ class Attachment(SamplerV2):
                 errors.append(f"candidate {int(k)}: {e}")
                 log.info("%s: %s", self.gp.alias, errors[-1][:300])
         raise Reject("target_placement", "; ".join(errors[-3:])[:1500])
+
+    def _check_deadline(self):
+        """Per-attempt time budget (owner 2026-09-16 10:47 item 3: an attempt stays under ~5 min): the current candidate
+        stops with ``Reject("time_budget")`` once it is spent."""
+        if time.time() > getattr(self, "_deadline", math.inf):
+            raise Reject("time_budget", f"attempt budget of {self.gen('attempt_budget_s', ATTEMPT_BUDGET_S):.0f} s spent")
 
     def _sample_with(self, rng, init: Stance, manip: Stance, k: int) -> Draft:
         d = Draft()
@@ -300,8 +316,13 @@ class Attachment(SamplerV2):
             raise Reject("partner_placement", "no attach-reach cell at this trunk")
         m_fp = self.world.footprint(self.hull[self.t_role], m_pose)
         f_pose = attach = pre_attach = None
-        fails = {"distance": 0, "support": 0, "gap": 0, "frame": 0, "brace_off_band": 0, "brace_class_failed": 0, "ik": 0}
+        fails = {"distance": 0, "support": 0, "gap": 0, "frame": 0, "brace_off_band": 0, "brace_class_failed": 0, "screen": 0, "ik": 0}
         brace_geom = None
+        # geometric admissibility of the partner cells first (cheap), then ONE batched screening of every admissible
+        # [pre-attach, attach] pair with the male in hand (the female parked: its own collision is ignored for the attach
+        # pose anyway), and the exact IK only for the screened few (owner 2026-09-16 10:47 item 3: the per-cell exact IK
+        # with the attached male took ~1 s a pose and the attempt 1457 s)
+        geo: List[Tuple[Any, ...]] = []
         for i in rng.permutation(len(cells))[:40]:
             xy = cells[int(i)]
             if float(th.linalg.norm(xy - m_pose[0][:2])) < float(self.g("partner_centre_distance_min_m")):
@@ -332,6 +353,17 @@ class Attachment(SamplerV2):
             eef_attach = IK.grasp_pose(goal, grasp.eef_in_object)
             axis = self._insertion_axis_world(pose)
             eef_pre = (eef_attach[0] + axis * float(self.g("pre_attach_back_m")), eef_attach[1])
+            geo.append((pose, eef_pre, eef_attach, point, b_dir, jp.get("brace_classes")))
+        if geo:
+            with TT.posed_in_hand(self, "right", male, grasp.eef_in_object):
+                with attached(self.kit, "right", male):
+                    ok = self.ikc.screen_pairs([[g_[1], g_[2]] for g_ in geo], manip, "right", ignore_for_last=[support])
+            screened = [g_ for g_, o in zip(geo, ok.tolist()) if o]
+            fails["screen"] = len(geo) - len(screened)
+        else:
+            screened = []
+        for pose, eef_pre, eef_attach, point, b_dir, brace_classes in screened[:PARTNER_EXACT_CAP]:
+            self._check_deadline()
             female.set_position_orientation(*pose)
             female.keep_still()
             self.kit.sync_world()
@@ -342,7 +374,7 @@ class Attachment(SamplerV2):
                 fails["ik"] += 1
                 continue
             f_pose, attach, pre_attach = pose, eef_attach, eef_pre
-            brace_geom = (point, b_dir, jp.get("brace_classes"))
+            brace_geom = (point, b_dir, brace_classes)
             break
         if f_pose is None:
             raise Reject("partner_placement", f"no partner cell with a reachable attach pose ({fails}"
@@ -363,6 +395,7 @@ class Attachment(SamplerV2):
                 point, b_dir, passing = brace_geom
                 res_b, brace_pre, brace, brace_kind, brace_fails = None, None, None, None, []
                 for pre_c, c_pose, kind in self._brace_candidates(manip, point, b_dir, passing):
+                    self._check_deadline()
                     res_b = TT.brace_second_arm(self, manip, "right", [pre_attach, attach], "left", [pre_c, c_pose], ignore_work_last=[support, female],
                                                 ignore_brace_last=[support, female])
                     if res_b.ok:
