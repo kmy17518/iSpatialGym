@@ -242,7 +242,12 @@ class R1ProCuRobo:
         self._joint_child = self._parse_joint_children(self.urdf_path)
         self._default_q = {n: float(v) for n, v in zip(self.joint_names, robot.reset_joint_pos)}
 
-        # Shared world
+        # Shared world. NOTE: cuRobo 0.8 launches its sphere-vs-mesh kernel over spheres x ``mesh_cache_size`` threads (the
+        # cache capacity, not the number of loaded meshes; ``wp_autograd.py``: ``dim = b * h * n * max_n``), so an oversized
+        # cache is paid on every collision evaluation: measured 2026-09-16, a 128-pose x 12-seed batched IK call with 28
+        # enabled meshes took 8.0 s with the 8192 cache and 5.2 s with *no* enabled mesh at all. Callers that know their
+        # world (reach_bands.load_world) pass a cache sized to the loaded meshes.
+        self.mesh_cache_size = int(mesh_cache_size)
         self.checker = create_collision_checker(
             SceneCollisionCfg(
                 device_cfg=self.device_cfg,

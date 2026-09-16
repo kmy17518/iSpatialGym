@@ -1368,6 +1368,13 @@ def _chairs_to_remove(scene: str, support_name: str, rooms: List[str], stable: O
     return SV.chairs_near_tables(stable, rooms, [support_name], distance=1.0, categories=SV.CHAIR_CATEGORIES)
 
 
+#: cuRobo mesh store: capacity = loaded collision meshes + this headroom for the objects bands spawn (a target object is
+#: 1-6 meshes, a placed tray a few more; the worker reloads the world when fewer than MESH_CACHE_RESERVE slots are left),
+#: at least MESH_CACHE_MIN. The capacity, not the fill, sizes every collision kernel launch (R1ProCuRobo.__init__).
+MESH_CACHE_HEADROOM = 256
+MESH_CACHE_MIN = 512
+MESH_CACHE_RESERVE = 64
+
 #: slim load (``_slim_drop_list``): safety margin (m) added to every bounding box derived from the stable scene json before
 #: the ``SimWorld.obstacle_filter`` test - the json knows the canonical (visual) bounding box, the filter measures the
 #: collision meshes; articulated objects get their largest extent on top (an open door leaf / drawer reaches that far).
@@ -1615,6 +1622,10 @@ def build_parser() -> argparse.ArgumentParser:
                     "the neighbouring rooms' (and the always-loaded structures') objects that can never pass SimWorld.obstacle_filter are left out - their "
                     "stable-scene bounding box, grown by SLIM_MARGIN_M (+ extent when articulated), misses the task rooms' floor extent + ISG_OBSTACLE_MARGIN_M; "
                     "the collision world (obstacle set, cuRobo mesh names, bands) is identical, the scene load 117 s -> 54 s, 421 -> 108 objects (house_single_floor)")
+    ap.add_argument("--mesh-cache", default=None, help="SAME-ALGORITHM OPT-IN (default: cuRobo's 8192, unchanged): capacity of the cuRobo mesh store, a number "
+                    "or 'auto' (= the loaded collision meshes + %d, at least %d). cuRobo launches spheres x capacity collision threads per evaluation, so "
+                    "'auto' made every batched IK call ~2.5x faster (trunk 65 s -> 25 s), but the thread layout changes the order of its atomic float "
+                    "accumulation and a marginal cell can differ from the 8192 result (1 pair of 88 on the contact test band); recorded as schedule.mesh_cache" % (MESH_CACHE_HEADROOM, MESH_CACHE_MIN))
     ap.add_argument("--ik-tail-sizes", default=None, help="SAME-ALGORITHM OPT-IN (default: the committed 16,32,64,128): batched IK solver sizes for the last "
                     "chunk of a screening call, e.g. 8,16,24,32,48,64,96,128 - fewer padded slots (73 real poses per 128-slot call in the pilot), but every "
                     "solver size draws its own cuRobo seed stream, so marginal cells can differ from the default schedule; recorded as schedule.ik_sizes")
@@ -1645,8 +1656,19 @@ def load_world(args, rooms: List[str], variant: Optional[dict], removed: List[st
 
     t_load = time.time()
     world = SimWorld(args.scene, rooms, scene_variant=variant, cameras=bool(args.cameras))
-    kit = RobotKit(world, prebuild=tuple(f"{a}_arm" for a in arms) if args.prebuild_planner else ())
+    # cuRobo's mesh store capacity sizes every collision kernel launch (see R1ProCuRobo.__init__). SAME-ALGORITHM OPT-IN: a
+    # snug capacity (``--mesh-cache auto`` = loaded meshes + MESH_CACHE_HEADROOM, or a number) made the batched IK 2.5x
+    # faster, but the kernel's thread layout changes with the capacity and with it the order of cuRobo's atomic float
+    # accumulation over the obstacles that touch one sphere: measured 2026-09-16, two of three two-trunk bands
+    # byte-identical, the contact band gained one marginal (cell, class) pair. Default: the backend's 8192 (unchanged).
+    n_meshes = RobotKit.count_collision_meshes(world)
+    cache = None
+    if args.mesh_cache:
+        cache = max(MESH_CACHE_MIN, 64 * math.ceil((n_meshes + MESH_CACHE_HEADROOM) / 64)) if str(args.mesh_cache).lower() == "auto" else int(args.mesh_cache)
+    kit = RobotKit(world, prebuild=tuple(f"{a}_arm" for a in arms) if args.prebuild_planner else (), mesh_cache_size=cache)
     kit.sync_world()
+    log.info("cuRobo mesh cache %d for %d loaded collision meshes (%d after the sync)%s", kit.backend.mesh_cache_size, n_meshes, len(kit.backend._world_mesh_names),
+             "" if cache is None else " [--mesh-cache: same-algorithm opt-in, marginal cells can differ from the 8192 default]")
     #: physics state a band starts from in a fresh process (robot parked, five physics steps, nothing spawned); restored
     #: before every further band of a worker (:func:`reset_world_between_bands`)
     world.parked_state = og.sim.dump_state()
@@ -1731,6 +1753,8 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
         if sizes != tuple(BandComputer.IK_SIZES):
             bc.IK_SIZES = sizes  # instance override; the class default stays the exact schedule
             meta["schedule"]["ik_sizes"] = list(sizes)
+    if args.mesh_cache:  # same-algorithm opt-in (see load_world): record the capacity the bands were computed with
+        meta["schedule"]["mesh_cache"] = int(kit.backend.mesh_cache_size)
     if args.smoke:
         t_fk = time.time()
         meta["shoulder_fk_check"] = verify_shoulder_fk(world, kit, bc, SMOKE_FK_TRUNKS, arm="right")
@@ -2160,7 +2184,7 @@ def run_jobs(args):
             jargs.out = os.path.join(root, job["id"])
             jargs.log_level, jargs.prebuild_planner = args.log_level, args.prebuild_planner
             jargs.cameras, jargs.full_load = args.cameras or jargs.cameras, args.full_load or jargs.full_load
-            jargs.ik_tail_sizes = args.ik_tail_sizes or jargs.ik_tail_sizes
+            jargs.ik_tail_sizes, jargs.mesh_cache = args.ik_tail_sizes or jargs.ik_tail_sizes, args.mesh_cache or jargs.mesh_cache
             key = band_world_key(jargs)
             floor_mode, rooms = band_rooms(jargs)
             prepared.append((job, jargs, floor_mode, rooms, list(key[2]), key))
@@ -2190,6 +2214,10 @@ def run_jobs(args):
                 raise p[1]
             _, jargs, floor_mode, rooms, removed, key = p
             arms = band_arms(jargs)
+            if world is not None and key == cur_key and len(kit.backend._world_mesh_names) + MESH_CACHE_RESERVE > kit.backend.mesh_cache_size:
+                log.info("worker: cuRobo mesh store nearly full (%d of %d after %d bands); reloading the scene", len(kit.backend._world_mesh_names),
+                         kit.backend.mesh_cache_size, n_bands)
+                cur_key = None  # forces the reload below
             if world is None or key != cur_key:
                 if world is not None:
                     log.info("worker: world key changed (%s -> %s); reloading the scene", cur_key, key)

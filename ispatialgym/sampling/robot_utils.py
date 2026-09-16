@@ -36,10 +36,13 @@ class ViewSolution:
 
 
 class RobotKit:
-    def __init__(self, world, prebuild: Sequence[str] = ("right_arm",)):
+    def __init__(self, world, prebuild: Sequence[str] = ("right_arm",), mesh_cache_size: Optional[int] = None):
+        """``mesh_cache_size``: capacity of the cuRobo mesh store (default: the backend's 8192). The store's capacity, not
+        its fill, sizes every collision kernel launch, so a caller that knows how many collision meshes its world holds
+        (``count_collision_meshes``) should pass a snug value - see ``R1ProCuRobo.__init__``."""
         self.world = world
         self.robot = world.robot
-        self.backend = R1ProCuRobo(self.robot, prebuild=prebuild)
+        self.backend = R1ProCuRobo(self.robot, prebuild=prebuild, **({"mesh_cache_size": int(mesh_cache_size)} if mesh_cache_size else {}))
         if hasattr(world, "obstacle_filter"):
             self.backend.obstacle_filter = world.obstacle_filter
         self.jidx = self.backend._jidx
@@ -55,6 +58,17 @@ class RobotKit:
 
     def stats_snapshot(self) -> Dict[str, float]:
         return dict(self.stats)
+
+    @staticmethod
+    def count_collision_meshes(world) -> int:
+        """Number of collision meshes ``R1ProCuRobo.update_world`` would load from ``world`` now (scene objects passing the
+        obstacle filter, spawned objects; the robot and visual-only objects excluded) - what the cuRobo mesh cache must hold."""
+        n = 0
+        for o in world.scene.objects:
+            if o is world.robot or getattr(o, "visual_only", False) or (hasattr(world, "obstacle_filter") and not world.obstacle_filter(o)):
+                continue
+            n += sum(len(link.collision_meshes) for link in o.links.values())
+        return n
 
     @staticmethod
     def stats_delta(before: Dict[str, float], after: Dict[str, float]) -> Dict[str, float]:
