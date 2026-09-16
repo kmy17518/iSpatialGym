@@ -322,6 +322,23 @@ def test_program_check_ignore_sets_mirror_the_sampler():
     assert every == [wall, partner] and last == []
 
 
+def test_per_role_scale_default_and_template_id_tag():
+    """Owner item 4b: ``roles.<role>.scale = {"<cat>/<model>": s, "default": s}`` (or a bare scalar) applies to every model
+    of the role at spawn; the template id carries it (``-s1.25``) so scaled and unscaled draws never share a directory."""
+    from ispatialgym.sampling.spec import ModelChoice
+    from ispatialgym.sampling.v2.problem import TemplateChoice, resolve_scale, scale_tag
+
+    assert resolve_scale({"tray/gsxbym": 1.25, "default": 1.25}, "tray", "other") == [1.25, 1.25, 1.25]
+    assert resolve_scale({"tray/gsxbym": [1.0, 1.2, 1.0], "default": 1.25}, "tray", "gsxbym") == [1.0, 1.2, 1.0]
+    assert resolve_scale(1.25, "tray", "gsxbym") == [1.25, 1.25, 1.25] and resolve_scale(None, "tray", "gsxbym") is None
+    assert resolve_scale({"bag_of_chips/dwkdko": 0.7}, "bag_of_chips", "zzzzzz") is None  # no default: unscaled
+    assert scale_tag(None) == "" and scale_tag([1.0, 1.0, 1.0]) == "" and scale_tag([1.25, 1.25, 1.25]) == "-s1.25" and scale_tag([1.0, 1.2, 1.0]) == "-s1x1.2x1"
+    scaled = TemplateChoice("house_single_floor", {"source": ModelChoice("tray", "gsxbym", scale=[1.25, 1.25, 1.25]), "target": ModelChoice("bar_soap", "abc")}, {}, {}, [])
+    plain = TemplateChoice("house_single_floor", {"source": ModelChoice("tray", "gsxbym"), "target": ModelChoice("bar_soap", "abc")}, {}, {}, [])
+    assert scaled.template_id == "house_single_floor__source-tray-gsxbym-s1.25__target-bar_soap-abc" and plain.template_id == "house_single_floor__source-tray-gsxbym__target-bar_soap-abc"
+    assert TemplateChoice.from_json(scaled.to_json()).template_id == scaled.template_id
+
+
 def test_straight_approach_detection_and_reject_code():
     """Branch consistency (oracle finding): pre -> end segments are tracked from the pre solution; the failure carries the
     distinct ``approach_untrackable`` code for the callers' Reject."""

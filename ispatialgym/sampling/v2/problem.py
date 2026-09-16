@@ -188,6 +188,45 @@ class LookalikeIndex:
 # ----------------------------------------------------------------------------------------------------------------
 
 
+def normalize_scale_spec(spec: Any) -> Dict[str, Any]:
+    """``roles.<role>.scale`` as a dict: ``{"<cat>/<model>": s, "default": s}`` stays, a bare scalar or ``[sx, sy, sz]``
+    becomes ``{"default": value}``, None / missing -> ``{}``."""
+    if spec is None:
+        return {}
+    if isinstance(spec, dict):
+        return dict(spec)
+    return {"default": spec}
+
+
+def resolve_scale(spec: Any, category: str, model: str) -> Optional[List[float]]:
+    """Spawn scale ``[sx, sy, sz]`` of ``category/model`` from a role's scale spec (``"<cat>/<model>"`` first, then the
+    bare model id, then ``"default"``); None when the spec gives nothing."""
+    d = normalize_scale_spec(spec)
+    val = d.get(f"{category}/{model}", d.get(model, d.get("default")))
+    if val is None:
+        return None
+    if isinstance(val, (list, tuple)):
+        return [float(v) for v in val]
+    return [float(val)] * 3
+
+
+def scale_tag(scale: Optional[Sequence[float]]) -> str:
+    """Template-id suffix of a spawn scale: ``""`` for none / unit, ``-s1.25`` for a uniform 1.25, ``-s1.25x1x1.25`` otherwise
+    (owner item 4b: the template id carries the per-role scale; bands key the same value as ``<cat>/<model>*1.25``)."""
+    if scale is None:
+        return ""
+    vals = [round(float(v), 4) for v in scale]
+    if all(abs(v - 1.0) < 1e-9 for v in vals):
+        return ""
+
+    def fmt(v: float) -> str:
+        return f"{v:g}"
+
+    if all(abs(v - vals[0]) < 1e-9 for v in vals):
+        return f"-s{fmt(vals[0])}"
+    return "-s" + "x".join(fmt(v) for v in vals)
+
+
 @dataclass
 class RoleEntry:
     """``roles.<role>`` of the customs entry (§2.3)."""
@@ -211,7 +250,9 @@ class RoleEntry:
         return g if isinstance(g, str) else None
 
     def scale_of(self, category: str, model: str):
-        return self.scale.get(f"{category}/{model}", self.scale.get(model))
+        """Spawn scale of a model of this role: ``roles.<role>.scale`` is ``{"<cat>/<model>": s, "default": s}`` (owner item 4b;
+        a bare scalar / list means ``default``); ``None`` when the role has no scale."""
+        return resolve_scale(self.scale, category, model)
 
     def grasp_key_of(self, category: str, model: str) -> Optional[str]:
         return self.grasp_keys.get(f"{category}/{model}", self.grasp_keys.get(model))
@@ -252,7 +293,7 @@ class GroundedProblem:
             cat = r.get("category")
             cats = [cat] if isinstance(cat, str) else list(cat or [])
             self.roles[name] = RoleEntry(name, cats[0] if cats else None, bool(r.get("sampleable", False)), dict(r.get("require") or {}),
-                                         r.get("representative"), dict(r.get("scale") or {}), r.get("joint"), r.get("handle_key"),
+                                         r.get("representative"), normalize_scale_spec(r.get("scale")), r.get("joint"), r.get("handle_key"),
                                          r.get("dataset") or "behavior-1k-assets", kind, cats, dict(r.get("grasp_keys") or {}),
                                          dict(r.get("orientation_equivalences") or {}))
         self.entry.setdefault("constraints", [])
@@ -548,13 +589,17 @@ class TemplateChoice:
 
     @property
     def template_id(self) -> str:
-        parts = [f"{role}-{c.category}-{c.model}" for role, c in sorted(self.models.items())]
+        # the per-role spawn scale is part of the id (``-s1.25``; owner item 4b) so scaled and unscaled draws of one model
+        # never share a template directory / band key
+        parts = [f"{role}-{c.category}-{c.model}{scale_tag(c.scale)}" for role, c in sorted(self.models.items())]
         for role in sorted(self.groups):
             members = self.groups[role]
             cats: Dict[str, List[str]] = {}
             for m in members:
                 cats.setdefault(m.category, []).append(m.model)
-            parts.append(f"{role}-" + "-".join(f"{c}_{len(ms)}" for c, ms in sorted(cats.items())))
+            tags = {scale_tag(m.scale) for m in members}
+            tag = tags.pop() if len(tags) == 1 else ""
+            parts.append(f"{role}-" + "-".join(f"{c}_{len(ms)}" for c, ms in sorted(cats.items())) + tag)
         return "__".join([self.scene] + parts) if parts else self.scene
 
     def to_json(self) -> Dict[str, Any]:
@@ -598,10 +643,7 @@ class ModelCycler:
 
     def choice(self, cat: str, model: str) -> ModelChoice:
         key = self.grasp_keys.get(f"{cat}/{model}")
-        scale = self.scales.get(f"{cat}/{model}", self.scales.get(model))
-        if scale is not None and not isinstance(scale, list):
-            scale = [float(scale)] * 3
-        return ModelChoice(cat, model, self.dataset, key, scale)
+        return ModelChoice(cat, model, self.dataset, key, resolve_scale(self.scales, cat, model))
 
     def next(self, exclude: Set[Tuple[str, str]] = frozenset()) -> Optional[ModelChoice]:
         """Next model of the cycle not in ``exclude`` (looks ahead within the pass; starts a new pass when exhausted)."""
@@ -647,10 +689,7 @@ def draw_group(problem: GroundedProblem, role: str, scene: str, rng, taken: Set[
     la = problem.lookalikes
 
     def mk(c, m):
-        scale = entry.scale_of(c, m)
-        if scale is not None and not isinstance(scale, list):
-            scale = [float(scale)] * 3
-        return ModelChoice(c, m, entry.dataset, grasp_keys.get(f"{c}/{m}"), scale)
+        return ModelChoice(c, m, entry.dataset, grasp_keys.get(f"{c}/{m}"), entry.scale_of(c, m))
 
     def admissible(cats: Optional[Sequence[str]]) -> List[Tuple[str, str]]:
         out = [(c, m) for c, ms in wl.items() if cats is None or c in cats for m in ms]

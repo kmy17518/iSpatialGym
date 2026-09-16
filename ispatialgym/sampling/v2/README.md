@@ -333,6 +333,14 @@ its own and the segment tracked backward; the pre witness then moves to the end'
 program check raise as their own reject reason. `waypoints_ok` hands straight chains to `exact` (one tracked motion with
 `ignore_all` removed throughout). `IKChecker.ignoring` contexts nest (refcounted per mesh).
 
+### Per-role spawn scale (owner item 4b, 2026-09-16)
+
+`roles.<role>.scale` — `{"<cat>/<model>": s, "default": s}` (a bare scalar / `[sx, sy, sz]` = `default`) — resolves through
+`problem.resolve_scale` (`<cat>/<model>` → model id → `default`) into `ModelChoice.scale` for every sampleable / group
+role (D1's `roles.source.scale = 1.25` for the disembedding tray included); `spawn_role` passes it to `SimWorld.spawn`.
+The template id carries the scale (`source-tray-gsxbym-s1.25`, `problem.scale_tag`; unscaled ids unchanged), so scaled
+and unscaled draws never share a directory; band keys use the same `ModelChoice.scale` (`tray/gsxbym*1.25@…`).
+
 ## Status (D2 / D4, 2026-09-15) and gaps
 
 Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,
