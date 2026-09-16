@@ -1157,10 +1157,20 @@ class IORSLarge(SamplerV2):
             # a side stance looks along the edge: the lane point sits at the frame's lateral border (45–49° off-axis at
             # b = 0.35–0.40 m); the drop footprint in frame is what it needs (the partner's side fills that half of the image)
             pts = disc if st.extras.get("stance_kind") == "side" else th.cat([disc, lane])
+            kind = st.extras.get("stance_kind", "frontal")
             if not P0.in_frame(self, cam, pts):
+                stats[f"{kind}_out_of_frame"] = stats.get(f"{kind}_out_of_frame", 0) + 1
+                if kind == "side" and stats[f"{kind}_out_of_frame"] == 1:
+                    log.info("%s: side stance C example out of frame: base %s trunk %s camera %s focus %s disc %s", self.gp.alias, [round(float(v), 2) for v in st.base_pose2d],
+                             (st.translate, st.tilt), [round(float(v), 2) for v in cam[0].tolist()], [round(float(v), 2) for v in st.focus.tolist()],
+                             [[round(float(v), 2) for v in p] for p in disc.tolist()])
                 continue
             ang = P0.axis_angle(self, cam, st.focus)
             if ang > math.radians(P0.AXIS_LOOSE_DEG):
+                stats[f"{kind}_axis_off"] = stats.get(f"{kind}_axis_off", 0) + 1
+                if kind == "side" and stats[f"{kind}_axis_off"] == 1:
+                    log.info("%s: side stance C example axis off by %.0f deg: trunk %s camera %s focus %s", self.gp.alias, math.degrees(ang), (st.translate, st.tilt),
+                             [round(float(v), 2) for v in cam[0].tolist()], [round(float(v), 2) for v in st.focus.tolist()])
                 continue
             st.extras["angle_class"] = 1
             classed.append((st, 1))
