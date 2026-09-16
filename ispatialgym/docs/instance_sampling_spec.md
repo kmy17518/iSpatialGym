@@ -647,7 +647,7 @@ braces, touching partner brace) the working point must lie in a right‑band cel
 band cell **of the same trunk**, the brace's contact class passing where the band records classes; then the exact
 two‑arm IK of step 6, the touched objects ignored only for the contact poses and the combined check. The push / stop
 approach pitch follows the cell's passing classes (shallowest first); 45° / 60° are tried before rejecting. A stop
-blade stands `finger_profile(h above the fingertips) + 5 mm` outside the goal face — the closed R1Pro finger is a
+blade (axial: only when the joint placement exists — otherwise push‑only, 6.10) stands `finger_profile(h above the fingertips) + 5 mm` outside the goal face — the closed R1Pro finger is a
 wedge: outer face 8.4 mm from the closing plane over the last 3 cm of the tip, 18 mm above, palm beyond ≈ 7 cm — on
 the part of the face the turning object does not sweep before the goal, and is checked against the target at its
 goal pose (3 mm margin); the push contact keeps its ignore. `[pilot]` finding: on `breakfast_table_rhjoby_0` the
@@ -1233,6 +1233,14 @@ run of it must be in the init image — of 9 points sampled uniformly along the 
 to the point, the target itself may not hide them: the points in front of the target are the ones that count), from
 the init stance (Phase 1) and from the manipulation stance (Phase 2). Rejection reason `edge_not_visible`; the
 template retries with the next lateral position (4.4) before the next edge.
+
+**Push‑only axial (owner decision 2026‑09‑16 08:10).** The stop‑edge brace is optional. The sampler records
+`contacts.brace` only when a joint two‑arm placement exists (4.6: work point in the right band AND brace point in the
+left contact band at the same trunk, sweep test passed); otherwise the instance is a push‑only axial with the right‑arm
+push record alone (`summary.brace: present | none`; the missing brace is not a rejection), and the oracle's push closure
+(hold at the goal until the object is still, residual re‑pushed once along the extended arc, back‑off before the
+retreat) is the stop. `[pilot]`: on `breakfast_table_rhjoby_0` the two bands overlap only at λ ≈ 0, so axial instances
+there are push‑only; the pilot's blocked axial instance succeeded with the closure (final error 0.027 rad).
 
 ### 6.11 IORS — ontop / under / inside / nextto / touching (small-scale)
 
