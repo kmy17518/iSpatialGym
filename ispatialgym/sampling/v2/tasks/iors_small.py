@@ -409,7 +409,8 @@ class IORSSmall(SamplerV2):
             # the push starts from) must be a band lateral at the target's depth, else the place IK of §6.11 fails
             # (touching box_of_sanitary_napkins: every attempt place_unreachable with the goal 4-9 cm left of centre)
             cells = self.bands.band(manip.translate, manip.tilt)
-            depth_t, lat_t = manip.local(t_pose[0])
+            base_t = manip.world_to_base(t_pose[0][:2])  # band cells are base-frame (x ahead, lateral + left)
+            depth_t, lat_t = float(base_t[0]), float(base_t[1])
             near = cells[np.abs(cells[:, 0] - depth_t) <= 0.12] if len(cells) else cells
             gap_goal = self.place_gap()
             if len(near):
