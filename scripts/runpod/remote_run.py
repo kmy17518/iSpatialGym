@@ -118,10 +118,17 @@ def main():
         rc = r.returncode
         # one job per pod also when the command backgrounded itself (nohup … &): hold the lock until every process that
         # references this run's directory is gone (owner rule 2026-09-16 11:05: no pool pod runs two simulators)
+        if args.pull:  # pull first: the results must not wait for stragglers
+            remote_path = args.pull[0].replace("$SMOKE_OUT", f"/root/smoke/{run_id}")
+            os.makedirs(args.pull[1], exist_ok=True)
+            rp.rsync(remote_path.rstrip("/") + "/", args.pull[1].rstrip("/") + "/", *ep, to_pod=False)
+        # one job per pod also when the command backgrounded itself: hold the lock while processes of this run live (the
+        # pattern must not match the pgrep shell itself: bracket trick on the last character), at most 15 min, then kill them
+        pat = f"/root/smoke/{run_id[:-1]}[{run_id[-1]}]"
         t_wait = time.time()
-        while time.time() - t_wait < args.timeout:
+        while time.time() - t_wait < 900:
             try:
-                chk = rp.ssh_run(*ep, f"pgrep -fc '/root/smoke/{run_id}' || true", capture=True, timeout=45)
+                chk = rp.ssh_run(*ep, f"pgrep -fc '{pat}' || true", capture=True, timeout=45)
                 n = int((chk.stdout or "0").strip().split()[0] or 0)
             except Exception:
                 n = 0
@@ -130,10 +137,9 @@ def main():
             if time.time() - t_wait < 5:
                 print(f"remote_run: {n} process(es) of run {run_id} still alive on {pid} after the command returned; holding the pod lock", file=sys.stderr, flush=True)
             time.sleep(30)
-        if args.pull:
-            remote_path = args.pull[0].replace("$SMOKE_OUT", f"/root/smoke/{run_id}")
-            os.makedirs(args.pull[1], exist_ok=True)
-            rp.rsync(remote_path.rstrip("/") + "/", args.pull[1].rstrip("/") + "/", *ep, to_pod=False)
+        else:
+            rp.ssh_run(*ep, f"pkill -KILL -f '{pat}' || true", capture=True, timeout=45)
+            print(f"remote_run: killed the stragglers of run {run_id} on {pid} after 15 min", file=sys.stderr, flush=True)
         print(f"remote_run: exit {rc} (pod {pid}, run {run_id})", file=sys.stderr, flush=True)
         sys.exit(rc)
     finally:
