@@ -472,6 +472,14 @@ class IORSLarge(SamplerV2):
                 rb = TT.compute_bands(self, self.make_band_spec(), top)
             else:
                 rb = self.compute_band(kind, support_obj, under_partner)
+        if rb is not None and int(rb.meta.get("n_reachable_total", 1) or 0) == 0:
+            # still empty after the recompute (the band stance itself collides at every trunk — e.g. the band script's
+            # under stance at a blocked AABB edge of the partner): the stance search runs without the band filter and the
+            # exact IK of the coupling decides (recorded in the template facts; the band owner gets the case)
+            log.warning("%s: reach band %s (%s) is empty after the recompute: stance C candidates are taken from the goal cells without the band filter",
+                        self.gp.alias, support, under or "-")
+            self.template_facts.setdefault("empty_bands", []).append({"support": support, "under": under, "stance": rb.meta.get("stance")})
+            rb = None
         memo[key] = rb
         return rb
 
