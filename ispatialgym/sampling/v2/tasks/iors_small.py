@@ -791,9 +791,12 @@ class IORSSmall(SamplerV2):
         yield "push_v", IK.contact_eef(face_point, d, closing=th.tensor([0.0, 0.0, 1.0])), {"blade_half_thickness_m": None}
         for pitch in TT.approach_pitch_order(None):
             z_tip = z0 + 0.005
-            so = TT.blade_standoff((z0, z1), z_tip, pitch, clearance, side=False)
+            # a push needs the blade on the lower part of the face only (unlike a stop brace, which the whole face may
+            # meet): faces taller than the finger section are pushed over their lowest ``PALM_FROM_TIP`` (7 cm)
+            z_face_hi = min(z1, z_tip + TT.PALM_FROM_TIP - 0.005)
+            so = TT.blade_standoff((z0, z_face_hi), z_tip, pitch, clearance, side=False)
             if so is None:
-                continue  # the face reaches the palm section: no blade push
+                continue  # nothing of the face above the tips: no blade push
             standoff, half = so
             a_vec = TT.pitched_approach(pitch, manip.forward)
             origin = th.tensor([float(face_point[0]), float(face_point[1]), z_tip + C.FINGERTIP_LENGTH * math.cos(math.radians(pitch))]) + outward * standoff

@@ -577,7 +577,15 @@ class IKChecker:
             with self.ignoring(list(ignored) + [o]):
                 if bool(self.kit.collision_free(q, margin=0.0)[0]):
                     return f"collides with {getattr(o, 'name', o)}"
-        return "collides with the scene / itself"
+        try:  # world-only check: passing here means the robot (or its attached object) collides with itself
+            self.kit._ensure_synced()
+            with self.ignoring(list(ignored)):
+                world_only = bool(self.kit.backend.check_collision(G.t(q).unsqueeze(0), emb_name="whole_body", sync_world=False, self_collision=False, margin=0.0)[0])
+            if not world_only:
+                return "self-collision (arm / attached object against the robot's own links)"
+        except Exception:  # noqa: BLE001
+            pass
+        return "collides with the scene (a non-spawned object)"
 
     def track_approach(self, q_pre: th.Tensor, pre: Pose, end: Pose, arm: str, ignore_end: Sequence[Any] = (), ignore_mid: Sequence[Any] = (),
                        q_hint: Optional[th.Tensor] = None) -> Tuple[Optional[th.Tensor], str]:
