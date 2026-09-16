@@ -156,6 +156,25 @@ On the shared smoke pods (`scripts/runpod/remote_run.py`) pass explicit paths (`
 reach band of a (support, object) pair is computed in-process on a cache miss (~10 min per pair on an L40S, then cached under
 `~/.cache/ispatialgym/reach_bands`). `ISG_PROGRAM_CHECK=stub` limits the program check to the structural test (development only).
 
+## Backend facts the checks depend on (found in the smoke runs, 2026-09-15)
+
+- **cuRobo IK seeds are random** (`solve_ik` uses the seed configuration plus random seeds), so a marginal pose that passed
+  once can fail when re-solved — the program check re-solves every recorded pose. `IKChecker` remembers the solution of
+  every successful exact solve (per attempt) and seeds a re-solve of the same / a nearby pose (3 cm, 0.15 rad) with it;
+  D5's `validate_instances` program check will need the same (or recorded joint solutions in the sidecar) to be stable.
+- **`R1ProCuRobo.attach_object` fits 5–7 spheres to a small object and the fit is random per call**; the attached link is
+  exempt from self-collision only against the finger links (`r1pro_model` self-collision ignore), not against
+  `<arm>_gripper_link` / the wrist, so a grasp that puts the object deep in the gripper self-collides once attached —
+  every attached check (lift, carry, place) then fails whatever the pose. `navigation.attached` seeds torch around the
+  fit (one geometry per attempt) and `IKChecker.attachable(obj, T_obj→eef, arm)` screens the grasp set once per template
+  (`iors_small` drops such grasps: `template_facts.grasps_dropped_not_attachable`). Owner of `r1pro_model` /
+  `curobo_planner`: exempting `attached_object_<arm>_eef_link` against `<arm>_gripper_link` (as cuRobo's stock configs do)
+  and a finer fit would make those grasps usable.
+- `RobotKit.ignoring` re-syncs the whole world twice per use (0.5 s locally, up to 13 s on an L40S pod); `IKChecker.
+  ignoring` switches the objects' meshes off by name instead (§3.6 "support ignored for the grasp pose only").
+- Every `q_at_base_pose` configuration is relative to the robot's articulation root at call time: a stance's 28-D vector
+  must not be cached across a teleport (`SamplerV2.stance_q` recomputes).
+
 ## Status (D2 / D4, 2026-09-15) and gaps
 
 Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,
