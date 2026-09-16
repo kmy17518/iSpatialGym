@@ -1,4 +1,4 @@
-# First-demo board (2026-09-16 09:44 PDT)
+# First-demo board (2026-09-16 09:46 PDT)
 
 **8 / 21 subtasks with a valid demo.**
 
@@ -15,8 +15,8 @@ state ∈ {no instance, instance, demo run, valid demo}; a demo is valid only wh
 | configuration_matching-attachment | no instance | left bands available (all classes); loop running (cap-lemonade_bottle) | loop / tabletop | 1d20a68, 4074359, 4fd4c89, 5552ee8, 7a340e4, d4a1745 |  |  |  |
 | configuration_matching-articulation_open_small_scale | no instance | left band wiring in articulation_small (tabletop item 2) → then loop (laptop) | tabletop | 7a340e4, fcf7bfc (run @ fa41514) | sampled n=0 target_placement 8 |  | 2026-09-16 09:37 PDT |
 | configuration_matching-articulation_close_small_scale | no instance | same as open | tabletop | 7a340e4, fcf7bfc |  |  |  |
-| configuration_matching-articulation_open_large_scale | no instance | Phase 1: 950+ (d,t) in frame, 0 collision-free on rvunhj_0 (office_cubicles_right) — scene-specific? diagnostic agent 79dce47f | large-scale / diag | 6abf9da, 7a340e4, c161a04 (run @ 0f0094a+dirty) | sampled n=0 no_stance 8 |  | 2026-09-16 08:42 PDT |
-| configuration_matching-articulation_close_large_scale | no instance | same as open | large-scale / diag | 6abf9da, 7a340e4, c161a04 (run @ 0f0094a+dirty) | sampled n=0 no_stance 8 |  | 2026-09-16 08:34 PDT |
+| configuration_matching-articulation_open_large_scale | no instance | floor_z = 0 vs the room floor at +7 mm → wheels penetrate, every stance collides (diag 79dce47f); core fixing SimWorld.floor_z, then loop | core | 6abf9da, 7a340e4, c161a04 (run @ 0f0094a+dirty) | sampled n=0 no_stance 8 |  | 2026-09-16 08:42 PDT |
+| configuration_matching-articulation_close_large_scale | no instance | same as open | core | 6abf9da, 7a340e4, c161a04 (run @ 0f0094a+dirty) | sampled n=0 no_stance 8 |  | 2026-09-16 08:34 PDT |
 | alignment-world_vertical | demo run | first instance written (4074359); demo loop running (painting_s080) | core / loop | 4074359, 4eb66f5, 7a340e4 (run @ 032d849+dirty) | oracle_failed / collision @ transition:collision | runlogs/pilot_20260915/first_demo/alignment-world_vertical/0916-081336/demo/alignment-world_vertical-painting_s080-walls__house_single_floor__target-painting-dacihj__0000/meta.json | 2026-09-16 08:29 PDT |
 | alignment-world_horizontal | no instance | demo loop running (picture_s070) | loop | 4074359, 4eb66f5, 7a340e4 (run @ 032d849+dirty) | sampled n=0 err=setup rejected: [no_stance] alignment-world_horizontal-pictu |  | 2026-09-16 08:30 PDT |
 | alignment-axial | valid demo | - | - | 27b27c1, 4fd4c89, 7a340e4, d4a1745, e4a1b5c (run @ 892988d) | success | runlogs/pilot_20260915/first_demo/alignment-axial/0916-085805/demo/alignment-axial-board_game-breakfast_table__house_single_floor__target-board_game-qgvsnb__0000/meta.json | 2026-09-16 09:19 PDT |

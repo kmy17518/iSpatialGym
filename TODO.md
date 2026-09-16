@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 09:44 PDT — 8/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 09:46 PDT — 8/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -131,8 +131,8 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | CM attachment | no instance | left bands available (all classes); loop running (cap-lemonade_bottle) | loop / tabletop |
 | CM articulation_open_small_scale | no instance | left band wiring in articulation_small (tabletop item 2) → then loop (laptop) | tabletop |
 | CM articulation_close_small_scale | no instance | same as open | tabletop |
-| CM articulation_open_large_scale | no instance | Phase 1: 950+ (d,t) in frame, 0 collision-free on rvunhj_0 (office_cubicles_right) — scene-specific? diagnostic agent 79dce47f | large-scale / diag |
-| CM articulation_close_large_scale | no instance | same as open | large-scale / diag |
+| CM articulation_open_large_scale | no instance | floor_z = 0 vs the room floor at +7 mm → wheels penetrate, every stance collides (diag 79dce47f); core fixing SimWorld.floor_z, then loop | core |
+| CM articulation_close_large_scale | no instance | same as open | core |
 | alignment-world_vertical | demo run | first instance written (4074359); demo loop running (painting_s080) | core / loop |
 | alignment-world_horizontal | no instance | demo loop running (picture_s070) | loop |
 | alignment-axial | valid demo | - | - |
@@ -176,6 +176,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
   - **D later list:** two‑stroke push for |δ| > 25°; hybrid base‑follow for room doors; edge‑length margin check in support admission; deterministic `candidates_extra.csv` order. Keep: `reach_volume.npz` tracked, axial draft shadowing fix, runner `n_written` from `summary.json`, watchdog without cap enforcement.
 
 ## Pitfalls (measured)
+- **Floor height ≠ 0 (measured 2026‑09‑16, agent 79dce47f):** `SimWorld.floor_z` came from `trav_map.floor_heights[0]` = 0.0 in every scene, but `office_cubicles_right/shared_office_0`'s floor slab tops out at z = +0.0071 → every stance check stood the robot 5 mm into the floor and cuRobo's penetration query (no ground exemption) failed all 205 (d, t) candidates in the room for every arm posture. Measure the floor under the park cell (raycast) instead of assuming 0; the physically parked robot (base z 0.012) is the reference. Secondary: the cubicle corridor is 1.08 m wide between 1.22 m partitions — untucked arms (1.27 m wide) fit only at trunk t ≤ 0.25 or tucked / ready.
 - **`pgrep -f` / `pkill -f` self‑match (measured 2026‑09‑16):** a pattern inside a `while pgrep -f "…"; do sleep; done` waiter, a stop script or an ssh'd command line is part of that very command line, so `pgrep` always finds its own shell (B3's two local band waiters slept 17 h / 6 h and never started their `run_local.sh`; the dispatcher's restart script killed itself before re‑queueing; the watchdog's idle check `isg_boot/bench.sh` never saw an idle pod). Rule: make the pattern unmatchable by its own text — the `[x]` bracket trick (`run_local\.s[h]`, `sample_is[g]`) or `pgrep -x` on the script name — and test a waiter once with the target process absent.
 
 
@@ -259,3 +260,4 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026‑09‑16 09:10 PDT agent-e2e: coverage of the two killed local band queues confirmed by the bands agent — the 10 right‑hand / generic / scaled breakfast‑table bands exist with cells; the 6 legacy placed‑tray bands are superseded by the 1.25 stance‑relative bands already in `w11` (all 30 by ≈ 10:15 PDT, `pencil_case` ≈ 10:45); the 13 `desk_xhjsub_0` init bands exist but are empty by geometry (the desk's 0.66 m overhang puts the Phase‑1a stance in the bathroom furniture; A6 re‑runs queued but expected to stay empty unless the stance rule changes); the sofa band now has 31 cells. Nothing queued, nothing local.
 - 2026‑09‑16 09:20 PDT agent-e2e: **board 7/21 valid** — camera standard, camera obstructed, object scaling, mental rotation, IORS ontop‑small, IORS nextto and **axial (push‑only, `282dafe`)** re‑sampled + demoed on commits that contain every fix affecting them (board validity = commit ⊇ fixes; the pool syncs the working tree, so the `dirty` flag is provenance only). Running: inside re‑run, wall v/h (`painting_s080`, `picture_s070`), attachment, block design, disembedding (`chili`), under‑small (`teacup-saucer`; `french_fries` now rejected `approach_untrackable` ×8 by the branch‑consistent rule), touching (`teacup-teapot`; `carton_of_milk` failed place/approach IK), ontop‑large floor class locally (B stance `path_collision` / `no_transition` so far). Large articulation on the roomy `rvunhj_0`: Phase 1 finds ~1000 (d, t) with the target in frame but 0 collision‑free → scene‑specific suspicion (floor height / ceiling / room‑spanning object), diagnostic agent 79dce47f on the pool.
 - 2026‑09‑16 09:50 PDT agent-e2e: board **8/21 valid** (+ IORS under‑small on `teacup-saucer`, `85a0ed4`; `french_fries` is rejected `approach_untrackable` by design now, one `teacup` run slipped in the hand → `ghost_hand` at lift). Ontop‑large floor class on the local GPU: **0/8** — the floor band for `bed_rrcvaq_0` is empty even when computed in‑process (0 cells, 36 s: the floor 0.45–0.9 m ahead is beyond the arm at every collision‑free trunk), so stance B fails (`path_collision` / `no_transition` / empty F_init) → the floor‑class fallback cannot produce an init stance for small floor objects; next candidate `box_of_shampoo-sofa-bar` running locally (A/B passed on the bar in the pilot; C needs a band at the sofa seat 0.40 m); the countertop pair needs the partner‑visibility relaxation (decision). Touching: `carton_of_milk` IK failures, `teacup-teapot` `target_not_pushable` (yield) → third alias running.
+- 2026‑09‑16 09:55 PDT agent-e2e: large‑articulation `no_stance` diagnosed (see the pitfall) → core agent interrupted with the `floor_z` fix (measured floor under the park cell) + loop re‑run on `rvunhj_0`; affects every non‑zero‑floor scene (T2/T3 supports).

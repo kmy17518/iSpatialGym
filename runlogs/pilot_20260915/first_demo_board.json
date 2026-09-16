@@ -48,12 +48,12 @@
   "owner": "tabletop"
  },
  "configuration_matching-articulation_open_large_scale": {
-  "blocking": "Phase 1: 950+ (d,t) in frame, 0 collision-free on rvunhj_0 (office_cubicles_right) \u2014 scene-specific? diagnostic agent 79dce47f",
-  "owner": "large-scale / diag"
+  "blocking": "floor_z = 0 vs the room floor at +7 mm \u2192 wheels penetrate, every stance collides (diag 79dce47f); core fixing SimWorld.floor_z, then loop",
+  "owner": "core"
  },
  "configuration_matching-articulation_close_large_scale": {
   "blocking": "same as open",
-  "owner": "large-scale / diag"
+  "owner": "core"
  },
  "alignment-world_vertical": {
   "blocking": "first instance written (4074359); demo loop running (painting_s080)",
