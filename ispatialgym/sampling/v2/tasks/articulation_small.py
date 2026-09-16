@@ -566,16 +566,21 @@ class ArticulationSmall(SamplerV2):
                 cell = self.left_bands.to_base(np.asarray([[float(pose[0][0]), float(pose[0][1])]], dtype=np.float32), manip.base_pose2d)[0]
                 passing = TT.cell_classes(self.left_bands, manip.translate, manip.tilt, cell) or None
 
+            # the faces the brace arm reaches (B3, mirrored for a right-arm brace): the near face and the face on the arm's own
+            # side; the far face (pulling toward the robot) and the face across the body never pass
+            own_side = "left" if self.brace_arm == "left" else "right"
+            other_side = "right" if self.brace_arm == "left" else "left"
+
             def rank(item):
                 cls, pt, _, _ = item
                 in_band = TT.in_band(self.left_bands, manip, pt[:2], tol=1.0)[0] if self.left_bands is not None else True
-                return (0 if (passing and cls in passing) else 1, 0 if in_band else 1, 0 if cls.startswith(("near", "left")) else 1)
+                return (0 if (passing and cls in passing) else 1, 0 if in_band else 1, 0 if cls.startswith(("near", own_side)) else 1)
 
             body.sort(key=rank)
             cands = []
             for cls, pt, a, c_axis in body:
-                if cls.startswith(("far", "right")) and not (passing and cls in passing):
-                    continue  # pulling faces / the robot-right face are out of the left arm's reach (B3 measurements)
+                if cls.startswith(("far", other_side)) and not (passing and cls in passing):
+                    continue
                 for c_sign in (1.0, -1.0):
                     contact = C.contact_eef(pt, a, c_sign * c_axis)
                     cands.append((f"{cls}{'' if c_sign > 0 else '-'}", (C.pre_pose(contact), contact)))
