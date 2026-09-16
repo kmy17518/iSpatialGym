@@ -364,12 +364,21 @@ class AlignmentWall(SamplerV2):
         # ... and the closing axis IN the wall plane (⟂ a and n): the gripper's thin side then faces the wall — with the
         # closing axis along n the palm (far wider than the fingers along the closing axis) sits centred 2 cm off the
         # wall and penetrates it whichever way the wrist turns (first-demo loop 12:12: both turns "inside the wall")
-        c_in = C.unit(th.cross(a_push, n, dim=0))
+        # ... and the approach PITCHED off the wall plane toward the room (θ = 30° / 45°: a' = cos θ·a − sin θ·n): with the
+        # approach in the wall plane the forearm / wrist lie along the wall 2 cm from it and penetrate it at any wrist
+        # turn (first-demo loop 12:36: every closing variant "inside the wall"); the pitched hand comes down onto the
+        # contact from the room side and the wrist stands sin θ · (wrist offset) off the wall. The arc waypoints rotate
+        # the pitched init pose about C (the pitch is kept), the reach-volume class stays the nearest push class.
         push_variants = []
-        for label, closing in (("in+", c_in), ("in-", -c_in), ("n+", n), ("n-", -n)):
-            init_v = push_init if label == "n+" else C.contact_eef(E_low, a_push, closing=closing)
-            arc_v = arc if label == "n+" else C.arc_waypoints(init_v, C_, n, -delta, n=2)
-            push_variants.append({"wrist": label, "pre": C.pre_pose(init_v), "init": init_v, "mid": arc_v[0], "goal": arc_v[1]})
+        for pitch_deg in [float(v) for v in (self.param("contact_pitch_deg") or (30.0, 45.0, 0.0))]:
+            th_ = math.radians(pitch_deg)
+            a_v = C.unit(a_push * math.cos(th_) - n * math.sin(th_))
+            c_in = C.unit(th.cross(a_v, n, dim=0))
+            c_out = C.unit(th.cross(c_in, a_v, dim=0))  # the third axis (n-like, ⟂ a')
+            for label, closing in (("in+", c_in), ("in-", -c_in), ("n+", c_out), ("n-", -c_out)):
+                init_v = C.contact_eef(E_low, a_v, closing=closing)
+                arc_v = C.arc_waypoints(init_v, C_, n, -delta, n=2)
+                push_variants.append({"wrist": f"p{pitch_deg:.0f}/{label}", "pitch_deg": pitch_deg, "pre": C.pre_pose(init_v), "init": init_v, "mid": arc_v[0], "goal": arc_v[1]})
         # brace candidates on the level pose; E_high's side along the level axis
         side_l = G.rotate(pose_l[1], self.side)
         C_l = pose_l[0] + G.rotate(pose_l[1], self.com_local if com is None else com)
@@ -379,7 +388,6 @@ class AlignmentWall(SamplerV2):
         for kind in brace_candidate_order(h, w, self.param("brace_kinds", BRACE_KINDS)):
             B, a = brace_point(pts_l, kind, side_l, high_sign, C_l, band)
             B = on_plane(B, mid_plane, n)
-            eef = C.fingertip_eef(B, a, closing=n, clearance=float(self.param("brace_offset_m", 0.005)))
             # brace pre-contact = eef − 0.10·a (spec §5.5): the approach slides along the wall from outside the hull.
             # ``generation.brace_pre_offset_wall_m`` (default 0) adds an offset off the wall along +n. Smoke findings
             # (2026‑09‑16): the closed gripper's sphere model is flagged at the 1 cm margin at every pose within ≈ 5 cm of
@@ -388,12 +396,16 @@ class AlignmentWall(SamplerV2):
             # has to be ignored along the whole brace chain (as along the push chain), in the sampler and in the program
             # check alike.
             off_wall = float(self.param("brace_pre_offset_wall_m", 0.0))
-            c_in_b = C.unit(th.cross(a, n, dim=0))  # closing axis in the wall plane (see the push variants above)
-            for label, closing in (("in+", c_in_b), ("in-", -c_in_b), ("n+", n), ("n-", -n)):
-                eef_w = eef if label == "n+" else (eef[0], C.eef_quat(a, closing))
-                pre_a = C.pre_pose(eef_w)
-                pre = (pre_a[0] + off_wall * n, pre_a[1]) if off_wall else pre_a
-                braces.append({"kind": kind, "B": B, "a": a, "pose": eef_w, "pre": pre, "wrist": label})
+            for pitch_deg in [float(v) for v in (self.param("contact_pitch_deg") or (30.0, 45.0, 0.0))]:  # pitched off the wall (see the push variants)
+                th_ = math.radians(pitch_deg)
+                a_v = C.unit(a * math.cos(th_) - n * math.sin(th_))
+                c_in_b = C.unit(th.cross(a_v, n, dim=0))
+                c_out_b = C.unit(th.cross(c_in_b, a_v, dim=0))
+                for label, closing in (("in+", c_in_b), ("in-", -c_in_b), ("n+", c_out_b), ("n-", -c_out_b)):
+                    eef_w = C.fingertip_eef(B, a_v, closing=closing, clearance=float(self.param("brace_offset_m", 0.005)))
+                    pre_a = C.pre_pose(eef_w)
+                    pre = (pre_a[0] + off_wall * n, pre_a[1]) if off_wall else pre_a
+                    braces.append({"kind": kind, "B": B, "a": a_v, "pose": eef_w, "pre": pre, "wrist": f"p{pitch_deg:.0f}/{label}", "pitch_deg": pitch_deg})
         push_arm = push_arm_of(E_low, C_, th.tensor([float(n[1]), -float(n[0]), 0.0]))
         return {"pose_tilted": pose_t, "pose_level": pose_l, "hull_tilted": pts_t, "hull_level": pts_l, "C": C_, "E_low": E_low, "E_high": E_high,
                 "push": {"pre": push_pre, "init": push_init, "mid": push_mid, "goal": push_goal, "direction": a_push, "arm": push_arm,
