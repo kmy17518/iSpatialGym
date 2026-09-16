@@ -448,7 +448,7 @@ def cmd_watchdog(api: Api, args):
             ep = pod_ssh(api, p["id"]) if up > args.idle_grace_min * 60 else None
             if ep is not None:
                 try:
-                    r = ssh_run(*ep, "if [ -f /root/JOB_DONE ] && ! pgrep -f 'sampling\\.|isg_boot/bench.sh|setup.sh|bootstrap.sh' >/dev/null; then echo IDLE; else echo BUSY; fi",
+                    r = ssh_run(*ep, "if [ -f /root/JOB_DONE ] && ! pgrep -f 'sampling\\.|isg_boot/bench\\.s[h]|setup\\.s[h]|bootstrap\\.s[h]' >/dev/null; then echo IDLE; else echo BUSY; fi",
                                 capture=True, timeout=45)
                     state = (r.stdout or "").strip()
                 except SystemExit:

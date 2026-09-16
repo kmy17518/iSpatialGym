@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 08:27 PDT — 4/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 09:00 PDT — 4/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -133,13 +133,13 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | CM articulation_close_small_scale | no instance | same as open | tabletop |
 | CM articulation_open_large_scale | no instance | re-grounded on roomy picks (c161a04); needs a first sample (rvunhj_0) | large-scale |
 | CM articulation_close_large_scale | no instance | same as open | large-scale |
-| alignment-world_vertical | no instance | first instance written (4074359); demo loop running (painting_s080) | core / loop |
+| alignment-world_vertical | demo run | first instance written (4074359); demo loop running (painting_s080) | core / loop |
 | alignment-world_horizontal | no instance | demo loop running (picture_s070) | loop |
-| alignment-axial | no instance | push-only axial (owner 08:10): tabletop brace-optional + oracle program; then loop | tabletop / oracle |
+| alignment-axial | demo run (pre-fix success) | push-only axial (owner 08:10): tabletop brace-optional + oracle program; then loop | tabletop / oracle |
 | IORS ontop_small_scale | demo run (pre-fix success) | - | - |
 | IORS under_small_scale | demo run | approach witnesses in different IK branches → core branch-consistent solve (approach_untrackable) | core |
 | IORS inside | demo run (pre-fix success) | re-sample after 160c518 (release height) + drop executor | core / oracle |
-| IORS nextto | demo run | near-side goal 160c518 (future sampling) | - |
+| IORS nextto | demo run (pre-fix success) | near-side goal 160c518 (future sampling) | - |
 | IORS touching | no instance | left bands available; joint gate + blade record (core item 3 pending); loop running (carton_of_milk) | loop / core |
 | IORS ontop_large_scale | no instance | floor-class alias running on the local GPU (owner 08:19); floor cells in-process if the band is empty | coordinator (local) |
 | IORS under_large_scale | no instance | push-under: sampler landed (25e94d3/8140025/032d849), program + executor (oracle) pending | large-scale / oracle |
@@ -176,6 +176,8 @@ Columns: id | item | needs | where | owner | status | artefact / notes
   - **D later list:** two‑stroke push for |δ| > 25°; hybrid base‑follow for room doors; edge‑length margin check in support admission; deterministic `candidates_extra.csv` order. Keep: `reach_volume.npz` tracked, axial draft shadowing fix, runner `n_written` from `summary.json`, watchdog without cap enforcement.
 
 ## Pitfalls (measured)
+- **`pgrep -f` / `pkill -f` self‑match (measured 2026‑09‑16):** a pattern inside a `while pgrep -f "…"; do sleep; done` waiter, a stop script or an ssh'd command line is part of that very command line, so `pgrep` always finds its own shell (B3's two local band waiters slept 17 h / 6 h and never started their `run_local.sh`; the dispatcher's restart script killed itself before re‑queueing; the watchdog's idle check `isg_boot/bench.sh` never saw an idle pod). Rule: make the pattern unmatchable by its own text — the `[x]` bracket trick (`run_local\.s[h]`, `sample_is[g]`) or `pgrep -x` on the script name — and test a waiter once with the target process absent.
+
 
 - RunPod: hosts with driver 595/610 and the RTX PRO 6000 Blackwell segfault at Isaac Sim startup → `allowedCudaVersions` 12.8/12.9/13.0; `EUR‑IS‑2` pulls GitHub at 120 KB/s; vCPU allotment per pod varies 9–36 for the same GPU type (`RUNPOD_CPU_COUNT` in `/proc/1/environ`); SSH sessions do not inherit the container env.
 - Throughput: the sampler is CPU‑bound (GPU 5–10 %, 7–8 GB per process); K=2 on a 4090 = K=1; K=4 on L40S/A6000 is slower than K=1 → **one process per pod**; host CPU decides (EPYC 9354: 208 s/job, EPYC 7642: 302 s, Xeon 6342: 384 s for the same job). Sampling report layout: `problems.<problem>.<template>.{n_written,time_s}`.
@@ -253,3 +255,4 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026‑09‑16 08:15 PDT agent-e2e: owner decision — axial push‑only (brace optional, see the register); tabletop agent → `alignment_axial.py`, oracle agent → `programs.py` / `sidecar.py` (F6 files, it owns them now), spec §6.10 / §4.6 by me; then the first‑demo loop on `alignment-axial-board_game-breakfast_table`. Context: the oracle's push closure already turned the pilot's blocked axial instance into a success (final error 0.027 rad) on the old sidecar, and the A1 joint placement yields 0 on the breakfast table (bands overlap only at λ ≈ 0).
 - 2026‑09‑16 08:25 PDT agent-e2e: owner 08:19 — `first_demo.py --local` added; the ontop‑large floor‑class demo launched on the local GPU (GPU was free: 945 MiB used, no compute apps; the earlier 7.6 GB process had ended). Found the bands agent computing an under‑edge floor band locally (pid 48693) → told to stop it and use the band fleet. A3 picks (`05ce671`) + D1 items (`d455b77` distractor budget: 90 disembedding aliases, 33/27/30 with 3/2/1 distractors; `b4ab9f9` source tray 1.25; `4eb66f5` hanger blacklist + next‑model fallbacks; `c161a04` articulation re‑ground; top‑level `superseded_by`) integrated in the scheduler; loop launched for articulation open/close on `rvunhj_0` and disembedding `chili-asparagus_1`.
 - 2026‑09‑16 08:30 PDT agent-e2e: bands agent (c239cbc6) reported — band queue re‑ordered on the 15 band pods (30 disembedding bands with the 1.25 stance‑relative tray first on the 8 L40S, ETA ≈ 10:05 PDT; then 285 A3/A6 jobs by weight; 11 A6 re‑runs last); **every left‑brace subtask on the breakfast table already has its left contact band** (8 height classes; coverage 74/0 missing) → attachment (`cap-lemonade_bottle`), block design, touching (`carton_of_milk-box_of_cookies`) entered the first‑demo loop; small articulation waits for the tabletop agent's left‑band wiring. Placed‑tray spec `tray/gsxbym*1.25@focus_centred_edge_aligned` agreed with the tabletop agent (first result: 536 cells vs 100 legacy). Under‑edge floor‑band mode landed; local probe of sandal/bed at s = 0.45 empty (crouched trunks collide with the bed) → probes on 4 A40 pods. Dispatcher caveat: `--rebalance` treats band CMD jobs as unfinished (no summary.json) — use `fleet_remaining.py` for band manifests.
+- 2026‑09‑16 09:05 PDT agent-e2e: owner note 08:45 — killed B3's two stuck local band waiters (pids 3003199 / 3823256; their `while pgrep -f` patterns matched their own command lines, no `run_local.sh` ever started); their queued job lists saved (`/tmp/waiter1_jobs.txt` 17 breakfast‑table jobs incl. 6 legacy placed‑tray bands, `/tmp/waiter2_jobs.txt` 14 `desk_xhjsub_0` / sofa A6 jobs) and handed to the bands agent for a coverage check (placed‑tray ones superseded by the 1.25 stance‑relative bands; missing desk bands queued on the fleet, not locally). Same self‑match bug in the watchdog's idle check (`isg_boot/bench.sh`) fixed with the bracket trick; no other `while pgrep` waiters found in `scripts/` or as processes. Local GPU stays reserved for the ontop‑large demo.
