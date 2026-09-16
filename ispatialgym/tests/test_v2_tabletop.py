@@ -466,9 +466,11 @@ def test_joint_placement_requires_both_cells_at_the_same_trunk():
     st3 = _stance(0.5, yaw=math.pi / 2, xy=(1.0, 1.0))
     r3 = TT.joint_placement(right, left, st3, work_xy=(1.20, 1.60), brace_xy=(0.80, 1.60))
     assert r3["ok"]
-    # no left band yet: the brace side is left to the exact two-arm IK, flagged for the record
-    r4 = TT.joint_placement(right, None, st, (0.61, -0.21), (5.0, 5.0))
+    # no left band yet: the brace side is left to the exact two-arm IK behind a reach proxy, flagged for the record
+    r4 = TT.joint_placement(right, None, st, (0.61, -0.21), (0.70, 0.30))
     assert r4["ok"] and not r4["left_band"] and r4["brace_cell"] is None
+    assert not TT.joint_placement(right, None, st, (0.61, -0.21), (1.05, 0.10))["brace_ok"]  # a far-side stop point, beyond every band
+    assert not TT.joint_placement(right, None, st, (0.61, -0.21), (0.60, -0.80))["brace_ok"]
 
 
 def test_joint_placement_checks_the_brace_class_when_the_band_records_classes():

@@ -795,6 +795,10 @@ CONTACT_HEIGHT_FRACTION = float(getattr(RB, "CONTACT_HEIGHT_FRACTION", 0.75))
 #: a point is "in a band cell" when it lies within this fraction of the lattice from a cell centre (half a cell = the
 #: cell's own square)
 CELL_TOLERANCE = 0.5
+#: brace-point reach proxy used while no left contact band exists (base frame, m): the measured band envelopes of the
+#: B3 run (x 0.48–0.80 m ahead, |λ| <= 0.56) with a small allowance
+BRACE_PROXY_X = (0.30, 0.88)
+BRACE_PROXY_LATERAL = 0.65
 
 
 def height_class(height: float) -> float:
@@ -966,14 +970,18 @@ def joint_placement(bands_right: RB.ReachBands, bands_left: Optional[RB.ReachBan
     ``work_xy`` ∈ a right band cell AND ``brace_xy`` ∈ a left contact band cell **at the same trunk** (the stance's);
     with ``brace_class`` (B3 contact class of the intended brace pose, ``contact_class``) and a band that records the
     per-cell classes, the class must have passed at that cell. Without a left band (None) the brace side is left to
-    the exact two-arm IK alone and ``left_band`` is False so the caller can record it. The dict carries ``ok`` /
+    the exact two-arm IK behind the reach proxy ``BRACE_PROXY_X`` / ``BRACE_PROXY_LATERAL`` and ``left_band`` is False
+    so the caller can record it. The dict carries ``ok`` /
     ``work_ok`` / ``brace_ok`` / ``brace_class_ok``, the nearest cells (base frame), the work cell's ``classes`` and the
     brace cell's ``brace_classes`` (B3 bitmasks, None when absent)."""
     work_ok, work_cell = in_band(bands_right, stance, work_xy, tol)
     brace_classes = None
     class_ok = True
     if bands_left is None:
-        brace_ok, brace_cell = True, None
+        # no left band yet: a reach proxy keeps the exact IK from being spent on hopeless brace points (the arms' bands
+        # span x 0.48–0.80 m ahead and |λ| <= 0.56 on the pilot supports, README of the B3 run)
+        bx, bl = (float(v) for v in stance.world_to_base(_t(brace_xy)[:2]).tolist())
+        brace_ok, brace_cell = (BRACE_PROXY_X[0] <= bx <= BRACE_PROXY_X[1] and abs(bl) <= BRACE_PROXY_LATERAL), None
     else:
         brace_ok, brace_cell = in_band(bands_left, stance, brace_xy, tol)
         if brace_ok:

@@ -313,13 +313,15 @@ class AlignmentAxial(SamplerV2):
         push = brace_found = None
         push_fails, brace_fails = [], []
         n_push_ok = 0
-        # the end whose motion at the goal points to the robot's left leaves the stop edge on the left arm's side: first
+        # with the long axis parallel to the edge at the goal, exactly one end moves toward the robot there: its stop face
+        # is the near long face (reachable for the left arm); the other end's stop face is the far side (x ≈ 0.9–1.1 m
+        # from the base, beyond every band) — try the near-stop end first
         motions = []
         for e, jp, goal_pose, stop_pt, d_stop in pairs:
             r_xy = th.tensor([float(e[0] - com[0]), float(e[1] - com[1]), 0.0])
             d = spin * th.cross(z_axis, r_xy, dim=0)
             motions.append((e, jp, d / th.linalg.norm(d), r_xy, goal_pose, stop_pt, d_stop))
-        motions.sort(key=lambda m: -float(th.dot(m[2][:2], manip.tangent)))
+        motions.sort(key=lambda m: float(th.dot(m[6][:2], manip.inward)))
         for e, jp, d, r_xy, goal_pose, stop_pt, d_stop in motions:
             if not jp["ok"]:
                 continue
