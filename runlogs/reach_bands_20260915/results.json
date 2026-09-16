@@ -1445,16 +1445,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-0",
+   "wall_s": 654,
+   "trunks_free": 11,
+   "trunks_total": 20,
+   "cells_total": 80,
+   "union_extent": "[-0.1599999964237213, 0.07999999821186066]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__beaker-sfvswx__placed-tray-gsxbym__255b07b3de156869",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__beer_glass-rxscji",
@@ -1685,16 +1685,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "inter_object_relation_satisfaction-touching",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-0",
+   "wall_s": 1314,
+   "trunks_free": 11,
+   "trunks_total": 20,
+   "cells_total": 238,
+   "union_extent": "[-0.7200000286102295, 0.0]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__box_of_sanitary_napkins-zqinib__00ffc4b2125bd3e5",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__box_of_shampoo-bclpiq",
@@ -1765,16 +1765,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "inter_object_relation_satisfaction-inside",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-2",
+   "wall_s": 1137,
+   "trunks_free": 11,
+   "trunks_total": 20,
+   "cells_total": 309,
+   "union_extent": "[-0.800000011920929, 0.0]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__brussels_sprouts-siodbb__99c7e08e543db3d8",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__can_of_soda-evcxlr__placed-tray-gsxbym",
@@ -1989,64 +1989,64 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "alignment-axial",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-1",
+   "wall_s": 1290,
+   "trunks_free": 11,
+   "trunks_total": 20,
+   "cells_total": 584,
+   "union_extent": "[-0.800000011920929, 0.0]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__frying_pan-sfbdjn__b171eb378cb4ed14",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__gym_shoe-qxecbh__gp",
    "kind": "tabletop",
    "wave": null,
    "subtasks": "alignment-axial",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-2",
+   "wall_s": 1210,
+   "trunks_free": 11,
+   "trunks_total": 20,
+   "cells_total": 583,
+   "union_extent": "[-0.800000011920929, 0.0]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__gym_shoe-qxecbh__db5ce636865d478d",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__half_bagel-hsvakn",
    "kind": "tabletop",
    "wave": null,
    "subtasks": "inter_object_relation_satisfaction-ontop_small_scale",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-3",
+   "wall_s": 1486,
+   "trunks_free": 11,
+   "trunks_total": 20,
+   "cells_total": 740,
+   "union_extent": "[-0.800000011920929, 0.1599999964237213]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__half_bagel-hsvakn__c6e0b21ff8b9a8a7",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__hard_candy-yuatcg",
    "kind": "tabletop",
    "wave": null,
    "subtasks": "inter_object_relation_satisfaction-inside",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-4",
+   "wall_s": 1453,
+   "trunks_free": 11,
+   "trunks_total": 20,
+   "cells_total": 534,
+   "union_extent": "[-0.800000011920929, 0.07999999821186066]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__hard_candy-yuatcg__07cf8c772d4eb04a",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__hardback-agbqsy__gp",
@@ -2101,16 +2101,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "alignment-axial",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-a40-4",
+   "wall_s": 2941,
+   "trunks_free": 12,
+   "trunks_total": 20,
+   "cells_total": 653,
+   "union_extent": "[-0.800000011920929, 0.0]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__keyboard-jtdyix__09838892375ed301",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__letter-qhqhwk__gp",
@@ -2133,32 +2133,32 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "configuration_matching-attachment",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-a40-7",
+   "wall_s": 2744,
+   "trunks_free": 12,
+   "trunks_total": 20,
+   "cells_total": 406,
+   "union_extent": "[-0.800000011920929, 0.0]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__lid-zkderg__db89f713b2cb42b7",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__light_bulb-sxkjea",
    "kind": "tabletop",
    "wave": null,
    "subtasks": "configuration_matching-attachment",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-a40-8",
+   "wall_s": 2740,
+   "trunks_free": 12,
+   "trunks_total": 20,
+   "cells_total": 362,
+   "union_extent": "[-0.800000011920929, 0.0]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__light_bulb-sxkjea__a6046ac8ca2dfd68",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__magazine-zfeoeu__gp",
@@ -2181,16 +2181,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "inter_object_relation_satisfaction-nextto",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-a40-10",
+   "wall_s": 2892,
+   "trunks_free": 12,
+   "trunks_total": 20,
+   "cells_total": 558,
+   "union_extent": "[-0.800000011920929, 0.07999999821186066]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__marker-kjxpdi__a796aef722963d49",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__mouse-pljjtu__placed-tray-gsxbym",
@@ -2229,16 +2229,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-1",
+   "wall_s": 570,
+   "trunks_free": 11,
+   "trunks_total": 20,
+   "cells_total": 61,
+   "union_extent": "[-0.1599999964237213, 0.0]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__notebook-yibctu__placed-tray-gsxbym__3b5f0a6c9499859f",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__pack_of_cigarettes-qabdgg__placed-tray-gsxbym",
@@ -2293,32 +2293,32 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "inter_object_relation_satisfaction-nextto",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-7",
+   "wall_s": 1373,
+   "trunks_free": 11,
+   "trunks_total": 20,
+   "cells_total": 533,
+   "union_extent": "[-0.800000011920929, 0.07999999821186066]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__parsnip-invznw__0eb42319a95c4576",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__pencil-rzscao__scaled",
    "kind": "tabletop",
    "wave": null,
    "subtasks": "inter_object_relation_satisfaction-nextto",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-9",
+   "wall_s": 1272,
+   "trunks_free": 11,
+   "trunks_total": 20,
+   "cells_total": 303,
+   "union_extent": "[-0.800000011920929, 0.0]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__pencil-rzscao__af481c6bc7d5957d",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__pencil_case-cqxkgl__placed-tray-gsxbym",
@@ -2357,16 +2357,16 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "inter_object_relation_satisfaction-inside",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-a40-5",
+   "wall_s": 3083,
+   "trunks_free": 12,
+   "trunks_total": 20,
+   "cells_total": 636,
+   "union_extent": "[-0.800000011920929, 0.07999999821186066]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__quartz-poplsu__9fbc3dfc386c9b02",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__skateboard_wheel_assembly-acmbvb",
@@ -2389,48 +2389,48 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-a40-8",
+   "wall_s": 1138,
+   "trunks_free": 12,
+   "trunks_total": 20,
+   "cells_total": 43,
+   "union_extent": "[-0.1599999964237213, 0.0]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__soap_dispenser-cgxrwd__placed-tray-gsxbym__36a4d56ff73807c1",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__sunflower-mdpoct",
    "kind": "tabletop",
    "wave": null,
    "subtasks": "inter_object_relation_satisfaction-inside",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-a40-9",
+   "wall_s": 3252,
+   "trunks_free": 12,
+   "trunks_total": 20,
+   "cells_total": 639,
+   "union_extent": "[-0.800000011920929, 0.1599999964237213]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__sunflower-mdpoct__6197dab60b7a5faf",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__tablefork-uodzrq__placed-tray-gsxbym",
    "kind": "tabletop",
    "wave": null,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-a40-10",
+   "wall_s": 1208,
+   "trunks_free": 12,
+   "trunks_total": 20,
+   "cells_total": 104,
+   "union_extent": "[-0.1599999964237213, 0.07999999821186066]",
+   "band_file": "tabletop__house_single_floor__bar_udatjt_0__tablefork-uodzrq__placed-tray-gsxbym__60c97942795c3531",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__house_single_floor__bar_udatjt_0__teacup-tfzfam",
@@ -7381,32 +7381,32 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-9",
+   "wall_s": 430,
+   "trunks_free": 17,
+   "trunks_total": 20,
+   "cells_total": 133,
+   "union_extent": "[-0.1599999964237213, 0.0]",
+   "band_file": "tabletop__office_cubicles_right__desk_mdhelw_1__bar_soap-feqemg__placed-tray-gsxbym__42a4c73705447d65",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__office_cubicles_right__desk_mdhelw_1__beaker-sfvswx__placed-tray-gsxbym",
    "kind": "tabletop",
    "wave": null,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-10",
+   "wall_s": 459,
+   "trunks_free": 17,
+   "trunks_total": 20,
+   "cells_total": 160,
+   "union_extent": "[-0.1599999964237213, 0.07999999821186066]",
+   "band_file": "tabletop__office_cubicles_right__desk_mdhelw_1__beaker-sfvswx__placed-tray-gsxbym__302a00ebf078d96a",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__office_cubicles_right__desk_mdhelw_1__beer_glass-rxscji",
@@ -7621,32 +7621,32 @@
    "kind": "tabletop",
    "wave": null,
    "subtasks": "disembedding",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-9",
+   "wall_s": 462,
+   "trunks_free": 17,
+   "trunks_total": 20,
+   "cells_total": 99,
+   "union_extent": "[-0.1599999964237213, 0.0]",
+   "band_file": "tabletop__office_cubicles_right__desk_mdhelw_1__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym__27f0e907313680b0",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__office_cubicles_right__desk_mdhelw_1__box_of_sanitary_napkins-zqinib",
    "kind": "tabletop",
    "wave": null,
    "subtasks": "inter_object_relation_satisfaction-touching",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-10",
+   "wall_s": 1329,
+   "trunks_free": 17,
+   "trunks_total": 20,
+   "cells_total": 539,
+   "union_extent": "[-0.800000011920929, 0.0]",
+   "band_file": "tabletop__office_cubicles_right__desk_mdhelw_1__box_of_sanitary_napkins-zqinib__be5feb63b82a60d2",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__tabletop__office_cubicles_right__desk_mdhelw_1__box_of_shampoo-nijidu__placed-tray-gsxbym",
@@ -12029,6 +12029,376 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__marker-kjxpdi": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-10/rb__tabletop__house_single_floor__bar_udatjt_0__marker-kjxpdi",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-10/rb__tabletop__house_single_floor__bar_udatjt_0__marker-kjxpdi/tabletop__house_single_floor__bar_udatjt_0__marker-kjxpdi__a796aef722963d49"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__marker-kjxpdi/tabletop__house_single_floor__bar_udatjt_0__marker-kjxpdi__a796aef722963d49.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.07999999821186066
+    ],
+    "n_reachable_total": 558,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      38,
+      false,
+      211.71,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      56,
+      false,
+      180.83,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      68,
+      false,
+      224.54,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      72,
+      false,
+      276.96,
+      "ready"
+     ],
+     [
+      0.25,
+      0.0,
+      43,
+      false,
+      159.96,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      62,
+      false,
+      193.47,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      66,
+      false,
+      250.37,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      43,
+      false,
+      147.61,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      62,
+      false,
+      203.7,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      45,
+      false,
+      181.11,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      3,
+      false,
+      111.42,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      137.73,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 2875.9
+   },
+   "error": null,
+   "pod": "pilot2-a40-10",
+   "rc": 0,
+   "wall_s": 2892,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__marker-kjxpdi__a796aef722963d49"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__tablefork-uodzrq__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-10/rb__tabletop__house_single_floor__bar_udatjt_0__tablefork-uodzrq__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-10/rb__tabletop__house_single_floor__bar_udatjt_0__tablefork-uodzrq__placed-tray-gsxbym/tabletop__house_single_floor__bar_udatjt_0__tablefork-uodzrq__placed-tray-gsxbym__60c97942795c3531"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__tablefork-uodzrq__placed-tray-gsxbym/tabletop__house_single_floor__bar_udatjt_0__tablefork-uodzrq__placed-tray-gsxbym__60c97942795c3531.npz",
+    "union_extent": [
+     -0.1599999964237213,
+     0.07999999821186066
+    ],
+    "n_reachable_total": 104,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      8,
+      false,
+      101.43,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      12,
+      false,
+      66.84,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      13,
+      false,
+      53.16,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      8,
+      false,
+      47.68,
+      "ready"
+     ],
+     [
+      0.25,
+      0.0,
+      8,
+      false,
+      45.67,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      13,
+      false,
+      50.38,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      14,
+      false,
+      58.0,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      8,
+      false,
+      32.93,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      12,
+      false,
+      52.68,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      8,
+      false,
+      28.97,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      28.9,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      28.93,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 1192.4
+   },
+   "error": null,
+   "pod": "pilot2-a40-10",
+   "rc": 0,
+   "wall_s": 1208,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__tablefork-uodzrq__placed-tray-gsxbym__60c97942795c3531"
+   ],
+   "current_code": true
+  },
   "v2__camera_relocalization-obstructed-footstool_1": {
    "dir": "runlogs/runpod/rb/pilot2-a40-11/v2__camera_relocalization-obstructed-footstool_1",
    "files": [],
@@ -14116,6 +14486,191 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__keyboard-jtdyix__gp": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-4/rb__tabletop__house_single_floor__bar_udatjt_0__keyboard-jtdyix__gp",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-4/rb__tabletop__house_single_floor__bar_udatjt_0__keyboard-jtdyix__gp/tabletop__house_single_floor__bar_udatjt_0__keyboard-jtdyix__09838892375ed301"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__keyboard-jtdyix__gp/tabletop__house_single_floor__bar_udatjt_0__keyboard-jtdyix__09838892375ed301.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.0
+    ],
+    "n_reachable_total": 653,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      40,
+      false,
+      172.7,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      55,
+      false,
+      182.19,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      62,
+      false,
+      238.82,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      68,
+      false,
+      255.77,
+      "ready"
+     ],
+     [
+      0.25,
+      0.0,
+      49,
+      false,
+      146.12,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      59,
+      false,
+      190.71,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      67,
+      false,
+      231.52,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      51,
+      false,
+      167.83,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      62,
+      false,
+      205.57,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      54,
+      false,
+      200.57,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      38,
+      false,
+      142.18,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      48,
+      false,
+      173.69,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 2923.9
+   },
+   "error": null,
+   "pod": "pilot2-a40-4",
+   "rc": 0,
+   "wall_s": 2941,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__keyboard-jtdyix__09838892375ed301"
+   ],
+   "current_code": true
+  },
   "v2__alignment-world_horizontal-shelf-walls": {
    "dir": "runlogs/runpod/rb/pilot2-a40-5/v2__alignment-world_horizontal-shelf-walls",
    "files": [],
@@ -15383,6 +15938,191 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__quartz-poplsu": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-5/rb__tabletop__house_single_floor__bar_udatjt_0__quartz-poplsu",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-5/rb__tabletop__house_single_floor__bar_udatjt_0__quartz-poplsu/tabletop__house_single_floor__bar_udatjt_0__quartz-poplsu__9fbc3dfc386c9b02"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__quartz-poplsu/tabletop__house_single_floor__bar_udatjt_0__quartz-poplsu__9fbc3dfc386c9b02.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.07999999821186066
+    ],
+    "n_reachable_total": 636,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      42,
+      false,
+      202.84,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      59,
+      false,
+      184.21,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      69,
+      false,
+      280.47,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      72,
+      false,
+      299.08,
+      "ready"
+     ],
+     [
+      0.25,
+      0.0,
+      50,
+      false,
+      153.1,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      62,
+      false,
+      223.72,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      70,
+      false,
+      262.34,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      49,
+      false,
+      164.42,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      64,
+      false,
+      226.95,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      55,
+      false,
+      200.56,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      20,
+      false,
+      116.85,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      24,
+      false,
+      143.09,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 3068.3
+   },
+   "error": null,
+   "pod": "pilot2-a40-5",
+   "rc": 0,
+   "wall_s": 3083,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__quartz-poplsu__9fbc3dfc386c9b02"
+   ],
+   "current_code": true
+  },
   "v2__alignment-world_vertical-signpost-walls": {
    "dir": "runlogs/runpod/rb/pilot2-a40-7/v2__alignment-world_vertical-signpost-walls",
    "files": [],
@@ -16475,6 +17215,191 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__lid-zkderg": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-7/rb__tabletop__house_single_floor__bar_udatjt_0__lid-zkderg",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-7/rb__tabletop__house_single_floor__bar_udatjt_0__lid-zkderg/tabletop__house_single_floor__bar_udatjt_0__lid-zkderg__db89f713b2cb42b7"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__lid-zkderg/tabletop__house_single_floor__bar_udatjt_0__lid-zkderg__db89f713b2cb42b7.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.0
+    ],
+    "n_reachable_total": 406,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      30,
+      false,
+      169.12,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      45,
+      false,
+      171.23,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      53,
+      false,
+      219.63,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      55,
+      false,
+      277.7,
+      "ready"
+     ],
+     [
+      0.25,
+      0.0,
+      33,
+      false,
+      139.3,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      46,
+      false,
+      191.82,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      52,
+      false,
+      227.41,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      30,
+      false,
+      148.73,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      44,
+      false,
+      209.87,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      18,
+      false,
+      158.55,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      111.74,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      138.06,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 2728.3
+   },
+   "error": null,
+   "pod": "pilot2-a40-7",
+   "rc": 0,
+   "wall_s": 2744,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__lid-zkderg__db89f713b2cb42b7"
+   ],
+   "current_code": true
+  },
   "v2__alignment-world_vertical-wall_clock-walls": {
    "dir": "runlogs/runpod/rb/pilot2-a40-8/v2__alignment-world_vertical-wall_clock-walls",
    "files": [],
@@ -17524,6 +18449,376 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__light_bulb-sxkjea": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-8/rb__tabletop__house_single_floor__bar_udatjt_0__light_bulb-sxkjea",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-8/rb__tabletop__house_single_floor__bar_udatjt_0__light_bulb-sxkjea/tabletop__house_single_floor__bar_udatjt_0__light_bulb-sxkjea__a6046ac8ca2dfd68"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__light_bulb-sxkjea/tabletop__house_single_floor__bar_udatjt_0__light_bulb-sxkjea__a6046ac8ca2dfd68.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.0
+    ],
+    "n_reachable_total": 362,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      28,
+      false,
+      164.27,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      45,
+      false,
+      171.17,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      49,
+      false,
+      211.54,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      52,
+      false,
+      277.13,
+      "ready"
+     ],
+     [
+      0.25,
+      0.0,
+      31,
+      false,
+      131.35,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      43,
+      false,
+      186.23,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      47,
+      false,
+      237.62,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      27,
+      false,
+      150.99,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      40,
+      false,
+      209.5,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      false,
+      155.56,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      111.59,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      137.98,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 2723.5
+   },
+   "error": null,
+   "pod": "pilot2-a40-8",
+   "rc": 0,
+   "wall_s": 2740,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__light_bulb-sxkjea__a6046ac8ca2dfd68"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__soap_dispenser-cgxrwd__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-8/rb__tabletop__house_single_floor__bar_udatjt_0__soap_dispenser-cgxrwd__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-8/rb__tabletop__house_single_floor__bar_udatjt_0__soap_dispenser-cgxrwd__placed-tray-gsxbym/tabletop__house_single_floor__bar_udatjt_0__soap_dispenser-cgxrwd__placed-tray-gsxbym__36a4d56ff73807c1"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__soap_dispenser-cgxrwd__placed-tray-gsxbym/tabletop__house_single_floor__bar_udatjt_0__soap_dispenser-cgxrwd__placed-tray-gsxbym__36a4d56ff73807c1.npz",
+    "union_extent": [
+     -0.1599999964237213,
+     0.0
+    ],
+    "n_reachable_total": 43,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      3,
+      false,
+      75.73,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      8,
+      false,
+      54.52,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      8,
+      false,
+      61.29,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      5,
+      false,
+      66.46,
+      "ready"
+     ],
+     [
+      0.25,
+      0.0,
+      3,
+      false,
+      27.41,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      7,
+      false,
+      37.06,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      6,
+      false,
+      60.08,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      1,
+      false,
+      27.83,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      2,
+      false,
+      28.86,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      false,
+      28.79,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      28.83,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      28.92,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 1121.8
+   },
+   "error": null,
+   "pod": "pilot2-a40-8",
+   "rc": 0,
+   "wall_s": 1138,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__soap_dispenser-cgxrwd__placed-tray-gsxbym__36a4d56ff73807c1"
+   ],
+   "current_code": true
+  },
   "v2__alignment-axial-board_game-breakfast_table": {
    "dir": "runlogs/runpod/rb/pilot2-a40-9/v2__alignment-axial-board_game-breakfast_table",
    "files": [],
@@ -18503,6 +19798,191 @@
    "wall_s": 3032,
    "band_files": [
     "tabletop__house_single_floor__bar_udatjt_0__magazine-zfeoeu__1f8f865a07f04eb4"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__sunflower-mdpoct": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-9/rb__tabletop__house_single_floor__bar_udatjt_0__sunflower-mdpoct",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-9/rb__tabletop__house_single_floor__bar_udatjt_0__sunflower-mdpoct/tabletop__house_single_floor__bar_udatjt_0__sunflower-mdpoct__6197dab60b7a5faf"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__sunflower-mdpoct/tabletop__house_single_floor__bar_udatjt_0__sunflower-mdpoct__6197dab60b7a5faf.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.1599999964237213
+    ],
+    "n_reachable_total": 639,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      46,
+      false,
+      226.97,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      63,
+      false,
+      255.56,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      80,
+      false,
+      286.29,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      78,
+      false,
+      307.88,
+      "ready"
+     ],
+     [
+      0.25,
+      0.0,
+      51,
+      false,
+      184.57,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      71,
+      false,
+      228.44,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      80,
+      false,
+      282.94,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      50,
+      false,
+      151.04,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      65,
+      false,
+      191.86,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      49,
+      false,
+      176.26,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.03,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      6,
+      false,
+      111.82,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      138.06,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 3231.1
+   },
+   "error": null,
+   "pod": "pilot2-a40-9",
+   "rc": 0,
+   "wall_s": 3252,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__sunflower-mdpoct__6197dab60b7a5faf"
    ],
    "current_code": true
   },
@@ -23218,6 +24698,376 @@
    "wall_s": 1308,
    "band_files": [
     "contact__house_single_floor__bar_udatjt_0__left_h0.04__04f8f4483daf2100"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__beaker-sfvswx__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-0/rb__tabletop__house_single_floor__bar_udatjt_0__beaker-sfvswx__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-0/rb__tabletop__house_single_floor__bar_udatjt_0__beaker-sfvswx__placed-tray-gsxbym/tabletop__house_single_floor__bar_udatjt_0__beaker-sfvswx__placed-tray-gsxbym__255b07b3de156869"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__beaker-sfvswx__placed-tray-gsxbym/tabletop__house_single_floor__bar_udatjt_0__beaker-sfvswx__placed-tray-gsxbym__255b07b3de156869.npz",
+    "union_extent": [
+     -0.1599999964237213,
+     0.07999999821186066
+    ],
+    "n_reachable_total": 80,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      8,
+      false,
+      41.7,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      13,
+      false,
+      28.67,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      14,
+      false,
+      17.76,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      8,
+      false,
+      14.76,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      13,
+      false,
+      16.9,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      13,
+      false,
+      17.63,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      4,
+      false,
+      17.56,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      7,
+      false,
+      15.46,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      false,
+      13.29,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      13.36,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      13.33,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 636.4
+   },
+   "error": null,
+   "pod": "pilot2-l40s-0",
+   "rc": 0,
+   "wall_s": 654,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__beaker-sfvswx__placed-tray-gsxbym__255b07b3de156869"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__box_of_sanitary_napkins-zqinib": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-0/rb__tabletop__house_single_floor__bar_udatjt_0__box_of_sanitary_napkins-zqinib",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-0/rb__tabletop__house_single_floor__bar_udatjt_0__box_of_sanitary_napkins-zqinib/tabletop__house_single_floor__bar_udatjt_0__box_of_sanitary_napkins-zqinib__00ffc4b2125bd3e5"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__box_of_sanitary_napkins-zqinib/tabletop__house_single_floor__bar_udatjt_0__box_of_sanitary_napkins-zqinib__00ffc4b2125bd3e5.npz",
+    "union_extent": [
+     -0.7200000286102295,
+     0.0
+    ],
+    "n_reachable_total": 238,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      22,
+      false,
+      76.9,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      37,
+      false,
+      83.67,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      37,
+      false,
+      107.14,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      25,
+      false,
+      55.92,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      35,
+      false,
+      90.35,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      36,
+      false,
+      116.15,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      20,
+      false,
+      64.24,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      26,
+      false,
+      114.37,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      false,
+      67.69,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      48.37,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      58.78,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 1297.1
+   },
+   "error": null,
+   "pod": "pilot2-l40s-0",
+   "rc": 0,
+   "wall_s": 1314,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__box_of_sanitary_napkins-zqinib__00ffc4b2125bd3e5"
    ],
    "current_code": true
   },
@@ -29198,6 +31048,376 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__frying_pan-sfbdjn__gp": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-1/rb__tabletop__house_single_floor__bar_udatjt_0__frying_pan-sfbdjn__gp",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-1/rb__tabletop__house_single_floor__bar_udatjt_0__frying_pan-sfbdjn__gp/tabletop__house_single_floor__bar_udatjt_0__frying_pan-sfbdjn__b171eb378cb4ed14"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__frying_pan-sfbdjn__gp/tabletop__house_single_floor__bar_udatjt_0__frying_pan-sfbdjn__b171eb378cb4ed14.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.0
+    ],
+    "n_reachable_total": 584,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      42,
+      false,
+      91.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      56,
+      false,
+      96.67,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      62,
+      false,
+      102.05,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      49,
+      false,
+      65.84,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      59,
+      false,
+      87.63,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      67,
+      false,
+      110.02,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      51,
+      false,
+      76.33,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      62,
+      false,
+      93.6,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      54,
+      false,
+      91.26,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      36,
+      false,
+      60.85,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      46,
+      false,
+      76.42,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 1276.7
+   },
+   "error": null,
+   "pod": "pilot2-l40s-1",
+   "rc": 0,
+   "wall_s": 1290,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__frying_pan-sfbdjn__b171eb378cb4ed14"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__notebook-yibctu__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-1/rb__tabletop__house_single_floor__bar_udatjt_0__notebook-yibctu__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-1/rb__tabletop__house_single_floor__bar_udatjt_0__notebook-yibctu__placed-tray-gsxbym/tabletop__house_single_floor__bar_udatjt_0__notebook-yibctu__placed-tray-gsxbym__3b5f0a6c9499859f"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__notebook-yibctu__placed-tray-gsxbym/tabletop__house_single_floor__bar_udatjt_0__notebook-yibctu__placed-tray-gsxbym__3b5f0a6c9499859f.npz",
+    "union_extent": [
+     -0.1599999964237213,
+     0.0
+    ],
+    "n_reachable_total": 61,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      5,
+      false,
+      41.0,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      9,
+      false,
+      30.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      10,
+      false,
+      18.28,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      6,
+      false,
+      15.18,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      9,
+      false,
+      17.5,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      9,
+      false,
+      18.33,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      5,
+      false,
+      27.24,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      8,
+      false,
+      18.25,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      false,
+      13.68,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      14.03,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      13.64,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 557.0
+   },
+   "error": null,
+   "pod": "pilot2-l40s-1",
+   "rc": 0,
+   "wall_s": 570,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__notebook-yibctu__placed-tray-gsxbym__3b5f0a6c9499859f"
+   ],
+   "current_code": true
+  },
   "v2__alignment-axial-paperback_book-breakfast_table": {
    "dir": "runlogs/runpod/rb/pilot2-l40s-10/v2__alignment-axial-paperback_book-breakfast_table",
    "files": [],
@@ -35097,6 +37317,376 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__office_cubicles_right__desk_mdhelw_1__beaker-sfvswx__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-10/rb__tabletop__office_cubicles_right__desk_mdhelw_1__beaker-sfvswx__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-10/rb__tabletop__office_cubicles_right__desk_mdhelw_1__beaker-sfvswx__placed-tray-gsxbym/tabletop__office_cubicles_right__desk_mdhelw_1__beaker-sfvswx__placed-tray-gsxbym__302a00ebf078d96a"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__office_cubicles_right__desk_mdhelw_1__beaker-sfvswx__placed-tray-gsxbym/tabletop__office_cubicles_right__desk_mdhelw_1__beaker-sfvswx__placed-tray-gsxbym__302a00ebf078d96a.npz",
+    "union_extent": [
+     -0.1599999964237213,
+     0.07999999821186066
+    ],
+    "n_reachable_total": 160,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      5,
+      false,
+      46.76,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      10,
+      false,
+      30.0,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      14,
+      false,
+      17.14,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      11,
+      false,
+      14.09,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      8,
+      false,
+      14.58,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      12,
+      false,
+      17.1,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      13,
+      false,
+      12.84,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      7,
+      false,
+      11.78,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      8,
+      false,
+      16.28,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      14,
+      false,
+      12.77,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      13,
+      false,
+      12.98,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      6,
+      false,
+      18.6,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      8,
+      false,
+      11.41,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      12,
+      false,
+      13.56,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      12,
+      false,
+      13.56,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      2,
+      false,
+      9.94,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      5,
+      false,
+      10.22,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 443.3
+   },
+   "error": null,
+   "pod": "pilot2-l40s-10",
+   "rc": 0,
+   "wall_s": 459,
+   "band_files": [
+    "tabletop__office_cubicles_right__desk_mdhelw_1__beaker-sfvswx__placed-tray-gsxbym__302a00ebf078d96a"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__office_cubicles_right__desk_mdhelw_1__box_of_sanitary_napkins-zqinib": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-10/rb__tabletop__office_cubicles_right__desk_mdhelw_1__box_of_sanitary_napkins-zqinib",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-10/rb__tabletop__office_cubicles_right__desk_mdhelw_1__box_of_sanitary_napkins-zqinib/tabletop__office_cubicles_right__desk_mdhelw_1__box_of_sanitary_napkins-zqinib__be5feb63b82a60d2"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__office_cubicles_right__desk_mdhelw_1__box_of_sanitary_napkins-zqinib/tabletop__office_cubicles_right__desk_mdhelw_1__box_of_sanitary_napkins-zqinib__be5feb63b82a60d2.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.0
+    ],
+    "n_reachable_total": 539,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      12,
+      false,
+      102.57,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      29,
+      false,
+      59.4,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      36,
+      false,
+      81.45,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      43,
+      false,
+      76.18,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      20,
+      false,
+      39.65,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      33,
+      false,
+      69.62,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      38,
+      false,
+      78.54,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      46,
+      false,
+      86.34,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      28,
+      false,
+      49.02,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      34,
+      false,
+      63.75,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      42,
+      false,
+      75.96,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      44,
+      false,
+      82.67,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      26,
+      false,
+      42.36,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      35,
+      false,
+      67.62,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      36,
+      false,
+      80.61,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      13,
+      false,
+      41.07,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      24,
+      false,
+      62.01,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 1312.6
+   },
+   "error": null,
+   "pod": "pilot2-l40s-10",
+   "rc": 0,
+   "wall_s": 1329,
+   "band_files": [
+    "tabletop__office_cubicles_right__desk_mdhelw_1__box_of_sanitary_napkins-zqinib__be5feb63b82a60d2"
+   ],
+   "current_code": true
+  },
   "v2__alignment-axial-catalog-breakfast_table": {
    "dir": "runlogs/runpod/rb/pilot2-l40s-2/v2__alignment-axial-catalog-breakfast_table",
    "files": [],
@@ -40936,6 +43526,376 @@
    "wall_s": 1193,
    "band_files": [
     "tabletop__house_single_floor__bar_udatjt_0__board_game-eoywpy__04067d6741f5aa53"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__brussels_sprouts-siodbb": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-2/rb__tabletop__house_single_floor__bar_udatjt_0__brussels_sprouts-siodbb",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-2/rb__tabletop__house_single_floor__bar_udatjt_0__brussels_sprouts-siodbb/tabletop__house_single_floor__bar_udatjt_0__brussels_sprouts-siodbb__99c7e08e543db3d8"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__brussels_sprouts-siodbb/tabletop__house_single_floor__bar_udatjt_0__brussels_sprouts-siodbb__99c7e08e543db3d8.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.0
+    ],
+    "n_reachable_total": 309,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      28,
+      false,
+      99.18,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      39,
+      false,
+      74.59,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      46,
+      false,
+      94.5,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      30,
+      false,
+      58.72,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      41,
+      false,
+      83.38,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      46,
+      false,
+      97.81,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      27,
+      false,
+      63.91,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      40,
+      false,
+      90.21,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      12,
+      false,
+      68.38,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      47.95,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      59.4,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 1124.1
+   },
+   "error": null,
+   "pod": "pilot2-l40s-2",
+   "rc": 0,
+   "wall_s": 1137,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__brussels_sprouts-siodbb__99c7e08e543db3d8"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__gym_shoe-qxecbh__gp": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-2/rb__tabletop__house_single_floor__bar_udatjt_0__gym_shoe-qxecbh__gp",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-2/rb__tabletop__house_single_floor__bar_udatjt_0__gym_shoe-qxecbh__gp/tabletop__house_single_floor__bar_udatjt_0__gym_shoe-qxecbh__db5ce636865d478d"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__gym_shoe-qxecbh__gp/tabletop__house_single_floor__bar_udatjt_0__gym_shoe-qxecbh__db5ce636865d478d.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.0
+    ],
+    "n_reachable_total": 583,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      43,
+      false,
+      79.74,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      57,
+      false,
+      97.36,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      63,
+      false,
+      99.96,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      51,
+      false,
+      67.34,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      60,
+      false,
+      86.21,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      69,
+      false,
+      104.31,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      51,
+      false,
+      72.23,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      61,
+      false,
+      88.94,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      57,
+      false,
+      91.9,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      31,
+      false,
+      56.73,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      40,
+      false,
+      66.86,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 1197.5
+   },
+   "error": null,
+   "pod": "pilot2-l40s-2",
+   "rc": 0,
+   "wall_s": 1210,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__gym_shoe-qxecbh__db5ce636865d478d"
    ],
    "current_code": true
   },
@@ -47033,6 +49993,191 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__half_bagel-hsvakn": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-3/rb__tabletop__house_single_floor__bar_udatjt_0__half_bagel-hsvakn",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-3/rb__tabletop__house_single_floor__bar_udatjt_0__half_bagel-hsvakn/tabletop__house_single_floor__bar_udatjt_0__half_bagel-hsvakn__c6e0b21ff8b9a8a7"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__half_bagel-hsvakn/tabletop__house_single_floor__bar_udatjt_0__half_bagel-hsvakn__c6e0b21ff8b9a8a7.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.1599999964237213
+    ],
+    "n_reachable_total": 740,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      53,
+      false,
+      113.79,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      74,
+      false,
+      99.92,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      90,
+      false,
+      122.3,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      60,
+      false,
+      108.54,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      78,
+      false,
+      105.0,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      96,
+      false,
+      142.4,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      62,
+      false,
+      92.28,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      79,
+      false,
+      106.19,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      72,
+      false,
+      118.66,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      32,
+      false,
+      54.68,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      44,
+      false,
+      77.86,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 1469.3
+   },
+   "error": null,
+   "pod": "pilot2-l40s-3",
+   "rc": 0,
+   "wall_s": 1486,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__half_bagel-hsvakn__c6e0b21ff8b9a8a7"
+   ],
+   "current_code": true
+  },
   "v2__alignment-axial-hardback-breakfast_table": {
    "dir": "runlogs/runpod/rb/pilot2-l40s-4/v2__alignment-axial-hardback-breakfast_table",
    "files": [],
@@ -52932,6 +56077,191 @@
    "wall_s": 1225,
    "band_files": [
     "tabletop__house_single_floor__bar_udatjt_0__cap-hbafeb__0c464b2d15a7f1e1"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__hard_candy-yuatcg": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-4/rb__tabletop__house_single_floor__bar_udatjt_0__hard_candy-yuatcg",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-4/rb__tabletop__house_single_floor__bar_udatjt_0__hard_candy-yuatcg/tabletop__house_single_floor__bar_udatjt_0__hard_candy-yuatcg__07cf8c772d4eb04a"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__hard_candy-yuatcg/tabletop__house_single_floor__bar_udatjt_0__hard_candy-yuatcg__07cf8c772d4eb04a.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.07999999821186066
+    ],
+    "n_reachable_total": 534,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      38,
+      false,
+      128.67,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      57,
+      false,
+      115.69,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      70,
+      false,
+      141.35,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      45,
+      false,
+      96.35,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      62,
+      false,
+      124.48,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      75,
+      false,
+      150.76,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      47,
+      false,
+      75.07,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      62,
+      false,
+      104.52,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      53,
+      false,
+      84.02,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      11,
+      false,
+      51.38,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      14,
+      false,
+      62.79,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 1441.3
+   },
+   "error": null,
+   "pod": "pilot2-l40s-4",
+   "rc": 0,
+   "wall_s": 1453,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__hard_candy-yuatcg__07cf8c772d4eb04a"
    ],
    "current_code": true
   },
@@ -59399,6 +62729,191 @@
    ],
    "current_code": true
   },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__parsnip-invznw": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-7/rb__tabletop__house_single_floor__bar_udatjt_0__parsnip-invznw",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-7/rb__tabletop__house_single_floor__bar_udatjt_0__parsnip-invznw/tabletop__house_single_floor__bar_udatjt_0__parsnip-invznw__0eb42319a95c4576"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__parsnip-invznw/tabletop__house_single_floor__bar_udatjt_0__parsnip-invznw__0eb42319a95c4576.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.07999999821186066
+    ],
+    "n_reachable_total": 533,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      38,
+      false,
+      118.54,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      58,
+      false,
+      96.97,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      71,
+      false,
+      133.52,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      46,
+      false,
+      84.93,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      62,
+      false,
+      119.2,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      74,
+      false,
+      141.22,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      47,
+      false,
+      74.92,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      62,
+      false,
+      104.16,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      49,
+      false,
+      81.71,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      12,
+      false,
+      48.01,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      14,
+      false,
+      59.58,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 1359.9
+   },
+   "error": null,
+   "pod": "pilot2-l40s-7",
+   "rc": 0,
+   "wall_s": 1373,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__parsnip-invznw__0eb42319a95c4576"
+   ],
+   "current_code": true
+  },
   "v2__alignment-axial-magazine-breakfast_table": {
    "dir": "runlogs/runpod/rb/pilot2-l40s-9/v2__alignment-axial-magazine-breakfast_table",
    "files": [],
@@ -64458,6 +67973,561 @@
    "wall_s": 1360,
    "band_files": [
     "tabletop__house_single_floor__bar_udatjt_0__ice_cube-tqsquu__ceb02320af028f47"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__house_single_floor__bar_udatjt_0__pencil-rzscao__scaled": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-9/rb__tabletop__house_single_floor__bar_udatjt_0__pencil-rzscao__scaled",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-9/rb__tabletop__house_single_floor__bar_udatjt_0__pencil-rzscao__scaled/tabletop__house_single_floor__bar_udatjt_0__pencil-rzscao__af481c6bc7d5957d"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__house_single_floor__bar_udatjt_0__pencil-rzscao__scaled/tabletop__house_single_floor__bar_udatjt_0__pencil-rzscao__af481c6bc7d5957d.npz",
+    "union_extent": [
+     -0.800000011920929,
+     0.0
+    ],
+    "n_reachable_total": 303,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      28,
+      false,
+      102.47,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      37,
+      false,
+      72.22,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      45,
+      false,
+      94.41,
+      "ready"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.25,
+      0.0,
+      30,
+      false,
+      57.97,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      39,
+      false,
+      82.77,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      42,
+      false,
+      99.41,
+      "ready"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      0.0,
+      27,
+      false,
+      66.05,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      40,
+      false,
+      89.14,
+      "ready"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.3,
+      15,
+      false,
+      69.86,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      49.04,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      60.55,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 1255.8
+   },
+   "error": null,
+   "pod": "pilot2-l40s-9",
+   "rc": 0,
+   "wall_s": 1272,
+   "band_files": [
+    "tabletop__house_single_floor__bar_udatjt_0__pencil-rzscao__af481c6bc7d5957d"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__office_cubicles_right__desk_mdhelw_1__bar_soap-feqemg__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-9/rb__tabletop__office_cubicles_right__desk_mdhelw_1__bar_soap-feqemg__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-9/rb__tabletop__office_cubicles_right__desk_mdhelw_1__bar_soap-feqemg__placed-tray-gsxbym/tabletop__office_cubicles_right__desk_mdhelw_1__bar_soap-feqemg__placed-tray-gsxbym__42a4c73705447d65"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__office_cubicles_right__desk_mdhelw_1__bar_soap-feqemg__placed-tray-gsxbym/tabletop__office_cubicles_right__desk_mdhelw_1__bar_soap-feqemg__placed-tray-gsxbym__42a4c73705447d65.npz",
+    "union_extent": [
+     -0.1599999964237213,
+     0.0
+    ],
+    "n_reachable_total": 133,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      2,
+      false,
+      29.23,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      7,
+      false,
+      36.92,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      11,
+      false,
+      13.89,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      7,
+      false,
+      10.7,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      6,
+      false,
+      16.25,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      10,
+      false,
+      14.71,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      11,
+      false,
+      14.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      7,
+      false,
+      11.29,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      6,
+      false,
+      11.43,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      11,
+      false,
+      14.04,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      10,
+      false,
+      12.49,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      5,
+      false,
+      10.94,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      6,
+      false,
+      10.75,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      11,
+      false,
+      13.55,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      9,
+      false,
+      12.98,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      5,
+      false,
+      10.06,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      9,
+      false,
+      12.76,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 413.9
+   },
+   "error": null,
+   "pod": "pilot2-l40s-9",
+   "rc": 0,
+   "wall_s": 430,
+   "band_files": [
+    "tabletop__office_cubicles_right__desk_mdhelw_1__bar_soap-feqemg__placed-tray-gsxbym__42a4c73705447d65"
+   ],
+   "current_code": true
+  },
+  "rb__tabletop__office_cubicles_right__desk_mdhelw_1__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-9/rb__tabletop__office_cubicles_right__desk_mdhelw_1__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-9/rb__tabletop__office_cubicles_right__desk_mdhelw_1__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym/tabletop__office_cubicles_right__desk_mdhelw_1__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym__27f0e907313680b0"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__tabletop__office_cubicles_right__desk_mdhelw_1__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym/tabletop__office_cubicles_right__desk_mdhelw_1__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym__27f0e907313680b0.npz",
+    "union_extent": [
+     -0.1599999964237213,
+     0.0
+    ],
+    "n_reachable_total": 99,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      1,
+      false,
+      46.13,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      6,
+      false,
+      29.25,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      9,
+      false,
+      18.99,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      6,
+      false,
+      10.66,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      3,
+      false,
+      16.25,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      9,
+      false,
+      17.21,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      8,
+      false,
+      12.24,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      5,
+      false,
+      11.26,
+      "ready"
+     ],
+     [
+      0.5,
+      0.0,
+      5,
+      false,
+      17.33,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      9,
+      false,
+      19.19,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      8,
+      false,
+      15.96,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      3,
+      false,
+      17.05,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      4,
+      false,
+      10.71,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      9,
+      false,
+      12.49,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      8,
+      false,
+      12.94,
+      "ready"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      0.0,
+      2,
+      false,
+      10.08,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      4,
+      false,
+      11.1,
+      "ready"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ]
+    ],
+    "time_s": 444.8
+   },
+   "error": null,
+   "pod": "pilot2-l40s-9",
+   "rc": 0,
+   "wall_s": 462,
+   "band_files": [
+    "tabletop__office_cubicles_right__desk_mdhelw_1__box_of_sanitary_napkins-acaivd__placed-tray-gsxbym__27f0e907313680b0"
    ],
    "current_code": true
   },
