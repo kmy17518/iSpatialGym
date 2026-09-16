@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 15:11 PDT — 7/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 16:04 PDT — 5/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -126,7 +126,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | camera_relocalization-obstructed | valid demo | tracker corner fix d4a1745 not yet re-demoed | oracle |
 | object_scaling | valid demo | - | - |
 | mental_rotation | valid demo | - | - |
-| disembedding | valid demo | - | - |
+| disembedding | demo run (pre-fix success) | - | - |
 | CM block_design | no instance | DECISION: picks pass now; every remaining failure is the pre-place of the flipped in-hand orientation (no IK at any trunk) — options: goal face up at init (no flips), flip on the table, or 3 blocks no-flip | owner / tabletop |
 | CM attachment | no instance | DECISION: attempts 30–100 s; 902/1694 partner-cell rejections are the A1 brace gate (bands do not overlap) — brace optional for attachment too, or partner only where the bands overlap | owner / tabletop |
 | CM articulation_open_small_scale | no instance | DECISION: hinged jar best focus 24° off the camera axis (cone 20°); 25° admits 42 foci over 3 stand-offs; toolbox yield (lid handle at 85° unreachable) | owner / tabletop |
@@ -136,7 +136,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | alignment-world_vertical | demo run | after the wrist-camera fix: push_unreachable x8 (26dfaab) → large-scale | large-scale |
 | alignment-world_horizontal | demo run | first horizontal instance sampled (15:02); demo plan_failed at push → oracle / large-scale | oracle |
 | alignment-axial | valid demo | - | - |
-| IORS ontop_small_scale | valid demo | - | - |
+| IORS ontop_small_scale | demo run (pre-fix success) | - | - |
 | IORS under_small_scale | demo run (pre-fix success) | sweep: placed_orientation again with the well release (cup still tips) → core: check the landing (well rim vs bottom) / drop height | core |
 | IORS inside | demo run (pre-fix success) | sweep-1 regression: grasp_unreachable x6 'exact IK failed at pose 1 of 2' (the pre-grasp) after the 12:00–14:00 core changes (11:01 run sampled at attempt 0) → core to bisect | core |
 | IORS nextto | demo run (pre-fix success) | sampled; demo lift stalled (diff-IK 5.2 mm at waypoint 7/31, no joint limit) → oracle DLS item, demo-only re-run | oracle |
