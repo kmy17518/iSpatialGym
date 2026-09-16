@@ -268,6 +268,17 @@ def path_collision_free(kit: "RobotKit", poses: Sequence[Tuple[float, float, flo
     return False, int(th.nonzero(~free)[0])
 
 
+def attached_checks_enabled() -> bool:
+    """``ISG_ATTACHED_CHECKS=off`` (development switch, recorded in every summary as ``checks.attached_object``): the
+    carried object is *not* attached for the checks. Exists because the robot model exempts the attached object from
+    self-collision only against the finger links (README "Backend facts"), so with the current backend a grasped object
+    deep in the gripper fails every attached check; the switch lets the rest of the pipeline be exercised until the
+    model is fixed. It is not a sampler fallback: the setting is global, logged and written into the artefacts."""
+    import os
+
+    return os.environ.get("ISG_ATTACHED_CHECKS", "on").lower() not in ("off", "0", "false")
+
+
 class attached:
     """Context manager: the carried object attached to the planner for the checks inside (§3.7 / §3.8 / §3.5).
 
@@ -279,6 +290,8 @@ class attached:
 
     def __init__(self, kit: "RobotKit", arm: Optional[str], obj: Any, eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None):
         self.kit, self.arm, self.obj, self.eef_in_object = kit, arm, obj, eef_in_object
+        if not attached_checks_enabled():
+            self.obj = None
         self._saved = None
 
     def __enter__(self):

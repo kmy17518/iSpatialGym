@@ -471,12 +471,15 @@ class SamplerV2(TaskSampler):
         path = os.path.join(inst_dir, f"{iid}-tro_state.json")
         validate_and_write(tro, self.compiled, path)
         sidecar_path = os.path.join(inst_dir, f"{iid}.oracle.json")
+        if not NAV.attached_checks_enabled():
+            self.sidecar.waypoint_policy = "checked_without_attached_object"
         self.sidecar.finalize(iid, path)
         self.sidecar.write(sidecar_path)
         summary = dict(draft.summary)
         summary.update({"instance_id": iid, "seed": seed, "base_pose2d": list(draft.base_pose2d), "trunk": list(self.kit.trunk_of(draft.robot_q)),
                         "rejections_so_far": dict(self.rejection_log.counts), "sidecar": os.path.basename(sidecar_path),
-                        "stances": {k: v.to_meta() for k, v in self.sidecar.stances.items()}, "sampler_version": SAMPLER_VERSION})
+                        "stances": {k: v.to_meta() for k, v in self.sidecar.stances.items()}, "sampler_version": SAMPLER_VERSION,
+                        "checks": self.check_flags()})
         with open(os.path.join(inst_dir, f"{iid}.summary.json"), "w") as f:
             json.dump(_jsonable(summary), f, indent=2)
         if "stances" not in self.template_meta:
@@ -495,7 +498,14 @@ class SamplerV2(TaskSampler):
         self.template_meta["n_constraints_recorded"] = self.template_meta.get("n_constraints_recorded", 0) + len(out)
         return out
 
+    def check_flags(self) -> Dict[str, Any]:
+        """Which checks ran in full (development switches are recorded, never silent): ``attached_object`` (the carried
+        object attached for lift / carry / place / path / transition checks), ``program_check`` mode."""
+        return {"attached_object": NAV.attached_checks_enabled(),
+                "program_check": (self.last_program_check or {}).get("mode", "expand" if os.environ.get("ISG_PROGRAM_CHECK", "").lower() != "stub" else "stub")}
+
     def write_template_meta(self):
+        self.template_meta["checks"] = self.check_flags()
         self.template_meta["rejections"] = dict(self.rejection_log.counts)
         self.template_meta["rejection_examples"] = {k: list(v) for k, v in self.rejection_log.examples.items()}
         self.template_meta["seeds"] = list(self.instance_seeds)

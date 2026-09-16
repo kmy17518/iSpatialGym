@@ -314,8 +314,10 @@ class IKChecker:
         with the robot in an untucked free-space configuration (the attached spheres vs the palm / wrist, which the
         robot model does not exempt — only the finger links are). A grasp that fails here fails every attached check
         (lift, carry, place) whatever the pose, so task modules drop it from the grasp set once per template."""
-        from ispatialgym.sampling.v2.navigation import attached
+        from ispatialgym.sampling.v2.navigation import attached, attached_checks_enabled
 
+        if not attached_checks_enabled():
+            return True
         q = self.kit.q_at_base_pose(self.kit.q_config(arms="untucked", translate=0.5), *self.kit.world_base_pose2d())
         with attached(self.kit, arm, obj, eef_in_object=eef_in_object):
             self.kit._ensure_synced()
