@@ -370,26 +370,29 @@ class BlockDesign(SamplerV2):
             bonus = 0.05 if (self.left_bands is not None and self._anchor_braces_in_left_band(xy, manip, right, toward)) else 0.0
             return (0 if on_band else 1, abs(float(b[1]) - GRID_LATERAL_PREFERRED) + 0.5 * abs(float(b[0]) - REGION_DEPTH_PREFERRED) - bonus)
 
-        anchor_xy = min(cells, key=arm_score)
-        chosen.append(anchor_xy)
-        s_anchor = img_score(anchor_xy)
-        b_anchor = manip.world_to_base(th.stack(grid_cells(anchor_xy)).mean(dim=0))
-        log.info("%s: goal grid anchored at base (%.2f, %+.2f) (score %s)", self.gp.alias, float(b_anchor[0]), float(b_anchor[1]), arm_score(anchor_xy))
-        # the other blocks: cells right of / nearer than the preferred anchor first (it stays the top-left block in the init
-        # image), then the rest of the window, then the whole region (the anchor is re-derived as the top-left of the final
-        # set below; 21:37 first-demo run: the window + top-left filter alone left 2 of 4 cells -> 'layout' x8)
-        tiers = [[xy for xy in cells if xy is not anchor_xy and img_score(xy) > s_anchor], [xy for xy in cells if xy is not anchor_xy],
-                 [xy for xy in region_all if all(xy is not c for c in chosen)]]
-        for tier in tiers:
-            for xy in tier:
+        # the anchor must be the top-left block of the final set (its position stays, the goal grid hangs from it): try the
+        # cells in arm-score order and keep the first whose n-1 companions all lie right of / nearer than it (img_score) at
+        # >= edge*sqrt(2) + gap; the whole region as a last resort (blk_pre5 23:37: filling from farther cells made a far
+        # block the top-left anchor and put the goal grid at 0.80 m base-forward, beyond every place)
+        ranked = sorted(cells, key=arm_score)
+        for anchor_xy in ranked:
+            s_anchor = img_score(anchor_xy)
+            chosen = [anchor_xy]
+            for pool in ([xy for xy in cells if xy is not anchor_xy and img_score(xy) > s_anchor],
+                         [xy for xy in region_all if img_score(xy) > s_anchor and all(xy is not c for c in chosen)]):
+                for xy in pool:
+                    if len(chosen) == n:
+                        break
+                    if all(float(th.linalg.norm(xy - c)) >= self.edge * math.sqrt(2) + gap for c in chosen):
+                        chosen.append(xy)
                 if len(chosen) == n:
                     break
-                if all(float(th.linalg.norm(xy - c)) >= self.edge * math.sqrt(2) + gap for c in chosen):
-                    chosen.append(xy)
             if len(chosen) == n:
                 break
         if len(chosen) < n:
-            raise Reject("layout", f"only {len(chosen)} of {n} region cells keep >= {gap} m gaps")
+            raise Reject("layout", f"only {len(chosen)} of {n} region cells keep >= {gap} m gaps right of / nearer than an anchor")
+        b_anchor = manip.world_to_base(th.stack(grid_cells(chosen[0])).mean(dim=0))
+        log.info("%s: goal grid anchored at base (%.2f, %+.2f) (score %s)", self.gp.alias, float(b_anchor[0]), float(b_anchor[1]), arm_score(chosen[0]))
         # --- anchor (top-left in the init image) and slot assignment -----------------------------------------------
         score = [img_score(c) for c in chosen]
         order_img = sorted(range(n), key=lambda i: score[i])  # image order (top-left first)
