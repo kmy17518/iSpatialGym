@@ -32,12 +32,12 @@
   "owner": "-"
  },
  "configuration_matching-block_design": {
-  "blocking": "DECISION D-006: last block cannot be pinched into 1 mm gaps (finger-clearance gate 4c66d53a) \u2014 6 mm gaps / oracle push-only tail / 3 blocks; default A 21:00. Pre-pose reach fixed (3a7db49c); flip-on-table prep 0ec0153d behind block_table_flip",
-  "owner": "owner (D-006) / tabletop"
+  "blocking": "D-006 default A applied 21:17 (block_gap_m 0.006, 8c2a2bc) \u2014 loop runs next tick; flip-on-table prep 0ec0153d (sampler) + 0ee927f6 (program) behind switches",
+  "owner": "loop / tabletop"
  },
  "configuration_matching-attachment": {
-  "blocking": "second base pose (58afae2) + brace faces near/left/far (bd30c0cf) + oracle program travels the recorded stance, brace optional (6baaaa3b) \u2014 scheduler re-run due",
-  "owner": "loop / tabletop"
+  "blocking": "program travels the recorded attach stance (6baaaa3), PROGRAM_BLOCKS brace optional; re-run 0916-205838 in flight",
+  "owner": "loop"
  },
  "configuration_matching-articulation_open_small_scale": {
   "blocking": "25\u00b0 cone landed (aea6bd0a): Phase 2 survives; now contact_unreachable at the brace pre-contact (no brace face + handle grasp passes the two-arm IK) \u2192 tabletop (more brace faces / recorded stance; else brace-optional decision)",
@@ -72,20 +72,20 @@
   "owner": "-"
  },
  "inter_object_relation_satisfaction-under_small_scale": {
-  "blocking": "DECISION D-007: physically correct placement (1.4 mm, 2.7\u00b0) but OmniGibson Under never registered (passed 18:41 with the same geometry) \u2014 robust evaluator / pose-target fallback / re-run; default A 21:15. Core 1ba5e74 (open-pad support clearance) re-run queued",
-  "owner": "owner (D-007) / loop"
+  "blocking": "D-007 default A applied 21:17: robust Under evaluator \u2192 core; teacup placements are physically correct (1.4 mm, 2.7\u00b0)",
+  "owner": "core"
  },
  "inter_object_relation_satisfaction-inside": {
   "blocking": "valid on f5ae607; re-opened by the core's targeted 1ba5e74 (open pads clear of the support: the failing sprout grasp had its fingertip at the table) \u2014 re-run queued",
   "owner": "loop"
  },
  "inter_object_relation_satisfaction-nextto": {
-  "blocking": "oracle 166005ff FOV rule (b) + straight carry leg: 0 out-of-frame steps, 0.029 rad; pencil sweep at release \u2192 core 385de1e on new instances; scheduler re-run on HEAD pending; closure ramp (oracle-B) pending",
-  "owner": "loop"
+  "blocking": "closure ramp + pre-shape (bcc937d): 0.386 \u2192 0.038 rad; the release still flings the pencil (blocked lower pad snaps open in the retreat) \u2192 oracle-B staged / rate-limited release; gate = placed_orientation with cylinder equivalences (38258f0)",
+  "owner": "oracle-B"
  },
  "inter_object_relation_satisfaction-touching": {
-  "blocking": "first instance 20:21 demo plan_failed at grasp \u2192 primary oracle; carried-box descent collision = genuine (box vs forearm/torso) \u2192 core tries the next grasp yaw",
-  "owner": "oracle / core"
+  "blocking": "first two instances written (push-only program 0a81f739); 0916-202403 executed the whole chain, not_reached: the recorded 18 mm push left the boxes 2.3 cm apart (sampler push length vs gap \u2192 core; residual cap \u2192 primary oracle); pre-grasp joint jump \u2192 primary oracle",
+  "owner": "core / oracle"
  },
  "inter_object_relation_satisfaction-ontop_large_scale": {
   "blocking": "countertop pair = geometric yield (partner behind stance A) \u2192 floor fallback alias queued (local); sofa-bar re-run with the B\u2192C path limit geodesic+3 m (4df6d0a) running locally",
