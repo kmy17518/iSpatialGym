@@ -975,6 +975,95 @@ def test_touching_is_push_only_without_a_brace_record():
     assert any("placed target" in p for p in problems), problems
 
 
+def test_attachment_second_base_pose_is_travelled_while_holding():
+    """Owner decision 2026-09-16 17:10 item 2 (spec §6.8; tabletop ``58afae2``, core ``bd10c72``): when the attach pose
+    and the brace are not both reachable from the grasp stance the sidecar records an ``attach`` stance reached with the
+    male part in hand (``paths[] carried`` + ``transitions[] holding``, ``grasps[0].attach_stance`` / ``lift``). The
+    program drives that move after the lift (navigate + transition, the held object in ``objects``), then reorients from
+    the carried lift, braces, attaches and retreats both; the 19:06 run rejected every attempt in the program check."""
+    st = "configuration_matching-attachment"
+    with open(os.path.join(VARIANTS, f"{st}__second_base_pose.json")) as f:
+        d = json.load(f)
+    sc = Sidecar.from_dict(d)
+    assert sc.problems() == [] and sc.validate() is sc
+    assert sc.transition("manipulation", "attach").holding == "cap.n.02_1" and sc.path("manipulation", "attach").carried == "cap.n.02_1"
+    actions = expand(sc.alias, sc)
+    assert [a.name for a in actions] == _TABLE_IN + _PICK + ["navigate", "transition", "reorient", "brace", "place", "retreat", "retreat"]
+    nav, tr, reo, br = actions[3], actions[4], actions[5], actions[6]
+    assert nav.path.to == "attach" and nav.objects == ("cap.n.02_1",)
+    assert tr.transition.to == "attach" and tr.carried == "cap.n.02_1" and tr.objects == ("cap.n.02_1",)
+    assert tr.stance_to is sc.stance("attach") and tr.stance_from is sc.stance("manipulation")
+    fine, numbers = tr.annotate(sc)
+    assert "with the bottle cap" in fine and "with the bottle cap" in numbers
+    # the reorient starts from the sampler's carried lift (grasps[0].lift at the grasp orientation), not from the unshifted lift
+    assert reo.mode == "slerp" and reo.after is None and reo.start_pose is not None
+    assert reo.start_pose.position == d["grasps"][0]["lift"] and reo.start_pose.orientation == d["grasps"][0]["grasp"]["orientation"]
+    assert reo.waypoints[-1].position == d["grasps"][0]["pre_place"]["position"]
+    # the brace / place annotate from the attach stance (its yaw); both arms retreat, the brace arm releases
+    assert br.arms == ("left",) and br.objects == ("lemonade_bottle.n.01_1",)
+    assert actions[-2].arm == "right" and actions[-1].arm == "left" and actions[-1].release is True
+    if HAVE_CONVENTIONS:
+        tg = reo.targets(sc, StubState())
+        assert len(tg["waypoints"]) == len(d["grasps"][0]["waypoints"]) and len(tg["derived"]) == reo.n
+        assert _close(tg["derived"][-1].position, tg["waypoints"][-1].position)
+        first = tg["derived"][0].position
+        # the derived line starts at the carried lift: its first point lies between the carried lift and the pre-attach
+        for i in range(3):
+            lo, hi = sorted([d["grasps"][0]["lift"][i], d["grasps"][0]["pre_place"]["position"][i]])
+            assert lo - 1e-6 <= first[i] <= hi + 1e-6
+    # without the sampler's lift record the carried lift is the recorded grasp + carry_height moved with the base
+    d2 = copy.deepcopy(d)
+    d2["grasps"][0].pop("lift")
+    reo2 = [a for a in expand(sc.alias, Sidecar.from_dict(d2)) if a.name == "reorient"][0]
+    assert _close(reo2.start_pose.position, d["grasps"][0]["lift"], tol=1e-6)
+    # a transition swept with another object in hand, or with the object the program does not carry, is rejected
+    d3 = copy.deepcopy(d)
+    d3["transitions"][1]["holding"] = "lemonade_bottle.n.01_1"
+    problems = Sidecar.from_dict(d3).problems()
+    assert any("recorded holding='lemonade_bottle.n.01_1'" in p for p in problems), problems
+    d4 = copy.deepcopy(d)
+    d4["transitions"][0]["holding"] = "cap.n.02_1"  # init -> manipulation: nothing is in the hand yet
+    problems = Sidecar.from_dict(d4).problems()
+    assert any("transitions 'init' -> 'manipulation'" in p and "carries None" in p for p in problems), problems
+    # an attach stance that is neither recorded nor reachable is rejected
+    d5 = copy.deepcopy(d)
+    d5["grasps"][0]["attach_stance"] = "placement"
+    assert any("not recorded" in p for p in Sidecar.from_dict(d5).problems())
+    d6 = copy.deepcopy(d)
+    d6["paths"], d6["transitions"] = [], d6["transitions"][:1]
+    assert any("no transition is recorded" in p or "neither a recorded path nor a transition" in p for p in Sidecar.from_dict(d6).problems())
+    d7 = copy.deepcopy(d6)
+    d7["stances"]["attach"]["translate"], d7["stances"]["attach"]["tilt"] = d["stances"]["manipulation"]["translate"], d["stances"]["manipulation"]["tilt"]
+    assert any("neither a path nor a transition" in p for p in Sidecar.from_dict(d7).problems())
+    # the base fixture (attach from the grasp stance) keeps its sequence
+    base = load(st)
+    assert [a.name for a in expand(base.alias, base)] == EXPECTED_SEQUENCE[st]
+
+
+def test_attachment_without_a_brace_record_is_a_one_arm_attach():
+    """Owner decision 2026-09-16 17:10 item 2: only when the joint placement has no cell after the second base pose is
+    the attachment brace-less (``summary.brace: none``); the program is then grasp → lift → reorient → attach → retreat
+    and ``contacts.brace`` is optional (the 19:06 run failed ``check_blocks`` on it)."""
+    st = "configuration_matching-attachment"
+    assert "contacts.brace" not in REQUIRED_BLOCKS[st] and "grasps" in REQUIRED_BLOCKS[st]
+    with open(os.path.join(VARIANTS, f"{st}__brace_less.json")) as f:
+        d = json.load(f)
+    assert "contacts" not in d and d["summary"]["brace"] == "none"
+    sc = Sidecar.from_dict(d)
+    assert sc.problems() == [] and sc.validate() is sc and not sc.has_block("contacts.brace")
+    actions = expand(sc.alias, sc)
+    assert [a.name for a in actions] == _TABLE_IN + _PICK + ["reorient", "place", "retreat"]
+    assert actions[-2].kind == "attach" and actions[-2].on == "lemonade_bottle.n.01_1" and actions[-1].arm == "right"
+    assert all(a.arms == ("right",) for a in actions[1:])
+    # a brace on the wrong arm / object is still rejected when recorded
+    d2 = copy.deepcopy(raw(st))
+    d2["contacts"]["brace"]["arm"] = "right"
+    assert any("must use the other" in p or "same arm" in p for p in Sidecar.from_dict(d2).problems())
+    d3 = copy.deepcopy(raw(st))
+    d3["contacts"]["brace"]["object"] = "cap.n.02_1"
+    assert any("attachment partner" in p for p in Sidecar.from_dict(d3).problems())
+
+
 
 @pytest.mark.parametrize(
     "subtask,mutate,match",

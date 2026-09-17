@@ -38,7 +38,8 @@ PROGRAM_BLOCKS: Dict[str, Tuple[str, ...]] = {
     "configuration_matching-block_design": ("stances.init", "stances.manipulation", "transitions", "blocks"),
     "configuration_matching-articulation_large_scale": ("stances.init", "stances.manipulation", "articulation"),
     "configuration_matching-articulation_small_scale": ("stances.init", "stances.manipulation", "articulation"),
-    "configuration_matching-attachment": ("stances.init", "stances.manipulation", "transitions", "grasps", "contacts.brace"),
+    # brace optional only without a joint cell after the second base pose (owner 2026-09-16 17:10 item 2; oracle program_attachment)
+    "configuration_matching-attachment": ("stances.init", "stances.manipulation", "transitions", "grasps"),
     "alignment-world_vertical": ("stances.init", "stances.manipulation", "contacts.push", "contacts.brace"),
     "alignment-world_horizontal": ("stances.init", "stances.manipulation", "contacts.push", "contacts.brace"),
     "alignment-axial": ("stances.init", "stances.manipulation", "transitions", "contacts.push"),  # brace optional (owner 2026-09-16 08:10; F6 9b03aa4)

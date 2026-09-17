@@ -1,0 +1,198 @@
+{
+  "schema": "isg-oracle-v1",
+  "instance_id": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table__house_single_floor__target-cap-xxqyrt__partner-lemonade_bottle-yprkek__0000",
+  "tro_sha256": "c0a7dcc9cd822c65e67c5c8ff4cdfab0eb9730825ddc1c4c38e09fc2be844702",
+  "task_family": "configuration_matching",
+  "alias": "configuration_matching-attachment-cap-lemonade_bottle-breakfast_table",
+  "path_bucket_m": null,
+  "stances": {
+    "init": {
+      "base_pose2d": [
+        7.0,
+        2.4545,
+        1.5708
+      ],
+      "translate": 0.5,
+      "tilt": 0.0,
+      "arms": "untucked",
+      "stand_off": 0.45,
+      "edge": "-v"
+    },
+    "manipulation": {
+      "base_pose2d": [
+        7.0,
+        2.5545,
+        1.5708
+      ],
+      "translate": 0.75,
+      "tilt": -0.45,
+      "stand_off": 0.35,
+      "lateral": -0.295,
+      "focus": [
+        7.0,
+        3.1045,
+        0.813
+      ],
+      "arms": [
+        "right"
+      ],
+      "edge": "-v"
+    }
+  },
+  "transitions": [
+    {
+      "from": "init",
+      "to": "manipulation",
+      "stand_off": 0.55,
+      "order": [
+        "drive-back",
+        "trunk",
+        "drive-in"
+      ]
+    }
+  ],
+  "grasps": [
+    {
+      "object": "cap.n.02_1",
+      "arm": "right",
+      "grasp_key": "cap__xxqyrt",
+      "grasp_name": "grasp_1",
+      "yaw": 0.6,
+      "pre_grasp": {
+        "position": [
+          6.93,
+          3.1,
+          0.931
+        ],
+        "orientation": [
+          0.955337,
+          0.29552,
+          0.0,
+          0.0
+        ]
+      },
+      "grasp": {
+        "position": [
+          6.93,
+          3.1,
+          0.831
+        ],
+        "orientation": [
+          0.955337,
+          0.29552,
+          0.0,
+          0.0
+        ]
+      },
+      "pre_place": {
+        "position": [
+          7.08,
+          3.14,
+          1.148
+        ],
+        "orientation": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "place": {
+        "position": [
+          7.08,
+          3.14,
+          1.048
+        ],
+        "orientation": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "carry_height": 0.12,
+      "waypoints": [
+        {
+          "position": [
+            6.9675,
+            3.11,
+            1.0002
+          ],
+          "orientation": [
+            0.974794,
+            0.223106,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "position": [
+            7.005,
+            3.12,
+            1.0495
+          ],
+          "orientation": [
+            0.988771,
+            0.149438,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "position": [
+            7.0425,
+            3.13,
+            1.0987
+          ],
+          "orientation": [
+            0.997189,
+            0.07493,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "position": [
+            7.08,
+            3.14,
+            1.148
+          ],
+          "orientation": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      ],
+      "place_on": "lemonade_bottle.n.01_1",
+      "insertion_axis": [
+        0.0,
+        0.0,
+        -1.0
+      ]
+    }
+  ],
+  "language": {
+    "objects": {
+      "cap.n.02_1": {
+        "display_name": "cap",
+        "descriptor": "the bottle cap"
+      },
+      "lemonade_bottle.n.01_1": {
+        "display_name": "lemonade bottle",
+        "descriptor": "the lemonade bottle"
+      }
+    },
+    "goal_numbers": {
+      "insertion_cm": 10.0
+    }
+  },
+  "waypoint_policy": "checked",
+  "summary": {
+    "brace": "none",
+    "brace_class": null,
+    "attach_stance": "manipulation",
+    "second_base_pose": false
+  }
+}

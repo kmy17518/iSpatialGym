@@ -59,7 +59,10 @@ REQUIRED_BLOCKS: Dict[str, Tuple[str, ...]] = {
     "configuration_matching-articulation_close_large_scale": _TABLE + ("articulation",),
     "configuration_matching-articulation_open_small_scale": _TABLE + ("articulation", "contacts.brace"),
     "configuration_matching-articulation_close_small_scale": _TABLE + ("articulation", "contacts.brace"),
-    "configuration_matching-attachment": _TABLE + ("grasps", "contacts.brace"),
+    # attachment keeps the brace (owner 2026-09-16 17:10 item 2): the sampler records it from the grasp stance or from a
+    # second base pose (``stances.attach`` + a carried path / holding transition); only when the joint placement has no
+    # cell after that is the instance brace-less (``summary.brace: none``), so ``contacts.brace`` is optional here
+    "configuration_matching-attachment": _TABLE + ("grasps",),
     "alignment-world_vertical": _TABLE + ("contacts.push", "contacts.brace"),
     "alignment-world_horizontal": _TABLE + ("contacts.push", "contacts.brace"),
     # axial is push-only (owner decision 2026-09-16 08:10): ``contacts.brace`` is recorded only when the joint two-arm
@@ -263,7 +266,12 @@ class Stance:
 @dataclass
 class Transition:
     """A stance transition (spec §3.8): drive back to ``stand_off`` (s_T, along −n from the arriving stance), move
-    the trunk, drive in."""
+    the trunk, drive in.
+
+    Beyond spec §7: ``holding`` (in ``extra``; core ``bd10c72`` / tabletop ``58afae2``) — the bddl instance carried
+    through the transition (attachment's second base pose between the grasp and the attach, spec §6.8: the sampler swept
+    the drive-back / trunk / drive-in with the male part attached to the frozen arm). A program that travels this
+    transition must carry exactly that object (``programs._travel``)."""
 
     frm: str
     to: str
@@ -272,6 +280,12 @@ class Transition:
     extra: Dict[str, Any] = field(default_factory=dict)
 
     KNOWN = ("from", "to", "stand_off", "order")
+
+    @property
+    def holding(self) -> Optional[str]:
+        """The bddl instance carried through the transition (``None`` = nothing recorded)."""
+        v = self.extra.get("holding")
+        return v if isinstance(v, str) and v else None
 
     @classmethod
     def from_dict(cls, d: Any, where: str) -> "Transition":

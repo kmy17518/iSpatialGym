@@ -26,6 +26,7 @@ small-scale programs, the two wall alignments share ``program_alignment_wall``, 
 
 from __future__ import annotations
 
+import math
 from typing import Callable, Dict, List, Optional, Tuple
 
 from ispatialgym.oracle.actions import (
@@ -44,7 +45,7 @@ from ispatialgym.oracle.actions import (
     Transition,
     block_reorients,
 )
-from ispatialgym.oracle.sidecar import ARMS, GraspRecord, Sidecar, SidecarError, subtask_of_alias
+from ispatialgym.oracle.sidecar import ARMS, GraspRecord, Pose, Sidecar, SidecarError, subtask_of_alias
 
 # ----------------------------------------------------------------------------------------------------------------
 # Shared pieces
@@ -56,7 +57,12 @@ def _other_arm(arm: str) -> str:
 
 
 def _travel(sc: Sidecar, frm: str, to: str, carried: Optional[str] = None) -> List[Action]:
-    """``Navigate`` (recorded path) and / or ``Transition`` (recorded transition) from stance ``frm`` to ``to``."""
+    """``Navigate`` (recorded path) and / or ``Transition`` (recorded transition) from stance ``frm`` to ``to``.
+
+    ``carried`` = the bddl instance in the hand during the travel: a recorded path must carry exactly it
+    (``paths[].carried``) and a recorded transition that names what it was swept with (``transitions[].holding``,
+    core ``bd10c72``) must name it too — the sampler validated the drive-back / trunk / drive-in with that object
+    attached to the frozen arm, the oracle drives it with the arms as they are (no re-planning of the stance)."""
     s_from, s_to = sc.stance(frm), sc.stance(to)
     path, transition = sc.path(frm, to), sc.transition(frm, to)
     actions: List[Action] = []
@@ -65,6 +71,8 @@ def _travel(sc: Sidecar, frm: str, to: str, carried: Optional[str] = None) -> Li
             raise SidecarError(f"paths {frm!r} -> {to!r}: recorded carried={path.carried!r}, the program carries {carried!r}")
         actions.append(Navigate(path=path, objects=(carried,) if carried else ()))
     if transition is not None:
+        if transition.holding is not None and transition.holding != carried:
+            raise SidecarError(f"transitions {frm!r} -> {to!r}: recorded holding={transition.holding!r}, the program carries {carried!r}")
         actions.append(Transition(transition=transition, stance_from=s_from, stance_to=s_to, carried=carried, objects=(carried,) if carried else ()))
     trunk_differs = abs(s_from.translate - s_to.translate) > 1e-6 or abs(s_from.tilt - s_to.tilt) > 1e-6
     base_differs = any(abs(a - b) > 1e-6 for a, b in zip(s_from.base_pose2d, s_to.base_pose2d))
@@ -265,26 +273,88 @@ def program_articulation_small(sc: Sidecar, direction: str = "move") -> List[Act
     ]
 
 
+def _attach_stance(sc: Sidecar, g: GraspRecord) -> str:
+    """The stance the attach (and the brace) were solved from: ``grasps[0].attach_stance`` (tabletop ``58afae2``), else
+    the recorded ``attach`` stance, else the grasp stance."""
+    name = g.extra.get("attach_stance")
+    if name is None:
+        name = "attach" if "attach" in sc.stances else "manipulation"
+    if not isinstance(name, str) or name not in sc.stances:
+        raise SidecarError(f"grasps[0].attach_stance: stance {name!r} is not recorded")
+    return str(name)
+
+
+def _carried_lift_pose(sc: Sidecar, g: GraspRecord, frm: str, to: str) -> Pose:
+    """Where the lifted grasp sits after the base moved from stance ``frm`` to ``to`` with the arm frozen: the sampler's
+    own record (``grasps[0].lift``, the shifted lift the SLERP waypoints start from), else the recorded grasp pose
+    lifted by ``carry_height`` and carried along the base motion (the same eef pose in the base frame)."""
+    rec = g.extra.get("lift")
+    if isinstance(rec, (list, tuple)) and len(rec) == 3:
+        return Pose([float(v) for v in rec], list(g.grasp.orientation))
+    end = g.grasp.translated([0.0, 0.0, float(g.carry_height)])
+    (x0, y0, yaw0), (x1, y1, yaw1) = sc.stance(frm).base_pose2d, sc.stance(to).base_pose2d
+    c, s = math.cos(yaw0), math.sin(yaw0)
+    dx, dy = end.position[0] - x0, end.position[1] - y0
+    bx, by = c * dx + s * dy, -s * dx + c * dy  # the eef in the departing base frame
+    c1, s1 = math.cos(yaw1), math.sin(yaw1)
+    pos = [x1 + c1 * bx - s1 * by, y1 + s1 * bx + c1 * by, end.position[2]]
+    dyaw = yaw1 - yaw0
+    if abs(dyaw) > 1e-9:
+        half = 0.5 * dyaw
+        qz = [0.0, 0.0, math.sin(half), math.cos(half)]
+        x, y, z, w = end.orientation
+        quat = [
+            qz[3] * x + qz[0] * w + qz[1] * z - qz[2] * y,
+            qz[3] * y - qz[0] * z + qz[1] * w + qz[2] * x,
+            qz[3] * z + qz[0] * y - qz[1] * x + qz[2] * w,
+            qz[3] * w - qz[0] * x - qz[1] * y - qz[2] * z,
+        ]
+    else:
+        quat = list(end.orientation)
+    return Pose(pos, quat)
+
+
 def program_attachment(sc: Sidecar) -> List[Action]:
-    """init → manipulation stance → grasp the target → lift → reorient_in_hand toward the attach orientation while
-    moving to the pre-attach pose (recorded SLERP waypoints, end = pre-attach 10 cm back along the female insertion
-    axis) → brace the partner on its face opposite to the insertion with the other gripper → insert along the axis
-    until attached → release → retreat both."""
+    """init → manipulation stance → grasp the target → lift → [the recorded second base pose: navigate / transition to the
+    ``attach`` stance with the male part in hand] → reorient_in_hand toward the attach orientation while moving to the
+    pre-attach pose (recorded SLERP waypoints, end = pre-attach 10 cm back along the female insertion axis) → [brace
+    the partner on its face opposite to the insertion with the other gripper] → insert along the axis until attached →
+    release → retreat (both, when braced).
+
+    Owner decision 2026-09-16 17:10 item 2 (spec §6.8): **attachment keeps the brace**. When the attach pose and the
+    brace are not both reachable from the grasp stance the sampler records a **second base pose** (tabletop ``58afae2``:
+    ``stances.attach`` = lateral trunk move + torso adjust, ``paths[] manipulation -> attach`` with ``carried`` = the
+    male part and / or ``transitions[]`` with ``holding`` = the male part, ``grasps[0].attach_stance``, the SLERP
+    waypoints from the carried lift ``grasps[0].lift``); the oracle drives the recorded move with the held object in
+    the collision world and the arms frozen at their joints (no re-planning of the stance) and reorients / braces /
+    attaches from there. Only when the joint placement has no cell after that is the instance brace-less
+    (``summary.brace: none``): one-arm attach, no brace leg."""
     g = _single_grasp(sc, "pre_grasp", "carry_height", "waypoints", "pre_place", "place", "place_on")
-    brace = _brace_contact(sc)
-    if brace.arm != _other_arm(g.arm):
-        raise SidecarError(f"contacts.brace.arm: the target is grasped with the {g.arm} arm, the brace must use the other")
-    if brace.object != g.place_on:
-        raise SidecarError("contacts.brace.object: the brace must hold the attachment partner (grasps[0].place_on)")
-    base_yaw = sc.stance("manipulation").base_pose2d[2]
+    brace = sc.contacts.brace if sc.contacts is not None else None
+    if brace is not None:
+        if brace.arm != _other_arm(g.arm):
+            raise SidecarError(f"contacts.brace.arm: the target is grasped with the {g.arm} arm, the brace must use the other")
+        if brace.object != g.place_on:
+            raise SidecarError("contacts.brace.object: the brace must hold the attachment partner (grasps[0].place_on)")
+    work = _attach_stance(sc, g)
     grasp, lift = _pick(g)
-    reorient = Reorient(mode="slerp", arm=g.arm, object=g.object, after=lift, waypoints=g.waypoints)
-    b = Brace(contact=brace, base_yaw=base_yaw)
+    actions = _travel(sc, "init", "manipulation") + [grasp, lift]
+    if work != "manipulation":
+        travel = _travel(sc, "manipulation", work, carried=g.object)
+        if not travel:
+            raise SidecarError(f"attachment: the attach stance {work!r} is reached by neither a recorded path nor a transition from 'manipulation'")
+        actions += travel
+        start = _carried_lift_pose(sc, g, "manipulation", work)
+        reorient = Reorient(mode="slerp", arm=g.arm, object=g.object, start_pose=start, waypoints=g.waypoints)
+    else:
+        reorient = Reorient(mode="slerp", arm=g.arm, object=g.object, after=lift, waypoints=g.waypoints)
+    base_yaw = sc.stance(work).base_pose2d[2]
     place = Place(kind="attach", arm=g.arm, object=g.object, place=g.place, pre_place=g.pre_place, on=g.place_on)
-    return _travel(sc, "init", "manipulation") + [
-        grasp,
-        lift,
-        reorient,
+    actions.append(reorient)
+    if brace is None:
+        return actions + [place, Retreat(arm=g.arm, object=g.object, after=place, distance=RETREAT_LITTLE)]
+    b = Brace(contact=brace, base_yaw=base_yaw)
+    return actions + [
         b,
         place,
         Retreat(arm=g.arm, object=g.object, after=place, distance=RETREAT_LITTLE),
