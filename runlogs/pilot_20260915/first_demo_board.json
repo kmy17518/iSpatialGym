@@ -75,8 +75,8 @@
   "last_change": "2026-09-16 04:37 PDT"
  },
  "inter_object_relation_satisfaction-under_small_scale": {
-  "blocking": "held (owner 16:40): re-run when the core's release/settle change lands (placed_orientation honest today)",
-  "owner": "core"
+  "blocking": "core 6307dd7: the cup rotated in the hand at the grasp (grasp_3 closing axis 28\u00b0 off horizontal) \u2192 flush pinches only + release at half the well depth; loop running (17:24)",
+  "owner": "core / loop"
  },
  "inter_object_relation_satisfaction-inside": {
   "blocking": "-",
