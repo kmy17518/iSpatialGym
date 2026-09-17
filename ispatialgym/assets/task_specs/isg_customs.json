@@ -18629,7 +18629,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 = A (chat 2026-09-16 22:02): brace optional for small articulation - contacts.brace only with a joint two-arm cell (hinged jar: none), else handle-only with the articulate closure"
   },
   "constraints": []
  },
@@ -18739,7 +18741,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 = A (chat 2026-09-16 22:02): brace optional for small articulation - contacts.brace only with a joint two-arm cell (hinged jar: none), else handle-only with the articulate closure"
   },
   "constraints": []
  },
@@ -18849,7 +18853,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 = A (chat 2026-09-16 22:02): brace optional for small articulation - contacts.brace only with a joint two-arm cell (hinged jar: none), else handle-only with the articulate closure"
   },
   "constraints": []
  },
@@ -18964,7 +18970,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 = A (chat 2026-09-16 22:02): brace optional for small articulation - contacts.brace only with a joint two-arm cell (hinged jar: none), else handle-only with the articulate closure"
   },
   "constraints": []
  },
@@ -19079,7 +19087,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 = A (chat 2026-09-16 22:02): brace optional for small articulation - contacts.brace only with a joint two-arm cell (hinged jar: none), else handle-only with the articulate closure"
   },
   "constraints": []
  },
@@ -19194,7 +19204,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 = A (chat 2026-09-16 22:02): brace optional for small articulation - contacts.brace only with a joint two-arm cell (hinged jar: none), else handle-only with the articulate closure"
   },
   "constraints": []
  },
@@ -21619,7 +21631,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 = A (chat 2026-09-16 22:02): brace optional for small articulation - contacts.brace only with a joint two-arm cell (hinged jar: none), else handle-only with the articulate closure"
   },
   "constraints": []
  },
@@ -21729,7 +21743,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 = A (chat 2026-09-16 22:02): brace optional for small articulation - contacts.brace only with a joint two-arm cell (hinged jar: none), else handle-only with the articulate closure"
   },
   "constraints": []
  },
@@ -21839,7 +21855,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 = A (chat 2026-09-16 22:02): brace optional for small articulation - contacts.brace only with a joint two-arm cell (hinged jar: none), else handle-only with the articulate closure"
   },
   "constraints": []
  },
@@ -21954,7 +21972,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 = A (chat 2026-09-16 22:02): brace optional for small articulation - contacts.brace only with a joint two-arm cell (hinged jar: none), else handle-only with the articulate closure"
   },
   "constraints": []
  },
@@ -22069,7 +22089,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 = A (chat 2026-09-16 22:02): brace optional for small articulation - contacts.brace only with a joint two-arm cell (hinged jar: none), else handle-only with the articulate closure"
   },
   "constraints": []
  },
@@ -22184,7 +22206,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 = A (chat 2026-09-16 22:02): brace optional for small articulation - contacts.brace only with a joint two-arm cell (hinged jar: none), else handle-only with the articulate closure"
   },
   "constraints": []
  },
