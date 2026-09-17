@@ -172,10 +172,10 @@
    ],
    "status": "answered",
    "answered_by": "chat",
-   "answer": "A - brace optional for small articulation (open + close): contacts.brace only when a joint cell exists, else handle-only with the oracle's articulate closure (as axial / touching)",
-   "applied_commit": null,
+   "answer": "A - brace optional for small articulation: sampler switch ac8992de flipped on the hinged_jar aliases, oracle program 59f6426f",
+   "applied_commit": "e5fbced3",
    "thread_ts": null,
-   "answered_at": "2026-09-16 22:02 PDT",
+   "answered_at": "2026-09-16 22:15 PDT",
    "channel": "chat (Slack paused 21:53)"
   },
   {

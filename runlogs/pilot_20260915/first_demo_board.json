@@ -36,16 +36,16 @@
   "owner": "loop / tabletop"
  },
  "configuration_matching-attachment": {
-  "blocking": "program travels the recorded attach stance (6baaaa3), PROGRAM_BLOCKS brace optional; re-run 0916-205838 in flight",
-  "owner": "loop"
+  "blocking": "re-run 0916-205838: each attempt burns the 360 s budget in the second-base-pose search \u2014 the SLERP's first waypoint (carried lift, 0.70\u20130.82 m base-forward) fails IK from the attach stance \u2192 tabletop: start the SLERP from a carried pose reachable at the attach stance / choose stances where the lift is reachable (D-009 B class-1 admission helps)",
+  "owner": "tabletop"
  },
  "configuration_matching-articulation_open_small_scale": {
-  "blocking": "25\u00b0 cone landed (aea6bd0a): Phase 2 survives; now contact_unreachable at the brace pre-contact (no brace face + handle grasp passes the two-arm IK) \u2192 tabletop (more brace faces / recorded stance; else brace-optional decision)",
-  "owner": "tabletop"
+  "blocking": "D-008 A applied (e5fbced: brace_optional on the hinged_jar aliases; program 59f6426f) \u2014 handle-only loop runs next tick",
+  "owner": "loop"
  },
  "configuration_matching-articulation_close_small_scale": {
   "blocking": "same as open",
-  "owner": "tabletop"
+  "owner": "loop"
  },
  "configuration_matching-articulation_open_large_scale": {
   "blocking": "all five A3 units handle_unreachable x8 (fridge, dishwasher, oven, top_cabinet, no_top); Rs_int drawer running; large-scale: object-inclusive trav map non-traversable within 1.3 m of the cabinet face",
