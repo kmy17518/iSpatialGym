@@ -16861,11 +16861,9 @@
      "handle": true
     },
     "joint": {
-     "office_cubicles_right/bottom_cabinet_rvunhj_0": "j_link_2",
      "Rs_int/bottom_cabinet_bamfsz_0": "j_link_4"
     },
     "handle_key": {
-     "office_cubicles_right/bottom_cabinet_rvunhj_0": "bottom_cabinet__rvunhj",
      "Rs_int/bottom_cabinet_bamfsz_0": "bottom_cabinet__bamfsz"
     }
    },
@@ -16874,21 +16872,6 @@
    }
   },
   "scenes": {
-   "office_cubicles_right": {
-    "rooms": [
-     "shared_office_0"
-    ],
-    "bindings": {
-     "target": [
-      "bottom_cabinet_rvunhj_0"
-     ],
-     "floor": {
-      "room": "shared_office_0"
-     }
-    },
-    "whitelist": {},
-    "blacklist": {}
-   },
    "Rs_int": {
     "rooms": [
      "kitchen_0"
@@ -16962,7 +16945,29 @@
    "pinch_axis_vertical_threshold": 0.7,
    "path_max_m": 3.0
   },
-  "constraints": []
+  "constraints": [],
+  "blacklisted": {
+   "office_cubicles_right": [
+    "bottom_cabinet_rvunhj_0",
+    "bottom_cabinet_rvunhj_5"
+   ],
+   "note": "owner decision D-004 (Slack, 2026-09-16 18:30 PDT): B - bottom_cabinet_rvunhj_0 + rvunhj_5 (office_cubicles_right) blacklisted for both directions: 8 mm bar / 7 mm knobs below the 15 mm pinch minimum -> B4 edge-pinch fallback follows the leaf only within ~20-25 deg of 90 deg (large-scale 18:13); the alias keeps Rs_int/bottom_cabinet_bamfsz_0 (drawer, 19.7 mm bar); first-demo candidates = fridge / dishwasher / oven / top_cabinet / bottom_cabinet_no_top (A3 picks 05ce671)",
+   "removed_scene_entry": {
+    "rooms": [
+     "shared_office_0"
+    ],
+    "bindings": {
+     "target": [
+      "bottom_cabinet_rvunhj_0"
+     ],
+     "floor": {
+      "room": "shared_office_0"
+     }
+    },
+    "whitelist": {},
+    "blacklist": {}
+   }
+  }
  },
  "configuration_matching-articulation_close_large_scale-bottom_cabinet_no_top": {
   "iddl": "configuration_matching/articulation_close_large_scale.iddl",
@@ -19846,11 +19851,9 @@
      "handle": true
     },
     "joint": {
-     "office_cubicles_right/bottom_cabinet_rvunhj_0": "j_link_2",
      "Rs_int/bottom_cabinet_bamfsz_0": "j_link_4"
     },
     "handle_key": {
-     "office_cubicles_right/bottom_cabinet_rvunhj_0": "bottom_cabinet__rvunhj",
      "Rs_int/bottom_cabinet_bamfsz_0": "bottom_cabinet__bamfsz"
     }
    },
@@ -19859,21 +19862,6 @@
    }
   },
   "scenes": {
-   "office_cubicles_right": {
-    "rooms": [
-     "shared_office_0"
-    ],
-    "bindings": {
-     "target": [
-      "bottom_cabinet_rvunhj_0"
-     ],
-     "floor": {
-      "room": "shared_office_0"
-     }
-    },
-    "whitelist": {},
-    "blacklist": {}
-   },
    "Rs_int": {
     "rooms": [
      "kitchen_0"
@@ -19947,7 +19935,29 @@
    "pinch_axis_vertical_threshold": 0.7,
    "path_max_m": 3.0
   },
-  "constraints": []
+  "constraints": [],
+  "blacklisted": {
+   "office_cubicles_right": [
+    "bottom_cabinet_rvunhj_0",
+    "bottom_cabinet_rvunhj_5"
+   ],
+   "note": "owner decision D-004 (Slack, 2026-09-16 18:30 PDT): B - bottom_cabinet_rvunhj_0 + rvunhj_5 (office_cubicles_right) blacklisted for both directions: 8 mm bar / 7 mm knobs below the 15 mm pinch minimum -> B4 edge-pinch fallback follows the leaf only within ~20-25 deg of 90 deg (large-scale 18:13); the alias keeps Rs_int/bottom_cabinet_bamfsz_0 (drawer, 19.7 mm bar); first-demo candidates = fridge / dishwasher / oven / top_cabinet / bottom_cabinet_no_top (A3 picks 05ce671)",
+   "removed_scene_entry": {
+    "rooms": [
+     "shared_office_0"
+    ],
+    "bindings": {
+     "target": [
+      "bottom_cabinet_rvunhj_0"
+     ],
+     "floor": {
+      "room": "shared_office_0"
+     }
+    },
+    "whitelist": {},
+    "blacklist": {}
+   }
+  }
  },
  "configuration_matching-articulation_open_large_scale-bottom_cabinet_no_top": {
   "iddl": "configuration_matching/articulation_open_large_scale.iddl",
