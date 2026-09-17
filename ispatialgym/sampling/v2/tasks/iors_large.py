@@ -925,20 +925,30 @@ class IORSLarge(SamplerV2):
         trunks = rb.trunks() if rb is not None else [(t, k) for t in RB.TRANSLATES for k in list(RB.TILTS) + [RB.LOW_TOP_TILT]]
         focus = th.tensor([float(c_t[0]), float(c_t[1]), self.floor_z + 0.03])
         cands = []
+        # the floor band lies to the robot's RIGHT of the centreline (B3 under-edge probe: lateral −0.40…−0.16; the floor
+        # bands' cells at translate 0.95 likewise): the base is turned so that c_t sits at lateral ``y_off`` (0 = straight
+        # ahead, negative = right) — a stance facing c_t squarely puts it between the arms where no floor cell is reachable
+        # (countertop-floor 18:50: 41 band cells, "c_t is in no band cell of any stance" for 29 anchors)
+        offsets = [float(v) for v in (self.gp.gen("floor_init_lateral_offsets_m") or (-0.25, -0.15, -0.35, 0.0))]
         for _ in range(12):
             bearing = float(rng.uniform(-math.pi, math.pi))
             for dist in STAND_OFFS:
                 xy = c_t + th.tensor([math.cos(bearing), math.sin(bearing)]) * dist
                 if not P0.base_ok(self, xy):
                     continue
-                yaw = math.atan2(float(c_t[1] - xy[1]), float(c_t[0] - xy[0]))
-                for tr, ti in trunks:
-                    st = Stance("manipulation", (float(xy[0]), float(xy[1]), yaw), tr, ti, dist, None, None, 0.0, focus.clone(), ["right"])
-                    if rb is not None:
-                        cells = self.band_cells_world(rb, st)
-                        if len(cells) == 0 or float(th.linalg.norm(cells - c_t, dim=1).min()) > 0.51 * float(rb.meta.get("lattice", RB.LATTICE)):
-                            continue
-                    cands.append(st)
+                yaw0 = math.atan2(float(c_t[1] - xy[1]), float(c_t[0] - xy[0]))
+                for y_off in offsets:
+                    if abs(y_off) >= dist:
+                        continue
+                    yaw = yaw0 + math.asin(-y_off / dist)  # turn left so that c_t moves to the robot's right
+                    for tr, ti in trunks:
+                        st = Stance("manipulation", (float(xy[0]), float(xy[1]), yaw), tr, ti, dist, None, None, 0.0, focus.clone(), ["right"])
+                        st.extras["lateral_offset_m"] = y_off
+                        if rb is not None:
+                            cells = self.band_cells_world(rb, st)
+                            if len(cells) == 0 or float(th.linalg.norm(cells - c_t, dim=1).min()) > 0.51 * float(rb.meta.get("lattice", RB.LATTICE)):
+                                continue
+                        cands.append(st)
         if not cands:
             raise Reject("no_manipulation_stance", "floor init: c_t is in no band cell of any stance")
         # the floor band has cells at the deep trunks only (translate 0.95): like the push-under stance C, the floor mesh
