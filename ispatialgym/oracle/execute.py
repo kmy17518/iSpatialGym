@@ -264,7 +264,11 @@ def standoff_configuration(motions: Motions, arm: str, pre, standoff, q_hint) ->
     if solve is None:
         return None
     try:
-        q0 = C.as_tensor(q_hint).reshape(-1).float()
+        # the witness's base / torso entries are the sampler session's own (odometry frame): only its arm joints are
+        # the witness, everything else is the live configuration (as arm_to does)
+        q0 = C.as_tensor(backend.q_full()).reshape(-1).float().clone()
+        idx = motions.robot.arm_control_idx[arm]
+        q0[idx] = C.as_tensor(q_hint).reshape(-1).float()[idx]
         dense = motions._densify(as_world_pose(pre), [standoff])
         frame = M.EEF_LINK[arm]
         res = solve(f"{arm}_arm", [{frame: wp} for wp in dense], q_start=q0, pos_tol=motions.cfg.diff_ik_pos_tol, rot_tol=motions.cfg.diff_ik_rot_tol,
