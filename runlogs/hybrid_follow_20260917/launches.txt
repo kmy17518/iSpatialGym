@@ -1,0 +1,6 @@
+0917-014213 configuration_matching-articulation_open_large_scale-top_cabinet -> runlogs/hybrid_follow_20260917/open_large_scale-top_cabinet/0917-014213
+0917-014215 configuration_matching-articulation_open_large_scale-dishwasher -> runlogs/hybrid_follow_20260917/open_large_scale-dishwasher/0917-014215
+0917-014217 configuration_matching-articulation_open_large_scale-fridge -> runlogs/hybrid_follow_20260917/open_large_scale-fridge/0917-014217
+0917-020825 configuration_matching-articulation_open_large_scale-top_cabinet -> runlogs/hybrid_follow_20260917/open_large_scale-top_cabinet/0917-020825
+0917-020847 configuration_matching-articulation_close_large_scale-top_cabinet -> runlogs/hybrid_follow_20260917/close_large_scale-top_cabinet/0917-020847
+0917-020849 configuration_matching-articulation_open_large_scale-door -> runlogs/hybrid_follow_20260917/open_large_scale-door/0917-020849
