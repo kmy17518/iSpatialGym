@@ -217,15 +217,21 @@ def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[An
     push) — then a straight ``arm_along`` closes the standoff. ``through`` (the pushed target) is ignored for both."""
     if not supports:
         yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(through))
+        if getattr(motions, "last_relaxed_links", None):
+            ctx["plan_relaxed_links"] = list(motions.last_relaxed_links)
         return
     n = escape_direction(state, pre, supports)
     if n is None:
         yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(supports) + list(through))
+        if getattr(motions, "last_relaxed_links", None):
+            ctx["plan_relaxed_links"] = list(motions.last_relaxed_links)
         return
     p, q = as_world_pose(pre)
     standoff = (p + n * cfg.pre_pose_standoff_m, q)
     ctx["pre_pose_standoff"] = {"direction": [round(float(v), 3) for v in n.tolist()], "distance_m": cfg.pre_pose_standoff_m}
     yield from motions.arm_to(arm, pose=standoff, ignore_objects=list(through))
+    if getattr(motions, "last_relaxed_links", None):
+        ctx["plan_relaxed_links"] = list(motions.last_relaxed_links)
     yield from motions.arm_along(arm, [pre], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
 
 

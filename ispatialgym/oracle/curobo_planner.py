@@ -20,6 +20,7 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
+from contextlib import contextmanager
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -738,6 +739,77 @@ class R1ProCuRobo:
                 ds = costs["self"].forward(spheres).reshape(n, -1).amax(dim=1)
                 in_coll = in_coll | (ds > 0.0)
         return in_coll.cpu()
+
+    def self_collision_pairs(self, q_full: th.Tensor, emb_name: str = "whole_body") -> List[Dict[str, object]]:
+        """The link pairs of cuRobo's self-collision list whose padded spheres overlap at ``q_full``:
+        ``[{"links": (a, b), "penetration": m}]`` (the worst sphere pair per link pair)."""
+        entry = self.kin_entry(emb_name)
+        q_full = as_tensor(q_full).reshape(-1)
+        self.refresh_locked_joints(emb_name, q_full)
+        js = self._active_js(entry, q_full.unsqueeze(0))
+        with th.no_grad():
+            sp = entry.fk.compute_kinematics(js).robot_spheres.reshape(-1, 4)
+            scfg = entry.fk.get_self_collision_config()
+            pairs = scfg.collision_pairs.long()
+            pad = scfg.sphere_padding.to(sp.device)
+            i, j = pairs[:, 0], pairs[:, 1]
+            d = th.linalg.norm(sp[i, :3] - sp[j, :3], dim=1)
+            pen = (sp[i, 3] + pad[i]) + (sp[j, 3] + pad[j]) - d
+            active = (sp[i, 3] > 0) & (sp[j, 3] > 0)
+            hot = th.nonzero((pen > 0) & active).reshape(-1)
+        if hot.numel() == 0:
+            return []
+        kc = entry.fk.kinematics_config
+        link_of = {}
+        for name in kc.link_name_to_idx_map:
+            for k in kc.get_sphere_index_from_link_name(name).tolist():
+                link_of[int(k)] = name
+        worst: Dict[Tuple[str, str], float] = {}
+        for k in hot.tolist():
+            a, b = link_of.get(int(i[k]), str(int(i[k]))), link_of.get(int(j[k]), str(int(j[k])))
+            key = (a, b) if a <= b else (b, a)
+            worst[key] = max(worst.get(key, 0.0), float(pen[k]))
+        return [{"links": key, "penetration": v} for key, v in sorted(worst.items(), key=lambda kv: -kv[1])]
+
+    @contextmanager
+    def static_links_relaxed(self, emb_name: str, q_start: th.Tensor, moving_arms: Sequence[str]):
+        """Plan an arm while the **other** arm holds a contact it was driven into by an unchecked straight leg (a brace
+        approach, a grasp): when the start configuration violates cuRobo's self-collision margin between two links
+        the plan cannot move (the held arm against the trunk), those held-arm links leave the sphere model for the
+        duration of the block (``kinematics_config.disable_link_spheres``, shared by every solver of the planner) and
+        are restored afterwards. Yields the disabled link names. Pairs that involve a planned arm, or the trunk /
+        base alone, are genuine constraints and stay."""
+        moving = set(moving_arms)
+        disable: List[str] = []
+        try:
+            pairs = self.self_collision_pairs(q_start, emb_name)
+        except Exception as e:  # noqa: BLE001
+            log.warning("static_links_relaxed: self-collision pairs unavailable (%r)", e)
+            pairs = []
+        for pr in pairs:
+            arms = [next((arm for arm in M.ARMS if link.startswith(arm + "_")), None) for link in pr["links"]]
+            if any(arm in moving for arm in arms if arm is not None):
+                continue
+            for link, arm in zip(pr["links"], arms):
+                if arm is not None and link not in disable:
+                    disable.append(link)
+        if not disable:
+            yield []
+            return
+        entry = self.kin_entry(emb_name)
+        kc = entry.fk.kinematics_config
+        done = []
+        try:
+            for link in disable:
+                if link in kc.link_name_to_idx_map:
+                    kc.disable_link_spheres(link)
+                    done.append(link)
+            log.warning("planning %s with the held arm's %s out of the sphere model: the start violates the self-collision margin by %.1f mm (%s)",
+                        "/".join(sorted(moving)), done, 1000 * pairs[0]["penetration"], " ".join(f"{a}-{b}" for a, b in (pr["links"] for pr in pairs)))
+            yield done
+        finally:
+            for link in done:
+                kc.enable_link_spheres(link)
 
     # ------------------------------------------------------------------ goal construction
 

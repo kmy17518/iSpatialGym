@@ -259,6 +259,7 @@ class Motions:
         self.cfg = cfg or MotionsConfig()
         self.dt = float(getattr(planner, "control_dt", 1.0 / 30.0))
         self.state = ActionState(self.robot)
+        self.last_relaxed_links: List[str] = []  # held-arm links taken out of the sphere model by the last arm_to plan
         self._joint_limits = (
             self.robot.joint_lower_limits[self.robot.trunk_control_idx],
             self.robot.joint_upper_limits[self.robot.trunk_control_idx],
@@ -453,12 +454,18 @@ class Motions:
         q_start = self.backend.q_full()
         if (pose is None) == (q is None):
             raise ValueError("arm_to needs exactly one of pose / q")
+        relax = getattr(self.backend, "static_links_relaxed", None)
         if pose is not None and q_hint is not None and len(arms) == 1:
             arm = arms[0]
             q28 = C.as_tensor(q_hint).reshape(-1)
             q_goal = q_start.clone()
             q_goal[self.robot.arm_control_idx[arm]] = q28[self.robot.arm_control_idx[arm]]
-            res = self.backend.plan_joint(emb, q_goal, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
+            if relax is not None:
+                with relax(emb, q_start, arms) as relaxed:
+                    self.last_relaxed_links = list(relaxed)
+                    res = self.backend.plan_joint(emb, q_goal, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
+            else:
+                res = self.backend.plan_joint(emb, q_goal, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
             if not res.success:
                 raise SkillError("plan_failed", f"arm_to({arm}, witness q): {res.status}", diagnostics=dict(res.diagnostics), stage="trajopt")
             if max_excursion is not None:
@@ -479,7 +486,12 @@ class Motions:
         if pose is not None:
             poses = pose if isinstance(pose, dict) and set(pose) <= set(M.ARMS) else {arms[0]: pose}
             targets = {M.EEF_LINK[a]: as_world_pose(p) for a, p in poses.items()}
-            res = self.backend.plan_pose(emb, targets, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
+            if relax is not None:
+                with relax(emb, q_start, arms) as relaxed:
+                    self.last_relaxed_links = list(relaxed)
+                    res = self.backend.plan_pose(emb, targets, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
+            else:
+                res = self.backend.plan_pose(emb, targets, q_start=q_start, max_attempts=self.cfg.plan_attempts, sync_world=False)
             what = "pose"
         else:
             q_goal = q_start.clone()
