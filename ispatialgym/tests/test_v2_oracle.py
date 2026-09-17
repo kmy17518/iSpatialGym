@@ -1440,6 +1440,49 @@ def test_gripper_closure_ramp_and_preshaped_opening():
     env.after_step = None
 
 
+def test_epilogue_reports_the_predicate_branch_of_the_final_binary_evaluation(tmp_path):
+    """Owner 2026-09-16 22:05 item 4 (D-007 wrapper, core 5555526): the executor resets the task's predicate branch log
+    before each settle window and copies ``predicate_branches()`` of the final evaluation into the result (→
+    ``meta.binary_branch``), naming the atoms a fallback branch (rays / geometry) passed; a task without the wrapper reports
+    nothing."""
+    from ispatialgym.sampling import predicates as PRED
+
+    sc, env = iors_world()
+    goal = _place_goal(sc)
+    calls = {"reset": 0}
+
+    def evaluate(env_):
+        d = success_eval("apple.n.01_1", goal, tol=0.08)(env_)
+        # the wrapper's log as the task evaluator fills it every step: omnigibson said no, the rays decided under(...)
+        PRED._log("ontop", [env.objects["apple.n.01_1"], env.objects["plate.n.04_1"]], "omnigibson", False)
+        PRED._log("ontop", [env.objects["apple.n.01_1"], env.objects["plate.n.04_1"]], "rays", True, {"hits": 3})
+        return d
+
+    env.evaluate = evaluate
+    env.task.predicate_branches = staticmethod(PRED.decided_by)
+
+    def reset():
+        calls["reset"] += 1
+        PRED.reset_branches()
+
+    env.task.reset_predicate_branches = staticmethod(reset)
+    PRED._log("under", [env.objects["plate.n.04_1"], env.objects["apple.n.01_1"]], "geometry", True)  # a stale entry from before the epilogue
+    ex, *_ = make_executor(env, sc, tmp_path)
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["success"], result["verdict"]
+    assert calls["reset"] >= 1
+    assert result["binary_branch"] == {"ontop(apple_omzprq_0, plate_pkkgzc_0)": "rays"}  # the stale under(...) entry was reset away
+    assert result["binary_branch_fallback"] == ["ontop(apple_omzprq_0, plate_pkkgzc_0)"]
+    assert result["binary_branch_log"] and result["binary_branch_log"][-1]["branch"] == "rays" and result["binary_branch_log"][-1]["detail"] == {"hits": 3}
+    PRED.reset_branches()
+    # without the wrapper (a task that has no predicate_branches) the fields are empty
+    sc2, env2 = iors_world()
+    env2.evaluate = success_eval("apple.n.01_1", _place_goal(sc2), tol=0.08)
+    ex2, *_ = make_executor(env2, sc2, tmp_path / "b")
+    result2 = ex2.run_program(expand(sc2.alias, sc2))
+    assert result2["success"] and result2["binary_branch"] == {} and result2["binary_branch_fallback"] == [] and result2["binary_branch_log"] == []
+
+
 def test_release_is_rate_limited_and_staged_until_the_hand_clears():
     """Owner 2026-09-16 21:18 (nextto 0916-201902 / 0916-201730): opening moves ramp at ``gripper_open_rate``; the release
     of a held object is staged - first to the pre-shape width (pinch / 2 + margin, or the executor's capped value), the

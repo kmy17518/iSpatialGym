@@ -1093,6 +1093,37 @@ class Executor:
                     return True
         return False
 
+    def _reset_predicate_branches(self) -> None:
+        """Clear the D-007 predicate branch log (``ISpatialGymTask.reset_predicate_branches``) so the next evaluations are
+        the ones ``_predicate_branches`` reports; a task without the wrapper is left alone."""
+        fn = getattr(self.task, "reset_predicate_branches", None)
+        if callable(fn):
+            try:
+                fn()
+            except Exception as e:  # noqa: BLE001
+                log.warning("reset_predicate_branches failed: %r", e)
+
+    def _predicate_branches(self) -> Tuple[Dict[str, str], List[Dict[str, Any]]]:
+        """``({"under(saucer, teacup)": "rays", ...}, log tail)``: the wrapper branch that decided each under / ontop atom
+        in the latest evaluation (``ISpatialGymTask.predicate_branches``; ``{}`` without the wrapper) and the last six
+        under / ontop log entries (``ispatialgym.sampling.predicates.branches``) for the ledger."""
+        fn = getattr(self.task, "predicate_branches", None)
+        branch: Dict[str, str] = {}
+        if callable(fn):
+            try:
+                branch = {str(k): str(v) for k, v in (fn() or {}).items()}
+            except Exception as e:  # noqa: BLE001
+                log.warning("predicate_branches failed: %r", e)
+        tail: List[Dict[str, Any]] = []
+        if branch:
+            try:
+                from ispatialgym.sampling import predicates as PRED  # lazy: the sampler package
+
+                tail = [_jsonable(e) for e in PRED.branches() if e.get("predicate") in ("under", "ontop")][-6:]
+            except Exception:  # noqa: BLE001
+                tail = []
+        return branch, tail
+
     def epilogue(self, verdict: Optional[Verdict], n_action_steps: int) -> Dict[str, Any]:
         t0 = time.time()
         if self.monitors is not None:
@@ -1101,6 +1132,7 @@ class Executor:
         before = MotionSnapshot(self.robot, self.tracked)
         settle_verdict = None
         windows = [window]
+        self._reset_predicate_branches()  # D-007: the branch log of the final binary evaluation starts with the settle window
         if verdict is None or verdict.category != "timeout":
             settle_verdict = self.run_generator(self._noop_actions(window), PHASE_SETTLE)
             if self.recorder is not None:
@@ -1117,6 +1149,7 @@ class Executor:
             window2 = int(math.ceil(self.cfg.settle_second_window_factor * window))
             log.info("epilogue: motion after the first no-op window (%s) - second window of %d steps", {k: round(v, 4) for k, v in motion.items() if (v > 1e-4)}, window2)
             before2 = MotionSnapshot(self.robot, self.tracked)
+            self._reset_predicate_branches()  # the second window's last evaluation is the final one
             settle_verdict = self.run_generator(self._noop_actions(window2), PHASE_SETTLE)
             if self.recorder is not None:
                 self.recorder.commit()
@@ -1129,6 +1162,9 @@ class Executor:
             windows.append(window2)
         binary_ever = bool(isg.get("binary_success_ever", isg.get("binary_success", False)))
         settled_task = bool(isg.get("settled_success", False))
+        binary_branch, branch_log = self._predicate_branches()  # D-007: which wrapper branch decided each under / ontop atom at the last step
+        if binary_branch:
+            log.info("epilogue: binary goal atoms decided by %s", binary_branch)
         out_of_tol = _out_of_tolerance(isg)
         if verdict is None and settle_verdict is not None:
             verdict = settle_verdict
@@ -1197,6 +1233,11 @@ class Executor:
             "reason": None if verdict is None else verdict.category,
             "binary_success_ever": binary_ever,
             "binary_success_final": binary_final,
+            # D-007 (owner 2026-09-16 22:05 item 4): the wrapper branch (omnigibson / rays / geometry / none) that decided every
+            # under / ontop atom at the final evaluation; ``binary_branch_fallback`` lists the atoms a fallback branch passed
+            "binary_branch": binary_branch,
+            "binary_branch_fallback": sorted(k for k, v in binary_branch.items() if v not in ("omnigibson",)),
+            "binary_branch_log": branch_log,
             "settled_success": settled_task,
             "settled_success_ever": int(isg.get("first_settled_success_step", -1)) >= 0,
             "first_success_step": isg.get("first_success_step"),

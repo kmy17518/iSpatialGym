@@ -805,7 +805,7 @@ def main(argv=None) -> int:
             "status": meta["status"], "success": success, "reason": reason, "n_steps": episode["n_steps"], "n_action_steps": episode["n_action_steps"],
             "max_position_error": errors.get("max_position_error"), "max_orientation_error": errors.get("max_orientation_error"),
             "final_step_max_position_error": last_errors.get("max_position_error"), "final_step_max_orientation_error": last_errors.get("max_orientation_error"),
-            "settled_success": episode.get("settled_success"), "collisions": (episode.get("qa") or {}).get("collisions", {}).get("n_events"),
+            "settled_success": episode.get("settled_success"), "binary_branch": episode.get("binary_branch"), "collisions": (episode.get("qa") or {}).get("collisions", {}).get("n_events"),
             "qa_by_category": (episode.get("qa") or {}).get("stats", {}).get("by_category"), "goal_override": None if override is None else override.get("applied"),
         })
         return exit_code
