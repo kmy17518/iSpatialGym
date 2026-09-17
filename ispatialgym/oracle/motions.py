@@ -78,10 +78,11 @@ class MotionsConfig:
     #: a contact leg (a push arc, a brace approach) ends with the pad pressing on the object: the position-controlled
     #: joints settle with a steady error that reflects the contact force, not a tracking failure
     joint_tol_loaded: float = 0.25
-    #: ``arm_to`` to an IK witness: a residual to the recorded pose up to these is closed best-effort (a witness on a
-    #: joint limit cannot move the last millimetres along a straight segment; the hand stays at the sampler-validated
-    #: configuration), a larger one must close
-    witness_residual_accept_pos: float = 0.01
+    #: ``arm_to`` to an IK witness of a *pre-pose*: a residual to the recorded pose up to these is closed best-effort (a
+    #: witness on a joint limit cannot move the last millimetres along a straight segment; the hand stays at the
+    #: sampler-validated configuration and the following leg starts from where the hand is - the touching pre-grasp
+    #: witness stood 10.5 mm off its pose), a larger one and every finishing motion must close
+    witness_residual_accept_pos: float = 0.02
     witness_residual_accept_rot: float = 0.05
     #: how long to keep holding the final waypoint while waiting for convergence (steps)
     settle_steps: int = 90
@@ -669,7 +670,8 @@ class Motions:
             dp, da = float(th.linalg.norm(cur[0] - target[0])), C.quat_angle(cur[1], target[1])
             if dp > 2e-3 or da > 0.01:
                 log.info("arm_to(%s): witness residual %.1f mm / %.3f rad, closing it along a straight segment", arm, dp * 1000, da)
-                if dp <= self.cfg.witness_residual_accept_pos and da <= self.cfg.witness_residual_accept_rot:
+                # a finishing motion (``max_excursion`` given: the end pose of an approach / descent) must reach its pose
+                if max_excursion is None and dp <= self.cfg.witness_residual_accept_pos and da <= self.cfg.witness_residual_accept_rot:
                     # the witness *is* the sampler's exact-IK solution of this pose (its tolerance); closing the last
                     # millimetres is a refinement that a witness sitting on a joint limit cannot make (touching box:
                     # right_arm_joint2 2.8 mrad from its limit, the first DLS step jumped 0.25 rad) - the hand stays at
