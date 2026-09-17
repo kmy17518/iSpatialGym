@@ -509,6 +509,109 @@ class ArticulationSmall(SamplerV2):
                 out.append((f"{side}_{suffix}", point, a, c_axis))
         return out
 
+    # ------------------------------------------------------------------ brace + handle from a stance, second stance
+
+    def _brace_candidates_at(self, stance: Stance, pose: TT.Pose, q_values) -> Tuple[List[Tuple[str, Tuple[TT.Pose, TT.Pose]]], Dict[str, Any]]:
+        """Brace pose candidates of the brace arm at ``stance``: the base link's four side faces (near / own side / far /
+        other side, vertical and horizontal closing, either sign) ranked by B3's passing classes at the target's cell,
+        then in-band, then near / own side first (owner 20:21: the far and across faces are candidates too, the IK
+        decides); without the handle-only band, B3's §5.4 brace kinds."""
+        if self.handle_only_band:
+            body = self._body_brace_points(pose, stance)
+            passing = None
+            if self.left_bands is not None:
+                cell = self.left_bands.to_base(np.asarray([[float(pose[0][0]), float(pose[0][1])]], dtype=np.float32), stance.base_pose2d)[0]
+                passing = TT.cell_classes(self.left_bands, stance.translate, stance.tilt, cell) or None
+            own_side = "left" if self.brace_arm == "left" else "right"
+
+            def rank(item):
+                cls, pt, _, _ = item
+                in_band = TT.in_band(self.left_bands, stance, pt[:2], tol=1.0)[0] if self.left_bands is not None else True
+                return (0 if (passing and cls in passing) else 1, 0 if in_band else 1, 0 if cls.startswith(("near", own_side)) else 1)
+
+            body.sort(key=rank)
+            cands = []
+            for cls, pt, a, c_axis in body:
+                for c_sign in (1.0, -1.0):
+                    contact = C.contact_eef(pt, a, c_sign * c_axis)
+                    cands.append((f"{cls}{'' if c_sign > 0 else '-'}", (C.pre_pose(contact), contact)))
+            return cands, {"pose_classes_passing": passing, "left_band": self.left_bands is not None}
+        hdata = {"handle": self.handle, "base_link": self.base_link_bbox or _base_link_bbox(self.hull, self.jinfo)}
+        cands = RB.brace_candidates(self.jinfo, hdata, pose, q_values, 1.0 if self.brace_arm == "left" else -1.0, _G())
+        kinds_pref = list(self.g("brace_kinds"))
+        cands.sort(key=lambda c: kinds_pref.index(c[0]) if c[0] in kinds_pref else 99)
+        return cands, {}
+
+    def _brace_from(self, stance: Stance, pose: TT.Pose, q_values, grasp_pair, target, support):
+        """Handle grasp (pre + grasp, the handle arm) FIRST, then the brace arm's pre-contact + contact with the handle arm
+        locked at its solution, combined check (``tabletop.brace_second_arm``; the 0916-172359 run locked the brace first
+        and the handle arm's pre-grasp failed for every brace: the handle is the tighter constraint, the brace gets the
+        freedom). Returns ``(chosen | None, cands, fails, extras)``."""
+        cands, extras = self._brace_candidates_at(stance, pose, q_values)
+        fails: List[str] = []
+        for kind, (b_pre, b_contact) in cands:
+            res = TT.brace_second_arm(self, stance, self.handle_arm, grasp_pair, self.brace_arm, [b_pre, b_contact], ignore_work_last=[support, target],
+                                      ignore_brace_last=[target])
+            if res.ok:
+                return (kind, b_pre, b_contact, res.q), cands, fails, extras
+            fails.append(f"{kind}: {res.reason}")
+        return None, cands, fails, extras
+
+    SECOND_STANCE_LATERALS = (0.10, -0.10, 0.20, -0.20)
+    SECOND_STANCE_MAX = 6
+
+    def _brace_second_stance(self, manip: Stance, pose: TT.Pose, q_values, grasp_pair, target, support, cam_init):
+        """Second stance for the brace + handle pair: the manipulation stance shifted along the edge by
+        ``SECOND_STANCE_LATERALS`` with the trunk kept or moved to (0.5, 0) / (0.25, -0.3); on free floor, whole-body
+        collision-free, the target (hull at q_init, handle contact) in frame from its camera. Returns
+        ``(chosen | None, stance, tried_stances)``."""
+        tried: List[Stance] = []
+        pts = C.transform_points(pose, self._hull_q_init)
+        wp0 = C.handle_waypoints(self.handle, self.jinfo, [self.q_init], pose)[0]
+        for dlat in self.SECOND_STANCE_LATERALS:
+            for trunk in ((manip.translate, manip.tilt), (0.5, 0.0), (0.25, -0.3)):
+                if len(tried) >= self.SECOND_STANCE_MAX:
+                    return None, manip, tried
+                st = manip.shifted(lateral=manip.lateral + dlat, name="manipulation").with_trunk(trunk[0], trunk[1], "manipulation")
+                st.focus, st.arms = manip.focus, list(manip.arms) if isinstance(manip.arms, list) else manip.arms
+                if not self.kit.trav_free(st.base_xy) or not self.ikc.stance_collision_free(st):
+                    continue
+                cam = self.camera_pose_at(st)
+                if not TT.in_frame(self, cam, pts, float(self.g("view_margin_m"))) or not TT.in_frame(self, cam, wp0.contact.unsqueeze(0), TT.IN_FRAME_MARGIN):
+                    continue
+                tried.append(st)
+                chosen, _, _, extras = self._brace_from(st, pose, q_values, grasp_pair, target, support)
+                if chosen is not None:
+                    st.extras.update({"second_stance": True, "lateral_shift": float(dlat), "trunk_from": [float(manip.translate), float(manip.tilt)]})
+                    log.info("%s: second stance: lateral %+.2f, trunk (%.2f, %+.2f) reaches the handle grasp + brace %s", self.gp.alias, dlat, trunk[0], trunk[1], chosen[0])
+                    return chosen, st, tried
+        return None, manip, tried
+
+    def _log_brace_failure(self, manip: Stance, pose: TT.Pose, q_values, grasp_pair, target, support, stances: List[Stance]):
+        """BRACE_FAILURE diagnostic (owner 20:21: the numbers for a brace-optional decision): per stance the target's base
+        coordinates, the handle grasp alone (pre + grasp exact IK), and per brace candidate the point's base coordinates,
+        left-band membership, the brace alone (pre + contact, target ignored) and the two-arm reason."""
+        try:
+            out: Dict[str, Any] = {"target_base": [round(float(v), 3) for v in manip.world_to_base(pose[0][:2]).tolist()], "handle_arm": self.handle_arm, "brace_arm": self.brace_arm,
+                                   "stances": []}
+            for st in stances:
+                r_h = self.ikc.exact(list(grasp_pair), st, self.handle_arm, [support, target], cache=False)
+                cands, extras = self._brace_candidates_at(st, pose, q_values)
+                rows = []
+                for kind, (b_pre, b_contact) in cands[:8]:
+                    r_b = self.ikc.exact([b_pre, b_contact], st, self.brace_arm, [target], cache=False)
+                    two = TT.brace_second_arm(self, st, self.handle_arm, grasp_pair, self.brace_arm, [b_pre, b_contact], ignore_work_last=[support, target], ignore_brace_last=[target])
+                    pt = b_contact[0]
+                    rows.append({"class": kind, "point_base": [round(float(v), 3) for v in st.world_to_base(pt[:2]).tolist()] + [round(float(pt[2]) - float(self.top.z), 3)],
+                                 "in_left_band": bool(TT.in_band(self.left_bands, st, pt[:2], tol=1.0)[0]) if self.left_bands is not None else None,
+                                 "brace_alone": r_b.ok if r_b.ok else r_b.reason[:80], "two_arm": True if two.ok else two.reason[:100]})
+                out["stances"].append({"name": st.name, "base": [round(float(v), 3) for v in st.base_pose2d], "trunk": [float(st.translate), float(st.tilt)],
+                                       "lateral_shift": st.extras.get("lateral_shift"), "handle_alone": r_h.ok if r_h.ok else r_h.reason[:80],
+                                       "passing_classes": extras.get("pose_classes_passing"), "braces": rows})
+            log.info("%s: BRACE_FAILURE %s", self.gp.alias, json.dumps(out))
+        except Exception as e:  # diagnostics only
+            log.info("%s: BRACE_FAILURE diagnostic failed: %r", self.gp.alias, e)
+
     @property
     def _hull_q_init(self) -> th.Tensor:
         if not hasattr(self, "_hull_qi"):
@@ -540,7 +643,6 @@ class ArticulationSmall(SamplerV2):
         d = Draft()
         tname = self.tname
         target, support = self.obj(self.role), self._support()
-        self.record_transition(init, manip)
         cam_init = self.camera_pose_at(init)
         yaw = self.face_yaw + float(rng.uniform(-float(self.g("yaw_jitter_rad")), float(self.g("yaw_jitter_rad"))))
         pose = None
@@ -564,54 +666,21 @@ class ArticulationSmall(SamplerV2):
         q_values = [self.q_init] + [self.q_init + kk * (self.q_goal - self.q_init) for kk in self.required]
         wp0 = C.handle_waypoints(self.handle, self.jinfo, [self.q_init], pose)[0]
         grasp_pair = [wp0.pre_grasp, wp0.eef]
-        brace_extras: Dict[str, Any] = {}
-        if self.handle_only_band:
-            # owner decision 2026-09-16 item 2: the brace is a pad contact on a face of the base link, the classes the left
-            # contact band recorded as passing at the target's cell first (A1 joint placement: the brace point within one
-            # lattice cell of a left band cell), then the remaining near / left faces; far / right faces never pass (B3)
-            body = self._body_brace_points(pose, manip)
-            passing = None
-            if self.left_bands is not None:
-                cell = self.left_bands.to_base(np.asarray([[float(pose[0][0]), float(pose[0][1])]], dtype=np.float32), manip.base_pose2d)[0]
-                passing = TT.cell_classes(self.left_bands, manip.translate, manip.tilt, cell) or None
-
-            # the faces the brace arm reaches (B3, mirrored for a right-arm brace): the near face and the face on the arm's own
-            # side; the far face (pulling toward the robot) and the face across the body never pass
-            own_side = "left" if self.brace_arm == "left" else "right"
-            other_side = "right" if self.brace_arm == "left" else "left"
-
-            def rank(item):
-                cls, pt, _, _ = item
-                in_band = TT.in_band(self.left_bands, manip, pt[:2], tol=1.0)[0] if self.left_bands is not None else True
-                return (0 if (passing and cls in passing) else 1, 0 if in_band else 1, 0 if cls.startswith(("near", own_side)) else 1)
-
-            body.sort(key=rank)
-            cands = []
-            for cls, pt, a, c_axis in body:
-                if cls.startswith(("far", other_side)) and not (passing and cls in passing):
-                    continue
-                for c_sign in (1.0, -1.0):
-                    contact = C.contact_eef(pt, a, c_sign * c_axis)
-                    cands.append((f"{cls}{'' if c_sign > 0 else '-'}", (C.pre_pose(contact), contact)))
-            brace_extras = {"pose_classes_passing": passing, "left_band": self.left_bands is not None}
-        else:
-            hdata = {"handle": self.handle, "base_link": self.base_link_bbox or _base_link_bbox(self.hull, self.jinfo)}
-            cands = RB.brace_candidates(self.jinfo, hdata, pose, q_values, 1.0 if self.brace_arm == "left" else -1.0, _G())
-            kinds_pref = list(self.g("brace_kinds"))
-            cands.sort(key=lambda c: kinds_pref.index(c[0]) if c[0] in kinds_pref else 99)
-        chosen = None
-        fails = []
-        for kind, (b_pre, b_contact) in cands:
-            # brace arm first (contact with the target ignored), then the handle arm with the brace arm locked (support + target
-            # ignored for the grasp); the combined check ignores the target both hands touch (``tabletop.brace_second_arm``)
-            res = TT.brace_second_arm(self, manip, self.brace_arm, [b_pre, b_contact], self.handle_arm, grasp_pair, ignore_work_last=[target],
-                                      ignore_brace_last=[support, target])
-            if res.ok:
-                chosen = (kind, b_pre, b_contact, res.q)
-                break
-            fails.append(f"{kind}: {res.reason}")
+        # brace + handle grasp from the manipulation stance; else (owner 2026-09-16 20:21 item 1, the attachment treatment) from a
+        # SECOND STANCE - the manipulation stance shifted along the edge / re-trunked, the target staying where it is - which then
+        # becomes the recorded manipulation stance (nothing is carried: the init -> manipulation transition is recorded after)
+        chosen, cands, fails, brace_extras = self._brace_from(manip, pose, q_values, grasp_pair, target, support)
+        tried_stances = [manip]
         if chosen is None:
-            raise Reject("contact_unreachable", f"no brace of {[c[0] for c in cands][:8]} + handle grasp at q_init passes the exact IK ({sorted(set(fails))[:3]})")
+            chosen, manip2, tried = self._brace_second_stance(manip, pose, q_values, grasp_pair, target, support, cam_init)
+            tried_stances += tried
+            if chosen is not None:
+                manip = manip2
+        if chosen is None:
+            self._log_brace_failure(manip, pose, q_values, grasp_pair, target, support, tried_stances)
+            raise Reject("contact_unreachable", f"no brace of {[c[0] for c in cands][:8]} + handle grasp at q_init passes the exact IK from the manipulation stance or "
+                                                f"{len(tried_stances) - 1} second stances ({sorted(set(fails))[:3]})")
+        self.record_transition(init, manip)
         kind, b_pre, b_contact, q_both = chosen
         if self.handle_only_band:
             brace_extras["pose_class"] = kind
