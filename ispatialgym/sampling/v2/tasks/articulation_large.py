@@ -330,6 +330,37 @@ def record_handle_rows(joint_rec: Dict[str, Any]) -> List[HandleRow]:
     return out
 
 
+def leaf_plane_approach(handle: Dict[str, Any], jinfo: Dict[str, Any], min_angle_deg: float = 20.0) -> Optional[List[float]]:
+    """§5.3 edge pinch: the approach runs **into the exposed edge along the leaf plane** (toward the hinge / along the
+    joint's motion), the pinch axis is the leaf normal. The B4 ``edge_door`` fallback rows carry the face normal as
+    ``approach_dir`` — parallel to the pinch axis, so ``handle_eef`` builds an accidental frame from the 0.7° skew and
+    the rotated frame at an open angle points the approach along the face (no forward reach class: office cabinet
+    ``rvunhj_0`` close 0/8 ``no_manipulation_stance``, 2026‑09‑16). Returns the repaired approach (object frame) when
+    the recorded one is within ``min_angle_deg`` of the pinch axis, else None (the record is kept)."""
+    pinch = th.as_tensor(handle.get("pinch_axis"), dtype=th.float32)
+    approach = th.as_tensor(handle.get("approach_dir", handle.get("approach_dir_obj")), dtype=th.float32)
+    pinch = pinch / max(float(th.linalg.norm(pinch)), 1e-9)
+    approach = approach / max(float(th.linalg.norm(approach)), 1e-9)
+    if abs(float(th.dot(pinch, approach))) < math.cos(math.radians(min_angle_deg)):
+        return None
+    axis = th.as_tensor(jinfo.get("axis_dir_obj") or [0.0, 0.0, 1.0], dtype=th.float32)
+    axis = axis / max(float(th.linalg.norm(axis)), 1e-9)
+    kind = str(jinfo.get("type", "")).lower()
+    if "prismatic" in kind or "slider" in kind:
+        along = axis  # a drawer front's edge: into the edge along the motion axis
+    else:
+        along = th.cross(pinch, axis, dim=0)  # in the leaf plane, ⟂ the hinge axis
+    if float(th.linalg.norm(along)) < 1e-6:
+        return None
+    along = along / float(th.linalg.norm(along))
+    hinge = jinfo.get("hinge_point_obj")
+    if hinge is not None and "prismatic" not in kind:
+        to_hinge = th.as_tensor(hinge, dtype=th.float32) - th.as_tensor(handle["contact"], dtype=th.float32)
+        if float(th.dot(along, to_hinge)) < 0:
+            along = -along  # from the free edge toward the hinge
+    return [float(v) for v in along.tolist()]
+
+
 def sane_hinge_point(jinfo: Dict[str, Any], measured: Optional[th.Tensor] = None) -> Optional[List[float]]:
     """Hinge point of a revolute joint on the plane through the moving link's bbox centre (the inventories recover the
     hinge by least squares, unconstrained along the axis: B4 records show z ~ 1e8). ``measured`` (from the joint prim)
@@ -482,6 +513,12 @@ class ArticulationLarge(SamplerV2):
         if jinfo.get("axis_dir_obj") is None:
             jinfo["axis_dir_obj"] = self._axis_from_prim(obj, joint_name)
         jinfo["hinge_point_obj"] = sane_hinge_point(jinfo, self._hinge_from_prim(obj, joint_name))
+        repaired = leaf_plane_approach(handle, jinfo)
+        if repaired is not None:
+            log.info("%s: %s/%s edge pinch: recorded approach %s is parallel to the pinch axis %s — replaced by the leaf-plane approach %s", self.gp.alias, obj.name,
+                     joint_name, handle.get("approach_dir"), handle.get("pinch_axis"), [round(v, 3) for v in repaired])
+            handle["approach_dir_recorded"] = list(handle.get("approach_dir", []))
+            handle["approach_dir"] = repaired
         self.joint_name, self.joint, self.handle, self.jinfo, self.handle_rows = joint_name, jt, handle, jinfo, ranked
         self.lower, self.upper = float(jt.lower_limit), float(jt.upper_limit)
         self.template_facts["handle"] = {"source": path and os.path.relpath(path, REPO_ROOT), "frame": frame, "row": row.source, "kind": row.kind,

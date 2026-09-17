@@ -203,6 +203,23 @@ def test_a4_door_class_follow_mode_and_hinge_side():
     assert AL.arm_for_hinge_side("left") == "right" and AL.arm_for_hinge_side("right") == "left"
 
 
+def test_edge_pinch_leaf_plane_approach():
+    # office cabinet rvunhj_0 / j_link_2 (B4 edge_door fallback): approach parallel to the pinch axis -> repaired along the leaf toward the hinge
+    handle = {"contact": [0.262, -0.0352, -0.1119], "pinch_axis": [1.0, 0.0, 0.0], "approach_dir": [-0.9999, -0.0122, 0.0]}
+    jinfo = {"type": "RevoluteJoint", "axis_dir_obj": [0.0, 0.0, -1.0], "hinge_point_obj": [0.27, -0.399, -0.3]}
+    a = AL.leaf_plane_approach(handle, jinfo)
+    assert a is not None and a[1] == pytest.approx(-1.0) and abs(a[0]) < 1e-6 and abs(a[2]) < 1e-6
+    # the repaired frame is valid: at 90 deg open the approach points into the face (-x) and the pinch is horizontal (-y)
+    handle2 = dict(handle, approach_dir=a)
+    wps = C.handle_waypoints(handle2, dict(jinfo, lower=0.0, closed_q=0.0), [0.0, math.pi / 2])
+    assert th.allclose(wps[1].approach, th.tensor([-1.0, 0.0, 0.0]), atol=1e-4) and th.allclose(wps[1].pinch.abs(), th.tensor([0.0, 1.0, 0.0]), atol=1e-4)
+    # a proper bar handle (approach perpendicular to the pinch) is left alone
+    assert AL.leaf_plane_approach({"contact": [0, 0, 0], "pinch_axis": [0, 0, 1], "approach_dir": [-1, 0, 0]}, jinfo) is None
+    # a drawer front's edge: along the motion axis
+    d = AL.leaf_plane_approach({"contact": [0.3, 0, 0], "pinch_axis": [1, 0, 0], "approach_dir": [-1, 0, 0]}, {"type": "PrismaticJoint", "axis_dir_obj": [1, 0, 0]})
+    assert d is not None and abs(d[0]) == pytest.approx(1.0)
+
+
 def test_a4_reach_grid_and_goal_set_restriction():
     step = math.radians(10.0)
     grid = AL.reach_grid(0.0, math.radians(95.0), step)
