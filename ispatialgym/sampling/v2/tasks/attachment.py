@@ -59,6 +59,9 @@ PARTNER_EXACT_CAP = 6
 #: §6.8 second base pose: lateral shifts of the grasp stance along the edge (m, + = robot's left) tried in this order
 SECOND_BASE_LATERALS = (0.10, -0.10, 0.20, -0.20, 0.30, -0.30)
 SECOND_BASE_MAX_TRIES = 6
+FOCUS_DEPTH_PREFERRED = 0.62  # base-forward depth of the manipulation focus beyond which the lift / SLERP fail (att_diag2 21:04)
+GOOD_TRUNKS = ((0.5, -0.45), (0.5, 0.0), (0.25, -0.3))  # (translate, tilt) verified for pick + pre-poses by the block probes
+CARRY_HEIGHTS = (0.12, 0.08, 0.05)  # the lift above the grasp: the first whose lift + SLERP pass the IK
 
 
 @dataclass
@@ -297,7 +300,19 @@ class Attachment(SamplerV2):
         init = self.init_stance
         errors = []
         self._deadline = time.time() + float(self.gen("attempt_budget_s", ATTEMPT_BUDGET_S))
-        for k in rng.permutation(len(self.manip_candidates))[:6]:
+        # candidates with the focus at an arm-friendly depth first (att_diag2 21:04: the male at 0.81 m base-forward grasps
+        # but its 12 cm lift fails the IK at every candidate; the block probes pass picks + pre-poses up to 0.65-0.70 m),
+        # ties by the draw
+        order = [int(k) for k in rng.permutation(len(self.manip_candidates))]
+
+        def score(k: int) -> float:
+            c = self.manip_candidates[k]
+            depth = float(c.world_to_base(c.focus[:2])[0]) if c.focus is not None else FOCUS_DEPTH_PREFERRED
+            trunk_pen = min(abs(float(c.translate) - t0) + abs(float(c.tilt) - i0) for t0, i0 in GOOD_TRUNKS)
+            return max(0.0, depth - FOCUS_DEPTH_PREFERRED) + 0.3 * trunk_pen
+
+        order.sort(key=score)
+        for k in order[:6]:
             if time.time() > self._deadline:
                 errors.append(f"attempt budget of {self.gen('attempt_budget_s', ATTEMPT_BUDGET_S):.0f} s spent")
                 break
@@ -494,9 +509,7 @@ class Attachment(SamplerV2):
                 ok = self.ikc.screen_pairs([[g_[1], g_[2]] for g_ in geo], st, "right", ignore_for_last=[support])
         screened = [g_ for g_, o in zip(geo, ok.tolist()) if o]
         fails["screen"] = len(geo) - len(screened)
-        carry = 0.12  # the lift clears the table; the SLERP waypoints carry the male up to the pre-attach pose above the partner
         shift = th.tensor([float(st.base_xy[0] - manip.base_xy[0]), float(st.base_xy[1] - manip.base_xy[1]), 0.0])
-        lift = (grasp.grasp[0] + th.tensor([0.0, 0.0, carry]) + shift, grasp.grasp[1])  # the carried male moves with the base
         for pose, eef_pre, eef_attach, point, b_dir, brace_classes, joint_ok in screened[:PARTNER_EXACT_CAP]:
             self._check_deadline()
             female.set_position_orientation(*pose)
@@ -508,12 +521,19 @@ class Attachment(SamplerV2):
                     if not res.ok:
                         fails["ik"] += 1
                         continue
-                    wps = [(TT._t(p[0]), TT._t(p[1])) for p in C.line_waypoints(lift, eef_pre, int(self.g("reorientation_waypoints")) + 1)]
-                    r_w = self.ikc.waypoints_ok([lift] + wps, st, "right", ignore_all=[support])
+                    # the lift clears the table; the SLERP waypoints carry the male up to the pre-attach pose above the partner. The
+                    # carry height ladder (owner item 2 / att_diag2: a 12 cm lift of a grasp at 0.8 m base-forward has no IK)
+                    r_w, lift, wps = None, None, []
+                    for carry in CARRY_HEIGHTS:
+                        lift = (grasp.grasp[0] + th.tensor([0.0, 0.0, carry]) + shift, grasp.grasp[1])  # the carried male moves with the base
+                        wps = [(TT._t(p[0]), TT._t(p[1])) for p in C.line_waypoints(lift, eef_pre, int(self.g("reorientation_waypoints")) + 1)]
+                        r_w = self.ikc.waypoints_ok([lift] + wps, st, "right", ignore_all=[support])
+                        if r_w.ok:
+                            break
                     if not r_w.ok:
                         fails["slerp"] += 1
                         seq = [lift] + wps
-                        log.info("%s: SLERP_FAILURE at %s: %s | %s", self.gp.alias, st.name, r_w.reason,
+                        log.info("%s: SLERP_FAILURE at %s (carry ladder %s): %s | %s", self.gp.alias, st.name, CARRY_HEIGHTS, r_w.reason,
                                  "; ".join(f"wp{i}: z_top+{float(pz[0][2]) - float(self.top.z):.2f} m, base {[round(float(v), 2) for v in st.world_to_base(pz[0][:2]).tolist()]}, "
                                            f"approach z {float(C.approach_axis(pz[1])[2]):+.2f}" for i, pz in enumerate(seq)))
                         continue
