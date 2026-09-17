@@ -36,13 +36,17 @@ class ViewSolution:
 
 
 class RobotKit:
-    def __init__(self, world, prebuild: Sequence[str] = ("right_arm",), mesh_cache_size: Optional[int] = None):
+    def __init__(self, world, prebuild: Sequence[str] = ("right_arm",), mesh_cache_size: Optional[int] = None, sdf_grid: Optional[Dict[str, object]] = None):
         """``mesh_cache_size``: capacity of the cuRobo mesh store (default: the backend's 8192). The store's capacity, not
         its fill, sizes every collision kernel launch, so a caller that knows how many collision meshes its world holds
-        (``count_collision_meshes``) should pass a snug value - see ``R1ProCuRobo.__init__``."""
+        (``count_collision_meshes``) should pass a snug value - see ``R1ProCuRobo.__init__``. ``sdf_grid``: the opt-in
+        voxel-grid collision world (``R1ProCuRobo(sdf_grid=...)``; ``reach_bands --collision sdf-grid``)."""
         self.world = world
         self.robot = world.robot
-        self.backend = R1ProCuRobo(self.robot, prebuild=prebuild, **({"mesh_cache_size": int(mesh_cache_size)} if mesh_cache_size else {}))
+        kw = {"mesh_cache_size": int(mesh_cache_size)} if mesh_cache_size else {}
+        if sdf_grid:
+            kw["sdf_grid"] = sdf_grid
+        self.backend = R1ProCuRobo(self.robot, prebuild=prebuild, **kw)
         if hasattr(world, "obstacle_filter"):
             self.backend.obstacle_filter = world.obstacle_filter
         self.jidx = self.backend._jidx
