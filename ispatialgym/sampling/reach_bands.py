@@ -58,7 +58,10 @@ kinematics entries and the batched IK solvers only) and the neighbouring rooms' 
 objects, scene load 117 s -> 54 s on house_single_floor); per trunk, the near meshes no robot sphere can reach are
 disabled during that trunk's IK passes (:class:`TrunkBound`). ``--cameras`` / ``--prebuild-planner`` / ``--full-load`` /
 ``--no-trunk-bound`` restore the old setup; none changes a band. Same-algorithm opt-ins (marginal cells may differ,
-default off): ``--mesh-cache auto`` (2.5x faster IK), ``--ik-tail-sizes``.
+default off): ``--mesh-cache auto`` (2.5x faster IK), ``--ik-tail-sizes``. Approximate opt-in (default off):
+``--collision sdf-grid [--sdf-res 0.01]`` - the static obstacles become float16 signed-distance voxel layers (cuRobo
+``VoxelGrid``, trilinear lookup, sampled from the exact mesh SDF; :mod:`ispatialgym.oracle.sdf_grid`), ~25x cheaper per
+batched IK call; recorded as ``schedule.collision`` and in the file-name key, so such bands never shadow exact ones by name.
 
 Reading a band (the sampler)::
 
@@ -600,15 +603,25 @@ class ObstacleScope:
         for o in world.scene.objects:
             if o is world.robot or o.name not in self.names_of:
                 continue
-            lo, hi = o.aabb
-            dx = max(float(lo[0]) - bx, 0.0, bx - float(hi[0]))
-            dy = max(float(lo[1]) - by, 0.0, by - float(hi[1]))
             mine = self.names_of[o.name]
-            if math.hypot(dx, dy) > radius or float(lo[2]) > world.floor_z + self.Z_ABOVE or (drop_ground and all(n in ground for n in mine)):
+            if self.is_far(o, (bx, by), world.floor_z, radius) or (drop_ground and all(n in ground for n in mine)):
                 self.far.extend(mine)
             else:
                 self.kept.append(o.name)
         self.n_near = sum(len(v) for v in self.names_of.values()) - len(self.far)
+        #: sdf-grid mode (``--collision sdf-grid``): the ground-like objects are a voxel layer, toggled like their meshes
+        self.grid_layers = dict(getattr(be, "_grid_layers", {}) or {})
+        self.drop_ground = drop_ground
+
+    @staticmethod
+    def is_far(obj, base_xy, floor_z: float, radius: float = RADIUS) -> bool:
+        """Whether ``obj`` (with ``.aabb``) is out of the robot's reach from ``base_xy``: its horizontal AABB distance exceeds
+        ``radius`` or its bottom is above ``floor_z + Z_ABOVE`` (ceilings, room lights)."""
+        bx, by = float(base_xy[0]), float(base_xy[1])
+        lo, hi = obj.aabb
+        dx = max(float(lo[0]) - bx, 0.0, bx - float(hi[0]))
+        dy = max(float(lo[1]) - by, 0.0, by - float(hi[1]))
+        return math.hypot(dx, dy) > radius or float(lo[2]) > floor_z + ObstacleScope.Z_ABOVE
 
     def _enable(self, names: Sequence[str], enabled: bool):
         be = self.kit.backend
@@ -616,14 +629,25 @@ class ObstacleScope:
             if n in be._world_mesh_names:
                 be._mesh_enable(n, enabled)
 
+    def _ground_layers_enable(self, enabled: bool):
+        """sdf-grid mode with ``drop_ground``: the ground-like layers follow the ground-like meshes (disabled with the scope)."""
+        if not (self.drop_ground and self.grid_layers):
+            return
+        for lname, info in self.grid_layers.items():
+            if info.get("ground_like"):
+                self.kit.backend.grid_layer_enable(lname, enabled)
+
     def __enter__(self):
         self._enable(self.far, False)
-        log.info("collision world for the band: %d meshes of %d objects kept within %.1f m of the base (%s), %d far meshes disabled", self.n_near, len(self.kept),
-                 self.radius, ", ".join(sorted(self.kept)), len(self.far))
+        self._ground_layers_enable(False)
+        log.info("collision world for the band: %d meshes of %d objects kept within %.1f m of the base (%s), %d far meshes disabled%s", self.n_near, len(self.kept),
+                 self.radius, ", ".join(sorted(self.kept)), len(self.far),
+                 "; sdf-grid layers: " + ", ".join(f"{k} ({len(v['objects'])} objects)" for k, v in self.grid_layers.items()) if self.grid_layers else "")
         return self
 
     def __exit__(self, *exc):
         self._enable(self.far, True)
+        self._ground_layers_enable(True)
 
     def trunk_prune(self, q: th.Tensor, shoulder_world, arm: str, protect=()) -> List[str]:
         """Disable, for one trunk configuration ``q``, the meshes of the kept scene objects that :class:`TrunkBound` proves
@@ -652,9 +676,15 @@ class ObstacleScope:
             def __enter__(self_inner):
                 self_inner.names = [n for o in objs for n in scope.names_of.get(getattr(o, "name", o), [])]
                 scope._enable(self_inner.names, False)
+                if scope.grid_layers:  # sdf-grid mode: an ignored object that is a voxel layer (the support) is switched off too
+                    for o in objs:
+                        scope.kit.backend.grid_object_enable(getattr(o, "name", o), False)
 
             def __exit__(self_inner, *exc):
                 scope._enable(self_inner.names, True)
+                if scope.grid_layers:
+                    for o in objs:
+                        scope.kit.backend.grid_object_enable(getattr(o, "name", o), True)
 
         return _Ctx()
 
@@ -898,6 +928,8 @@ class BandComputer:
         self.lattice = lattice
         self.seeds = seeds
         self.scope: Optional[ObstacleScope] = None
+        #: sdf-grid mode context (:meth:`sdf_prepare`); ``None`` = the exact mesh world
+        self._sdf: Optional[Dict[str, Any]] = None
         #: gripper opening of the locked finger joints (open for grasp bands, closed for the contact bands)
         self.fingers: float = 0.05
         #: contact-band mode: object height class (m) -> the generic CONTACT set replaces the generic pinch in
@@ -910,12 +942,114 @@ class BandComputer:
     def ignoring(self, objs):
         return self.scope.ignoring(objs) if self.scope is not None else self.kit.ignoring(objs)
 
+    # -- sdf-grid collision world (opt-in, --collision sdf-grid) ---------------------------------------------------
+    #: base displacement (m) from the current grid centre beyond which :meth:`trunk_config` rebuilds the layers around the
+    #: queried base pose (the stance search probes several base poses before the band's stance is known; the grid's half
+    #: width 1.8 m minus this keeps the whole body inside the grid for the trunk (0.5, 0) check)
+    SDF_RECENTRE_TOL = 0.5
+
+    def sdf_prepare(self, scene: str, ignore_for_grasp: Sequence[Any], cache_dir: Optional[str]):
+        """Arm the sdf-grid mode for this band (before the stance search): the layers are built around every base pose the
+        whole-body checks of :meth:`trunk_config` ask about (re-centred when it moves by more than ``SDF_RECENTRE_TOL``), and
+        finally at the band's stance by :meth:`setup_sdf_world`. ``ignore_for_grasp``: the non-spawned objects ignored at the
+        grasp pose (the support / the floor) - they get their own layer."""
+        self._sdf = {"scene": scene, "ignore": list(ignore_for_grasp), "cache_dir": cache_dir, "centre": None, "meta": None}
+
+    def _sdf_ensure_centre(self, x0: float, y0: float, tol: Optional[float] = None):
+        ctx = getattr(self, "_sdf", None)
+        if not ctx:
+            return
+        c = ctx["centre"]
+        if c is None or math.hypot(c[0] - float(x0), c[1] - float(y0)) > (self.SDF_RECENTRE_TOL if tol is None else tol):
+            ctx["meta"] = self._sdf_load((float(x0), float(y0)))
+            ctx["centre"] = (float(x0), float(y0))
+
+    def _sdf_load(self, base_xy: Tuple[float, float]) -> Dict[str, Any]:
+        """Move the static obstacles into signed-distance voxel layers around ``base_xy`` (:mod:`ispatialgym.oracle.sdf_grid`):
+        ``__sdf_static__`` = every scene object the exact mode's :class:`ObstacleScope` would keep (within ``RADIUS`` of the
+        base, below ``Z_ABOVE``) except the ground-like ones (``__sdf_ground__``, toggled like the ground meshes) and the
+        objects ignored at the grasp pose that are not spawned (the support; ``__sdf_support__``, switched off by
+        :meth:`ignoring`). Spawned objects (placed trays, the target) stay meshes in the small mesh store, so
+        :class:`MovingPlaced` and the per-cell checks work unchanged."""
+        from ispatialgym.oracle import sdf_grid as SG
+
+        ctx = self._sdf
+        kit, world = self.kit, self.world
+        be = kit.backend
+        assert be.sdf_grid, "the sdf-grid mode needs a kit built with sdf_grid=... (reach_bands --collision sdf-grid)"
+        x0, y0 = base_xy
+        support_objs = [o for o in ctx["ignore"] if getattr(o, "name", None) is not None and o.name not in world.spawned]
+        support_names = {o.name for o in support_objs}
+        static, ground = [], []
+        for o in world.scene.objects:
+            if o is world.robot or getattr(o, "visual_only", False) or o.name in world.spawned or o.name in support_names:
+                continue
+            if hasattr(world, "obstacle_filter") and not world.obstacle_filter(o):
+                continue
+            if ObstacleScope.is_far(o, (x0, y0), world.floor_z):
+                continue
+            (ground if be._is_ground_like(o) else static).append(o)
+        centre = np.array([float(x0), float(y0), world.floor_z + 0.5 * (SG.Z_ABOVE - SG.Z_BELOW)])
+        meta = be.load_sdf_layers({SG.LAYER_STATIC: static, SG.LAYER_SUPPORT: support_objs, SG.LAYER_GROUND: ground}, centre, ctx["cache_dir"], ctx["scene"])
+        meta["mesh_store"] = sorted(be._world_mesh_names)
+        meta["n_loads"] = (ctx["meta"] or {}).get("n_loads", 0) + 1
+        return meta
+
+    def setup_sdf_world(self, stance: Dict[str, Any], trunks: Sequence[Tuple[float, float]], arms: Sequence[str]) -> Dict[str, Any]:
+        """The band's final sdf-grid world: the layers centred exactly on the stance (:meth:`_sdf_load`; a cache hit when the
+        stance search already built them there), the check that the grid covers every robot sphere at the band's trunks, and
+        :class:`TrunkBound` switched off (the layers cost the same at every trunk). Returns the ``schedule.collision`` meta."""
+        x0, y0, _ = stance["base_pose2d"]
+        self._sdf_ensure_centre(x0, y0, tol=1e-6)
+        meta = dict(self._sdf["meta"])
+        meta["extent_check"] = self.sdf_extent_check(stance, trunks, arms, meta["bounds_world"])
+        meta["trunk_bound"] = "off (the static obstacles are voxel layers, whose lookup costs the same at every trunk)"
+        meta["recentre_tol"] = self.SDF_RECENTRE_TOL
+        self.TRUNK_BOUND = False
+        return meta
+
+    def sdf_extent_check(self, stance: Dict[str, Any], trunks: Sequence[Tuple[float, float]], arms: Sequence[str], bounds_world) -> Dict[str, Any]:
+        """Whether the grid box ``bounds_world`` contains every position a robot sphere can take during the band: per trunk
+        (untucked arms), the fixed spheres' AABB and the :class:`TrunkBound` ball of every band arm around its shoulder, grown
+        by the activation distance + its margin. Points outside the grid are free space for cuRobo, so a too small grid would
+        silently miss collisions; the check is recorded in the meta and logged as a warning when it fails."""
+        kit = self.kit
+        x0, y0, yaw0 = stance["base_pose2d"]
+        bounds = {arm: TrunkBound(kit, arm) for arm in arms}
+        lo_all = hi_all = None
+        n_ok = 0
+        for tr, ti in trunks:
+            try:
+                q = kit.q_at_base_pose(kit.q_config(arms="untucked", translate=tr, tilt=ti, fingers=self.fingers), x0, y0, yaw0)
+            except (ValueError, KeyError):
+                continue
+            for arm, bound in bounds.items():
+                centres, radii, moving = bound.spheres_world(q)
+                shoulder, _ = self.shoulder_and_reach(q, arm)
+                lo = th.minimum((centres - radii.unsqueeze(1)).min(dim=0).values, shoulder - bound.r_arm)
+                hi = th.maximum((centres + radii.unsqueeze(1)).max(dim=0).values, shoulder + bound.r_arm)
+                lo_all = lo if lo_all is None else th.minimum(lo_all, lo)
+                hi_all = hi if hi_all is None else th.maximum(hi_all, hi)
+            n_ok += 1
+        if lo_all is None:
+            return {"ok": None, "n_trunks": 0}
+        slack = max(b.eta + b.MARGIN for b in bounds.values())
+        need_lo, need_hi = (lo_all - slack).tolist(), (hi_all + slack).tolist()
+        g_lo, g_hi = bounds_world
+        ok = all(a >= b for a, b in zip(need_lo, g_lo)) and all(a <= b for a, b in zip(need_hi, g_hi))
+        rec = {"ok": bool(ok), "n_trunks": n_ok, "needed_world": [[round(v, 3) for v in need_lo], [round(v, 3) for v in need_hi]], "grid_world": [[round(float(v), 3) for v in g_lo], [round(float(v), 3) for v in g_hi]],
+               "r_arm": {arm: round(b.r_arm, 3) for arm, b in bounds.items()}}
+        (log.info if ok else log.warning)("sdf-grid extent check over %d trunks: robot spheres need %s .. %s, grid %s .. %s -> %s", n_ok, rec["needed_world"][0], rec["needed_world"][1],
+                                          rec["grid_world"][0], rec["grid_world"][1], "ok" if ok else "TOO SMALL (outside the grid is free space)")
+        return rec
+
     # -- postures (owner decision A6) -----------------------------------------------------------------------------
     def trunk_config(self, translate: float, tilt: float, x0: float, y0: float, yaw0: float, postures: Sequence[str] = POSTURES):
         """Whole-body collision-free configuration at the trunk with the first posture of ``postures`` that is free
         (``untucked`` first; ``ready`` / ``tucked`` when the untucked arms self-collide, e.g. translate 0.95 / tilt -1.2):
         ``(q, posture)`` or ``(None, None)`` when every posture collides."""
         kit = self.kit
+        self._sdf_ensure_centre(x0, y0)  # sdf-grid mode only: the layers must surround the queried base pose
         for posture in postures:
             try:
                 q = kit.q_at_base_pose(kit.q_config(arms=posture, translate=translate, tilt=tilt, fingers=self.fingers), x0, y0, yaw0)
@@ -1522,6 +1656,10 @@ def _chairs_to_remove(scene: str, support_name: str, rooms: List[str], stable: O
 MESH_CACHE_HEADROOM = 256
 MESH_CACHE_MIN = 512
 MESH_CACHE_RESERVE = 64
+#: --collision sdf-grid defaults (APPROXIMATE OPT-IN, see build_parser): voxel size (m) and the mesh-store capacity for the
+#: spawned objects (the only meshes of that mode; ~0.6 ms per slot per batched IK call)
+SDF_RES = 0.01
+SDF_MESH_CACHE = 64
 
 #: slim load (``_slim_drop_list``): safety margin (m) added to every bounding box derived from the stable scene json before
 #: the ``SimWorld.obstacle_filter`` test - the json knows the canonical (visual) bounding box, the filter measures the
@@ -1780,7 +1918,36 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--ik-tail-sizes", default=None, help="SAME-ALGORITHM OPT-IN (default: the committed 16,32,64,128): batched IK solver sizes for the last "
                     "chunk of a screening call, e.g. 8,16,24,32,48,64,96,128 - fewer padded slots (73 real poses per 128-slot call in the pilot), but every "
                     "solver size draws its own cuRobo seed stream, so marginal cells can differ from the default schedule; recorded as schedule.ik_sizes")
+    ap.add_argument("--collision", default=None, choices=["mesh", "sdf-grid"],
+                    help="APPROXIMATE OPT-IN (default 'mesh': the exact per-mesh cuRobo world, unchanged): 'sdf-grid' represents the static scene obstacles "
+                    "by float16 signed-distance voxel layers (cuRobo VoxelGrid, trilinear lookup; ispatialgym.oracle.sdf_grid) sampled from the exact "
+                    "mesh SDF at the voxel centres - the static objects near the stance, the support (its own layer, switched off for the grasp pose) "
+                    "and the ground-like objects; spawned objects (placed trays, the target) stay meshes in a %d-slot store. ~25x cheaper per batched IK "
+                    "call on an RTX 4090; marginal cells can differ (interpolation between voxel centres). Recorded as schedule.collision" % SDF_MESH_CACHE)
+    ap.add_argument("--sdf-res", type=float, default=SDF_RES, help=f"--collision sdf-grid: voxel size (m), default {SDF_RES} (3.6 x 3.6 x 2.95 m grid: 38 M voxels = "
+                    "76 MB float16 per layer, three layers; 0.005 = 1.8 GB)")
+    ap.add_argument("--sdf-mesh-cache", type=int, default=SDF_MESH_CACHE, help=f"--collision sdf-grid: capacity of the mesh store for the spawned objects (default {SDF_MESH_CACHE}; "
+                    "~0.6 ms per slot per batched IK call)")
+    ap.add_argument("--sdf-cache-dir", default=None, help="--collision sdf-grid: directory of the sampled layers (<key>.npz float16 + <key>.json), shared by every band of a "
+                    "support / stance (default: <--out or the cache root>/sdf_grids; worker mode: <ROOT>/sdf_grids)")
     return ap
+
+
+def sdf_grid_config(args) -> Optional[Dict[str, Any]]:
+    """The ``R1ProCuRobo(sdf_grid=...)`` config of ``--collision sdf-grid`` (``None`` in the default mesh mode): the voxel size, the
+    grid's voxel counts / extents (fixed: ``2 * HALF_XY`` around the stance, ``Z_BELOW`` below the floor to ``Z_ABOVE`` above it) and
+    the mesh-store capacity."""
+    if getattr(args, "collision", None) != "sdf-grid":
+        return None
+    from ispatialgym.oracle import sdf_grid as SG
+
+    res = float(args.sdf_res)
+    n, dims, _ = SG.grid_spec((0.0, 0.0), -SG.Z_BELOW, SG.Z_ABOVE, res)
+    return {"res": res, "n": n.tolist(), "dims": dims.tolist(), "mesh_cache": int(args.sdf_mesh_cache)}
+
+
+def sdf_cache_dir(args, out_dir: str) -> str:
+    return args.sdf_cache_dir or os.path.join(out_dir, "sdf_grids")
 
 
 def _reset_kit_seeds(kit):
@@ -1816,10 +1983,18 @@ def load_world(args, rooms: List[str], variant: Optional[dict], removed: List[st
     cache = None
     if args.mesh_cache:
         cache = max(MESH_CACHE_MIN, 64 * math.ceil((n_meshes + MESH_CACHE_HEADROOM) / 64)) if str(args.mesh_cache).lower() == "auto" else int(args.mesh_cache)
-    kit = RobotKit(world, prebuild=tuple(f"{a}_arm" for a in arms) if args.prebuild_planner else (), mesh_cache_size=cache)
+    sdf = sdf_grid_config(args)
+    kit = RobotKit(world, prebuild=tuple(f"{a}_arm" for a in arms) if args.prebuild_planner else (), mesh_cache_size=cache, sdf_grid=sdf)
+    if sdf:
+        # APPROXIMATE OPT-IN (--collision sdf-grid): only spawned objects are meshes; the scene's static obstacles become voxel
+        # layers per band (BandComputer.setup_sdf_world), so the first sync loads nothing but the ground slab
+        kit.backend.mesh_object_filter = lambda o, _w=world: o.name in _w.spawned
     kit.sync_world()
     log.info("cuRobo mesh cache %d for %d loaded collision meshes (%d after the sync)%s", kit.backend.mesh_cache_size, n_meshes, len(kit.backend._world_mesh_names),
              "" if cache is None else " [--mesh-cache: same-algorithm opt-in, marginal cells can differ from the 8192 default]")
+    if sdf:
+        log.info("collision world: sdf-grid (APPROXIMATE OPT-IN) - voxel %.3f m, %s voxels per layer, %d layers, mesh store %d for the spawned objects", sdf["res"],
+                 "x".join(str(v) for v in sdf["n"]), 3, sdf["mesh_cache"])
     #: physics state a band starts from in a fresh process (robot parked, five physics steps, nothing spawned); restored
     #: before every further band of a worker (:func:`reset_world_between_bands`)
     world.parked_state = og.sim.dump_state()
@@ -1861,7 +2036,11 @@ def reset_world_between_bands(world, kit):
         og.sim.load_state(world.parked_state, serialized=False)
     finally:
         del og.sim.sync_physx_to_fabric
-    kit.sync_world()
+    if kit.backend.sdf_grid:  # --collision sdf-grid: the small mesh store is emptied of the previous band's objects; the layers are rebuilt per band
+        kit.backend.reload_mesh_store()
+        kit._synced_root = kit.backend.root_pose()[0].clone()
+    else:
+        kit.sync_world()
     _reset_kit_seeds(kit)
 
 
@@ -1908,6 +2087,11 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
         meta["schedule"]["mesh_cache"] = int(kit.backend.mesh_cache_size)
     if args.no_trunk_bound:
         bc.TRUNK_BOUND = False
+    grid_mode = bool(kit.backend.sdf_grid)  # --collision sdf-grid (approximate opt-in): the layers are built once the stance is known
+    if grid_mode != (getattr(args, "collision", None) == "sdf-grid"):
+        raise SystemExit(f"--collision {args.collision!r} does not match the loaded world (sdf-grid={grid_mode}); the worker groups jobs by collision mode")
+    #: file-name key extras: a grid band never overwrites / shadows an exact band of the same factors by name (the exact key is unchanged)
+    key_extra = {"collision": ["sdf_grid", float(kit.backend.sdf_grid["res"])]} if grid_mode else {}
     if args.smoke:
         t_fk = time.time()
         meta["shoulder_fk_check"] = verify_shoulder_fk(world, kit, bc, SMOKE_FK_TRUNKS, arm="right")
@@ -1916,6 +2100,15 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
     # ---- support geometry and stance
     placed_objs = []
     placed_specs = [PlacedSpec.parse(s) for s in args.placed]
+    if grid_mode:
+        # the stance search below runs whole-body checks at candidate base poses: the layers are built around each of them
+        # (BandComputer.trunk_config), the object ignored at the grasp pose (support / floor) in its own layer from the start
+        if floor_mode:
+            room = rooms[0] if args.under else args.room
+            sdf_ignore = [world.floor_of_room(room)] if room else []
+        else:
+            sdf_ignore = [world.obj(args.support)]
+        bc.sdf_prepare(args.scene, sdf_ignore, sdf_cache_dir(args, out_dir))
     if floor_mode:
         z_support = world.floor_z
         if args.under:
@@ -2101,6 +2294,8 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
         trunks = trunk_sel or (SMOKE_TRUNKS if args.smoke else trunk_grid(z_support - world.floor_z))
         per_trunk = []
         cells_out: Dict[Tuple[float, float], np.ndarray] = {}
+        if grid_mode:
+            meta["schedule"]["collision"] = bc.setup_sdf_world(stance, trunks, (handle_arm, brace_arm))
         bc.scope = ObstacleScope(kit, world, (x0, y0), drop_ground=(z_support - world.floor_z) >= 0.55).__enter__()
         for tr, ti in trunks:
             t0 = time.time()
@@ -2179,7 +2374,8 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
         bc.scope = None
         result = {"trunks": per_trunk, "cells": cells_out, "pairs": {}}
         key = _key({"scene": args.scene, "support": args.support, "z": round(z_support, 2), "stance": stance["edge"], "s": args.stand_off, "target": args.target,
-                    "scale": scale, "handle_key": args.handle_key, "joint": args.joint, "q": q_values, "brace": True, "grid": meta["grid"], "lattice": lattice, "arms": "untucked"})
+                    "scale": scale, "handle_key": args.handle_key, "joint": args.joint, "q": q_values, "brace": True, "grid": meta["grid"], "lattice": lattice, "arms": "untucked",
+                    **key_extra})
         name = f"brace__{args.scene}__{args.support}__{cat}-{model}__{key}"
     else:
         grasps, rest_quat, max_off = None, G.IDENTITY_QUAT.clone(), 0.0
@@ -2231,12 +2427,14 @@ def compute_band(args, world, kit, out_dir: str, *, rooms: List[str], removed: L
         restore_placed()
         kit.sync_world()
         trunks = trunk_sel or (SMOKE_TRUNKS if args.smoke else trunk_grid(z_support - world.floor_z))
+        if grid_mode:
+            meta["schedule"]["collision"] = bc.setup_sdf_world(stance, trunks, (band_arm,))
         result = bc.compute(stance, lattice_world, z_eval, pose_fn, grasps if not (args.generic_pinch or args.generic_contact) else None, ignore_grasp,
                             arm=band_arm, trunks=trunks, max_grasp_offset=max_off)
         gset = [(g.key, g.name, g.position.tolist(), g.quat.tolist()) for g in grasps] if grasps else ("contact:" + ",".join(CONTACT_CLASSES_NAMES) if args.generic_contact else "generic:" + ",".join(GENERIC_CLASSES))
         key = _key({"scene": args.scene, "support": args.support, "z": round(z_support, 2), "stance": stance["edge"], "s": args.stand_off, "object": meta.get("object"),
                     "scale": scale, "grasps": gset, "rest": rest_quat.tolist(), "placed": meta["placed_specs"], "under": args.under, "grid": meta["grid"], "lattice": lattice,
-                    "arms": "untucked", "seeds": 12, "arm": band_arm, "height_class": meta.get("height_class"), "postures": list(POSTURES)})
+                    "arms": "untucked", "seeds": 12, "arm": band_arm, "height_class": meta.get("height_class"), "postures": list(POSTURES), **key_extra})
         oname = f"h{meta['height_class']:.2f}" if args.generic_contact else (args.object.replace("/", "-") if args.object else "generic")
         for ps in placed_specs:
             oname += f"__placed-{ps.category}-{ps.model}" + (f"-s{ps.scale[0]:g}" if ps.scale else "") + ("-focus" if ps.mode == PLACED_MODE_FOCUS else "")
@@ -2343,7 +2541,13 @@ def run_jobs(args):
             jargs.log_level, jargs.prebuild_planner = args.log_level, args.prebuild_planner
             jargs.cameras, jargs.full_load = args.cameras or jargs.cameras, args.full_load or jargs.full_load
             jargs.ik_tail_sizes, jargs.mesh_cache = args.ik_tail_sizes or jargs.ik_tail_sizes, args.mesh_cache or jargs.mesh_cache
+            jargs.collision = args.collision or jargs.collision
+            if args.collision == "sdf-grid":
+                jargs.sdf_res, jargs.sdf_mesh_cache = args.sdf_res, args.sdf_mesh_cache
+            jargs.sdf_cache_dir = args.sdf_cache_dir or jargs.sdf_cache_dir or os.path.join(root, "sdf_grids")
             key = band_world_key(jargs)
+            if jargs.collision == "sdf-grid":  # the voxel store is part of the world: grid jobs get their own world key
+                key = key + (("sdf-grid", float(jargs.sdf_res), int(jargs.sdf_mesh_cache)),)
             floor_mode, rooms = band_rooms(jargs)
             prepared.append((job, jargs, floor_mode, rooms, list(key[2]), key))
         except (SystemExit, Exception) as e:  # noqa: BLE001 - a malformed job must not stop the others
@@ -2372,7 +2576,7 @@ def run_jobs(args):
                 raise p[1]
             _, jargs, floor_mode, rooms, removed, key = p
             arms = band_arms(jargs)
-            if world is not None and key == cur_key and len(kit.backend._world_mesh_names) + MESH_CACHE_RESERVE > kit.backend.mesh_cache_size:
+            if world is not None and key == cur_key and not kit.backend.sdf_grid and len(kit.backend._world_mesh_names) + MESH_CACHE_RESERVE > kit.backend.mesh_cache_size:
                 log.info("worker: cuRobo mesh store nearly full (%d of %d after %d bands); reloading the scene", len(kit.backend._world_mesh_names),
                          kit.backend.mesh_cache_size, n_bands)
                 cur_key = None  # forces the reload below
