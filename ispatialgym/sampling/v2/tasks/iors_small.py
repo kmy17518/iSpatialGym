@@ -95,6 +95,8 @@ RELEASE_ABOVE_SURFACE_MIN = 0.003
 #: library grasps whose closing axis is inclined more than this to the horizontal (and the vertical) in the target's rest
 #: frame rotate the object in the hand until the pinch is flush (dropped while a flush grasp remains)
 CLOSING_TILT_MAX_DEG = 12.0
+#: the flush-pinch filter applies to objects at least this many times taller than their footprint width (walls to pivot about)
+FLUSH_PINCH_MIN_ASPECT = 1.2
 #: a target that rolled more than this while settling gets its grasp re-selected at the settled pose
 REGRASP_AFTER_ROLL_DEG = 10.0
 #: touching brace (axial stop-brace rule): the pads' / blade's outer face this far outside the partner's far face, and the
@@ -207,7 +209,12 @@ class IORSSmall(SamplerV2):
         self.template_facts["grasp_closing_tilt_deg"] = {k: round(v, 1) for k, v in tilts.items()}
         self.template_facts["grasp_pivot_arms_m"] = {g.name: round(self.pivot_arm(g.pose), 4) for g in self.grasps}
         tilt_max = float(self.gen("closing_tilt_max_deg", CLOSING_TILT_MAX_DEG))
-        flush = [g for g in self.grasps if tilts[g.name] <= tilt_max]
+        ext = TT.hull_extents(self.hull["target"], self.rest["target"])
+        tall = float(ext[2]) >= float(self.gen("flush_pinch_min_aspect", FLUSH_PINCH_MIN_ASPECT)) * min(float(ext[0]), float(ext[1]))
+        # only objects with walls to pivot about (height >= 1.2 x footprint width: cups, jars, boxes) are filtered; a round
+        # apple / sprout has no flat wall to sit flush against and its grasps are all "inclined" (ontop apple probe: F empty)
+        flush = [g for g in self.grasps if tilts[g.name] <= tilt_max] if tall else list(self.grasps)
+        self.template_facts["flush_pinch_filter"] = "applied" if tall else "skipped (not a tall object)"
         if flush:
             self.template_facts["grasps_dropped_inclined_pinch"] = [g.name for g in self.grasps if g not in flush]
             self.grasps = flush
