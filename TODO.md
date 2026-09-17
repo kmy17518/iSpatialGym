@@ -118,15 +118,15 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 20:41 PDT — 5/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 21:07 PDT — 7/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
-| camera_relocalization-standard | valid demo | - | - |
-| camera_relocalization-obstructed | valid demo | tracker corner fix d4a1745 not yet re-demoed | oracle |
-| object_scaling | valid demo | - | - |
-| mental_rotation | valid demo | - | - |
-| disembedding | valid demo (pre-bcc937d) | - | - |
+| camera_relocalization-standard | valid demo (pre-166005f) | - | - |
+| camera_relocalization-obstructed | valid demo (pre-166005f) | tracker corner fix d4a1745 not yet re-demoed | oracle |
+| object_scaling | valid demo (pre-166005f) | - | - |
+| mental_rotation | valid demo (pre-166005f) | - | - |
+| disembedding | valid demo (pre-bcc937d,166005f) | - | - |
 | CM block_design | no instance | DECISION D-006: last block cannot be pinched into 1 mm gaps (finger-clearance gate 4c66d53a) — 6 mm gaps / oracle push-only tail / 3 blocks; default A 21:00. Pre-pose reach fixed (3a7db49c); flip-on-table prep 0ec0153d behind block_table_flip | owner (D-006) / tabletop |
 | CM attachment | no instance | second base pose (58afae2) + brace faces near/left/far (bd30c0cf) + oracle program travels the recorded stance, brace optional (6baaaa3b) — scheduler re-run due | loop / tabletop |
 | CM articulation_open_small_scale | no instance | 25° cone landed (aea6bd0a): Phase 2 survives; now contact_unreachable at the brace pre-contact (no brace face + handle grasp passes the two-arm IK) → tabletop (more brace faces / recorded stance; else brace-optional decision) | tabletop |
@@ -135,12 +135,12 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | CM articulation_close_large_scale | no instance | same as open; Rs_int drawer close = Phase-1 no_stance (base_ok instrumented 1c829ae) | large-scale |
 | alignment-world_vertical | demo run | oracle chain landed (standoff, 3-D arc about the hook, loaded bounds): demo runs to the end in tolerance (0.052 rad) but not_settled — the frictionless hook (revolute limits: null, no damping) swings undamped after release → large-scale / TRO: hook joint damping/friction | large-scale |
 | alignment-world_horizontal | demo run | push plan_failed = self-collision left_realsense_link vs right_arm_link7 (13 mm) along every path: the sidecar's push witnesses have the brace arm at zeros → large-scale: two-arm witness for the push pre with the brace arm at its contact | large-scale |
-| alignment-axial | demo run (pre-fix success) | - | - |
-| IORS ontop_small_scale | demo run (pre-fix success) | - | - |
+| alignment-axial | demo run (pre-fix success) | re-run 20:40 (oracle retreat changes 35be0ee/3eb8e51): plan_failed at retreat → primary oracle | oracle |
+| IORS ontop_small_scale | valid demo (pre-166005f) | - | - |
 | IORS under_small_scale | demo run (pre-fix success) | DECISION D-007: physically correct placement (1.4 mm, 2.7°) but OmniGibson Under never registered (passed 18:41 with the same geometry) — robust evaluator / pose-target fallback / re-run; default A 21:15. Core 1ba5e74 (open-pad support clearance) re-run queued | owner (D-007) / loop |
-| IORS inside | demo run (pre-fix success) | valid on f5ae607; re-opened by the core's targeted 1ba5e74 (open pads clear of the support: the failing sprout grasp had its fingertip at the table) — re-run queued | loop |
-| IORS nextto | demo run (pre-fix success) | core 385de1e: partner outside the open-jaw sweep at the release (place moved along the nextto bound / jaw yaw; release_opening_max_m fact for a pre-shaped release) → re-run queued; closure ramp + pre-shape (oracle-B) pending | loop / oracle-B |
-| IORS touching | demo run | first instance 20:21 (push-only); demo plan_failed at grasp → oracle-B; 385de1e facts re-run queued | oracle-B / loop |
+| IORS inside | valid demo (pre-166005f) | valid on f5ae607; re-opened by the core's targeted 1ba5e74 (open pads clear of the support: the failing sprout grasp had its fingertip at the table) — re-run queued | loop |
+| IORS nextto | demo run (pre-fix success) | oracle 166005ff FOV rule (b) + straight carry leg: 0 out-of-frame steps, 0.029 rad; pencil sweep at release → core 385de1e on new instances; scheduler re-run on HEAD pending; closure ramp (oracle-B) pending | loop |
+| IORS touching | demo run | first instance 20:21 demo plan_failed at grasp → primary oracle; carried-box descent collision = genuine (box vs forearm/torso) → core tries the next grasp yaw | oracle / core |
 | IORS ontop_large_scale | no instance | countertop pair = geometric yield (partner behind stance A) → floor fallback alias queued (local); sofa-bar re-run with the B→C path limit geodesic+3 m (4df6d0a) running locally | large-scale / loop |
 | IORS under_large_scale | no instance | push-under lanes 0.45–0.6 m ahead + edge-end laterals + frontal offset 0.25 m right (7162fe7, 8c93d0b, 2cfce47) — re-run queued/running | large-scale / loop |
 <!-- /first-demo-board -->
@@ -322,3 +322,4 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026‑09‑16 20:25 PDT agent-e2e: tabletop report — 25° cone (`aea6bd0a`): hinged‑jar Phase 2 survives, next blocker `contact_unreachable` at the brace pre‑contact (tabletop continues; brace‑optional decision only if no joint cell exists); attachment second base pose (`58afae2`) + brace faces near/left/far (`bd30c0cf`), oracle‑B's `6baaaa3b` travels the recorded attach stance (brace optional) → re‑run due; block design: places failed on the cuRobo sphere‑fit bulge vs touching neighbours → placed neighbours ignored behind a finger‑clearance gate (`4c66d53a`), regions capped at 0.70 m (`3a7db49c`), but the last 2×2 block cannot be pinched into 1 mm gaps → **D‑006 posted** (6 mm gaps / push‑only tail / 3 blocks; default A 21:00); flip‑on‑the‑table prep `0ec0153d` behind `generation.block_table_flip` (record `legs[]`, yaw‑first then one quarter turn about a horizontal axis).
 - 2026‑09‑16 20:32 PDT agent-e2e: core — the failing sprout grasp had its fingertip at the table (−0.6 mm; the passing one +7.7 mm): the closure‑probe mechanism → `1ba5e74` open‑pad support clearance (2 mm) with grasp re‑selection (preference, fact recorded) + the program‑check single‑pose consistency fix (approached object removed as along the chain); inside re‑validated on 02c700d; teacup re‑run physically correct but `Under` never registered → **D‑007 posted** (robust evaluator / pose‑target fallback / re‑run; default A 21:15); core next: the nextto open‑jaw footprint rule.
 - 2026‑09‑16 20:42 PDT agent-e2e: core `385de1e` — open‑jaw footprint at the release for nextto / touching (partner outside the box the opened fingers sweep from the release through the retreat; nextto moves the place along the bound, then turns the jaw when the orientation is free; `release_sweep` facts incl. `release_opening_max_m` for a pre‑shaped / asymmetric oracle release; `Reject(release_sweep)` when even pinch + 1 cm sweeps the partner — reproduces the 0916‑181440 demo: pencil 3 mm inside the sweep). Yield on the marker alias roughly halves (axis along the edge passes); the oracle's asymmetric release would recover the rest → relayed to oracle‑B with the fact names.
+- 2026‑09‑16 21:08 PDT agent-e2e: primary oracle — **FOV rule (b) + straight carry leg landed** (`166005ff`, `513c536`; blanket entry, final sweep): per‑arm spans opened at the pre‑grasp / pre‑contact and closed after the release / contact leg, checkpointed; `Place.targets["carry"]` straight leg through `grasps[k].carry`; regression on the 0916‑152503 instance: old transit → `gripper_out_of_fov` at the place transit (114 consecutive steps), straight leg → 0 out‑of‑frame steps, place in 175 steps (was 429), 0.029 rad; the live old‑transit re‑run died earlier of `ghost_hand` (38° in‑hand roll during the swing). A7 verified (attached object exempt vs gripper / wrist camera / link6‑7 / fingers; the touching descent collision is the box vs forearm / torso → core tries the next grasp yaw). Block flip‑on‑table program prep `0ee927f6` (record `blocks[k].table_flip` proposed to the tabletop agent). Primary oracle next: axial retreat `plan_failed` (20:40) and the first touching demo's grasp `plan_failed`.

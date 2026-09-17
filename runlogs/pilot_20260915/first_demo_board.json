@@ -80,12 +80,12 @@
   "owner": "loop"
  },
  "inter_object_relation_satisfaction-nextto": {
-  "blocking": "core 385de1e: partner outside the open-jaw sweep at the release (place moved along the nextto bound / jaw yaw; release_opening_max_m fact for a pre-shaped release) \u2192 re-run queued; closure ramp + pre-shape (oracle-B) pending",
-  "owner": "loop / oracle-B"
+  "blocking": "oracle 166005ff FOV rule (b) + straight carry leg: 0 out-of-frame steps, 0.029 rad; pencil sweep at release \u2192 core 385de1e on new instances; scheduler re-run on HEAD pending; closure ramp (oracle-B) pending",
+  "owner": "loop"
  },
  "inter_object_relation_satisfaction-touching": {
-  "blocking": "first instance 20:21 (push-only); demo plan_failed at grasp \u2192 oracle-B; 385de1e facts re-run queued",
-  "owner": "oracle-B / loop"
+  "blocking": "first instance 20:21 demo plan_failed at grasp \u2192 primary oracle; carried-box descent collision = genuine (box vs forearm/torso) \u2192 core tries the next grasp yaw",
+  "owner": "oracle / core"
  },
  "inter_object_relation_satisfaction-ontop_large_scale": {
   "blocking": "countertop pair = geometric yield (partner behind stance A) \u2192 floor fallback alias queued (local); sofa-bar re-run with the B\u2192C path limit geodesic+3 m (4df6d0a) running locally",

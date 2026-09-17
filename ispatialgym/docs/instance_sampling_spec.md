@@ -401,7 +401,7 @@ is exempt until the next pre‑grasp. Each grasp → release pair is its own spa
 blocks, the flip‑on‑table re‑grasp); contact spans (brace / push) run from the pre‑contact to the end of the contact leg.
 Consequence for the recorded motion: the **carry leg** from the lift end to the pre‑place is a straight Cartesian leg at
 constant orientation (both ends are recorded in frame, so the projected path is in frame by construction); when that leg
-is infeasible the sampler records a `carry` waypoint — never a free trajopt swing. B1K's replay QA
+is infeasible the sampler records a `carry` waypoint (`grasps[k].carry`, core `dc6a1a5`) — never a free trajopt swing. Implemented oracle‑side in `166005ff` (per‑arm spans opened at the pre‑grasp / pre‑contact, closed after the release / contact leg, checkpointed; `Place.targets["carry"]` straight leg through the recorded waypoint): the nextto regression instance goes from 114 consecutive out‑of‑frame steps at the place transit (verdict `gripper_out_of_fov`) to 0. B1K's replay QA
 (`FieldOfViewMetric`, `gripper_changes_outside_fov_limit=0`) only requires the gripper in view at the grasp / release
 toggles; ours is deliberately stricter (oracle doc §6.4).
 
