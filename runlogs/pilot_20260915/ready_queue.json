@@ -1,5 +1,5 @@
 {
- "updated": "2026-09-16 18:07 PDT",
+ "updated": "2026-09-16 18:14 PDT",
  "entries": [
   {
    "id": "configuration_matching-articulation_close_large_scale:0916-175857",
@@ -38,6 +38,103 @@
    "launched_at": "2026-09-16 18:07 PDT",
    "pid": 980827,
    "log": "runlogs/pilot_20260915/first_demo/logs/inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar.sched-180755.log"
+  },
+  {
+   "id": "inter_object_relation_satisfaction-ontop_large_scale:0916-181424",
+   "priority": 16,
+   "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+   "alias": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-floor",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": true,
+   "state": "ready",
+   "added_by": "coordinator",
+   "added_at": "2026-09-16 18:14 PDT",
+   "note": "B fallback of the countertop pair (geometric yield: the partner countertop stands behind stance A) - floor init",
+   "max_attempts": 8,
+   "timeout": 7200
+  },
+  {
+   "id": "inter_object_relation_satisfaction-ontop_small_scale:0916-181255",
+   "priority": 20,
+   "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
+   "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "running",
+   "added_by": "rule",
+   "added_at": "2026-09-16 18:12 PDT",
+   "note": "auto: new fix(es) dc6a1a5, 667416d since the last run",
+   "missing_fixes": [
+    "dc6a1a5",
+    "667416d"
+   ],
+   "launched_at": "2026-09-16 18:12 PDT",
+   "pid": 997854,
+   "log": "runlogs/pilot_20260915/first_demo/logs/inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_ta.sched-181259.log"
+  },
+  {
+   "id": "disembedding:0916-181254",
+   "priority": 21,
+   "subtask": "disembedding",
+   "alias": "disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "running",
+   "added_by": "rule",
+   "added_at": "2026-09-16 18:12 PDT",
+   "note": "auto: new fix(es) dc6a1a5 since the last run",
+   "missing_fixes": [
+    "dc6a1a5"
+   ],
+   "launched_at": "2026-09-16 18:12 PDT",
+   "pid": 997855,
+   "log": "runlogs/pilot_20260915/first_demo/logs/disembedding-bottle_of_milk-bottle_of_milk_1-breakfast_table.sched-181259.log"
+  },
+  {
+   "id": "inter_object_relation_satisfaction-under_small_scale:0916-181255",
+   "priority": 22,
+   "subtask": "inter_object_relation_satisfaction-under_small_scale",
+   "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "running",
+   "added_by": "rule",
+   "added_at": "2026-09-16 18:12 PDT",
+   "note": "auto: new fix(es) dc6a1a5 since the last run",
+   "missing_fixes": [
+    "dc6a1a5"
+   ],
+   "launched_at": "2026-09-16 18:12 PDT",
+   "pid": 997856,
+   "log": "runlogs/pilot_20260915/first_demo/logs/inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table.sched-181259.log"
+  },
+  {
+   "id": "inter_object_relation_satisfaction-touching:0916-181255",
+   "priority": 30,
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "alias": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "running",
+   "added_by": "rule",
+   "added_at": "2026-09-16 18:12 PDT",
+   "note": "auto: new fix(es) dc6a1a5 since the last run",
+   "missing_fixes": [
+    "dc6a1a5"
+   ],
+   "launched_at": "2026-09-16 18:12 PDT",
+   "pid": 997857,
+   "log": "runlogs/pilot_20260915/first_demo/logs/inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfa.sched-181259.log"
   },
   {
    "id": "configuration_matching-block_design:0916-172358",
@@ -101,6 +198,26 @@
    "launched_at": "2026-09-16 17:38 PDT",
    "pid": 905641,
    "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-attachment-lid-teapot-breakfast_table.sched-173836.log"
+  },
+  {
+   "id": "inter_object_relation_satisfaction-inside:0916-181255",
+   "priority": 66,
+   "subtask": "inter_object_relation_satisfaction-inside",
+   "alias": "inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "running",
+   "added_by": "rule",
+   "added_at": "2026-09-16 18:12 PDT",
+   "note": "auto: new fix(es) dc6a1a5 since the last run",
+   "missing_fixes": [
+    "dc6a1a5"
+   ],
+   "launched_at": "2026-09-16 18:12 PDT",
+   "pid": 997858,
+   "log": "runlogs/pilot_20260915/first_demo/logs/inter_object_relation_satisfaction-inside-brussels_sprouts-bowl-breakfast_table.sched-181259.log"
   },
   {
    "id": "inter_object_relation_satisfaction-under_large_scale:0916-171927",

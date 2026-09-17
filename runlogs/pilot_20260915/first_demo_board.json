@@ -48,12 +48,12 @@
   "owner": "tabletop"
  },
  "configuration_matching-articulation_open_large_scale": {
-  "blocking": "HEAD (floor 2893a09 + A3 05ce671): open handle_unreachable x8 (step 5), close no_manipulation_stance x8 (Phase 2) \u2014 large-scale diagnosing; 10:15 item-5 blacklist question waits on its verdict",
-  "owner": "large-scale"
+  "blocking": "D-004: large-scale verdict = blacklist rvunhj_0 (8 mm bar / 7 mm knobs < 15 mm pinch \u2192 edge-pinch fallback, follow \u2264 25\u00b0) unless the owner relaxes the pinch minimum; fallbacks running: fridge / dishwasher / oven / top_cabinet / bottom_cabinet_no_top; Rs_int drawer bamfsz_0 (19.7 mm bar, base mode) queued open+close after the base_ok instrumentation 1c829ae",
+  "owner": "owner (D-004) / large-scale"
  },
  "configuration_matching-articulation_close_large_scale": {
-  "blocking": "HEAD (floor 2893a09 + A3 05ce671): no_manipulation_stance x8 (Phase 2) \u2014 large-scale diagnosing; open alias running",
-  "owner": "large-scale"
+  "blocking": "same as open (close sweep follows \u2264 25\u00b0 from 90\u00b0 on rvunhj_0; 9a3e678 records the honest fraction); Rs_int drawer queued",
+  "owner": "owner (D-004) / large-scale"
  },
  "alignment-world_vertical": {
   "blocking": "oracle re-runs on 4b2bb60 / 9345c8a: push [execution] again (17:06) \u2192 oracle",
@@ -91,11 +91,11 @@
   "owner": "core \u2192 oracle"
  },
  "inter_object_relation_satisfaction-ontop_large_scale": {
-  "blocking": "countertop pair: goal_region_not_visible at the only free edge (+u) now logged; sofa-bar target_placement x8 \u2192 large-scale",
-  "owner": "large-scale"
+  "blocking": "countertop pair = geometric yield (partner behind stance A) \u2192 floor fallback alias queued (local); sofa-bar re-run with the B\u2192C path limit geodesic+3 m (4df6d0a) running locally",
+  "owner": "large-scale / loop"
  },
  "inter_object_relation_satisfaction-under_large_scale": {
-  "blocking": "blade 6\u20139 cm (d073579): target_placement x8 (new category) \u2192 large-scale",
-  "owner": "large-scale"
+  "blocking": "push-under lanes 0.45\u20130.6 m ahead + edge-end laterals + frontal offset 0.25 m right (7162fe7, 8c93d0b, 2cfce47) \u2014 re-run queued/running",
+  "owner": "large-scale / loop"
  }
 }
