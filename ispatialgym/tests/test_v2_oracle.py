@@ -183,6 +183,20 @@ class FakeRobot:
 
     # -- OmniGibson-like API -----------------------------------------------------------------------------------------
 
+    def _calculate_in_hand_object(self, arm="right"):
+        """OmniGibson's in-hand rule as the fake knows it: both pads touch an object when the finger opening is down to the
+        object's half width (+2 mm) and the object lies within 15 cm of the eef; returns ``(object, link_name)`` or None."""
+        env = getattr(self, "_env", None)
+        if env is None:
+            return None
+        ep, _ = self.eef_pose(arm)
+        opening = float(self.q[self.gripper_control_idx[arm]].max())
+        for o in env.objects.values():
+            half = 0.5 * float(min(o.aabb_extent[0], o.aabb_extent[1])) if getattr(o, "aabb_extent", None) is not None else 0.03
+            if getattr(o, "graspable", True) and float(th.linalg.norm(o.pos - ep)) < 0.15 and opening <= half + 0.002:
+                return o, "base_link"
+        return None
+
     def get_joint_positions(self):
         return self.q.clone()
 
@@ -393,6 +407,7 @@ class FakeEnv:
         self.last_action = None
         self._closing = {a: False for a in M.ARMS}
         self._refuse = {a: False for a in M.ARMS}
+        robot._env = self  # the fake robot's in-hand rule (``_calculate_in_hand_object``) reads the env's objects
         # the fake renderer: like the simulator, a frame shows the scene the renderer last synced, one step behind
         # the physics (after ``load_state`` the first draw still shows the pre-restore scene)
         self._usd_state = self._render_state()
@@ -468,13 +483,9 @@ class FakeEnv:
                     if self._refuse[a]:
                         r.ag_fail_next -= 1
                 if closing and r._ag_obj_in_hand[a] is None and not self._refuse[a]:
-                    ep, _ = r.eef_pose(a)
-                    opening = float(r.q[r.gripper_control_idx[a]].max())
-                    for o in self.objects.values():
-                        half = 0.5 * float(min(o.aabb_extent[0], o.aabb_extent[1])) if getattr(o, "aabb_extent", None) is not None else 0.03
-                        if getattr(o, "graspable", True) and float(th.linalg.norm(o.pos - ep)) < 0.15 and opening <= half + 0.002:
-                            r._create_assisted_grasp_joint(a, {"target_obj": o, "target_link_name": "base_link", "joint_type": "FixedJoint"})
-                            break
+                    hit = r._calculate_in_hand_object(a)
+                    if hit is not None:
+                        r._create_assisted_grasp_joint(a, {"target_obj": hit[0], "target_link_name": hit[1], "joint_type": "FixedJoint"})
             else:
                 self._closing[a] = False
                 if r._ag_obj_in_hand[a] is not None:
@@ -1429,11 +1440,31 @@ def test_gripper_closure_ramp_and_preshaped_opening():
     env.objects["ball"] = FakeObject("ball_0", ep.tolist())
     cmds.clear()
     drive(env, m.gripper("right", close=True, rate=0.00225))
+    # symmetric closure: the ramp stops when both pads touch the 8 cm ball (opening 41 mm), the command holds the fingers at
+    # the contact width minus the 1 mm squeeze instead of driving to -1 through the object, the assisted grasp attaches there
+    assert robot._ag_obj_in_hand["right"] is env.objects["ball"] and cmds[-1] > -1.0
+    hold_m = 0.05 * (cmds[-1] + 1.0) / 2.0
+    assert 0.038 <= hold_m <= 0.042 and all(c == cmds[-1] for c in cmds[-6:]), cmds[-8:]
+    ev = m.release_events[-1]
+    assert ev["event"] == "contact_hold" and abs(ev["hold_m"] - hold_m) < 1e-3 and ev["ramp_steps"] == 4 and ev["attached_after_steps"] >= 1 and "fallback" not in ev
+    assert m.gripper_closed("right")
+    # no squeeze configured: the stock fight (-1) after the ramp, as before
+    drive(env, m.gripper("right", close=False))
+    m.cfg.gripper_contact_squeeze_m = None
+    cmds.clear()
+    drive(env, m.gripper("right", close=True, rate=0.00225))
     assert robot._ag_obj_in_hand["right"] is env.objects["ball"] and cmds[-1] == -1.0
-    n_ramp = len([t for t in (0.05 * (c + 1.0) / 2.0 for c in cmds) if t > 1e-9])
-    assert 10 < n_ramp < 22  # the ramp stopped at the attach (fingers < 30 mm in the fake), the -1 command finished
+    m.cfg.gripper_contact_squeeze_m = 0.001
+    # both pads on the object but the assisted grasp never attaches: the stock command takes over after the step budget
+    drive(env, m.gripper("right", close=False))
+    robot.ag_fail_next = 1
+    cmds.clear()
+    drive(env, m.gripper("right", close=True, rate=0.00225))
+    assert robot._ag_obj_in_hand["right"] is None and cmds[-1] == -1.0 and m.release_events[-1].get("fallback") == "full_close"
+    robot.ag_fail_next = 0
     # no rate (opening, or a push / brace closure): the stock step command alone
     drive(env, m.gripper("right", close=False))
+    del env.objects["ball"]
     cmds.clear()
     drive(env, m.gripper("right", close=True))
     assert set(cmds) == {-1.0}
@@ -1580,8 +1611,9 @@ def test_place_releases_in_two_stages_and_the_retreat_completes_the_opening(tmp_
     assert events[0]["source"] == "release_opening" and abs(events[0]["stage_m"] - round(0.5 * 0.0734 + 0.010, 4)) < 1e-6
     assert events[1]["by"] == "clearance" and events[1]["started_clearance_m"] >= 0.03 and events[1]["clearance_m"] <= 0.10 + 1e-6
     assert robot._ag_obj_in_hand["right"] is None and float(robot.q[robot.gripper_control_idx["right"]].max()) > 0.049
-    # the opening never jumps: every command step opens the fingers by at most 2.25 mm
-    i0 = next(i for i, c in enumerate(cmds) if c == -1.0)
+    # the opening never jumps: every command step opens the fingers by at most 2.25 mm (from the closure's contact hold on)
+    i0 = min(range(len(cmds)), key=lambda i: cmds[i])
+    assert -1.0 < cmds[i0] < 0.9  # the symmetric closure holds at the apple's contact width, never at -1
     steps = [0.05 * (b - a) / 2.0 for a, b in zip(cmds[i0:-1], cmds[i0 + 1:]) if b > a]
     assert steps and max(steps) <= 0.00225 + 1e-6, max(steps)
     # the sampler's release sweep caps the first stage (core 385de1e: the largest symmetric opening clearing the partner)
@@ -1616,13 +1648,17 @@ def test_grasp_preshapes_from_the_library_pinch_width_and_closes_with_the_ramp(t
     grasp = result["actions"][1]
     assert grasp["name"] == "grasp"
     assert abs(grasp["notes"]["preshape_opening_m"] - (0.5 * 0.0734 + 0.010)) < 1e-6 and grasp["notes"]["closure_rate_m_per_step"] == 0.00225
-    # the command sequence: open (+1), the pre-shaped opening (0.868), the ramp down at <= 2.25 mm per step, then -1
+    # the command sequence: open (+1), the pre-shaped opening (0.868), the ramp down at <= 2.25 mm per step to the contact
+    # hold (the symmetric closure stops at the apple's width: 4 cm + 2 mm - 1 mm squeeze), never -1
     pre = 2.0 * (0.5 * 0.0734 + 0.010) / 0.05 - 1.0
     assert any(abs(c - pre) < 1e-6 for c in cmds)
     i0 = next(i for i, c in enumerate(cmds) if abs(c - pre) < 1e-6)
-    i1 = next(i for i in range(i0, len(cmds)) if cmds[i] == -1.0)
+    i1 = min(range(i0, len(cmds)), key=lambda i: cmds[i])
+    hold_m = 0.05 * (cmds[i1] + 1.0) / 2.0
+    assert 0.038 <= hold_m <= 0.042 and -1.0 not in cmds[i0:], (hold_m, cmds[i0:i1 + 3])
     steps = [0.05 * (a - b) / 2.0 for a, b in zip(cmds[i0:i1 - 1], cmds[i0 + 1:i1])]
     assert steps and all(-1e-9 <= s <= 0.00225 + 1e-9 for s in steps), steps
+    assert grasp["notes"]["release"][0]["event"] == "contact_hold" and abs(grasp["notes"]["release"][0]["hold_m"] - hold_m) < 1e-3
     assert EX.grasp_pinch_width(expand(sc.alias, sc)[1]) == 0.0734
     # no width / not a library grasp -> no pre-shape
     from ispatialgym.oracle.actions import Grasp as GraspAction
@@ -1638,8 +1674,9 @@ def test_grasp_preshapes_from_the_library_pinch_width_and_closes_with_the_ramp(t
     motions2.cfg.gripper_preshape_margin = None
     result2 = ex2.run_program(expand(sc2.alias, sc2))
     assert result2["success"] and "preshape_opening_m" not in result2["actions"][1]["notes"]
-    before_close = cmds[: next(i for i, c in enumerate(cmds) if c == -1.0)]  # the descent runs fully open (the staged release later may use the same width)
-    assert not any(abs(c - pre) < 1e-6 for c in before_close) and before_close and max(before_close) == 1.0
+    i_close = next(i for i, c in enumerate(cmds) if c < 1.0 - 1e-6)  # the first command below fully open = the closure's first ramp step
+    before_close = cmds[:i_close]  # the descent runs fully open (the staged release later may use the pre-shape width)
+    assert not any(abs(c - pre) < 1e-6 for c in before_close) and before_close and set(before_close) == {1.0}
 
 
 # ==========================================================================================
@@ -2118,10 +2155,12 @@ def test_checkpoint_restore_fixes_a_broken_ag_roundtrip(tmp_path):
     assert report["ag_roundtrip_ok"] is False and report["ag_fixed"][0] == {"arm": "right", "restored": None, "checkpoint": apple.name}
     assert env.robot._ag_obj_in_hand["right"] is apple
     assert report["attached_fixed"] == [{"arm": "right", "attached": apple.name}] and backend._attached["right"]["obj"] is apple
-    assert motions.state.gripper_cmd["right"] == -1.0
+    # the restored gripper command is the grasp's contact hold (the symmetric closure holds at the apple's width, not -1)
+    hold_cmd = motions.state.gripper_cmd["right"]
+    assert -1.0 < hold_cmd < 0.9 and motions.gripper_closed("right") and abs(0.05 * (hold_cmd + 1.0) / 2.0 - 0.040) < 0.003
     # the counters are rolled back, then the one recorded hold step re-applies the restored drive targets
     assert ex.n == cp.step + 1 and env._current_step == cp.env_step + 1
-    assert th.equal(env.last_action[env.robot.controller_action_idx["gripper_right"]], th.tensor([-1.0]))
+    assert th.allclose(env.last_action[env.robot.controller_action_idx["gripper_right"]], th.tensor([hold_cmd]))
     # and with a faithful round-trip the report says so
     sc2, env2 = iors_world(ag_roundtrip=True)
     ex2, motions2, backend2, _ = make_executor(env2, sc2)

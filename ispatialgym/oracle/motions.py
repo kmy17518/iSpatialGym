@@ -132,6 +132,13 @@ class MotionsConfig:
     #: only once the hand has moved ``gripper_release_clearance_m`` away from the release pose (the retreat leg; the
     #: deferred target is completed by whatever motion moves the hand, ``_emit``), at the same rate.
     gripper_open_rate: Optional[float] = 0.00225
+    #: symmetric closure (core 2026-09-16 22:09, closure probe): once both pads touch the object the ramp stops and the
+    #: command holds the fingers where they are minus this squeeze (m). The two position drives (stiffness 1e7, max
+    #: effort 100 N: any target inside the object saturates them) otherwise keep driving to 0 through the object and
+    #: PhysX lets one of them win - finger 2 shoved the un-attached marker 8.5 mm and the centred napkins box 15.4 mm
+    #: toward finger 1 (0916-202403) before the assisted grasp attached. With the targets frozen at the contact width the
+    #: drift is bounded by the squeeze. None = the stock command (the fight).
+    gripper_contact_squeeze_m: Optional[float] = 0.001
     gripper_release_clearance_m: float = 0.03
     #: the deferred full opening completes at the latest this many control steps after the release (a hand that never
     #: moves 3 cm away; the ramp keeps even that late opening slow)
@@ -338,6 +345,18 @@ class Motions:
     def held_object(self, arm: str):
         return self.robot._ag_obj_in_hand.get(arm)
 
+    def object_between_pads(self, arm: str) -> bool:
+        """Whether both finger pads of ``arm`` touch one assisted-graspable object right now (OmniGibson's own in-hand
+        rule ``_calculate_in_hand_object``: contact on at least two finger links + the object on the ray between the pads
+        - the condition whose 0.3 s window attaches the assisted grasp). False when the robot has no such rule."""
+        fn = getattr(self.robot, "_calculate_in_hand_object", None)
+        if not callable(fn):
+            return False
+        try:
+            return fn(arm=arm) is not None
+        except Exception:  # noqa: BLE001
+            return False
+
     def gripper_closed(self, arm: str) -> bool:
         """Whether the gripper is meant to be closed (the last ``gripper`` intent; a staged release or a pre-shaped
         opening emits a command below zero while the fingers are meant to be open)."""
@@ -506,6 +525,8 @@ class Motions:
         self.gripper_intent_closed[arm] = bool(close)
         q_now = float(self.robot.get_joint_positions()[idx].float().mean())
         if close:
+            self.release_opening.pop(arm, None)  # the pre-shape of the grasp this closure completes stays: the release's first stage
+            contact_hold = None
             if rate:
                 q_target = q_now
                 n = 0
@@ -516,8 +537,30 @@ class Motions:
                     n += 1
                     if n > 10 and self.held_object(arm) is not None:
                         break  # attached: finish with the full command below
+                    if self.cfg.gripper_contact_squeeze_m is not None and self.object_between_pads(arm):
+                        # symmetric closure: both pads touch the object - stop the ramp and hold the fingers at the contact
+                        # width minus the squeeze, so the two saturated drives do not fight through the object (finger 2
+                        # would win and shove the un-attached object toward finger 1: marker 8.5 mm, napkins box 15.4 mm)
+                        q_touch = float(self.robot.get_joint_positions()[idx].float().mean())
+                        contact_hold = max(lo, q_touch - float(self.cfg.gripper_contact_squeeze_m))
+                        self.state.gripper_cmd[arm] = self.gripper_command(arm, contact_hold)
+                        self.release_events.append({"arm": arm, "event": "contact_hold", "hold_m": round(contact_hold, 4), "touch_m": round(q_touch, 4),
+                                                    "fingers_m": [round(float(v), 4) for v in self.robot.get_joint_positions()[idx].float().tolist()], "ramp_steps": n})
+                        break
+            if contact_hold is not None:
+                # wait for the assisted grasp with the pads holding the object; without it in the step budget the stock
+                # command takes over (the closure then behaves as before)
+                steps = self.cfg.gripper_steps if steps is None else int(steps)
+                for i in range(steps):
+                    yield self._emit()
+                    if self.held_object(arm) is not None:
+                        self.release_events[-1]["attached_after_steps"] = i + 1
+                        self.release_events[-1]["fingers_at_attach_m"] = [round(float(v), 4) for v in self.robot.get_joint_positions()[idx].float().tolist()]
+                        yield from self.hold(5)
+                        return
+                log.info("gripper(%s): both pads on the object but no assisted grasp within %d steps at the contact hold %.1f mm; closing fully", arm, steps, contact_hold * 1000)
+                self.release_events[-1]["fallback"] = "full_close"
             self.state.set_gripper(arm, True)
-            self.release_opening.pop(arm, None)  # the pre-shape of the grasp this closure completes stays: the release's first stage
         else:
             stage = None
             if self.held_object(arm) is not None:
