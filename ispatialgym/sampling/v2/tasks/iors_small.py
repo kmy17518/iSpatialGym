@@ -657,13 +657,22 @@ class IORSSmall(SamplerV2):
         p_now = self.obj("partner").get_position_orientation()[0].float()
         if float(th.linalg.norm(p_now[:2] - G.t(p_pose[0])[:2])) > 0.05:
             return None
-        hit = self.world.surface_z_under(xy, top_z + 0.30, ignore=[self.obj("target")])
-        if hit is None:
+        # a small cluster of rays (centre + 4 at +-1.5 cm): a saucer's convex-decomposed well can let the centre ray through
+        # to the table (teacup run 17:24: surface 0.8127 = the table, 6 mm under the well floor - the cup was set 4 mm into
+        # the saucer); only hits on the partner's own links count, the highest of them is the floor under the footprint centre
+        partner = self.obj("partner")
+        paths = tuple({l.prim_path for l in partner.links.values()} | {partner.prim_path})
+        c = G.t(xy)[:2]
+        hits = []
+        for dx, dy in ((0.0, 0.0), (0.015, 0.0), (-0.015, 0.0), (0.0, 0.015), (0.0, -0.015)):
+            h = self.world.surface_z_under(th.tensor([float(c[0]) + dx, float(c[1]) + dy]), top_z + 0.30, ignore=[self.obj("target")])
+            if h is not None and str(h.get("body", "")).startswith(paths) and h["z"] <= top_z + 0.005:
+                hits.append(h)
+        if not hits:
             return None
-        lo = float(self.top.z) if self.top is not None else -math.inf
-        if not (lo - 0.005 <= hit["z"] <= top_z + 0.005):
-            return None
-        return hit
+        best = max(hits, key=lambda h: h["z"])
+        best["n_partner_hits"] = len(hits)
+        return best
 
     def release_pose(self, t_quat: th.Tensor, t_hull: th.Tensor, p_hull_w: th.Tensor, p_pose: G.Pose) -> G.Pose:
         """§6.11 inside, owner decision 2026-09-16: release just above the partner's rim so the gripper never contacts it.
