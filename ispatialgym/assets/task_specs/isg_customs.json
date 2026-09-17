@@ -24483,7 +24483,9 @@
     60.0
    ],
    "flip_tilt_deg": 45.0,
-   "orientation_equivalences": null
+   "orientation_equivalences": null,
+   "block_no_flip": true,
+   "_block_no_flip_note": "owner decision 2026-09-16 17:10 item 1: first demo with the goal face up at init; flip-on-the-table is the required end state (prep workstream)"
   },
   "constraints": []
  },
