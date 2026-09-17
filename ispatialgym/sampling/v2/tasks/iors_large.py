@@ -911,13 +911,13 @@ class IORSLarge(SamplerV2):
                 init = self.floor_stance_a(c_t, rng, height)
                 self.record_path(init, manip[0])  # §5.6: a path A -> B exists
             except Reject as e:
-                errors.append(f"{e.reason}")
+                errors.append(f"{e.reason}: {e}")
                 continue
             self.sidecar.paths.clear()
             self.surface.update({"c_t": c_t, "init": init, "manip": manip, "init_xy": c_t.clone(), "z": self.floor_z, "edge": None})
             self.template_facts["floor_init"] = {"c_t": c_t.tolist(), "geodesic_m": dist, "n_anchor_candidates": int(len(anchors))}
             return
-        raise Reject("no_floor_cell", f"no anchor cell admits stances A / B: {sorted(set(errors))}")
+        raise Reject("no_floor_cell", f"no anchor cell admits stances A / B ({len(errors)} tried): " + "; ".join(sorted(set(errors))[-4:]))
 
     def floor_stance_b(self, c_t: th.Tensor, rb: Optional[RB.ReachBands], half: float, rng: np.random.Generator) -> List[Stance]:
         """Stance B candidates of the floor init: base facing c_t at {0.35, 0.45, 0.55} (bearing uniform), trunk from the
@@ -941,23 +941,33 @@ class IORSLarge(SamplerV2):
                     cands.append(st)
         if not cands:
             raise Reject("no_manipulation_stance", "floor init: c_t is in no band cell of any stance")
-        free = P0.body_free(self, cands)
+        # the floor band has cells at the deep trunks only (translate 0.95): like the push-under stance C, the floor mesh
+        # is removed from the stance check (the cuRobo ground slab stays — B3's "torso / head within 1 cm of the floor
+        # mesh" finding) and the optical-axis rule is 45° (the crouched head hangs over the cell)
+        with self.ikc.ignoring([self.obj("floor")]):
+            free = P0.body_free(self, cands)
+        n_cands, trunks_seen = len(cands), sorted({(float(st.translate), round(float(st.tilt), 2)) for st in cands})
         cands = [st for st, f in zip(cands, free.tolist()) if f]
         if not cands:
-            raise Reject("no_manipulation_stance", "floor init: every stance B collides")
+            raise Reject("no_manipulation_stance", f"floor init: every stance B collides ({n_cands} candidates at trunks {trunks_seen})")
         pts = G.local_points_world(self.hull, (focus, self.rest))
         classed = []
+        n_frame, n_axis = 0, 0
+        axis_max = math.radians(float(self.num("floor_init_axis_max_deg", 45.0)))
         for st, cam in zip(cands, P0.camera_poses(self, cands)):
             if not P0.in_frame(self, cam, pts):
+                n_frame += 1
                 continue
-            k = P0.angle_class(P0.axis_angle(self, cam, focus))
-            if k is None:
+            ang = P0.axis_angle(self, cam, focus)
+            if ang > axis_max:
+                n_axis += 1
                 continue
-            st.extras["angle_class"] = k
-            classed.append((st, k))
+            st.extras["angle_class"] = 1 if ang > math.radians(P0.AXIS_TIGHT_DEG) else 0
+            st.extras["axis_angle_deg"] = math.degrees(ang)
+            classed.append((st, st.extras["angle_class"]))
         out = P0.best_class(classed)
         if not out:
-            raise Reject("no_manipulation_stance", "floor init: no stance B sees c_t within 20°")
+            raise Reject("no_manipulation_stance", f"floor init: no stance B sees c_t ({len(cands)} collision-free; {n_frame} target out of frame, {n_axis} axis > {math.degrees(axis_max):.0f}°)")
         return out
 
     def floor_stance_a(self, c_t: th.Tensor, rng: np.random.Generator, height: float) -> Stance:
