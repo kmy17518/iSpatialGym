@@ -48,5 +48,6 @@
   "channel": "sub_a6770b43-defc-43ce-ad09-8a57c0e3e86e",
   "D-004": "sub_e90d53ab-1c6e-409a-85bd-cc7337959528",
   "note": "subscribed 17:50 PDT after the account link; the 5-min poll loop was stopped, status loop (30 min) continues"
- }
+ },
+ "status_note": "17:58 execution note: two orphan simulators killed (attachment on pilot2-a40-6, wall-h run_isg on pilot2-l40s-3); cancel path now kills the pod-side tree; 43 held-out band jobs (shampoo countertops first) run on pool pods moved to the band role (6 now, one job each), preemptible for first-demo runs."
 }
