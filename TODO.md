@@ -118,14 +118,14 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 17:45 PDT — 6/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 17:48 PDT — 7/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
 | camera_relocalization-standard | valid demo | - | - |
 | camera_relocalization-obstructed | valid demo | tracker corner fix d4a1745 not yet re-demoed | oracle |
 | object_scaling | valid demo | - | - |
-| mental_rotation | demo run (pre-fix success) | - | - |
+| mental_rotation | valid demo | - | - |
 | disembedding | valid demo | - | - |
 | CM block_design | no instance | owner 17:10 (1): first demo with block_no_flip (35506bf) — loop running (scheduler 17:24); flip-on-the-table sub-chain = required end state, prep workstream (tabletop sampler + oracle program) | tabletop / oracle |
 | CM attachment | no instance | owner 17:10 (2): brace stays — second base pose recorded after the male grasp, sidecar transition, oracle executes it holding the object; brace optional only if no cell after that | tabletop → oracle |
@@ -286,3 +286,4 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026‑09‑16 17:35 PDT agent-e2e: core — teacup diagnosis from the 14:44 demo.hdf5: the cup was tilted 16–32° in the hand right after the grasp closed (`grasp_3`'s closing axis 28° off the horizontal → the flat pads squeezed the cup wall at two heights and the cup turned until flush), reached the place 21° tilted and rested 10° tilted 1.6 cm off the well centre — not a rim landing, not a release‑pose tilt; fix `6307dd7` (flush pinches only, closing axis within 12° of horizontal / vertical; release at half the well depth clamped 3 mm–1 cm; per‑grasp `closing_tilt_deg` / `pivot_arm_m` facts) — the under‑small loop launched on it at 17:24. Core next: touching brace optional, carry waypoint on demand (FOV rule b), attachment transition support.
 - 2026‑09‑16 17:42 PDT agent-e2e (owner 17:35): **Slack bridge** live on `#cursor-demos-chat` (`C0C2D1X2V8E`, private — always by id; posts as the owner's user `U0C28KXH5J7`, own posts start with a tag, owner replies with `D-` / `Q:` / `RUN:` / free text; never act on own posts; a main‑chat message overrides a Slack reply on the same decision id). Files: `runlogs/pilot_20260915/pending_decisions.json` (D‑001 block design, D‑002 attachment, D‑003 small articulation — all three recorded **answered by chat 17:10** and posted with their answers; D‑004 large articulation rvunhj_0 keep‑working vs blacklist — **open**, default A until the `0427202` verdict ≈ 18:40), `status.md` (30 min), `slack_state.json` (announced [DEMO-VALID] rows, last seen ts); renderer / parser `scripts/isg/slack_bridge.py`. Seeded: rules message marked 📌 (the Slack MCP has no pin call — owner pins), D‑001…D‑004, `[STATUS 17:38]`, six `[DEMO-VALID]` (camera standard / obstructed, object_scaling, disembedding, axial, inside). `subscribe_slack_channel` / `subscribe_slack_thread` refused ("Cursor account not linked to Slack") → polling loop every 5 min (search newer than the last seen ts) + status every 30 min until the owner links the account.
 - 2026‑09‑16 17:47 PDT agent-e2e: Slack poll 1 — no owner replies. D‑004 verdict on `0427202` landed early (open `no_manipulation_stance` ×8, close `handle_unreachable` ×6 + `no_manipulation_stance` ×2) → default applied: fallback aliases `articulation_open_large_scale-{fridge,dishwasher,oven}` launched on three pool pods; rvunhj_0 stays open (large‑scale agent); thread reply posted. Wall vertical demo‑only on the oracle's `170d02a`: push `execution` again.
+- 2026‑09‑16 17:51 PDT agent-e2e: Slack subscriptions active after the owner linked the account — channel `C0C2D1X2V8E` (threads included) `sub_a6770b43…`, D‑004 thread `sub_e90d53ab…`; the 5‑min poll loop stopped, the 30‑min `[STATUS]` loop continues; replies now arrive as events.

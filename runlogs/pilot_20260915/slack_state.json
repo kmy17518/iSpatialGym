@@ -37,5 +37,9 @@
  "last_seen_ts": "1789605493.000000",
  "handled": [],
  "loop_pid": 908952,
- "subscriptions": "channel/thread subscriptions unavailable (Cursor account not linked to Slack) - polling every 5 min via search; status every 30 min"
+ "subscriptions": {
+  "channel": "sub_a6770b43-defc-43ce-ad09-8a57c0e3e86e",
+  "D-004": "sub_e90d53ab-1c6e-409a-85bd-cc7337959528",
+  "note": "subscribed 17:50 PDT after the account link; the 5-min poll loop was stopped, status loop (30 min) continues"
+ }
 }
