@@ -208,6 +208,7 @@ class IORSSmall(SamplerV2):
         tilts = {g.name: self.closing_tilt_deg(g.pose) for g in self.grasps}
         self.template_facts["grasp_closing_tilt_deg"] = {k: round(v, 1) for k, v in tilts.items()}
         self.template_facts["grasp_pivot_arms_m"] = {g.name: round(self.pivot_arm(g.pose), 4) for g in self.grasps}
+        self.template_facts["grasp_pinch_vs_long_axis_deg"] = {g.name: round(self.pinch_vs_long_axis_deg(g.pose), 1) for g in self.grasps}
         tilt_max = float(self.gen("closing_tilt_max_deg", CLOSING_TILT_MAX_DEG))
         ext = TT.hull_extents(self.hull["target"], self.rest["target"])
         tall = float(ext[2]) >= float(self.gen("flush_pinch_min_aspect", FLUSH_PINCH_MIN_ASPECT)) * min(float(ext[0]), float(ext[1]))
@@ -263,6 +264,37 @@ class IORSSmall(SamplerV2):
         self.template_facts.update({"support": self.top.to_json(), "edge": self.edge.to_json(), "init_stance": self.init_stance.to_meta(),
                                     "n_manipulation_candidates": len(self.manip_candidates), "grasp_key": self.grasp_key, "n_grasps": len(self.grasps),
                                     "bands": getattr(getattr(self, "bands", None), "path", None), "H_max": H_max})
+
+    def pinch_vs_long_axis_deg(self, eef_in_object: G.Pose) -> float:
+        """Angle (deg, 0-90) between a library grasp's pinch line (closing axis c) and the target's long axis — the largest
+        AABB extent in the rest frame (a lying cylinder's axis). 90 = the pads close across the cylinder, 0 = along it."""
+        c_obj = C.quat_to_mat(G.t(eef_in_object[1]))[:, 1]
+        c_rest = G.rotate(G.t(self.rest["target"]), c_obj)
+        ext = TT.hull_extents(self.hull["target"], self.rest["target"])
+        axis = th.zeros(3)
+        axis[int(th.argmax(ext))] = 1.0
+        d = min(1.0, abs(float(th.dot(c_rest / th.linalg.norm(c_rest).clamp(min=1e-9), axis))))
+        return math.degrees(math.acos(d))
+
+    def grasp_facts(self, grasp: GraspRecord) -> Dict[str, Any]:
+        """Facts of the recorded grasp for the closure investigation (agent 52b4fb5f): ``pinch_vs_long_axis_deg``,
+        ``pad_height_above_support_m`` (pad centre z at the grasp pose - support top z), ``pad_height_above_axis_m`` (the same
+        minus the object's radius = half its rest-frame height: a lying cylinder's axis), ``object_radius_m``,
+        ``closing_tilt_deg`` and ``pivot_arm_m``. None where a value is not available."""
+        out: Dict[str, Any] = {}
+        if grasp.eef_in_object is None:
+            return out
+        out["pinch_vs_long_axis_deg"] = round(self.pinch_vs_long_axis_deg(grasp.eef_in_object), 1)
+        out["closing_tilt_deg"] = round(self.closing_tilt_deg(grasp.eef_in_object), 1)
+        out["pivot_arm_m"] = round(self.pivot_arm(grasp.eef_in_object), 4)
+        ext = TT.hull_extents(self.hull["target"], self.rest["target"])
+        radius = 0.5 * float(ext[2])
+        out["object_radius_m"] = round(radius, 4)
+        if grasp.grasp is not None and self.top is not None:
+            pad_z = float(C.pad_center((G.t(grasp.grasp[0]), G.t(grasp.grasp[1])))[2])
+            out["pad_height_above_support_m"] = round(pad_z - float(self.top.z), 4)
+            out["pad_height_above_axis_m"] = round(pad_z - float(self.top.z) - radius, 4)
+        return out
 
     def closing_tilt_deg(self, eef_in_object: G.Pose) -> float:
         """Inclination (deg) of a library grasp's closing axis to the horizontal *or* the vertical, whichever is nearer, in the
@@ -830,6 +862,11 @@ class IORSSmall(SamplerV2):
                 draft.summary["pivot_arm_m"] = grasp.extras["pivot_arm_m"]
         if self.goal_side is not None:
             draft.summary["goal_side"] = self.goal_side
+        # grasp facts for the finger-closure investigation (facts only, 2026-09-16 18:16): the pinch line's angle to the
+        # object's long axis and the pad-centre height above the support at the grasp pose
+        grasp.extras.update(self.grasp_facts(grasp))
+        draft.summary["grasp_facts"] = {k: grasp.extras.get(k) for k in ("pinch_vs_long_axis_deg", "pad_height_above_support_m", "pad_height_above_axis_m",
+                                                                          "closing_tilt_deg", "pivot_arm_m")}
         with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
             # along the whole descent: the placed-on partner (owner A) and — as the program check's ``place`` rule and the
             # oracle's descent — the supports (the carried object's sphere fit reaches the table 4-6 cm above the place)
