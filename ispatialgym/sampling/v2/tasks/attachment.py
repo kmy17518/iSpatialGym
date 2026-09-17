@@ -25,6 +25,7 @@ pre-attach, ``place`` = attach, ``place_on`` = the partner), ``contacts.brace`` 
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import time
@@ -344,6 +345,7 @@ class Attachment(SamplerV2):
             att, work_st = self._second_base_pose(rng, manip, m_pose, grasp, cam_init, tname)
         if att is None:
             self._check_deadline()
+            log.info("%s: BRACE_FALLBACK no joint placement from the grasp stance or a second base pose: %s", self.gp.alias, json.dumps(self._att_fails, default=str))
             att = self._attach_and_brace(rng, manip, manip, m_pose, grasp, cam_init, require_joint=False)
             work_st, brace_state = manip, "none"
             if att is None:
@@ -532,27 +534,31 @@ class Attachment(SamplerV2):
         (both arms' exact IK there); on free floor and whole-body collision-free. Returns ``(facts, stance)`` or
         ``(None, manip)``."""
         male = self.obj(self.t_role)
-        tried = 0
+        tried, skipped = 0, {"no_floor": 0, "stance_collision": 0}
         for dlat in SECOND_BASE_LATERALS:
             for trunk in ((manip.translate, manip.tilt), (0.5, 0.0), (0.25, -0.3)):
                 if tried >= SECOND_BASE_MAX_TRIES:
+                    log.info("%s: second base pose: none of %d stances reaches attach + brace (%s)", self.gp.alias, tried, skipped)
                     return None, manip
                 self._check_deadline()
                 st = manip.shifted(lateral=manip.lateral + dlat, name="attach").with_trunk(trunk[0], trunk[1], "attach")
                 st.focus = manip.focus
                 st.arms = ["right"]
                 if not self.kit.trav_free(st.base_xy):
+                    skipped["no_floor"] += 1
                     continue
                 male.set_position_orientation(*m_pose)
                 male.keep_still()
                 self.kit.sync_world()
                 if not self.ikc.stance_collision_free(st):
+                    skipped["stance_collision"] += 1
                     continue
                 tried += 1
                 att = self._attach_and_brace(rng, manip, st, m_pose, grasp, cam_init, require_joint=True)
                 if att is not None:
                     log.info("%s: second base pose: lateral %+.2f, trunk (%.2f, %+.2f) reaches the attach pose and the brace", self.gp.alias, dlat, trunk[0], trunk[1])
                     return att, st
+        log.info("%s: second base pose: none of %d stances reaches attach + brace (%s)", self.gp.alias, tried, skipped)
         return None, manip
 
     def _partner_brace_point(self, f_pose: TT.Pose, manip: Stance) -> Tuple[th.Tensor, th.Tensor]:

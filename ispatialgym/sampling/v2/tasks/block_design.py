@@ -62,10 +62,14 @@ REGION_RADIUS = 0.20
 #: owner 2026-09-16 10:47 ladder: block regions 0.5–0.6 m ahead of the base first, the pitched 30° / 45° picks as the primary
 #: class for every block (straight down last), the pinch 1 mm above the table so the pads get more than ~1 cm of face
 REGION_DEPTH_PREFERRED = 0.55
+GRID_LATERAL_PREFERRED = -0.20  # base-lateral of the goal grid centre: in front of the right shoulder (probe_place_depth 17:59)
+GOOD_TRUNKS = ((0.5, -0.45), (0.5, 0.0), (0.25, -0.3))  # (translate, tilt) the place-depth probe verified for pick + pre-place
+GRID_LATERAL_WINDOW = (-0.40, -0.10)  # base-lateral window of the init cells / slots the right arm's pitched classes reach
 RELEASE_ABOVE_SURFACE = 0.01  # owner item 3: release 1 cm above the actual surface under the slot (surface_z_under)
 MAX_MANIP_TRANSLATE = 0.5  # manipulation trunks deeper than this put the tilted picks' pre-grasps out of reach (PICK_FAILURE 13:20)
 PICK_TILTS_DEG = (30.0, -30.0, 45.0, -45.0, 0.0)
 PICK_TIP_CLEARANCE = 0.001
+PICK_TIP_CLEARANCES = (0.001, 0.003, 0.006)  # the ladder: deepest pinch first, shallower when the attached cube self-collides
 
 
 @register(SUBTASK)
@@ -271,9 +275,12 @@ class BlockDesign(SamplerV2):
         def score(k: int) -> float:
             c = self.manip_candidates[k]
             depth = float(c.extras.get("focus_info", {}).get("depth", REGION_DEPTH_PREFERRED))
-            # regions 0.5–0.6 m ahead first; among them the arm-friendly trunks (translate 0.5, small tilt: the probe's
-            # (0.5, 0) / (0.75, −0.3) pass every pick class, the tall bent trunk (0, −0.61) fails the tilted pre-places)
-            return abs(depth - REGION_DEPTH_PREFERRED) + 0.5 * (abs(float(c.translate) - 0.5) + abs(float(c.tilt)))
+            lat = float(c.world_to_base(c.focus[:2])[1]) if c.focus is not None else GRID_LATERAL_PREFERRED
+            # regions 0.5–0.6 m ahead and in front of the right shoulder first; among them the probe-verified trunks
+            # (probe_place_depth 17:59: (0.5, −0.45) passes the x/t−45 pick + pre-place at every depth 0.50–0.80, (0.5, 0)
+            # up to 0.65, (0.25, −0.3) best at 0.50–0.55; the tall bent trunk (0, −0.61) fails the tilted pre-places)
+            trunk_pen = min(abs(float(c.translate) - t0) + abs(float(c.tilt) - i0) for t0, i0 in GOOD_TRUNKS)
+            return abs(depth - REGION_DEPTH_PREFERRED) + 0.5 * abs(lat - GRID_LATERAL_PREFERRED) + 0.5 * trunk_pen
 
         order.sort(key=score)
         for k in order[:6]:
@@ -318,16 +325,38 @@ class BlockDesign(SamplerV2):
             return float(uv[0] + uv[1])
 
         cells = [region[int(i)] for i in rng.permutation(len(region))]
+        # 17:24 first-demo run: every pick-screening failure was a block at base-lateral 0.0 / -0.08 with the other blocks
+        # to its right (the arm reaches over them), every pick at -0.16 / -0.24 passed; the isolated kinematics do not
+        # depend on the lateral (probe_place_lat 18:25), so keep the blocks in front of the right shoulder when the region
+        # holds enough such cells, else use the whole region
+        lat_of = {id(xy): float(manip.world_to_base(xy)[1]) for xy in cells}
+        window = [xy for xy in cells if GRID_LATERAL_WINDOW[0] <= lat_of[id(xy)] <= GRID_LATERAL_WINDOW[1]]
+        if len(window) >= n:
+            cells = window
         chosen: List[th.Tensor] = []
-        if self.left_bands is not None:
-            # braces are a bonus (owner 11:08): when the region has cells whose brace points lie in the left contact band,
-            # anchor there so the braces can be recorded; never required
-            feas = [xy for xy in cells if self._anchor_braces_in_left_band(xy, manip, right, toward)]
-            if feas:
-                anchor_xy = min(feas, key=img_score)
-                chosen.append(anchor_xy)
-                s_anchor = img_score(anchor_xy)
-                cells = [xy for xy in cells if xy is not anchor_xy and img_score(xy) > s_anchor] or [xy for xy in cells if xy is not anchor_xy]
+
+        def grid_cells(xy):
+            return [xy + right * (cc * pitch) + toward * (rr * pitch) for rr in range(n_rows) for cc in range(n_cols)]
+
+        def arm_score(xy) -> Tuple[int, float]:
+            # the goal grid for the RIGHT arm first (owner 11:08): every slot on a right-band cell at this trunk, the grid
+            # centre in front of the right shoulder (base-lateral GRID_LATERAL_PREFERRED: the arm does not reach over the
+            # other blocks) and near REGION_DEPTH_PREFERRED (probe_place_depth 17:59: the x/t-45 pick + pre-place pass at
+            # every depth 0.50-0.80 for trunk (0.5, -0.45), up to 0.65 for (0.5, 0)); the left-band brace feasibility is a
+            # small bonus, never required (the 17:24 run anchored at lateral 0.0 through the left-band rule's remnant)
+            gc = grid_cells(xy)
+            b = manip.world_to_base(th.stack(gc).mean(dim=0))
+            on_band = all(TT.in_band(self.bands, manip, g_, tol=1.0)[0] for g_ in gc)
+            bonus = 0.05 if (self.left_bands is not None and self._anchor_braces_in_left_band(xy, manip, right, toward)) else 0.0
+            return (0 if on_band else 1, abs(float(b[1]) - GRID_LATERAL_PREFERRED) + 0.5 * abs(float(b[0]) - REGION_DEPTH_PREFERRED) - bonus)
+
+        anchor_xy = min(cells, key=arm_score)
+        chosen.append(anchor_xy)
+        s_anchor = img_score(anchor_xy)
+        # the anchor is the top-left block in the init image: the other blocks come from cells right of / nearer than it
+        cells = [xy for xy in cells if xy is not anchor_xy and img_score(xy) > s_anchor] or [xy for xy in cells if xy is not anchor_xy]
+        b_anchor = manip.world_to_base(th.stack(grid_cells(anchor_xy)).mean(dim=0))
+        log.info("%s: goal grid anchored at base (%.2f, %+.2f) (score %s)", self.gp.alias, float(b_anchor[0]), float(b_anchor[1]), arm_score(anchor_xy))
         for xy in cells:
             if all(float(th.linalg.norm(xy - c)) >= self.edge * math.sqrt(2) + gap for c in chosen):
                 chosen.append(xy)
@@ -508,6 +537,21 @@ class BlockDesign(SamplerV2):
         world_poses = {names[o]: (goal_pose[o] if j < step else poses[o]) for j, o in enumerate(order)}
         self._teleport(world_poses)
         pick_pose, place_pose = poses[bi], goal_pose[bi]
+        # Placed neighbours at the place pose (replay probe 19:00, the 17:24 first-demo run): with the slots edge + 1 mm
+        # apart, the attached cube's coarse cuRobo sphere fit (1-4 spheres for a 2.6 cm dice, bulging ~1 cm beyond the
+        # faces) collides with a touching placed neighbour at every class — 0/24 place poses pass with the neighbours
+        # present, 14/24 with them parked — a model artefact, not geometry. The neighbours already at their slots are
+        # therefore ignored for the attached place pose (like the support under a grasp, §3.6) PROVIDED the finger
+        # clearance is guaranteed geometrically: the finger beside the block descends into the gap slot_gap + PLACE_MARGIN
+        # (the block is released the margin away from every placed neighbour), which must hold the 8.4 mm fingertip
+        # section plus 2 mm; otherwise the honest check stays and the block is rejected with the reason
+        placed_neighbours = [self.objects[names[o]] for j, o in enumerate(order) if j < step]
+        gap_needed = TT.FINGER_PROFILE[0][1] + 0.002  # the pad on the block face, the outer face 8.4 mm out (fingertip section)
+        if placed_neighbours and float(self.g("block_gap_m")) + PLACE_MARGIN < gap_needed:
+            raise Reject("finger_clearance", f"block {names[bi]}: slot gap {float(self.g('block_gap_m')) * 1000:.0f} mm + place margin {PLACE_MARGIN * 1000:.0f} mm < "
+                                             f"{gap_needed * 1000:.1f} mm the closed finger needs beside a placed neighbour (set generation.block_gap_m >= "
+                                             f"{(gap_needed - PLACE_MARGIN) * 1000:.0f} mm or record the push tail)")
+        place_ignore = [support] + placed_neighbours
         # release pose: the slot pose lifted so the block bottom sits RELEASE_ABOVE_SURFACE above the raycast surface (the
         # goal target keeps the on-top pose; without a surface hit the 1 mm drop of the slot pose stays)
         surface_z = getattr(self, "slot_surface_z", {}).get(bi)
@@ -533,14 +577,24 @@ class BlockDesign(SamplerV2):
                 for pair in pairs:
                     for yaw in (table_yaw, table_yaw + math.pi / 2, table_yaw + math.pi, table_yaw - math.pi / 2):
                         cands.append((pair, tilt, tilt, yaw, 0))
-        # keep the downward pick approaches only (exactly one tilt sign for a flipping block), then screen pick + place pairs
+        # keep the downward pick approaches only (exactly one tilt sign for a flipping block), then screen pick + place pairs.
+        # Tip clearance ladder (17:24 first-demo run: every place with the block attached failed the exact IK while the
+        # picks passed — README "Backend facts": an object deep in the gripper self-collides with the non-exempt gripper
+        # link once attached, so every attached check fails whatever the pose): the 1 mm pinch first, then 3 / 6 mm, and a
+        # class whose attached cube self-collides (``IKChecker.attachable``, once per template per class) is skipped
         screened = []
         for pair, tilt_pick, tilt_place, yaw, sign in cands:
-            try:
-                g_pick = C.cube_grasp(self._centre(pick_pose), pair, tilt_pick, yaw, edge=self.edge, tip_clearance=PICK_TIP_CLEARANCE)
-            except ValueError:
-                continue
-            if not g_pick.downward:
+            for clearance in PICK_TIP_CLEARANCES:
+                try:
+                    g_pick = C.cube_grasp(self._centre(pick_pose), pair, tilt_pick, yaw, edge=self.edge, tip_clearance=clearance)
+                except ValueError:
+                    continue
+                if not g_pick.downward:
+                    continue
+                if not self._class_attachable(block, pair, tilt_pick, clearance, g_pick.eef_in_block):
+                    continue
+                break
+            else:
                 continue
             # place eef: the rigid in-hand transform carried to the goal block pose
             place_eef = C.compose(self._centre(place_pose), g_pick.eef_in_block)
@@ -549,6 +603,10 @@ class BlockDesign(SamplerV2):
             screened.append((pair, tilt_pick, tilt_place, yaw, sign, g_pick, place_eef))
         if not screened:
             raise Reject("grasp_unreachable", f"block {names[bi]}: no cube grasp with downward pick and place approaches")
+        # classes whose wrist stays on the robot's side first (PLACE_FACTORS 19:45: at 0.7 m base-forward the pre-poses whose
+        # lean puts the wrist beyond the block, 0.74 m forward and 11 cm up, fail the IK under every condition while the
+        # grasp poses pass; the pre-grasp / pre-place reach decides at the far cells)
+        screened.sort(key=lambda c: float(manip.world_to_base(IK.pre_pose(c[5].eef)[0][:2])[0]) + float(manip.world_to_base(IK.pre_pose(c[6])[0][:2])[0]))
         pre_picks = [[IK.pre_pose(c[5].eef), c[5].eef] for c in screened]
         ok_pick = self.ikc.screen_pairs(pre_picks, manip, "right", ignore_for_last=[support, block])
         idx = [i for i, s in enumerate(ok_pick.tolist()) if s]
@@ -557,7 +615,7 @@ class BlockDesign(SamplerV2):
             raise Reject("grasp_unreachable", f"block {names[bi]}: no pick passes the screening IK")
         chosen = None
         place_diag: List[str] = []
-        for i in [idx[j] for j in rng.permutation(len(idx))]:
+        for i in idx:  # sorted: the wrist-on-the-robot's-side classes first
             pair, tilt_pick, tilt_place, yaw, sign, g_pick, place_eef = screened[i]
             pre_pick = IK.pre_pose(g_pick.eef)
             res = self.ikc.exact([pre_pick, g_pick.eef], manip, "right", ignore_for_last=[support, block])
@@ -569,7 +627,7 @@ class BlockDesign(SamplerV2):
             pre_place = IK.pre_pose(place_margin_pose)
             with TT.posed_in_hand(self, "right", block, C.relative(g_pick.eef, pick_pose)):
                 with attached(self.kit, "right", block):
-                    res_p = self.ikc.exact([pre_place, place_margin_pose], manip, "right", ignore_for_last=[support])
+                    res_p = self.ikc.exact([pre_place, place_margin_pose], manip, "right", ignore_for_last=place_ignore)
                     wps_ok = True
                     wps: List[TT.Pose] = []
                     if res_p.ok and (plan["flips"] or abs(plan["yaw_deg"]) > 1e-6):
@@ -585,6 +643,8 @@ class BlockDesign(SamplerV2):
                         wps_ok = r_w.ok
             if not res_p.ok or not wps_ok:
                 place_diag.append(f"{pair}/t{tilt_pick:+.0f}/y{math.degrees(yaw) % 360:.0f}: {'place exact ' + res_p.reason if not res_p.ok else 'flip waypoints ' + r_w.reason}")
+                if not res_p.ok and len(place_diag) <= 2:
+                    self._place_failure_factors(manip, block, pick_pose, g_pick, pre_place, place_margin_pose, support, names, bi, world_poses)
                 continue
             chosen = (pair, tilt_pick, tilt_place, yaw, sign, g_pick, place_margin_pose, pre_pick, pre_place, wps)
             break
@@ -634,6 +694,49 @@ class BlockDesign(SamplerV2):
         rec["brace_reasons"] = outcomes
         return rec
 
+    def _place_failure_factors(self, manip: Stance, block, pick_pose: TT.Pose, g_pick, pre_place: TT.Pose, place_eef: TT.Pose, support, names, bi, world_poses):
+        """PLACE_FACTORS diagnostic (17:24 first-demo run: every place failed the pre-place exact IK while the replay
+        probes pass it): re-solve the pre-place / place from the manipulation stance under isolated conditions — plain
+        32-seed IK from the posture seed (no remembered seeds), the other blocks ignored, the block not attached, the
+        support ignored — and log which passes."""
+        try:
+            others = [self.objects[n] for n in names if n != names[bi]]
+            q0 = self.ikc.q_locked(manip)
+            out: Dict[str, Any] = {"block": names[bi], "class": f"{g_pick.face_pair}/t{g_pick.tilt_deg:+.0f}",
+                                   "pre_place_base": [round(float(v), 3) for v in manip.world_to_base(pre_place[0][:2]).tolist()] + [round(float(pre_place[0][2]) - float(self.top.z), 3)],
+                                   "approach_fwd": round(float(th.dot(C.approach_axis(pre_place[1])[:2], manip.inward[:2])), 2)}
+            with TT.posed_in_hand(self, "right", block, C.relative(g_pick.eef, pick_pose)):
+                with attached(self.kit, "right", block):
+                    out["attached: plain ik pre"] = self.kit.ik(pre_place, q0, arm="right") is not None
+                    out["attached: plain ik place (support ignored)"] = None
+                    with self.ikc.ignoring([support]):
+                        out["attached: plain ik place (support ignored)"] = self.kit.ik(place_eef, q0, arm="right") is not None
+                    with self.ikc.ignoring(others):
+                        out["attached: plain ik pre, other blocks ignored"] = self.kit.ik(pre_place, q0, arm="right") is not None
+                    with self.ikc.ignoring(others + [support]):
+                        out["attached: plain ik pre, blocks + support ignored"] = self.kit.ik(pre_place, q0, arm="right") is not None
+            with self.ikc.ignoring([block]):
+                out["not attached: plain ik pre (block ignored)"] = self.kit.ik(pre_place, q0, arm="right") is not None
+                with self.ikc.ignoring(others):
+                    out["not attached: plain ik pre, all blocks ignored"] = self.kit.ik(pre_place, q0, arm="right") is not None
+            log.info("%s: PLACE_FACTORS %s", self.gp.alias, json.dumps(out))
+        except Exception as e:  # diagnostics only
+            log.info("%s: PLACE_FACTORS failed: %r", self.gp.alias, e)
+
+    def _class_attachable(self, block, pair: str, tilt: float, clearance: float, eef_in_block: TT.Pose) -> bool:
+        """Once per template per (face pair, tilt, tip clearance): whether the cube attached per this class's rigid
+        in-hand transform is free of self-collision with the non-exempt gripper links (``IKChecker.attachable``); the
+        transform does not depend on the block's pose, so the answer is cached in ``self.attachable_classes`` and the
+        dropped classes are listed in ``template_facts.cube_classes_not_attachable``."""
+        key = (pair, round(float(tilt), 1), round(float(clearance), 4))
+        cache = self.__dict__.setdefault("attachable_classes", {})
+        if key not in cache:
+            cache[key] = bool(self.ikc.attachable(block, eef_in_block, "right"))
+            if not cache[key]:
+                self.template_facts.setdefault("cube_classes_not_attachable", []).append(f"{pair}/t{tilt:+.0f}/c{clearance * 1000:.0f}mm")
+                log.info("%s: cube class %s/t%+.0f at %.0f mm tip clearance: attached cube self-collides with the gripper; dropped", self.gp.alias, pair, tilt, clearance * 1000)
+        return cache[key]
+
     # ------------------------------------------------------------------ §6.5 flip-on-the-table (prep, ``generation.block_table_flip``)
 
     def _leg_ik(self, manip: Stance, block, pose_a: TT.Pose, pose_b: TT.Pose, world_poses: Dict[str, TT.Pose], table_yaw: float,
@@ -659,11 +762,16 @@ class BlockDesign(SamplerV2):
             for tilt in PICK_TILTS_DEG:
                 for k in range(4):
                     yaw = table_yaw + k * math.pi / 2
-                    try:
-                        g = C.cube_grasp(self._centre(pose_a), pair, tilt, yaw, edge=self.edge, tip_clearance=PICK_TIP_CLEARANCE)
-                    except ValueError:
-                        continue
-                    if not g.downward:
+                    g = None
+                    for clearance in PICK_TIP_CLEARANCES:
+                        try:
+                            g_ = C.cube_grasp(self._centre(pose_a), pair, tilt, yaw, edge=self.edge, tip_clearance=clearance)
+                        except ValueError:
+                            continue
+                        if g_.downward and self._class_attachable(block, pair, tilt, clearance, g_.eef_in_block):
+                            g = g_
+                            break
+                    if g is None:
                         continue
                     place_eef = C.compose(self._centre(pose_b), g.eef_in_block)
                     if float(C.approach_axis(place_eef[1])[2]) > -0.1:
