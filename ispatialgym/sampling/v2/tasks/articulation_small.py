@@ -554,16 +554,29 @@ class ArticulationSmall(SamplerV2):
         freedom). Returns ``(chosen | None, cands, fails, extras)``."""
         cands, extras = self._brace_candidates_at(stance, pose, q_values)
         fails: List[str] = []
+        handle_ok = None
         for kind, (b_pre, b_contact) in cands:
             res = TT.brace_second_arm(self, stance, self.handle_arm, grasp_pair, self.brace_arm, [b_pre, b_contact], ignore_work_last=[support, target],
                                       ignore_brace_last=[target])
             if res.ok:
                 return (kind, b_pre, b_contact, res.q), cands, fails, extras
-            fails.append(f"{kind}: {res.reason}")
+            if res.reason.startswith(f"{self.handle_arm}:"):
+                handle_ok = False
+                fails.append(f"{kind}: {res.reason}")
+                break  # the handle grasp alone fails at this stance: no brace can help
+            handle_ok = True
+            # the handle arm's first solution may be the one branch the brace cannot live with (0916-205838: at the one stance
+            # where both pass alone, every two-arm pair failed): the other order gives the brace arm its solution first
+            res2 = TT.brace_second_arm(self, stance, self.brace_arm, [b_pre, b_contact], self.handle_arm, grasp_pair, ignore_work_last=[target],
+                                       ignore_brace_last=[support, target])
+            if res2.ok:
+                return (kind, b_pre, b_contact, res2.q), cands, fails, extras
+            fails.append(f"{kind}: {res.reason} / reversed: {res2.reason}")
+        extras["handle_alone"] = handle_ok
         return None, cands, fails, extras
 
     SECOND_STANCE_LATERALS = (0.10, -0.10, 0.20, -0.20)
-    SECOND_STANCE_MAX = 8
+    SECOND_STANCE_MAX = 10
 
     def _brace_second_stance(self, manip: Stance, pose: TT.Pose, q_values, grasp_pair, target, support, cam_init):
         """Second stance for the brace + handle pair: the manipulation stance shifted along the edge by
@@ -592,6 +605,10 @@ class ArticulationSmall(SamplerV2):
         for _, dlat, dso, trunk, st in combos:
             if len(tried) >= self.SECOND_STANCE_MAX:
                 break
+            # the handle-only band (when computed) knows where the handle grasp is feasible per trunk: stances whose target
+            # cell is not a handle cell cannot pass (0916-205838: the handle grasp alone passed at 1 of 9 second stances)
+            if self.handle_only_band and self.bands is not None and not TT.in_band(self.bands, st, pose[0][:2], tol=1.0)[0]:
+                continue
             if not self.kit.trav_free(st.base_xy) or not self.ikc.stance_collision_free(st):
                 continue
             cam = self.camera_pose_at(st)
