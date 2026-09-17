@@ -1,0 +1,77 @@
+[
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__quartz-drqtci",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-inside"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-inside#03"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 1.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "quartz/drqtci",
+   "--grasp-key",
+   "quartz__drqtci"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object quartz/drqtci --grasp-key quartz__drqtci --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__toy_dice-bjrxkj__placed-tray-gsxbym",
+  "kind": "tabletop",
+  "subtasks": [
+   "disembedding"
+  ],
+  "picks": [
+   "disembedding#26"
+  ],
+  "slot": "a1",
+  "scene": "restaurant_diner",
+  "weight": 1.0,
+  "args": [
+   "--scene",
+   "restaurant_diner",
+   "--support",
+   "commercial_kitchen_table_vxvtec_0",
+   "--object",
+   "toy_dice/bjrxkj",
+   "--grasp-key",
+   "toy_dice__bjrxkj",
+   "--placed",
+   "tray/gsxbym"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene restaurant_diner --support commercial_kitchen_table_vxvtec_0 --object toy_dice/bjrxkj --grasp-key toy_dice__bjrxkj --placed tray/gsxbym --out $OUT"
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__desk_xhjsub_0__pen-hiyeki",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-ontop_large_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-ontop_large_scale#01"
+  ],
+  "slot": "variation_geometry",
+  "scene": "house_single_floor",
+  "weight": 2.5,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "desk_xhjsub_0",
+   "--object",
+   "pen/hiyeki",
+   "--grasp-key",
+   "pen__hiyeki"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 5400 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support desk_xhjsub_0 --object pen/hiyeki --grasp-key pen__hiyeki --out $OUT",
+  "wave": 2
+ }
+]
