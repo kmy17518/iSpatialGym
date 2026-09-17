@@ -902,7 +902,15 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         forward = residual * (1.0 if geom.kind == "line" else math.copysign(1.0, geom.angle)) > 0
         ctx["push_residual"]["short"] = bool(forward)
         rmin = cfg.push_residual_min_rad if geom.kind == "arc" else cfg.push_residual_min_m
-        if forward and rmin <= abs(residual) <= cfg.push_residual_max_fraction * geom.total:
+        # the re-push cap: a fraction of the recorded motion, never below twice the goal tolerance (a recorded push of
+        # gap + tolerance, core a6d7123, may leave a residual of a tolerance on a short gap)
+        cap = cfg.push_residual_max_fraction * geom.total
+        tgt = getattr(state, "pose_target", lambda name: None)(obj)
+        tol = getattr(tgt, "orientation_tolerance" if geom.kind == "arc" else "position_tolerance", None) if tgt is not None else None
+        if tol is not None:
+            cap = max(cap, 2.0 * float(tol))
+        ctx["push_residual"]["repush_cap"] = cap
+        if forward and rmin <= abs(residual) <= cap:
             ext = extend_push(geom, end_pose, residual)
             log.info("push(%s): residual %.4f %s (%s) -> pushing on along the extended %s", obj, residual, "rad" if geom.kind == "arc" else "m", source, geom.kind)
             yield from motions.arm_along(arm, ext, loaded=True)
@@ -911,7 +919,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
             after, _ = push_residual(geom, state, obj, pose0)
             ctx["push_residual"]["extended_by"] = residual
             ctx["push_residual"]["after"] = after
-        elif forward and abs(residual) > cfg.push_residual_max_fraction * geom.total:
+        elif forward and abs(residual) > cap:
             ctx["push_residual"]["skipped"] = "beyond the recorded arc"
         elif not forward and abs(residual) >= rmin:
             ctx["push_residual"]["skipped"] = "overshoot (a pad cannot pull)"

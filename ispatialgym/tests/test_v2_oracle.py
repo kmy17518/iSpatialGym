@@ -912,6 +912,40 @@ def test_brace_retry_ladder_short_and_overshoot(tmp_path):
     assert result["reason"] == "tolerance" and result["brace_retry"] == []
 
 
+def test_arm_along_unwinds_a_loaded_arm_before_the_leg():
+    """A loaded arm reports joint positions whose FK lies past the eef link (PhysX wind-up under a contact force; the
+    touching push retreat snapped the link 2.9 cm onto the joints' FK and carried the box 27.6 mm). ``arm_along`` then
+    prepends the link's own pose to the tracked leg so the joints are re-targeted onto the link before it moves; an
+    unloaded arm (FK == link) tracks the leg as given."""
+    from ispatialgym.oracle import executor as EXE
+
+    sc, env = iors_world()
+    ex, motions, backend, _ = make_executor(env, sc)
+    arm = "right"
+    frame = M.EEF_LINK[arm]
+    captured = []
+    orig = backend.solve_ik_path
+
+    def spy(emb, waypoints, *a, **k):
+        captured.append([tuple(float(v) for v in wp[frame][0]) for wp in waypoints])
+        return orig(emb, waypoints, *a, **k)
+
+    backend.solve_ik_path = spy
+    p0, q0 = motions.eef_pose(arm)
+    up = (p0 + th.tensor([0.0, 0.0, 0.05]), q0)
+    # (a) unloaded: the backend's FK agrees with the link -> the leg starts at the first densified waypoint
+    backend.fk = lambda frames, q_full=None, emb_name="whole_body": {frame: (p0.clone(), q0.clone())}
+    assert ex.run_generator(motions.arm_along(arm, [up]), EXE.PHASE_ORACLE) is None
+    first = captured[-1][0]
+    assert abs(first[2] - float(p0[2])) > 0.004  # the first tracked waypoint is already above the start
+    # (b) loaded: the joints' FK sits 3 cm past the link -> the link's own pose is the first waypoint
+    p1, q1 = motions.eef_pose(arm)
+    backend.fk = lambda frames, q_full=None, emb_name="whole_body": {frame: (p1 + th.tensor([-0.03, 0.0, 0.0]), q1.clone())}
+    assert ex.run_generator(motions.arm_along(arm, [(p1 + th.tensor([0.0, 0.0, 0.05]), q1)]), EXE.PHASE_ORACLE) is None
+    first = captured[-1][0]
+    assert all(abs(first[i] - float(p1[i])) < 1e-6 for i in range(3)), (first, p1.tolist())
+
+
 def test_arm_along_finishes_a_stalled_approach_with_arm_to():
     """A straight approach whose differential IK stalls 7 mm short (no joint limit) is finished: the converged prefix
     is executed, the last centimetres are planned by ``arm_to`` (to the witness when there is one), the grasp goes on."""

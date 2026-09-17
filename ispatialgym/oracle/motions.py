@@ -87,6 +87,9 @@ class MotionsConfig:
     #: the witness is refined by the collision-aware IK of the recorded pose seeded at it when that solution stays
     #: within this joint distance (the same branch); the sampler's witnesses miss their poses by 3-15 mm
     witness_refine_max_jump: float = 0.6
+    #: a leg that starts with the eef link this far from the FK of the reported joints (the arm wound up under a
+    #: contact load) first re-targets the joints onto the link's pose (``arm_along`` unwind)
+    unwind_min_deflection: float = 0.005
     #: how long to keep holding the final waypoint while waiting for convergence (steps)
     settle_steps: int = 90
     #: eef speed of ``arm_along`` (m/s, rad/s) and the densification resolution of its waypoint lists (m, rad)
@@ -337,6 +340,18 @@ class Motions:
     def eef_pose(self, arm: str) -> Pose:
         pos, quat = self.robot.eef_links[arm].get_position_orientation()
         return pos.float().clone(), quat.float().clone()
+
+    def _deflection(self, arm: str) -> Optional[float]:
+        """Distance (m) between the eef link's pose and the FK of the reported joint positions - the elastic wind-up
+        of a loaded arm (0 when unloaded; None without a backend FK)."""
+        fk = getattr(self.backend, "fk", None)
+        if fk is None:
+            return None
+        try:
+            pose = fk([M.EEF_LINK[arm]])[M.EEF_LINK[arm]]
+        except Exception:  # noqa: BLE001
+            return None
+        return float(th.linalg.norm(as_world_pose(pose)[0] - self.eef_pose(arm)[0]))
 
     def base_pose2d(self) -> Tuple[float, float, float]:
         pos, quat = self.robot.get_position_orientation()
@@ -826,6 +841,14 @@ class Motions:
         start = self.eef_pose(arm)
         dense = self._densify(start, waypoints)
         frame = M.EEF_LINK[arm]
+        # a loaded arm (a pad pressing on its object) is wound up: PhysX reports joint positions whose FK lies past the
+        # eef link (touching push 0916-202403: 2.9 cm deeper into the box). A leg planned from those joints snaps the
+        # link onto their FK the moment the load releases - the retreat pushed the box another 27.6 mm. Unwind first:
+        # the first waypoint is the link's own pose, so the joints are re-targeted onto where the link actually is.
+        deflection = self._deflection(arm)
+        if deflection is not None and deflection > self.cfg.unwind_min_deflection:
+            log.info("arm_along(%s): the arm is wound up %.1f mm under load (FK of the joints vs the eef link): unwinding onto the link pose first", arm, deflection * 1000)
+            dense = [start] + dense
         res = self.backend.solve_ik_path(
             f"{arm}_arm",
             [{frame: wp} for wp in dense],
