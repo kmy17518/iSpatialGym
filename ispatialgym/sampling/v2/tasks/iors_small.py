@@ -491,10 +491,18 @@ class IORSSmall(SamplerV2):
         contact (``push_distance``)."""
         return max(0.0, float(self.pair.get("g_NT", 0.03)) - 0.01)
 
-    def push_distance(self) -> float:
-        """Touching: the push from the place (nextto) position to contact plus 5 mm so that the pads keep pressing
-        (``touching_contacts``: ``push_goal = push_init + direction * push_distance``)."""
-        return self.place_gap() + 0.005
+    def push_margin(self) -> float:
+        """Touching: how far past the measured gap the recorded push reaches - the place position tolerance (the executed
+        place may leave the target that much farther from the partner: oracle-B run 0916-202403, boxes 4.1 cm apart at a
+        2.7 cm recorded push) plus 5 mm of pressing. The oracle pushes the residual it measures; the recorded arc is its cap."""
+        return float(self.tol("position", 0.03)) + 0.005
+
+    def push_distance(self, gap_at_place: Optional[float] = None) -> float:
+        """Touching: the recorded push spans the gap between the target's near face at the place and the partner's face —
+        measured from the hulls when given, else the nominal place gap — plus ``push_margin`` (``touching_contacts``:
+        ``push_goal = push_init + direction * push_distance``)."""
+        gap = self.place_gap() if gap_at_place is None else max(0.0, float(gap_at_place))
+        return gap + self.push_margin()
 
     def place_partner(self, rng: np.random.Generator, t_pose: G.Pose, manip: Stance, cam: G.Pose) -> G.Pose:
         """§4.6 step 2 with the gap range per side cut to the reach band of the manipulation trunk (§4.1 / principle 3:
@@ -1014,9 +1022,11 @@ class IORSSmall(SamplerV2):
                 # the oracle program places at the *nextto* position and pushes the target into contact from there: the
                 # place is the settled contact position moved back (away from the partner, robot's right) by the push distance
                 tangent = manip.tangent
-                place_pos = goal_pos - th.tensor([float(tangent[0]), float(tangent[1]), 0.0]) * self.push_distance()
+                # the place sits the nominal gap (g_NT - 1 cm) short of the settled contact; the push (recorded in
+                # ``touching_contacts``) spans the measured gap at that place plus the margin
+                place_pos = goal_pos - th.tensor([float(tangent[0]), float(tangent[1]), 0.0]) * self.place_gap()
                 self._touching_place_pos = place_pos
-                draft.summary["touching"] = {"place_gap_m": round(self.place_gap(), 4), "push_distance_m": round(self.push_distance(), 4)}
+                draft.summary["touching"] = {"place_gap_m": round(self.place_gap(), 4)}
             place = IK.grasp_pose((place_pos, goal_quat), grasp.eef_in_object)
             pre_place = IK.pre_pose(place)
             ignore = self.support_objects() + [self.obj("partner")]
@@ -1144,9 +1154,14 @@ class IORSSmall(SamplerV2):
         tangent = manip.tangent
         direction = th.tensor([float(tangent[0]), float(tangent[1]), 0.0])  # toward the partner = robot's left
         p_init, b_point = self.touching_points(t_pose, p_pose, manip)
-        dist = self.push_distance()
         p_hull = self.world.hull_at(self.hull["partner"], p_pose)
         face_z = (float(p_hull[:, 2].min()), float(p_hull[:, 2].max()))
+        # the push spans the *measured* gap at the place (target's left face at the place pose -> partner's right face along
+        # the push direction) plus the margin; the recorded goal lies past the contact by the margin
+        t_hull_place = self.world.hull_at(self.hull["target"], t_pose)
+        gap_at_place = float((p_hull[:, :2] @ tangent).min() - (t_hull_place[:, :2] @ tangent).max())
+        dist = self.push_distance(gap_at_place)
+        draft.summary.setdefault("touching", {}).update({"gap_at_place_m": round(gap_at_place, 4), "push_distance_m": round(dist, 4), "push_margin_m": round(self.push_margin(), 4)})
         # closed pads for both contacts (§3.6); the push arm first, then the brace with the push arm locked (§4.6 step 6).
         # Push candidates: the pads closing horizontally (default) then vertically (the other wrist roll — the horizontal
         # one put the right pre-contact out of reach on 5/8 attempts of the sanitary-napkins loop); brace candidates in
