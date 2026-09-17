@@ -908,7 +908,7 @@ class IORSLarge(SamplerV2):
                 continue
             try:
                 manip = self.floor_stance_b(c_t, rb, half, rng)
-                init = self.floor_stance_a(c_t, rng, height)
+                init = self.floor_stance_a(c_t, rng, height, like=manip[0])
                 self.record_path(init, manip[0])  # §5.6: a path A -> B exists
             except Reject as e:
                 errors.append(f"{e.reason}: {e}")
@@ -980,10 +980,13 @@ class IORSLarge(SamplerV2):
             raise Reject("no_manipulation_stance", f"floor init: no stance B sees c_t ({len(cands)} collision-free; {n_frame} target out of frame, {n_axis} axis > {math.degrees(axis_max):.0f}°)")
         return out
 
-    def floor_stance_a(self, c_t: th.Tensor, rng: np.random.Generator, height: float) -> Stance:
-        """Stance A of the floor init: base on the eroded map 0.6–1.5 m from c_t facing it, tilt 0, the translate whose
-        optical axis is closest to c_t with the target and the partner's relevant region (goal patch / nearest bottom
-        edge, owner decision (a)/(d)) in frame, collision-free."""
+    def floor_stance_a(self, c_t: th.Tensor, rng: np.random.Generator, height: float, like: Optional[Stance] = None) -> Stance:
+        """Stance A of the floor init: base on the eroded map 0.6–1.5 m from c_t facing it, with the target and the
+        partner's relevant region (goal patch / nearest bottom edge, owner decision (a)/(d)) in frame, collision-free.
+        Trunk candidates: stance B's own trunk first (``like``; then A -> B needs no trunk sweep and the path is driven
+        with B's tucked arms — countertop-floor 19:07: every A at (0.95, 0) untucked collided on the path / the sweep
+        (0.95, 0) -> (0.95, -0.9) hit the cabinets at every s_T), then tilt 0 at the translate whose optical axis is
+        closest to c_t."""
         fi = dict(self.gp.gen("floor_init") or {})
         d_lo, d_hi = fi.get("distance_range_m", [0.6, 1.5])
         focus = th.tensor([float(c_t[0]), float(c_t[1]), self.floor_z + height / 2])
@@ -995,7 +998,10 @@ class IORSLarge(SamplerV2):
             if not self.kit.trav_free(xy, eroded=True) or not P0.in_task_rooms(self, xy):
                 continue
             yaw = math.atan2(float(c_t[1] - xy[1]), float(c_t[0] - xy[0]))
-            cands = [Stance("init", (float(xy[0]), float(xy[1]), yaw), t, 0.0, dist) for t in RB.TRANSLATES]
+            trunks = [(float(t), 0.0) for t in RB.TRANSLATES]
+            if like is not None:
+                trunks = [(float(like.translate), float(like.tilt))] + trunks
+            cands = [Stance("init", (float(xy[0]), float(xy[1]), yaw), t, ti, dist) for t, ti in trunks]
             cams = P0.camera_poses(self, cands)
             feas = []
             for st, cam in zip(cands, cams):
@@ -1004,13 +1010,17 @@ class IORSLarge(SamplerV2):
                 feas.append((st, P0.axis_angle(self, cam, focus)))
             if not feas:
                 continue
+            for st, _ in feas:  # B's own trunk: the same (tucked) arms as B, else the untucked init posture
+                st.arms = like.arms if (like is not None and (st.translate, round(st.tilt, 6)) == (like.translate, round(float(like.tilt), 6))) else "untucked"
+                if st.arms != "untucked" and like is not None:
+                    st.fingers = like.fingers
             free = P0.body_free(self, [st for st, _ in feas])
             feas = [(st, a) for (st, a), f in zip(feas, free.tolist()) if f]
             if not feas or not P0.trunk_sweep_free(self, (float(xy[0]), float(xy[1]), yaw)):
                 continue
-            st = min(feas, key=lambda sa: (round(sa[1], 6), sa[0].translate))[0]
-            st.arms = "untucked"
-            st.extras.update({"bearing_deg": math.degrees(bearing), "distance": dist})
+            same = [sa for sa in feas if sa[0].arms != "untucked"]
+            st = same[0][0] if same else min(feas, key=lambda sa: (round(sa[1], 6), sa[0].translate))[0]
+            st.extras.update({"bearing_deg": math.degrees(bearing), "distance": dist, "trunk_like_b": bool(same)})
             return st
         raise Reject("no_stance", "floor init: no stance A sees the target at c_t and the partner")
 
