@@ -1170,6 +1170,10 @@ class IORSLarge(SamplerV2):
         margin = half + 0.10
         half_run = edge.length / 2 - margin
         laterals = P0.lattice_values(-half_run, half_run, 0.10) if half_run > 0 else [0.0]
+        # side stances may use the lane up to the edge's end minus the target's half extent (the deep trunks were clear only
+        # with the base near the +tangent end of the bed edge: the lane 0.45 m further along is at the edge's end)
+        half_run_side = edge.length / 2 - half - 0.02
+        laterals_side = P0.lattice_values(-half_run_side, half_run_side, 0.10) if half_run_side > 0 else [0.0]
         stand_offs = [float(v) for v in (self.gp.gen("push_under_stand_offs_m") or PUSH_UNDER_STAND_OFFS)]
         trunks = [tuple(t) for t in (self.gp.gen("floor_trunks") or FLOOR_TRUNKS)]
         lo_ahead, hi_ahead = PUSH_UNDER_DROP_AHEAD_M
@@ -1188,7 +1192,9 @@ class IORSLarge(SamplerV2):
         side_b = [float(v) for v in (self.gp.gen("push_under_side_standoff_m") or (0.35, 0.40))]
         yaw_side = math.atan2(float(tangent[1]), float(tangent[0]))  # facing +tangent: the robot's right = inward (the partner side)
         cands: List[Stance] = []
-        for lat in laterals:
+        lat_all = sorted({round(float(v), 4) for v in list(laterals) + list(laterals_side)})
+        lat_frontal = {round(float(v), 4) for v in laterals}
+        for lat in lat_all:
             g = mid + tangent * float(lat) + d2 * inside
             cl = self.clearance_at(g)
             clear = (cl is not None and cl >= need) or (cl is None and len(cells) > 0 and float(th.linalg.norm(cells - g, dim=1).min()) <= 0.03)
@@ -1204,7 +1210,7 @@ class IORSLarge(SamplerV2):
             # frontal stances: the lane to the robot's RIGHT of the base centre by ``frontal_lane_offset_m`` — B3's under-edge
             # probe (bed_rrcvaq_0, briefcase, s = 0.6) reaches the edge strip at lateral −0.40…−0.16 only (the right arm's
             # side), a centred lane at s = 0.45 / 0.6 has 0–1 cells
-            for off in [float(v) for v in (self.gp.gen("frontal_lane_offset_m") or (0.25, 0.0))]:
+            for off in ([float(v) for v in (self.gp.gen("frontal_lane_offset_m") or (0.25, 0.0))] if lat in lat_frontal else []):
                 for so in stand_offs:
                     ahead = so - out
                     if ahead < lo_ahead or ahead > hi_ahead:
