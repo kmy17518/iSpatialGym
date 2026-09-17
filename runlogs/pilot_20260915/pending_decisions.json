@@ -155,6 +155,50 @@
    "applied_commit": "5555526",
    "thread_ts": "1789615821.434969",
    "answered_at": "2026-09-16 21:38 PDT"
+  },
+  {
+   "id": "D-008",
+   "time": "2026-09-16 21:54 PDT",
+   "subtask": "configuration_matching-articulation_open_small_scale",
+   "question": "hinged jar: no joint two-arm cell exists (two-arm 0/108, no left contact band for the 0.20 m height class) \u2014 brace optional for small articulation as for axial / touching?",
+   "context": "Tabletop 21:50 (run 0916-205838 on 6dede1f5, 9 stances x 12 brace classes): brace alone passes at 8/9 stances (left-face classes 66/108), handle grasp alone at 1/9, two-arm 0/108 (arm-arm interference at the centre line at the one stance where both pass alone); the reverse-order run (7bb88c17) is the last try. Asked in chat (Slack paused).",
+   "options": [
+    "A) brace optional for small articulation (open + close): record contacts.brace only when a joint cell exists, else handle-only with the oracle's articulate closure (as axial 6c3d967 / touching 6de8803)",
+    "B) keep the brace required \u2014 yield only (toolbox / laptop aliases)"
+   ],
+   "default": "A at 22:30 PDT if unanswered, unless the 7bb88c17 run finds a two-arm pair",
+   "artefacts": [
+    "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_open_small_scale/0916-205838/"
+   ],
+   "status": "open",
+   "answered_by": null,
+   "answer": null,
+   "applied_commit": null,
+   "thread_ts": null,
+   "answered_at": null,
+   "channel": "chat (Slack paused 21:53)"
+  },
+  {
+   "id": "D-009",
+   "time": "2026-09-16 21:54 PDT",
+   "subtask": "configuration_matching-attachment",
+   "question": "attachment: every Phase-2 survivor is class 0 (8 deg) with foci 0.77-0.81 m base-forward, beyond the lift/carry reach \u2014 loose class for attachment, or admit class-1 candidates when class-0 foci are deeper than 0.65 m?",
+   "context": "Tabletop 21:50: with the near/left/far brace faces (bd30c0cf) the joint placement passes; the SLERP waypoints (z_top + 0.11-0.18 m at 0.70-0.77 m) fail because phase2_manipulation_stance returns class-0 survivors only when any exist; carry-height ladder 12/8/5 cm added (deb0093c). Each candidate costs 2-3 min (second-base-pose search). Asked in chat (Slack paused).",
+   "options": [
+    "A) loose class 20-25 deg for attachment (same shape as D-003 for small articulation)",
+    "B) general rule: class-1 candidates admitted whenever the class-0 foci are deeper than 0.65 m base-forward (applies to every tabletop subtask)"
+   ],
+   "default": "B at 22:30 PDT if unanswered (general, reach-driven)",
+   "artefacts": [
+    "runlogs/pilot_20260915/first_demo/configuration_matching-attachment/"
+   ],
+   "status": "open",
+   "answered_by": null,
+   "answer": null,
+   "applied_commit": null,
+   "thread_ts": null,
+   "answered_at": null,
+   "channel": "chat (Slack paused 21:53)"
   }
  ]
 }
