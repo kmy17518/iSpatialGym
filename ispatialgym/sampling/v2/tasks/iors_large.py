@@ -909,7 +909,10 @@ class IORSLarge(SamplerV2):
             try:
                 manip = self.floor_stance_b(c_t, rb, half, rng)
                 init = self.floor_stance_a(c_t, rng, height, like=manip[0])
-                self.record_path(init, manip[0])  # §5.6: a path A -> B exists
+                with self.ikc.ignoring([self.obj("floor")]):
+                    self.record_path(init, manip[0])  # §5.6: a path A -> B exists
+                    self.record_transition(init, manip[0])
+                self.sidecar.transitions.clear()
             except Reject as e:
                 errors.append(f"{e.reason}: {e}")
                 continue
@@ -1010,15 +1013,16 @@ class IORSLarge(SamplerV2):
                 feas.append((st, P0.axis_angle(self, cam, focus)))
             if not feas:
                 continue
-            for st, _ in feas:  # B's own trunk: the same (tucked) arms as B, else the untucked init posture
-                st.arms = like.arms if (like is not None and (st.translate, round(st.tilt, 6)) == (like.translate, round(float(like.tilt), 6))) else "untucked"
-                if st.arms != "untucked" and like is not None:
-                    st.fingers = like.fingers
+            for st, _ in feas:
+                # floor class: A spawns TUCKED (documented exception to the untucked init, §3.3) — driven at A's crouch the
+                # untucked hands hang at floor level and swept the target on the floor at c_t (countertop-floor 19:45:
+                # path collides at stride 8/9 at trunk (0.95, 0)); the path A -> B is recorded at that posture
+                st.arms = "tucked"
             free = P0.body_free(self, [st for st, _ in feas])
             feas = [(st, a) for (st, a), f in zip(feas, free.tolist()) if f]
             if not feas or not P0.trunk_sweep_free(self, (float(xy[0]), float(xy[1]), yaw)):
                 continue
-            same = [sa for sa in feas if sa[0].arms != "untucked"]
+            same = [sa for sa in feas if like is not None and (sa[0].translate, round(float(sa[0].tilt), 6)) == (like.translate, round(float(like.tilt), 6))]
             st = same[0][0] if same else min(feas, key=lambda sa: (round(sa[1], 6), sa[0].translate))[0]
             st.extras.update({"bearing_deg": math.degrees(bearing), "distance": dist, "trunk_like_b": bool(same)})
             return st
@@ -1402,9 +1406,10 @@ class IORSLarge(SamplerV2):
             self.sidecar.transitions.clear()
             self.sidecar.paths.clear()
             try:
-                # A -> B (§3.7 / §3.8)
-                self.record_path(init, manip)
-                self.record_transition(init, manip)
+                # A -> B (§3.7 / §3.8); floor class: the floor mesh out of the sweep / drive-in checks like stance B itself
+                with self._floor_relaxed():
+                    self.record_path(init, manip)
+                    self.record_transition(init, manip)
                 focus_xy = self.surface["c_t"] if kind == "floor" else manip.focus[:2]
                 z_init = self.surface["z"]
                 F_init = self.ikc.feasible_sets([focus_xy], YAWS, self.grasps, lambda xy, yaw: self.pose_on(xy, yaw, z_init), manip, "right", self.grasp_ignore_objects())
@@ -1576,7 +1581,8 @@ class IORSLarge(SamplerV2):
         """Context: the floor object out of the collision world (the cuRobo ground slab stays) — the push-under stance C
         stands at the deep trunks, where the 1 cm margin against the floor mesh is what fails (see
         :meth:`push_under_candidates`); applied to the core's stance / transition re-check and to the program check."""
-        return self.ikc.ignoring([self.obj("floor")]) if self.push_under else _NullContext()
+        floor_class = (getattr(self, "surface", None) or {}).get("kind") == "floor"
+        return self.ikc.ignoring([self.obj("floor")]) if (self.push_under or floor_class) else _NullContext()
 
     def check_stances_with_objects(self, draft: Draft):
         with self._floor_relaxed():
