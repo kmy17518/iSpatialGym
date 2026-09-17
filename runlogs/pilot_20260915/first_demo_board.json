@@ -36,8 +36,8 @@
   "owner": "tabletop / oracle"
  },
  "configuration_matching-attachment": {
-  "blocking": "owner 17:10 (2): brace stays \u2014 second base pose recorded after the male grasp, sidecar transition, oracle executes it holding the object; brace optional only if no cell after that",
-  "owner": "tabletop \u2192 oracle"
+  "blocking": "tabletop 58afae2: second base pose between grasp and attach (paths carried, Transition.holding bd10c72) \u2014 lid-teapot loop running since 17:38",
+  "owner": "loop / tabletop"
  },
  "configuration_matching-articulation_open_small_scale": {
   "blocking": "owner 17:10 (3): Phase-2 cone 25\u00b0 / focus-in-frame for small articulation (tabletop, 20 min) \u2192 hinged_jar loop",
@@ -87,8 +87,8 @@
   "owner": "oracle / investigation"
  },
  "inter_object_relation_satisfaction-touching": {
-  "blocking": "owner 17:10: brace optional (as axial) \u2014 core (iors_small + program_check) + oracle (program); loop on the fix",
-  "owner": "core \u2192 oracle"
+  "blocking": "core 6de8803: brace optional (push chain required) \u2014 napkins loop launched 18:12; oracle program_touching must accept the brace-less sidecar (queued with the oracle)",
+  "owner": "loop / oracle"
  },
  "inter_object_relation_satisfaction-ontop_large_scale": {
   "blocking": "countertop pair = geometric yield (partner behind stance A) \u2192 floor fallback alias queued (local); sofa-bar re-run with the B\u2192C path limit geodesic+3 m (4df6d0a) running locally",
