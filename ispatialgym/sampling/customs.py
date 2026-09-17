@@ -61,6 +61,7 @@ from __future__ import annotations
 import copy
 import datetime as _dt
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
@@ -68,6 +69,8 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 import numpy as np
 
 from ispatialgym import ASSETS_ROOT
+
+log = logging.getLogger("ispatialgym.customs")
 
 DEFAULT_CUSTOMS_PATH = os.path.join(ASSETS_ROOT, "task_specs", "isg_customs.json")
 
@@ -92,7 +95,10 @@ CONSTRAINT_TYPES = ("stance", "grasp_set", "joint_set", "placement", "scale", "b
 SCOPE_KEYS = ("scene", "support", "partner", "target", "model", "support_height", "trunk")
 #: Fields a ``hold`` record carries (``Constraint.fields``); the write-back adds ``source``.
 HOLD_FIELDS = ("robot", "depth_m", "trunk", "roll_deg", "eef_in_base", "approach", "closing", "right_arm_q", "idle_arms")
-#: Keys of a customs entry, in the order they are written (the fallback keys only when set).
+#: Keys of a customs entry, in the order they are written (the fallback keys only when set). Any other top-level key of
+#: an entry is a hand-written owner / agent record (D-004 ``f8e9aa7`` ``blacklisted``: the office_cubicles_right cabinets
+#: removed from the alias; ``pick_note`` of the Rs_int drawer pick) — kept verbatim in ``CustomsEntry.notes`` and written
+#: back after the schema keys, never interpreted here.
 ENTRY_KEYS = ("iddl", "definition_id", "fallback_of", "fallback_rank", "fallback_kind", "fallback_params", "fallbacks", "superseded_by",
               "roles", "scenes", "generation", "constraints")
 #: ``fallback_kind`` values (see the module docstring).
@@ -347,6 +353,8 @@ class CustomsEntry:
     fallbacks: List[str] = field(default_factory=list)
     # set when a later grounding replaced this alias (the replacing alias, or True): dormant, never queued
     superseded_by: Union[None, str, bool] = None
+    # hand-written owner / agent records outside the schema (``blacklisted``, ``pick_note``, ...): kept verbatim
+    notes: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def is_fallback(self) -> bool:
@@ -424,13 +432,17 @@ class CustomsEntry:
                 "constraints": [c.to_dict() for c in self.constraints],
             }
         )
+        for k, v in self.notes.items():
+            if k not in d:
+                d[k] = copy.deepcopy(v)
         return d
 
     @classmethod
     def from_dict(cls, alias: str, d: Dict[str, Any]) -> "CustomsEntry":
-        unknown = set(d) - set(ENTRY_KEYS)
+        unknown = sorted(set(d) - set(ENTRY_KEYS))
         if unknown:
-            raise CustomsError(f"entry {alias!r} has unknown keys {sorted(unknown)}; expected {ENTRY_KEYS}")
+            # hand-written records (owner blacklists, pick notes) ride along; a schema key misspelt by hand would too, so say so
+            log.info("customs entry %r: keys outside the schema kept verbatim: %s", alias, unknown)
         entry = cls(
             alias=alias,
             iddl=d.get("iddl"),
@@ -441,6 +453,7 @@ class CustomsEntry:
             constraints=[Constraint.from_dict(c) for c in (d.get("constraints") or [])],
             fallbacks=list(d.get("fallbacks") or []),
             superseded_by=d.get("superseded_by") or None,
+            notes={k: copy.deepcopy(d[k]) for k in unknown},
         )
         if d.get("fallback_of") is not None:
             entry.set_fallback(d["fallback_of"], int(d.get("fallback_rank") or 1), d.get("fallback_kind") or "init_surface", d.get("fallback_params"))

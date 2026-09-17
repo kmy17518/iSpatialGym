@@ -6630,7 +6630,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "decorative_sign/rypeha": "+x"
+   },
+   "up_axis": {
+    "decorative_sign/rypeha": "+z"
+   },
+   "level_axis": {
+    "decorative_sign/rypeha": "+y"
+   }
   },
   "constraints": [
    {
@@ -6831,7 +6840,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "decorative_sign/rypeha": "+x"
+   },
+   "up_axis": {
+    "decorative_sign/rypeha": "+z"
+   },
+   "level_axis": {
+    "decorative_sign/rypeha": "+y"
+   }
   },
   "constraints": [
    {
@@ -7217,7 +7235,16 @@
    ],
    "settle_free": [],
    "goal": "level",
-   "swept_patch": true
+   "swept_patch": true,
+   "front_axis": {
+    "hanger/lymqks": "+z"
+   },
+   "up_axis": {
+    "hanger/lymqks": "-x"
+   },
+   "level_axis": {
+    "hanger/lymqks": "+y"
+   }
   },
   "constraints": [
    {
@@ -7419,7 +7446,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "hanger/nadesv": "+z"
+   },
+   "up_axis": {
+    "hanger/nadesv": "-x"
+   },
+   "level_axis": {
+    "hanger/nadesv": "+y"
+   }
   },
   "constraints": [
    {
@@ -7612,7 +7648,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "license_plate/nwfbxn": "+z"
+   },
+   "up_axis": {
+    "license_plate/nwfbxn": "+y"
+   },
+   "level_axis": {
+    "license_plate/nwfbxn": "+x"
+   }
   },
   "constraints": [
    {
@@ -7813,7 +7858,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "license_plate/nwfbxn": "+z"
+   },
+   "up_axis": {
+    "license_plate/nwfbxn": "+y"
+   },
+   "level_axis": {
+    "license_plate/nwfbxn": "+x"
+   }
   },
   "constraints": [
    {
@@ -8006,7 +8060,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "picture/qavxsz": "+z"
+   },
+   "up_axis": {
+    "picture/qavxsz": "+y"
+   },
+   "level_axis": {
+    "picture/qavxsz": "+x"
+   }
   },
   "constraints": [
    {
@@ -8207,7 +8270,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "picture/qavxsz": "+z"
+   },
+   "up_axis": {
+    "picture/qavxsz": "+y"
+   },
+   "level_axis": {
+    "picture/qavxsz": "+x"
+   }
   },
   "constraints": [
    {
@@ -8400,7 +8472,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "radiator/arfdpk": "+x"
+   },
+   "up_axis": {
+    "radiator/arfdpk": "+z"
+   },
+   "level_axis": {
+    "radiator/arfdpk": "+y"
+   }
   },
   "constraints": [
    {
@@ -8601,7 +8682,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "radiator/arfdpk": "+x"
+   },
+   "up_axis": {
+    "radiator/arfdpk": "+z"
+   },
+   "level_axis": {
+    "radiator/arfdpk": "+y"
+   }
   },
   "constraints": [
    {
@@ -8794,7 +8884,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "shelf/xogqqm": "-z"
+   },
+   "up_axis": {
+    "shelf/xogqqm": "+x"
+   },
+   "level_axis": {
+    "shelf/xogqqm": "+y"
+   }
   },
   "constraints": [
    {
@@ -8995,7 +9094,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "shelf/xogqqm": "-z"
+   },
+   "up_axis": {
+    "shelf/xogqqm": "+x"
+   },
+   "level_axis": {
+    "shelf/xogqqm": "+y"
+   }
   },
   "constraints": [
    {
@@ -9188,7 +9296,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "signpost/ivvjfv": "+x"
+   },
+   "up_axis": {
+    "signpost/ivvjfv": "+z"
+   },
+   "level_axis": {
+    "signpost/ivvjfv": "+y"
+   }
   },
   "constraints": [
    {
@@ -9389,7 +9506,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "signpost/ivvjfv": "+x"
+   },
+   "up_axis": {
+    "signpost/ivvjfv": "+z"
+   },
+   "level_axis": {
+    "signpost/ivvjfv": "+y"
+   }
   },
   "constraints": [
    {
@@ -9584,7 +9710,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "towel_rack/kqrmrh": "+x"
+   },
+   "up_axis": {
+    "towel_rack/kqrmrh": "+z"
+   },
+   "level_axis": {
+    "towel_rack/kqrmrh": "+y"
+   }
   },
   "constraints": [
    {
@@ -9787,7 +9922,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "towel_rack/kqrmrh": "+x"
+   },
+   "up_axis": {
+    "towel_rack/kqrmrh": "+z"
+   },
+   "level_axis": {
+    "towel_rack/kqrmrh": "+y"
+   }
   },
   "constraints": [
    {
@@ -9980,7 +10124,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "umbrella/frpfnc": "+z"
+   },
+   "up_axis": {
+    "umbrella/frpfnc": "+y"
+   },
+   "level_axis": {
+    "umbrella/frpfnc": "+x"
+   }
   },
   "constraints": [
    {
@@ -10181,7 +10334,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "umbrella/frpfnc": "+z"
+   },
+   "up_axis": {
+    "umbrella/frpfnc": "+y"
+   },
+   "level_axis": {
+    "umbrella/frpfnc": "+x"
+   }
   },
   "constraints": [
    {
@@ -10376,7 +10538,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "wall_mounted_tv/ggfznh": "+x"
+   },
+   "up_axis": {
+    "wall_mounted_tv/ggfznh": "+z"
+   },
+   "level_axis": {
+    "wall_mounted_tv/ggfznh": "+y"
+   }
   },
   "constraints": [
    {
@@ -10579,7 +10750,16 @@
    "goal": "level",
    "swept_patch": true,
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "wall_mounted_tv/ggfznh": "+x"
+   },
+   "up_axis": {
+    "wall_mounted_tv/ggfznh": "+z"
+   },
+   "level_axis": {
+    "wall_mounted_tv/ggfznh": "+y"
+   }
   },
   "constraints": [
    {
@@ -10771,7 +10951,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "fire_extinguisher/bejaeu": "+z"
+   },
+   "up_axis": {
+    "fire_extinguisher/bejaeu": "+x"
+   }
   },
   "constraints": [
    {
@@ -10971,7 +11157,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "fire_extinguisher/bejaeu": "+z"
+   },
+   "up_axis": {
+    "fire_extinguisher/bejaeu": "+x"
+   }
   },
   "constraints": [
    {
@@ -11163,7 +11355,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "guitar/cybisc": "+z"
+   },
+   "up_axis": {
+    "guitar/cybisc": "-x"
+   }
   },
   "constraints": [
    {
@@ -11363,7 +11561,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "guitar/cybisc": "+z"
+   },
+   "up_axis": {
+    "guitar/cybisc": "-x"
+   }
   },
   "constraints": [
    {
@@ -11747,7 +11951,13 @@
     0.5
    ],
    "settle_free": [],
-   "goal": "upright"
+   "goal": "upright",
+   "front_axis": {
+    "hanger/nagryh": "+z"
+   },
+   "up_axis": {
+    "hanger/nagryh": "-x"
+   }
   },
   "constraints": [
    {
@@ -11948,7 +12158,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "hanger/agrpio": "+z"
+   },
+   "up_axis": {
+    "hanger/agrpio": "-x"
+   }
   },
   "constraints": [
    {
@@ -12140,7 +12356,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "license_plate/hjdaqn": "+z"
+   },
+   "up_axis": {
+    "license_plate/hjdaqn": "+y"
+   }
   },
   "constraints": [
    {
@@ -12340,7 +12562,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "license_plate/hjdaqn": "+z"
+   },
+   "up_axis": {
+    "license_plate/hjdaqn": "+y"
+   }
   },
   "constraints": [
    {
@@ -12532,7 +12760,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "painting/dacihj": "+x"
+   },
+   "up_axis": {
+    "painting/dacihj": "+z"
+   }
   },
   "constraints": [
    {
@@ -12733,7 +12967,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "painting/dacihj": "+x"
+   },
+   "up_axis": {
+    "painting/dacihj": "+z"
+   }
   },
   "constraints": [
    {
@@ -12933,7 +13173,13 @@
     0.5
    ],
    "settle_free": [],
-   "goal": "upright"
+   "goal": "upright",
+   "front_axis": {
+    "painting/dacihj": "+x"
+   },
+   "up_axis": {
+    "painting/dacihj": "+z"
+   }
   },
   "constraints": [
    {
@@ -13119,7 +13365,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "paper_towel_dispenser/jacqxv": "+x"
+   },
+   "up_axis": {
+    "paper_towel_dispenser/jacqxv": "+z"
+   }
   },
   "constraints": [
    {
@@ -13313,7 +13565,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "paper_towel_dispenser/jacqxv": "+x"
+   },
+   "up_axis": {
+    "paper_towel_dispenser/jacqxv": "+z"
+   }
   },
   "constraints": [
    {
@@ -13505,7 +13763,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "picture/jmvdxm": "+z"
+   },
+   "up_axis": {
+    "picture/jmvdxm": "-x"
+   }
   },
   "constraints": [
    {
@@ -13697,7 +13961,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "picture_frame/guatvs": "+x"
+   },
+   "up_axis": {
+    "picture_frame/guatvs": "+z"
+   }
   },
   "constraints": [
    {
@@ -13897,7 +14167,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "picture_frame/guatvs": "+x"
+   },
+   "up_axis": {
+    "picture_frame/guatvs": "+z"
+   }
   },
   "constraints": [
    {
@@ -14097,7 +14373,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "picture/jmvdxm": "+z"
+   },
+   "up_axis": {
+    "picture/jmvdxm": "-x"
+   }
   },
   "constraints": [
    {
@@ -14289,7 +14571,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "signpost/vvjtkv": "+x"
+   },
+   "up_axis": {
+    "signpost/vvjtkv": "+z"
+   }
   },
   "constraints": [
    {
@@ -14489,7 +14777,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "signpost/vvjtkv": "+x"
+   },
+   "up_axis": {
+    "signpost/vvjtkv": "+z"
+   }
   },
   "constraints": [
    {
@@ -14681,7 +14975,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "wall_clock/zpctvp": "+x"
+   },
+   "up_axis": {
+    "wall_clock/zpctvp": "+z"
+   }
   },
   "constraints": [
    {
@@ -14881,7 +15181,13 @@
    "settle_free": [],
    "goal": "upright",
    "max_deviation_deg": 25.0,
-   "stance_arm_posture": "tucked"
+   "stance_arm_posture": "tucked",
+   "front_axis": {
+    "wall_clock/zpctvp": "+x"
+   },
+   "up_axis": {
+    "wall_clock/zpctvp": "+z"
+   }
   },
   "constraints": [
    {

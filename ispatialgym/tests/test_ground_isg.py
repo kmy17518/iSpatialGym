@@ -30,6 +30,7 @@ SUBTASKS = [
     "configuration_matching-articulation_open_large_scale",
     "configuration_matching-articulation_open_small_scale",
     "alignment-world_vertical",
+    "alignment-world_horizontal",
     "alignment-axial",
     "inter_object_relation_satisfaction-under_small_scale",
     "inter_object_relation_satisfaction-under_large_scale",
@@ -238,8 +239,33 @@ def test_wall_support_bindings(grounded):
     assert sc.whitelist["target"]
     pend = [c for c in gp.entry.constraints if c.fields.get("reason") == GI.PENDING_CONTACTS_REASON]
     assert pend and all(c.type == "blacklist" and not c.hard for c in pend)
-    horizontal = next(iter(_entries(grounded, "alignment-axial")))
-    assert horizontal.entry.generation["tolerances"] == {"orientation": 0.10}
+    axial = next(iter(_entries(grounded, "alignment-axial")))
+    assert axial.entry.generation["tolerances"] == {"orientation": 0.10}
+
+
+def test_wall_frames_are_written_per_model(grounded):
+    """Owner 2026‑09‑16 22:55 (spec §5.5): every whitelisted wall target carries its reviewed icl frame in the alias as
+    ``generation.front_axis`` / ``up_axis`` (/ ``level_axis`` for world horizontal) in the per-model dict form the
+    sampler's ``target_param`` resolves — the sampler never defaults a frame (``Reject("missing_frame")``)."""
+    for st in ("alignment-world_vertical", "alignment-world_horizontal"):
+        for gp in _entries(grounded, st):
+            gen = gp.entry.generation
+            whitelisted = {f"{cat}/{m}" for sc in gp.entry.scenes.values() for cat, models in sc.whitelist.get("target", {}).items() for m in models}
+            assert whitelisted, gp.alias
+            for key in whitelisted:
+                assert isinstance(gen.get("front_axis"), dict) and gen["front_axis"].get(key), f"{gp.alias}: no front_axis for {key}"
+                assert isinstance(gen.get("up_axis"), dict) and gen["up_axis"].get(key), f"{gp.alias}: no up_axis for {key}"
+                if st == "alignment-world_horizontal":
+                    assert isinstance(gen.get("level_axis"), dict) and gen["level_axis"].get(key), f"{gp.alias}: no level_axis for {key}"
+                else:
+                    assert "level_axis" not in gen or key not in gen["level_axis"]
+                row = grounded.icl.row(st, "target", *key.split("/", 1))
+                assert gen["front_axis"][key] == GI.wall_frame_of(row, st)["front_axis"]
+    plate = [gp for gp in _entries(grounded, "alignment-world_horizontal") if gp.entry.roles["target"].category == "license_plate"]
+    if plate:  # the representative pick of the horizontal license plate: reviewed +z / +y / +x (not the painting-shaped +x / +z)
+        gen = plate[0].entry.generation
+        key = next(k for k in gen["front_axis"] if k.startswith("license_plate/"))
+        assert (gen["front_axis"][key], gen["up_axis"][key], gen["level_axis"][key]) == ("+z", "+y", "+x")
 
 
 def test_groups(grounded):

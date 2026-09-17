@@ -330,6 +330,76 @@ def test_frame_axes_and_hang_quat():
     assert th.allclose(C.quat_rotate(q, u), th.tensor([0.0, 0.0, 1.0]), atol=1e-5)
 
 
+def _wall_target_rows():
+    """The reviewed wall-target rows of the shipped icl (``roles/candidates.csv``): (subtask, category, model, frame, bbox)."""
+    import csv
+    import os
+
+    from ispatialgym.sampling import ground_isg as GI
+
+    path = os.path.join(GI.DEFAULT_ICL, "roles", "candidates.csv")
+    out = []
+    with open(path) as f:
+        for row in csv.DictReader(f):
+            if row["subtask"] not in GI.WALL_SUBTASKS or row["role"] != "target" or row.get("kind") == "scene":
+                continue
+            frame = GI.wall_frame_of(row, row["subtask"])
+            bbox = [float(row[k]) for k in ("bbox_x", "bbox_y", "bbox_z")] if all(row.get(k) for k in ("bbox_x", "bbox_y", "bbox_z")) else None
+            out.append((row["subtask"], row["category"], row["model"], (row.get("representative") or "") == "1", frame, bbox))
+    return out
+
+
+def test_hang_quat_puts_every_reviewed_wall_frame_upright():
+    """Owner 2026‑09‑16 22:55 (spec §5.5 / §6.9): for every reviewed wall target the hang pose built from the icl frame
+    (as ``ground_isg`` writes it into the alias) puts the object's reviewed up axis along world +z and its front axis
+    along the wall normal; for flat objects (plate, picture, painting: thinnest bbox axis ≤ 1/5 of the middle one) the
+    thickness axis ends horizontal — along the normal — instead of world-up (the table-flat license plate of run
+    0916‑212037 came from the painting-shaped default +x / +z applied to a +z / +y / +x frame)."""
+    rows = _wall_target_rows()
+    reps = [r for r in rows if r[3]]
+    assert len(reps) >= 15, f"expected the wall representatives in the icl, found {len(reps)}"
+    non_default = [r for r in reps if r[4].get("front_axis") != "+x" or r[4].get("up_axis") != "+z"]
+    assert {(r[1]) for r in non_default} >= {"license_plate", "picture", "umbrella", "hanger", "shelf", "fire_extinguisher", "guitar"}
+    normals = [th.tensor([0.0, -1.0, 0.0]), th.tensor([1.0, 0.0, 0.0]), th.tensor([-0.6, 0.8, 0.0])]
+    z = th.tensor([0.0, 0.0, 1.0])
+    for subtask, cat, model, _rep, frame, bbox in rows:
+        assert frame.get("front_axis") and frame.get("up_axis"), f"{subtask} {cat}/{model}: the icl row has no complete frame {frame}"
+        if subtask == "alignment-world_horizontal":
+            assert frame.get("level_axis"), f"{cat}/{model}: horizontal rows carry frame_level"
+        front, side, up = AW.frame_axes(frame["front_axis"], frame["up_axis"], frame.get("level_axis"))
+        for n in normals:
+            q = AW.hang_quat(n, front, side, up)
+            assert th.allclose(C.quat_rotate(q, up), z, atol=1e-5), f"{cat}/{model}: up {frame['up_axis']} not along world +z"
+            assert th.allclose(C.quat_rotate(q, front), n, atol=1e-5), f"{cat}/{model}: front {frame['front_axis']} not along the wall normal"
+            assert abs(float(C.quat_rotate(q, side)[2])) < 1e-5, f"{cat}/{model}: level axis not horizontal"
+            if bbox is not None and sorted(bbox)[0] <= 0.2 * sorted(bbox)[1]:
+                # flat object (one axis distinctly thinner than the other two — plates, pictures, paintings, boards; not rods):
+                # the thinnest body axis is the reviewed front (thickness into the wall), so it hangs horizontal
+                thin = th.zeros(3)
+                thin[int(np.argmin(bbox))] = 1.0
+                world_thin = C.quat_rotate(q, thin)
+                assert abs(float(world_thin[2])) < 1e-5, f"{cat}/{model}: the thickness axis {bbox} points along world up in the hang pose"
+                assert abs(abs(float(th.dot(world_thin, n))) - 1.0) < 1e-5, f"{cat}/{model}: the thickness axis is not along the wall normal"
+
+
+def test_wall_frame_written_per_model_and_never_defaulted():
+    """``ground_isg.write_wall_frame`` writes the dict form the sampler's ``target_param`` resolves; ``level_axis`` only
+    for world horizontal; a hand-set scalar is replaced by the dict; empty columns write nothing."""
+    from ispatialgym.sampling import ground_isg as GI
+
+    gen = {"front_axis": "+x"}
+    row = {"frame_front": "+z", "frame_up": "+y", "frame_level": "+x"}
+    assert GI.write_wall_frame(gen, "alignment-world_horizontal", "license_plate", "nwfbxn", row) == {"front_axis": "+z", "up_axis": "+y", "level_axis": "+x"}
+    assert gen == {"front_axis": {"license_plate/nwfbxn": "+z"}, "up_axis": {"license_plate/nwfbxn": "+y"}, "level_axis": {"license_plate/nwfbxn": "+x"}}
+    GI.write_wall_frame(gen, "alignment-world_horizontal", "hanger", "agrpio", {"frame_front": "z", "frame_up": "-x", "frame_level": "+y"})
+    assert gen["front_axis"] == {"license_plate/nwfbxn": "+z", "hanger/agrpio": "+z"} and gen["up_axis"]["hanger/agrpio"] == "-x"
+    gen_v: dict = {}
+    assert GI.write_wall_frame(gen_v, "alignment-world_vertical", "painting", "dacihj", {"frame_front": "+x", "frame_up": "+z", "frame_level": "+y"}) == {
+        "front_axis": "+x", "up_axis": "+z"}
+    assert "level_axis" not in gen_v
+    assert GI.write_wall_frame({}, "alignment-world_vertical", "x", "y", {"frame_front": "", "frame_up": ""}) == {}
+
+
 def test_swept_extent_and_brace_order():
     assert AW.swept_extent(1.0, 0.1, 0.0) == 1.0
     assert AW.swept_extent(1.0, 0.1, math.radians(30)) == pytest.approx(math.hypot(1.0, 0.1))  # atan(0.1) = 5.7° <= 30°: the diagonal

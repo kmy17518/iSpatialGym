@@ -400,18 +400,54 @@ def _is_ready(row: Dict[str, str]) -> bool:
         return True
 
 
+WALL_SUBTASKS = ("alignment-world_vertical", "alignment-world_horizontal")
+#: §5.5 frame of a wall target: ``generation.<key>`` (per-model dict form) <- icl ``roles/candidates.csv`` column
+WALL_FRAME_KEYS = (("front_axis", "frame_front"), ("up_axis", "frame_up"), ("level_axis", "frame_level"))
+
+
 def _frame_ok(subtask: str, row: Dict[str, str], strict_symmetric_180: bool) -> Optional[str]:
     """§2.2: alignment targets need a reviewed frame record; wall targets ``symmetric_180`` (strict mode)."""
     front, up, level, long_ = (row.get(k) or "" for k in ("frame_front", "frame_up", "frame_level", "frame_long"))
     if subtask == "alignment-axial":
         ok = bool(front or up) and bool(long_)
-    elif subtask in ("alignment-world_vertical", "alignment-world_horizontal"):
+    elif subtask in WALL_SUBTASKS:
         ok = bool(front) and bool(up or level)
         if ok and strict_symmetric_180 and (row.get("symmetric_180") or "") not in ("0", "1"):
             ok = False
     else:
         return None
     return None if ok else "missing_frame"
+
+
+def wall_frame_of(row: Dict[str, str], subtask: str) -> Dict[str, str]:
+    """The reviewed frame of a wall target row as ``generation`` keys: ``front_axis`` / ``up_axis`` (and ``level_axis``
+    for world horizontal) from the icl ``frame_front`` / ``frame_up`` / ``frame_level`` columns; empty columns are left
+    out (the sampler rejects an alias without a frame — ``missing_frame`` — instead of defaulting one)."""
+    out: Dict[str, str] = {}
+    for gen_key, col in WALL_FRAME_KEYS:
+        if gen_key == "level_axis" and subtask != "alignment-world_horizontal":
+            continue
+        val = (row.get(col) or "").strip()
+        if val:
+            out[gen_key] = val if val[0] in "+-" else "+" + val
+    return out
+
+
+def write_wall_frame(generation: Dict[str, Any], subtask: str, cat: str, model: str, row: Dict[str, str]) -> Dict[str, str]:
+    """Owner 2026-09-16 22:55 (spec §5.5 / §6.9): the reviewed icl frame of a whitelisted wall target is written into the
+    alias as ``generation.front_axis`` / ``up_axis`` / ``level_axis`` in the per-model dict form ``{"<category>/<model>":
+    "+z", ...}`` (``AlignmentWall.target_param`` resolves it) — no wall alias carried the keys before, so every target
+    hung in the painting-shaped default (+x / +z: the license plate table-flat, run 0916-212037). Other models' entries
+    of the dict are kept; a non-dict value left by hand is replaced by the dict (the sampler never defaults). Returns
+    the frame written."""
+    frame = wall_frame_of(row, subtask)
+    for gen_key, val in frame.items():
+        cur = generation.get(gen_key)
+        if not isinstance(cur, dict):
+            cur = {}
+        cur[C.model_key(cat, model)] = val
+        generation[gen_key] = cur
+    return frame
 
 
 def _symmetry_tags(row: Dict[str, str]) -> List[str]:
@@ -1647,6 +1683,12 @@ class Grounder:
                         continue
                     se.whitelist_add(role, cat, m)
                     self._model_facts(entry.roles[role], iddl, role, cat, m, r, v, rp)
+                    if subtask in WALL_SUBTASKS and role == "target":
+                        # §5.5 frame per model (owner 22:55): the reviewed icl frame goes into generation.front_axis / up_axis
+                        # / level_axis (dict form); the sampler rejects an alias without it instead of defaulting
+                        frame = write_wall_frame(entry.generation, subtask, cat, m, r)
+                        if len(frame) < (3 if subtask == "alignment-world_horizontal" else 2):
+                            comb.notes.append(f"{cat}/{m}: incomplete reviewed frame in the icl ({frame}); the sampler will reject missing_frame")
                     for p in v.pending:
                         rec = Constraint("blacklist", {"scene": sc, role: C.model_key(cat, m)}, False,
                                          C.constraint_source("ground_isg", VERSION, date=self.today), {"reason": p, "pending": True})
@@ -1791,6 +1833,8 @@ class Grounder:
                             self.report.tests.append(f"{gp.alias} @ {sc}: {outcome}")
             self._supersede_stale_primaries(subtask)
             self._prune_stale_scene_blocks(subtask)
+            if subtask in WALL_SUBTASKS:
+                self._write_dormant_wall_frames(subtask)
             if self.opt.reseed_generation:
                 # entries of the subtask this run did not produce (superseded fallbacks) follow the spec number too
                 produced = {gp.alias for gp in self.grounded if gp.subtask == subtask}
@@ -1801,6 +1845,25 @@ class Grounder:
             if not self.opt.dry_run:
                 self.customs.save()
         return self.report
+
+    def _write_dormant_wall_frames(self, subtask: str) -> None:
+        """§5.5 frames for the wall aliases of ``subtask`` this run did not produce (superseded fallbacks such as
+        ``painting_s070``, which the first-demo loop still samples): every whitelisted target model gets its reviewed icl
+        frame written into ``generation`` (idempotent; a model without an icl row is left alone and noted — the sampler
+        rejects it ``missing_frame``)."""
+        produced = {gp.alias for gp in self.grounded if gp.subtask == subtask}
+        iddl_rel = I.relative_path(self.iddls[subtask].path, self.iddl_root) if self.iddls[subtask].path else None
+        for alias, entry in self.customs.entries.items():
+            if alias in produced or entry.iddl != iddl_rel:
+                continue
+            for sc in entry.scenes.values():
+                for cat, models in sc.whitelist.get("target", {}).items():
+                    for m in models:
+                        row = self.icl.row(subtask, "target", cat, m)
+                        if row is None:
+                            self.report.notes[subtask].append(f"{alias}: dormant alias, {cat}/{m} has no icl row for its §5.5 frame")
+                            continue
+                        write_wall_frame(entry.generation, subtask, cat, m, row)
 
     def _update_fallback_list(self, gp: GroundedProblem, produced: List[str]) -> None:
         """``primary.fallbacks`` = the fallbacks produced by this run (rank order). A fallback entry of an earlier run

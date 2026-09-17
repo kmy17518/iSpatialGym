@@ -931,12 +931,22 @@ rays within 1 cm over (w + 0.10) × (h + 0.10) (horizontal: swept extents over t
 front clearance 0.35 m; in-room test 0.8 m in front; one wall per template (most spots); frame from `front_axis` /
 `up_axis` / `level_axis` (dict form), `symmetric_180`; hang pose (up axis along world z, front axis along n, centre at
 height 1.45 m, thickness/2 + 0.01 off the wall); hinge at the COM with axis n, parent = the support's wall link (TRO
-`constraints`); init in-plane angle δ = sign · U(15°, 25°) (owner decision 2026‑09‑16, A8: |δ| > 25° is beyond the
+`constraints`, with the §7 hinge friction / damping); init in-plane angle δ = sign · U(15°, 25°) (owner decision 2026‑09‑16, A8: |δ| > 25° is beyond the
 one-stroke push of the R1Pro; a two-stroke push for larger tilts is recommended later); the template filter uses
 δ = ±25°; goal = level pose (rotation 0), orientation tolerance
 0.08, equivalences (`symmetric_180` half turn + explicit); `settle_free = []`; hinge drift ≤ 0.03 rad after settling;
 ≥ `min_visible_objects` (5) objects with ≥ 200 px, structure included, in the init render; whole tilted target in frame
 at init (5 %).
+
+**Frame** (reviewed, never defaulted; owner 2026‑09‑16 22:55): `ground_isg` writes the icl frame of every whitelisted
+wall target (`roles/candidates.csv` `frame_front` / `frame_up`, and `frame_level` for world horizontal) into the alias as
+`generation.front_axis` / `up_axis` / `level_axis` in the per-model dict form (`{"license_plate/nwfbxn": "+z", …}`;
+dormant / superseded aliases of the subtask included). The sampler builds the hang pose from that record only —
+`Reject("missing_frame")` when the alias carries no entry for the spawned model (no default frame inside the sampler:
+the painting-shaped `+x` / `+z` default hung the `+z` / `+y` / `+x` license plate table-flat, run 0916‑212037) — and
+records the frame used in `template_facts.frame` and the instance summary (`frame`). Unit test: for every reviewed wall
+target the hang quaternion puts the up axis along world +z and the front axis along n; a flat object's thickness axis
+ends horizontal.
 
 **Scale** (configured, not searched): `roles.target.scale` in the customs list ([sx, sy, sz] per model, or the dict
 form keyed by `<category>/<model>`, `<category>`, `default`; uniform recommended). Hull, COM, dimensions, swept
@@ -1342,7 +1352,11 @@ is not a candidate (2.2). Only the male is grasped; the attachment grasp rows (`
 
 ### 6.9 Alignment — world vertical / world horizontal
 
-Section 5.5. Goal: position as at init (hinge), orientation = aligned (upright / level), tolerance 0.08 rad.
+Section 5.5. Goal: position as at init (hinge), orientation = aligned (upright / level), tolerance 0.08 rad. The
+aligned orientation is defined by the target's **reviewed frame** (`generation.front_axis` / `up_axis` / `level_axis`
+per model, written by `ground_isg` from the icl; §5.5 "Frame"): upright / level = the reviewed up axis along world +z
+with the front axis along the wall normal. An alias without the frame record for its model is rejected
+(`missing_frame`), never sampled with a default.
 
 ### 6.10 Alignment — axial
 
