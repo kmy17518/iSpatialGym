@@ -443,6 +443,22 @@ Categories, as the executor's verdict / `SkillError.reason` (F3 fixes the final 
 statistics are reported per category and per action name, so a sampler-side cause and a planner-side cause of the
 same symptom stay distinguishable.
 
+Owner decision 2026‑09‑16 17:10 — **gripper‑in‑FOV rule (b), continuous per grasp → release span** (supersedes the
+per‑action arming below): for each acting arm the monitor is enabled when the pre‑grasp pose is reached and stays enabled
+through grasp, lift, the carry to the pre‑place, the descent and the release step; disabled after the release (retreat)
+until the next pre‑grasp; each grasp → release pair is its own span (disembedding's grasps, block design's blocks, the
+flip‑on‑table re‑grasp); contact spans (brace / push) run pre‑contact → end of the contact leg. The 5‑consecutive‑steps
+threshold and the fingertip pinhole projection with the 5 % margin stay. The carry leg (lift end → pre‑place) is a
+straight Cartesian leg at constant orientation (or a recorded `carry` waypoint) — no free trajopt swing. Regression
+reference: nextto 0916‑152503 (transit to x 7.25, 106/429 place steps out of frame) must fail `gripper_out_of_fov` at the
+place transit under the rule and pass after the carry‑leg change. **B1K comparison:** the replay QA
+(`joylo/gello/utils/qa_utils.py::FieldOfViewMetric`, `gripper_changes_outside_fov_limit=0`) requires the gripper in view
+only at grasp / release toggles, measured as any‑gripper‑link visibility by instance segmentation, and would pass that
+episode; ours is deliberately stricter. **Placed‑object gate:** `placed_orientation` (full orientation error vs the
+recorded tolerance) is the demo gate; the `placed_tilt` variant is withdrawn (the nextto roll happened during finger
+closure, not at release) — pending the closure investigation, cylinders may get orientation equivalences (continuous
+symmetry about the long axis) in this gate, everything else stays full.
+
 Owner decisions 2026‑09‑16: **`gripper_out_of_fov` is armed unconditionally** from the pre‑pose of every manipulation
 action (grasp, lift, place, push, brace) to the end of the action — a leg whose fingertips never enter the frame is
 itself a verdict (`fov_first_entry_step: null`); the transit to the pre‑pose and the retreat legs stay unmonitored, and

@@ -394,6 +394,18 @@ replaces the oracle's "torso first or drive first" guess and its `ready_arms` fa
 
 ### 3.9 Waypoints and gripper visibility
 
+**Gripper-in-FOV rule (b) — owner decision 2026‑09‑16 17:10.** The acting arm's fingertips must stay in the head camera's
+frame (pinhole projection, 5 % margin) **continuously over every grasp → release span**: from the moment the pre‑grasp pose
+is reached, through grasp, lift, the carry to the pre‑place, the descent and the release step; the retreat after a release
+is exempt until the next pre‑grasp. Each grasp → release pair is its own span (disembedding's grasps, block design's
+blocks, the flip‑on‑table re‑grasp); contact spans (brace / push) run from the pre‑contact to the end of the contact leg.
+Consequence for the recorded motion: the **carry leg** from the lift end to the pre‑place is a straight Cartesian leg at
+constant orientation (both ends are recorded in frame, so the projected path is in frame by construction); when that leg
+is infeasible the sampler records a `carry` waypoint — never a free trajopt swing. B1K's replay QA
+(`FieldOfViewMetric`, `gripper_changes_outside_fov_limit=0`) only requires the gripper in view at the grasp / release
+toggles; ours is deliberately stricter (oracle doc §6.4).
+
+
 - Motions the oracle executes as paths are checked at intermediate waypoints, not only at the endpoints: SLERP of
   in-hand rotations and the straight camera-ray motion of the held-object tasks (3 waypoints), push arcs of the
   alignment tasks (δ/2 and the goal), articulation trajectories (q_k), block flips (pick tilt → place tilt). Screening
@@ -1198,6 +1210,14 @@ Numbers and records kept from v1 §5.3:
 
 ### 6.5 Configuration matching — block design (goal and cube grasp rule)
 
+**Owner decision 2026‑09‑16 17:10.** First demos run with the goal face up at init (`generation.block_no_flip: true`, no
+flip; the yaw‑align stays). **Flip‑on‑the‑table sub‑chain (required end state, prep workstream):** a block whose goal face
+is not up is placed on a free cell of the region in the intermediate orientation, re‑grasped with the other pitch class
+and placed at its slot — grasp → place(intermediate) → grasp → place, every pose in frame and recorded like any other
+grasp / place (two grasp records per flipped block, each its own FOV span, §3.9); the carried‑tilt flip (pick tilt →
+place tilt) is no longer the flip mechanism.
+
+
 - Goal pattern from `generation.patterns` (or `--variant`); the top-left block in the init image is the anchor: its
   position stays, its goal orientation is the table-aligned orientation with the pattern's top face up reached by the
   **smallest rotation** from its init orientation — yaw-align (|ψ| ≤ 45°) then one flip about a horizontal table axis
@@ -1227,9 +1247,22 @@ angle ∈ S, goal = closed limit. Pose unchanged (scene object).
 
 ### 6.7 Configuration matching — articulation (small-scale, open / close)
 
+**Owner decision 2026‑09‑16 17:10.** The manipulation‑stance cone of §4.5 is relaxed for small articulation: the loose
+class is 25° / focus‑in‑frame (the same shape as the ontop‑large C rule; the hinged jar's best focus lies 24° off the
+optical axis and 25° admits 42 foci over 3 stand‑offs).
+
+
 Section 5.4. Root pose measured only (0.03 / 0.20); joint goals as 6.6.
 
 ### 6.8 Configuration matching — attachment
+
+**Owner decision 2026‑09‑16 17:10 — the brace stays.** When the left brace on the female and the mating pose are not both
+reachable from the grasp stance, the sampler records a **second base pose** after the male grasp (lateral trunk move +
+torso adjust, both arms' IK verified there, all poses in frame) and the sidecar carries it as a recorded transition
+between grasp and attach; the oracle executes that recorded move holding the object — no runtime re‑planning of the
+stance (no‑fallback principle). Only when the joint placement has no cell after that is the brace optional (as axial /
+block design).
+
 
 Init per section 4 with: partner (female) upright on a cell of the attach-reach band, target (male) at the focus with
 the attachment pipeline's library grasps. Goal: partner unchanged; target attached at
