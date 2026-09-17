@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 22:00 PDT — 8/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 22:08 PDT — 8/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -343,3 +343,4 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026-09-16 22:01 PDT pod_scheduler: role change bands -> pool: xnam1nh3y2706e (smoke-l40s-3); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed)
 - 2026‑09‑16 22:03 PDT agent-e2e: owner (chat) D‑008 = A, D‑009 = B → tabletop implements both (switches were prepared), oracle‑B the brace‑less small‑articulation program; decisions recorded `answered_by: chat`.
 - 2026-09-16 22:02 PDT pod_scheduler: role change bands -> pool: cy0f5t6i58i08v (pilot2-l40s-3); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed)
+- 2026‑09‑16 22:09 PDT agent-e2e (owner 22:05): the five appliance aliases launched in parallel (`dishwasher` already running on `pjf6451ahyqxll` smoke2‑a40‑1; `fridge` on `cy0f5t6i58i08v` pilot2‑l40s‑3; `oven`, `top_cabinet`, `bottom_cabinet_no_top` waiting for pods — the scheduler preempts band pods for pending runs); `active_manifests.txt` emptied (bands done; the 16 covered_empty aliases in the register); D‑007 thread post made at the owner's explicit request (the 21:46 teacup pass ran on the wrapper commit but `meta.binary_branch` is not yet written → oracle‑B wires it, demo‑only re‑run reports the branch); hinge damping + per‑unit handle diagnosis queued for the large‑scale agent (it noted the owner's side‑chat at 21:46 already).
