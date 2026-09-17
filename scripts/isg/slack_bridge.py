@@ -320,7 +320,9 @@ def cmd_mark_valid(a):
 # ---------------------------------------------------------------------------------------------------------- parse
 def parse_reply(text):
     t = text.strip()
-    if re.match(r"^\[(DECISION|DEMO-VALID|STATUS|BLOCKED)", t):
+    # own posts: tagged top-level posts and thread replies ([A D-0xx], [RUN ...], [DECISION ...] answered), and anything the
+    # Slack MCP stamps with its "Sent using (Cursor)" footer - never acted on
+    if re.match(r"^\[(DECISION|DEMO-VALID|STATUS|BLOCKED|A |RUN |Q |NOTE)", t) or re.search(r"Sent using.*\(Cursor\)", t):
         return {"kind": "own_post"}
     m = re.match(r"^(D-\d{3})\s*:\s*(.*)$", t, re.S)
     if m:
