@@ -27,6 +27,7 @@ small-scale programs, the two wall alignments share ``program_alignment_wall``, 
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 from typing import Callable, Dict, List, Optional, Tuple
 
 from ispatialgym.oracle.actions import (
@@ -192,6 +193,34 @@ def program_disembedding(sc: Sidecar) -> List[Action]:
     )
 
 
+def table_flip_record(b) -> Optional[Dict[str, object]]:
+    """The block's ``table_flip`` sub-chain (``blocks[k].table_flip``, carried in the record's ``extra`` until the
+    sidecar schema names it): ``{"place": Pose, "pre_place": Pose | None, "block": BlockRecord}`` where ``block`` is
+    the re-grasp as a block record (the other pitch class: ``face_pair`` / ``tilt_pick_deg`` / ``yaw_deg`` /
+    ``carry_height`` / ``pick`` replaced, no flip); None when the block has none."""
+    raw = (getattr(b, "extra", None) or {}).get("table_flip")
+    if not raw:
+        return None
+    if not isinstance(raw, dict):
+        raise SidecarError(f"blocks[{b.order}].table_flip: expected an object, got {type(raw).__name__}")
+    where = f"blocks[{b.order}].table_flip"
+    for key in ("place", "regrasp"):
+        if key not in raw:
+            raise SidecarError(f"{where}.{key}: required")
+    rg = raw["regrasp"]
+    if not isinstance(rg, dict):
+        raise SidecarError(f"{where}.regrasp: expected an object")
+    for key in ("face_pair", "tilt_pick_deg", "yaw_deg", "pick"):
+        if key not in rg:
+            raise SidecarError(f"{where}.regrasp.{key}: required")
+    block = replace(b, face_pair=str(rg["face_pair"]), tilt_pick_deg=float(rg["tilt_pick_deg"]), yaw_deg=float(rg["yaw_deg"]),
+                    carry_height=float(rg.get("carry_height", b.carry_height)), pick=Pose.from_dict(rg["pick"], f"{where}.regrasp.pick"),
+                    flip_sign=0, flip_axis=None, waypoints=None, extra={k: v for k, v in (b.extra or {}).items() if k != "table_flip"})
+    return {"place": Pose.from_dict(raw["place"], f"{where}.place"),
+            "pre_place": Pose.from_dict(raw["pre_place"], f"{where}.pre_place") if raw.get("pre_place") else None,
+            "block": block}
+
+
 def program_block_design(sc: Sidecar) -> List[Action]:
     """init → manipulation stance → for each block in the recorded order (anchor first): grasp (recorded cube grasp:
     pinch across ``face_pair``, ``tilt_pick_deg``, wrist yaw ``yaw_deg``) → lift → reorient_in_hand (smallest yaw ψ =
@@ -204,7 +233,16 @@ def program_block_design(sc: Sidecar) -> List[Action]:
     The braces are **optional** (owner decision 2026-09-16 11:08, the axial rule): the sampler records ``brace_row`` /
     ``brace_col`` with their paired pushes only when a joint two-arm placement exists; a block without them is
     pick → [reorient] → place → retreat, no brace / push tail (all-or-none per axis is enforced by
-    ``Sidecar.problems()`` and here)."""
+    ``Sidecar.problems()`` and here).
+
+    **Flip on the table** (owner decision 2026-09-16 17:10 item 1): a block whose goal face is not up is flipped on
+    the table instead of in the hand when the sampler recorded the sub-chain ``blocks[k].table_flip`` (tabletop
+    agent's record; the in-hand ``Reorient`` stays for blocks without it): ``{"place": Pose, "pre_place": Pose?,
+    "cell": [x, y]?, "regrasp": {"face_pair", "tilt_pick_deg", "yaw_deg", "carry_height", "pick": Pose}}`` — the eef
+    pose that sets the block down on a free cell in the intermediate orientation, then the cube grasp of the other
+    pitch class that picks it up again (recorded like any grasp / place, all poses in frame). The program emits
+    grasp → lift → place(intermediate) → retreat → grasp(re-grasp) → lift → place(slot) → retreat; each grasp →
+    release pair is its own gripper-in-FOV span (QA rule (b))."""
     if not sc.blocks:
         raise SidecarError("blocks: required for block design")
     arm = _working_arm(sc)
@@ -215,7 +253,15 @@ def program_block_design(sc: Sidecar) -> List[Action]:
         lift = Lift(arm=arm, object=b.instance, carry_height=b.carry_height, after=grasp)
         actions += [grasp, lift]
         last: Action = lift
-        if block_reorients(b):
+        flip = table_flip_record(b)
+        if flip is not None:
+            mid = Place(kind="support", arm=arm, object=b.instance, place=flip["place"], pre_place=flip.get("pre_place"),
+                        relation="on a free cell of the table, turned onto its side for the re-grasp")
+            regrasp = Grasp(kind="cube", arm=arm, object=b.instance, block=flip["block"])
+            relift = Lift(arm=arm, object=b.instance, carry_height=flip["block"].carry_height, after=regrasp)
+            actions += [mid, Retreat(arm=arm, object=b.instance, after=mid, distance=RETREAT_LITTLE), regrasp, relift]
+            last = relift
+        elif block_reorients(b):
             last = Reorient(mode="flip", arm=arm, object=b.instance, after=lift, block=b, waypoints=b.waypoints)
             actions.append(last)
         slot = "at its initial position (the anchor)" if b.order == 0 else "at its slot in the goal grid"
