@@ -412,7 +412,11 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
             if key.split(".")[0] in skip_keys:
                 continue
             if len(poses) == 1:
-                res = sampler.ikc.exact(poses, stance, arm, ignore_for_last=ignore_last + ignore_all, cache=False, fingers=fingers, approached=approached)
+                # a single end pose (``grasp``, ``place``, ``contact``) is the end of its approach: the approached object is
+                # removed for it as along the tracked chain (owner A) - with it in the world the open pads straddling the
+                # target pass or fail at margin 0 by millimetres (teacup 18:41: 'grasp: exact IK failed at pose 1 of 1')
+                res = sampler.ikc.exact(poses, stance, arm, ignore_for_last=ignore_last + ignore_all + list(approached or []), cache=False, fingers=fingers,
+                                        approached=approached)
             else:
                 res = sampler.ikc.waypoints_ok(poses, stance, arm, ignore_for_last=ignore_last, ignore_all=ignore_all, cache=False, fingers=fingers, approached=approached)
             n += len(poses)

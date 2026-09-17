@@ -97,6 +97,9 @@ RELEASE_ABOVE_SURFACE_MIN = 0.003
 CLOSING_TILT_MAX_DEG = 12.0
 #: a target that rolled more than this while settling gets its grasp re-selected at the settled pose
 REGRASP_AFTER_ROLL_DEG = 10.0
+#: the open gripper at the grasp configuration keeps this clear of the support (closure probe: a pad on the table makes
+#: the closure asymmetric and knocks the object)
+PAD_SUPPORT_CLEARANCE = 0.002
 #: touching brace (axial stop-brace rule): the pads' / blade's outer face this far outside the partner's far face, and the
 #: partner height below which the top-down blade is tried before the pad contacts
 STOP_CLEARANCE = 0.005
@@ -149,6 +152,7 @@ class IORSSmall(SamplerV2):
         self._touching_place_pos: Optional[th.Tensor] = None  # touching: the nextto position the program places at
         self._brace_gate: Optional[Dict[str, Any]] = None  # touching: the A1 joint band gate verdict of the drawn partner position
         self.grasps_flush: List[Any] = []  # the flush-pinch tier of ``self.grasps`` (tried first at every focus)
+        self._reselected_q: Optional[th.Tensor] = None  # grasp configuration of the last re-selected grasp
 
     # ------------------------------------------------------------------ numbers (customs generation)
 
@@ -764,6 +768,35 @@ class IORSSmall(SamplerV2):
                                                                 f"pre with the partner removed {_ok(r_pre_np)}, pre with every object removed {_ok(r_pre_all)}; target settled "
                                                                 f"{settled.get('translation_mm', float('nan')):.1f} mm / {settled.get('rotation_deg', float('nan')):.0f} deg from its draft "
                                                                 f"(goal {moved * 1000:.0f} mm away); trunk ({manip.translate}, {manip.tilt:.2f}), grasp {grasp.grasp_name} yaw {grasp.yaw:.2f})")
+            # closure probe 2026-09-16 (runlogs/closure_probe_20260916): the lower *open* pad standing on the table makes the
+            # closure asymmetric (one finger crawls, the other knocks the object along the table: marker roll 24-77 deg, the
+            # sprout knocked out of the pinch). The support is ignored for the grasp pose by §3.6, so this is checked here:
+            # the open gripper at the grasp configuration must stay ``pad_support_clearance_m`` clear of the support; a grasp
+            # that fails tries the other library grasps at the settled pose, then ``grasp_pad_on_support``
+            q_grasp = res.q if res.ok else getattr(self, "_reselected_q", None)
+            clear = None if q_grasp is None else self.open_pads_clear_of_support(q_grasp)
+            if clear is False:
+                # a preference, not a gate: a grasp whose open pads clear the support replaces this one when the library has
+                # one at the settled pose; otherwise the grasp stays (the oracle's closure ramp covers the residual) and the
+                # fact is recorded (low cylinders: the pads necessarily reach the table)
+                chosen = self.reselect_grasp(draft, grasp, manip, tname, require_pad_clearance=True)
+                if chosen is not None:
+                    log.info("%s: open pad on the support for %s; grasp re-selected at the settled pose: %s", self.gp.alias, draft.summary.get("grasp", {}).get("name"), chosen)
+                    draft.summary["grasp"] = {"key": grasp.grasp_key, "name": grasp.grasp_name, "yaw": grasp.yaw, "reselected_pad_clearance": True}
+                    clear = True
+                else:
+                    log.info("%s: open pad on the support for %s and no library grasp clears it at the settled pose; kept", self.gp.alias, grasp.grasp_name)
+            grasp.extras["open_pads_clear_of_support"] = clear
+            draft.summary["open_pads_clear_of_support"] = clear
+
+    def open_pads_clear_of_support(self, q: th.Tensor) -> bool:
+        """Whether the robot at the grasp configuration ``q`` (fingers open as the sampler solves it) keeps its gripper
+        ``pad_support_clearance_m`` (5 mm) clear of the support: whole-body proximity check with every spawned object removed,
+        so only the support (and the scene) remain — the complement of the grasp pose's §3.6 support exemption."""
+        margin = float(self.gen("pad_support_clearance_m", PAD_SUPPORT_CLEARANCE))
+        others = list(self.world.spawned.values())
+        with self.ikc.ignoring(others):
+            return bool(self.kit.collision_free(q, margin=margin)[0])
 
     def settle_motion(self, draft: Draft, tname: str) -> Dict[str, float]:
         """Translation (mm) and rotation (deg) of the target between its drafted pose (``summary.target_draft_pose``) and
@@ -775,14 +808,16 @@ class IORSSmall(SamplerV2):
         p1, q1 = G.t(draft.object_poses[tname][0]), G.t(draft.object_poses[tname][1])
         return {"translation_mm": round(float(th.linalg.norm(p1 - p0)) * 1000, 1), "rotation_deg": round(math.degrees(G.quat_angle(q0, q1)), 1)}
 
-    def reselect_grasp(self, draft: Draft, grasp: GraspRecord, manip: Stance, tname: str) -> Optional[str]:
-        """Try the library grasps (``self.grasps``, already filtered for attachability) at the *settled* target pose from
-        the manipulation stance — pre-grasp + grasp exactly, support removed for the grasp, the target removed along the
-        approach — and rewrite the grasp record with the first that passes. Returns its name or None."""
+    def reselect_grasp(self, draft: Draft, grasp: GraspRecord, manip: Stance, tname: str, require_pad_clearance: bool = False) -> Optional[str]:
+        """Try the library grasps (flush tier first, then the rest; all attachable) at the *settled* target pose from the
+        manipulation stance — pre-grasp + grasp exactly, support removed for the grasp, the target removed along the
+        approach, optionally the open pads clear of the support — and rewrite the grasp record with the first that passes.
+        Returns its name or None."""
         t_pose = draft.object_poses[tname]
-        for g in self.grasps:
+        order = list(self.grasps_flush) + [g for g in self.grasps if g not in self.grasps_flush]
+        for g in order:
             eef_in_object = getattr(g, "pose", None)
-            if eef_in_object is None:
+            if eef_in_object is None or (getattr(g, "name", None) == grasp.grasp_name and require_pad_clearance):
                 continue
             eef = IK.grasp_pose(t_pose, eef_in_object)
             pre = IK.pre_pose(eef)
@@ -790,6 +825,9 @@ class IORSSmall(SamplerV2):
                                  cache=False, approached=[self.obj("target")])
             if not res.ok:
                 continue
+            if require_pad_clearance and res.q is not None and not self.open_pads_clear_of_support(res.q):
+                continue
+            self._reselected_q = res.q
             grasp.grasp_key, grasp.grasp_name = getattr(g, "key", grasp.grasp_key), getattr(g, "name", grasp.grasp_name)
             grasp.finger_q = list(getattr(g, "finger_q", []) or []) or None
             grasp.eef_in_object = eef_in_object
