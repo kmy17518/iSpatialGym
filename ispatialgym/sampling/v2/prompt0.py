@@ -307,15 +307,24 @@ def base_z(s) -> float:
 
 
 def in_task_rooms(s, xy) -> bool:
-    """Whether a world xy lies in one of the loaded task rooms (§5.2 Phase 1 (1) "inside the task room")."""
+    """Whether a world xy lies in one of the task rooms (§5.2 Phase 1 (1) "inside the task room"). With
+    ``generation.stance_rooms_include_adjacent`` (default off — an owner decision, see the Rs_int drawer finding: the
+    seg-map boundary between the kitchen and the living room runs along the counter fronts, so the floor in front of a
+    kitchen unit belongs to the living room) the loaded adjacent rooms (``world.eval_rooms``) count as well."""
     rooms = getattr(s.world, "rooms", None)
     if not rooms:
         return True
     seg = getattr(s.world.scene, "seg_map", None)
     if seg is None:
         return True
+    allowed = set(rooms)
     try:
-        return seg.get_room_instance_by_point(_t(xy)[:2]) in set(rooms)
+        if bool(s.gp.gen("stance_rooms_include_adjacent", False)):
+            allowed |= set(getattr(s.world, "eval_rooms", None) or [])
+    except Exception:  # noqa: BLE001 - samplers without a customs entry
+        pass
+    try:
+        return seg.get_room_instance_by_point(_t(xy)[:2]) in allowed
     except Exception:  # noqa: BLE001 - outside the segmentation map
         return False
 
@@ -429,6 +438,8 @@ def phase1_scan(s, face: FaceFrame, beta: float, d_min: float, d_max: float, tar
             # which half of base_ok fails (Rs_int drawer 17:44: 287/287 (d, t) failed base_ok in 3 s — floor map or room?)
             k = "off_trav_map" if not bool(s.kit.trav_free((x, y))) else "outside_rooms"
             st_[k] = st_.get(k, 0) + 1
+            lo_k, hi_k = st_.get(k + "_d", (d, d))
+            st_[k + "_d"] = (round(min(lo_k, d), 2), round(max(hi_k, d), 2))  # the d range of that failure
             if k == "outside_rooms" and "room_seen" not in st_:
                 try:
                     st_["room_seen"] = str(s.world.scene.seg_map.get_room_instance_by_point(th.tensor([x, y])))
