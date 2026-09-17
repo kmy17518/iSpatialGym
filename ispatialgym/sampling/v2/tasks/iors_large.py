@@ -1404,7 +1404,10 @@ class IORSLarge(SamplerV2):
         # §5.6: B → C ≤ max_partner_geodesic + extra. The geodesic rule measures near side to near side; the recorded stances
         # sit at particular edges (the bar's short end → the sofa's front), so the stance-to-stance drive is longer — extra
         # 3 m (sofa-bar 17:04: every C survivor failed with path_too_long at 4 m; the B-C IK never got its turn)
-        max_len = self.num("max_partner_geodesic_m", 3.0) + self.num("path_max_extra_m", 3.0)
+        geo = self.num("max_partner_geodesic_m", 3.0)
+        # the customs pin path_max_extra_m = 1.0 (D1 generation_defaults): the stance-to-stance drive is bounded here by
+        # max(geodesic + extra, 2 × geodesic) — the base rounds the support / partner between B and C (D1: raise the default)
+        max_len = max(geo + self.num("path_max_extra_m", 3.0), 2.0 * geo)
         order = list(rng.permutation(len(c_pool)))
         n_try = 6
         if self.push_under:
