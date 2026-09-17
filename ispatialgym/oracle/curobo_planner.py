@@ -872,6 +872,10 @@ class R1ProCuRobo:
                 else:
                     out.diagnostics.update(self._diagnose_trajopt(result))
                     out.status = "IK found a goal configuration but trajectory optimization failed: " + out.diagnostics["trajopt_verdict"]
+                    out.diagnostics.update(self._diagnose_path(entry, result, q_start, emb_name))
+                    psc = out.diagnostics.get("path_self_collision")
+                    if isinstance(psc, dict):
+                        out.status += f" [self-collision along the path: {psc['links'][0]} - {psc['links'][1]} by {1000 * psc['penetration']:.0f} mm at waypoint {psc['waypoint']}/{psc['of']}]"
                 if out.diagnostics.get("start_in_collision"):
                     out.status += " [start configuration is in collision]"
         finally:
@@ -896,6 +900,10 @@ class R1ProCuRobo:
             if result is not None:
                 out.diagnostics.update(self._diagnose_trajopt(result))
                 out.status = "trajectory optimization to the joint goal failed: " + out.diagnostics["trajopt_verdict"]
+                out.diagnostics.update(self._diagnose_path(entry, result, q_start, emb_name))
+                psc = out.diagnostics.get("path_self_collision")
+                if isinstance(psc, dict):
+                    out.status += f" [self-collision along the path: {psc['links'][0]} - {psc['links'][1]} by {1000 * psc['penetration']:.0f} mm at waypoint {psc['waypoint']}/{psc['of']}]"
             else:
                 out.status = "no trajectory to the joint goal (graph search found no seed path)"
             if goal_coll:
@@ -985,6 +993,24 @@ class R1ProCuRobo:
         finally:
             for s, e in zip(stores, saved):
                 s.enable.copy_(e)
+
+    def _diagnose_path(self, entry: _PlannerEntry, result, q_ref: th.Tensor, emb_name: str, samples: int = 12) -> Dict[str, object]:
+        """The worst self-collision pair along the trajectory the failed optimisation returned (the pair the plan
+        could not get around, e.g. the other hand's wrist when both hands work 13 cm apart)."""
+        try:
+            plan = result.get_interpolated_plan()
+            names = list(plan.joint_names)
+            q_active = plan.position.reshape(-1, len(names))
+            q_traj = self._full_from_active(entry, q_active, names, q_ref)
+            worst: Optional[Dict[str, object]] = None
+            idx = th.linspace(0, len(q_traj) - 1, min(samples, len(q_traj))).long().tolist()
+            for k in idx:
+                pairs = self.self_collision_pairs(q_traj[k], emb_name)
+                if pairs and (worst is None or pairs[0]["penetration"] > worst["penetration"]):
+                    worst = {"links": list(pairs[0]["links"]), "penetration": pairs[0]["penetration"], "waypoint": int(k), "of": int(len(q_traj))}
+            return {} if worst is None else {"path_self_collision": worst}
+        except Exception as e:  # noqa: BLE001
+            return {"path_self_collision": f"unknown ({e})"}
 
     @staticmethod
     def _diagnose_trajopt(result) -> Dict[str, object]:
