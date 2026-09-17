@@ -118,14 +118,14 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 17:10 PDT — 7/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 17:13 PDT — 4/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
 | camera_relocalization-standard | valid demo | - | - |
 | camera_relocalization-obstructed | valid demo | tracker corner fix d4a1745 not yet re-demoed | oracle |
-| object_scaling | valid demo | - | - |
-| mental_rotation | valid demo | - | - |
+| object_scaling | demo run (pre-fix success) | - | - |
+| mental_rotation | demo run (pre-fix success) | - | - |
 | disembedding | demo run (pre-fix success) | - | - |
 | CM block_design | no instance | DECISION (staged_decisions.md §1): flip pre-place has no IK — (a) goal face up at init [block_no_flip], (b) flip on the table, (c) 3 no-flip blocks | owner |
 | CM attachment | no instance | DECISION (staged_decisions.md §2): brace optional for attachment, or partner only in the band overlap (902/1694 brace_off_band) | owner |
@@ -135,12 +135,12 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | CM articulation_close_large_scale | no instance | HEAD (floor 2893a09 + A3 05ce671): no_manipulation_stance x8 (Phase 2) — large-scale diagnosing; open alias running | large-scale |
 | alignment-world_vertical | demo run | oracle re-runs on 4b2bb60 / 9345c8a: push [execution] again (17:06) → oracle | oracle |
 | alignment-world_horizontal | demo run | oracle re-run on 4b2bb60: push plan_failed again (16:56) → oracle | oracle |
-| alignment-axial | valid demo | - | - |
+| alignment-axial | demo run (pre-fix success) | - | - |
 | IORS ontop_small_scale | valid demo | - | - |
 | IORS under_small_scale | demo run (pre-fix success) | held (owner 16:40): re-run when the core's release/settle change lands (placed_orientation honest today) | core |
-| IORS inside | valid demo | sweep-1 regression: grasp_unreachable x6 'exact IK failed at pose 1 of 2' (the pre-grasp) after the 12:00–14:00 core changes (11:01 run sampled at attempt 0) → core to bisect | core |
+| IORS inside | valid demo | - | - |
 | IORS nextto | demo run (pre-fix success) | clean execution; placed_orientation 0.386 rad = the marker rolls about its axis at release → proposal: gate on the up-axis tilt (15°) instead of the full orientation (owner veto?) | oracle / owner |
-| IORS touching | no instance | approach_untrackable (intermediate waypoint collides with the target itself) + place_unreachable → core: ignore the target along the approach segment | core |
+| IORS touching | no instance | DECISION (staged_decisions.md §4): with the left contact band (66–76 cells) 0/8 — no brace candidate passes the two-arm IK; push-only touching would pass the contact stage in 3/8 (owner 08:10: 'same rule may apply to touching') | owner |
 | IORS ontop_large_scale | no instance | countertop pair: goal_region_not_visible at the only free edge (+u) now logged; sofa-bar target_placement x8 → large-scale | large-scale |
 | IORS under_large_scale | no instance | blade 6–9 cm (d073579): target_placement x8 (new category) → large-scale | large-scale |
 <!-- /first-demo-board -->

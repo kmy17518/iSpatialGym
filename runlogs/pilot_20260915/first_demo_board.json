@@ -79,16 +79,16 @@
   "owner": "core"
  },
  "inter_object_relation_satisfaction-inside": {
-  "blocking": "sweep-1 regression: grasp_unreachable x6 'exact IK failed at pose 1 of 2' (the pre-grasp) after the 12:00\u201314:00 core changes (11:01 run sampled at attempt 0) \u2192 core to bisect",
-  "owner": "core"
+  "blocking": "-",
+  "owner": "-"
  },
  "inter_object_relation_satisfaction-nextto": {
   "blocking": "clean execution; placed_orientation 0.386 rad = the marker rolls about its axis at release \u2192 proposal: gate on the up-axis tilt (15\u00b0) instead of the full orientation (owner veto?)",
   "owner": "oracle / owner"
  },
  "inter_object_relation_satisfaction-touching": {
-  "blocking": "approach_untrackable (intermediate waypoint collides with the target itself) + place_unreachable \u2192 core: ignore the target along the approach segment",
-  "owner": "core"
+  "blocking": "DECISION (staged_decisions.md \u00a74): with the left contact band (66\u201376 cells) 0/8 \u2014 no brace candidate passes the two-arm IK; push-only touching would pass the contact stage in 3/8 (owner 08:10: 'same rule may apply to touching')",
+  "owner": "owner"
  },
  "inter_object_relation_satisfaction-ontop_large_scale": {
   "blocking": "countertop pair: goal_region_not_visible at the only free edge (+u) now logged; sofa-bar target_placement x8 \u2192 large-scale",

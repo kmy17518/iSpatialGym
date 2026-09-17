@@ -40,3 +40,15 @@ Code path: `ispatialgym/sampling/v2/tabletop.py:1389-1456` `phase2_manipulation_
 ## Also held (not a decision, a gate)
 
 `inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table` — owner 16:40: re-run as soon as the core's release / settle change lands; released by the coordinator when the core's fix-log entry appears.
+
+## 4. Touching — the left-arm brace never has a feasible candidate (core 17:10, run 0916-141225)
+
+With the A1 left contact band in place (`629b737`: 76 cells at trunk (0.25, −0.80), 66 at (0.0, −0.92), gate admitting every drawn position) 8 attempts wrote nothing: 5× `contact_unreachable` — in 3 the right‑arm `push_blade_0` chain passes but 0 of ~10 brace candidates (pads `left_v`/`left_h`, blades pitch 0, both wrist turns) pass their pre‑contact; 2× `approach_untrackable` (carried 11 cm box vs itself on the descent); 1× `goal_infeasible`. A push‑only touching would have passed the contact stage in 3/8. Owner 08:10: "the same rule may apply later to touching's brace if its joint placement never exists".
+
+Alias: `inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table` (16:52 run on HEAD in flight; `teacup-teapot` aliases are the fallbacks).
+Code path: `ispatialgym/sampling/v2/tasks/iors_small.py` touching joint gate (`brace_off_band` / `contact_unreachable` at the brace candidates), `program_check.PROGRAM_BLOCKS["inter_object_relation_satisfaction-touching"]` (brace required today), oracle `programs.program_touching` (push closure = the stop, as axial `6c3d967`).
+
+| option | change | loop command |
+|---|---|---|
+| push‑only (as axial) | record `contacts.brace` only when a joint placement exists, else push‑only with the oracle's push closure; `program_check` brace optional; oracle program without the brace leg — core + oracle, ~1 h | `python scripts/isg/first_demo.py run --alias inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table --max-attempts 8 --timeout 7200 --note "owner: touching push-only"` |
+| keep the brace (yield) | none; try the `teacup-teapot` aliases (lower target, different brace classes) | `… --alias inter_object_relation_satisfaction-touching-teacup-teapot-breakfast_table …` |
