@@ -37,6 +37,8 @@ below and the docs listed under A3 once rewritten). Keep this file current; noth
   `ISPATIALGYM_REACH_VOLUME`). Survey outputs that samplers read at runtime must be copied into the repo
   (`runlogs/...`) or the cache dir named in the item's artefact.
 
+**Pod operations (create / roles / remote_run / scheduler / bands / collect / terminate / pitfalls): `docs/runpod_operations.md`. Hand‑off for a fresh agent: `runlogs/pilot_20260915/HANDOFF_20260917.md`; post‑mortem of the 00:00 cut‑off: `runlogs/pilot_20260915/postmortem_20260917.md`.**
+
 ## Phases and items
 
 Columns: id | item | needs | where | owner | status | artefact / notes
