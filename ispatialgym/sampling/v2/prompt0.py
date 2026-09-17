@@ -676,19 +676,52 @@ def phase2_manipulation(s, face: FaceFrame, contact_set: Sequence[ContactSpec], 
     return out
 
 
+CLEARANCE_MARGINS = (0.05, 0.03)
+
+
+def clearance_tier_indices(s, survivors: Sequence[Stance], ignore: Sequence[Any], margins: Sequence[float] = CLEARANCE_MARGINS) -> List[int]:
+    """Indices of the survivors in the best base-clearance tier: base + torso + head collision-free against the scene
+    (``ignore`` — the target — removed) at the largest margin of ``margins`` that any survivor passes; all indices when
+    none passes 3 cm. The pilot's executor tracks the recorded path / drive-in with more than the 1 cm cuRobo margin of
+    error: the Rs_int drawer stance drawn 2 cm from coffee_table_fqluyq_0 (20:57) failed its first navigate with
+    ``base_link in contact with coffee_table_fqluyq_0``."""
+    idx = list(range(len(survivors)))
+    if len(idx) <= 1:
+        return idx
+    ctx = s.ikc.ignoring(list(ignore)) if ignore else contextlib.nullcontext()
+    with ctx:
+        for m in margins:
+            free = body_free(s, list(survivors), arms_excluded=True, margin=float(m))
+            keep = [i for i, f in zip(idx, free.tolist()) if f]
+            if keep:
+                return keep
+    return idx
+
+
 def draw_manipulation(s, survivors: Sequence[Stance], rng: np.random.Generator, arms: Sequence[str], focus=None,
                       extra_visibility: Optional[Callable[[Pose], bool]] = None, arms_excluded: Optional[bool] = None,
                       in_frame_margin: float = IN_FRAME_MARGIN, name: str = "manipulation", tilt_draws: int = 3,
-                      posture: Optional[str] = None, fingers: Optional[float] = None) -> Tuple[int, Optional[Stance]]:
+                      posture: Optional[str] = None, fingers: Optional[float] = None,
+                      clearance_ignore: Optional[Sequence[Any]] = None) -> Tuple[int, Optional[Stance]]:
     """§5.2 step 4: one survivor drawn uniformly (its index is returned so the caller can drop it) with the tilt drawn
     continuously inside its band; the drawn stance is re-checked (collision, focus in frame, extra visibility, optical
     axis within its class). The tilt is redrawn up to ``tilt_draws`` times inside the band (the grid tilt itself, which
     passed steps 1–3, is the last draw); when every draw fails the re-check ``(index, None)`` is returned and the
     caller takes the next survivor. ``posture`` (A6): the stance is checked in that named arm posture and records it
-    (``q`` = the configuration the checks locked, ``fingers`` its gripper opening, ``extras["arm_posture"]``)."""
+    (``q`` = the configuration the checks locked, ``fingers`` its gripper opening, ``extras["arm_posture"]``).
+    ``clearance_ignore`` (the target): the draw is uniform among the survivors of the best base-clearance tier
+    (:func:`clearance_tier_indices`; the tier is cached on the survivors' ``extras["clearance_tier"]``)."""
     if not survivors:
         return -1, None
-    i = int(rng.integers(len(survivors)))
+    if clearance_ignore is not None:
+        if any("clearance_tier" not in st.extras for st in survivors):
+            keep = set(clearance_tier_indices(s, survivors, clearance_ignore))
+            for j, st in enumerate(survivors):
+                st.extras["clearance_tier"] = 0 if j in keep else 1
+        top = [j for j, st in enumerate(survivors) if st.extras.get("clearance_tier") == 0] or list(range(len(survivors)))
+        i = int(top[int(rng.integers(len(top)))])
+    else:
+        i = int(rng.integers(len(survivors)))
     grid = survivors[i]
     lo, hi = grid.extras.get("band", tilt_band(grid.tilt, grid.translate))
     excl = (len(set(arms)) > 1) if arms_excluded is None else arms_excluded
@@ -697,7 +730,7 @@ def draw_manipulation(s, survivors: Sequence[Stance], rng: np.random.Generator, 
         st = grid.with_trunk(grid.translate, tilt, name)
         st.focus = grid.focus if focus is None else _t(focus)
         st.arms = list(arms)
-        st.extras = {k: v for k, v in grid.extras.items() if k in ("band", "angle_class")}
+        st.extras = {k: v for k, v in grid.extras.items() if k in ("band", "angle_class", "clearance_tier")}
         st.extras["grid_tilt"] = grid.tilt
         if not bool(body_free(s, [st], arms_excluded=excl, posture=posture, fingers=fingers)[0]):
             continue

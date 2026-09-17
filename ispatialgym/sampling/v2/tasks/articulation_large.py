@@ -787,7 +787,7 @@ class ArticulationLarge(SamplerV2):
         pool = list(survivors)
         errors: List[str] = []
         for _ in range(min(len(pool), 8)):
-            i, manip = P0.draw_manipulation(self, pool, rng, [self.arm], focus=h0.contact, extra_visibility=extra_vis)
+            i, manip = P0.draw_manipulation(self, pool, rng, [self.arm], focus=h0.contact, extra_visibility=extra_vis, clearance_ignore=[self.target])
             pool.pop(i)
             if manip is None:
                 errors.append("drawn tilt fails the re-check")

@@ -729,7 +729,8 @@ class AlignmentWall(SamplerV2):
         done = False
         for pool in pools:
             for _ in range(min(len(pool), 8)):
-                i, manip = P0.draw_manipulation(self, pool, rng, arms, focus=geo["C"], extra_visibility=extra_vis, posture=posture, fingers=fingers)
+                i, manip = P0.draw_manipulation(self, pool, rng, arms, focus=geo["C"], extra_visibility=extra_vis, posture=posture, fingers=fingers,
+                                                clearance_ignore=[self.target])
                 kinds = pool[i].extras.get("brace_kinds", [])
                 pool.pop(i)
                 if manip is None:
