@@ -99,6 +99,11 @@ class ExecuteConfig:
     #: eef at the end of a tracked segment (m, rad)
     eef_pos_tol: float = 0.02
     eef_rot_tol: float = 0.10
+    #: the pad at the end of a push / brace is loaded by the object it holds (a swung painting rests on the pad, a
+    #: braced board preloads the stop): the joint controller yields 2-3 cm under that load, so their eef checks are
+    #: looser; whether the object reached its goal is the epilogue's judgement
+    contact_eef_pos_tol: float = 0.04
+    contact_eef_rot_tol: float = 0.20
     #: camera relocalization (spec §8) and the residual above which the corrective ``track_path`` runs
     camera_pos_tol: float = 0.05
     camera_rot_tol: float = 0.10
@@ -257,9 +262,11 @@ def _base_error(cur: Tuple[float, float, float], goal) -> Tuple[float, float]:
     return math.hypot(gx - cur[0], gy - cur[1]), abs(C.wrap_angle(gyaw - cur[2]))
 
 
-def _eef_reached(state: PrivilegedState, arm: str, target, cfg: ExecuteConfig, what: str) -> Optional[str]:
+def _eef_reached(state: PrivilegedState, arm: str, target, cfg: ExecuteConfig, what: str, loaded: bool = False) -> Optional[str]:
     dp, da = _pose_error(state.eef_pose(arm), target)
-    if dp > cfg.eef_pos_tol or da > cfg.eef_rot_tol:
+    pos_tol, rot_tol = (cfg.contact_eef_pos_tol, cfg.contact_eef_rot_tol) if loaded else (cfg.eef_pos_tol, cfg.eef_rot_tol)
+    if dp > pos_tol or da > rot_tol:
+        log.warning("%s: the %s hand is %.1f mm / %.3f rad off its end pose (tolerance %.0f mm / %.2f rad)", what, arm, dp * 1000, da, pos_tol * 1000, rot_tol)
         return "execution"
     return None
 
@@ -827,18 +834,22 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
             ctx["push_residual"]["skipped"] = "beyond the recorded arc"
         elif not forward and abs(residual) >= rmin:
             ctx["push_residual"]["skipped"] = "overshoot (a pad cannot pull)"
-    # 3. back off along the reversed push direction so the retreat does not rub the pad up the object's face
+    # 3. back off along the reversed push direction so the retreat does not rub the pad up the object's face, then
+    #    measure the residual the object is left with (a swung painting settles back onto the backed-off pad)
     tangent = push_tangent(geom, end_pose)
     back = (end_pose[0] - tangent * cfg.push_backoff_m, end_pose[1])
     yield from motions.arm_along(arm, [back])
     ctx["push_end_pose"] = back
+    yield from _hold_until_still(motions, state, obj, cfg)
+    final, _ = push_residual(geom, state, obj, pose0)
+    ctx["push_residual"]["final"] = final
     p_now = C.as_tensor(state.object_pose(obj)[0]).float()
     ctx["push_object_drift_m"] = float(th.linalg.norm(p_now - C.as_tensor(pose0[0]).float()))
 
 
 def post_push(action: Push, state, targets, ctx) -> Optional[str]:
     cfg = _cfg(ctx)
-    verdict = _eef_reached(state, action.contact.arm, ctx.get("push_end_pose", targets["waypoints"][-1]), cfg, "push")
+    verdict = _eef_reached(state, action.contact.arm, ctx.get("push_end_pose", targets["waypoints"][-1]), cfg, "push", loaded=True)
     if verdict is not None:
         return verdict
     before = ctx.get("object_pose0")
@@ -862,7 +873,7 @@ def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Itera
 
 
 def post_brace(action: Brace, state, targets, ctx) -> Optional[str]:
-    return _eef_reached(state, action.contact.arm, targets["contact"], _cfg(ctx), "brace")
+    return _eef_reached(state, action.contact.arm, targets["contact"], _cfg(ctx), "brace", loaded=True)
 
 
 def joint_tolerance(art) -> float:

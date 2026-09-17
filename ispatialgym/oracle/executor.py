@@ -722,7 +722,7 @@ class Executor:
         held) and the ladder ``reason``: ``"short"`` (out of tolerance, short, the target touched the stop before the
         goal), ``"overshoot"`` (out of tolerance, the residual flipped sign) or None."""
         res = ctx.get("push_residual") or {}
-        value = res.get("after", res.get("value"))
+        value = res.get("final", res.get("after", res.get("value")))  # the residual the object is left with after the back-off
         kind = res.get("kind", "line")
         tgt = self.state.pose_target(push.contact.object) if hasattr(self.state, "pose_target") else None
         tol = None
