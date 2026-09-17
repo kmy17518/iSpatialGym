@@ -708,6 +708,10 @@ class Executor:
             self.last_ctx = ctx
             rec.targets_keys = ctx.get("targets_keys", [])
             rec.notes = {key: val for key, val in ctx.items() if key in NOTE_KEYS}
+            left = getattr(self.motions, "last_witness_residual", None) if self.motions is not None else None
+            if left is not None:  # an arm_to left a small witness residual unclosed (a witness on a joint limit)
+                rec.notes["witness_residual_left"] = {"pos_m": round(float(left[0]), 4), "rot_rad": round(float(left[1]), 4)}
+                self.motions.last_witness_residual = None
             rec.attempts.append(None if verdict is None else verdict.to_dict())
             if verdict is None:
                 self._commit()

@@ -1063,8 +1063,10 @@ class Retreat(Action):
     def _segment(self, sidecar, state) -> Tuple[Pose, Pose]:
         """From where the hand **is** (``state.eef_pose`` at run time: a brace / push pad pressing on its object sits
         a few cm short of the recorded contact under the load — a retreat that first drove to the recorded contact
-        shoved the painting 0.6 rad off its goal), ``distance`` along the recorded end pose's −a (the direction the
-        sampler validated); from the recorded pose when the state has none (the sampler's check, the stub state)."""
+        shoved the painting 0.6 rad off its goal) straight to the **recorded** clear pose ``pre_pose(recorded end,
+        distance)`` — the pose the sampler validated and the retreat witness belongs to (a leg ending ``distance``
+        from the actual pose instead ran into a joint limit 1.2 cm short, axial 0916-202403); from the recorded end
+        pose when the state has none (the sampler's check, the stub state)."""
         C = _conventions()
         recorded = self.after.end_pose(sidecar, state)
         if recorded is None:
@@ -1079,8 +1081,7 @@ class Retreat(Action):
                 start = None
         if start is None:
             return recorded, clear
-        offset = [float(b - a) for a, b in zip(recorded.position, clear.position)]
-        return start, start.translated(offset)
+        return start, clear
 
     def targets(self, sidecar, state):
         C = _conventions()

@@ -78,6 +78,11 @@ class MotionsConfig:
     #: a contact leg (a push arc, a brace approach) ends with the pad pressing on the object: the position-controlled
     #: joints settle with a steady error that reflects the contact force, not a tracking failure
     joint_tol_loaded: float = 0.25
+    #: ``arm_to`` to an IK witness: a residual to the recorded pose up to these is closed best-effort (a witness on a
+    #: joint limit cannot move the last millimetres along a straight segment; the hand stays at the sampler-validated
+    #: configuration), a larger one must close
+    witness_residual_accept_pos: float = 0.01
+    witness_residual_accept_rot: float = 0.05
     #: how long to keep holding the final waypoint while waiting for convergence (steps)
     settle_steps: int = 90
     #: eef speed of ``arm_along`` (m/s, rad/s) and the densification resolution of its waypoint lists (m, rad)
@@ -276,6 +281,7 @@ class Motions:
         self.dt = float(getattr(planner, "control_dt", 1.0 / 30.0))
         self.state = ActionState(self.robot)
         self.last_relaxed_links: List[str] = []  # held-arm links taken out of the sphere model by the last arm_to plan
+        self.last_witness_residual: Optional[Tuple[float, float]] = None  # a witness residual arm_to left unclosed (m, rad)
         self._joint_limits = (
             self.robot.joint_lower_limits[self.robot.trunk_control_idx],
             self.robot.joint_upper_limits[self.robot.trunk_control_idx],
@@ -537,7 +543,18 @@ class Motions:
             dp, da = float(th.linalg.norm(cur[0] - target[0])), C.quat_angle(cur[1], target[1])
             if dp > 2e-3 or da > 0.01:
                 log.info("arm_to(%s): witness residual %.1f mm / %.3f rad, closing it along a straight segment", arm, dp * 1000, da)
-                yield from self.arm_along(arm, [target])
+                if dp <= self.cfg.witness_residual_accept_pos and da <= self.cfg.witness_residual_accept_rot:
+                    # the witness *is* the sampler's exact-IK solution of this pose (its tolerance); closing the last
+                    # millimetres is a refinement that a witness sitting on a joint limit cannot make (touching box:
+                    # right_arm_joint2 2.8 mrad from its limit, the first DLS step jumped 0.25 rad) - the hand stays at
+                    # the validated configuration and the following leg starts from where the hand is
+                    try:
+                        yield from self.arm_along(arm, [target])
+                    except SkillError as e:
+                        log.warning("arm_to(%s): the %.1f mm / %.3f rad witness residual is left as is (%s)", arm, dp * 1000, da, e)
+                        self.last_witness_residual = (dp, da)
+                else:
+                    yield from self.arm_along(arm, [target])
             return
         if pose is not None:
             poses = pose if isinstance(pose, dict) and set(pose) <= set(M.ARMS) else {arms[0]: pose}

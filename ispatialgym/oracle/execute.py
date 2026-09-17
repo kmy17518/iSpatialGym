@@ -240,10 +240,42 @@ def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[An
     p, q = as_world_pose(pre)
     standoff = (p + n * cfg.pre_pose_standoff_m, q)
     ctx["pre_pose_standoff"] = {"direction": [round(float(v), 3) for v in n.tolist()], "distance_m": cfg.pre_pose_standoff_m}
-    yield from motions.arm_to(arm, pose=standoff, ignore_objects=list(through))
+    q_standoff = standoff_configuration(motions, arm, pre, standoff, q_hint) if q_hint is not None else None
+    if q_standoff is not None:
+        # the standoff in the **witness's IK branch**: differential IK from the recorded pre-pose witness back along the
+        # short leg, then a joint-space plan there - a pose plan let cuRobo pick its own branch and the whole contact
+        # chain (arc, back-off, retreat) ran 3.18 rad away from the sampler's witnesses (axial retreat 0916-202403)
+        ctx["pre_pose_standoff"]["branch"] = "witness"
+        yield from motions.arm_to(arm, q=q_standoff, ignore_objects=list(through))
+    else:
+        ctx["pre_pose_standoff"]["branch"] = "planner"
+        yield from motions.arm_to(arm, pose=standoff, ignore_objects=list(through))
     if getattr(motions, "last_relaxed_links", None):
         ctx["plan_relaxed_links"] = list(motions.last_relaxed_links)
     yield from motions.arm_along(arm, [pre], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+
+
+def standoff_configuration(motions: Motions, arm: str, pre, standoff, q_hint) -> Optional[th.Tensor]:
+    """The joint configuration (28-D) of ``standoff`` in the branch of the pre-pose witness ``q_hint``: differential IK
+    from the witness along the straight leg pre -> standoff (no collision check: the leg is the one the hand will
+    retrace). None when the backend cannot track it (the caller plans the pose instead)."""
+    backend = getattr(motions, "backend", None)
+    solve = getattr(backend, "solve_ik_path", None)
+    if solve is None:
+        return None
+    try:
+        q0 = C.as_tensor(q_hint).reshape(-1).float()
+        dense = motions._densify(as_world_pose(pre), [standoff])
+        frame = M.EEF_LINK[arm]
+        res = solve(f"{arm}_arm", [{frame: wp} for wp in dense], q_start=q0, pos_tol=motions.cfg.diff_ik_pos_tol, rot_tol=motions.cfg.diff_ik_rot_tol,
+                    max_iters=motions.cfg.diff_ik_max_iters, check_collisions=False, sync_world=False, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+        if not res.success or res.q_traj is None or len(res.q_traj) == 0:
+            log.warning("standoff configuration from the witness not trackable (%s): planning the standoff pose instead", res.status)
+            return None
+        return C.as_tensor(res.q_traj[-1]).reshape(-1).float()
+    except Exception as e:  # noqa: BLE001
+        log.warning("standoff configuration from the witness failed (%r): planning the standoff pose instead", e)
+        return None
 
 
 def _hook(ctx: Dict[str, Any], name: str):
