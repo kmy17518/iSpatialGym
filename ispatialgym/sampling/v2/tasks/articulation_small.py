@@ -255,8 +255,12 @@ class ArticulationSmall(SamplerV2):
                 init = TT.phase1b_init_trunk(self, st, H_max, bands=self.bands, top=self.top, left_bands=self.left_bands)
                 init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=self.bands)
                 init.name = "init"
+                # §6.7 (owner 2026-09-16 17:10): the Phase-2 loose class is 25° / focus-in-frame for small articulation (the same
+                # shape as the ontop-large C rule; the hinged jar's best focus lies 24° off the optical axis from the tall trunks
+                # where the handle is reachable, 25° admits 42 foci over 3 stand-offs); the tight class stays at 8°
                 cands = TT.phase2_manipulation_stance(self, init, w_a, target_height=H_max, in_frame_fn=self._target_in_frame, bands=self.bands, top=self.top,
-                                                      stand_offs=tuple(self.g("stand_offs_m")), focus_z=self.top.z + 0.5 * H_max)
+                                                      stand_offs=tuple(self.g("stand_offs_m")), focus_z=self.top.z + 0.5 * H_max,
+                                                      angle_classes_deg=(float(self.gen("phase2_tight_class_deg", 8.0)), float(self.gen("phase2_loose_class_deg", 25.0))))
                 if not cands:
                     raise Reject("no_manipulation_stance", "Phase 2 left no survivor with the target, handle and brace point in frame")
                 self.edge_frame, self.init_stance, self.manip_candidates = edge, init, cands
