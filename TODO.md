@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 22:55 PDT — 8/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 23:06 PDT — 8/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -135,12 +135,12 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | CM articulation_close_large_scale | no instance | same as open; Rs_int drawer close = Phase-1 no_stance (base_ok instrumented 1c829ae) | large-scale |
 | alignment-world_vertical | demo run | painting demo in tolerance, not_settled (undamped hook) → large-scale-B: hinge friction/damping in the constraints record + TRO loader (owner 22:05), demo-only re-run | large-scale-B |
 | alignment-world_horizontal | demo run | owner 22:55: hang frame bug — no wall alias carries front/up/level axes, the sampler defaults to the painting frame (+x/+z) → the plate hangs table-flat; large-scale-B: ground_isg writes the reviewed icl frames per model, Reject(missing_frame), unit test, re-sample; + push witness with the brace arm at contact | large-scale-B |
-| alignment-axial | valid demo | re-run 20:40 (oracle retreat changes 35be0ee/3eb8e51): plan_failed at retreat → primary oracle | oracle |
+| alignment-axial | valid demo | - | - |
 | IORS ontop_small_scale | demo run (pre-fix success) | - | - |
 | IORS under_small_scale | valid demo (pre-de4e723,ab60baa) | D-007 A landed (core 5555526: robust under/ontop predicate, branch logged) — re-run queued | loop |
 | IORS inside | valid demo (pre-166005f,de4e723,ab60baa) | valid on f5ae607; re-opened by the core's targeted 1ba5e74 (open pads clear of the support: the failing sprout grasp had its fingertip at the table) — re-run queued | loop |
 | IORS nextto | demo run (pre-fix success) | - | - |
-| IORS touching | demo run | push spans the gap + tolerance (a6d7123); closure shifts the box 15.4 mm (off-centre pinch → core pinch_offset rule); the push's Retreat pushes the box 27.6 mm further (→ primary oracle, as the axial retreat fix); grasp plan_failed x2 (oracle) | core / oracle |
+| IORS touching | demo run | plan_failed at grasp = sampler witnesses off by a constant world offset (9–13 mm) and on joint-2's limit → core: witnesses at the recorded base_pose2d + fk_residual fact + 0.05 rad limit margin; push Retreat push-through 27.6 mm → primary oracle | core / oracle |
 | IORS ontop_large_scale | no instance | countertop pair = geometric yield (partner behind stance A) → floor fallback alias queued (local); sofa-bar re-run with the B→C path limit geodesic+3 m (4df6d0a) running locally | large-scale / loop |
 | IORS under_large_scale | no instance | D-010: sandal/bed F_goal 0 at every side lane (bed too low for the blade) — apple-desk-desk launched 23:00 as the candidate; per-attempt 900 s budget (large-scale-B); default C at 23:30 | owner (D-010) / large-scale |
 <!-- /first-demo-board -->
@@ -353,3 +353,4 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026-09-16 22:20 PDT pod_scheduler: PREEMPTION uilwpybjxnekg0 (smoke2-a40-2): band job(s) ['rb__tabletop__house_single_floor__countertop_ikwqer_0__shampoo_dispenser-zoyyia'] stopped for first-demo work (started 21:43); files parked in /root/samp/queue_preempted, re-dispatched to a band pod by the next tick via the manifest (no band file yet = still remaining)
 - 2026-09-16 22:20 PDT pod_scheduler: role change bands -> pool: uilwpybjxnekg0 (smoke2-a40-2); queued jobs moved: ['rb__tabletop__house_single_floor__countertop_ikwqer_0__shampoo_dispenser-zoyyia']; files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed)
 - 2026‑09‑16 23:02 PDT agent-e2e (owner 22:55): wall hang‑frame fix + hinge damping + horizontal two‑arm push witness + push‑under per‑attempt budget → new agent **large‑scale‑B** (87e668ec; `alignment_wall.py`, `ground_isg`, TRO loader, an isolated deadline in `iors_large.py`; the primary large‑scale agent stays on `articulation_large.py` / the Rs_int drawer bar‑offset). Under‑large: live run 0916‑211327 shows F_goal 0 at every side lane (blade cannot travel under the low bed) → `apple-desk-desk` launched 23:00, **D‑010 posted** (one‑off Slack post at the owner's request + chat; default C at 23:30).
+- 2026‑09‑16 23:08 PDT agent-e2e: primary oracle — axial retreat regression fixed (`041ca85c` standoff reached in the witness's IK branch, `0d9c116b` retreat straight to the recorded clear pose; two successes 0.0017 / 0.0040 rad). Touching `plan_failed` at grasp diagnosed **sampler‑side**: FK of every chain witness vs its recorded pose is a constant world offset per sidecar (touching 9–13 mm, axial 14.6 mm, nextto 3–5 mm — the sampler's IK ran at a base pose ≠ the recorded `base_pose2d`) and the touching witnesses sit 2.8 mrad from `right_arm_joint2`'s limit → core: witnesses at the recorded base pose (or record the base used), `fk_residual_m` fact (> 2 mm rejects), 0.05 rad joint‑limit margin. Oracle‑side robustness landed (`72b55d6`, `80779eb`, `b2bdabf`, `f3546f9`: witness refined by IK of the recorded pose in the same branch, pre‑pose residual ≤ 2 cm closed best‑effort).

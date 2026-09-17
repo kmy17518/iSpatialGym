@@ -64,8 +64,8 @@
   "owner": "large-scale-B"
  },
  "alignment-axial": {
-  "blocking": "re-run 20:40 (oracle retreat changes 35be0ee/3eb8e51): plan_failed at retreat \u2192 primary oracle",
-  "owner": "oracle"
+  "blocking": "-",
+  "owner": "-"
  },
  "inter_object_relation_satisfaction-ontop_small_scale": {
   "blocking": "-",
@@ -84,7 +84,7 @@
   "owner": "-"
  },
  "inter_object_relation_satisfaction-touching": {
-  "blocking": "push spans the gap + tolerance (a6d7123); closure shifts the box 15.4 mm (off-centre pinch \u2192 core pinch_offset rule); the push's Retreat pushes the box 27.6 mm further (\u2192 primary oracle, as the axial retreat fix); grasp plan_failed x2 (oracle)",
+  "blocking": "plan_failed at grasp = sampler witnesses off by a constant world offset (9\u201313 mm) and on joint-2's limit \u2192 core: witnesses at the recorded base_pose2d + fk_residual fact + 0.05 rad limit margin; push Retreat push-through 27.6 mm \u2192 primary oracle",
   "owner": "core / oracle"
  },
  "inter_object_relation_satisfaction-ontop_large_scale": {
