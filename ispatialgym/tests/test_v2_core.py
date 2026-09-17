@@ -456,10 +456,11 @@ def test_open_gripper_lowest_point_for_top_down_and_side_grasps():
     q_side = C.eef_quat(th.tensor([1.0, 0.0, 0.0]), th.tensor([0.0, 0.0, 1.0]))
     low = float(gripper_corners_world((th.tensor([0.0, 0.0, 1.0]), q_side))[:, 2].min())
     assert abs(low - (1.0 - 0.5 * C.GRIPPER_OPEN_M - FINGER_THICKNESS)) < 1e-6
-    # grasp record extras reach the sidecar block
-    g = GraspRecord("obj", "right", "k", "n", 0.0, grasp=(th.zeros(3), th.tensor([0.0, 0.0, 0.0, 1.0])), extras={"place_kind": "drop", "rim_z": 0.8})
+    # grasp record extras and the carry waypoint (FOV rule b) reach the sidecar block
+    g = GraspRecord("obj", "right", "k", "n", 0.0, grasp=(th.zeros(3), th.tensor([0.0, 0.0, 0.0, 1.0])), extras={"place_kind": "drop", "rim_z": 0.8},
+                    carry=[(th.tensor([0.5, 0.0, 1.1]), th.tensor([0.0, 0.0, 0.0, 1.0]))])
     d = g.to_sidecar()
-    assert d["place_kind"] == "drop" and d["rim_z"] == 0.8
+    assert d["place_kind"] == "drop" and d["rim_z"] == 0.8 and d["carry"][0]["position"] == pytest.approx([0.5, 0.0, 1.1])
 
 
 def test_stance_idle_posture_and_world_key_string():

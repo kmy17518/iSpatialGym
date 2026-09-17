@@ -396,6 +396,80 @@ class SamplerV2(TaskSampler):
             self.kit.sync_world()
             self.configure_targets(draft)
 
+    #: FOV rule (b) (owner 2026-09-16 17:10 item 5, spec 3.9): the carry leg lift end -> pre-place is a straight Cartesian
+    #: leg at constant orientation; screened at this many waypoints, and when it fails one carry waypoint is searched among
+    #: these raises (m) and lateral offsets (m) of its midpoint, in frame and IK-checked like the 3.9 waypoints
+    CARRY_LEG_WAYPOINTS = 5
+    CARRY_RAISES = (0.05, 0.10, 0.15, 0.20)
+    CARRY_LATERAL = (0.0, 0.05, -0.05, 0.10, -0.10)
+
+    def verify_carry_legs(self, draft: Draft):
+        """For every grasp record that places (``grasp`` + ``pre_place`` + ``carry_height``, same orientation at both ends):
+        the straight leg from the lift end to the pre-place must be trackable with the object attached (screening IK at
+        ``CARRY_LEG_WAYPOINTS`` waypoints, exact ends; supports removed, everything else — partner, scene — in the world).
+        When it is not, one carry waypoint (midpoint raised / shifted laterally, inside the manipulation image) whose two
+        sub-legs pass is recorded as ``grasps[k].carry = [pose]`` (the oracle carries through it; ``waypoint_policy``
+        notes it); none → ``Reject("carry_infeasible")``. ``summary.carry`` records the outcome per object."""
+        out: Dict[str, Any] = {}
+        if "placement" in self.sidecar.stances:
+            draft.summary["carry"] = {"leg": "skipped (the place is made from the placement stance after a base move)"}
+            return
+        for g in list(self.sidecar.grasps):
+            if g.grasp is None or g.pre_place is None or g.carry_height is None:
+                continue
+            if G.quat_angle(G.t(g.grasp[1]), G.t(g.pre_place[1])) > 0.05:
+                out[g.object] = {"leg": "skipped (orientation changes along the carry)"}
+                continue
+            stance = self.sidecar.stances.get(g.stance) or self.sidecar.stance("manipulation")
+            obj = self.objects.get(g.object)
+            lift_end = (G.t(g.grasp[0]) + th.tensor([0.0, 0.0, float(g.carry_height)]), G.t(g.grasp[1]))
+            pre_place = (G.t(g.pre_place[0]), G.t(g.pre_place[1]))
+            supports = self.support_objects()
+            cam = self.camera_pose_at(stance)
+
+            def leg_ok(a: G.Pose, b: G.Pose) -> Tuple[bool, str]:
+                wps = [tuple(w) for w in C.line_waypoints(a, b, self.CARRY_LEG_WAYPOINTS)]
+                with NAV.attached(self.kit, g.arm, obj, eef_in_object=g.eef_in_object):
+                    r = self.ikc.waypoints_ok([a] + wps, stance, g.arm, ignore_all=supports, cache=False, approached=[])
+                return r.ok, r.reason
+
+            ok, why = leg_ok(lift_end, pre_place)
+            if ok:
+                out[g.object] = {"leg": "straight", "length_m": round(float(th.linalg.norm(pre_place[0] - lift_end[0])), 3)}
+                continue
+            mid = 0.5 * (lift_end[0] + pre_place[0])
+            d = pre_place[0] - lift_end[0]
+            horiz = th.tensor([-float(d[1]), float(d[0]), 0.0])
+            horiz = horiz / max(float(th.linalg.norm(horiz)), 1e-6)
+            found = None
+            tried = 0
+            for raise_m in self.CARRY_RAISES:
+                for lat in self.CARRY_LATERAL:
+                    wp = (mid + th.tensor([0.0, 0.0, raise_m]) + horiz * lat, G.t(g.grasp[1]))
+                    tried += 1
+                    if not self.ikc.eef_in_frame(wp, cam):
+                        continue
+                    ok1, _ = leg_ok(lift_end, wp)
+                    if not ok1:
+                        continue
+                    ok2, _ = leg_ok(wp, pre_place)
+                    if ok2:
+                        found = (wp, raise_m, lat)
+                        break
+                if found is not None:
+                    break
+            if found is None:
+                raise Reject("carry_infeasible", f"{g.object}: the straight carry leg lift end -> pre-place fails ({why}) and none of {tried} carry waypoints "
+                                                 f"(raises {self.CARRY_RAISES}, lateral {self.CARRY_LATERAL}) is in frame with both sub-legs trackable")
+            wp, raise_m, lat = found
+            g.carry = [wp]
+            out[g.object] = {"leg": "carry waypoint", "raise_m": raise_m, "lateral_m": lat, "straight_leg_failure": why}
+            self.sidecar.waypoint_policy = (self.sidecar.waypoint_policy + "; " if self.sidecar.waypoint_policy else "") + \
+                f"carry: straight lift-end -> pre-place leg infeasible, one carry waypoint recorded (raise {raise_m:.2f} m, lateral {lat:+.2f} m), both sub-legs screened at {self.CARRY_LEG_WAYPOINTS} waypoints"
+            log.info("%s: carry waypoint recorded for %s (raise %.2f m, lateral %+.2f m): straight leg %s", self.gp.alias, g.object, raise_m, lat, why)
+        if out:
+            draft.summary["carry"] = out
+
     #: up-axis guard (owner item 4, 2026-09-16 10:15): after the goal settle an object's up axis must stay within this
     #: of the up axis of the goal pose it was released at (= its init orientation for IORS)
     GOAL_TIP_MAX_DEG = 15.0
@@ -667,6 +741,7 @@ class SamplerV2(TaskSampler):
                     phase = "goal_check"
                     self.check_goal_feasible(draft)
                     self.after_goal_check(draft)
+                    self.verify_carry_legs(draft)
                     phase = "program_check"
                     self.program_check(draft)
                     phase = "write"

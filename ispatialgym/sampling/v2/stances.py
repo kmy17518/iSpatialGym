@@ -402,6 +402,7 @@ class GraspRecord:
     stance: str = "manipulation"
     place_on: Optional[str] = None  # bddl instance the object is placed on / into / attached to (F6 programs)
     waypoints: Optional[List[Pose]] = None  # in-hand motion key poses (held-object tasks, attachment), last = end pose
+    carry: Optional[List[Pose]] = None  # FOV rule (b): waypoint(s) of the lift-end -> pre-place carry leg when the straight leg fails
     extras: Dict[str, Any] = field(default_factory=dict)  # diagnostics / task facts (F6 keeps unknown keys in ``extra``)
 
     def to_sidecar(self) -> Dict[str, Any]:
@@ -415,6 +416,8 @@ class GraspRecord:
             d["place_on"] = self.place_on
         if self.waypoints is not None:
             d["waypoints"] = [pose_to_sidecar(p) for p in self.waypoints]
+        if self.carry is not None:
+            d["carry"] = [pose_to_sidecar(p) for p in self.carry]
         if self.finger_q is not None:
             d["finger_q"] = [float(v) for v in self.finger_q]
         if self.eef_in_object is not None:

@@ -383,6 +383,17 @@ re-measures at the task room's park cell.
 - **D. Up-axis guard**: `SamplerV2.check_goal_upright` after the goal settle — every goal object's up axis within
   `goal_tip_max_deg` (15°) of its goal pose's, else `Reject("goal_tipped")`; `summary.goal_tilt_deg`, counter `goal_tipped`.
 
+### FOV rule (b): carry waypoint on demand (owner 2026-09-16 17:10 item 5, spec §3.9)
+
+The gripper-in-FOV monitor is continuous from the pre-grasp to the release, so the carry leg lift end → pre-place must
+stay in frame; the oracle drives it as a straight Cartesian leg at constant orientation (both ends recorded in frame ⇒
+in frame). `SamplerV2.verify_carry_legs` (after `after_goal_check`) screens that leg with the object attached
+(`waypoints_ok`, 5 waypoints, supports removed, partner and scene in the world); when it fails, one carry waypoint —
+the midpoint raised 5–20 cm / shifted ±5–10 cm laterally, inside the manipulation image, both sub-legs trackable — is
+recorded as **`grasps[k].carry: [pose]`** (`waypoint_policy` notes it, `summary.carry` per object), else
+`Reject("carry_infeasible")`. Skipped when the place is made from a `placement` stance (large-scale: base move) or the
+orientation changes along the carry (held-object rotation).
+
 ## Status (D2 / D4, 2026-09-15) and gaps
 
 Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,
