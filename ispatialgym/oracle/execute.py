@@ -43,7 +43,7 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Dict, Iterator, List, Optional, Protocol, Sequence, Tuple
 
 import torch as th
@@ -612,9 +612,11 @@ def post_retreat(action: Retreat, state, targets, ctx) -> Optional[str]:
 
 @dataclass
 class PushGeometry:
-    """The recorded push as a motion of the pad: an ``arc`` about a vertical pivot (the sampler's hinge at the settled
-    COM, spec §6.10) through ``init, mid, goal`` — ``angle`` the signed swept angle about +z, ``radius`` — or a
-    straight ``line`` of ``distance`` along ``direction``."""
+    """The recorded push as a motion of the pad: an ``arc`` about the axis through ``pivot`` along ``axis`` (the
+    sampler's hinge: a vertical axis at the settled COM for a tabletop yaw correction, spec §6.10; the horizontal hook
+    axis of a hanging painting) through ``init, mid, goal`` — ``angle`` the signed swept angle about ``axis``,
+    ``radius`` — or a straight ``line`` of ``distance`` along ``direction``. The axis is oriented +z-most (a tabletop
+    arc keeps the yaw sign convention), a horizontal axis so that the swept angle is positive."""
 
     kind: str
     direction: th.Tensor
@@ -622,65 +624,90 @@ class PushGeometry:
     radius: float = 0.0
     angle: float = 0.0
     distance: float = 0.0
+    axis: th.Tensor = field(default_factory=lambda: th.tensor([0.0, 0.0, 1.0]))
 
     @property
     def total(self) -> float:
         return abs(self.angle) if self.kind == "arc" else self.distance
 
 
-def _circle_through(p0: th.Tensor, p1: th.Tensor, p2: th.Tensor) -> Optional[Tuple[th.Tensor, float]]:
-    """Circumcentre (xy) and radius of three points, None when they are (nearly) collinear."""
-    ax, ay = float(p0[0]), float(p0[1])
-    bx, by = float(p1[0]), float(p1[1])
-    cx, cy = float(p2[0]), float(p2[1])
-    d = 2.0 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
-    chord = math.hypot(cx - ax, cy - ay)
-    if abs(d) < 1e-6 * max(chord, 1e-3):
+def _circle_through(p0: th.Tensor, p1: th.Tensor, p2: th.Tensor, min_sagitta: float = 5e-4) -> Optional[Tuple[th.Tensor, float, th.Tensor]]:
+    """Circumcentre, radius and unit plane normal of three points in 3-D; None when they are (nearly) collinear (the
+    middle point less than ``min_sagitta`` off the chord)."""
+    a, b = p1 - p0, p2 - p0
+    n = th.linalg.cross(a, b)
+    nn = float(th.linalg.norm(n))
+    chord = float(th.linalg.norm(b))
+    if chord < 1e-9 or nn / chord < min_sagitta:
         return None
-    ux = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / d
-    uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / d
-    r = math.hypot(ax - ux, ay - uy)
-    if r > 5.0:  # an almost straight arc: treat as a line
-        return None
-    return th.tensor([ux, uy]), r
+    c = p0 + th.linalg.cross(float(th.dot(a, a)) * b - float(th.dot(b, b)) * a, n) / (2.0 * nn * nn)
+    return c, float(th.linalg.norm(c - p0)), n / nn
+
+
+def _signed_angle_about(u: th.Tensor, v: th.Tensor, axis: th.Tensor) -> float:
+    """Signed angle from ``u`` to ``v`` about ``axis`` (both projected onto the plane normal to the axis)."""
+    u = u - axis * float(th.dot(u, axis))
+    v = v - axis * float(th.dot(v, axis))
+    return math.atan2(float(th.dot(axis, th.linalg.cross(u, v))), float(th.dot(u, v)))
 
 
 def push_geometry(waypoints: Sequence[Any], direction: Sequence[float]) -> PushGeometry:
-    pts = [as_world_pose(w)[0] for w in waypoints]
+    pts = [as_world_pose(w)[0].float() for w in waypoints]
     direction = C.as_tensor(direction).reshape(-1)[:3].float()
     if len(pts) >= 3:
         circ = _circle_through(pts[0], pts[len(pts) // 2], pts[-1])
         if circ is not None:
-            pivot, r = circ
-            angle = 0.0
-            for a, b in zip(pts[:-1], pts[1:]):
-                pa = math.atan2(float(a[1] - pivot[1]), float(a[0] - pivot[0]))
-                pb = math.atan2(float(b[1] - pivot[1]), float(b[0] - pivot[0]))
-                angle += C.wrap_angle(pb - pa)
-            return PushGeometry("arc", direction, pivot=pivot, radius=r, angle=angle)
-    dist = sum(float(th.linalg.norm(b[:2] - a[:2])) for a, b in zip(pts[:-1], pts[1:]))
+            pivot, r, axis = circ
+            if abs(float(axis[2])) > 1e-3:
+                if float(axis[2]) < 0:
+                    axis = -axis
+            angle = sum(_signed_angle_about(a - pivot, b - pivot, axis) for a, b in zip(pts[:-1], pts[1:]))
+            if abs(float(axis[2])) <= 1e-3 and angle < 0:
+                axis, angle = -axis, -angle
+            return PushGeometry("arc", direction, pivot=pivot, radius=r, angle=angle, axis=axis)
+    dist = sum(float(th.linalg.norm(b - a)) for a, b in zip(pts[:-1], pts[1:]))
     return PushGeometry("line", direction, distance=dist)
 
 
-def _rotate_pose_about(pose, pivot: th.Tensor, angle: float) -> Tuple[th.Tensor, th.Tensor]:
-    """A world pose rotated about the vertical axis through ``pivot`` (xy) by ``angle`` (rad, +z)."""
+def _rotate_pose_about(pose, pivot: th.Tensor, angle: float, axis: Optional[th.Tensor] = None) -> Tuple[th.Tensor, th.Tensor]:
+    """A world pose rotated by ``angle`` (rad) about the axis through ``pivot`` along ``axis`` (+z by default)."""
     p, q = as_world_pose(pose)
-    c, s = math.cos(angle), math.sin(angle)
-    dx, dy = float(p[0] - pivot[0]), float(p[1] - pivot[1])
-    p2 = th.tensor([float(pivot[0]) + c * dx - s * dy, float(pivot[1]) + s * dx + c * dy, float(p[2])])
-    qz = th.tensor([0.0, 0.0, math.sin(angle / 2.0), math.cos(angle / 2.0)])
-    return p2, C.qmul(qz, q)
+    axis = th.tensor([0.0, 0.0, 1.0]) if axis is None else axis / max(float(th.linalg.norm(axis)), 1e-9)
+    rot = C.quat_from_axis_angle(axis, angle)
+    pivot = C.as_tensor(pivot).float().reshape(-1)
+    if pivot.numel() == 2:
+        pivot = th.tensor([float(pivot[0]), float(pivot[1]), float(p[2])])
+    return pivot + C.quat_rotate(rot, p - pivot), C.qmul(rot, q)
+
+
+def _rotation_about(from_q: th.Tensor, to_q: th.Tensor, axis: th.Tensor) -> float:
+    """The rotation (rad, signed about ``axis``) of the world rotation taking orientation ``from_q`` to ``to_q``:
+    the axis-angle vector of ``to_q * from_q^-1`` projected on the axis."""
+    r = C.qmul(to_q, C.qinv(from_q))
+    r = r / max(float(th.linalg.norm(r)), 1e-9)
+    if float(r[3]) < 0:
+        r = -r
+    s = float(th.linalg.norm(r[:3]))
+    if s < 1e-9:
+        return 0.0
+    ang = 2.0 * math.atan2(s, float(r[3]))
+    return float(th.dot(r[:3] / s, axis)) * ang
+
+
+def _axis_residual(goal_q: th.Tensor, cur_q: th.Tensor, axis: th.Tensor, equivalences: Sequence[Any] = ()) -> float:
+    """Signed rotation about ``axis`` from ``cur_q`` to the nearest equivalent of ``goal_q`` (rad)."""
+    best, best_full = None, None
+    for e in [None] + list(equivalences or []):
+        g = goal_q if e is None else C.qmul(goal_q, C.as_tensor(e).float())
+        full = C.quat_angle(g, cur_q)
+        if best_full is None or full < best_full:
+            best_full, best = full, _rotation_about(cur_q, g, axis)
+    return float(best)
 
 
 def _yaw_residual(goal_q: th.Tensor, cur_q: th.Tensor, equivalences: Sequence[Any] = ()) -> float:
     """Signed rotation about +z from ``cur_q`` to the nearest equivalent of ``goal_q`` (rad)."""
-    best = None
-    for e in [None] + list(equivalences or []):
-        g = goal_q if e is None else C.qmul(goal_q, C.as_tensor(e).float())
-        r = C.wrap_angle(C.yaw_of(g) - C.yaw_of(cur_q))
-        if best is None or abs(r) < abs(best):
-            best = r
-    return float(best)
+    return _axis_residual(goal_q, cur_q, th.tensor([0.0, 0.0, 1.0]), equivalences)
 
 
 def push_residual(geom: PushGeometry, state, obj: str, pose0) -> Tuple[Optional[float], str]:
@@ -690,23 +717,23 @@ def push_residual(geom: PushGeometry, state, obj: str, pose0) -> Tuple[Optional[
     has one, else against the recorded motion (swept angle / distance minus what the object did since the push
     began). Returns ``(residual, source)``; ``(None, reason)`` when nothing can be measured."""
     p, q = state.object_pose(obj)
+    p, q = C.as_tensor(p).float(), C.as_tensor(q).float()
     tgt = getattr(state, "pose_target", lambda name: None)(obj)
     world = tgt is not None and str(getattr(tgt, "frame", "world")) == "world"
     if geom.kind == "arc":
         if world and getattr(tgt, "orientation", None) is not None:
-            return _yaw_residual(C.as_tensor(tgt.orientation).float(), q, getattr(tgt, "orientation_equivalences", ())), "goal_orientation"
+            return _axis_residual(C.as_tensor(tgt.orientation).float(), q, geom.axis, getattr(tgt, "orientation_equivalences", ())), "goal_orientation"
         if pose0 is None:
             return None, "no_reference"
-        done = C.wrap_angle(C.yaw_of(q) - C.yaw_of(as_world_pose(pose0)[1]))
+        done = _rotation_about(as_world_pose(pose0)[1].float(), q, geom.axis)
         return float(geom.angle - done), "arc_angle"
-    d = geom.direction[:2]
-    d = d / max(float(th.linalg.norm(d)), 1e-9)
+    d = geom.direction / max(float(th.linalg.norm(geom.direction)), 1e-9)
     if world and getattr(tgt, "position", None) is not None:
         gp = C.as_tensor(tgt.position).float()
-        return float(th.dot(gp[:2] - p[:2], d)), "goal_position"
+        return float(th.dot(gp - p, d)), "goal_position"
     if pose0 is None:
         return None, "no_reference"
-    done = float(th.dot(p[:2] - as_world_pose(pose0)[0][:2], d))
+    done = float(th.dot(p - as_world_pose(pose0)[0].float(), d))
     return float(geom.distance - done), "line_distance"
 
 
@@ -715,7 +742,7 @@ def extend_push(geom: PushGeometry, end_pose, residual: float, step: float = 0.0
     along its direction) from ``end_pose``; the arc is densified at ``step`` rad so the pad stays on the circle."""
     if geom.kind == "arc":
         n = max(1, int(math.ceil(abs(residual) / step)))
-        return [_rotate_pose_about(end_pose, geom.pivot, residual * (i / n)) for i in range(1, n + 1)]
+        return [_rotate_pose_about(end_pose, geom.pivot, residual * (i / n), geom.axis) for i in range(1, n + 1)]
     p, q = as_world_pose(end_pose)
     d = geom.direction / max(float(th.linalg.norm(geom.direction)), 1e-9)
     return [(p + d * residual, q)]
@@ -724,13 +751,12 @@ def extend_push(geom: PushGeometry, end_pose, residual: float, step: float = 0.0
 def push_tangent(geom: PushGeometry, pose) -> th.Tensor:
     """Unit push direction of the pad at ``pose`` (the arc's tangent in the swept sense, or the line direction)."""
     if geom.kind == "arc":
-        p = as_world_pose(pose)[0]
-        rx, ry = float(p[0] - geom.pivot[0]), float(p[1] - geom.pivot[1])
-        sign = 1.0 if geom.angle >= 0 else -1.0
-        t = th.tensor([-ry * sign, rx * sign, 0.0])
+        p = as_world_pose(pose)[0].float()
+        radial = p - geom.pivot
+        radial = radial - geom.axis * float(th.dot(radial, geom.axis))
+        t = th.linalg.cross(geom.axis, radial) * (1.0 if geom.angle >= 0 else -1.0)
         return t / max(float(th.linalg.norm(t)), 1e-9)
     d = geom.direction.clone()
-    d[2] = 0.0
     return d / max(float(th.linalg.norm(d)), 1e-9)
 
 
@@ -766,7 +792,10 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     ctx["object_pose0"] = pose0
     geom = push_geometry(targets["waypoints"], targets["direction"])
     if geom.kind == "arc":
-        ctx["push_pivot_offset_m"] = float(th.linalg.norm(geom.pivot - pose0[0][:2]))  # the arc's pivot vs the object's COM
+        off = C.as_tensor(pose0[0]).float() - geom.pivot
+        off = off - geom.axis * float(th.dot(off, geom.axis))
+        ctx["push_pivot_offset_m"] = float(th.linalg.norm(off))  # the arc's axis vs the object's COM
+        ctx["push_axis"] = [round(float(v), 3) for v in geom.axis.tolist()]
     yield from motions.arm_along(arm, targets["waypoints"])
     # 1. hold with the pad in contact until the object is still, then measure the residual to the goal
     yield from _hold_until_still(motions, state, obj, cfg)
@@ -797,8 +826,8 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     back = (end_pose[0] - tangent * cfg.push_backoff_m, end_pose[1])
     yield from motions.arm_along(arm, [back])
     ctx["push_end_pose"] = back
-    p_now = state.object_pose(obj)[0]
-    ctx["push_object_drift_m"] = float(th.linalg.norm(p_now[:2] - pose0[0][:2]))
+    p_now = C.as_tensor(state.object_pose(obj)[0]).float()
+    ctx["push_object_drift_m"] = float(th.linalg.norm(p_now - C.as_tensor(pose0[0]).float()))
 
 
 def post_push(action: Push, state, targets, ctx) -> Optional[str]:

@@ -684,6 +684,56 @@ def test_push_closure_geometry_residual_and_extension():
     assert len(ext) == 1 and abs(float(th.linalg.norm(ext[0][0] - p1)) - 0.02) < 1e-6
 
 
+def test_push_geometry_of_a_hanging_painting_is_an_arc_about_the_hook_axis():
+    """The wall-vertical push swings a painting about its horizontal hook axis: the recorded init / mid / goal pad
+    poses lie on a circle in a vertical plane. The geometry is an arc about that (horizontal) axis — not the planar
+    'line of 8 mm' the xy projection gave (which measured the residual on the object's position, i.e. on the hook
+    that never moves) — the residual is the rotation still missing about the hook, an overshoot flips its sign, the
+    extension stays on the circle and the back-off tangent points down the arc."""
+    sc = Sidecar.load(os.path.join(SIDECARS, "alignment-world_vertical.json"))
+    push = [a for a in expand(sc.alias, sc) if isinstance(a, Push)][0]
+    wps = push.contact.waypoints
+    geom = EX.push_geometry(wps, push.contact.direction)
+    assert geom.kind == "arc" and geom.angle > 0.2 and abs(float(geom.axis[2])) < 0.05 and abs(float(geom.axis[0])) > 0.99  # the hook axis is along x
+    p0, p1 = wps[0].tensors()[0], wps[-1].tensors()[0]
+    for p in (p0, p1):
+        radial = p - geom.pivot
+        radial = radial - geom.axis * float(th.dot(radial, geom.axis))
+        assert abs(float(th.linalg.norm(radial)) - geom.radius) < 1e-4
+    q0 = C.quat_from_axis_angle(geom.axis, -0.4)  # the painting hangs 0.4 rad off, to be swung back by the push
+
+    class St:
+        def __init__(self, q, target=None):
+            self.q, self.target = q, target
+
+        def object_pose(self, name):
+            return geom.pivot.clone(), self.q  # the hook does not move
+
+        def pose_target(self, name):
+            return self.target
+
+    pose0 = (geom.pivot.clone(), q0)
+    # (a) arc-derived: rotated 90 % of the swept angle -> the missing 10 % in the push's sense
+    r, src = EX.push_residual(geom, St(C.qmul(C.quat_from_axis_angle(geom.axis, 0.9 * geom.angle), q0)), push.contact.object, pose0)
+    assert src == "arc_angle" and abs(r - 0.1 * geom.angle) < 1e-5 and r > 0
+    # (b) goal-derived: an orientation target 0.08 rad beyond -> short; swung 0.14 rad past it -> overshoot (negative)
+    goal_q = C.quat_from_axis_angle(geom.axis, 0.0)
+    tgt = SimpleNamespace(frame="world", orientation=goal_q, orientation_equivalences=[], position=None)
+    r, src = EX.push_residual(geom, St(C.quat_from_axis_angle(geom.axis, -0.08), tgt), push.contact.object, pose0)
+    assert src == "goal_orientation" and abs(r - 0.08) < 1e-5
+    r, _ = EX.push_residual(geom, St(C.quat_from_axis_angle(geom.axis, 0.14), tgt), push.contact.object, pose0)
+    assert abs(r + 0.14) < 1e-5
+    # (c) the extension stays on the circle, (d) the tangent at the goal is perpendicular to the radius and mostly up
+    ext = EX.extend_push(geom, wps[-1], 0.1)
+    for p, q in ext:
+        radial = p - geom.pivot
+        radial = radial - geom.axis * float(th.dot(radial, geom.axis))
+        assert abs(float(th.linalg.norm(radial)) - geom.radius) < 1e-4
+    t = EX.push_tangent(geom, wps[-1])
+    radial = p1 - geom.pivot
+    assert abs(float(th.dot(t, radial))) < 1e-5 and float(t[2]) > 0.5 and abs(float(t[0])) < 1e-5
+
+
 def test_execute_push_holds_measures_repushes_and_backs_off(tmp_path):
     """``execute_push`` on a fake world whose pushed object follows the pad at 90 %: after the arc it holds until the
     object is still, measures the residual, pushes the extension once, backs the pad off along the reversed push
