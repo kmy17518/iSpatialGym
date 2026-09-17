@@ -194,10 +194,10 @@
    ],
    "status": "answered",
    "answered_by": "chat",
-   "answer": "B - general rule: class-1 Phase-2 candidates admitted whenever the class-0 foci are deeper than 0.65 m base-forward (all tabletop subtasks)",
-   "applied_commit": null,
+   "answer": "B applied: phase2_class1_when_deep_m 0.65 on the attachment aliases",
+   "applied_commit": "41782c94",
    "thread_ts": null,
-   "answered_at": "2026-09-16 22:02 PDT",
+   "answered_at": "2026-09-17 01:07 PDT",
    "channel": "chat (Slack paused 21:53)"
   },
   {
@@ -239,13 +239,31 @@
    "artefacts": [
     "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_open_large_scale/probe-0916-2216-rsint_bamfsz_1/"
    ],
-   "status": "open",
-   "answered_by": null,
-   "answer": null,
-   "applied_commit": null,
+   "status": "answered",
+   "answered_by": "chat",
+   "answer": "B now (min_reachable_opening 20 deg on the door units, five appliance aliases re-launched) + C in parallel (chained open: large-scale + oracle program; hybrid base-follow: new agent 31b7a643); Rs_int drawer continues; nothing blacklisted",
+   "applied_commit": "7c7bac86",
    "thread_ts": null,
-   "answered_at": null,
+   "answered_at": "2026-09-17 01:09 PDT",
    "channel": "chat (Slack paused)"
+  },
+  {
+   "id": "D-012",
+   "time": "2026-09-17 01:07 PDT",
+   "subtask": "configuration_matching-articulation_open_small_scale",
+   "question": "small articulation first-demo object",
+   "context": "hinged jar: no handle - edge pinch on a 17 mm rim beside the wire clamp holding the lid; the 23:02 instance failed the grasp twice (pads on the rim, no attach)",
+   "options": [
+    "toolbox (redmtl top carry bar 22 mm, 70 mm proud) first, then carton_msfzpz-floor (one-piece lid, 15 mm edge), then laptop (8 mm lid edge)"
+   ],
+   "default": "-",
+   "artefacts": [],
+   "status": "answered",
+   "answered_by": "chat",
+   "answer": "owner 01:00: drop the hinged jar (later list: lid without handle + wire clamp - hold-body + push-under-flange, or an asset check that the clamp is inert); launch toolbox x3 supports, carton_msfzpz-floor, laptop-breakfast_table in parallel with brace_optional; the close alias follows the first open unit that yields; toolbox no_workspace -> tabletop diagnoses the edge/stage before any alias change",
+   "applied_commit": "41782c94",
+   "thread_ts": null,
+   "answered_at": "2026-09-17 01:07 PDT"
   }
  ]
 }
