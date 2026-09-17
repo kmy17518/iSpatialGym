@@ -1505,6 +1505,89 @@ def test_gripper_closure_ramp_and_preshaped_opening():
     env.after_step = None
 
 
+def test_support_disturbance_fact_tracks_the_unmanipulated_supports(tmp_path):
+    """Owner 2026-09-16 23:00 (fact, no verdict): ``meta.support_disturbance`` carries the pose drift of every tracked object
+    no action manipulates (the table under a tabletop task) - max / end displacement and up-axis tilt - and, with a contact
+    view, the finger-support contact steps by action and the peak force; without the simulator's contact view those are
+    None. A world whose tracked objects are all manipulated reports nothing."""
+    sc, env = iors_world()
+    env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
+    table = FakeObject("breakfast_table_rhjoby_0", [7.0, 3.1, 0.40], category="breakfast_table", extent=(1.2, 0.8, 0.8))
+    table.graspable = False
+    table.fixed_base = False
+    env.objects["breakfast_table.n.01_1"] = table
+    q0 = table.quat.clone()
+
+    def rock(step_action):
+        # the table rocks 0.3 mm / 0.02 deg while the arm is at the place height, and settles back afterwards
+        held = env.robot._ag_obj_in_hand["right"] is not None
+        z = float(env.robot.eef_pose("right")[0][2])
+        if held and z < 0.90:
+            table.pos = th.tensor([7.0003, 3.1, 0.40])
+            table.quat = C.qmul(q0, th.tensor([math.sin(math.radians(0.01)), 0.0, 0.0, math.cos(math.radians(0.01))]))
+        else:
+            table.pos, table.quat = th.tensor([7.0, 3.1, 0.40]), q0.clone()
+
+    env.after_step = rock
+    ex, *_ = make_executor(env, sc, tmp_path)
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["success"], result["verdict"]
+    sd = result["support_disturbance"]
+    assert sd["supports"] == ["breakfast_table.n.01_1"] and sd["fixed_base"] == {"breakfast_table.n.01_1": False}
+    assert abs(sd["max_displacement_m"] - 0.0003) < 5e-5 and abs(sd["max_tilt_deg"] - 0.02) < 0.003, sd
+    assert sd["end_displacement_m"] < 1e-6 and sd["end_tilt_deg"] < 1e-4
+    assert sd["contact_steps"] is None and sd["peak_force_N"] is None and sd["by_action"] is None  # no contact view in the fake
+    assert sd["steps_observed"] == result["n_steps"] and sd["force_sampling"]
+    # every tracked object manipulated: nothing to report
+    sc2, env2 = iors_world()
+    env2.evaluate = success_eval("apple.n.01_1", _place_goal(sc2), tol=0.08)
+    ex2, *_ = make_executor(env2, sc2, tmp_path / "b")
+    result2 = ex2.run_program(expand(sc2.alias, sc2))
+    assert result2["success"] and result2["support_disturbance"] == {}
+    # the collector itself with a fake contact view: contact steps by action and the peak force
+    class _View:
+        def get_contact_force_matrix(self, dt):
+            return th.tensor([[[0.0, 0.0, 12.5], [0.0, 0.0, 0.0]], [[0.0, 0.0, 3.0], [0.0, 0.0, 0.0]]])
+
+    class _API:
+        _CONTACT_VIEW = {0: _View()}
+
+        @staticmethod
+        def get_contact_pairs(scene_idx, query, with_set, current_only):
+            return {("finger1", "table")}
+
+        @staticmethod
+        def get_contact_row_indices(scene_idx, links):
+            return th.tensor([0, 1])
+
+        @staticmethod
+        def get_contact_col_indices(scene_idx, links):
+            return th.tensor([0])
+
+    from ispatialgym.oracle.executor import SupportLoad
+    import sys as _sys, types as _types
+    og_stub = _types.ModuleType("omnigibson")
+    og_stub.sim = SimpleNamespace(get_physics_dt=lambda: 1.0 / 120.0)
+    robot = env.robot
+    robot.finger_links = {a: [SimpleNamespace(prim_path=f"/f_{a}_{i}") for i in range(2)] for a in M.ARMS}
+    table.links = {"base_link": SimpleNamespace(prim_path="/table/base_link")}
+    sl = SupportLoad(robot, {"breakfast_table.n.01_1": table}, scene_idx=0)
+    sl.contact_api = _API()
+    saved = _sys.modules.get("omnigibson")
+    _sys.modules["omnigibson"] = og_stub
+    try:
+        for name in ("grasp", "grasp", "place", None):
+            sl.observe(name)
+    finally:
+        if saved is not None:
+            _sys.modules["omnigibson"] = saved
+        else:
+            _sys.modules.pop("omnigibson", None)
+    rep = sl.report()
+    assert rep["contact_steps"] == 4 and rep["contact_steps_by_action"] == {"grasp": 2, "place": 1, "epilogue": 1}
+    assert rep["peak_force_N"] == 12.5 and rep["peak_force_action"] == "grasp" and rep["by_action"]["place"] == {"contact_steps": 1, "peak_force_N": 12.5}
+
+
 def test_epilogue_reports_the_predicate_branch_of_the_final_binary_evaluation(tmp_path):
     """Owner 2026-09-16 22:05 item 4 (D-007 wrapper, core 5555526): the executor resets the task's predicate branch log
     before each settle window and copies ``predicate_branches()`` of the final evaluation into the result (→

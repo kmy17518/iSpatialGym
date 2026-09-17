@@ -45,6 +45,7 @@ import math
 import os
 import time
 import traceback
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
@@ -140,6 +141,135 @@ class ExecutorConfig:
     override_rot: float = 0.20
     #: record the serialized sim state every step (needed for the BEHAVIOR-replayable hdf5)
     record_state: bool = True
+
+
+class SupportLoad:
+    """QA **fact** (owner 2026-09-16 23:00, no verdict): how much the fingers load the support during a demo — the
+    support's pose drift over the episode (displacement and up-axis tilt vs its pose at the first step, max and at the
+    end), the control steps in which a finger link of either arm touches a support body (by action name, from
+    ``RigidContactAPI``) and the peak contact force between the finger links and the support (the contact force matrix
+    of the last physics substep of each control step, N). ``supports`` = the tracked objects no program action
+    manipulates (the table under a tabletop task); ``fixed_base`` records the object's flag in the loaded scene (a
+    dynamic table is what the fingers can rock). Written as ``meta.support_disturbance``; every simulator call is guarded
+    so a missing contact view leaves the pose drift alone."""
+
+    def __init__(self, robot, supports: Dict[str, Any], scene_idx: int = 0):
+        self.robot = robot
+        self.supports = dict(supports)
+        self.scene_idx = int(scene_idx)
+        self.pose0: Dict[str, Tuple[th.Tensor, th.Tensor]] = {}
+        self.max_disp: Dict[str, float] = {}
+        self.max_tilt: Dict[str, float] = {}
+        self.end_disp: Dict[str, float] = {}
+        self.end_tilt: Dict[str, float] = {}
+        self.contact_steps: Counter = Counter()
+        self.contact_steps_total = 0
+        self.peak_force: float = 0.0
+        self.peak_force_action: Optional[str] = None
+        self.peak_force_by_action: Dict[str, float] = {}
+        self.fixed_base: Dict[str, Optional[bool]] = {}
+        self.contact_api = None
+        self.contact_failed = False
+        self.force_failed = False
+        self.finger_links: List[Any] = []
+        self.support_links: List[Any] = []
+        self.steps = 0
+        for name, obj in self.supports.items():
+            try:
+                self.fixed_base[name] = bool(getattr(obj, "fixed_base")) if getattr(obj, "fixed_base", None) is not None else None
+            except Exception:  # noqa: BLE001
+                self.fixed_base[name] = None
+            try:
+                self.support_links += list(getattr(obj, "links", {}).values())
+            except Exception:  # noqa: BLE001
+                pass
+        try:
+            for arm in M.ARMS:
+                self.finger_links += list(getattr(robot, "finger_links", {}).get(arm, []))
+        except Exception:  # noqa: BLE001
+            self.finger_links = []
+        if not self.finger_links or not self.support_links:
+            self.contact_failed = True  # no finger / support bodies to query (no simulator): contacts not measured
+
+    def _pose(self, obj) -> Optional[Tuple[th.Tensor, th.Tensor]]:
+        try:
+            p, q = obj.get_position_orientation()
+            return p.float().clone(), q.float().clone()
+        except Exception:  # noqa: BLE001
+            return None
+
+    def observe(self, action_name: Optional[str]) -> None:
+        self.steps += 1
+        for name, obj in self.supports.items():
+            pose = self._pose(obj)
+            if pose is None:
+                continue
+            if name not in self.pose0:
+                self.pose0[name] = pose
+            p0, q0 = self.pose0[name]
+            disp = float(th.linalg.norm(pose[0] - p0))
+            up0, up = C.quat_rotate(q0, th.tensor([0.0, 0.0, 1.0])), C.quat_rotate(pose[1], th.tensor([0.0, 0.0, 1.0]))
+            tilt = math.degrees(math.acos(max(-1.0, min(1.0, float(th.dot(up, up0))))))
+            self.max_disp[name] = max(self.max_disp.get(name, 0.0), disp)
+            self.max_tilt[name] = max(self.max_tilt.get(name, 0.0), tilt)
+            self.end_disp[name], self.end_tilt[name] = disp, tilt
+        if not self.finger_links or not self.support_links or self.contact_failed:
+            return
+        action = action_name or "epilogue"
+        try:
+            if self.contact_api is None:
+                from omnigibson.utils.usd_utils import RigidContactAPI
+
+                self.contact_api = RigidContactAPI
+            pairs = self.contact_api.get_contact_pairs(self.scene_idx, self.finger_links, self.support_links, current_only=True)
+        except Exception as e:  # noqa: BLE001
+            log.warning("support load monitor: contact query failed (%r); contact steps not measured", e)
+            self.contact_failed = True
+            return
+        if not pairs:
+            return
+        self.contact_steps[action] += 1
+        self.contact_steps_total += 1
+        if self.force_failed:
+            return
+        try:
+            import omnigibson as og
+
+            view = self.contact_api._CONTACT_VIEW[self.scene_idx]
+            forces = view.get_contact_force_matrix(dt=og.sim.get_physics_dt())
+            rows = self.contact_api.get_contact_row_indices(self.scene_idx, self.finger_links)
+            cols = self.contact_api.get_contact_col_indices(self.scene_idx, self.support_links)
+            f = th.as_tensor(forces)[rows][:, cols]
+            peak = float(th.linalg.norm(f.reshape(-1, 3), dim=1).max()) if f.numel() else 0.0
+        except Exception as e:  # noqa: BLE001
+            log.warning("support load monitor: contact force read failed (%r); peak force not measured", e)
+            self.force_failed = True
+            return
+        self.peak_force_by_action[action] = max(self.peak_force_by_action.get(action, 0.0), peak)
+        if peak > self.peak_force:
+            self.peak_force, self.peak_force_action = peak, action
+
+    def report(self) -> Dict[str, Any]:
+        if not self.supports:
+            return {}
+        by_action = {a: {"contact_steps": int(n), "peak_force_N": round(self.peak_force_by_action.get(a, 0.0), 2) if not self.force_failed else None}
+                     for a, n in sorted(self.contact_steps.items(), key=lambda kv: -kv[1])}
+        return {
+            "supports": sorted(self.supports),
+            "fixed_base": dict(self.fixed_base),
+            "max_displacement_m": round(max(self.max_disp.values(), default=0.0), 5),
+            "end_displacement_m": round(max(self.end_disp.values(), default=0.0), 5),
+            "max_tilt_deg": round(max(self.max_tilt.values(), default=0.0), 4),
+            "end_tilt_deg": round(max(self.end_tilt.values(), default=0.0), 4),
+            "per_support": {n: {"max_displacement_m": round(self.max_disp.get(n, 0.0), 5), "max_tilt_deg": round(self.max_tilt.get(n, 0.0), 4)} for n in self.supports},
+            "contact_steps": None if self.contact_failed else int(self.contact_steps_total),
+            "contact_steps_by_action": None if self.contact_failed else {a: int(n) for a, n in self.contact_steps.items()},
+            "peak_force_N": None if (self.contact_failed or self.force_failed) else round(self.peak_force, 2),
+            "peak_force_action": None if (self.contact_failed or self.force_failed) else self.peak_force_action,
+            "by_action": None if self.contact_failed else by_action,
+            "steps_observed": int(self.steps),
+            "force_sampling": "last physics substep of each control step",
+        }
 
 
 @dataclass
@@ -426,6 +556,7 @@ class Executor:
         self.timings: Dict[str, float] = {}
         self.result: Dict[str, Any] = {}
         self.verdict: Optional[Verdict] = None
+        self.support_load: Optional[SupportLoad] = None  # the support loading fact (meta.support_disturbance), built by run_program
 
     # ------------------------------------------------------------------ sim access
 
@@ -471,6 +602,13 @@ class Executor:
         self.n += 1
         self.phase_steps[phase] = self.phase_steps.get(phase, 0) + 1
         self.last_obs, self.last_info = obs, info
+        if self.support_load is not None:
+            try:
+                name = self.program_actions[action_index].name if 0 <= action_index < len(self.program_actions) else None
+                self.support_load.observe(name)
+            except Exception as e:  # noqa: BLE001  (a fact, never a failure)
+                log.warning("support load monitor failed (%r); disabled", e)
+                self.support_load = None
         if self.recorder is not None:
             state = self._dump_state(full=False) if (self.cfg.record_state and self.recorder.cfg.hdf5) else None
             sim_time = None
@@ -770,10 +908,27 @@ class Executor:
 
     # ------------------------------------------------------------------ the loop
 
+    def _init_support_load(self) -> None:
+        """The support loading fact: every tracked object no program action manipulates (the table of a tabletop task)."""
+        acted = set()
+        for a in self.program_actions:
+            acted.update(getattr(a, "objects", ()) or ())
+        supports = {inst: obj for inst, obj in self.tracked.items() if inst not in acted and obj is not self.robot}
+        if not supports:
+            self.support_load = None
+            return
+        scene_idx = 0
+        try:
+            scene_idx = int(getattr(getattr(self.env, "scene", None), "idx", 0) or 0)
+        except Exception:  # noqa: BLE001
+            scene_idx = 0
+        self.support_load = SupportLoad(self.robot, supports, scene_idx=scene_idx)
+
     def run_program(self, actions: Sequence[Action]) -> Dict[str, Any]:
         t0 = time.time()
         actions = list(actions)
         self.program_actions = actions
+        self._init_support_load()
         verdict: Optional[Verdict] = None
         i = 0
         while i < len(actions):
@@ -1238,6 +1393,8 @@ class Executor:
             "binary_branch": binary_branch,
             "binary_branch_fallback": sorted(k for k, v in binary_branch.items() if v not in ("omnigibson",)),
             "binary_branch_log": branch_log,
+            # owner 2026-09-16 23:00 (fact, no verdict): the support's pose drift and the finger-support contact loading
+            "support_disturbance": self.support_load.report() if self.support_load is not None else {},
             "settled_success": settled_task,
             "settled_success_ever": int(isg.get("first_settled_success_step", -1)) >= 0,
             "first_success_step": isg.get("first_success_step"),
