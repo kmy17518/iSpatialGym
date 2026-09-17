@@ -288,6 +288,28 @@ def test_program_check_target_extraction():
     assert set(found) == {"pre_grasp", "approach", "nested.place"} and len(found["approach"]) == 3
 
 
+def test_program_check_tracker_handle_grasp_carries_nothing():
+    """Large articulation (Rs_int drawer bamfsz_1): a kind="handle" grasp must not set ``carried`` - the cabinet stays in the
+    world, only its handle link follows the hand; library / cube grasps carry their object until the place."""
+    sd = SidecarDraft("alias", "configuration_matching")
+    sd.add_stance(Stance("init", (0.0, 0.0, 0.0), 0.5))
+    tr = PC._Tracker(sd)
+
+    class A:
+        def __init__(self, name, **kw):
+            self.name = name
+            self.__dict__.update(kw)
+
+    tr.after(A("grasp", object="cabinet.n.01_1", kind="handle"))
+    assert tr.carried is None
+    tr.after(A("grasp", object="apple.n.01_1", kind="library"))
+    assert tr.carried == "apple.n.01_1"
+    tr.after(A("place", object="apple.n.01_1"))
+    assert tr.carried is None
+    tr.after(A("grasp", object="block.n.01_1", kind="cube"))
+    assert tr.carried == "block.n.01_1"
+
+
 def test_program_check_ignore_sets_mirror_the_sampler():
     """Large-scale A4/A5/A8: a brace approach runs along the wall -> the supports are removed for every waypoint (as for a
     push), the braced object only at the contact; explicit ``ignore_every`` / ``ignore_last`` on the record win."""

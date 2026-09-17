@@ -285,9 +285,59 @@ class _Tracker:
         elif name == "transition" and getattr(action, "transition", None) is not None:
             self.stance = action.transition.to
         if name == "grasp":
-            self.carried = getattr(action, "object", None)
+            # a handle grasp does not carry anything: the articulated object stays in the world and only its handle link
+            # moves with the hand along the recorded joint trajectory (large articulation, Rs_int drawer bamfsz_1: the
+            # whole cabinet was attached to the gripper and every base-follow handle pose failed)
+            self.carried = getattr(action, "object", None) if getattr(action, "kind", "library") != "handle" else None
         elif name == "place":
             self.carried = None
+
+
+def check_base_follow_handles(sidecar: SidecarDraft, sampler, action, targets: Dict[str, Any], stance: Stance, arm: str, witnesses: Dict[str, Any]) -> int:
+    """Arm-mode base-follow: every handle pose h(q_k) is IK-checked from the stance with the articulated object's joint set
+    to q_k (its link where the hand is at that step; the object itself removed at the pose like a grasped object, the
+    supports too), the joint restored afterwards. Returns the number of poses checked; witnesses per k."""
+    from ispatialgym.sampling.sim_utils import Reject
+
+    art = getattr(action, "articulation", None)
+    poses = targets.get("handle_poses") or []
+    qs = targets.get("q_values") or []
+    obj = sampler.objects.get(getattr(art, "object", None)) if art is not None else None
+    ignore = list(sampler.support_objects()) + ([obj] if obj is not None else [])
+    joint_idx = None
+    q_saved = None
+    if obj is not None and getattr(art, "joint", None) in getattr(obj, "joints", {}):
+        joint_idx = list(obj.joints.keys()).index(art.joint)
+        q_saved = obj.get_joint_positions().clone()
+    n = 0
+    try:
+        for k, pose in enumerate(poses):
+            if joint_idx is not None and k < len(qs):
+                q_all = q_saved.clone()
+                q_all[joint_idx] = float(qs[k])
+                obj.set_joint_positions(q_all)
+                obj.keep_still()
+                sampler.kit.sync_world()
+            p = _as_pose(pose)
+            res = sampler.ikc.exact([p], stance, arm, ignore_for_last=ignore, cache=False, approached=[obj] if obj is not None else [])
+            n += 1
+            if not res.ok:
+                raise Reject(res.code or "program_check_failed", f"handle_poses[{k}] (q = {qs[k] if k < len(qs) else '?'}): {res.reason} (stance {stance.name}, arm {arm})",
+                             action=getattr(action, "name", "base_follow"))
+            if res.q is not None:
+                q_pol, residual = sampler.ikc.polish_witness(res.q, p, arm, ignore=ignore)
+                margin, joint = sampler.ikc.joint_limit_margin(q_pol, arm)
+                witnesses[f"handle_poses[{k}]"] = {"pose": {"position": [round(float(v), 5) for v in p[0].tolist()], "orientation": [round(float(v), 6) for v in p[1].tolist()]},
+                                                  "q": [round(float(v), 5) for v in sampler.ikc.canonical_q(q_pol, stance).tolist()],
+                                                  "q_frame": "root at the world origin (identity pose, z = 0)", "base_pose2d": [float(v) for v in stance.base_pose2d],
+                                                  "fk_residual_m": round(residual, 5), "joint_limit_margin_rad": round(margin, 4), "joint_limit_nearest": joint,
+                                                  "joint_q": None if k >= len(qs) else float(qs[k])}
+    finally:
+        if joint_idx is not None and q_saved is not None:
+            obj.set_joint_positions(q_saved)
+            obj.keep_still()
+            sampler.kit.sync_world()
+    return n
 
 
 def _ignore_for(action, sampler, carried: Optional[str]) -> Tuple[List[Any], List[Any]]:
@@ -400,12 +450,16 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     approached = _approached_for(action, sampler)
     # push / brace contacts are made with closed pads (§3.6 contact eef poses; the gripper closes before the pre-contact)
     fingers = 0.0 if name in ("push", "brace") else None
-    # base-follow in base mode: the handle poses h(q_k) are reached by driving the base, not by the arm from the stance
+    # base-follow in base mode: the handle poses h(q_k) are reached by driving the base, not by the arm from the stance;
+    # in arm mode they are checked one by one with the articulated object at q_k (``check_base_follow_handles``), not as a
+    # chain against the object frozen at q_init (closing: the hand moves into where the open front was)
     skip_keys = set()
-    if name == "base_follow" and isinstance(targets, dict) and targets.get("mode") == "base":
+    if name == "base_follow" and isinstance(targets, dict):
         skip_keys.add("handle_poses")
     n = 0
     witnesses: Dict[str, Any] = {}
+    if name == "base_follow" and isinstance(targets, dict) and targets.get("mode") != "base":
+        n += check_base_follow_handles(sidecar, sampler, action, targets, stance, arm, witnesses)
     attach_arm = (g.arm if g is not None and g.arm else arm) if carried_obj is not None else None
     with attached(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object):
         for key, poses in iter_pose_targets(targets):
