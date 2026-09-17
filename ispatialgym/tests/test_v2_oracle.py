@@ -453,21 +453,26 @@ class FakeEnv:
         for a in M.ARMS:
             r.q[r.arm_control_idx[a]] = action[idx[f"arm_{a}"]]
             cmd = float(action[idx[f"gripper_{a}"]])
-            fingers = r.q[r.gripper_control_idx[a]]
+            fingers = r.q[r.gripper_control_idx[a]].clone()
             target = 0.05 * (max(-1.0, min(1.0, cmd)) + 1.0) / 2.0  # JoyLo smooth mode: the command is the finger target (-1 = closed, +1 = 50 mm)
             r.q[r.gripper_control_idx[a]] = fingers + th.clamp(target - fingers, -0.01, 0.01)
-            # assisted grasp: closing near an object attaches it; opening releases it. ``ag_fail_next`` refuses whole
-            # closures (open -> close transitions), like an assisted grasp that never sees both pads on the object.
-            if cmd < 0:
-                if not self._closing[a]:
+            # assisted grasp (OmniGibson's rule): the gripper "applies a grasp" whenever its position target is below the
+            # open limit; closing pads that reach an object's half width (both pads touching) attach it, the exact open
+            # command (+1) releases it. ``ag_fail_next`` refuses whole closures (open -> close transitions), like an
+            # assisted grasp that never sees both pads on the object.
+            closing = target < float(fingers.max()) - 1e-9
+            if cmd < 1.0 - 1e-6:
+                if closing and not self._closing[a]:
                     self._closing[a] = True
                     self._refuse[a] = r.ag_fail_next > 0
                     if self._refuse[a]:
                         r.ag_fail_next -= 1
-                if r._ag_obj_in_hand[a] is None and not self._refuse[a] and float(r.q[r.gripper_control_idx[a]].max()) < 0.03:
+                if closing and r._ag_obj_in_hand[a] is None and not self._refuse[a]:
                     ep, _ = r.eef_pose(a)
+                    opening = float(r.q[r.gripper_control_idx[a]].max())
                     for o in self.objects.values():
-                        if getattr(o, "graspable", True) and float(th.linalg.norm(o.pos - ep)) < 0.15:
+                        half = 0.5 * float(min(o.aabb_extent[0], o.aabb_extent[1])) if getattr(o, "aabb_extent", None) is not None else 0.03
+                        if getattr(o, "graspable", True) and float(th.linalg.norm(o.pos - ep)) < 0.15 and opening <= half + 0.002:
                             r._create_assisted_grasp_joint(a, {"target_obj": o, "target_link_name": "base_link", "joint_type": "FixedJoint"})
                             break
             else:
@@ -1435,6 +1440,123 @@ def test_gripper_closure_ramp_and_preshaped_opening():
     env.after_step = None
 
 
+def test_release_is_rate_limited_and_staged_until_the_hand_clears():
+    """Owner 2026-09-16 21:18 (nextto 0916-201902 / 0916-201730): opening moves ramp at ``gripper_open_rate``; the release
+    of a held object is staged - first to the pre-shape width (pinch / 2 + margin, or the executor's capped value), the
+    full opening deferred until the hand has moved ``gripper_release_clearance_m`` from the release pose (completed by
+    the retreat leg through ``_emit``, ending on the exact open command); a gripper holding nothing opens fully in one
+    ramp; a new gripper command supersedes a pending deferred opening; the state round-trips through the checkpoints."""
+    robot = FakeRobot()
+    env = FakeEnv(robot, {})
+    m = Motions(env, FakeBackend(robot), MotionsConfig(gripper_steps=30, settle_steps=5, cartesian_step=0.05, cartesian_rot_step=0.3))
+    idx = robot.gripper_control_idx["right"]
+    cmds = []
+    env.after_step = lambda a: cmds.append(float(a[robot.controller_action_idx["gripper_right"]]))
+    # (a) nothing held: closed -> open is one ramp of 2.25 mm per step (22 steps for 50 mm) ending on exactly +1
+    drive(env, m.gripper("right", close=True))
+    cmds.clear()
+    drive(env, m.gripper("right", close=False))
+    targets = [0.05 * (c + 1.0) / 2.0 for c in cmds]
+    ramp = [t for t in targets if t < 0.05 - 1e-9]
+    assert len(ramp) == 22 and all(abs((ramp[i + 1] - ramp[i]) - 0.00225) < 1e-6 for i in range(len(ramp) - 1)), ramp
+    assert cmds[len(ramp)] == 1.0 and cmds[-1] == 1.0 and not m.gripper_closed("right") and abs(float(robot.q[idx].max()) - 0.05) < 1e-6
+    # (b) a held object with the grasp's pre-shape remembered: the release stops at the pre-shape width, the object is
+    # still attached (the assisted grasp releases only on the full open command), the deferred opening is pending
+    ep, _ = robot.eef_pose("right")
+    marker = FakeObject("marker_xakoic_0", ep.tolist(), category="marker", extent=(0.1536, 0.0171, 0.0141))
+    env.objects["marker.n.03_1"] = marker
+    drive(env, m.gripper_opening("right", 0.5 * 0.01585 + 0.010))
+    assert m.preshape_opening["right"] == 0.017925 and not m.gripper_closed("right")
+    drive(env, m.gripper("right", close=True, rate=0.00225))
+    assert robot._ag_obj_in_hand["right"] is marker and m.gripper_closed("right")
+    cmds.clear()
+    drive(env, m.gripper("right", close=False))
+    stage = 0.017925
+    assert abs(float(robot.q[idx].max()) - stage) < 1e-6 and robot._ag_obj_in_hand["right"] is marker
+    assert not m.gripper_closed("right") and "right" in m.deferred_open and m.deferred_open["right"]["stage_m"] == stage
+    opened = [0.05 * (c + 1.0) / 2.0 for c in cmds]
+    assert max(opened) <= stage + 1e-6 and all(opened[i + 1] - opened[i] <= 0.00225 + 1e-6 for i in range(len(opened) - 1))
+    assert m.release_events[-1]["event"] == "staged" and m.release_events[-1]["source"] == "preshape" and m.release_events[-1]["stage_m"] == 0.0179
+    # the explicit release (execute_place) detaches; holding the hand still keeps the fingers at the stage (no clearance)
+    robot._ag_obj_in_hand["right"] = None
+    m.backend.detach_object("right")
+    drive(env, m.hold(40))
+    assert abs(float(robot.q[idx].max()) - stage) < 1e-6 and "right" in m.deferred_open and m.deferred_open["right"]["steps"] >= 40  # + the release's own wait steps
+    # (c) the retreat leg lifts the hand: past 3 cm the deferred opening ramps to fully open at 2.25 mm/step, exactly +1 at the end
+    cmds.clear()
+    p0, q0 = m.eef_pose("right")
+    drive(env, m.arm_along("right", [(p0 + th.tensor([0.0, 0.0, 0.10]), q0)]))
+    assert "right" not in m.deferred_open and cmds[-1] == 1.0 and abs(float(robot.q[idx].max()) - 0.05) < 1e-6
+    ev = m.release_events[-1]
+    assert ev["event"] == "full_open" and ev["by"] == "clearance" and 0.03 <= ev["started_clearance_m"] < 0.04, ev
+    opened = [0.05 * (c + 1.0) / 2.0 for c in cmds]
+    first_move = next(i for i, t in enumerate(opened) if t > stage + 1e-9)
+    assert first_move > 0 and all(opened[i + 1] - opened[i] <= 0.00225 + 1e-6 for i in range(first_move, len(opened) - 1))
+    assert "right" not in m.preshape_opening
+    # (d) the executor's sidecar-derived first stage wins over the pre-shape; a closing command supersedes a pending deferral
+    robot.ag_fail_next = 0
+    drive(env, m.gripper_opening("right", 0.030))
+    drive(env, m.gripper("right", close=True, rate=0.00225))
+    assert robot._ag_obj_in_hand["right"] is marker
+    m.release_opening["right"] = 0.021
+    drive(env, m.gripper("right", close=False))
+    assert abs(float(robot.q[idx].max()) - 0.021) < 1e-6 and m.release_events[-1]["source"] == "release_opening"
+    st = m.export_state()
+    assert st["deferred_open"]["right"]["stage_m"] == 0.021 and st["gripper_intent_closed"]["right"] is False
+    drive(env, m.gripper("right", close=True))
+    assert "right" not in m.deferred_open and m.gripper_closed("right") and float(robot.q[idx].max()) <= 0.021 + 1e-6
+    m.import_state(st)
+    assert "right" in m.deferred_open and m.deferred_open["right"]["stage_m"] == 0.021 and not m.gripper_closed("right")
+    # (e) the deferred opening completes at the latest after gripper_release_deferred_max_steps without any clearance
+    m.cfg.gripper_release_deferred_max_steps = 25
+    m.deferred_open["right"]["steps"] = 0
+    drive(env, m.hold(60))
+    assert "right" not in m.deferred_open and m.release_events[-1]["by"] == "max_steps" and abs(float(robot.q[idx].max()) - 0.05) < 1e-6
+    # (f) a pre-shape narrower than the current fingers stages nothing (the pads already clear the object)
+    drive(env, m.gripper("right", close=False))
+    env.after_step = None
+
+
+def test_place_releases_in_two_stages_and_the_retreat_completes_the_opening(tmp_path):
+    """The executor derives the first stage from the sidecar (library pinch 73.4 mm / 2 + 10 mm = 46.7 mm; capped by the
+    sampler's ``release_sweep.release_opening_max_m`` / 2 when recorded), ``execute_place`` needs no edit: its
+    ``gripper(open)`` stops at the stage and its retreat leg (10 cm along -a) completes the full opening once the hand
+    is 3 cm away; both events are in the place's notes; the object is released (the explicit release) and the demo passes."""
+    sc, env = iors_world()
+    env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
+    robot = env.robot
+    cmds = []
+    env.after_step = lambda a: cmds.append(float(a[robot.controller_action_idx["gripper_right"]]))
+    ex, motions, *_ = make_executor(env, sc, tmp_path)
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["success"], result["verdict"]
+    place = result["actions"][3]
+    assert place["name"] == "place" and abs(place["notes"]["release_stage_m"] - (0.5 * 0.0734 + 0.010)) < 1e-6
+    events = place["notes"]["release"]
+    assert [e["event"] for e in events] == ["staged", "full_open"], events
+    assert events[0]["source"] == "release_opening" and abs(events[0]["stage_m"] - round(0.5 * 0.0734 + 0.010, 4)) < 1e-6
+    assert events[1]["by"] == "clearance" and events[1]["started_clearance_m"] >= 0.03 and events[1]["clearance_m"] <= 0.10 + 1e-6
+    assert robot._ag_obj_in_hand["right"] is None and float(robot.q[robot.gripper_control_idx["right"]].max()) > 0.049
+    # the opening never jumps: every command step opens the fingers by at most 2.25 mm
+    i0 = next(i for i, c in enumerate(cmds) if c == -1.0)
+    steps = [0.05 * (b - a) / 2.0 for a, b in zip(cmds[i0:-1], cmds[i0 + 1:]) if b > a]
+    assert steps and max(steps) <= 0.00225 + 1e-6, max(steps)
+    # the sampler's release sweep caps the first stage (core 385de1e: the largest symmetric opening clearing the partner)
+    sc2, env2 = iors_world()
+    env2.evaluate = success_eval("apple.n.01_1", _place_goal(sc2), tol=0.08)
+    sc2.grasps[0].extra["release_sweep"] = {"release_opening_max_m": 0.086, "pinch_width_m": 0.0734, "clearance_at_place_m": -0.004}
+    ex2, motions2, *_ = make_executor(env2, sc2, tmp_path / "b")
+    result2 = ex2.run_program(expand(sc2.alias, sc2))
+    assert result2["success"], result2["verdict"]
+    ev2 = result2["actions"][3]["notes"]["release"]
+    assert abs(result2["actions"][3]["notes"]["release_stage_m"] - 0.043) < 1e-6 and ev2[0]["stage_m"] == 0.043 and ev2[1]["event"] == "full_open"
+    # a cap below pinch / 2 + 5 mm is not honoured (never less than 5 mm of clearance per pad)
+    assert abs(ex2.release_stage_opening(SimpleNamespace(object="apple.n.01_1", arm="right")) - 0.043) < 1e-6
+    sc2.grasps[0].extra["release_sweep"]["release_opening_max_m"] = 0.075
+    assert abs(ex2.release_stage_opening(SimpleNamespace(object="apple.n.01_1", arm="right")) - (0.5 * 0.0734 + 0.005)) < 1e-6
+    assert ex2.release_stage_opening(SimpleNamespace(object="plate.n.04_1", arm="right")) is None
+
+
 def test_grasp_preshapes_from_the_library_pinch_width_and_closes_with_the_ramp(tmp_path):
     """``execute_grasp`` pre-shapes the opening to pinch width / 2 + ``gripper_preshape_margin`` (the apple's library grasp:
     73.4 mm -> 46.7 mm per finger) before the descent and closes with ``gripper_close_rate``; both are recorded in the
@@ -1473,7 +1595,8 @@ def test_grasp_preshapes_from_the_library_pinch_width_and_closes_with_the_ramp(t
     motions2.cfg.gripper_preshape_margin = None
     result2 = ex2.run_program(expand(sc2.alias, sc2))
     assert result2["success"] and "preshape_opening_m" not in result2["actions"][1]["notes"]
-    assert not any(abs(c - pre) < 1e-6 for c in cmds)
+    before_close = cmds[: next(i for i, c in enumerate(cmds) if c == -1.0)]  # the descent runs fully open (the staged release later may use the same width)
+    assert not any(abs(c - pre) < 1e-6 for c in before_close) and before_close and max(before_close) == 1.0
 
 
 # ==========================================================================================

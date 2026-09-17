@@ -168,7 +168,7 @@ TASK_TRACKING_ATTRS = ("_first_success_step", "_first_settled_success_step", "_e
 
 #: ctx keys the execute functions write for the record (meta.json ``actions[].notes``)
 NOTE_KEYS = ("push_residual", "push_pivot_offset_m", "push_object_drift_m", "approach_finish", "descent_finish", "lift_finish", "retreat_finish", "pre_pose_standoff", "plan_relaxed_links", "push_axis", "carry_leg", "idle_arms_moved", "arms_posture", "fingers_set", "plan_ignored", "object_motion",
-             "camera_error_before_correction", "camera_error", "attached", "preshape_opening_m", "closure_rate_m_per_step")
+             "camera_error_before_correction", "camera_error", "attached", "preshape_opening_m", "closure_rate_m_per_step", "release_stage_m")
 
 
 def _jsonable(x):
@@ -627,6 +627,31 @@ class Executor:
                     out[key] = th.tensor([float(v) for v in q], dtype=th.float32)
         return out
 
+    def release_stage_opening(self, action: Place) -> Optional[float]:
+        """The first-stage opening (m per finger) of the staged release of ``action.object`` (owner 2026-09-16 21:18):
+        the library pinch width / 2 + ``MotionsConfig.gripper_preshape_margin`` (the pre-shape width, ~1 cm past the
+        pinch), capped by the sampler's ``grasps[k].release_sweep.release_opening_max_m`` / 2 (core ``385de1e``: the
+        largest symmetric opening that still clears the partner by 1 cm) and never below pinch / 2 + 5 mm. None when
+        the sidecar has no library grasp with a pinch width for the object (a cube / handle grasp): ``Motions`` then
+        falls back to the remembered pre-shape, else opens fully."""
+        g = next((g for g in (getattr(self.sidecar, "grasps", None) or []) if g.object == action.object), None)
+        if g is None:
+            return None
+        try:
+            width = (C.grasp_entry(g.grasp_key, g.grasp_name).meta or {}).get("width")
+            width = float(width)
+        except Exception:  # noqa: BLE001
+            return None
+        if not math.isfinite(width) or width <= 0:
+            return None
+        margin = getattr(self.motions.cfg, "gripper_preshape_margin", None) if self.motions is not None else None
+        stage = 0.5 * width + float(0.010 if margin is None else margin)
+        sweep = (getattr(g, "extra", None) or {}).get("release_sweep")
+        cap = sweep.get("release_opening_max_m") if isinstance(sweep, dict) else None
+        if isinstance(cap, (int, float)) and math.isfinite(float(cap)) and float(cap) > 0:
+            stage = min(stage, 0.5 * float(cap))
+        return max(stage, 0.5 * width + 0.005)
+
     def _scene_names(self, instances: Iterable[str]) -> set:
         out = set()
         for inst in instances:
@@ -649,6 +674,12 @@ class Executor:
             return v, ctx
         ctx["targets_keys"] = sorted(targets.keys())
         ctx["witnesses"] = self.witnesses_for(index)
+        if isinstance(action, Place) and self.motions is not None and hasattr(self.motions, "release_opening"):
+            # the staged release (Motions.gripper): first stage = pinch / 2 + margin, capped by the sampler's release sweep
+            stage = self.release_stage_opening(action)
+            if stage is not None:
+                self.motions.release_opening[action.arm] = stage
+            ctx["release_stage_m"] = stage
         if self.monitors is not None:
             ctx["hooks"] = {"fov": self.monitors.set_fov_enabled}
             self.monitors.begin_action(action, index, attempt, intended=self._scene_names(intended_contacts(action)), held=self.state.held_objects(),
@@ -712,6 +743,10 @@ class Executor:
             if left is not None:  # an arm_to left a small witness residual unclosed (a witness on a joint limit)
                 rec.notes["witness_residual_left"] = {"pos_m": round(float(left[0]), 4), "rot_rad": round(float(left[1]), 4)}
                 self.motions.last_witness_residual = None
+            events = list(getattr(self.motions, "release_events", None) or []) if self.motions is not None else []
+            if events:  # staged release: the first stage of this release and / or the deferred full opening a retreat completed
+                rec.notes["release"] = events
+                self.motions.release_events.clear()
             rec.attempts.append(None if verdict is None else verdict.to_dict())
             if verdict is None:
                 self._commit()
