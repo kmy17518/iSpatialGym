@@ -1084,8 +1084,10 @@ class ArticulationLarge(SamplerV2):
         footprint as a planar stand-in), base path b_{k−1} → b_k collision-checked per §3.7 with the arm locked."""
         obj = self.target
         bz = P0.base_z(self)
-        arm_idx = self.kit.robot.arm_control_idx[self.arm]
-        arm_q = q_star[arm_idx].clone()
+        # the whole step-5 configuration travels with the base: working arm at q*, the idle arm in the posture the exact
+        # IK was seeded with (A6 ``idle_posture``, e.g. tucked) and the fingers as recorded — composing "untucked" for the
+        # idle arm here collided at every b_k for the Rs_int drawer (20:14) although the stance itself was collision-free
+        arm_q = {a: q_star[self.kit.robot.arm_control_idx[a]].clone() for a in ("right", "left")}
         ks = [k for k in sorted(by_k) if k in required]
         h_eefs = [by_k[k].eef for k in ks]
         targets = base_follow_targets(h_eefs, h0.eef, manip.base_pose2d, bz)
@@ -1101,16 +1103,16 @@ class ArticulationLarge(SamplerV2):
                 if not self.kit.trav_free(b[:2]):  # §5.3: b_k on free floor (un-eroded); the room rule binds the init stance only
                     raise Reject("base_follow_infeasible", f"b_{k:g} = {[round(v, 3) for v in b]} is off the free floor")
                 self.pose_joint(by_k[k].q)
-                q_b = self.kit.q_at_base_pose(self.kit.q_config(arms="untucked", translate=trunk[0], tilt=trunk[1], **{f"{self.arm}_arm": arm_q}), *b)
+                q_b = self.kit.q_at_base_pose(q_star, *b)
                 with self.kit.ignoring([obj]):
                     free = bool(self.kit.collision_free(q_b, margin=P0.COLLISION_MARGIN)[0])
                 if not free:
-                    raise Reject("base_follow_infeasible", f"whole body collides at b_{k:g} with the target at q_{k:g}")
+                    raise Reject("base_follow_infeasible", f"whole body collides at b_{k:g} (target at q_{k:g} removed from the check)")
                 if not leaf_clear_of_base(self.moving_link_footprint(), b[:2]):
                     raise Reject("base_follow_infeasible", f"the moving link sweeps into the base footprint at q_{k:g}")
                 poses = NAV.stride_poses([prev, b], NAV.STRIDE_M)
                 with self.kit.ignoring([obj]):
-                    ok, bad = NAV.path_collision_free(self.kit, poses, trunk, "untucked", q_arms={self.arm: arm_q})
+                    ok, bad = NAV.path_collision_free(self.kit, poses, trunk, "untucked", q_arms=arm_q)
                 if not ok:
                     raise Reject("base_follow_infeasible", f"base path b -> b_{k:g} collides at stride {bad}/{len(poses)}")
                 out[fraction_key(k)] = list(b)
