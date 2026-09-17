@@ -632,3 +632,183 @@ def test_push_under_attempt_budget_rejects_time_budget_with_the_stage():
     with pytest.raises(Reject) as e:
         IL.IORSLarge._check_deadline(s, "C candidate 3 of 56 (F_goal feasible set)")
     assert e.value.reason == "time_budget" and "C candidate 3 of 56" in str(e.value) and e.value.details.get("stage", "").startswith("C candidate")
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# hybrid base-follow (§5.3 A4 / D-011 C; ``articulation_hybrid``)
+# ----------------------------------------------------------------------------------------------------------------
+
+AH = pytest.importorskip("ispatialgym.sampling.v2.tasks.articulation_hybrid")
+
+
+def test_hybrid_dense_grid_contains_the_fractions_and_bounds_the_step():
+    """The dense joint grid runs from q_init (excluded) to the last required waypoint, contains every §5.3 fraction value
+    in between and splits every interval into equal sub-steps no larger than the step (10° default), either direction."""
+    q0, q1 = 0.0, math.radians(90.0)
+    marks = [q0 + k * (q1 - q0) for k in (0.25, 0.5, 0.75, 1.0)]
+    vals = AH.dense_values(q0, q1, marks, math.radians(10.0))
+    assert vals[0] > q0 and vals[-1] == pytest.approx(q1)
+    for m in marks:
+        assert any(abs(v - m) < 1e-9 for v in vals)
+    steps = np.diff([q0] + vals)
+    assert steps.max() <= math.radians(10.0) + 1e-9 and steps.min() > 0
+    # 22.5° intervals -> 3 sub-steps of 7.5° each: 12 values
+    assert len(vals) == 12
+    # closing: descending grid, the marks still inside
+    down = AH.dense_values(q1, q0, [q1 - 0.25 * (q1 - q0)], math.radians(10.0))
+    assert down[0] < q1 and down[-1] == pytest.approx(q0) and all(np.diff(down) < 0)
+    assert AH.dense_values(0.3, 0.3, [], 0.1) == []
+    # prismatic: 5 cm steps, a 0.3 m pull with the 0.25 mark (0.075) inside
+    pv = AH.dense_values(0.0, 0.3, [0.075, 0.15, 0.225, 0.3], 0.05)
+    assert max(np.diff([0.0] + pv)) <= 0.05 + 1e-9 and any(abs(v - 0.075) < 1e-9 for v in pv)
+
+
+def test_hybrid_candidates_ordered_by_displacement_and_deduped():
+    b_prev = (1.0, 2.0, 0.0)
+    b_rigid = (1.4, 2.3, 0.6)  # the rigid-sweep pose 0.5 m / 0.6 rad away
+    cands = AH.lattice_candidates(b_prev, b_rigid, 0.10, 0.30, math.radians(15.0), math.radians(15.0), 0.3, alphas=[0.25, 0.5, 1.0])
+    costs = [c[0] for c in cands]
+    assert costs == sorted(costs) and all(c[0] > 0 for c in cands)  # b_prev itself is not a candidate
+    tags = [c[2] for c in cands]
+    assert "alpha=0.25" in tags and "alpha=1" in tags and "lattice" in tags
+    # the alpha poses interpolate position and yaw together
+    a = next(c for c in cands if c[2] == "alpha=0.5")
+    assert a[1] == pytest.approx((1.2, 2.15, 0.3))
+    # no duplicates (5 mm / 0.5° key), every lattice position within the radius, yaws between the current and the rigid yaw ± 15°
+    keys = {(round(c[1][0], 3), round(c[1][1], 3), round(c[1][2], 3)) for c in cands}
+    assert len(keys) == len(cands)
+    for _, p, tag in cands:
+        if tag == "lattice":
+            assert math.hypot(p[0] - 1.0, p[1] - 2.0) <= 0.30 + 1e-9
+            assert -math.radians(15.0) - 1e-9 <= p[2] <= 0.6 + math.radians(15.0) + 1e-9
+    yaws = AH.yaw_candidates(0.0, 0.6, math.radians(15.0), math.radians(15.0))
+    assert yaws[0] == 0.0 and pytest.approx(0.6) in [pytest.approx(y) for y in yaws] and min(yaws) == pytest.approx(-math.radians(15.0))
+    # the displacement cost weighs the yaw at w metres per radian
+    assert AH.displacement_cost((0, 0, 0), (0.3, 0.4, 1.0), 0.3) == pytest.approx(0.5 + 0.3)
+    assert AH.pose2d_lerp((0, 0, math.pi - 0.1), (0, 0, -math.pi + 0.1), 0.5)[2] == pytest.approx(math.pi, abs=1e-6) or \
+        AH.pose2d_lerp((0, 0, math.pi - 0.1), (0, 0, -math.pi + 0.1), 0.5)[2] == pytest.approx(-math.pi, abs=1e-6)  # shortest way through ±π
+
+
+def test_hybrid_planar_stand_ins():
+    boxes = [(0.0, 0.0, 1.0, 0.5)]
+    assert AH.disc_clear_of_boxes((1.5, 0.25), 0.3, boxes)  # 0.5 m from the box edge
+    assert not AH.disc_clear_of_boxes((1.2, 0.25), 0.3, boxes)  # 0.2 m from the edge < 0.3
+    assert not AH.disc_clear_of_boxes((0.5, 0.25), 0.3, boxes)  # inside
+    assert AH.disc_clear_of_boxes((1.25, 0.75), 0.3, boxes)  # diagonal: 0.25, 0.25 -> 0.354 > 0.3
+    assert AH.leaf_clear_of_base(th.tensor([[1.0, 1.0], [1.2, 1.0]]), (0.0, 0.0), 0.33)
+    assert not AH.leaf_clear_of_base(th.tensor([[0.2, 0.1]]), (0.0, 0.0), 0.33)
+    assert AH.leaf_clear_of_base(th.zeros(0, 2), (0.0, 0.0), 0.33)
+
+
+def _hybrid_poses():
+    q_init, q_goal = 0.0, 1.2
+    poses = [AH.FollowPose(0.0, q_init, (4.05, -1.45, math.pi), [0.1] * 7, chosen="stance")]
+    for k, chosen, step in ((0.25, "arm_only", 0.0), (0.5, "alpha=0.5", 0.2), (0.75, "lattice", 0.1), (1.0, "arm_only", 0.0)):
+        prev = poses[-1].base_pose2d
+        b = (prev[0] + step, prev[1] - step / 2, prev[2] - step)
+        poses.append(AH.FollowPose(k, q_init + k * (q_goal - q_init), b, [0.1 + k] * 7, fk_residual_m=0.0005, joint_limit_margin_rad=0.2,
+                                   base_step_m=math.hypot(step, step / 2), base_step_rad=step, chosen=chosen, n_ik=3))
+    return q_init, q_goal, poses
+
+
+def test_hybrid_path_records_mirror_the_drawer_base_follow():
+    q_init, q_goal, poses = _hybrid_poses()
+    marks = {"0.25": 0.3, "0.5": 0.6, "0.75": 0.9, "1.0": 1.2}
+    bf = AH.base_follow_dict(poses, marks)
+    assert set(bf) == set(marks) and bf["0.5"] == list(poses[2].base_pose2d)
+    # only the followed fractions are recorded (the passive continuation has no base pose)
+    assert set(AH.base_follow_dict(poses[:3], marks)) == {"0.25", "0.5"}
+    st = AH.path_stats(poses, q_init, q_goal)
+    assert st["n_poses"] == 5 and st["n_base_moves"] == 2 and st["followed_fraction"] == 1.0 and st["arm_only_fraction"] == 0.5
+    hp = AH.HybridPath("right", (0.5, -0.2), poses, bf, "left", [0.0] * 7, 0.05, {"revolute_rad": math.radians(10.0)}, st, AH.knobs(None))
+    block = hp.to_sidecar()
+    assert block["mode"] == "hybrid" and block["poses"][0]["k"] == 0.0 and len(block["poses"][2]["arm_q"]) == 7 and block["poses"][2]["chosen"] == "alpha=0.5"
+    assert block["knobs"]["step_revolute_deg"] == 10.0 and "record_eef" not in block["knobs"]
+    # generation.hybrid_follow overrides the defaults
+    assert AH.knobs({"lattice_radius_m": 0.8, "budget_s": None})["lattice_radius_m"] == 0.8 and AH.knobs({"budget_s": None})["budget_s"] == 600.0
+
+
+def test_hybrid_sidecar_schema_and_base_follow_targets(tmp_path):
+    """The oracle's sidecar accepts ``follow_mode: hybrid`` (``base_follow`` per followed fraction as in base mode plus the
+    dense ``base_follow_path``); ``BaseFollow.targets()`` returns the recorded base poses and the dense path (a pure read);
+    the program-check tracker continues from the path's end for the retreat."""
+    import json
+    import os
+
+    from ispatialgym.oracle import programs as PR
+    from ispatialgym.oracle.sidecar import Sidecar
+    from ispatialgym.sampling.v2 import program_check as PC
+    from ispatialgym.sampling.v2.stances import SidecarDraft
+
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    d = json.load(open(os.path.join(here, "tests", "data", "sidecars", "configuration_matching-articulation_open_large_scale.json")))
+    art = d["articulation"]
+    q_init, q_goal, poses = _hybrid_poses()
+    art["q_init"], art["q_goal"] = q_init, q_goal
+    marks = {"0.25": 0.3, "0.5": 0.6, "0.75": 0.9, "1.0": 1.2}
+    art["follow_mode"] = "hybrid"
+    art["base_follow"] = AH.base_follow_dict(poses, marks)
+    art["base_follow_path"] = AH.HybridPath("right", (0.5, -0.2), poses, art["base_follow"], step={"revolute_rad": 0.17}).to_sidecar()
+    sc = Sidecar.from_dict(d)
+    assert sc.problems() == [], sc.problems()
+    actions = PR.expand(sc.alias, sc)
+    follow = next(a for a in actions if a.name == "base_follow")
+    t = follow.targets(sc, None)
+    assert t["mode"] == "hybrid" and set(t) == set(follow.TARGET_KEYS)
+    # passive_from 0.75: the oracle drives through 0.25 / 0.5 / 0.75 with the recorded (not the rigid-sweep) base poses
+    assert t["fractions"] == [0.25, 0.5, 0.75] and t["base_poses"] == [art["base_follow"][k] for k in ("0.25", "0.5", "0.75")]
+    assert len(t["follow_path"]) == 5 and t["follow_path"][0]["k"] == 0.0 and len(t["follow_path"][3]["arm_q"]) == 7
+    fine, numbers = follow.annotate(sc)
+    assert "driving the base and moving the arm together" in fine
+    # a hybrid record without the dense path, or with a path that does not start at the grasp, is a problem
+    d2 = json.loads(json.dumps(d))
+    del d2["articulation"]["base_follow_path"]
+    assert any("base_follow_path" in p for p in Sidecar.from_dict(d2).problems())
+    d3 = json.loads(json.dumps(d))
+    d3["articulation"]["base_follow_path"]["poses"][0]["k"] = 0.1
+    assert any("k = 0" in p for p in Sidecar.from_dict(d3).problems())
+    # the tracker: after a hybrid base_follow the retreat is checked from the follow's end configuration
+    draft = SidecarDraft.from_dict(d) if hasattr(SidecarDraft, "from_dict") else None
+    tracker = PC._Tracker(draft) if draft is not None else None
+    if tracker is not None:
+        w = {"follow_end": {"base_pose2d": list(poses[-1].base_pose2d), "q": [0.0] * 28, "translate": 0.5, "tilt": -0.2, "arm": "right"}}
+        tracker.after(follow, w, None)
+        assert tracker.stance_obj is not None and tuple(tracker.stance_obj.base_pose2d) == poses[-1].base_pose2d and tracker.stance_obj.working_arms == ["right"]
+        tracker.after(actions[0], {}, None)  # the transition / navigate that follows clears it
+    st = AH.end_stance_from_witness({"base_pose2d": [1.0, 2.0, 0.3], "q": [0.0] * 28, "translate": 0.4, "tilt": 0.1, "arm": "left"})
+    assert st.base_pose2d == (1.0, 2.0, 0.3) and st.translate == 0.4 and st.working_arms == ["left"] and st.q is not None
+    assert AH.end_stance_from_witness({}) is None
+
+
+def test_hybrid_leaf_footprint_moves_with_the_joint():
+    """The oriented leaf footprint: the closed leaf's AABB corners rotated about the hinge by q − q_ref (the same
+    convention as ``handle_waypoints``), or translated along a prismatic axis; a slab at 90° stands perpendicular to the
+    closed slab instead of filling the world AABB of the rotated leaf."""
+
+    class _Link:
+        def __init__(self, lo, hi):
+            self.aabb = (th.tensor(lo), th.tensor(hi))
+
+    # a 0.8 m wide, 4 cm thick leaf hinged at its left edge (x = 0), closed along +x, world frame = object frame
+    leaf = {"leaf": _Link([0.0, -0.02, 0.0], [0.8, 0.02, 2.0])}
+    jinfo = {"type": "RevoluteJoint", "axis_dir_obj": [0.0, 0.0, 1.0], "hinge_point_obj": [0.0, 0.0, 0.0]}
+    fp = AH.LeafFootprint(None, leaf, jinfo, (th.zeros(3), C.IDENTITY_QUAT.clone()), q_ref=0.0)
+    assert fp.analytic
+    closed = fp.at(0.0)
+    assert closed.shape == (8, 2) and closed[:, 0].max() == pytest.approx(0.8) and abs(closed[:, 1]).max() == pytest.approx(0.02)
+    open90 = fp.at(math.pi / 2)
+    assert open90[:, 1].max() == pytest.approx(0.8, abs=1e-5) and abs(open90[:, 0]).max() == pytest.approx(0.02, abs=1e-5)
+    # a base 0.5 m in front of the closed leaf's middle is clear when closed, hit by the leaf at 90° when it stands in the swing
+    assert AH.leaf_clear_of_base(closed, (0.4, -0.5), 0.33)
+    assert not AH.leaf_clear_of_base(open90, (0.1, 0.5), 0.33)
+    # the same object frame rotated in the world: the footprint follows the object pose
+    fp2 = AH.LeafFootprint(None, leaf, jinfo, (th.tensor([2.0, 1.0, 0.0]), C.quat_from_yaw(math.pi / 2)), q_ref=0.0)
+    # (the link AABBs are world boxes already; only the hinge / axis are mapped) -> the hinge is at (2, 1), the axis still vertical
+    assert th.allclose(fp2.hinge_w, th.tensor([2.0, 1.0, 0.0]), atol=1e-6) and abs(float(fp2.axis_w[2])) == pytest.approx(1.0)
+    # prismatic: translated along the axis
+    fpp = AH.LeafFootprint(None, leaf, {"type": "PrismaticJoint", "axis_dir_obj": [0.0, -1.0, 0.0]}, (th.zeros(3), C.IDENTITY_QUAT.clone()), q_ref=0.0)
+    pulled = fpp.at(0.3)
+    assert pulled[:, 1].min() == pytest.approx(-0.32) and pulled[:, 1].max() == pytest.approx(-0.28)
+    # no hinge on a revolute record -> not analytic, the fallback (the sampler's AABB at q) is returned
+    fpn = AH.LeafFootprint(None, leaf, {"type": "RevoluteJoint", "axis_dir_obj": [0.0, 0.0, 1.0]}, (th.zeros(3), C.IDENTITY_QUAT.clone()), q_ref=0.0)
+    assert not fpn.analytic and fpn.at(0.5, fallback=th.tensor([[1.0, 2.0, 0.0]])).tolist() == [[1.0, 2.0]]

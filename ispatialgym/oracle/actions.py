@@ -979,12 +979,19 @@ class BaseFollow(Action):
     q_goal. Postcondition: joint at q_goal, or ``passive_from`` reached and the joint continued passively.
 
     targets: ``{"mode": str, "fractions": [k, ...], "q_values": [q_k, ...], "handle_poses": [Pose, ...],
-    "base_poses": [[x, y, yaw], ...] | None}`` — ``handle_poses`` = ``conventions.handle_eef`` of the recorded
-    h(q_k) records (``articulation.waypoints[k]``: the ``contact`` / ``approach`` / ``pinch`` the sampler's
-    ``handle_waypoints(handle, joint_info, q_values, obj_pose)`` produced, in the world frame — the sidecar carries
-    those outputs, not the handle annotation / joint info, so the eef is re-derived from the records, never from
-    ``handle_waypoints``); ``base_poses`` (base mode) = ``base_follow_poses(handle_poses, T_eef_base)`` with
+    "base_poses": [[x, y, yaw], ...] | None, "follow_path": [...] | None}`` — ``handle_poses`` = ``conventions.handle_eef``
+    of the recorded h(q_k) records (``articulation.waypoints[k]``: the ``contact`` / ``approach`` / ``pinch`` the
+    sampler's ``handle_waypoints(handle, joint_info, q_values, obj_pose)`` produced, in the world frame — the sidecar
+    carries those outputs, not the handle annotation / joint info, so the eef is re-derived from the records, never
+    from ``handle_waypoints``); ``base_poses`` (base mode) = ``base_follow_poses(handle_poses, T_eef_base)`` with
     ``T_eef_base = eef_base_transform(h(q_init) eef, stance base pose)`` (the arm locked at its grasp solution).
+
+    ``"hybrid"`` (sampler ``articulation_hybrid``, D-011 C): ``base_poses`` = the **recorded** ``articulation.base_follow[k]``
+    per followed fraction (the base does not orbit rigidly: the arm re-solves per pose), and ``follow_path`` = the dense
+    ``articulation.base_follow_path.poses[]`` records ``{"k", "q", "base_pose2d": [x, y, yaw], "arm_q": [7 arm joints],
+    "eef": {position, orientation}}`` from the grasp (k = 0, the manipulation stance) to the last followed waypoint — the
+    executor drives the base along ``base_pose2d`` and moves the arm joints to ``arm_q`` **together** (both interpolated
+    over the same segment) so the eef stays on the handle arc; no re-planning.
     """
 
     name: str = "base_follow"
@@ -993,7 +1000,7 @@ class BaseFollow(Action):
     stance: Stance
     grasp_action: Grasp
     direction: str = "move"
-    TARGET_KEYS = ("mode", "fractions", "q_values", "handle_poses", "base_poses")
+    TARGET_KEYS = ("mode", "fractions", "q_values", "handle_poses", "base_poses", "follow_path")
 
     def __post_init__(self):
         self.arms = (self.arm,)
@@ -1009,16 +1016,29 @@ class BaseFollow(Action):
         fractions = [f for f, _ in followed]
         handle_poses = [_handle_eef(C, art.waypoints[key]) for _, key in followed]
         base_poses = None
+        follow_path = None
         if art.follow_mode == "base":
             eef0 = self.grasp_action.grasp_pose(sidecar, state)
             t_eef_base = _as_pose(C.eef_base_transform(eef0.tensors(), _yaw_pose(self.stance.base_pose2d).tensors()))
             base_poses = _as_pose2d_list(C.base_follow_poses([p.tensors() for p in handle_poses], t_eef_base.tensors()))
+        elif art.follow_mode == "hybrid":
+            if not art.base_follow:
+                raise SidecarError("base_follow: follow_mode 'hybrid' needs the recorded base_follow[k] poses")
+            missing = [key for _, key in followed if key not in art.base_follow]
+            if missing:
+                raise SidecarError(f"base_follow: no recorded base pose for the followed waypoints {missing}")
+            base_poses = [[float(v) for v in art.base_follow[key]] for _, key in followed]
+            path = (art.extra or {}).get("base_follow_path") or {}
+            follow_path = [dict(p) for p in (path.get("poses") or [])]
+            if len(follow_path) < 2:
+                raise SidecarError("base_follow_path.poses: follow_mode 'hybrid' needs the recorded dense path (>= 2 poses)")
         return {
             "mode": art.follow_mode,
             "fractions": fractions,
             "q_values": [art.q_at(f) for f in fractions],
             "handle_poses": handle_poses,
             "base_poses": base_poses,
+            "follow_path": follow_path,
         }
 
     def end_pose(self, sidecar, state):
@@ -1027,7 +1047,7 @@ class BaseFollow(Action):
     def annotate(self, sidecar):
         art = self.articulation
         obj = sidecar.language.phrase(art.object)
-        how = "driving the base" if art.follow_mode == "base" else "moving the arm"
+        how = {"base": "driving the base", "hybrid": "driving the base and moving the arm together"}.get(art.follow_mode, "moving the arm")
         fine = f"{self.direction} {obj} by {how} while holding its handle with the {_hand(self.arm)}"
         if art.joint_type == "prismatic":
             span = f"{art.q_init:.2f} m to {art.q_goal:.2f} m ({_cm(art.q_goal - art.q_init)})"

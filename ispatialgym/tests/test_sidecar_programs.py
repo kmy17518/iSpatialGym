@@ -495,7 +495,10 @@ def test_direction_words():
 
 def _check_value(key, value, where):
     if value is None:
-        assert key in ("base_poses", "carried"), where
+        assert key in ("base_poses", "carried", "follow_path"), where  # follow_path: hybrid base-follow only
+        return
+    if key == "follow_path":
+        assert isinstance(value, list) and len(value) >= 2 and all(len(p["base_pose2d"]) == 3 and len(p["arm_q"]) == 7 for p in value), where
         return
     if isinstance(value, Pose):
         assert len(value.position) == 3 and len(value.orientation) == 4, where

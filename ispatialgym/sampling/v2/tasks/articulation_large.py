@@ -51,6 +51,7 @@ from ispatialgym.sampling.v2 import navigation as NAV
 from ispatialgym.sampling.v2 import prompt0 as P0
 from ispatialgym.sampling.v2.core import SamplerV2, register
 from ispatialgym.sampling.v2.stances import FaceFrame, Stance
+from ispatialgym.sampling.v2.tasks import articulation_hybrid as AH
 
 log = logging.getLogger("ispatialgym.sampling.v2")
 
@@ -703,13 +704,18 @@ class ArticulationLarge(SamplerV2):
         off_left = float(th.dot((contact - Pc)[:2], self.face_view.tangent))
         self.arm = arm_rule(off_left, float(self.gp.gen("arm_side_threshold_m", 0.10)), self.gp.gen("arm", "auto"))
         axis_world = G.rotate(self.obj_pose()[1], th.as_tensor(self.jinfo["axis_dir_obj"], dtype=th.float32))
-        # A4 (owner decision 2026‑09‑16): class → follow mode / stance side / arm
+        # A4 (owner decision 2026‑09‑16): class → follow mode / stance side / arm; ``generation.follow_mode_override``
+        # (arm / base / hybrid) wins (D-011 C, 2026‑09‑17: the hybrid follow on the door units, ``articulation_hybrid``)
         self.door_class = door_class(obj.category, self.jinfo["type"])
         self.mode = follow_mode_by_class(self.door_class, self.jinfo["type"], axis_world)
+        override = self.gp.gen("follow_mode_override")
+        if override in ("arm", "base", "hybrid"):
+            self.mode = str(override)
         lam_cfg = self.gp.gen("lateral_range_m") or {"right": [-0.10, 0.60], "left": [-0.60, 0.10]}
         self.lam_range = tuple(lam_cfg[self.arm]) if isinstance(lam_cfg, dict) else tuple(lam_cfg)
         self.hinge_side = None
-        if self.door_class == "cabinet" and axis_is_vertical(axis_world) and self.jinfo.get("hinge_point_obj") is not None:
+        # the hinge-side stance rule serves the arm-only follow; the hybrid follow moves the base and keeps the full Λ
+        if self.door_class == "cabinet" and self.mode == "arm" and axis_is_vertical(axis_world) and self.jinfo.get("hinge_point_obj") is not None:
             hinge_w = G.local_points_world(th.as_tensor([self.jinfo["hinge_point_obj"]], dtype=th.float32), self.obj_pose())[0]
             self.hinge_side = hinge_side(hinge_w, contact, self.face_view.tangent)
             lam_max = max(abs(float(v)) for v in self.lam_range) if self.lam_range else 0.60
@@ -723,10 +729,6 @@ class ArticulationLarge(SamplerV2):
                                     "door_class": self.door_class, "hinge_side": self.hinge_side, "lateral_range_m": list(self.lam_range)})
         log.info("%s: %s/%s %s: class %s, S=%s, arm %s (handle %.2f m left of the face centre, hinge %s), follow_mode %s, Λ %s", self.gp.alias, obj.name,
                  self.joint_name, self.direction, self.door_class, [round(s, 3) for s in self.stable], self.arm, off_left, self.hinge_side, self.mode, self.lam_range)
-        if self.mode == "hybrid":
-            # A4: room doors follow with base poses re-chosen per handle waypoint (free floor near the current base, arm
-            # IK feasible, minimum displacement) — not implemented yet (owner: after the pilot if time is short)
-            raise Reject("room_door_hybrid_todo", f"{obj.name}/{self.joint_name}: class room_door needs the hybrid base-follow (§5.3 A4), not implemented")
 
     def stable_set(self) -> List[float]:
         """§5.3 stable set S: 7 fractions of ``open_fraction_range`` + the upper limit, each held 120 steps and kept when
@@ -1069,20 +1071,25 @@ class ArticulationLarge(SamplerV2):
         # base mode = the base-follow pose b_k passes its checks (arm-only IK recorded separately as the per-waypoint
         # fallback); arm mode = the arm-only IK
         base_follow: Optional[Dict[str, List[float]]] = None
+        follow_path: Optional[Dict[str, Any]] = None  # hybrid: the dense base + arm path (``articulation.base_follow_path``)
         mode, base_follow_reason = self.mode, None
-        if mode == "base":
+        if mode in ("base", "hybrid"):
             try:
-                base_follow = self._base_follow(manip, q_star, h0, by_k, required, q_init)
+                if mode == "hybrid":
+                    hp = AH.search_follow_path(self, manip, q_star, h0, q_init, q_goal, fractions, required, fraction_key)
+                    base_follow, follow_path = hp.base_follow, hp.to_sidecar(bool(self.gp.gen("hybrid_follow_record_eef", True)))
+                else:
+                    base_follow = self._base_follow(manip, q_star, h0, by_k, required, q_init)
             except Reject as e:
-                # the rigid eef->base sweep about the hinge is blocked (a door next to furniture): the oracle's secondary
-                # mode carries the instance when the arm alone reaches every required waypoint (§5.3 "arm-only IK at each
-                # waypoint ... as the oracle's secondary mode"); otherwise the candidate is rejected
+                # the rigid eef->base sweep about the hinge is blocked (a door next to furniture) / no hybrid path: the
+                # oracle's secondary mode carries the instance when the arm alone reaches every required waypoint (§5.3
+                # "arm-only IK at each waypoint ... as the oracle's secondary mode"); otherwise the candidate is rejected
                 if all(arm_reach.get(fraction_key(k), False) for k in required):
                     mode, base_follow, base_follow_reason = "arm", None, f"{e.reason}: {e}"
-                    log.info("%s: base-follow blocked (%s); the arm reaches every required waypoint -> follow_mode arm", self.gp.alias, e)
+                    log.info("%s: %s-follow blocked (%s); the arm reaches every required waypoint -> follow_mode arm", self.gp.alias, self.mode, e)
                 else:
                     raise
-        if mode == "base":
+        if mode in ("base", "hybrid"):
             handle_reach = {fraction_key(k): (fraction_key(k) in base_follow) or arm_reach[fraction_key(k)] for k in fractions}
         else:
             handle_reach = dict(arm_reach)
@@ -1108,6 +1115,8 @@ class ArticulationLarge(SamplerV2):
                                      # A4: the class and the stance-side rule behind the follow mode; the goal set of this stance
                                      "door_class": self.door_class, "hinge_side": self.hinge_side, "goal_set": [float(s) for s in (goal_set or self.stable)],
                                      "reachable_fraction": reach_info.get("reachable_fraction"), "q_reach": reach_info.get("q_reach")}
+        if follow_path is not None:
+            self.sidecar.articulation["base_follow_path"] = follow_path
         self.sidecar.describe(tname, obj.category.replace("_", " "))
         # draft: joints only (nothing spawned), robot at the init stance, the moving link held while settling
         d = Draft()
@@ -1133,6 +1142,8 @@ class ArticulationLarge(SamplerV2):
         d.summary["base_follow"] = base_follow
         d.summary["follow_mode"] = mode
         d.summary["base_follow_blocked"] = base_follow_reason
+        if follow_path is not None:
+            d.summary["hybrid_follow"] = dict(follow_path.get("stats") or {})
         return d
 
     def _base_follow(self, manip: Stance, q_star: th.Tensor, h0: C.HandleWaypoint, by_k: Dict[float, C.HandleWaypoint], required: List[float],

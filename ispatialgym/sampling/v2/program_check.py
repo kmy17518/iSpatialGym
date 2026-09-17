@@ -238,7 +238,7 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
             raise Reject("program_check_failed", f"targets() failed: {e!r}", action=name)
         stance_name, carried = tracker.before(action)
         locked = tracker.locked_arms(action)
-        n, witnesses = check_action_targets(sidecar, sampler, action, targets, stance_name, carried, locked_arms=locked)
+        n, witnesses = check_action_targets(sidecar, sampler, action, targets, stance_name, carried, locked_arms=locked, stance_obj=tracker.stance_obj)
         tracker.after(action, witnesses, sampler)
         entry = {"index": i, "name": name, "arms": list(getattr(action, "arms", ()) or []), "objects": list(getattr(action, "objects", ()) or []),
                  "stance": stance_name, "carried": carried, "n_poses": n, "witnesses": witnesses}
@@ -268,6 +268,9 @@ class _Tracker:
         self.sidecar = sidecar
         #: arm -> its 7 arm-joint values while it braces (from the brace action's ``contact`` witness)
         self.arm_q: Dict[str, th.Tensor] = {}
+        #: where the robot stands after a hybrid ``base_follow`` (the base moved off the manipulation stance): the in-memory
+        #: stance the following actions (the retreat) are checked from, until the next navigate / transition
+        self.stance_obj: Optional[Stance] = None
 
     def locked_arms(self, action) -> Dict[str, th.Tensor]:
         """The arms held at a contact configuration while ``action`` runs (never the acting arm itself)."""
@@ -296,8 +299,15 @@ class _Tracker:
         name = getattr(action, "name", "")
         if name == "navigate" and getattr(action, "path", None) is not None:
             self.stance = action.path.to
+            self.stance_obj = None
         elif name == "transition" and getattr(action, "transition", None) is not None:
             self.stance = action.transition.to
+            self.stance_obj = None
+        elif name == "base_follow" and witnesses and witnesses.get("follow_end"):
+            # hybrid follow: the base ends where the recorded path ends (``articulation_hybrid.check_program_follow``)
+            from ispatialgym.sampling.v2.tasks import articulation_hybrid as AH
+
+            self.stance_obj = AH.end_stance_from_witness(witnesses["follow_end"])
         if name == "grasp":
             # a handle grasp does not carry anything: the articulated object stays in the world and only its handle link
             # moves with the hand along the recorded joint trajectory (large articulation, Rs_int drawer bamfsz_1: the
@@ -452,7 +462,7 @@ def _explicit_ignores(rec, sampler) -> Optional[Tuple[List[Any], List[Any]]]:
 
 
 def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, stance_name: str, carried: Optional[str],
-                         locked_arms: Optional[Dict[str, th.Tensor]] = None) -> Tuple[int, Dict[str, Any]]:
+                         locked_arms: Optional[Dict[str, th.Tensor]] = None, stance_obj: Optional[Stance] = None) -> Tuple[int, Dict[str, Any]]:
     """IK / collision check of every eef pose / waypoint list in ``targets`` from the recorded stance ``stance_name``
     (its recorded configuration: working arm untucked, idle arm in its posture, trunk of the stance) with the ``carried``
     object attached to the carrying arm and posed in the hand. Base-pose targets (paths, transitions, base-follow) are
@@ -463,7 +473,10 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     action runs (the brace arm at its contact during the push and the push arm's retreat): those arms are **locked at
     that configuration** for every IK / collision check here — a two-arm exact IK as the wall / axial modules solve it —
     instead of the stance's idle posture; a pre-pose without a solution in that world is a rejection
-    (``program_check_failed``), never a witness the oracle has to plan through the braced arm."""
+    (``program_check_failed``), never a witness the oracle has to plan through the braced arm.
+
+    ``stance_obj``: an in-memory stance that replaces the recorded ``stance_name`` — where a hybrid ``base_follow`` left
+    the base (``_Tracker.stance_obj``), so the retreat after it is checked from there."""
     from ispatialgym.sampling.sim_utils import Reject
     from ispatialgym.sampling.v2 import navigation as NAV
     from ispatialgym.sampling.v2.navigation import attached
@@ -471,7 +484,9 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     name = getattr(action, "name", type(action).__name__)
     arms = list(getattr(action, "arms", ()) or ["right"])
     arm = arms[0]
-    stance: Stance = sidecar.stance(stance_name)
+    stance: Stance = stance_obj if stance_obj is not None else sidecar.stance(stance_name)
+    if stance_obj is not None:
+        stance_name = f"{stance_name} -> {stance_obj.name} {[round(float(v), 3) for v in stance_obj.base_pose2d]}"
     locked = {a: q for a, q in (locked_arms or {}).items() if a != arm}
     carried_obj = sampler.objects.get(carried) if carried else None
     g = sidecar.grasp_of(carried) if carried else None
@@ -490,7 +505,12 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
         skip_keys.add("handle_poses")
     n = 0
     witnesses: Dict[str, Any] = {}
-    if name == "base_follow" and isinstance(targets, dict) and targets.get("mode") != "base":
+    if name == "base_follow" and isinstance(targets, dict) and targets.get("mode") == "hybrid":
+        # hybrid follow: the recorded dense base + arm path is verified pose by pose (``articulation_hybrid``)
+        from ispatialgym.sampling.v2.tasks import articulation_hybrid as AH
+
+        n += AH.check_program_follow(sidecar, sampler, action, targets, stance, arm, witnesses)
+    elif name == "base_follow" and isinstance(targets, dict) and targets.get("mode") != "base":
         n += check_base_follow_handles(sidecar, sampler, action, targets, stance, arm, witnesses)
     attach_arm = (g.arm if g is not None and g.arm else arm) if carried_obj is not None else None
     # the IK seed / locked-joint source: the stance configuration, with every arm that holds a contact put at it

@@ -36,7 +36,9 @@ from ispatialgym import ASSETS_ROOT
 
 SCHEMA = "isg-oracle-v1"
 ARMS = ("left", "right")
-FOLLOW_MODES = ("base", "arm")
+#: ``hybrid`` (sampler ``articulation_hybrid``, D-011 C 2026-09-17): ``base_follow`` as in base mode plus the dense
+#: ``base_follow_path.poses[]`` (``q``, ``base_pose2d``, ``arm_q``) the executor drives + tracks together
+FOLLOW_MODES = ("base", "arm", "hybrid")
 PATH_MODES = ("local", "global")
 JOINT_TYPES = ("revolute", "prismatic")
 FACE_PAIRS = ("x", "y", "z")
@@ -1332,9 +1334,9 @@ def _articulation_problems(art: Articulation) -> List[str]:
         for f, key in art.followed_fractions():
             if not art.handle_reach.get(key, False):
                 out.append(f"{w}.handle_reach[{key!r}]: a waypoint the oracle drives through is recorded unreachable")
-    if art.follow_mode == "base":
+    if art.follow_mode in ("base", "hybrid"):
         if art.base_follow is None:
-            out.append(f"{w}.base_follow: required in follow_mode 'base'")
+            out.append(f"{w}.base_follow: required in follow_mode {art.follow_mode!r}")
         else:
             for key in art.base_follow:
                 if key not in art.waypoints:
@@ -1345,6 +1347,38 @@ def _articulation_problems(art: Articulation) -> List[str]:
                         out.append(f"{w}.base_follow: no base pose for waypoint {key!r}")
     elif art.base_follow is not None:
         out.append(f"{w}.base_follow: present but follow_mode is {art.follow_mode!r}")
+    if art.follow_mode == "hybrid":
+        out.extend(_follow_path_problems(art.extra.get("base_follow_path"), f"{w}.base_follow_path"))
+    return out
+
+
+def _follow_path_problems(path: Any, w: str) -> List[str]:
+    """The hybrid follow's dense path: ``poses[]`` (>= 2) of ``{q, base_pose2d [x, y, yaw], arm_q [7 joints]}``, the
+    first pose at the manipulation stance (``k`` 0), ``k`` non-decreasing."""
+    if not isinstance(path, dict):
+        return [f"{w}: required in follow_mode 'hybrid' (a dict with poses[])"]
+    poses = path.get("poses")
+    if not isinstance(poses, list) or len(poses) < 2:
+        return [f"{w}.poses: expected a list of >= 2 poses"]
+    out: List[str] = []
+    prev_k = None
+    for i, p in enumerate(poses):
+        if not isinstance(p, dict):
+            out.append(f"{w}.poses[{i}]: expected a dict")
+            continue
+        for key, n in (("base_pose2d", 3), ("arm_q", 7)):
+            v = p.get(key)
+            if not isinstance(v, (list, tuple)) or len(v) != n or not all(isinstance(x, (int, float)) and math.isfinite(float(x)) for x in v):
+                out.append(f"{w}.poses[{i}].{key}: expected {n} finite numbers")
+        if not isinstance(p.get("q"), (int, float)):
+            out.append(f"{w}.poses[{i}].q: expected a number")
+        k = p.get("k")
+        if isinstance(k, (int, float)):
+            if prev_k is not None and k < prev_k - 1e-9:
+                out.append(f"{w}.poses[{i}].k: {k} decreases")
+            prev_k = float(k)
+    if not out and isinstance(poses[0].get("k"), (int, float)) and abs(float(poses[0]["k"])) > 1e-9:
+        out.append(f"{w}.poses[0].k: the path must start at the grasp (k = 0), got {poses[0]['k']}")
     return out
 
 
