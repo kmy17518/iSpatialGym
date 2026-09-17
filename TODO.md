@@ -118,31 +118,31 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 23:06 PDT — 8/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 23:10 PDT — 8/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
-| camera_relocalization-standard | valid demo (pre-166005f) | - | - |
-| camera_relocalization-obstructed | valid demo (pre-166005f) | tracker corner fix d4a1745 not yet re-demoed | oracle |
-| object_scaling | valid demo (pre-166005f) | - | - |
-| mental_rotation | valid demo (pre-166005f) | - | - |
-| disembedding | valid demo (pre-bcc937d,166005f,de4e723,ab60baa) | - | - |
+| camera_relocalization-standard | valid demo (pre-166005f,dde4f11) | - | - |
+| camera_relocalization-obstructed | valid demo (pre-166005f,dde4f11) | tracker corner fix d4a1745 not yet re-demoed | oracle |
+| object_scaling | valid demo (pre-166005f,dde4f11) | - | - |
+| mental_rotation | valid demo (pre-166005f,dde4f11) | - | - |
+| disembedding | valid demo (pre-bcc937d,166005f,de4e723,ab60baa,dde4f11) | - | - |
 | CM block_design | no instance | D-006 default A applied 21:17 (block_gap_m 0.006, 8c2a2bc) — loop runs next tick; flip-on-table prep 0ec0153d (sampler) + 0ee927f6 (program) behind switches | loop / tabletop |
 | CM attachment | demo run | re-run 0916-205838: each attempt burns the 360 s budget in the second-base-pose search — the SLERP's first waypoint (carried lift, 0.70–0.82 m base-forward) fails IK from the attach stance → tabletop: start the SLERP from a carried pose reachable at the attach stance / choose stances where the lift is reachable (D-009 B class-1 admission helps) | tabletop |
 | CM articulation_open_small_scale | no instance | D-008 A applied (e5fbced: brace_optional on the hinged_jar aliases; program 59f6426f) — handle-only loop runs next tick | loop |
 | CM articulation_close_small_scale | no instance | same as open | loop |
-| CM articulation_open_large_scale | no instance | all five A3 units handle_unreachable x8 (fridge, dishwasher, oven, top_cabinet, no_top); Rs_int drawer running; large-scale: object-inclusive trav map non-traversable within 1.3 m of the cabinet face | large-scale |
-| CM articulation_close_large_scale | no instance | same as open; Rs_int drawer close = Phase-1 no_stance (base_ok instrumented 1c829ae) | large-scale |
+| CM articulation_open_large_scale | no instance | first instance + demo through grasp(handle) on the Rs_int drawer bamfsz_1 (probe; pick applied 0589d9d) — needs core program_check (handle grasp must not set carried) + oracle ghost_hand on the handle link; door units = yields under arm-only follow (9–33 %) → D-011 (chat, default A 23:45) | core / oracle / owner (D-011) |
+| CM articulation_close_large_scale | no instance | same pick (bamfsz_1); close waits on the open fixes | loop |
 | alignment-world_vertical | demo run | painting demo in tolerance, not_settled (undamped hook) → large-scale-B: hinge friction/damping in the constraints record + TRO loader (owner 22:05), demo-only re-run | large-scale-B |
 | alignment-world_horizontal | demo run | owner 22:55: hang frame bug — no wall alias carries front/up/level axes, the sampler defaults to the painting frame (+x/+z) → the plate hangs table-flat; large-scale-B: ground_isg writes the reviewed icl frames per model, Reject(missing_frame), unit test, re-sample; + push witness with the brace arm at contact | large-scale-B |
-| alignment-axial | valid demo | - | - |
+| alignment-axial | valid demo (pre-dde4f11) | - | - |
 | IORS ontop_small_scale | demo run (pre-fix success) | - | - |
-| IORS under_small_scale | valid demo (pre-de4e723,ab60baa) | D-007 A landed (core 5555526: robust under/ontop predicate, branch logged) — re-run queued | loop |
-| IORS inside | valid demo (pre-166005f,de4e723,ab60baa) | valid on f5ae607; re-opened by the core's targeted 1ba5e74 (open pads clear of the support: the failing sprout grasp had its fingertip at the table) — re-run queued | loop |
+| IORS under_small_scale | valid demo (pre-de4e723,ab60baa,dde4f11) | D-007 A landed (core 5555526: robust under/ontop predicate, branch logged) — re-run queued | loop |
+| IORS inside | valid demo (pre-166005f,de4e723,ab60baa,dde4f11) | valid on f5ae607; re-opened by the core's targeted 1ba5e74 (open pads clear of the support: the failing sprout grasp had its fingertip at the table) — re-run queued | loop |
 | IORS nextto | demo run (pre-fix success) | - | - |
 | IORS touching | demo run | plan_failed at grasp = sampler witnesses off by a constant world offset (9–13 mm) and on joint-2's limit → core: witnesses at the recorded base_pose2d + fk_residual fact + 0.05 rad limit margin; push Retreat push-through 27.6 mm → primary oracle | core / oracle |
-| IORS ontop_large_scale | no instance | countertop pair = geometric yield (partner behind stance A) → floor fallback alias queued (local); sofa-bar re-run with the B→C path limit geodesic+3 m (4df6d0a) running locally | large-scale / loop |
-| IORS under_large_scale | no instance | D-010: sandal/bed F_goal 0 at every side lane (bed too low for the blade) — apple-desk-desk launched 23:00 as the candidate; per-attempt 900 s budget (large-scale-B); default C at 23:30 | owner (D-010) / large-scale |
+| IORS ontop_large_scale | no instance | countertop-floor: setup fixed (c5040c8/b931b31/729a1ec/1dd3820/f0684cb), now B↔C coupling F_init ∩ F_goal empty → large-scale; sofa-bar limit 514ad3f | large-scale |
+| IORS under_large_scale | no instance | D-010 (default C 23:30): sandal/bed F_goal 0 (matches B3); apple-desk-desk no_init_surface at setup; apple-desk-floor + pencil-sofa-sofa launched 23:09; briefcase pick would need a grounded alias | owner (D-010) / large-scale |
 <!-- /first-demo-board -->
 
 ## Decisions register (apply everywhere; details in the design thread and, after A3, in the docs)
@@ -354,3 +354,4 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026-09-16 22:20 PDT pod_scheduler: role change bands -> pool: uilwpybjxnekg0 (smoke2-a40-2); queued jobs moved: ['rb__tabletop__house_single_floor__countertop_ikwqer_0__shampoo_dispenser-zoyyia']; files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed)
 - 2026‑09‑16 23:02 PDT agent-e2e (owner 22:55): wall hang‑frame fix + hinge damping + horizontal two‑arm push witness + push‑under per‑attempt budget → new agent **large‑scale‑B** (87e668ec; `alignment_wall.py`, `ground_isg`, TRO loader, an isolated deadline in `iors_large.py`; the primary large‑scale agent stays on `articulation_large.py` / the Rs_int drawer bar‑offset). Under‑large: live run 0916‑211327 shows F_goal 0 at every side lane (blade cannot travel under the low bed) → `apple-desk-desk` launched 23:00, **D‑010 posted** (one‑off Slack post at the owner's request + chat; default C at 23:30).
 - 2026‑09‑16 23:08 PDT agent-e2e: primary oracle — axial retreat regression fixed (`041ca85c` standoff reached in the witness's IK branch, `0d9c116b` retreat straight to the recorded clear pose; two successes 0.0017 / 0.0040 rad). Touching `plan_failed` at grasp diagnosed **sampler‑side**: FK of every chain witness vs its recorded pose is a constant world offset per sidecar (touching 9–13 mm, axial 14.6 mm, nextto 3–5 mm — the sampler's IK ran at a base pose ≠ the recorded `base_pose2d`) and the touching witnesses sit 2.8 mrad from `right_arm_joint2`'s limit → core: witnesses at the recorded base pose (or record the base used), `fk_residual_m` fact (> 2 mm rejects), 0.05 rad joint‑limit margin. Oracle‑side robustness landed (`72b55d6`, `80779eb`, `b2bdabf`, `f3546f9`: witness refined by IK of the recorded pose in the same branch, pre‑pose residual ≤ 2 cm closed best‑effort).
+- 2026‑09‑16 23:12 PDT agent-e2e: large‑scale report — **first large‑articulation instance** on the Rs_int drawer `bottom_cabinet_bamfsz_1/j_link_4` (probe 221636‑94bf90 with the program‑check stub): navigate ✓ transition ✓ grasp(handle) ✓, then `ghost_hand` (the executor compares the cabinet root to the hand while the drawer link moves → oracle: track the handle link) and, without the stub, `program_check` attaches the whole cabinet after the handle grasp (`Tracker.after(grasp)` sets carried → core). Pick applied: `bamfsz_0 → bamfsz_1` on both aliases (`0589d9d`, fix‑logged; bamfsz_0's drawer front is blocked by a trash can in a 0.35 m aisle — B4's 3.0 m came from the no‑object map → B4 note). Sampler fixes `0f39220` (joint by handle height), `c314de7` (base‑follow re‑bases the A6 idle arm), `5976d2c` (`debug_collision_q` names the blocker: coffee_table), `15f381b` (≥ 5 cm base clearance tiers), `4fef6f2`/`9682d7e`/`1665380` (bar‑handle grasp slides along the bar, `bar_offset_m`). Door units = yields under the arm‑only follow (top_cabinet 9–18 %, dishwasher 11–33 %, oven 0 %, rvunhj_0 close 67 %) → **D‑011** (chat: drawer carries the first demo, doors → hybrid follow later / lower min opening / hybrid now; default A 23:45). Ontop‑large countertop‑floor moved from setup to the B↔C coupling; sofa‑bar limit `514ad3f`. Push‑under: sandal F_goal 0 (matches B3) → briefcase pick or higher drop; `apple-desk-desk` failed setup `no_init_surface` → `apple-desk-floor` + `pencil-sofa-sofa` launched (D‑010 context updated).
