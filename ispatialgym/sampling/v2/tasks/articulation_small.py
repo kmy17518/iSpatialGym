@@ -236,7 +236,10 @@ class ArticulationSmall(SamplerV2):
         if self.direction == "open":
             self.q_init, self.q_goal = self.lower, float(np.random.default_rng(self.ctx.base_seed).choice(self.stable))
         else:
-            self.q_init, self.q_goal = float(np.random.default_rng(self.ctx.base_seed).choice(self.stable)), self.lower
+            # close: the init is a stable open value (§6.6); the LEAST open one — the handle of a lid resting 150 deg back
+            # (hinged jar, first-demo runs 0916-205838 / 214238: q_init 2.618) lies behind the body and no handle cell exists
+            # at any trunk ('no_workspace'), while the 75 deg state the open variant reaches has 10-22 cells per trunk
+            self.q_init, self.q_goal = float(min(self.stable)), self.lower
         self.required, self.passive_from = self._required_waypoints(target)
         # H_max at q_init, half extent at q_init
         pts_init = self._hull_at_q(target, self.q_init)
