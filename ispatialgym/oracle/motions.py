@@ -84,6 +84,10 @@ class MotionsConfig:
     #: witness stood 10.5 mm off its pose), a larger one and every finishing motion must close
     witness_residual_accept_pos: float = 0.02
     witness_residual_accept_rot: float = 0.05
+    #: a finishing motion (the grasp / place pose itself) tolerates a smaller unclosed residual: the touching grasp
+    #: witnesses stand 11 mm off their poses (the sampler's frame) and the 20:24 demo grasped the box from exactly
+    #: that configuration; the assisted-grasp check / the placed-pose tolerance judge the outcome
+    witness_residual_accept_pos_finish: float = 0.015
     #: the witness is refined by the collision-aware IK of the recorded pose seeded at it when that solution stays
     #: within this joint distance (the same branch); the sampler's witnesses miss their poses by 3-15 mm
     witness_refine_max_jump: float = 0.6
@@ -751,8 +755,9 @@ class Motions:
             dp, da = float(th.linalg.norm(cur[0] - target[0])), C.quat_angle(cur[1], target[1])
             if dp > 2e-3 or da > 0.01:
                 log.info("arm_to(%s): witness residual %.1f mm / %.3f rad, closing it along a straight segment", arm, dp * 1000, da)
-                # a finishing motion (``max_excursion`` given: the end pose of an approach / descent) must reach its pose
-                if max_excursion is None and dp <= self.cfg.witness_residual_accept_pos and da <= self.cfg.witness_residual_accept_rot:
+                # a finishing motion (``max_excursion`` given: the end pose of an approach / descent) tolerates less
+                accept_pos = self.cfg.witness_residual_accept_pos if max_excursion is None else self.cfg.witness_residual_accept_pos_finish
+                if dp <= accept_pos and da <= self.cfg.witness_residual_accept_rot:
                     # the witness *is* the sampler's exact-IK solution of this pose (its tolerance); closing the last
                     # millimetres is a refinement that a witness sitting on a joint limit cannot make (touching box:
                     # right_arm_joint2 2.8 mrad from its limit, the first DLS step jumped 0.25 rad) - the hand stays at
