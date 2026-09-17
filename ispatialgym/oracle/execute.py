@@ -601,7 +601,7 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
         # is finished by ``arm_to`` to the pre-place, as for the lift / retreat legs.
         finish = _free_leg_finish(state, targets["pre_place"], _witness(ctx, "pre_place"), on, cfg)
         yield from motions.arm_along(arm, carry, finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
-        ctx["carry_leg"] = {"kind": "straight", "waypoints": len(carry), "via_recorded": bool(targets.get("carry_recorded")), "finish": finish.info if finish.used else None}
+        ctx["carry_leg"] = {"kind": "straight", "waypoints": len(carry), "via_recorded": len(targets.get("carry_via") or ()), "finish": finish.info if finish.used else None}
     else:
         yield from motions.arm_to(arm, pose=targets["pre_place"], q_hint=_witness(ctx, "pre_place"), ignore_objects=on)
         ctx["carry_leg"] = {"kind": "trajopt"}

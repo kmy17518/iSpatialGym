@@ -320,6 +320,49 @@ def test_block_design_program_details():
     assert any("push_row" in p for p in Sidecar.from_dict(d).problems())
 
 
+def test_block_design_flip_on_the_table_sub_chain():
+    """Owner 2026-09-16 17:10 item 1: a block with a recorded ``table_flip`` sub-chain is flipped on the table —
+    grasp → lift → place(intermediate) → retreat → grasp(the other pitch class) → lift → place(slot) → retreat — with
+    no in-hand reorient; the re-grasp is a cube grasp on the recorded face pair / tilt / yaw with its own carry height;
+    blocks without the record keep the in-hand flip. A record missing its re-grasp is a sidecar error."""
+    d = raw("configuration_matching-block_design")
+    flipping = [b for b in d["blocks"] if b["flip_sign"] != 0]
+    assert flipping, "the fixture needs a flipping block"
+    b = flipping[0]
+    b["table_flip"] = {
+        "cell": [0.55, -0.25],
+        "place": {"position": [0.55, -0.25, 0.86], "orientation": [0.0, 0.7071, 0.0, 0.7071]},
+        "pre_place": {"position": [0.55, -0.25, 0.96], "orientation": [0.0, 0.7071, 0.0, 0.7071]},
+        "regrasp": {"face_pair": "y" if b["face_pair"] != "y" else "x", "tilt_pick_deg": 0.0, "yaw_deg": 5.0, "carry_height": 0.12,
+                    "pick": {"position": [0.55, -0.25, 0.85], "orientation": [0.0, 0.7071, 0.0, 0.7071]}},
+    }
+    sc = Sidecar.from_dict(d)
+    actions = expand(sc.alias, sc)
+    first = next(i for i, a in enumerate(actions) if a.name == "grasp" and a.objects[0] == b["instance"])
+    names = []
+    for a in actions[first:]:
+        if a.name in ("brace", "push") or (a.name == "grasp" and a.objects[0] != b["instance"]):
+            break
+        names.append(a.name)
+    assert names == ["grasp", "lift", "place", "retreat", "grasp", "lift", "place", "retreat"]
+    grasps = [a for a in actions if a.name == "grasp" and a.object == b["instance"]]
+    assert grasps[0].block.face_pair == b["face_pair"] and grasps[1].block.face_pair == b["table_flip"]["regrasp"]["face_pair"]
+    assert grasps[1].block.flip_sign == 0 and grasps[1].block.yaw_deg == 5.0 and grasps[1].block.carry_height == 0.12
+    places = [a for a in actions if a.name == "place" and a.object == b["instance"]]
+    assert places[0].place.position == [0.55, -0.25, 0.86] and places[0].pre_place is not None and "re-grasp" in places[0].relation
+    assert places[1].place.position == sc.blocks[[x["instance"] for x in d["blocks"]].index(b["instance"])].place.position
+    lifts = [a for a in actions if a.name == "lift" and a.object == b["instance"]]
+    assert lifts[1].carry_height == 0.12 and lifts[1].after is grasps[1]
+    # the other flipping blocks (without the record) still reorient in hand
+    others = [x["instance"] for x in flipping[1:]]
+    assert [a.object for a in actions if a.name == "reorient"] == [o for o in others if o in [x["instance"] for x in d["blocks"] if x["flip_sign"] != 0]]
+    # a sub-chain without its re-grasp is rejected
+    d2 = raw("configuration_matching-block_design")
+    [x for x in d2["blocks"] if x["flip_sign"] != 0][0]["table_flip"] = {"place": b["table_flip"]["place"]}
+    with pytest.raises(SidecarError):
+        expand(sc.alias, Sidecar.from_dict(d2))
+
+
 def test_articulation_program_details():
     sc = load("configuration_matching-articulation_open_large_scale")
     follow = [a for a in expand(sc.alias, sc) if a.name == "base_follow"][0]
@@ -471,6 +514,8 @@ def _check_value(key, value, where):
         assert isinstance(value, str) and value, where
     elif key == "distance_m":
         assert value > 0, where
+    elif key in ("carry", "carry_via"):
+        assert isinstance(value, list), where  # empty without a run-time eef pose (the stub state) / without a recorded waypoint
     else:
         raise AssertionError(f"unexpected target key {key!r} at {where}")
 
