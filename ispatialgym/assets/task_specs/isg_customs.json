@@ -24479,7 +24479,7 @@
      "red"
     ]
    },
-   "block_gap_m": 0.001,
+   "block_gap_m": 0.006,
    "scatter_min_gap_m": 0.03,
    "region_spacing_extra_m": 0.03,
    "region_extra_cells": 2,
@@ -24495,7 +24495,8 @@
    "flip_tilt_deg": 45.0,
    "orientation_equivalences": null,
    "block_no_flip": true,
-   "_block_no_flip_note": "owner decision 2026-09-16 17:10 item 1: first demo with the goal face up at init; flip-on-the-table is the required end state (prep workstream)"
+   "_block_no_flip_note": "owner decision 2026-09-16 17:10 item 1: first demo with the goal face up at init; flip-on-the-table is the required end state (prep workstream)",
+   "_block_gap_note": "owner D-006 default A (Slack, unanswered at 21:00 PDT 2026-09-16): 6 mm gaps so the last 2x2 block passes the finger-clearance gate (4c66d53a); B (push-only tail for 1 mm gaps) stays the end-state question"
   },
   "constraints": []
  },
