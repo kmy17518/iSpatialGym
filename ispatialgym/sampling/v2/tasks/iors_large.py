@@ -1201,20 +1201,24 @@ class IORSLarge(SamplerV2):
             stats["drop_free"] += 1
             common = {"goal_cell": [float(g[0]), float(g[1])], "drop_cell": [float(c_d[0]), float(c_d[1])], "push_dir": [float(d2[0]), float(d2[1])], "inside_m": inside,
                       "edge": edge.name}
-            for so in stand_offs:
-                ahead = so - out
-                if ahead < lo_ahead or ahead > hi_ahead:
-                    continue
-                xy = edge.base_xy(so, float(lat))
-                if not P0.base_ok(self, xy):
-                    continue
-                stats["base_ok"] += 1
-                for tr, ti in trunks:
-                    st = Stance("placement", (float(xy[0]), float(xy[1]), edge.yaw), float(tr), float(ti), so, edge, None, float(lat), None, ["right"])
-                    st.focus = th.tensor([float(c_d[0]), float(c_d[1]), self.floor_z + height / 2])
-                    st.extras.update(common, drop_ahead_m=float(ahead), stance_kind="frontal")
-                    cands.append(st)
-                    stats["candidates"] += 1
+            # frontal stances: the lane to the robot's RIGHT of the base centre by ``frontal_lane_offset_m`` — B3's under-edge
+            # probe (bed_rrcvaq_0, briefcase, s = 0.6) reaches the edge strip at lateral −0.40…−0.16 only (the right arm's
+            # side), a centred lane at s = 0.45 / 0.6 has 0–1 cells
+            for off in [float(v) for v in (self.gp.gen("frontal_lane_offset_m") or (0.25, 0.0))]:
+                for so in stand_offs:
+                    ahead = so - out
+                    if ahead < lo_ahead or ahead > hi_ahead:
+                        continue
+                    xy = edge.base_xy(so, float(lat) + off)  # base left of the lane by ``off`` (+tangent = the robot's left)
+                    if not P0.base_ok(self, xy):
+                        continue
+                    stats["base_ok"] += 1
+                    for tr, ti in trunks:
+                        st = Stance("placement", (float(xy[0]), float(xy[1]), edge.yaw), float(tr), float(ti), so, edge, None, float(lat) + off, None, ["right"])
+                        st.focus = th.tensor([float(c_d[0]), float(c_d[1]), self.floor_z + height / 2])
+                        st.extras.update(common, drop_ahead_m=float(ahead), stance_kind="frontal", lane_offset_m=off)
+                        cands.append(st)
+                        stats["candidates"] += 1
             for x_ahead in side_ahead:
                 for b in side_b:
                     xy = mid + tangent * (float(lat) - x_ahead) - d2 * b
