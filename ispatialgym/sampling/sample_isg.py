@@ -277,7 +277,8 @@ def load_problem_from_args(args) -> GroundedProblem:
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--alias", action="append", required=True, help="customs alias; repeatable")
-    parser.add_argument("--customs", default=DEFAULT_CUSTOMS)
+    parser.add_argument("--customs", default=os.environ.get("ISG_CUSTOMS") or DEFAULT_CUSTOMS,
+                        help="customs JSON (default: $ISG_CUSTOMS, else the shared assets list) — an A/B run points this at a copy")
     parser.add_argument("--bddl-root", default=None, help="activity_definitions root of the grounded BDDL (default: assets)")
     parser.add_argument("--scene", default=None, help="restrict to one scene")
     parser.add_argument("--templates", type=int, default=None, help="templates per alias and scene (default: generation.templates_max)")

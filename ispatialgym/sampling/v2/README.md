@@ -427,6 +427,29 @@ support, up axis ≤ 15°). `reset_branches()` / `branches()` / `decided_by()`; 
   `base_link` on the recorded stance — the sampler's articulation root stood elsewhere, which showed as a constant
   per-sidecar world offset in the oracle's FK check.
 
+### A/B knob `generation.contact_height_extra_m` (owner 2026-09-16 23:00)
+
+- Default 0.0 = today's behaviour. A positive value lifts every recorded contact / grasp height by that constant above
+  today's pose, re-checked by the same IK / in-frame / reach checks: grasp + pre-grasp (`iors_small`: the pinch moves up
+  the object by shifting `eef_in_object` along world up, so grasp at the settled pose, place and the pre-poses all carry
+  it; the lifted pair must pass the exact IK, else the library height is kept and the reason says so), the release
+  height (ontop / under `release_above_m` and the inside drop floor), the touching push pads / blades and brace pads /
+  blades, and through the shared helper the axial push / stop blade (`alignment_axial._push_height`) and the block
+  blades (`block_design._blade_height`).
+- **Pads, not tips** (`core.contact_height_extra(gp, kind, ...)`): for a `grasp` the lift is only what brings the
+  fingertip to ≥ x above the support (`fingertip_z`, `support_z`; a fingertip already that clear needs none) and never
+  puts the pad centre above the hull top − 5 mm (`band_top_z`, `pad_center_z`; reason `clipped: pinch band`) — thin
+  lying objects (closure probe: +5 mm lost the marker's AG attach, +10 mm the pads missed). For `blade` / `stop` the
+  fingertip stays ≥ 1 cm below the face top, for `push` / `brace` pads the pad centre + 1.2 cm stays below it
+  (`clipped: face top`); `release` takes the full offset.
+- Facts on every grasp / contact record (`height_extra_m` requested, `height_extra_effective_m`,
+  `height_extra_clip_reason`) and `template_facts.contact_height_extra_m`. Module one-liners:
+  `z = core.lift_contact_height(self, z, "blade", face_top_z=…)` for a top-down eef-origin height and
+  `core.annotate_height_extra(record, self)` on the record.
+- Running the A/B without editing the shared list: `sample_isg --customs <copy.json>` (or `ISG_CUSTOMS=<copy.json>`,
+  also read by `multiply_isg`); `scripts/isg/first_demo.py` passes its own `--customs`, so an A/B through it needs the
+  flag there.
+
 ## Status (D2 / D4, 2026-09-15) and gaps
 
 Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,

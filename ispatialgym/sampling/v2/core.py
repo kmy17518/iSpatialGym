@@ -83,6 +83,94 @@ def register(*subtasks: str) -> Callable[[type], type]:
     return deco
 
 
+# ----------------------------------------------------------------------------------------------------------------
+# A/B knob ``generation.contact_height_extra_m`` (owner 2026-09-16 23:00): a constant lift of every recorded contact /
+# grasp height above today's pose (default 0.0 = today's behaviour)
+# ----------------------------------------------------------------------------------------------------------------
+
+#: the pad centre of a lifted grasp stays this far below the object's pinch band top; a lifted blade's fingertip stays this
+#: far below the face top
+PAD_BAND_MARGIN = 0.005
+FACE_TOP_MARGIN = 0.010
+PAD_HALF_HEIGHT = 0.012
+
+
+def requested_height_extra(sampler_or_gp) -> float:
+    """``generation.contact_height_extra_m`` of the alias (0.0 when absent)."""
+    gen = getattr(sampler_or_gp, "gen", None)
+    try:
+        return max(0.0, float(gen("contact_height_extra_m", 0.0) or 0.0)) if gen is not None else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def contact_height_extra(sampler_or_gp, kind: str, *, fingertip_z: Optional[float] = None, support_z: Optional[float] = None,
+                         band_top_z: Optional[float] = None, pad_center_z: Optional[float] = None) -> Tuple[float, str]:
+    """``(effective lift m, clip reason)`` of the A/B knob for one record. ``kind``:
+
+    * ``grasp`` — the offset applies to the **pads**, not the tips: raise only until the fingertip is >= x above the support
+      (``fingertip_z`` / ``support_z``; a fingertip already that clear needs no lift), never above the object's pinch band
+      (``pad_center_z`` + lift <= ``band_top_z`` - ``PAD_BAND_MARGIN``) — thin lying objects (closure probe: +5 mm lost the
+      marker's AG attach, +10 mm the pads missed);
+    * ``blade`` / ``stop`` — a top-down blade beside a face: the fingertip stays >= ``FACE_TOP_MARGIN`` below ``band_top_z``;
+    * ``push`` / ``brace`` — pads on a face: the pad centre + ``PAD_HALF_HEIGHT`` stays below ``band_top_z``;
+    * ``release`` (and anything else) — the full offset.
+    Reasons: ``"off"`` (knob 0), ``"full"``, ``"fingertip already clear"``, ``"clipped: pinch band"``, ``"clipped: face top"``.
+    """
+    x = requested_height_extra(sampler_or_gp)
+    if x <= 0.0:
+        return 0.0, "off"
+    eff, why = x, "full"
+    if kind == "grasp":
+        if fingertip_z is not None and support_z is not None:
+            clearance = float(fingertip_z) - float(support_z)
+            eff = min(x, max(0.0, x - clearance))
+            if eff <= 0.0:
+                return 0.0, "fingertip already clear"
+            if eff < x:
+                why = "partial: fingertip clearance"
+        if band_top_z is not None and pad_center_z is not None:
+            room = max(0.0, float(band_top_z) - PAD_BAND_MARGIN - float(pad_center_z))
+            if room < eff:
+                eff, why = room, "clipped: pinch band"
+    elif kind in ("blade", "stop"):
+        if fingertip_z is not None and band_top_z is not None:
+            room = max(0.0, float(band_top_z) - FACE_TOP_MARGIN - float(fingertip_z))
+            if room < eff:
+                eff, why = room, "clipped: face top"
+    elif kind in ("push", "brace"):
+        if pad_center_z is not None and band_top_z is not None:
+            room = max(0.0, float(band_top_z) - PAD_HALF_HEIGHT - float(pad_center_z))
+            if room < eff:
+                eff, why = room, "clipped: face top"
+    return float(eff), why
+
+
+def lift_contact_height(sampler, z: float, kind: str, *, face_top_z: Optional[float] = None, fingertip_below: float = C.FINGERTIP_LENGTH) -> float:
+    """One-line form for the task modules: the eef-origin height ``z`` of a top-down push / blade / stop pose lifted by the
+    knob (fingertip = ``z - fingertip_below``, kept below ``face_top_z``); the verdict is kept on ``sampler.height_extra_last``
+    for ``annotate_height_extra``."""
+    eff, why = contact_height_extra(sampler, "blade" if kind in ("blade", "stop", "push") else kind, fingertip_z=float(z) - float(fingertip_below),
+                                    band_top_z=face_top_z)
+    sampler.height_extra_last = {"height_extra_m": requested_height_extra(sampler), "height_extra_effective_m": round(eff, 4), "height_extra_clip_reason": why}
+    return float(z) + eff
+
+
+def annotate_height_extra(record, sampler, effective: Optional[float] = None, reason: Optional[str] = None):
+    """Write the knob's facts (``height_extra_m`` requested, ``height_extra_effective_m``, ``height_extra_clip_reason``) on a
+    grasp / contact record's ``extras`` (from ``sampler.height_extra_last`` when not given); returns the record."""
+    facts = dict(getattr(sampler, "height_extra_last", None) or {"height_extra_m": requested_height_extra(sampler), "height_extra_effective_m": 0.0,
+                                                                  "height_extra_clip_reason": "off" if requested_height_extra(sampler) <= 0 else "not applied"})
+    if effective is not None:
+        facts["height_extra_effective_m"] = round(float(effective), 4)
+    if reason is not None:
+        facts["height_extra_clip_reason"] = reason
+    extras = getattr(record, "extras", None)
+    if isinstance(extras, dict):
+        extras.update(facts)
+    return record
+
+
 def get_sampler(subtask: str) -> type:
     """The registered ``SamplerV2`` subclass for ``subtask`` (imports the task modules on first use)."""
     if subtask not in REGISTRY:
@@ -162,6 +250,7 @@ class SamplerV2(TaskSampler):
         self.counters: Dict[str, int] = {}  # scene_reset, attempts, ... (not rejections)
         self.instance_seeds: List[int] = []
         self.template_facts: Dict[str, Any] = {}  # cached geometry of sample_template (written to template_meta)
+        self.height_extra_last: Optional[Dict[str, Any]] = None  # the A/B knob's last verdict (``lift_contact_height`` / ``annotate_height_extra``)
         self.template_meta.update({"alias": self.gp.alias, "subtask": self.subtask, "scene": self.scene, "sampler_version": SAMPLER_VERSION,
                                    "spec_hash": self.gp.spec_hash(), "choice": self.choice.to_json(), "rooms": list(self.gp.rooms(self.scene)),
                                    "customs": self.gp.customs_path})
@@ -314,6 +403,7 @@ class SamplerV2(TaskSampler):
         self.park_robot()
         self.adopt_existing_template()
         try:
+            self.template_facts["contact_height_extra_m"] = requested_height_extra(self)  # A/B knob (owner 2026-09-16 23:00)
             self.sample_template()
         finally:
             # the facts gathered so far stay in template_meta (a rejected template documents where it failed)

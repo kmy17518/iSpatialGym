@@ -26,7 +26,7 @@ from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.tro_writer import full_pose_target
 from ispatialgym.sampling.v2 import ik as IK
 from ispatialgym.sampling.v2 import tabletop as TT
-from ispatialgym.sampling.v2.core import SamplerV2, register
+from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, contact_height_extra, register, requested_height_extra
 from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Stance
 
@@ -276,6 +276,34 @@ class IORSSmall(SamplerV2):
                                     "n_manipulation_candidates": len(self.manip_candidates), "grasp_key": self.grasp_key, "n_grasps": len(self.grasps),
                                     "bands": getattr(getattr(self, "bands", None), "path", None), "H_max": H_max})
 
+    def apply_height_extra_to_grasp(self, grasp: GraspRecord, t_pose: G.Pose, manip: Stance) -> None:
+        """A/B knob ``generation.contact_height_extra_m`` on the grasp (owner 2026-09-16 23:00): the pinch moves up the object
+        by the effective lift — the fingertip only until it is >= x above the support, the pad centre never above the hull
+        top minus 5 mm (``core.contact_height_extra(kind="grasp")``) — by shifting ``eef_in_object`` along world up in the
+        object frame, so every derived pose (grasp / pre-grasp at the settled pose, place = goal ∘ T_obj→eef) carries it;
+        the lifted pre-grasp / grasp must still pass the exact IK, else the library height is kept. Facts on the record."""
+        x = requested_height_extra(self)
+        if x <= 0.0 or grasp.eef_in_object is None or grasp.grasp is None:
+            grasp.extras.update({"height_extra_m": x, "height_extra_effective_m": 0.0, "height_extra_clip_reason": "off" if x <= 0 else "no grasp pose"})
+            return
+        tip_z = float(C.fingertip((G.t(grasp.grasp[0]), G.t(grasp.grasp[1])))[2])
+        pad_z = float(C.pad_center((G.t(grasp.grasp[0]), G.t(grasp.grasp[1])))[2])
+        hull_w = self.world.hull_at(self.hull["target"], t_pose)
+        eff, why = contact_height_extra(self, "grasp", fingertip_z=tip_z, support_z=float(self.top.z), band_top_z=float(hull_w[:, 2].max()), pad_center_z=pad_z)
+        if eff > 0.0:
+            R_obj = C.quat_to_mat(G.t(t_pose[1]))
+            up_obj = R_obj.T @ th.tensor([0.0, 0.0, 1.0])  # world up in the object frame
+            eef_in_object = (G.t(grasp.eef_in_object[0]) + eff * up_obj, G.t(grasp.eef_in_object[1]))
+            eef = IK.grasp_pose(t_pose, eef_in_object)
+            pre = IK.pre_pose(eef)
+            res = self.ikc.exact([pre, eef], manip, grasp.arm, ignore_for_last=self.support_objects(), scale_key=self.choice.models["target"].scale, cache=False,
+                                 approached=[self.obj("target")])
+            if res.ok:
+                grasp.eef_in_object, grasp.grasp, grasp.pre_grasp = eef_in_object, eef, pre
+            else:
+                eff, why = 0.0, f"IK failed with the lift ({res.reason}); library height kept"
+        grasp.extras.update({"height_extra_m": x, "height_extra_effective_m": round(eff, 4), "height_extra_clip_reason": why})
+
     def phase3_two_tier(self, manip: Stance, rng: np.random.Generator):
         """§4.6 step 1 with the flush pinches first: ``tabletop.phase3_target`` over ``grasps_flush``; when that finds no
         feasible (yaw, grasp) at the focus and inclined grasps exist, the same draw over every attachable grasp."""
@@ -470,6 +498,7 @@ class IORSSmall(SamplerV2):
                 self.record_transition(init, manip)
                 # §4.6 step 1: target init pose from the feasible set F at the focus (exact IK confirmation)
                 t_pose, grasp = self.phase3_two_tier(manip, rng)
+                self.apply_height_extra_to_grasp(grasp, t_pose, manip)  # A/B knob generation.contact_height_extra_m (0 = no-op)
                 # §4.6 step 2: partner on a random side (touching: robot's left) at gap g ∈ [g_lo, D_p]
                 p_pose = self.place_partner(rng, t_pose, manip, cam_init)
                 # §4.6 step 4: every object fully in frame (5 %) in the init image
@@ -708,6 +737,7 @@ class IORSSmall(SamplerV2):
             # curved well landed on the slope and rested 10 deg tilted (demo 2026-09-16 14:44)
             depth = max(0.0, top - base_z)
             above = min(float(self.gen("release_above_surface_m", RELEASE_ABOVE_SURFACE)), max(RELEASE_ABOVE_SURFACE_MIN, 0.5 * depth))
+            above += contact_height_extra(self, "release")[0]  # A/B knob: the release height lifted by the constant
             self.release_above_m = above
             z = base_z + above - float(t_hull[:, 2].min())
             return th.tensor([float(xy[0]), float(xy[1]), z]), t_quat
@@ -865,7 +895,7 @@ class IORSSmall(SamplerV2):
         tname = self.bindings.one("target").name
         centre, rim_z = self._container_volume(self.obj("partner"), p_pose)
         t_min = float(t_hull[:, 2].min())
-        drop_floor = float(self.gen("drop_height_m", 0.005))
+        drop_floor = float(self.gen("drop_height_m", 0.005)) + contact_height_extra(self, "release")[0]  # A/B knob lift
         clearance = float(self.gen("release_clearance_m", RELEASE_CLEARANCE))
         pos = th.tensor([float(centre[0]), float(centre[1]), rim_z + drop_floor - t_min])
         grasp = self.sidecar.grasp_of(tname)
@@ -993,6 +1023,7 @@ class IORSSmall(SamplerV2):
             grasp.finger_q = list(getattr(g, "finger_q", []) or []) or None
             grasp.eef_in_object = eef_in_object
             grasp.grasp, grasp.pre_grasp = eef, pre
+            self.apply_height_extra_to_grasp(grasp, t_pose, manip)  # the A/B lift applies to the re-selected library grasp too
             return str(grasp.grasp_name)
         return None
 
@@ -1273,10 +1304,17 @@ class IORSSmall(SamplerV2):
         outward = -d  # the pushed (right) face's outward normal
         z0, z1 = face_z
         clearance = float(self.gen("stop_clearance_m", STOP_CLEARANCE))
-        yield "push_h", IK.contact_eef(face_point, d), {"blade_half_thickness_m": None}
-        yield "push_v", IK.contact_eef(face_point, d, closing=th.tensor([0.0, 0.0, 1.0])), {"blade_half_thickness_m": None}
+        # A/B knob: pad contacts lifted by the constant (pad centre + half the finger height below the face top), blades lifted
+        # with the fingertip kept 1 cm below the face top
+        pad_lift, pad_why = contact_height_extra(self, "push", pad_center_z=float(face_point[2]), band_top_z=z1)
+        fp = G.t(face_point) + th.tensor([0.0, 0.0, pad_lift])
+        pad_facts = {"height_extra_m": requested_height_extra(self), "height_extra_effective_m": round(pad_lift, 4), "height_extra_clip_reason": pad_why}
+        yield "push_h", IK.contact_eef(fp, d), {"blade_half_thickness_m": None, **pad_facts}
+        yield "push_v", IK.contact_eef(fp, d, closing=th.tensor([0.0, 0.0, 1.0])), {"blade_half_thickness_m": None, **pad_facts}
         for pitch in TT.approach_pitch_order(None):
             z_tip = z0 + 0.005
+            blade_lift, blade_why = contact_height_extra(self, "blade", fingertip_z=z_tip, band_top_z=z1)
+            z_tip += blade_lift
             # a push needs the blade on the lower part of the face only (unlike a stop brace, which the whole face may
             # meet): faces taller than the finger section are pushed over their lowest ``PALM_FROM_TIP`` (7 cm)
             z_face_hi = min(z1, z_tip + TT.PALM_FROM_TIP - 0.005)
@@ -1288,7 +1326,8 @@ class IORSSmall(SamplerV2):
             origin = th.tensor([float(face_point[0]), float(face_point[1]), z_tip + C.FINGERTIP_LENGTH * math.cos(math.radians(pitch))]) + outward * standoff
             for c_sign in (1.0, -1.0):
                 yield f"push_blade_{pitch:.0f}{'' if c_sign > 0 else '-'}", (origin, C.eef_quat(a_vec, c_sign * outward)), {
-                    "blade_half_thickness_m": half, "stop_clearance_m": clearance, "blade_standoff_m": standoff, "fingertip_z": z_tip}
+                    "blade_half_thickness_m": half, "stop_clearance_m": clearance, "blade_standoff_m": standoff, "fingertip_z": z_tip,
+                    "height_extra_m": requested_height_extra(self), "height_extra_effective_m": round(blade_lift, 4), "height_extra_clip_reason": blade_why}
 
     def touching_brace_candidates(self, manip: Stance, b_point: th.Tensor, face_z: Tuple[float, float], a_face: th.Tensor):
         """Brace poses of the closed left gripper at the partner's far (robot-left) face, in the order to try — the axial
@@ -1306,17 +1345,22 @@ class IORSSmall(SamplerV2):
         z0, z1 = face_z
         clearance = float(self.gen("stop_clearance_m", STOP_CLEARANCE))
 
+        pad_lift, pad_why = contact_height_extra(self, "brace", pad_center_z=float(b_point[2]), band_top_z=z1)  # A/B knob
+        pad_facts = {"height_extra_m": requested_height_extra(self), "height_extra_effective_m": round(pad_lift, 4), "height_extra_clip_reason": pad_why}
+
         def side_contacts():
-            point = G.t(b_point) + outward * clearance
+            point = G.t(b_point) + outward * clearance + th.tensor([0.0, 0.0, pad_lift])
             for c_axis, suffix in ((z_axis, "v"), (side_h, "h")):
                 name = TT.contact_class(manip, a, c_axis) or f"side_{suffix}"
                 for c_sign in (1.0, -1.0):
                     contact = IK.contact_eef(point, a, c_sign * c_axis)
-                    yield IK.pre_pose(contact), contact, f"{name}{'' if c_sign > 0 else '-'}", {"stop_clearance_m": clearance, "pose_class": name, "blade_half_thickness_m": None}
+                    yield IK.pre_pose(contact), contact, f"{name}{'' if c_sign > 0 else '-'}", {"stop_clearance_m": clearance, "pose_class": name, "blade_half_thickness_m": None, **pad_facts}
 
         def blades():
             for pitch in TT.approach_pitch_order(None):
-                z_tip = z0 + 0.005  # the fingertips just above the support: the fingers span the face height
+                z_tip = z0 + 0.005
+                blade_lift, blade_why = contact_height_extra(self, "blade", fingertip_z=z_tip, band_top_z=z1)
+                z_tip += blade_lift  # the fingertips just above the support: the fingers span the face height
                 so = TT.blade_standoff((z0, z1), z_tip, pitch, clearance, side=False)
                 if so is None:
                     continue  # the face reaches the palm section: no blade contact
@@ -1326,7 +1370,8 @@ class IORSSmall(SamplerV2):
                 for c_sign in (1.0, -1.0):
                     contact = (origin, C.eef_quat(a_vec, c_sign * outward))
                     yield IK.pre_pose(contact), contact, f"blade_{pitch:.0f}{'' if c_sign > 0 else '-'}", {
-                        "blade_half_thickness_m": half, "stop_clearance_m": clearance, "blade_standoff_m": standoff, "fingertip_z": z_tip, "pose_class": f"blade_{pitch:.0f}"}
+                        "blade_half_thickness_m": half, "stop_clearance_m": clearance, "blade_standoff_m": standoff, "fingertip_z": z_tip, "pose_class": f"blade_{pitch:.0f}",
+                        "height_extra_m": requested_height_extra(self), "height_extra_effective_m": round(blade_lift, 4), "height_extra_clip_reason": blade_why}
 
         order = (blades, side_contacts) if (z1 - z0) < THIN_PARTNER_HEIGHT else (side_contacts, blades)
         for gen in order:

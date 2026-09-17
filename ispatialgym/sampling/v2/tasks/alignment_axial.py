@@ -39,7 +39,7 @@ from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.tro_writer import pose_target
 from ispatialgym.sampling.v2 import tabletop as TT
-from ispatialgym.sampling.v2.core import SamplerV2, register
+from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, lift_contact_height, register
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, Stance
 
 import omnigibson as og  # noqa: E402
@@ -245,7 +245,9 @@ class AlignmentAxial(SamplerV2):
         0.6·h above the top) with the floor lowered from 3 cm to the fingertip length + 3 mm — at the 3 cm floor the
         closed fingers' tips (1.88 cm beyond the origin) hover 1.1 cm above the top and never touch a letter / magazine
         / catalog (h <= 1 cm); with the lower floor the blade spans the side face of every target."""
-        return float(self.top.z) + max(0.6 * self.extents["height"], C.FINGERTIP_LENGTH + PUSH_TIP_CLEARANCE)
+        z = float(self.top.z) + max(0.6 * self.extents["height"], C.FINGERTIP_LENGTH + PUSH_TIP_CLEARANCE)
+        # A/B knob generation.contact_height_extra_m (D2 core helper, 0 = no-op): the fingertip stays >= 1 cm below the target's top
+        return lift_contact_height(self, z, "push", face_top_z=float(self.top.z) + float(self.extents["height"]))
 
     # ------------------------------------------------------------------ instance
 
@@ -442,11 +444,11 @@ class AlignmentAxial(SamplerV2):
         # record: the push always, the brace only when the joint placement produced one (push-only otherwise: the
         # manipulation stance works with the right arm, the left arm idle)
         self.sidecar.add_stance(manip)
-        self.sidecar.add_contact(ContactRecord("push", "right", p_pre, p_init, p_mid, p_goal, d_push, dist, object=tname))
+        annotate_height_extra(self.sidecar.add_contact(ContactRecord("push", "right", p_pre, p_init, p_mid, p_goal, d_push, dist, object=tname)), self)
         if brace_found is not None:
             brace_pre, brace, brace_kind, brace_extras = brace_found
-            self.sidecar.add_contact(TT.BraceRecord("brace", "left", brace_pre, brace, direction=-d_stop, brace_kind="stop_edge", object=tname,
-                                                    extras={k: (float(v) if isinstance(v, (int, float)) else v) for k, v in brace_extras.items()}))
+            annotate_height_extra(self.sidecar.add_contact(TT.BraceRecord("brace", "left", brace_pre, brace, direction=-d_stop, brace_kind="stop_edge", object=tname,
+                                                    extras={k: (float(v) if isinstance(v, (int, float)) else v) for k, v in brace_extras.items()})), self)
             manip.contacts = ["push", "brace"]
             manip.arms = ["right", "left"]
         else:

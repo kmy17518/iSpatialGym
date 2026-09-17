@@ -24,7 +24,7 @@ from ispatialgym.sampling.v2.problem import (
     subtask_of_alias,
     template_summary,
 )
-from ispatialgym.sampling.v2.stances import EdgeFrame, GraspRecord, PathRecord, SidecarDraft, Stance, Transition, path_length
+from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, PathRecord, SidecarDraft, Stance, Transition, path_length
 
 
 def _entry(target_models, partner_models, groups=None, templates_max=20):
@@ -620,3 +620,49 @@ def test_rejection_log_and_summary_layout():
         for e in temps.values():
             assert {"n_written", "time_s"} <= set(e)
     json.dumps(run)
+
+
+def test_contact_height_extra_knob():
+    """A/B knob ``generation.contact_height_extra_m``: pads not tips for grasps (lift until the fingertip is x above the
+    support, never above the pinch band), face-top clips for blades / pads, the full offset for releases, 0 = off."""
+    from ispatialgym.sampling.v2 import core as CORE
+
+    class Fake:
+        def __init__(self, x):
+            self.x = x
+
+        def gen(self, key, default=None):
+            return self.x if key == "contact_height_extra_m" else default
+
+    off = Fake(0.0)
+    assert CORE.requested_height_extra(off) == 0.0 and CORE.contact_height_extra(off, "grasp") == (0.0, "off")
+    assert CORE.contact_height_extra(Fake(None), "release") == (0.0, "off") and CORE.contact_height_extra(Fake("bad"), "release") == (0.0, "off")
+    k = Fake(0.005)
+    # a lying marker: fingertip 3 mm above the table, pad centre 8.5 mm, hull top 17 mm → needs 2 mm to clear 5 mm, room 3.5 mm
+    eff, why = CORE.contact_height_extra(k, "grasp", fingertip_z=0.803, support_z=0.8, band_top_z=0.817, pad_center_z=0.8085)
+    assert abs(eff - 0.002) < 1e-9 and why == "partial: fingertip clearance"
+    # a fingertip already 1 cm clear needs nothing
+    assert CORE.contact_height_extra(k, "grasp", fingertip_z=0.81, support_z=0.8, band_top_z=0.9, pad_center_z=0.82) == (0.0, "fingertip already clear")
+    # a tall object with the tip on the table: the full 5 mm
+    assert CORE.contact_height_extra(k, "grasp", fingertip_z=0.8, support_z=0.8, band_top_z=0.9, pad_center_z=0.82) == (0.005, "full")
+    # the pinch band clips: pad centre 2 mm below the top-minus-margin line
+    eff, why = CORE.contact_height_extra(k, "grasp", fingertip_z=0.8, support_z=0.8, band_top_z=0.83, pad_center_z=0.823)
+    assert abs(eff - 0.002) < 1e-9 and why == "clipped: pinch band"
+    # blades: fingertip 5 mm above the table beside a 2.5 cm cube → room 1 cm - 5 mm = 1 cm... top 0.825 - 0.01 - 0.805 = 0.01 ≥ 5 mm → full
+    assert CORE.contact_height_extra(k, "blade", fingertip_z=0.805, band_top_z=0.825) == (0.005, "full")
+    eff, why = CORE.contact_height_extra(Fake(0.02), "blade", fingertip_z=0.805, band_top_z=0.825)
+    assert abs(eff - 0.01) < 1e-9 and why == "clipped: face top"
+    # pads on a face: centre + half height below the top
+    eff, why = CORE.contact_height_extra(Fake(0.02), "push", pad_center_z=0.85, band_top_z=0.87)
+    assert abs(eff - 0.008) < 1e-9 and why == "clipped: face top"
+    assert CORE.contact_height_extra(Fake(0.02), "release") == (0.02, "full")
+    # the one-line module form + the record annotation
+    s = Fake(0.02)
+    z = CORE.lift_contact_height(s, 0.83, "push", face_top_z=0.85)  # fingertip 0.83 - 0.0188 = 0.8112 → room 0.85 - 0.01 - 0.8112 = 0.0288 ≥ 2 cm
+    assert abs(z - 0.85) < 1e-9 and s.height_extra_last["height_extra_clip_reason"] == "full"
+    rec = ContactRecord("push", "right", ((0, 0, 0), (0, 0, 0, 1)), ((0, 0, 0), (0, 0, 0, 1)), None, ((0, 0, 0), (0, 0, 0, 1)), (1, 0, 0), 0.1, object="t")
+    CORE.annotate_height_extra(rec, s)
+    d = rec.to_sidecar()
+    assert d["height_extra_m"] == 0.02 and d["height_extra_effective_m"] == 0.02 and d["height_extra_clip_reason"] == "full"
+    off_rec = CORE.annotate_height_extra(ContactRecord("push", "right", ((0, 0, 0), (0, 0, 0, 1)), ((0, 0, 0), (0, 0, 0, 1)), None, ((0, 0, 0), (0, 0, 0, 1)), (1, 0, 0), 0.1), off)
+    assert off_rec.extras["height_extra_clip_reason"] == "off" and off_rec.extras["height_extra_effective_m"] == 0.0

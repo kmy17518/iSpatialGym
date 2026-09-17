@@ -41,7 +41,7 @@ from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.v2 import ik as IK
 from ispatialgym.sampling.v2 import tabletop as TT
-from ispatialgym.sampling.v2.core import SamplerV2, register
+from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, lift_contact_height, register
 from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, Stance, pose_to_sidecar
 
@@ -978,7 +978,9 @@ class BlockDesign(SamplerV2):
     def _blade_height(self) -> float:
         """eef origin height of a top-down blade beside a block: the closed fingertips 3 mm above the top (a 2.5 cm cube
         sits entirely below the wrist of a horizontal contact)."""
-        return float(self.top.z) + max(0.6 * self.edge, C.FINGERTIP_LENGTH + 0.003)
+        z = float(self.top.z) + max(0.6 * self.edge, C.FINGERTIP_LENGTH + 0.003)
+        # A/B knob generation.contact_height_extra_m (D2 core helper, 0 = no-op): the fingertip stays >= 1 cm below the block's top
+        return lift_contact_height(self, z, "blade", face_top_z=float(self.top.z) + float(self.edge))
 
     def _blade_poses(self, pose: TT.Pose, direction_xy: th.Tensor, into: bool, manip: Stance, prefix: str):
         """Top-down blade contacts of the closed gripper beside a block face (outward normal ``-direction_xy`` for a
@@ -1065,12 +1067,12 @@ class BlockDesign(SamplerV2):
             log.info("%s: %s brace / push of %s skipped: %s", self.gp.alias, kind, pushed, (sorted(set(brace_fails)) or sorted(set(push_fails)))[:2])
             return "brace_ik_failed" if brace_fails else "push_ik_failed"
         push_pre, push_init, push_goal, brace_pre, brace, brace_a, used, p_half, b_half = chosen
-        rec[f"push_{kind}"] = ContactRecord("push", "right", push_pre, push_init, None, push_goal, d3, dist, object=pushed).to_sidecar()
+        rec[f"push_{kind}"] = annotate_height_extra(ContactRecord("push", "right", push_pre, push_init, None, push_goal, d3, dist, object=pushed), self).to_sidecar()
         if p_half is not None:
             rec[f"push_{kind}"]["blade_half_thickness_m"] = float(p_half)
-        rec[f"brace_{kind}"] = TT.BraceRecord("brace", "left", brace_pre, brace, direction=brace_a, brace_kind="row_left" if kind == "row" else "column_top",
+        rec[f"brace_{kind}"] = annotate_height_extra(TT.BraceRecord("brace", "left", brace_pre, brace, direction=brace_a, brace_kind="row_left" if kind == "row" else "column_top",
                                               object=braced, extras={"pose_class": used, "blade_half_thickness_m": None if b_half is None else float(b_half),
-                                                                     "stop_clearance_m": 0.0}).to_sidecar()
+                                                                     "stop_clearance_m": 0.0}), self).to_sidecar()
         return "present"
 
     # ------------------------------------------------------------------ program check (blocks without a brace / push tail)

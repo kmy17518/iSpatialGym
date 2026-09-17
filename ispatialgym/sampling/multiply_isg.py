@@ -81,7 +81,7 @@ def main(argv=None):
     parser.add_argument("--instances", type=int, required=True, help="instances to add (instance 0 exists)")
     parser.add_argument("--path-buckets", default=None, help="camera relocalization: max_m:n,... (overrides generation.path_buckets)")
     parser.add_argument("--seed", type=int, default=1)
-    parser.add_argument("--customs", default=None)
+    parser.add_argument("--customs", default=os.environ.get("ISG_CUSTOMS") or None, help="customs JSON (default: $ISG_CUSTOMS, else the template's copy)")
     parser.add_argument("--bddl-root", default=None)
     parser.add_argument("--max-attempts", type=int, default=30)
     parser.add_argument("--no-write-back", action="store_true")
