@@ -1466,9 +1466,14 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
         if min(depth0) > float(class1_when_deep_m):
             out = classes[0] + classes[1]
             which = f"0+1 (class-0 foci {min(depth0):.2f}–{max(depth0):.2f} m base-forward, all deeper than {float(class1_when_deep_m):.2f})"
-    log.info("phase 2: %d trunk candidates collision-free, %d (stance, focus) pairs within 20°, %d survivors in class %s", len(cands), n_cells, len(out), which)
-    if not out and diag:
-        log.info("phase 2: no survivor — per trunk candidate: %s", " | ".join(diag[:24]))
+    log.info("phase 2: %d trunk candidates collision-free, %d (stance, focus) pairs within %.0f°, %d survivors in class %s", len(cands), n_cells,
+             float(angle_classes_deg[1]), len(out), which)
+    if diag and (not out or os.environ.get("ISG_PHASE2_DEBUG")):
+        # ISG_PHASE2_DEBUG=1: the per-trunk view even with survivors (which trunks the cone / in-frame rule excludes)
+        log.info("phase 2: per trunk candidate: %s", " | ".join(diag[:40]))
+        if os.environ.get("ISG_PHASE2_DEBUG"):
+            trunks = sorted({(round(float(c.stand_off or 0), 2), round(float(c.translate), 2), round(float(c.tilt), 2)) for c in out})
+            log.info("phase 2: surviving (stand-off, translate, tilt): %s", trunks)
     return out
 
 
