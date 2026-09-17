@@ -95,6 +95,7 @@ DEFAULT_ALIAS = {
 DEFAULT_SCENE = {"configuration_matching-articulation_open_large_scale-bottom_cabinet": "office_cubicles_right",
                  "configuration_matching-articulation_close_large_scale-bottom_cabinet": "office_cubicles_right"}
 LOCAL_ONLY = {"inter_object_relation_satisfaction-ontop_large_scale"}  # owner 08:19: ontop large-scale on the local GPU
+MOVE_CAP = 6  # pool -> band moves per tick (each dispatch syncs HEAD to the pod)
 ORACLE_ONLY_OWNERS = {"oracle"}  # fixes by these owners re-enter a subtask as demo-only on its last instance
 
 
@@ -165,7 +166,13 @@ def lock_free(pid):
 # the end); current.txt is written at the start and never cleared between jobs, and done.txt keeps the lines of earlier
 # attempts of a re-queued job - neither tells idle from busy
 BAND_CMD = ("cat /root/samp/current.txt 2>/dev/null; echo ---; for f in /root/samp/running/*.job; do [ -f \"$f\" ] && cut -f1 \"$f\"; done; echo ---; ls /root/samp/queue 2>/dev/null; echo ---; "
-            "kill -0 $(cat /root/samp/runner.pid 2>/dev/null) 2>/dev/null && echo RUNNER || echo NORUNNER; echo ---; test -f /root/BOOTSTRAP_DONE && echo BOOT")
+            "kill -0 $(cat /root/samp/runner.pid 2>/dev/null) 2>/dev/null && echo RUNNER || echo NORUNNER; echo ---; test -f /root/BOOTSTRAP_DONE && echo BOOT; echo ---; "
+            "stat -c %Y /root/samp/current.txt 2>/dev/null || echo 0")
+# preemption (owner 2026-09-16 17:58): stop the band job on a pod, put its job files aside (nothing lost: the job has no band file,
+# so fleet_remaining lists it again and the next tick re-dispatches it to a band pod), clear the markers
+PREEMPT_CMD = ("kill $(cat /root/samp/runner.pid 2>/dev/null) 2>/dev/null; pkill -KILL -f 'ispatialgym.sampling.reach_band[s]'; sleep 1; "
+               "mkdir -p /root/samp/queue_preempted; for f in /root/samp/running/*.job /root/samp/queue/*.job; do [ -f \"$f\" ] && cut -f1 \"$f\" && mv \"$f\" /root/samp/queue_preempted/; done; "
+               "rm -f /root/samp/current.txt; echo PREEMPTED")
 
 
 def survey_band_pod(api, pid):
@@ -182,7 +189,32 @@ def survey_band_pod(api, pid):
     cur, in_progress = parts[0], [l for l in parts[1].splitlines() if l]
     queue = [re.sub(r"^w\d+_\d+_", "", f)[: -len(".job")] if f.endswith(".job") else f for f in parts[2].splitlines() if f]
     running = in_progress[0] if in_progress else ""
-    return pid, {"ep": ep, "running": running, "stale_current": bool(cur and not running), "queue": queue, "runner": parts[3] == "RUNNER", "boot": "BOOT" in parts[4]}
+    try:
+        started = int(parts[5].strip() or 0) if len(parts) > 5 else 0
+    except ValueError:
+        started = 0
+    return pid, {"ep": ep, "running": running, "stale_current": bool(cur and not running), "queue": queue, "runner": parts[3] == "RUNNER", "boot": "BOOT" in parts[4],
+                 "started": started}
+
+
+def preempt_band_pod(pid, st, names, dry):
+    """Stop the band job on ``pid`` (least work lost = most recently started), park its job files, return the job ids interrupted."""
+    if dry:
+        log(f"DRY preempt band pod {pid} (running {st.get('running') or '-'})")
+        return [st.get("running")] if st.get("running") else []
+    try:
+        r = rp.ssh_run(*st["ep"], PREEMPT_CMD, capture=True, timeout=90)
+        ids = [l.strip() for l in (r.stdout or "").splitlines() if l.strip() and l.strip() != "PREEMPTED"]
+    except SystemExit:
+        ids = [st.get("running")] if st.get("running") else []
+        log(f"preempt {pid}: ssh failed, job files may still be on the pod")
+    msg = (f"PREEMPTION {pid} ({names.get(pid, '?')}): band job(s) {ids or 'none running'} stopped for first-demo work "
+           f"(started {dt.datetime.fromtimestamp(st.get('started') or 0).strftime('%H:%M') if st.get('started') else '-'}); files parked in /root/samp/queue_preempted, "
+           f"re-dispatched to a band pod by the next tick via the manifest (no band file yet = still remaining)")
+    log(msg)
+    todo_activity(msg)
+    paused_note(msg)
+    return ids
 
 
 def survey_band(api, pods):
@@ -352,13 +384,16 @@ def band_manifests():
     return [m if os.path.isabs(m) else os.path.join(REPO, m) for m in ms if os.path.exists(m if os.path.isabs(m) else os.path.join(REPO, m))]
 
 
-def band_remaining(band_pods):
-    """Jobs of the active band manifests that are neither done (band file) nor running (fleet_remaining.py) - the source of truth the owner named."""
+def band_remaining(band_pods, pool_pods=()):
+    """Jobs of the active band manifests that are neither done (band file) nor running (fleet_remaining.py) - the source of truth the owner named.
+    The done scan covers the band pods AND the pool pods (a pod that left the band role still holds its band files until pulled)."""
     ms = band_manifests()
-    if not ms or not band_pods:
+    if not ms:
         return [], ms
     out = os.path.join(RB, "jobs_remaining_sched.json")
-    r = subprocess.run([sys.executable, FLEET_REMAINING, "--manifest"] + ms + ["--pods-file", BAND_FILE, "--pulled", os.path.join(REPO, "runlogs", "runpod", "rb"), "--out", out],
+    scan = os.path.join(RB, "pods_scan_sched.txt")
+    write_lines(scan, list(dict.fromkeys(list(band_pods) + list(pool_pods))))
+    r = subprocess.run([sys.executable, FLEET_REMAINING, "--manifest"] + ms + ["--pods-file", scan, "--pulled", os.path.join(REPO, "runlogs", "runpod", "rb"), "--out", out],
                        capture_output=True, text=True, cwd=REPO, timeout=900)
     if r.returncode != 0:
         log(f"fleet_remaining failed: {r.stderr.strip()[-300:]}")
@@ -438,6 +473,30 @@ def tick(dry=False):
     pending = max(0, n_remote_inflight - (len(pool) - len(pool_free)))  # launched runs still waiting for a lock
     slots = max(0, len(pool_free) - pending)
 
+    # band survey first: band pods are the reserve for first-demo work (owner 17:58) - preempt when the pool cannot serve a run
+    bstate = survey_band(api, band) if band else {}
+    ready_remote_launchable = [e for e in sorted([e for e in q["entries"] if e.get("state") == "ready" and not e.get("local")], key=lambda e: (e.get("priority", 50), e.get("added_at", "")))
+                               if e["subtask"] not in inflight]
+    # one launch per subtask per tick
+    seen = set()
+    ready_remote_launchable = [e for e in ready_remote_launchable if not (e["subtask"] in seen or seen.add(e["subtask"]))]
+    need = max(0, len(ready_remote_launchable) - slots) + (pending if not pool_free else 0)
+    preempted = []
+    if need > 0 and bstate:
+        idle_first = [p for p, s in bstate.items() if s and s["boot"] and not s["running"]]
+        running_recent = sorted([p for p, s in bstate.items() if s and s["boot"] and s["running"]], key=lambda p: -(bstate[p].get("started") or 0))
+        for p in (idle_first + running_recent)[:need]:
+            ids = preempt_band_pod(p, bstate[p], names, dry)
+            preempted.append((p, ids))
+        if preempted:
+            move_pods([p for p, _ in preempted], "bands", "pool", names, [i for _, ids in preempted for i in ids] or None, dry)
+            pool_free += [p for p, _ in preempted]
+            pool = pool + [p for p, _ in preempted]
+            band = [p for p in band if p not in {x for x, _ in preempted}]
+            for p, _ in preempted:
+                bstate.pop(p, None)
+            slots = max(0, len(pool_free) - pending)
+
     # (c) pool launches, priority order, one per free pod, one per subtask
     launched = []
     for e in sorted([e for e in q["entries"] if e.get("state") == "ready"], key=lambda e: (e.get("priority", 50), e.get("added_at", ""))):
@@ -456,12 +515,11 @@ def tick(dry=False):
         slots -= 1
     save_queue(q)
 
-    # band fleet: survey, refill, role moves
-    bstate = survey_band(api, band) if band else {}
+    # band fleet: refill idle band pods, role moves
     band_idle = [p for p, s in bstate.items() if s and s["boot"] and not s["running"] and not s["queue"]]
     band_busy = [p for p, s in bstate.items() if s and (s["running"] or s["queue"])]
     queued_ids = {jid for s in bstate.values() if s for jid in s["queue"]}
-    remaining, manifests = band_remaining(band) if band else ([], band_manifests())
+    remaining, manifests = band_remaining(band, pool)
     unassigned = [j for j in (remaining or []) if not any(j["id"].startswith(qid) or qid.startswith(j["id"][:100]) for qid in queued_ids)] if remaining is not None else None
     for p in band_idle:  # stale current.txt markers make idle pods read as busy to other checks (owner 11:05)
         if bstate[p]["stale_current"] and not dry:
@@ -476,13 +534,17 @@ def tick(dry=False):
             band_idle = [p for p in band_idle if p not in take]
             unassigned = unassigned[len(take):]
     # role moves (owner 11:05): band pods with nothing left -> pool; free pool pods -> bands only while band jobs wait for a pod
-    ready_remote = [e for e in q["entries"] if e.get("state") == "ready" and not e.get("local")]
+    # "the pool needs a pod" = a ready remote entry that could launch now (its subtask not in flight) or an agent run pending a lock
+    launched_st = {x["subtask"] for x in launched}
+    ready_remote = [e for e in q["entries"] if e.get("state") == "ready" and not e.get("local") and e["subtask"] not in inflight and e["subtask"] not in launched_st]
     if unassigned is not None and not unassigned and band_idle:
         move_pods(band_idle, "bands", "pool", names, None, dry)
         pool_free += band_idle
         band_idle = []
     elif unassigned and not ready_remote and pending == 0 and pool_free:
-        n = min(len(pool_free), len(unassigned))
+        # pool -> bands only while nothing waits for a pod; at most MOVE_CAP pods per tick (each dispatch syncs HEAD to the pod);
+        # one job per pod - the band pods are preemptible reserve for first-demo runs
+        n = min(len(pool_free), len(unassigned), MOVE_CAP)
         movers = [p for p in pool_free if lock_free(p)][:n]
         move_pods(movers, "pool", "bands", names, None, dry)
         if movers:
@@ -497,7 +559,7 @@ def tick(dry=False):
     band = read_lines(BAND_FILE) if not dry else [p for p in band if p not in pool_free]
     pool_free_now = [p for p in pool_free if lock_free(p)] if not dry else pool_free
     idle_pods = {p: "pool" for p in pool_free_now}
-    idle_pods.update({p: "bands" for p in band_idle})
+    idle_pods.update({p: "band (preemptible)" for p in band_idle})
     for p in list(state["idle_since"]):
         if p not in idle_pods:
             state["idle_since"].pop(p)
@@ -518,7 +580,8 @@ def tick(dry=False):
     why_pool = ("ready queue empty for the pool: " + (f"{len(holds)} subtask(s) on hold for an owner decision ({', '.join(holds)}); " if holds else "")
                 + (f"{len(waiting)} waiting for a fix ({', '.join(s.replace('inter_object_relation_satisfaction-', 'IORS ').replace('configuration_matching-', 'CM ') for s in waiting)}); " if waiting else "")
                 + f"{sum(1 for ex in explain.values() if ex == 'valid demo on the board')} valid; {sum(1 for ex in explain.values() if ex.startswith('run in flight'))} in flight; coverage paused")
-    why_band = "band manifests exhausted: nothing unassigned; pool did not need the pod this pass (moved to the pool when this line is gone)" if not unassigned else "dispatch pending"
+    why_band = ("band manifests exhausted: nothing unassigned; pool did not need the pod this pass (moved to the pool when this line is gone)" if not unassigned
+                else "dispatch pending (next tick)") + " — preemptible reserve for first-demo runs"
     for p, role in idle_pods.items():
         lines.append(f"| {p} | {names.get(p, '?')} | {role} | {state['idle_since'].get(p, '?')} | {why_pool if role == 'pool' else why_band} |")
     if not idle_pods:
@@ -559,6 +622,52 @@ def cmd_add(args):
     q["entries"].append(e)
     save_queue(q)
     log(f"queue += {st} ({args.kind} {args.alias}) prio {args.priority} by {args.by}: {args.note}")
+
+
+def cancel_pid_tree(pid, wait_s=90):
+    """Cancel a first_demo run: SIGTERM its remote_run child first (its handler kills the pod-side process tree and releases the
+    lock), wait for it, then SIGTERM the parent (owner 17:58: the 17:29 cancel left sample_isg running on the pod)."""
+    import signal
+
+    kids = subprocess.run(["pgrep", "-P", str(pid)], capture_output=True, text=True).stdout.split()
+    rr = [int(k) for k in kids if "remote_run.py" in (subprocess.run(["ps", "-o", "args=", "-p", k], capture_output=True, text=True).stdout or "")]
+    for k in rr:
+        try:
+            os.kill(k, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    t0 = time.time()
+    while any(pid_alive(k) for k in rr) and time.time() - t0 < wait_s:
+        time.sleep(2)
+    stragglers = [k for k in rr if pid_alive(k)]
+    for k in stragglers:
+        try:
+            os.kill(k, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    try:
+        os.kill(int(pid), signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    return {"remote_run": rr, "killed_after_wait": stragglers, "waited_s": round(time.time() - t0)}
+
+
+def cmd_cancel(args):
+    q = load_queue()
+    n = 0
+    for e in q["entries"]:
+        if e.get("state") == "running" and (e["subtask"] == args.subtask or e.get("id") == args.entry) and e.get("pid"):
+            res = cancel_pid_tree(e["pid"])
+            e["state"] = "cancelled"
+            e["note"] = (e.get("note") or "") + f" | cancelled {now()}: {args.reason} ({res})"
+            log(f"cancelled {e['subtask']} pid {e['pid']}: {res} - {args.reason}")
+            n += 1
+    if args.pid:
+        res = cancel_pid_tree(args.pid)
+        log(f"cancelled pid {args.pid}: {res} - {args.reason}")
+        n += 1
+    save_queue(q)
+    print(f"cancelled {n} run(s)")
 
 
 def cmd_hold(args):
@@ -602,6 +711,12 @@ def main():
     s.add_argument("--note", default="")
     s.add_argument("--by", default="agent")
     s.set_defaults(fn=cmd_add)
+    s = sub.add_parser("cancel", help="cancel a running first-demo run: remote_run child first (kills the pod-side tree), then the parent")
+    s.add_argument("--subtask", default=None)
+    s.add_argument("--entry", default=None)
+    s.add_argument("--pid", type=int, default=None, help="a first_demo.py pid not in the queue (agent-launched)")
+    s.add_argument("--reason", default="")
+    s.set_defaults(fn=cmd_cancel)
     s = sub.add_parser("hold")
     s.add_argument("--subtask", required=True)
     s.add_argument("--reason", required=True)

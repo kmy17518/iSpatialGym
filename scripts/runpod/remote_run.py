@@ -25,6 +25,7 @@ import argparse
 import fcntl
 import os
 import shlex
+import signal
 import subprocess
 import sys
 import time
@@ -108,14 +109,38 @@ def main():
     pid, ep, lock_fh = acquire_pod(api, args.wait)
     run_id = time.strftime("%H%M%S") + "-" + uuid.uuid4().hex[:6]
     print(f"remote_run: pod {pid} ({ep[0]}:{ep[1]}), run id {run_id}", file=sys.stderr, flush=True)
+    # cancellation (owner 2026-09-16 17:58): a SIGTERM / SIGINT to this process kills the remote command's process tree on the pod
+    # (everything whose command line names this run's directory) BEFORE the lock is released - the 17:29 cancel had killed
+    # only the local first_demo.py and left sample_isg running next to another job on the pod
+    pat = f"/root/smoke/{run_id[:-1]}[{run_id[-1]}]"
+    ssh_proc = {"p": None}
+
+    def on_term(signum, _frame):
+        print(f"remote_run: signal {signum}: killing run {run_id} on {pid} before releasing the lock", file=sys.stderr, flush=True)
+        try:
+            rp.ssh_run(*ep, f"pkill -KILL -f '{pat}' || true; sleep 1; pkill -KILL -f '{pat}' || true", capture=True, timeout=45)
+        except Exception as e:  # noqa: BLE001
+            print(f"remote_run: remote kill failed: {e}", file=sys.stderr, flush=True)
+        p = ssh_proc["p"]
+        if p is not None and p.poll() is None:
+            p.kill()
+        try:
+            fcntl.flock(lock_fh, fcntl.LOCK_UN)
+            lock_fh.close()
+        except Exception:  # noqa: BLE001
+            pass
+        sys.exit(143 if signum == signal.SIGTERM else 130)
+
+    signal.signal(signal.SIGTERM, on_term)
+    signal.signal(signal.SIGINT, on_term)
     try:
         if args.sync:
             sync_tree(ep)
         remote = (f"mkdir -p /root/smoke/{run_id} && cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && "
                   f"conda activate ispatialgym && export OMNIGIBSON_HEADLESS=1 OMNI_KIT_ACCEPT_EULA=YES SMOKE_OUT=/root/smoke/{run_id} && "
                   f"timeout {int(args.timeout)} bash -c {shlex.quote(cmd)}")
-        r = subprocess.run(rp.ssh_base(*ep) + [remote], stdin=subprocess.DEVNULL)
-        rc = r.returncode
+        ssh_proc["p"] = subprocess.Popen(rp.ssh_base(*ep) + [remote], stdin=subprocess.DEVNULL)
+        rc = ssh_proc["p"].wait()
         # one job per pod also when the command backgrounded itself (nohup … &): hold the lock until every process that
         # references this run's directory is gone (owner rule 2026-09-16 11:05: no pool pod runs two simulators)
         if args.pull:  # pull first: the results must not wait for stragglers
@@ -124,7 +149,6 @@ def main():
             rp.rsync(remote_path.rstrip("/") + "/", args.pull[1].rstrip("/") + "/", *ep, to_pod=False)
         # one job per pod also when the command backgrounded itself: hold the lock while processes of this run live (the
         # pattern must not match the pgrep shell itself: bracket trick on the last character), at most 15 min, then kill them
-        pat = f"/root/smoke/{run_id[:-1]}[{run_id[-1]}]"
         t_wait = time.time()
         while time.time() - t_wait < 900:
             try:
@@ -143,8 +167,11 @@ def main():
         print(f"remote_run: exit {rc} (pod {pid}, run {run_id})", file=sys.stderr, flush=True)
         sys.exit(rc)
     finally:
-        fcntl.flock(lock_fh, fcntl.LOCK_UN)
-        lock_fh.close()
+        try:
+            fcntl.flock(lock_fh, fcntl.LOCK_UN)
+            lock_fh.close()
+        except Exception:  # noqa: BLE001  (already released by the signal handler)
+            pass
 
 
 if __name__ == "__main__":

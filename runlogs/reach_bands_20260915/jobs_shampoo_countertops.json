@@ -1,0 +1,52 @@
+[
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__shampoo_dispenser-zoyyia",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-ontop_large_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-ontop_large_scale#02"
+  ],
+  "slot": "representative",
+  "scene": "house_single_floor",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_ikwqer_0",
+   "--object",
+   "shampoo_dispenser/zoyyia",
+   "--grasp-key",
+   "shampoo_dispenser__zoyyia"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 3000 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object shampoo_dispenser/zoyyia --grasp-key shampoo_dispenser__zoyyia --out $OUT",
+  "wave": 1
+ },
+ {
+  "id": "rb__tabletop__house_single_floor__countertop_fjkase_0__shampoo_dispenser-zoyyia",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-ontop_large_scale"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-ontop_large_scale#02"
+  ],
+  "slot": "representative",
+  "scene": "house_single_floor",
+  "weight": 3.0,
+  "args": [
+   "--scene",
+   "house_single_floor",
+   "--support",
+   "countertop_fjkase_0",
+   "--object",
+   "shampoo_dispenser/zoyyia",
+   "--grasp-key",
+   "shampoo_dispenser__zoyyia"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 3000 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_fjkase_0 --object shampoo_dispenser/zoyyia --grasp-key shampoo_dispenser__zoyyia --out $OUT",
+  "wave": 1
+ }
+]

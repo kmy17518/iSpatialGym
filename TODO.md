@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 17:52 PDT — 8/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 18:10 PDT — 5/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -126,7 +126,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | camera_relocalization-obstructed | valid demo | tracker corner fix d4a1745 not yet re-demoed | oracle |
 | object_scaling | valid demo | - | - |
 | mental_rotation | valid demo | - | - |
-| disembedding | valid demo | - | - |
+| disembedding | demo run (pre-fix success) | - | - |
 | CM block_design | no instance | owner 17:10 (1): first demo with block_no_flip (35506bf) — loop running (scheduler 17:24); flip-on-the-table sub-chain = required end state, prep workstream (tabletop sampler + oracle program) | tabletop / oracle |
 | CM attachment | no instance | owner 17:10 (2): brace stays — second base pose recorded after the male grasp, sidecar transition, oracle executes it holding the object; brace optional only if no cell after that | tabletop → oracle |
 | CM articulation_open_small_scale | no instance | owner 17:10 (3): Phase-2 cone 25° / focus-in-frame for small articulation (tabletop, 20 min) → hinged_jar loop | tabletop |
@@ -136,9 +136,9 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | alignment-world_vertical | demo run | oracle re-runs on 4b2bb60 / 9345c8a: push [execution] again (17:06) → oracle | oracle |
 | alignment-world_horizontal | demo run | oracle re-run on 4b2bb60: push plan_failed again (16:56) → oracle | oracle |
 | alignment-axial | valid demo | - | - |
-| IORS ontop_small_scale | valid demo | - | - |
+| IORS ontop_small_scale | demo run (pre-fix success) | - | - |
 | IORS under_small_scale | demo run (pre-fix success) | core 6307dd7: the cup rotated in the hand at the grasp (grasp_3 closing axis 28° off horizontal) → flush pinches only + release at half the well depth; loop running (17:24) | core / loop |
-| IORS inside | valid demo | - | - |
+| IORS inside | demo run (pre-fix success) | - | - |
 | IORS nextto | demo run (pre-fix success) | owner 17:10 (4): placed_tilt withdrawn (roll happens during finger closure, 24.6°); closure-roll investigation on a pod (≤ 3 h, agent 52b4fb5f: grasp height +5/+10 mm, closure speed, attach-on-first-contact; marker/pencil/bottle) → else cylinder equivalences in the gate; (5) FOV rule (b) + carry leg re-run | oracle / investigation |
 | IORS touching | no instance | owner 17:10: brace optional (as axial) — core (iors_small + program_check) + oracle (program); loop on the fix | core → oracle |
 | IORS ontop_large_scale | no instance | countertop pair: goal_region_not_visible at the only free edge (+u) now logged; sofa-bar target_placement x8 → large-scale | large-scale |
@@ -288,3 +288,5 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026‑09‑16 17:47 PDT agent-e2e: Slack poll 1 — no owner replies. D‑004 verdict on `0427202` landed early (open `no_manipulation_stance` ×8, close `handle_unreachable` ×6 + `no_manipulation_stance` ×2) → default applied: fallback aliases `articulation_open_large_scale-{fridge,dishwasher,oven}` launched on three pool pods; rvunhj_0 stays open (large‑scale agent); thread reply posted. Wall vertical demo‑only on the oracle's `170d02a`: push `execution` again.
 - 2026‑09‑16 17:51 PDT agent-e2e: Slack subscriptions active after the owner linked the account — channel `C0C2D1X2V8E` (threads included) `sub_a6770b43…`, D‑004 thread `sub_e90d53ab…`; the 5‑min poll loop stopped, the 30‑min `[STATUS]` loop continues; replies now arrive as events.
 - 2026‑09‑16 17:55 PDT agent-e2e: Slack D‑004 thread — owner `Q: other solutions for A while we wait for B` → answered: other A3 cabinet doors (`top_cabinet`, `bottom_cabinet_no_top`) launched on 2 pool pods; A6 posture in Phase 2 step 1 (rvunhj_0 open on `0427202`: 1511 untucked survivors, step‑2 reach 0); keep both approach families (leaf‑plane + perpendicular); hybrid base‑follow only on request; close variant = Phase‑1 `no_stance` with the door open → A4 S restriction. Items 2–3 queued for the large‑scale agent.
+- 2026-09-16 18:08 PDT pod_scheduler: role change pool -> bands: uilwpybjxnekg0 (smoke2-a40-2), xnam1nh3y2706e (smoke-l40s-3), oliefq3ymuexna (pilot2-a40-1), bl91tuqop45ila (pilot2-l40s-2), cy0f5t6i58i08v (pilot2-l40s-3), s7m4h2ay2slau4 (pilot2-l40s-4); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed)
+- 2026‑09‑16 18:13 PDT agent-e2e (owner 17:58): **orphans killed** — `pilot2-a40-6` (`1c88jsy46ubecf`): the attachment `sample_isg` left by the 17:29 cancel (pid 40952, 8.6 GB) killed with `pkill -f 'attachment-lid-teapot-breakfast_tabl[e]'`, the dishwasher run untouched (verified ps + nvidia-smi); fleet scan found one more orphan — `pilot2-l40s-3` ran the wall‑horizontal `run_isg` with no lock holder (its remote_run was gone) → killed. **Cancel path fixed:** `remote_run.py` SIGTERM/SIGINT handler kills the pod‑side tree (`pkill -KILL -f '/root/smoke/<run_id>'`) and the local ssh before releasing the lock; `pod_scheduler.py cancel --subtask|--entry|--pid` SIGTERMs the remote_run child first, waits for it (≤ 90 s), then the first_demo parent. **Held‑out bands:** `runlogs/reach_bands_20260915/active_manifests.txt` = `jobs_shampoo_countertops.json` (the two `shampoo_dispenser-zoyyia` countertop jobs, ikwqer_0 first, weight 3.0) + `jobs_w3_heldout.json` → fleet_remaining 43 remaining; the scheduler moved 6 idle pool pods to the band role (`xnam1nh3y2706e` smoke‑l40s‑3, `oliefq3ymuexna` pilot2‑a40‑1, `bl91tuqop45ila` pilot2‑l40s‑2, `cy0f5t6i58i08v` pilot2‑l40s‑3, `s7m4h2ay2slau4` pilot2‑l40s‑4, `nfgjwzgjajpr5u` pilot2‑l40s‑7; runners started where gone) and dispatched one job each (wave 40); ≤ 6 moves per tick, one job per pod, 37 unassigned queue behind. **Preemption rule** in `pod_scheduler.py`: when a first‑demo run (ready entry, agent run pending a lock, Slack `RUN:`) has no free pool pod, the scheduler preempts band pods — idle ones first, then the most recently started job (`current.txt` mtime): runner + `reach_bands` process killed, `running/` + `queue/` job files parked in `/root/samp/queue_preempted/`, `current.txt` cleared, pod → pool, the interrupted job stays in the remaining set (no band file) and is re‑dispatched to a band pod on the next tick; logged here + `paused_for_resume.md` with the job id; `idle_pods.md` shows band pods as "band (preemptible)". Never a pool pod for a band job.

@@ -1,109 +1,43 @@
 {
- "updated": "2026-09-16 17:28 PDT",
+ "updated": "2026-09-16 18:07 PDT",
  "entries": [
   {
-   "id": "configuration_matching-articulation_open_large_scale:0916-171926",
-   "priority": 10,
-   "subtask": "configuration_matching-articulation_open_large_scale",
-   "alias": "configuration_matching-articulation_open_large_scale-bottom_cabinet",
-   "kind": "run",
-   "tro": null,
-   "scene": "office_cubicles_right",
-   "local": false,
-   "state": "running",
-   "added_by": "rule",
-   "added_at": "2026-09-16 17:19 PDT",
-   "note": "auto: new fix(es) 0427202 since the last run",
-   "missing_fixes": [
-    "0427202"
-   ],
-   "launched_at": "2026-09-16 17:19 PDT",
-   "pid": 861912,
-   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-articulation_open_large_scale-bottom_cabinet.sched-171927.log"
-  },
-  {
-   "id": "configuration_matching-articulation_close_large_scale:0916-171926",
-   "priority": 11,
+   "id": "configuration_matching-articulation_close_large_scale:0916-175857",
+   "priority": 15,
    "subtask": "configuration_matching-articulation_close_large_scale",
    "alias": "configuration_matching-articulation_close_large_scale-bottom_cabinet",
    "kind": "run",
    "tro": null,
-   "scene": "office_cubicles_right",
+   "scene": "Rs_int",
    "local": false,
    "state": "running",
-   "added_by": "rule",
-   "added_at": "2026-09-16 17:19 PDT",
-   "note": "auto: new fix(es) 0427202 since the last run",
-   "missing_fixes": [
-    "0427202"
-   ],
-   "launched_at": "2026-09-16 17:19 PDT",
-   "pid": 861913,
-   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-articulation_close_large_scale-bottom_cabinet.sched-171927.log"
+   "added_by": "large-scale",
+   "added_at": "2026-09-16 17:58 PDT",
+   "note": "Rs_int drawer: Phase 1 base_ok diagnostics",
+   "max_attempts": 8,
+   "timeout": 7200,
+   "launched_at": "2026-09-16 18:07 PDT",
+   "pid": 980816,
+   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-articulation_close_large_scale-bottom_cabinet.sched-180755.log"
   },
   {
-   "id": "inter_object_relation_satisfaction-ontop_small_scale:0916-171926",
-   "priority": 20,
-   "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
-   "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
+   "id": "inter_object_relation_satisfaction-ontop_large_scale:0916-175955",
+   "priority": 15,
+   "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+   "alias": "inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar",
    "kind": "run",
    "tro": null,
-   "scene": null,
-   "local": false,
+   "scene": "house_single_floor",
+   "local": true,
    "state": "running",
-   "added_by": "rule",
-   "added_at": "2026-09-16 17:19 PDT",
-   "note": "auto: new fix(es) 6307dd7 since the last run",
-   "missing_fixes": [
-    "6307dd7"
-   ],
-   "launched_at": "2026-09-16 17:19 PDT",
-   "pid": 861917,
-   "log": "runlogs/pilot_20260915/first_demo/logs/inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_ta.sched-171927.log"
-  },
-  {
-   "id": "inter_object_relation_satisfaction-under_small_scale:0916-172358",
-   "priority": 22,
-   "subtask": "inter_object_relation_satisfaction-under_small_scale",
-   "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
-   "kind": "run",
-   "tro": null,
-   "scene": null,
-   "local": false,
-   "state": "running",
-   "added_by": "rule",
-   "added_at": "2026-09-16 17:23 PDT",
-   "note": "auto: new fix(es) 625759b, 7737dfe, 0bd9e1f, bcc1478, 6307dd7 since the last run",
-   "missing_fixes": [
-    "625759b",
-    "7737dfe",
-    "0bd9e1f",
-    "bcc1478",
-    "6307dd7"
-   ],
-   "launched_at": "2026-09-16 17:23 PDT",
-   "pid": 869722,
-   "log": "runlogs/pilot_20260915/first_demo/logs/inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table.sched-172359.log"
-  },
-  {
-   "id": "mental_rotation:0916-171350",
-   "priority": 53,
-   "subtask": "mental_rotation",
-   "alias": "mental_rotation-banana",
-   "kind": "run",
-   "tro": null,
-   "scene": null,
-   "local": false,
-   "state": "running",
-   "added_by": "rule",
-   "added_at": "2026-09-16 17:13 PDT",
-   "note": "auto: new fix(es) bcc1478 since the last run",
-   "missing_fixes": [
-    "bcc1478"
-   ],
-   "launched_at": "2026-09-16 17:13 PDT",
-   "pid": 846030,
-   "log": "runlogs/pilot_20260915/first_demo/logs/mental_rotation-banana.sched-171351.log"
+   "added_by": "large-scale",
+   "added_at": "2026-09-16 17:59 PDT",
+   "note": "B->C path limit 6 m (4df6d0ac): the sofa run failed only on path_too_long 4.7-5.2 m",
+   "max_attempts": 8,
+   "timeout": 7200,
+   "launched_at": "2026-09-16 18:07 PDT",
+   "pid": 980827,
+   "log": "runlogs/pilot_20260915/first_demo/logs/inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar.sched-180755.log"
   },
   {
    "id": "configuration_matching-block_design:0916-172358",
@@ -145,24 +79,28 @@
    "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-block_design-block_4-breakfast_table.sched-172359.log"
   },
   {
-   "id": "alignment-axial:0916-171351",
-   "priority": 63,
-   "subtask": "alignment-axial",
-   "alias": "alignment-axial-board_game-breakfast_table",
+   "id": "configuration_matching-attachment:0916-173835",
+   "priority": 56,
+   "subtask": "configuration_matching-attachment",
+   "alias": "configuration_matching-attachment-lid-teapot-breakfast_table",
    "kind": "run",
    "tro": null,
    "scene": null,
    "local": false,
    "state": "running",
    "added_by": "rule",
-   "added_at": "2026-09-16 17:13 PDT",
-   "note": "auto: new fix(es) bcc1478 since the last run",
+   "added_at": "2026-09-16 17:38 PDT",
+   "note": "auto: new fix(es) 5e30334, 5e30334, 625759b, bcc1478, 58afae2 since the last run",
    "missing_fixes": [
-    "bcc1478"
+    "5e30334",
+    "5e30334",
+    "625759b",
+    "bcc1478",
+    "58afae2"
    ],
-   "launched_at": "2026-09-16 17:13 PDT",
-   "pid": 846031,
-   "log": "runlogs/pilot_20260915/first_demo/logs/alignment-axial-board_game-breakfast_table.sched-171351.log"
+   "launched_at": "2026-09-16 17:38 PDT",
+   "pid": 905641,
+   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-attachment-lid-teapot-breakfast_table.sched-173836.log"
   },
   {
    "id": "inter_object_relation_satisfaction-under_large_scale:0916-171927",
@@ -184,6 +122,71 @@
    "launched_at": "2026-09-16 17:19 PDT",
    "pid": 861918,
    "log": "runlogs/pilot_20260915/first_demo/logs/inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed.sched-171927.log"
+  },
+  {
+   "id": "configuration_matching-articulation_open_large_scale:0916-171926",
+   "priority": 10,
+   "subtask": "configuration_matching-articulation_open_large_scale",
+   "alias": "configuration_matching-articulation_open_large_scale-bottom_cabinet",
+   "kind": "run",
+   "tro": null,
+   "scene": "office_cubicles_right",
+   "local": false,
+   "state": "done",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:19 PDT",
+   "note": "auto: new fix(es) 0427202 since the last run",
+   "missing_fixes": [
+    "0427202"
+   ],
+   "launched_at": "2026-09-16 17:19 PDT",
+   "pid": 861912,
+   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-articulation_open_large_scale-bottom_cabinet.sched-171927.log",
+   "finished_at": "2026-09-16 17:44 PDT",
+   "verdict": {
+    "n_written": 0,
+    "rejections": {
+     "no_manipulation_stance": 8
+    },
+    "demo": null,
+    "reason": null,
+    "failed": null,
+    "meta": null,
+    "commit": "6307dd7"
+   }
+  },
+  {
+   "id": "configuration_matching-articulation_close_large_scale:0916-171926",
+   "priority": 11,
+   "subtask": "configuration_matching-articulation_close_large_scale",
+   "alias": "configuration_matching-articulation_close_large_scale-bottom_cabinet",
+   "kind": "run",
+   "tro": null,
+   "scene": "office_cubicles_right",
+   "local": false,
+   "state": "done",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:19 PDT",
+   "note": "auto: new fix(es) 0427202 since the last run",
+   "missing_fixes": [
+    "0427202"
+   ],
+   "launched_at": "2026-09-16 17:19 PDT",
+   "pid": 861913,
+   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-articulation_close_large_scale-bottom_cabinet.sched-171927.log",
+   "finished_at": "2026-09-16 17:38 PDT",
+   "verdict": {
+    "n_written": 0,
+    "rejections": {
+     "handle_unreachable": 6,
+     "no_manipulation_stance": 2
+    },
+    "demo": null,
+    "reason": null,
+    "failed": null,
+    "meta": null,
+    "commit": "6307dd7"
+   }
   },
   {
    "id": "inter_object_relation_satisfaction-ontop_large_scale:0916-171927",
@@ -218,6 +221,163 @@
    }
   },
   {
+   "id": "inter_object_relation_satisfaction-ontop_large_scale:0916-174409",
+   "priority": 12,
+   "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+   "alias": "inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": true,
+   "state": "done",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:44 PDT",
+   "note": "auto: new fix(es) 4df6d0a since the last run",
+   "missing_fixes": [
+    "4df6d0a"
+   ],
+   "launched_at": "2026-09-16 17:44 PDT",
+   "pid": 923759,
+   "log": "runlogs/pilot_20260915/first_demo/logs/inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar.sched-174409.log",
+   "finished_at": "2026-09-16 17:54 PDT",
+   "verdict": {
+    "n_written": 0,
+    "rejections": {
+     "target_placement": 8
+    },
+    "demo": null,
+    "reason": null,
+    "failed": null,
+    "meta": null,
+    "commit": "0ec0153"
+   }
+  },
+  {
+   "id": "configuration_matching-articulation_open_large_scale:0916-174147",
+   "priority": 15,
+   "subtask": "configuration_matching-articulation_open_large_scale",
+   "alias": "configuration_matching-articulation_open_large_scale-bottom_cabinet",
+   "kind": "run",
+   "tro": null,
+   "scene": "Rs_int",
+   "local": false,
+   "state": "done",
+   "added_by": "large-scale",
+   "added_at": "2026-09-16 17:41 PDT",
+   "note": "Rs_int bamfsz_0 j_link_4 = prismatic drawer, 19.7 mm bar, base-mode follow; rvunhj_0 (office) has no >= 15 mm handle (edge pinch only)",
+   "max_attempts": 8,
+   "timeout": 7200,
+   "launched_at": "2026-09-16 17:44 PDT",
+   "pid": 923760,
+   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-articulation_open_large_scale-bottom_cabinet.sched-174409.log",
+   "finished_at": "2026-09-16 17:59 PDT",
+   "verdict": {
+    "n_written": 0,
+    "rejections": {
+     "no_stance": 8
+    },
+    "demo": null,
+    "reason": null,
+    "failed": null,
+    "meta": null,
+    "commit": "0ec0153"
+   }
+  },
+  {
+   "id": "configuration_matching-articulation_close_large_scale:0916-174147",
+   "priority": 15,
+   "subtask": "configuration_matching-articulation_close_large_scale",
+   "alias": "configuration_matching-articulation_close_large_scale-bottom_cabinet",
+   "kind": "run",
+   "tro": null,
+   "scene": "Rs_int",
+   "local": false,
+   "state": "done",
+   "added_by": "large-scale",
+   "added_at": "2026-09-16 17:41 PDT",
+   "note": "Rs_int drawer (base mode); rvunhj_0 edge pinch follows the leaf only near 90 deg",
+   "max_attempts": 8,
+   "timeout": 7200,
+   "launched_at": "2026-09-16 17:44 PDT",
+   "pid": 923761,
+   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-articulation_close_large_scale-bottom_cabinet.sched-174409.log",
+   "finished_at": "2026-09-16 17:54 PDT",
+   "verdict": {
+    "n_written": 0,
+    "rejections": {
+     "no_stance": 8
+    },
+    "demo": null,
+    "reason": null,
+    "failed": null,
+    "meta": null,
+    "commit": "0ec0153"
+   }
+  },
+  {
+   "id": "configuration_matching-articulation_close_large_scale:0916-175846",
+   "priority": 15,
+   "subtask": "configuration_matching-articulation_close_large_scale",
+   "alias": "configuration_matching-articulation_close_large_scale-bottom_cabinet",
+   "kind": "run",
+   "tro": null,
+   "scene": "Rs_int",
+   "local": false,
+   "state": "done",
+   "added_by": "large-scale",
+   "added_at": "2026-09-16 17:58 PDT",
+   "note": "Rs_int drawer: Phase 1 base_ok diagnostics",
+   "max_attempts": 8,
+   "timeout": 7200,
+   "launched_at": "2026-09-16 17:59 PDT",
+   "pid": 963674,
+   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-articulation_close_large_scale-bottom_cabinet.sched-175945.log",
+   "finished_at": "2026-09-16 18:07 PDT",
+   "verdict": {
+    "n_written": 0,
+    "rejections": {
+     "no_stance": 8
+    },
+    "demo": null,
+    "reason": null,
+    "failed": null,
+    "meta": null,
+    "commit": "1c829ae"
+   }
+  },
+  {
+   "id": "inter_object_relation_satisfaction-ontop_small_scale:0916-171926",
+   "priority": 20,
+   "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
+   "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "done",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:19 PDT",
+   "note": "auto: new fix(es) 6307dd7 since the last run",
+   "missing_fixes": [
+    "6307dd7"
+   ],
+   "launched_at": "2026-09-16 17:19 PDT",
+   "pid": 861917,
+   "log": "runlogs/pilot_20260915/first_demo/logs/inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_ta.sched-171927.log",
+   "finished_at": "2026-09-16 17:54 PDT",
+   "verdict": {
+    "n_written": 1,
+    "rejections": {
+     "target_placement": 1
+    },
+    "demo": "success",
+    "reason": null,
+    "failed": null,
+    "meta": "runlogs/pilot_20260915/first_demo/inter_object_relation_satisfaction-ontop_small_scale/0916-171927/demo/inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table__house_single_floor__partner-platter-csanbr__target-pack_of_kielbasa-dgodnn__0000/meta.json",
+    "commit": "6307dd7"
+   }
+  },
+  {
    "id": "inter_object_relation_satisfaction-under_small_scale:0916-170337",
    "priority": 22,
    "subtask": "inter_object_relation_satisfaction-under_small_scale",
@@ -234,6 +394,79 @@
     "625759b",
     "7737dfe"
    ]
+  },
+  {
+   "id": "inter_object_relation_satisfaction-under_small_scale:0916-172358",
+   "priority": 22,
+   "subtask": "inter_object_relation_satisfaction-under_small_scale",
+   "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "done",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:23 PDT",
+   "note": "auto: new fix(es) 625759b, 7737dfe, 0bd9e1f, bcc1478, 6307dd7 since the last run",
+   "missing_fixes": [
+    "625759b",
+    "7737dfe",
+    "0bd9e1f",
+    "bcc1478",
+    "6307dd7"
+   ],
+   "launched_at": "2026-09-16 17:23 PDT",
+   "pid": 869722,
+   "log": "runlogs/pilot_20260915/first_demo/logs/inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table.sched-172359.log",
+   "finished_at": "2026-09-16 17:59 PDT",
+   "verdict": {
+    "n_written": 1,
+    "rejections": {},
+    "demo": "oracle_failed",
+    "reason": "not_reached",
+    "failed": {
+     "action": null,
+     "category": "not_reached",
+     "message": "binary goal not reached; unsatisfied: (under ?saucer.n.02_1 ?teacup.n.02_1)"
+    },
+    "meta": "runlogs/pilot_20260915/first_demo/inter_object_relation_satisfaction-under_small_scale/0916-172359/demo/inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table__house_single_floor__partner-saucer-mgbeah__target-teacup-wopjex__0000/meta.json",
+    "commit": "35506bf"
+   }
+  },
+  {
+   "id": "inter_object_relation_satisfaction-touching:0916-173836",
+   "priority": 30,
+   "subtask": "inter_object_relation_satisfaction-touching",
+   "alias": "inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "done",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:38 PDT",
+   "note": "auto: new fix(es) 6de8803 since the last run",
+   "missing_fixes": [
+    "6de8803"
+   ],
+   "launched_at": "2026-09-16 17:38 PDT",
+   "pid": 905640,
+   "log": "runlogs/pilot_20260915/first_demo/logs/inter_object_relation_satisfaction-touching-box_of_sanitary_napkins-box_of_tissues-breakfa.sched-173836.log",
+   "finished_at": "2026-09-16 17:54 PDT",
+   "verdict": {
+    "n_written": 0,
+    "rejections": {
+     "contact_unreachable": 2,
+     "approach_untrackable": 2,
+     "program_check_failed": 3,
+     "target_placement": 1
+    },
+    "demo": null,
+    "reason": null,
+    "failed": null,
+    "meta": null,
+    "commit": "4b00a7e"
+   }
   },
   {
    "id": "object_scaling:0916-171350",
@@ -262,6 +495,36 @@
     "reason": null,
     "failed": null,
     "meta": "runlogs/pilot_20260915/first_demo/object_scaling/0916-171351/demo/object_scaling-beaker__house_single_floor__target-beaker-rhohgs__0000/meta.json",
+    "commit": "70d9ea2"
+   }
+  },
+  {
+   "id": "mental_rotation:0916-171350",
+   "priority": 53,
+   "subtask": "mental_rotation",
+   "alias": "mental_rotation-banana",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "done",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:13 PDT",
+   "note": "auto: new fix(es) bcc1478 since the last run",
+   "missing_fixes": [
+    "bcc1478"
+   ],
+   "launched_at": "2026-09-16 17:13 PDT",
+   "pid": 846030,
+   "log": "runlogs/pilot_20260915/first_demo/logs/mental_rotation-banana.sched-171351.log",
+   "finished_at": "2026-09-16 17:49 PDT",
+   "verdict": {
+    "n_written": 1,
+    "rejections": {},
+    "demo": "success",
+    "reason": null,
+    "failed": null,
+    "meta": "runlogs/pilot_20260915/first_demo/mental_rotation/0916-171351/demo/mental_rotation-banana__house_single_floor__target-banana-znakxm__0000/meta.json",
     "commit": "70d9ea2"
    }
   },
@@ -336,13 +599,39 @@
    "launched_at": "2026-09-16 17:23 PDT",
    "pid": 869726,
    "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-articulation_close_small_scale-hinged_jar-breakfast_table.sched-172359.log"
+  },
+  {
+   "id": "alignment-axial:0916-171351",
+   "priority": 63,
+   "subtask": "alignment-axial",
+   "alias": "alignment-axial-board_game-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "done",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:13 PDT",
+   "note": "auto: new fix(es) bcc1478 since the last run",
+   "missing_fixes": [
+    "bcc1478"
+   ],
+   "launched_at": "2026-09-16 17:13 PDT",
+   "pid": 846031,
+   "log": "runlogs/pilot_20260915/first_demo/logs/alignment-axial-board_game-breakfast_table.sched-171351.log",
+   "finished_at": "2026-09-16 17:38 PDT",
+   "verdict": {
+    "n_written": 1,
+    "rejections": {},
+    "demo": "success",
+    "reason": null,
+    "failed": null,
+    "meta": "runlogs/pilot_20260915/first_demo/alignment-axial/0916-171351/demo/alignment-axial-board_game-breakfast_table__house_single_floor__target-board_game-qgvsnb__0000/meta.json",
+    "commit": "70d9ea2"
+   }
   }
  ],
  "holds": {
-  "configuration_matching-attachment": {
-   "reason": "owner 17:10 item 2 decided (brace stays; second base pose after the grasp) - tabletop implementing; lifts on its targeted fix-log entry",
-   "since": "2026-09-16 17:28 PDT"
-  },
   "configuration_matching-articulation_open_small_scale": {
    "reason": "owner 17:10 item 3 decided (25 deg cone) - tabletop implementing; lifts on its targeted fix-log entry",
    "since": "2026-09-16 17:28 PDT"
@@ -350,10 +639,6 @@
   "configuration_matching-articulation_close_small_scale": {
    "reason": "same as open (25 deg cone)",
    "since": "2026-09-16 17:28 PDT"
-  },
-  "inter_object_relation_satisfaction-touching": {
-   "reason": "owner 17:10: brace optional (as axial) - core (iors_small + program_check) + oracle (program) implementing; lifts on the fix-log entry",
-   "since": "2026-09-16 17:27 PDT"
   },
   "inter_object_relation_satisfaction-nextto": {
    "reason": "owner 17:10 item 4: closure-roll investigation (agent 52b4fb5f, <= 3 h) then either the closure fix or cylinder equivalences in the gate; item 5 FOV rule (b) re-run follows",
