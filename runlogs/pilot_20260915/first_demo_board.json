@@ -80,12 +80,12 @@
   "owner": "loop"
  },
  "inter_object_relation_satisfaction-nextto": {
-  "blocking": "closure ramp + pre-shape (bcc937d): 0.386 \u2192 0.038 rad; the release still flings the pencil (blocked lower pad snaps open in the retreat) \u2192 oracle-B staged / rate-limited release; gate = placed_orientation with cylinder equivalences (38258f0)",
-  "owner": "oracle-B"
+  "blocking": "-",
+  "owner": "-"
  },
  "inter_object_relation_satisfaction-touching": {
-  "blocking": "push spans the measured gap at the place + tolerance margin (core a6d7123); pre-grasp joint jump / grasp plan \u2192 primary oracle; re-run queued",
-  "owner": "loop / oracle"
+  "blocking": "push spans the gap + tolerance (a6d7123); closure shifts the box 15.4 mm (off-centre pinch \u2192 core pinch_offset rule); the push's Retreat pushes the box 27.6 mm further (\u2192 primary oracle, as the axial retreat fix); grasp plan_failed x2 (oracle)",
+  "owner": "core / oracle"
  },
  "inter_object_relation_satisfaction-ontop_large_scale": {
   "blocking": "countertop pair = geometric yield (partner behind stance A) \u2192 floor fallback alias queued (local); sofa-bar re-run with the B\u2192C path limit geodesic+3 m (4df6d0a) running locally",
