@@ -830,17 +830,20 @@ class ArticulationLarge(SamplerV2):
     def _stance_key(self, manip: Stance) -> str:
         return f"d{manip.stand_off:.2f}_l{manip.lateral:+.2f}_t{manip.translate:.2f}_{manip.tilt:+.2f}_p{self.pinch_sign:+.0f}"
 
-    def arm_reach_limit(self, manip: Stance, q_from: float, q_seed: Optional[th.Tensor]) -> float:
-        """The largest joint value on the grid ``q_from → upper`` (10° / 5 cm steps, upper included) whose handle grasp
-        pose the arm reaches from ``manip`` with the world re-synced at that value (target ignored for the grasp pose);
-        the sweep stops at the first miss, so every value up to the limit is reachable."""
+    def arm_reach_limit(self, manip: Stance, q_from: float, q_seed: Optional[th.Tensor], q_to: Optional[float] = None) -> float:
+        """The farthest joint value on the grid ``q_from → q_to`` (default the upper limit; 10° / 5 cm steps, ``q_to``
+        included, either direction) whose handle grasp pose the arm reaches from ``manip`` with the world re-synced at
+        that value (target ignored for the grasp pose); the sweep stops at the first miss, so every value up to the
+        limit is reachable."""
         obj = self.target
         step_cfg = dict(self.gp.gen("reach_grid_step") or REACH_GRID_STEP)
         step = math.radians(float(step_cfg.get("revolute_deg", 10.0))) if self.joint.is_revolute else float(step_cfg.get("prismatic_m", 0.05))
+        q_to = self.upper if q_to is None else float(q_to)
+        grid = reach_grid(q_from, q_to, step) if q_to >= q_from else [2 * q_from - v for v in reach_grid(q_from, 2 * q_from - q_to, step)]
         q_now = self.joint_value()
         reach, seed = float(q_from), q_seed
         try:
-            for q in reach_grid(q_from, self.upper, step):
+            for q in grid:
                 self.pose_joint(q)
                 w = self.h([q])[0]
                 res = self.ikc.exact([w.eef], manip, self.arm, ignore_for_last=[obj], q_seed=seed, cache=False)
@@ -935,8 +938,23 @@ class ArticulationLarge(SamplerV2):
         if not sol.ok:
             self.debug_handle_ik(manip, contact)
             raise Reject("handle_unreachable", sol.reason)
-        q_reach = self.arm_reach_limit(manip, self.lower, sol.q)
         span = max(self.upper - self.lower, 1e-9)
+        if self.direction == "close":
+            # close: the arm must follow the handle from q_init all the way down to the lower limit — sweep downward from
+            # q_init; the reachable fraction is the closed part of the swing the arm covers
+            q_low = self.arm_reach_limit(manip, q_init, sol.q, q_to=self.lower)
+            frac = (q_init - q_low) / max(q_init - self.lower, 1e-9)
+            key = self._stance_key(manip)
+            rf = self.template_meta.setdefault("reachable_fraction", {})
+            rf[key] = round(frac, 4)
+            self.template_meta["reachable_fraction_max"] = max(float(v) for v in rf.values())
+            info = {"reachable_fraction": frac, "q_reach": q_low, "goal_set": [float(self.lower)]}
+            log.info("%s: stance %s follows %s from %.3f down to %.3f (fraction %.2f of the closing)", self.gp.alias, key, self.joint_name, q_init, q_low, frac)
+            if q_low > self.lower + 1e-6:
+                raise Reject("handle_unreachable", f"closing from {q_init:.3f}: the arm follows the handle only down to {q_low:.3f} (fraction {frac:.2f}) from stance {key}; "
+                                                   f"the rest needs a push on the leaf (not implemented)")
+            return float(self.lower), [float(self.lower)], info
+        q_reach = self.arm_reach_limit(manip, self.lower, sol.q)
         frac = (q_reach - self.lower) / span
         key = self._stance_key(manip)
         rf = self.template_meta.setdefault("reachable_fraction", {})
