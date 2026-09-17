@@ -1272,6 +1272,20 @@ optical axis and 25° admits 42 foci over 3 stand‑offs).
 the small‑articulation one (target hull + handle contact + at least one near / own‑side brace point in frame), i.e. the
 loose class is "focus within 25° of the optical axis and the target in frame", the same shape as the ontop‑large C rule.
 
+*Brace search (`d4546de2` … `6643f1be`):* handle grasp first (pre + grasp), then the brace arm's pre‑contact + contact
+with the handle arm locked, and the reverse order when that fails; brace candidates = the base link's four side faces
+(vertical / horizontal closing, either sign) plus a pitched 45° press on each face's upper part, ranked by B3's passing
+classes → in the left contact band → near / own side; when no pair passes from the manipulation stance, **second
+stances** (lateral ±0.10 / ±0.20 m, stand‑off kept or 10 cm closer, trunk kept or (0.5, 0) / (0.25, −0.3); the target must
+be a handle‑band cell, in frame from the new camera; ≤ 10 evaluated) — the passing one becomes the recorded manipulation
+stance. Per‑attempt budget 300 s. `BRACE_FAILURE` in the run log carries the per‑stance numbers.
+
+*D‑008 (prepared behind `generation.brace_optional`, default off):* when no pair passes anywhere, the instance is
+**handle‑only** — `contacts.brace` absent, `stances.manipulation.arms = [handle_arm]`, `summary.brace = "none"`,
+`articulation.brace_kind = null`; the oracle's `program_articulation_small` must accept that sidecar (REQUIRED_BLOCKS:
+contacts.brace optional, as for touching / axial). Hinged jar numbers (run 0916‑205838): handle grasp alone 1/9 stances,
+left‑face brace alone 66/108, two‑arm 0/108; no left contact band for the 0.20 m height class.
+
 
 Section 5.4. Root pose measured only (0.03 / 0.20); joint goals as 6.6.
 
@@ -1299,6 +1313,13 @@ sidecar records the stance as `stances[].name = "attach"` (`carried = male`), th
 no partner cell satisfies the joint placement from any of these stances is the attach derived brace‑less
 (`summary.brace = "none"`, `contacts.brace` absent); a brace‑less sidecar is not yet accepted by `Sidecar.problems()`
 (REQUIRED_BLOCKS) — smoke runs use `ISG_PROGRAM_CHECK=stub` for that case only. Per‑attempt budget 360 s.
+
+*Follow‑ups (`bd30c0cf`, `deb0093c`):* brace face candidates for a vertical insertion = the partner's near, robot‑left and
+far faces (the near face alone left 22/40 partner cells off the left band); manipulation candidates ordered by the focus
+depth (≤ 0.62 m base‑forward first) and the lift's carry height laddered 12 / 8 / 5 cm. *D‑009 (prepared, default off):*
+every class‑0 (8°) focus of the lid–teapot alias lies 0.77–0.81 m base‑forward, where the lift / SLERP have no IK —
+A `generation.phase2_loose_class_deg` (20–25°) or B `generation.phase2_class1_when_deep_m` (0.65: `phase2_manipulation_
+stance(class1_when_deep_m=…)` admits the class‑1 survivors when every class‑0 focus is deeper than that; §4.5 general rule).
 
 
 Init per section 4 with: partner (female) upright on a cell of the attach-reach band, target (male) at the focus with
