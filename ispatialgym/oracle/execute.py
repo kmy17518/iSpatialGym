@@ -140,7 +140,9 @@ class ExecuteConfig:
     #: segment left, the converged prefix is executed and the last part is planned by ``arm_to`` to the end pose — to
     #: the sidecar's IK witness when it has one, else cuRobo's own IK branch — instead of failing ``plan_failed``
     approach_finish_max_stall: float = 0.015
-    approach_finish_max_remaining: float = 0.06
+    #: the whole 10 cm approach / descent may be finished (the touching descent stalled after 2 cm against joint 2's
+    #: limit with 8 cm left; the finish plans to the recorded end witness, collision-checked but for the ignored supports)
+    approach_finish_max_remaining: float = 0.10
     #: free-space legs (lift / retreat) are finished by ``arm_to`` to their end pose from any stall (no contact made)
     free_leg_finish_max_stall: float = 0.03
     free_leg_finish_max_remaining: float = 0.6
