@@ -1035,6 +1035,9 @@ class BandComputer:
             return {"ok": None, "n_trunks": 0}
         slack = max(b.eta + b.MARGIN for b in bounds.values())
         need_lo, need_hi = (lo_all - slack).tolist(), (hi_all + slack).tolist()
+        # the arm ball reaches below the floor at low, tilted trunks; a sphere centre there already penetrates the floor's top
+        # layer (inside the grid), so the region below the floor is irrelevant
+        need_lo[2] = max(need_lo[2], float(self.world.floor_z) - 0.02)
         g_lo, g_hi = bounds_world
         ok = all(a >= b for a, b in zip(need_lo, g_lo)) and all(a <= b for a, b in zip(need_hi, g_hi))
         rec = {"ok": bool(ok), "n_trunks": n_ok, "needed_world": [[round(v, 3) for v in need_lo], [round(v, 3) for v in need_hi]], "grid_world": [[round(float(v), 3) for v in g_lo], [round(float(v), 3) for v in g_hi]],
