@@ -84,6 +84,9 @@ class MotionsConfig:
     #: witness stood 10.5 mm off its pose), a larger one and every finishing motion must close
     witness_residual_accept_pos: float = 0.02
     witness_residual_accept_rot: float = 0.05
+    #: the witness is refined by the collision-aware IK of the recorded pose seeded at it when that solution stays
+    #: within this joint distance (the same branch); the sampler's witnesses miss their poses by 3-15 mm
+    witness_refine_max_jump: float = 0.3
     #: how long to keep holding the final waypoint while waiting for convergence (steps)
     settle_steps: int = 90
     #: eef speed of ``arm_along`` (m/s, rad/s) and the densification resolution of its waypoint lists (m, rad)
@@ -648,7 +651,27 @@ class Motions:
             arm = arms[0]
             q28 = C.as_tensor(q_hint).reshape(-1)
             q_goal = q_start.clone()
-            q_goal[self.robot.arm_control_idx[arm]] = q28[self.robot.arm_control_idx[arm]]
+            idx = self.robot.arm_control_idx[arm]
+            q_goal[idx] = q28[idx]
+            # the witness is the sampler's IK solution in *its* frame (the recorded stance base, its session's settle):
+            # its FK misses the recorded pose by 3-15 mm per instance (nextto 3-5, touching 9-13, axial 14.6 mm, a
+            # constant world offset per sidecar). Refine it: the collision-aware IK of the exact pose seeded at the
+            # witness (same branch when the joint distance stays small), else the witness as recorded
+            solve_ik = getattr(self.backend, "solve_ik", None)
+            if solve_ik is not None:
+                try:
+                    q_ik = solve_ik(emb, {M.EEF_LINK[arm]: as_world_pose(pose)}, q_seed=q_goal, sync_world=False)
+                except Exception as e:  # noqa: BLE001
+                    log.info("arm_to(%s): witness refinement IK unavailable (%r)", arm, e)
+                    q_ik = None
+                if q_ik is not None:
+                    q_ik = C.as_tensor(q_ik).reshape(-1)
+                    jump = float(th.max(th.abs(q_ik[idx] - q_goal[idx])))
+                    if jump <= self.cfg.witness_refine_max_jump:
+                        log.info("arm_to(%s): witness refined by IK of the recorded pose (joint distance %.3f rad)", arm, jump)
+                        q_goal[idx] = q_ik[idx]
+                    else:
+                        log.info("arm_to(%s): IK of the recorded pose lies %.2f rad from the witness (> %.2f): keeping the witness", arm, jump, self.cfg.witness_refine_max_jump)
             if relax is not None:
                 with relax(emb, q_start, arms) as relaxed:
                     self.last_relaxed_links = list(relaxed)
