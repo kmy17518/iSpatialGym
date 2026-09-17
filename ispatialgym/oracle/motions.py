@@ -748,7 +748,12 @@ class Motions:
                         log.warning("arm_to(%s): the %.1f mm / %.3f rad witness residual is left as is (%s)", arm, dp * 1000, da, e)
                         self.last_witness_residual = (dp, da)
                 else:
-                    yield from self.arm_along(arm, [target])
+                    try:
+                        yield from self.arm_along(arm, [target])
+                    except SkillError as e:
+                        raise SkillError(e.reason, f"arm_to({arm}, witness q): closing the {dp * 1000:.1f} mm / {da:.3f} rad residual between the recorded witness and its pose failed: {e.message}"
+                                         f" (the recorded pose is not reachable from the witness's configuration; the sampler's witnesses miss their poses by a constant offset per sidecar)",
+                                         stage="witness_residual", residual_m=dp, residual_rad=da) from e
             return
         if pose is not None:
             poses = pose if isinstance(pose, dict) and set(pose) <= set(M.ARMS) else {arms[0]: pose}
