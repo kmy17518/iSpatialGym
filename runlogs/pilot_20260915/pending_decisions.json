@@ -133,6 +133,28 @@
    "applied_commit": null,
    "thread_ts": "1789615282.028399",
    "answered_at": null
+  },
+  {
+   "id": "D-007",
+   "time": "2026-09-16 20:30 PDT",
+   "subtask": "inter_object_relation_satisfaction-under_small_scale",
+   "question": "the teacup lands correctly on the saucer but OmniGibson's Under predicate sometimes never turns true \u2014 make the evaluator robust, fall back to a pose target, or keep re-running?",
+   "context": "Core (20:25): the 20:xx re-run on 02c700d placed the cup 1.4 mm from the goal, 2.7\u00b0 tilt, centred on the saucer well (release 6.5 mm above the well floor, straight carry), yet (under saucer teacup) was never true (binary_success_ever False) \u2014 the same geometry passed at 18:41. OmniGibson's Under shoots a ray up from the saucer's own well-floor surface into the resting cup's bottom; whether it registers depends on sub-mm contact/penetration. The release also spun the cup 0.27 rad in yaw (> 0.20 orientation tolerance), so a pose target would need the yaw relaxed (cups are yaw-symmetric).",
+   "options": [
+    "A) evaluator: robust Under for concave partners \u2014 several rays across the contact patch, ray origin a few mm below the partner's top surface, any hit counts (applies to every under task, policy evaluation included)",
+    "B) pose-target fallback for under-small: position within tolerance + up-axis within 15\u00b0 counts as success when the predicate ray misses (yaw relaxed for yaw-symmetric targets)",
+    "C) leave it: re-run until the predicate registers (18:41 passed; ~1 pod-hour per attempt, flaky policy evaluation later)"
+   ],
+   "default": "A at 21:15 PDT if unanswered (evaluator change, logged for every under subtask; B not applied)",
+   "artefacts": [
+    "runlogs/pilot_20260915/first_demo/inter_object_relation_satisfaction-under_small_scale/"
+   ],
+   "status": "open",
+   "answered_by": null,
+   "answer": null,
+   "applied_commit": null,
+   "thread_ts": "1789615821.434969",
+   "answered_at": null
   }
  ]
 }

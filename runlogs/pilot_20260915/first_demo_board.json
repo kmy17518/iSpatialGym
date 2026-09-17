@@ -72,15 +72,15 @@
   "owner": "-"
  },
  "inter_object_relation_satisfaction-under_small_scale": {
-  "blocking": "valid on 6b856ed 19:10 (release surface 5851c8b); re-opened by 02c700d \u2014 re-run scheduled (D-005)",
-  "owner": "core / loop"
+  "blocking": "DECISION D-007: physically correct placement (1.4 mm, 2.7\u00b0) but OmniGibson Under never registered (passed 18:41 with the same geometry) \u2014 robust evaluator / pose-target fallback / re-run; default A 21:15. Core 1ba5e74 (open-pad support clearance) re-run queued",
+  "owner": "owner (D-007) / loop"
  },
  "inter_object_relation_satisfaction-inside": {
-  "blocking": "-",
-  "owner": "-"
+  "blocking": "valid on f5ae607; re-opened by the core's targeted 1ba5e74 (open pads clear of the support: the failing sprout grasp had its fingertip at the table) \u2014 re-run queued",
+  "owner": "loop"
  },
  "inter_object_relation_satisfaction-nextto": {
-  "blocking": "oracle re-run 0916-181440: relation held, then the opening finger swept the pencil 9 cm at release (pencil 3 cm from the marker inside the open-jaw footprint) \u2192 core: partner outside the open-jaw footprint at the place; closure ramp + pre-shape (oracle-B) pending; placed_tilt retraction (oracle-B)",
+  "blocking": "failed_grasp = closure roll (oracle-B ramp + pre-shape pending); open-jaw footprint rule for the partner at the place \u2192 core; 1ba5e74 re-run queued",
   "owner": "core / oracle-B"
  },
  "inter_object_relation_satisfaction-touching": {
