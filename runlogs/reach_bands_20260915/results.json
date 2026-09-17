@@ -981,16 +981,16 @@
    "kind": "floor",
    "wave": 3,
    "subtasks": "inter_object_relation_satisfaction-ontop_large_scale",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-a40-1",
+   "wall_s": 709,
+   "trunks_free": 25,
+   "trunks_total": 25,
+   "cells_total": 40,
+   "union_extent": "[-0.4000000059604645, -0.07999999821186066]",
+   "band_file": "floor__house_double_floor_upper__floor__pencil-fnlbpu__b471649b7487a051",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__floor__house_double_floor_upper__floor-under-desk_aduafr_0__apple-bwteqh",
@@ -1029,16 +1029,16 @@
    "kind": "floor",
    "wave": 3,
    "subtasks": "inter_object_relation_satisfaction-under_large_scale",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "empty band",
+   "pod": "pilot2-l40s-2",
+   "wall_s": 210,
+   "trunks_free": 24,
+   "trunks_total": 25,
+   "cells_total": 0,
+   "union_extent": "null",
+   "band_file": "floor__house_double_floor_upper__floor-under-sofa_ukfaaz_0__pencil-fnlbpu__87cfc95162b15854",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__floor__house_double_floor_upper__floor-under-sofa_ukfaaz_0__pencil-lykqoh__scaled",
@@ -1173,16 +1173,16 @@
    "kind": "floor",
    "wave": 3,
    "subtasks": "inter_object_relation_satisfaction-under_large_scale",
-   "status": "not run",
-   "pod": "",
-   "wall_s": "",
-   "trunks_free": "",
-   "trunks_total": "",
-   "cells_total": "",
-   "union_extent": "",
-   "band_file": "",
+   "status": "ok",
+   "pod": "pilot2-l40s-3",
+   "wall_s": 600,
+   "trunks_free": 23,
+   "trunks_total": 25,
+   "cells_total": 3,
+   "union_extent": "[-0.6399999856948853, -0.6399999856948853]",
+   "band_file": "floor__house_single_floor__floor-under-bed_rrcvaq_0__briefcase-psvdau__6fc1cbfd6ff4845a",
    "error": "",
-   "script": ""
+   "script": "current"
   },
   {
    "id": "rb__floor__house_single_floor__floor-under-bed_rrcvaq_0__sandal-chgcrm",
@@ -11202,6 +11202,361 @@
   }
  ],
  "raw": {
+  "v2__alignment-world_horizontal-hanger-walls": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-1/v2__alignment-world_horizontal-hanger-walls",
+   "files": [],
+   "error": "no output dir",
+   "pod": "pilot2-a40-1",
+   "rc": 0,
+   "wall_s": 1230,
+   "band_files": [],
+   "current_code": null
+  },
+  "v2__alignment-world_vertical-wall_clock-walls": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-1/v2__alignment-world_vertical-wall_clock-walls",
+   "files": [],
+   "error": "no output dir",
+   "pod": "pilot2-a40-1",
+   "rc": 0,
+   "wall_s": 611,
+   "band_files": [],
+   "current_code": null
+  },
+  "v2__alignment-world_horizontal-radiator-walls": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-1/v2__alignment-world_horizontal-radiator-walls",
+   "files": [],
+   "error": "no output dir",
+   "pod": "pilot2-a40-1",
+   "rc": 0,
+   "wall_s": 1952,
+   "band_files": [],
+   "current_code": null
+  },
+  "v2__camera_relocalization-obstructed-teddy_bear_1": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-1/v2__camera_relocalization-obstructed-teddy_bear_1",
+   "files": [],
+   "error": "no output dir",
+   "pod": "pilot2-a40-1",
+   "rc": 0,
+   "wall_s": 1633,
+   "band_files": [],
+   "current_code": null
+  },
+  "v2__disembedding-box_of_cookies-box_of_cookies_2_bag_of_cookies_1-breakfast_table": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-1/v2__disembedding-box_of_cookies-box_of_cookies_2_bag_of_cookies_1-breakfast_table",
+   "files": [],
+   "error": "no output dir",
+   "pod": "pilot2-a40-1",
+   "rc": 0,
+   "wall_s": 521,
+   "band_files": [],
+   "current_code": null
+  },
+  "v2__inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-1/v2__inter_object_relation_satisfaction-nextto-marker-colored_pencil-breakfast_table",
+   "files": [],
+   "error": "no output dir",
+   "pod": "pilot2-a40-1",
+   "rc": 0,
+   "wall_s": 721,
+   "band_files": [],
+   "current_code": null
+  },
+  "v2__inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-1/v2__inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar",
+   "files": [],
+   "error": "no output dir",
+   "pod": "pilot2-a40-1",
+   "rc": 0,
+   "wall_s": 593,
+   "band_files": [],
+   "current_code": null
+  },
+  "v2__mental_rotation-coffee_cup": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-1/v2__mental_rotation-coffee_cup",
+   "files": [],
+   "error": "no output dir",
+   "pod": "pilot2-a40-1",
+   "rc": 0,
+   "wall_s": 1000,
+   "band_files": [],
+   "current_code": null
+  },
+  "v2__mental_rotation-toothbrush": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-1/v2__mental_rotation-toothbrush",
+   "files": [],
+   "error": "no output dir",
+   "pod": "pilot2-a40-1",
+   "rc": 0,
+   "wall_s": 1010,
+   "band_files": [],
+   "current_code": null
+  },
+  "v2__object_scaling-cherry_tomato": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-1/v2__object_scaling-cherry_tomato",
+   "files": [],
+   "error": "no output dir",
+   "pod": "pilot2-a40-1",
+   "rc": 0,
+   "wall_s": 1118,
+   "band_files": [],
+   "current_code": null
+  },
+  "cov_002__world_horizo+world_vertic": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-1/cov_002__world_horizo+world_vertic",
+   "files": [],
+   "error": "no output dir",
+   "pod": "pilot2-a40-1",
+   "rc": 0,
+   "wall_s": 2241,
+   "band_files": [],
+   "current_code": null
+  },
+  "rest_002__mental_rotat+object_scali+world_horizo+world_vertic": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-1/rest_002__mental_rotat+object_scali+world_horizo+world_vertic",
+   "files": [],
+   "error": "no output dir",
+   "pod": "pilot2-a40-1",
+   "rc": 0,
+   "wall_s": 3501,
+   "band_files": [],
+   "current_code": null
+  },
+  "rest_008__disembedding": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-1/rest_008__disembedding",
+   "files": [],
+   "error": "no output dir",
+   "pod": "pilot2-a40-1",
+   "rc": 124,
+   "wall_s": 15002,
+   "band_files": [],
+   "current_code": null
+  },
+  "rb__floor__house_double_floor_upper__floor-bedroom_0__pencil-fnlbpu__scaled": {
+   "dir": "runlogs/runpod/rb/pilot2-a40-1/rb__floor__house_double_floor_upper__floor-bedroom_0__pencil-fnlbpu__scaled",
+   "files": [
+    "runlogs/runpod/rb/pilot2-a40-1/rb__floor__house_double_floor_upper__floor-bedroom_0__pencil-fnlbpu__scaled/floor__house_double_floor_upper__floor__pencil-fnlbpu__b471649b7487a051"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__floor__house_double_floor_upper__floor-bedroom_0__pencil-fnlbpu__scaled/floor__house_double_floor_upper__floor__pencil-fnlbpu__b471649b7487a051.npz",
+    "union_extent": [
+     -0.4000000059604645,
+     -0.07999999821186066
+    ],
+    "n_reachable_total": 40,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      0.1,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -1.2,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      false,
+      0.02,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      false,
+      0.02,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      -1.2,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      false,
+      0.02,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      -1.2,
+      0,
+      false,
+      0.12,
+      "untucked"
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      false,
+      0.36,
+      "untucked"
+     ],
+     [
+      0.75,
+      -1.2,
+      0,
+      false,
+      0.84,
+      "untucked"
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      0.02,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      0.16,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      false,
+      0.53,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.9,
+      17,
+      false,
+      212.42,
+      "untucked"
+     ],
+     [
+      0.95,
+      -1.2,
+      23,
+      false,
+      184.55,
+      "untucked"
+     ]
+    ],
+    "time_s": 692.4
+   },
+   "error": null,
+   "pod": "pilot2-a40-1",
+   "rc": 0,
+   "wall_s": 709,
+   "band_files": [
+    "floor__house_double_floor_upper__floor__pencil-fnlbpu__b471649b7487a051"
+   ],
+   "current_code": true
+  },
   "v2__camera_relocalization-obstructed-carton_1": {
    "dir": "runlogs/runpod/rb/pilot2-a40-10/v2__camera_relocalization-obstructed-carton_1",
    "files": [],
@@ -18212,16 +18567,6 @@
     "tabletop__restaurant_diner__commercial_kitchen_table_vxvtec_0__video_game-lfdpse__placed-tray-gsxbym__3897ce3421114156"
    ],
    "current_code": true
-  },
-  "v2__alignment-world_horizontal-radiator-walls": {
-   "dir": "runlogs/runpod/rb/pilot2-a40-4/v2__alignment-world_horizontal-radiator-walls",
-   "files": [],
-   "error": "no output dir",
-   "pod": "pilot2-a40-4",
-   "rc": 0,
-   "wall_s": 1151,
-   "band_files": [],
-   "current_code": null
   },
   "v2__camera_relocalization-obstructed-toy_car_1": {
    "dir": "runlogs/runpod/rb/pilot2-a40-4/v2__camera_relocalization-obstructed-toy_car_1",
@@ -29919,16 +30264,6 @@
     "tabletop__house_single_floor__desk_xhjsub_0__beaker-exzsal__0a3659104161e02b"
    ],
    "current_code": true
-  },
-  "v2__alignment-world_vertical-wall_clock-walls": {
-   "dir": "runlogs/runpod/rb/pilot2-a40-8/v2__alignment-world_vertical-wall_clock-walls",
-   "files": [],
-   "error": "no output dir",
-   "pod": "pilot2-a40-8",
-   "rc": 0,
-   "wall_s": 1884,
-   "band_files": [],
-   "current_code": null
   },
   "v2__configuration_matching-articulation_close_large_scale-bottom_cabinet": {
    "dir": "runlogs/runpod/rb/pilot2-a40-8/v2__configuration_matching-articulation_close_large_scale-bottom_cabinet",
@@ -54721,16 +55056,6 @@
    "band_files": [],
    "current_code": null
   },
-  "v2__alignment-world_horizontal-hanger-walls": {
-   "dir": "runlogs/runpod/rb/pilot2-l40s-10/v2__alignment-world_horizontal-hanger-walls",
-   "files": [],
-   "error": "no output dir",
-   "pod": "pilot2-l40s-10",
-   "rc": 0,
-   "wall_s": 886,
-   "band_files": [],
-   "current_code": null
-  },
   "v2__camera_relocalization-obstructed-straight_chair_1": {
    "dir": "runlogs/runpod/rb/pilot2-l40s-10/v2__camera_relocalization-obstructed-straight_chair_1",
    "files": [],
@@ -72359,6 +72684,228 @@
    ],
    "current_code": true
   },
+  "rb__floor__house_double_floor_upper__floor-under-sofa_ukfaaz_0__pencil-fnlbpu__scaled": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-2/rb__floor__house_double_floor_upper__floor-under-sofa_ukfaaz_0__pencil-fnlbpu__scaled",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-2/rb__floor__house_double_floor_upper__floor-under-sofa_ukfaaz_0__pencil-fnlbpu__scaled/floor__house_double_floor_upper__floor-under-sofa_ukfaaz_0__pencil-fnlbpu__87cfc95162b15854"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__floor__house_double_floor_upper__floor-under-sofa_ukfaaz_0__pencil-fnlbpu__scaled/floor__house_double_floor_upper__floor-under-sofa_ukfaaz_0__pencil-fnlbpu__87cfc95162b15854.npz",
+    "union_extent": null,
+    "n_reachable_total": 0,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -1.2,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      -1.2,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      -1.2,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.75,
+      -1.2,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      false,
+      0.05,
+      "untucked"
+     ],
+     [
+      0.95,
+      -1.2,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 197.1
+   },
+   "error": null,
+   "pod": "pilot2-l40s-2",
+   "rc": 0,
+   "wall_s": 210,
+   "band_files": [
+    "floor__house_double_floor_upper__floor-under-sofa_ukfaaz_0__pencil-fnlbpu__87cfc95162b15854"
+   ],
+   "current_code": true
+  },
   "v2__alignment-axial-gym_shoe-breakfast_table": {
    "dir": "runlogs/runpod/rb/pilot2-l40s-3/v2__alignment-axial-gym_shoe-breakfast_table",
    "files": [],
@@ -81432,6 +81979,231 @@
    "wall_s": 317,
    "band_files": [
     "floor__house_single_floor__floor-under-desk_bhkhxo_0__apple-zlxfxt__c0bf96e7d6f8b1e6"
+   ],
+   "current_code": true
+  },
+  "rb__floor__house_single_floor__floor-under-bed_rrcvaq_0__briefcase-psvdau": {
+   "dir": "runlogs/runpod/rb/pilot2-l40s-3/rb__floor__house_single_floor__floor-under-bed_rrcvaq_0__briefcase-psvdau",
+   "files": [
+    "runlogs/runpod/rb/pilot2-l40s-3/rb__floor__house_single_floor__floor-under-bed_rrcvaq_0__briefcase-psvdau/floor__house_single_floor__floor-under-bed_rrcvaq_0__briefcase-psvdau__6fc1cbfd6ff4845a"
+   ],
+   "summary": {
+    "file": "/root/samp/rb__floor__house_single_floor__floor-under-bed_rrcvaq_0__briefcase-psvdau/floor__house_single_floor__floor-under-bed_rrcvaq_0__briefcase-psvdau__6fc1cbfd6ff4845a.npz",
+    "union_extent": [
+     -0.6399999856948853,
+     -0.6399999856948853
+    ],
+    "n_reachable_total": 3,
+    "trunks": [
+     [
+      0.0,
+      0.0,
+      0,
+      false,
+      0.09,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -0.9,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.0,
+      -1.2,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      0.0,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      -0.9,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.25,
+      -1.2,
+      0,
+      false,
+      9.15,
+      "untucked"
+     ],
+     [
+      0.5,
+      0.0,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.6,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.5,
+      -0.9,
+      0,
+      false,
+      11.41,
+      "untucked"
+     ],
+     [
+      0.5,
+      -1.2,
+      0,
+      false,
+      54.73,
+      "tucked"
+     ],
+     [
+      0.75,
+      0.0,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.3,
+      0,
+      false,
+      0.01,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.6,
+      0,
+      false,
+      26.45,
+      "untucked"
+     ],
+     [
+      0.75,
+      -0.9,
+      0,
+      false,
+      49.68,
+      "untucked"
+     ],
+     [
+      0.75,
+      -1.2,
+      2,
+      false,
+      73.53,
+      "tucked"
+     ],
+     [
+      0.95,
+      0.0,
+      0,
+      false,
+      4.81,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.3,
+      0,
+      false,
+      19.63,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.6,
+      1,
+      false,
+      42.8,
+      "untucked"
+     ],
+     [
+      0.95,
+      -0.9,
+      0,
+      true,
+      0.02,
+      null
+     ],
+     [
+      0.95,
+      -1.2,
+      0,
+      true,
+      0.01,
+      null
+     ]
+    ],
+    "time_s": 586.4
+   },
+   "error": null,
+   "pod": "pilot2-l40s-3",
+   "rc": 0,
+   "wall_s": 600,
+   "band_files": [
+    "floor__house_single_floor__floor-under-bed_rrcvaq_0__briefcase-psvdau__6fc1cbfd6ff4845a"
    ],
    "current_code": true
   },
