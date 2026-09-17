@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 17:48 PDT — 7/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 17:52 PDT — 8/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -136,7 +136,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | alignment-world_vertical | demo run | oracle re-runs on 4b2bb60 / 9345c8a: push [execution] again (17:06) → oracle | oracle |
 | alignment-world_horizontal | demo run | oracle re-run on 4b2bb60: push plan_failed again (16:56) → oracle | oracle |
 | alignment-axial | valid demo | - | - |
-| IORS ontop_small_scale | demo run (pre-fix success) | - | - |
+| IORS ontop_small_scale | valid demo | - | - |
 | IORS under_small_scale | demo run (pre-fix success) | core 6307dd7: the cup rotated in the hand at the grasp (grasp_3 closing axis 28° off horizontal) → flush pinches only + release at half the well depth; loop running (17:24) | core / loop |
 | IORS inside | valid demo | - | - |
 | IORS nextto | demo run (pre-fix success) | owner 17:10 (4): placed_tilt withdrawn (roll happens during finger closure, 24.6°); closure-roll investigation on a pod (≤ 3 h, agent 52b4fb5f: grasp height +5/+10 mm, closure speed, attach-on-first-contact; marker/pencil/bottle) → else cylinder equivalences in the gate; (5) FOV rule (b) + carry leg re-run | oracle / investigation |
@@ -287,3 +287,4 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026‑09‑16 17:42 PDT agent-e2e (owner 17:35): **Slack bridge** live on `#cursor-demos-chat` (`C0C2D1X2V8E`, private — always by id; posts as the owner's user `U0C28KXH5J7`, own posts start with a tag, owner replies with `D-` / `Q:` / `RUN:` / free text; never act on own posts; a main‑chat message overrides a Slack reply on the same decision id). Files: `runlogs/pilot_20260915/pending_decisions.json` (D‑001 block design, D‑002 attachment, D‑003 small articulation — all three recorded **answered by chat 17:10** and posted with their answers; D‑004 large articulation rvunhj_0 keep‑working vs blacklist — **open**, default A until the `0427202` verdict ≈ 18:40), `status.md` (30 min), `slack_state.json` (announced [DEMO-VALID] rows, last seen ts); renderer / parser `scripts/isg/slack_bridge.py`. Seeded: rules message marked 📌 (the Slack MCP has no pin call — owner pins), D‑001…D‑004, `[STATUS 17:38]`, six `[DEMO-VALID]` (camera standard / obstructed, object_scaling, disembedding, axial, inside). `subscribe_slack_channel` / `subscribe_slack_thread` refused ("Cursor account not linked to Slack") → polling loop every 5 min (search newer than the last seen ts) + status every 30 min until the owner links the account.
 - 2026‑09‑16 17:47 PDT agent-e2e: Slack poll 1 — no owner replies. D‑004 verdict on `0427202` landed early (open `no_manipulation_stance` ×8, close `handle_unreachable` ×6 + `no_manipulation_stance` ×2) → default applied: fallback aliases `articulation_open_large_scale-{fridge,dishwasher,oven}` launched on three pool pods; rvunhj_0 stays open (large‑scale agent); thread reply posted. Wall vertical demo‑only on the oracle's `170d02a`: push `execution` again.
 - 2026‑09‑16 17:51 PDT agent-e2e: Slack subscriptions active after the owner linked the account — channel `C0C2D1X2V8E` (threads included) `sub_a6770b43…`, D‑004 thread `sub_e90d53ab…`; the 5‑min poll loop stopped, the 30‑min `[STATUS]` loop continues; replies now arrive as events.
+- 2026‑09‑16 17:55 PDT agent-e2e: Slack D‑004 thread — owner `Q: other solutions for A while we wait for B` → answered: other A3 cabinet doors (`top_cabinet`, `bottom_cabinet_no_top`) launched on 2 pool pods; A6 posture in Phase 2 step 1 (rvunhj_0 open on `0427202`: 1511 untucked survivors, step‑2 reach 0); keep both approach families (leaf‑plane + perpendicular); hybrid base‑follow only on request; close variant = Phase‑1 `no_stance` with the door open → A4 S restriction. Items 2–3 queued for the large‑scale agent.
