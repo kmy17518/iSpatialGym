@@ -849,12 +849,22 @@ within 15–80 mm after scaling). Single arm; the object holds itself, no brace 
   reaches from it (h(q) on a 10° / 5 cm grid from the closed joint up to the first unreachable value, the target
   ignored for the grasp only); when no element of S is reachable, the reach limit itself is the goal provided it opens
   ≥ 50° (0.10 m) and holds passively — a 50–70° opening is a valid configuration-matching goal; `reachable_fraction`
-  per stance in the template meta and the articulation block; `room_door` (revolute door leaf) — **hybrid** follow:
-  per handle waypoint a base pose near the current base on free floor, collision-free, with feasible arm IK, minimum
-  displacement (not implemented yet: `Reject("room_door_hybrid_todo")`). The rigid eef→base sweep is no longer used
-  for revolute furniture doors (the pilot: the base orbits the hinge at ≈ 1 m through 55–110° into the kitchen).
-  Record `door_class`, `hinge_side`, `follow_mode ∈ {arm, base, hybrid}`, `goal_set`, `q_reach`, `base_follow`
-  (base mode only).
+  per stance in the template meta and the articulation block; `room_door` (revolute door leaf) — **hybrid** follow
+  (`sampling/v2/tasks/articulation_hybrid.py`; owner D‑011 C 2026‑09‑17: also on every other door class behind
+  `generation.follow_mode_override: "hybrid"`): along a dense joint grid (sub‑steps ≤ 10° / 5 cm containing the
+  fractions, q_init → the last required waypoint) the arm follows h(q_i) from the current base while it can; when it
+  cannot, a base pose **near the current base** is searched — the interpolations toward the rigid‑sweep pose
+  b_rigid(q_i) = h(q_i) ∘ T_eef→base(q*) (smallest fraction first = minimum displacement), then a 0.1 m lattice within
+  0.5 m × yaws between the current and the rigid yaw, in order of displacement — each candidate on free floor
+  (un‑eroded), footprint clear of the fixed body and of the leaf at q_i (the closed leaf's box rotated about the
+  hinge), exact arm IK with the joint‑limit margin, whole‑body collision‑free with the **leaf links removed but the
+  body present**, the base path b_{i−1} → b_i collision‑free (0.1 m strides, arm interpolated). Recorded as the
+  drawer's base path is: `follow_mode: hybrid`, `base_follow[k]` per followed fraction, plus `base_follow_path.poses[]`
+  (`k`, `q`, `base_pose2d`, `arm_q`, eef, witness quality) the oracle drives + tracks together without re‑planning;
+  the program check verifies every pose as a witness and checks the retreat from the path's end. The rigid eef→base
+  sweep is no longer used for revolute furniture doors (the pilot: the base orbits the hinge at ≈ 1 m through 55–110°
+  into the kitchen). Record `door_class`, `hinge_side`, `follow_mode ∈ {arm, base, hybrid}`, `goal_set`, `q_reach`,
+  `base_follow` (base / hybrid), `base_follow_path` (hybrid).
 - **Phase 3**: nothing is spawned. Joints at q_init, `settle_free = []`, the moving link held at q_init during
   settling; after settling the joint may not have drifted > ½ tolerance; `articulation_targets` = every non-fixed joint
   at its init value except the chosen one at q_goal, tolerance per type; then the pipeline (`:init` true, binary goal
