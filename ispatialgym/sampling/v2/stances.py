@@ -333,9 +333,17 @@ class Transition:
     trunk_from: Optional[Tuple[float, float]] = None
     trunk_to: Optional[Tuple[float, float]] = None
     n_samples: int = 5
+    holding: Optional[str] = None  # bddl instance carried through the transition (attachment: the second base pose after the male grasp)
+    extras: Dict[str, Any] = field(default_factory=dict)
 
     def to_sidecar(self) -> Dict[str, Any]:
-        return {"from": self.frm, "to": self.to, "stand_off": float(self.stand_off), "order": list(self.order)}
+        d = {"from": self.frm, "to": self.to, "stand_off": float(self.stand_off), "order": list(self.order)}
+        if self.holding is not None:
+            d["holding"] = self.holding
+        for k, v in (self.extras or {}).items():
+            if k not in d and v is not None and not str(k).startswith("_"):
+                d[k] = v
+        return d
 
 
 @dataclass

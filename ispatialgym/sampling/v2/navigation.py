@@ -493,7 +493,7 @@ def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_
                 ok, _ = path_collision_free(kit, extra, tf, "untucked", margin=margin, q_arms=arms_from, fingers=f_from)
                 if not ok:
                     continue
-            return Transition(stance_from.name, stance_to.name, s_T, trunk_from=tf, trunk_to=tt, n_samples=0 if same_trunk else n_samples)
+            return Transition(stance_from.name, stance_to.name, s_T, trunk_from=tf, trunk_to=tt, n_samples=0 if same_trunk else n_samples, holding=stance_to.carried)
     return None
 
 

@@ -570,6 +570,7 @@ class SamplerV2(TaskSampler):
         tr = NAV.transition(self.kit, frm, to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object)
         if tr is None:
             raise Reject("no_transition", f"{frm.name} -> {to.name}: no s_T in {NAV.transition_standoffs(to.stand_off or 0.0)} is swept collision-free")
+        tr.holding = carried or tr.holding  # ``transitions[].holding``: the bddl instance carried through (attachment's second base pose)
         return self.sidecar.add_transition(tr)
 
     def record_path(self, frm: Stance, to: Stance, carried: Optional[str] = None, arm: Optional[str] = None, max_length_m: Optional[float] = None,
