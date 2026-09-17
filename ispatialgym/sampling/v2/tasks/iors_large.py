@@ -1401,7 +1401,10 @@ class IORSLarge(SamplerV2):
         transition; the draft and the sidecar records."""
         tname, pname = self.tname, self.pname
         partner, target = self.partner, self.target
-        max_len = self.num("max_partner_geodesic_m", 3.0) + self.num("path_max_extra_m", 1.0)
+        # §5.6: B → C ≤ max_partner_geodesic + extra. The geodesic rule measures near side to near side; the recorded stances
+        # sit at particular edges (the bar's short end → the sofa's front), so the stance-to-stance drive is longer — extra
+        # 3 m (sofa-bar 17:04: every C survivor failed with path_too_long at 4 m; the B-C IK never got its turn)
+        max_len = self.num("max_partner_geodesic_m", 3.0) + self.num("path_max_extra_m", 3.0)
         order = list(rng.permutation(len(c_pool)))
         n_try = 6
         if self.push_under:
@@ -1489,7 +1492,8 @@ class IORSLarge(SamplerV2):
                         path_bc = self.record_path(manip, place, carried=tname, arm="right", max_length_m=max_len)
                         self.record_transition(manip, place, carried=tname, arm="right")
                 except Reject as e:
-                    errors.append(f"C: {e.reason}")
+                    errors.append(f"C: {e.reason}: {e}")
+                    fails["B -> C path / transition"] = fails.get("B -> C path / transition", 0) + 1
                     self.sidecar.stances.pop("placement", None)
                     self.sidecar.paths = [p for p in self.sidecar.paths if p.to != "placement"]
                     self.sidecar.transitions = [t for t in self.sidecar.transitions if t.to != "placement"]
