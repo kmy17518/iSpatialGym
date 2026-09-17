@@ -64,8 +64,8 @@
   "owner": "large-scale"
  },
  "alignment-axial": {
-  "blocking": "-",
-  "owner": "-"
+  "blocking": "re-run 20:40 (oracle retreat changes 35be0ee/3eb8e51): plan_failed at retreat \u2192 primary oracle",
+  "owner": "oracle"
  },
  "inter_object_relation_satisfaction-ontop_small_scale": {
   "blocking": "-",
