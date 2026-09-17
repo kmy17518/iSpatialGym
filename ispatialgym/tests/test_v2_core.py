@@ -271,7 +271,8 @@ def test_sidecar_draft_layout(tmp_path):
     assert d["waypoint_policy"] == "checked" and "contacts" not in d and "paths" not in d
     assert PC.check_blocks("inter_object_relation_satisfaction-ontop_small_scale", d) == []
     problems = PC.check_blocks("inter_object_relation_satisfaction-touching", d)
-    assert any("contacts.push" in p for p in problems) and any("contacts.brace" in p for p in problems)
+    # touching: the push is required, the brace optional (owner 2026-09-16 17:10, the axial rule)
+    assert any("contacts.push" in p for p in problems) and not any("contacts.brace" in p for p in problems)
     tro = tmp_path / "x-tro_state.json"
     tro.write_text("{}")
     out = sd.finalize("iid", str(tro))
