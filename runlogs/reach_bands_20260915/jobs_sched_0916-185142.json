@@ -1,0 +1,29 @@
+[
+ {
+  "id": "rb__tabletop__office_cubicles_right__desk_pfsjbc_0__pencil-fnlbpu__scaled",
+  "kind": "tabletop",
+  "subtasks": [
+   "inter_object_relation_satisfaction-nextto"
+  ],
+  "picks": [
+   "inter_object_relation_satisfaction-nextto#01"
+  ],
+  "slot": "heldout",
+  "scene": "office_cubicles_right",
+  "weight": 2.0,
+  "args": [
+   "--scene",
+   "office_cubicles_right",
+   "--support",
+   "desk_pfsjbc_0",
+   "--object",
+   "pencil/fnlbpu",
+   "--grasp-key",
+   "pencil__fnlbpu__s",
+   "--scale",
+   "1.0,4.217,5.069"
+  ],
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 3000 python -m ispatialgym.sampling.reach_bands --scene office_cubicles_right --support desk_pfsjbc_0 --object pencil/fnlbpu --grasp-key pencil__fnlbpu__s --scale 1.0,4.217,5.069 --out $OUT",
+  "wave": 3
+ }
+]

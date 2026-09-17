@@ -1,252 +1,28 @@
 [
  {
-  "id": "rb__tabletop__office_cubicles_right__desk_pfsjbc_0__jar_of_spaghetti_sauce-efrxze",
+  "id": "rb__tabletop__house_single_floor__countertop_ikwqer_0__shampoo_dispenser-zoyyia",
   "kind": "tabletop",
   "subtasks": [
-   "inter_object_relation_satisfaction-nextto"
+   "inter_object_relation_satisfaction-ontop_large_scale"
   ],
   "picks": [
-   "inter_object_relation_satisfaction-nextto#05"
+   "inter_object_relation_satisfaction-ontop_large_scale#02"
   ],
-  "slot": "heldout",
-  "scene": "office_cubicles_right",
-  "weight": 2.0,
+  "slot": "representative",
+  "scene": "house_single_floor",
+  "weight": 3.0,
   "args": [
    "--scene",
-   "office_cubicles_right",
+   "house_single_floor",
    "--support",
-   "desk_pfsjbc_0",
+   "countertop_ikwqer_0",
    "--object",
-   "jar_of_spaghetti_sauce/efrxze",
+   "shampoo_dispenser/zoyyia",
    "--grasp-key",
-   "jar_of_spaghetti_sauce__efrxze__t"
+   "shampoo_dispenser__zoyyia"
   ],
-  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 3000 python -m ispatialgym.sampling.reach_bands --scene office_cubicles_right --support desk_pfsjbc_0 --object jar_of_spaghetti_sauce/efrxze --grasp-key jar_of_spaghetti_sauce__efrxze__t --out $OUT",
-  "wave": 3
- },
- {
-  "id": "rb__tabletop__office_cubicles_right__desk_pfsjbc_0__keyboard-nddmmy__gp",
-  "kind": "tabletop",
-  "subtasks": [
-   "alignment-axial"
-  ],
-  "picks": [
-   "alignment-axial#09"
-  ],
-  "slot": "heldout",
-  "scene": "office_cubicles_right",
-  "weight": 2.0,
-  "args": [
-   "--scene",
-   "office_cubicles_right",
-   "--support",
-   "desk_pfsjbc_0",
-   "--object",
-   "keyboard/nddmmy",
-   "--generic-pinch"
-  ],
-  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 3000 python -m ispatialgym.sampling.reach_bands --scene office_cubicles_right --support desk_pfsjbc_0 --object keyboard/nddmmy --generic-pinch --out $OUT",
-  "wave": 3
- },
- {
-  "id": "rb__tabletop__office_cubicles_right__desk_pfsjbc_0__letter-bdlpry__gp",
-  "kind": "tabletop",
-  "subtasks": [
-   "alignment-axial"
-  ],
-  "picks": [
-   "alignment-axial#06"
-  ],
-  "slot": "heldout",
-  "scene": "office_cubicles_right",
-  "weight": 2.0,
-  "args": [
-   "--scene",
-   "office_cubicles_right",
-   "--support",
-   "desk_pfsjbc_0",
-   "--object",
-   "letter/bdlpry",
-   "--generic-pinch"
-  ],
-  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 3000 python -m ispatialgym.sampling.reach_bands --scene office_cubicles_right --support desk_pfsjbc_0 --object letter/bdlpry --generic-pinch --out $OUT",
-  "wave": 3
- },
- {
-  "id": "rb__tabletop__office_cubicles_right__desk_pfsjbc_0__light_bulb-ymomhw",
-  "kind": "tabletop",
-  "subtasks": [
-   "configuration_matching-attachment"
-  ],
-  "picks": [
-   "configuration_matching-attachment#03"
-  ],
-  "slot": "heldout",
-  "scene": "office_cubicles_right",
-  "weight": 2.0,
-  "args": [
-   "--scene",
-   "office_cubicles_right",
-   "--support",
-   "desk_pfsjbc_0",
-   "--object",
-   "light_bulb/ymomhw",
-   "--grasp-key",
-   "light_bulb__ymomhw"
-  ],
-  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 3000 python -m ispatialgym.sampling.reach_bands --scene office_cubicles_right --support desk_pfsjbc_0 --object light_bulb/ymomhw --grasp-key light_bulb__ymomhw --out $OUT",
-  "wave": 3
- },
- {
-  "id": "rb__tabletop__office_cubicles_right__desk_pfsjbc_0__pack_of_kielbasa-fwqdoy",
-  "kind": "tabletop",
-  "subtasks": [
-   "inter_object_relation_satisfaction-ontop_small_scale"
-  ],
-  "picks": [
-   "inter_object_relation_satisfaction-ontop_small_scale#01"
-  ],
-  "slot": "heldout",
-  "scene": "office_cubicles_right",
-  "weight": 2.0,
-  "args": [
-   "--scene",
-   "office_cubicles_right",
-   "--support",
-   "desk_pfsjbc_0",
-   "--object",
-   "pack_of_kielbasa/fwqdoy",
-   "--grasp-key",
-   "pack_of_kielbasa__fwqdoy__t"
-  ],
-  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 3000 python -m ispatialgym.sampling.reach_bands --scene office_cubicles_right --support desk_pfsjbc_0 --object pack_of_kielbasa/fwqdoy --grasp-key pack_of_kielbasa__fwqdoy__t --out $OUT",
-  "wave": 3
- },
- {
-  "id": "rb__tabletop__office_cubicles_right__desk_pfsjbc_0__paperback_book-vciijb__gp",
-  "kind": "tabletop",
-  "subtasks": [
-   "alignment-axial"
-  ],
-  "picks": [
-   "alignment-axial#01"
-  ],
-  "slot": "heldout",
-  "scene": "office_cubicles_right",
-  "weight": 2.0,
-  "args": [
-   "--scene",
-   "office_cubicles_right",
-   "--support",
-   "desk_pfsjbc_0",
-   "--object",
-   "paperback_book/vciijb",
-   "--generic-pinch"
-  ],
-  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 3000 python -m ispatialgym.sampling.reach_bands --scene office_cubicles_right --support desk_pfsjbc_0 --object paperback_book/vciijb --generic-pinch --out $OUT",
-  "wave": 3
- },
- {
-  "id": "rb__tabletop__office_cubicles_right__desk_pfsjbc_0__parsnip-fwmatc",
-  "kind": "tabletop",
-  "subtasks": [
-   "inter_object_relation_satisfaction-nextto"
-  ],
-  "picks": [
-   "inter_object_relation_satisfaction-nextto#03"
-  ],
-  "slot": "heldout",
-  "scene": "office_cubicles_right",
-  "weight": 2.0,
-  "args": [
-   "--scene",
-   "office_cubicles_right",
-   "--support",
-   "desk_pfsjbc_0",
-   "--object",
-   "parsnip/fwmatc",
-   "--grasp-key",
-   "parsnip__fwmatc"
-  ],
-  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 3000 python -m ispatialgym.sampling.reach_bands --scene office_cubicles_right --support desk_pfsjbc_0 --object parsnip/fwmatc --grasp-key parsnip__fwmatc --out $OUT",
-  "wave": 3
- },
- {
-  "id": "rb__tabletop__office_cubicles_right__desk_pfsjbc_0__pencil-fnlbpu__scaled",
-  "kind": "tabletop",
-  "subtasks": [
-   "inter_object_relation_satisfaction-nextto"
-  ],
-  "picks": [
-   "inter_object_relation_satisfaction-nextto#01"
-  ],
-  "slot": "heldout",
-  "scene": "office_cubicles_right",
-  "weight": 2.0,
-  "args": [
-   "--scene",
-   "office_cubicles_right",
-   "--support",
-   "desk_pfsjbc_0",
-   "--object",
-   "pencil/fnlbpu",
-   "--grasp-key",
-   "pencil__fnlbpu__s",
-   "--scale",
-   "1.0,4.217,5.069"
-  ],
-  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 3000 python -m ispatialgym.sampling.reach_bands --scene office_cubicles_right --support desk_pfsjbc_0 --object pencil/fnlbpu --grasp-key pencil__fnlbpu__s --scale 1.0,4.217,5.069 --out $OUT",
-  "wave": 3
- },
- {
-  "id": "rb__tabletop__office_cubicles_right__desk_pfsjbc_0__pickle-gytwes",
-  "kind": "tabletop",
-  "subtasks": [
-   "inter_object_relation_satisfaction-ontop_small_scale"
-  ],
-  "picks": [
-   "inter_object_relation_satisfaction-ontop_small_scale#04"
-  ],
-  "slot": "heldout",
-  "scene": "office_cubicles_right",
-  "weight": 2.0,
-  "args": [
-   "--scene",
-   "office_cubicles_right",
-   "--support",
-   "desk_pfsjbc_0",
-   "--object",
-   "pickle/gytwes",
-   "--grasp-key",
-   "pickle__gytwes"
-  ],
-  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 3000 python -m ispatialgym.sampling.reach_bands --scene office_cubicles_right --support desk_pfsjbc_0 --object pickle/gytwes --grasp-key pickle__gytwes --out $OUT",
-  "wave": 3
- },
- {
-  "id": "rb__tabletop__office_cubicles_right__desk_pfsjbc_0__quartz-drqtci",
-  "kind": "tabletop",
-  "subtasks": [
-   "inter_object_relation_satisfaction-inside"
-  ],
-  "picks": [
-   "inter_object_relation_satisfaction-inside#03"
-  ],
-  "slot": "heldout",
-  "scene": "office_cubicles_right",
-  "weight": 2.0,
-  "args": [
-   "--scene",
-   "office_cubicles_right",
-   "--support",
-   "desk_pfsjbc_0",
-   "--object",
-   "quartz/drqtci",
-   "--grasp-key",
-   "quartz__drqtci"
-  ],
-  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 3000 python -m ispatialgym.sampling.reach_bands --scene office_cubicles_right --support desk_pfsjbc_0 --object quartz/drqtci --grasp-key quartz__drqtci --out $OUT",
-  "wave": 3
+  "cmd": "cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && conda activate ispatialgym && OMNIGIBSON_HEADLESS=1 ISPATIALGYM_REACH_BANDS=/root/samp/rb_cache timeout 3000 python -m ispatialgym.sampling.reach_bands --scene house_single_floor --support countertop_ikwqer_0 --object shampoo_dispenser/zoyyia --grasp-key shampoo_dispenser__zoyyia --out $OUT",
+  "wave": 1
  },
  {
   "id": "rb__tabletop__office_cubicles_right__desk_pfsjbc_0__teacup-cpozxi",
