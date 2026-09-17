@@ -228,7 +228,9 @@ def cmd_fix(args):
 
 
 def fixes_for(st, fixes):
-    return [f for f in fixes if st in (f.get("subtasks") or []) or "*" in (f.get("subtasks") or [])]
+    """Fix-log entries that bear on the validity of a subtask's demo: ``kind`` facts / note entries (recorded facts, later-list notes)
+    change no behaviour and do not invalidate a demo."""
+    return [f for f in fixes if (f.get("kind") or "fix") not in ("facts", "note") and (st in (f.get("subtasks") or []) or "*" in (f.get("subtasks") or []))]
 
 
 def build_board():

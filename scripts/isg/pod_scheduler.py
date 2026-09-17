@@ -92,8 +92,7 @@ DEFAULT_ALIAS = {
     "inter_object_relation_satisfaction-ontop_large_scale": "inter_object_relation_satisfaction-ontop_large_scale-shampoo_dispenser-countertop-countertop",
     "inter_object_relation_satisfaction-under_large_scale": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed",
 }
-DEFAULT_SCENE = {"configuration_matching-articulation_open_large_scale-bottom_cabinet": "office_cubicles_right",
-                 "configuration_matching-articulation_close_large_scale-bottom_cabinet": "office_cubicles_right"}
+DEFAULT_SCENE = {}  # office_cubicles_right was the bottom_cabinet scene until D-004 (18:30) blacklisted rvunhj_0; the alias is Rs_int-only now
 LOCAL_ONLY = {"inter_object_relation_satisfaction-ontop_large_scale"}  # owner 08:19: ontop large-scale on the local GPU
 MOVE_CAP = 6  # pool -> band moves per tick (each dispatch syncs HEAD to the pod)
 ORACLE_ONLY_OWNERS = {"oracle"}  # fixes by these owners re-enter a subtask as demo-only on its last instance
