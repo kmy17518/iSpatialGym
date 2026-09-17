@@ -507,6 +507,11 @@ class ArticulationSmall(SamplerV2):
             side_h = C.unit(th.cross(z_axis, u, dim=0))
             for c_axis, suffix in ((z_axis, "v"), (side_h, "h")):
                 out.append((f"{side}_{suffix}", point, a, c_axis))
+            # pitched press (jar_diag 20:54: every horizontal pre-contact 17 cm above the top fails the IK from the low
+            # trunks): the pads on the face's upper part, the approach 45 deg from above (B3's pitched classes), closing horizontal
+            point_hi = th.tensor([float(centre[0]), float(centre[1]), float(cw[:, 2].min()) + 0.85 * float(cw[:, 2].max() - cw[:, 2].min())]) \
+                + u * (float(proj.max()) - float(centre[:2] @ u[:2]))
+            out.append((f"{side}_p45", point_hi, C.unit(-u - z_axis), side_h))
         return out
 
     # ------------------------------------------------------------------ brace + handle from a stance, second stance
@@ -558,7 +563,7 @@ class ArticulationSmall(SamplerV2):
         return None, cands, fails, extras
 
     SECOND_STANCE_LATERALS = (0.10, -0.10, 0.20, -0.20)
-    SECOND_STANCE_MAX = 6
+    SECOND_STANCE_MAX = 8
 
     def _brace_second_stance(self, manip: Stance, pose: TT.Pose, q_values, grasp_pair, target, support, cam_init):
         """Second stance for the brace + handle pair: the manipulation stance shifted along the edge by
@@ -568,23 +573,37 @@ class ArticulationSmall(SamplerV2):
         tried: List[Stance] = []
         pts = C.transform_points(pose, self._hull_q_init)
         wp0 = C.handle_waypoints(self.handle, self.jinfo, [self.q_init], pose)[0]
-        for dlat in self.SECOND_STANCE_LATERALS:
-            for trunk in ((manip.translate, manip.tilt), (0.5, 0.0), (0.25, -0.3)):
-                if len(tried) >= self.SECOND_STANCE_MAX:
-                    return None, manip, tried
-                st = manip.shifted(lateral=manip.lateral + dlat, name="manipulation").with_trunk(trunk[0], trunk[1], "manipulation")
-                st.focus, st.arms = manip.focus, list(manip.arms) if isinstance(manip.arms, list) else manip.arms
-                if not self.kit.trav_free(st.base_xy) or not self.ikc.stance_collision_free(st):
-                    continue
-                cam = self.camera_pose_at(st)
-                if not TT.in_frame(self, cam, pts, float(self.g("view_margin_m"))) or not TT.in_frame(self, cam, wp0.contact.unsqueeze(0), TT.IN_FRAME_MARGIN):
-                    continue
-                tried.append(st)
-                chosen, _, _, extras = self._brace_from(st, pose, q_values, grasp_pair, target, support)
-                if chosen is not None:
-                    st.extras.update({"second_stance": True, "lateral_shift": float(dlat), "trunk_from": [float(manip.translate), float(manip.tilt)]})
-                    log.info("%s: second stance: lateral %+.2f, trunk (%.2f, %+.2f) reaches the handle grasp + brace %s", self.gp.alias, dlat, trunk[0], trunk[1], chosen[0])
-                    return chosen, st, tried
+        # candidates: lateral shift x stand-off (kept / 10 cm closer) x trunk, ordered by the promise for the two-arm pair
+        # (jar_diag 20:54: the handle arm passes with the target at base lateral -0.15 / depth 0.71 and the brace arm fails
+        # every pre-contact there; the brace arm passes alone from the other trunk): the target between the shoulders
+        # (|lateral| small) and not deeper than 0.62 m first
+        combos = []
+        for dlat in self.SECOND_STANCE_LATERALS + (0.0,):
+            for dso in (0.0, -0.10):
+                for trunk in ((manip.translate, manip.tilt), (0.5, 0.0), (0.25, -0.3)):
+                    if dlat == 0.0 and dso == 0.0 and abs(trunk[0] - manip.translate) < 1e-6 and abs(trunk[1] - manip.tilt) < 1e-6:
+                        continue
+                    so = max(0.25, float(manip.stand_off or TT.STAND_OFF) + dso)
+                    st = manip.shifted(stand_off=so, lateral=manip.lateral + dlat, name="manipulation").with_trunk(trunk[0], trunk[1], "manipulation")
+                    st.focus, st.arms = manip.focus, list(manip.arms) if isinstance(manip.arms, list) else manip.arms
+                    b = st.world_to_base(pose[0][:2])
+                    combos.append((abs(float(b[1])) + max(0.0, float(b[0]) - 0.62) + 0.1 * abs(trunk[1]), dlat, dso, trunk, st))
+        combos.sort(key=lambda c: c[0])
+        for _, dlat, dso, trunk, st in combos:
+            if len(tried) >= self.SECOND_STANCE_MAX:
+                break
+            if not self.kit.trav_free(st.base_xy) or not self.ikc.stance_collision_free(st):
+                continue
+            cam = self.camera_pose_at(st)
+            if not TT.in_frame(self, cam, pts, float(self.g("view_margin_m"))) or not TT.in_frame(self, cam, wp0.contact.unsqueeze(0), TT.IN_FRAME_MARGIN):
+                continue
+            tried.append(st)
+            chosen, _, _, extras = self._brace_from(st, pose, q_values, grasp_pair, target, support)
+            if chosen is not None:
+                st.extras.update({"second_stance": True, "lateral_shift": float(dlat), "stand_off_shift": float(dso), "trunk_from": [float(manip.translate), float(manip.tilt)]})
+                log.info("%s: second stance: lateral %+.2f, stand-off %+.2f, trunk (%.2f, %+.2f) reaches the handle grasp + brace %s", self.gp.alias, dlat, dso,
+                         trunk[0], trunk[1], chosen[0])
+                return chosen, st, tried
         return None, manip, tried
 
     def _log_brace_failure(self, manip: Stance, pose: TT.Pose, q_values, grasp_pair, target, support, stances: List[Stance]):
@@ -598,16 +617,15 @@ class ArticulationSmall(SamplerV2):
                 r_h = self.ikc.exact(list(grasp_pair), st, self.handle_arm, [support, target], cache=False)
                 cands, extras = self._brace_candidates_at(st, pose, q_values)
                 rows = []
-                for kind, (b_pre, b_contact) in cands[:8]:
+                for kind, (b_pre, b_contact) in cands[:12]:
                     r_b = self.ikc.exact([b_pre, b_contact], st, self.brace_arm, [target], cache=False)
                     two = TT.brace_second_arm(self, st, self.handle_arm, grasp_pair, self.brace_arm, [b_pre, b_contact], ignore_work_last=[support, target], ignore_brace_last=[target])
                     pt = b_contact[0]
-                    rows.append({"class": kind, "point_base": [round(float(v), 3) for v in st.world_to_base(pt[:2]).tolist()] + [round(float(pt[2]) - float(self.top.z), 3)],
-                                 "in_left_band": bool(TT.in_band(self.left_bands, st, pt[:2], tol=1.0)[0]) if self.left_bands is not None else None,
-                                 "brace_alone": r_b.ok if r_b.ok else r_b.reason[:80], "two_arm": True if two.ok else two.reason[:100]})
-                out["stances"].append({"name": st.name, "base": [round(float(v), 3) for v in st.base_pose2d], "trunk": [float(st.translate), float(st.tilt)],
-                                       "lateral_shift": st.extras.get("lateral_shift"), "handle_alone": r_h.ok if r_h.ok else r_h.reason[:80],
-                                       "passing_classes": extras.get("pose_classes_passing"), "braces": rows})
+                    rows.append(f"{kind}@({float(st.world_to_base(pt[:2])[0]):.2f},{float(st.world_to_base(pt[:2])[1]):+.2f}):"
+                                f"{'B' if r_b.ok else 'b'}{'T' if two.ok else 't'}")  # B/b = brace alone ok / fail, T/t = two-arm ok / fail
+                out["stances"].append({"trunk": [round(float(st.translate), 2), round(float(st.tilt), 2)], "stand_off": st.stand_off, "target_base": [round(float(v), 2) for v in st.world_to_base(pose[0][:2]).tolist()],
+                                       "shift": [st.extras.get("lateral_shift"), st.extras.get("stand_off_shift")], "handle_alone": bool(r_h.ok),
+                                       "left_band": self.left_bands is not None, "braces": rows})
             log.info("%s: BRACE_FAILURE %s", self.gp.alias, json.dumps(out))
         except Exception as e:  # diagnostics only
             log.info("%s: BRACE_FAILURE diagnostic failed: %r", self.gp.alias, e)
