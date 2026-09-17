@@ -442,7 +442,7 @@ class Attachment(SamplerV2):
         male, female, support = self.obj(self.t_role), self.obj(self.p_role), self.obj("support")
         fails = {"distance": 0, "support": 0, "gap": 0, "frame": 0, "brace_off_band": 0, "brace_class_failed": 0, "screen": 0, "ik": 0, "slerp": 0, "brace_ik": 0}
         self._att_fails = getattr(self, "_att_fails", {})
-        self._att_fails[st.name if require_joint else st.name + "/brace-optional"] = fails
+        self._att_fails[f"{st.name}@lat{st.lateral:+.2f}/trunk({st.translate:.2f},{st.tilt:+.2f}){'' if require_joint else '/brace-optional'}"] = fails
         cells = TT.band_cells_world(self.attach_bands, st)
         if len(cells) == 0:
             fails["no_cells"] = 1
@@ -468,10 +468,17 @@ class Attachment(SamplerV2):
             if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull[self.p_role], pose), TT.IN_FRAME_MARGIN):
                 fails["frame"] += 1
                 continue
-            point, b_dir = self._partner_brace_point(pose, st)
-            jp = TT.joint_placement(self.attach_bands, self.left_bands, st, xy, point[:2], brace_class=TT.contact_class(st, -b_dir, th.tensor([0.0, 0.0, 1.0])))
-            if not jp["ok"] and jp["brace_ok"] and not jp["brace_class_ok"]:
-                jp = TT.joint_placement(self.attach_bands, self.left_bands, st, xy, point[:2], brace_class=TT.contact_class(st, -b_dir, C.default_closing_axis(-b_dir)))
+            # the first brace face whose point lies in the left contact band at this trunk (class passing), else the first face
+            jp = None
+            for point, b_dir in self._partner_brace_points(pose, st):
+                jp_ = TT.joint_placement(self.attach_bands, self.left_bands, st, xy, point[:2], brace_class=TT.contact_class(st, -b_dir, th.tensor([0.0, 0.0, 1.0])))
+                if not jp_["ok"] and jp_["brace_ok"] and not jp_["brace_class_ok"]:
+                    jp_ = TT.joint_placement(self.attach_bands, self.left_bands, st, xy, point[:2], brace_class=TT.contact_class(st, -b_dir, C.default_closing_axis(-b_dir)))
+                if jp is None or (jp_["ok"] and not jp["ok"]) or (jp_["brace_ok"] and not jp["brace_ok"] and not jp["ok"]):
+                    jp, point_best, b_dir_best = jp_, point, b_dir
+                if jp["ok"]:
+                    break
+            point, b_dir = point_best, b_dir_best
             if require_joint and not jp["ok"]:
                 fails["brace_off_band" if not jp["brace_ok"] else "brace_class_failed"] += 1
                 continue
@@ -567,20 +574,29 @@ class Attachment(SamplerV2):
         toward the robot (the left gripper reaches forward); ``point`` = the partner's centre pushed out to the hull's
         extreme along ``b_dir`` at B3's contact height (0.75 of the partner's height). Returns ``(point, b_dir)``
         (``b_dir`` = outward normal of the braced face; the approach is −b_dir)."""
+        return self._partner_brace_points(f_pose, manip)[0]
+
+    def _partner_brace_points(self, f_pose: TT.Pose, manip: Stance) -> List[Tuple[th.Tensor, th.Tensor]]:
+        """Brace face candidates in preference order: the face opposite a horizontal insertion (the face the insertion
+        pushes toward) alone; for a vertical insertion the partner's face toward the robot, then its robot-left face,
+        then its far face (att_diag 20:12: with the near face alone 22 of 40 partner cells had the brace point off the
+        left band — the attach-reach cells lie on the robot's right, the left band's lateral range is [-0.16, 0.56])."""
         axis = self._insertion_axis_world(f_pose)
         d_ins = -axis  # the male moves along -axis into the female
         horiz = th.tensor([float(d_ins[0]), float(d_ins[1]), 0.0])
-        if float(th.linalg.norm(horiz)) >= 0.3:
-            b_dir = horiz / th.linalg.norm(horiz)
-        else:
-            f = manip.forward
-            b_dir = th.tensor([-float(f[0]), -float(f[1]), 0.0])
+        f = manip.forward
+        fwd = th.tensor([float(f[0]), float(f[1]), 0.0])
+        left = th.tensor([-float(f[1]), float(f[0]), 0.0])
+        dirs = [horiz / th.linalg.norm(horiz)] if float(th.linalg.norm(horiz)) >= 0.3 else [-fwd, left, fwd]
         pts = C.transform_points(f_pose, self.hull[self.p_role])
-        proj = pts[:, :2] @ b_dir[:2]
         z_c = TT.contact_height(float(pts[:, 2].min()), float(pts[:, 2].max() - pts[:, 2].min()))
         centre = pts.mean(dim=0)
-        point = th.tensor([float(centre[0]), float(centre[1]), z_c]) + b_dir * (float(proj.max()) - float(centre[:2] @ b_dir[:2]))
-        return point, b_dir
+        out = []
+        for b_dir in dirs:
+            proj = pts[:, :2] @ b_dir[:2]
+            point = th.tensor([float(centre[0]), float(centre[1]), z_c]) + b_dir * (float(proj.max()) - float(centre[:2] @ b_dir[:2]))
+            out.append((point, b_dir))
+        return out
 
     def _brace_candidates(self, manip: Stance, point: th.Tensor, b_dir: th.Tensor, passing: Optional[List[str]]):
         """Brace poses of the closed left gripper on the partner face at ``point``: approach −b_dir into the face
