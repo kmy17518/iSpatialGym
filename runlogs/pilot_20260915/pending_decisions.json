@@ -170,12 +170,12 @@
    "artefacts": [
     "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_open_small_scale/0916-205838/"
    ],
-   "status": "open",
-   "answered_by": null,
-   "answer": null,
+   "status": "answered",
+   "answered_by": "chat",
+   "answer": "A - brace optional for small articulation (open + close): contacts.brace only when a joint cell exists, else handle-only with the oracle's articulate closure (as axial / touching)",
    "applied_commit": null,
    "thread_ts": null,
-   "answered_at": null,
+   "answered_at": "2026-09-16 22:02 PDT",
    "channel": "chat (Slack paused 21:53)"
   },
   {
@@ -192,12 +192,12 @@
    "artefacts": [
     "runlogs/pilot_20260915/first_demo/configuration_matching-attachment/"
    ],
-   "status": "open",
-   "answered_by": null,
-   "answer": null,
+   "status": "answered",
+   "answered_by": "chat",
+   "answer": "B - general rule: class-1 Phase-2 candidates admitted whenever the class-0 foci are deeper than 0.65 m base-forward (all tabletop subtasks)",
    "applied_commit": null,
    "thread_ts": null,
-   "answered_at": null,
+   "answered_at": "2026-09-16 22:02 PDT",
    "channel": "chat (Slack paused 21:53)"
   }
  ]
