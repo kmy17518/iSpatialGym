@@ -62,6 +62,10 @@ DEFAULTS: Dict[str, Any] = {
     "yaw_extra_deg": 15.0,  # one extra yaw step beyond either end
     "yaw_weight_m_per_rad": 0.30,  # displacement cost = |dxy| + w * |dyaw|
     "max_ik_per_step": 40,  # exact IK calls per dense step before the step is infeasible
+    "min_margin_rad": 0.15,  # preferred joint-limit margin of a follow pose: the closest-to-seed IK solution with >= this wins,
+    # else the best-margin one >= IKChecker.JOINT_LIMIT_MARGIN (top_cabinet 0917-014213: the retreat from the path's end
+    # found left_arm_joint7 within 14 mrad of its limit on every solution -> ik_joint_limit at the program check)
+    "check_retreat": True,  # the last pose must also admit the retreat pose (pre_pose of h(q_last), RETREAT 0.10 m back)
     "reach_fraction": 1.0,  # torso-top-to-eef distance pre-filter: <= this fraction of the straight arm's + reach_extra_m
     "reach_extra_m": 0.10,  # (the arm mounts off the torso top: the straight-arm distance measured there is not the maximum)
     "min_reach_m": 0.15,
@@ -475,26 +479,46 @@ class FollowSearch:
         return dataclasses.replace(self.manip, name=name, base_pose2d=(float(b[0]), float(b[1]), float(b[2])), q=None)
 
     # -- IK ------------------------------------------------------------------------------------------------------
-    def solve(self, b: Sequence[float], eef: Tuple[th.Tensor, th.Tensor], q_prev: th.Tensor, leaf_pts) -> Optional[_Sol]:
-        """Exact arm IK of ``eef`` from base ``b`` seeded with the previous configuration, kept away from the joint
-        limits, polished onto the pose, whole-body collision-free at ``COLLISION_MARGIN`` (leaf removed), the leaf clear
-        of the footprint. None when any of it fails."""
+    def _ik(self, eef: Tuple[th.Tensor, th.Tensor], q_seed: th.Tensor) -> Optional[th.Tensor]:
+        """Exact arm IK (every successful seed of the 32): the solution **closest to the seed** among those with a
+        joint-limit margin >= ``min_margin_rad`` (arm continuity between consecutive poses), else the largest-margin one
+        when it keeps ``IKChecker.JOINT_LIMIT_MARGIN``; None otherwise. Counted as one IK call."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        self.kit._ensure_synced()
+        t0 = time.time()
+        sols = self.kit.backend.solve_ik(f"{self.arm}_arm", {M.EEF_LINK[self.arm]: (G.t(eef[0]), G.t(eef[1]))}, q_seed=q_seed, return_all=True, sync_world=False)
+        self.kit.stats["ik_calls"] = self.kit.stats.get("ik_calls", 0) + 1
+        self.kit.stats["ik_s"] = self.kit.stats.get("ik_s", 0.0) + (time.time() - t0)
+        self.n_ik += 1
+        if sols is None or len(sols) == 0:
+            return None
+        sols = G.t(sols).reshape(-1, q_seed.shape[0])
+        margins = th.tensor([self.ikc.joint_limit_margin(q, self.arm)[0] for q in sols])
+        dist = th.linalg.norm(sols[:, self.idx] - G.t(q_seed)[self.idx], dim=1)
+        good = margins >= float(self.k["min_margin_rad"])
+        if bool(good.any()):
+            return sols[int(th.argmin(th.where(good, dist, th.full_like(dist, float("inf")))))].clone()
+        j = int(th.argmax(margins))
+        return sols[j].clone() if float(margins[j]) >= self.ikc.JOINT_LIMIT_MARGIN else None
+
+    def solve(self, b: Sequence[float], eef: Tuple[th.Tensor, th.Tensor], q_prev: th.Tensor, leaf_pts, retreat: bool = False) -> Optional[_Sol]:
+        """Exact arm IK of ``eef`` from base ``b`` seeded with the previous configuration (:meth:`_ik`: margin-aware),
+        polished onto the pose, whole-body collision-free at ``COLLISION_MARGIN`` (leaf removed), the leaf clear of the
+        footprint; with ``retreat`` the retreat pose (``pre_pose`` of ``eef``, 0.10 m back along −a) must be reachable
+        from the same base too. None when any of it fails."""
         q_seed = self.kit.q_at_base_pose(q_prev, float(b[0]), float(b[1]), float(b[2]))
         n0 = int(self.kit.stats.get("ik_calls", 0))
-        try:
-            with self.ikc.ignoring(self.ignore):
-                q = self.kit.ik(eef, q_seed, arm=self.arm)
-                if q is None:
-                    return None
-                q, _why = self.ikc.away_from_limits(q, eef, self.arm, q_seed)
-                if q is None:
-                    return None
-                q_pol, residual = self.ikc.polish_witness(q, eef, self.arm, ignore=())
-                if residual > 5e-3:  # the solver's own acceptance; the program check polishes again to <= 2 mm
-                    return None
-                free = bool(self.kit.collision_free(q_pol, margin=P0.COLLISION_MARGIN)[0])
-        finally:
-            self.n_ik += int(self.kit.stats.get("ik_calls", 0)) - n0
+        with self.ikc.ignoring(self.ignore):
+            q = self._ik(eef, q_seed)
+            if q is None:
+                return None
+            q_pol, residual = self.ikc.polish_witness(q, eef, self.arm, ignore=())
+            if residual > 5e-3:  # the solver's own acceptance; the program check polishes again to <= 2 mm
+                return None
+            free = bool(self.kit.collision_free(q_pol, margin=P0.COLLISION_MARGIN)[0])
+            if free and retreat and self._ik(C.pre_pose(eef, C.PRE_DIST), q_pol) is None:
+                return None
         if not free:
             return None
         margin, _ = self.ikc.joint_limit_margin(q_pol, self.arm)
@@ -538,7 +562,7 @@ class FollowSearch:
         if not ok0:
             log.info("%s: hybrid follow: the manipulation stance itself fails the planar %s stand-in (kept: the stance passed the whole-body check)", s.gp.alias, why0)
         try:
-            for q_i in q_values:
+            for i_q, q_i in enumerate(q_values):
                 if time.time() - self.t0 > float(self.k["budget_s"]):
                     self._fail(poses, "time_budget", f"hybrid follow search over {self.k['budget_s']:.0f} s at q = {q_i:.3f}")
                 s.pose_joint(q_i)
@@ -550,9 +574,10 @@ class FollowSearch:
                 sol = None
                 chosen = "arm_only"
                 b_new: Pose2D = b_prev
+                last = i_q == len(q_values) - 1 and bool(self.k["check_retreat"])  # the retreat must leave from the final pose
                 # 1. the arm alone from the current base (the leaf at q_i must stay clear of the footprint)
                 if leaf_clear_of_base(leaf_now, b_prev[:2], float(self.k["base_radius_m"])) and self.reach_ok(b_prev, w.eef[0]):
-                    sol = self.solve(b_prev, w.eef, q_prev, leaf_now)
+                    sol = self.solve(b_prev, w.eef, q_prev, leaf_now, retreat=last)
                 # 2. move the base: the rigid-sweep interpolations, then the lattice, in order of displacement
                 tried: Dict[str, int] = {}
                 if sol is None:
@@ -570,7 +595,7 @@ class FollowSearch:
                         if not self.reach_ok(b, w.eef[0]):
                             tried["reach"] = tried.get("reach", 0) + 1
                             continue
-                        cand = self.solve(b, w.eef, q_prev, leaf_now)
+                        cand = self.solve(b, w.eef, q_prev, leaf_now, retreat=last)
                         if cand is None:
                             tried["ik"] = tried.get("ik", 0) + 1
                             continue
