@@ -338,6 +338,7 @@ class BlockDesign(SamplerV2):
             return float(uv[0] + uv[1])
 
         cells = [region[int(i)] for i in rng.permutation(len(region))]
+        region_all = list(cells)
         # 17:24 first-demo run: every pick-screening failure was a block at base-lateral 0.0 / -0.08 with the other blocks
         # to its right (the arm reaches over them), every pick at -0.16 / -0.24 passed; the isolated kinematics do not
         # depend on the lateral (probe_place_lat 18:25), so keep the blocks in front of the right shoulder when the region
@@ -366,13 +367,19 @@ class BlockDesign(SamplerV2):
         anchor_xy = min(cells, key=arm_score)
         chosen.append(anchor_xy)
         s_anchor = img_score(anchor_xy)
-        # the anchor is the top-left block in the init image: the other blocks come from cells right of / nearer than it
-        cells = [xy for xy in cells if xy is not anchor_xy and img_score(xy) > s_anchor] or [xy for xy in cells if xy is not anchor_xy]
         b_anchor = manip.world_to_base(th.stack(grid_cells(anchor_xy)).mean(dim=0))
         log.info("%s: goal grid anchored at base (%.2f, %+.2f) (score %s)", self.gp.alias, float(b_anchor[0]), float(b_anchor[1]), arm_score(anchor_xy))
-        for xy in cells:
-            if all(float(th.linalg.norm(xy - c)) >= self.edge * math.sqrt(2) + gap for c in chosen):
-                chosen.append(xy)
+        # the other blocks: cells right of / nearer than the preferred anchor first (it stays the top-left block in the init
+        # image), then the rest of the window, then the whole region (the anchor is re-derived as the top-left of the final
+        # set below; 21:37 first-demo run: the window + top-left filter alone left 2 of 4 cells -> 'layout' x8)
+        tiers = [[xy for xy in cells if xy is not anchor_xy and img_score(xy) > s_anchor], [xy for xy in cells if xy is not anchor_xy],
+                 [xy for xy in region_all if all(xy is not c for c in chosen)]]
+        for tier in tiers:
+            for xy in tier:
+                if len(chosen) == n:
+                    break
+                if all(float(th.linalg.norm(xy - c)) >= self.edge * math.sqrt(2) + gap for c in chosen):
+                    chosen.append(xy)
             if len(chosen) == n:
                 break
         if len(chosen) < n:
