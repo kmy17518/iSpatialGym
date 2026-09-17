@@ -16861,10 +16861,10 @@
      "handle": true
     },
     "joint": {
-     "Rs_int/bottom_cabinet_bamfsz_0": "j_link_4"
+     "Rs_int/bottom_cabinet_bamfsz_1": "j_link_4"
     },
     "handle_key": {
-     "Rs_int/bottom_cabinet_bamfsz_0": "bottom_cabinet__bamfsz"
+     "Rs_int/bottom_cabinet_bamfsz_1": "bottom_cabinet__bamfsz"
     }
    },
    "floor": {
@@ -16874,14 +16874,14 @@
   "scenes": {
    "Rs_int": {
     "rooms": [
-     "kitchen_0"
+     "living_room_0"
     ],
     "bindings": {
      "target": [
-      "bottom_cabinet_bamfsz_0"
+      "bottom_cabinet_bamfsz_1"
      ],
      "floor": {
-      "room": "kitchen_0"
+      "room": "living_room_0"
      }
     },
     "whitelist": {},
@@ -16967,7 +16967,8 @@
     "whitelist": {},
     "blacklist": {}
    }
-  }
+  },
+  "pick_note": "large-scale 23:05: bamfsz_0's drawers face a 0.35 m aisle (trash can; free front 0.0 m on the with-objects trav map; B4's 3.0 m came from the no-object map) -> same model bamfsz_1 in living_room_0 (3.0 m free, handle 0.68 m); first large-articulation instance + demo through grasp(handle) on the probe"
  },
  "configuration_matching-articulation_close_large_scale-bottom_cabinet_no_top": {
   "iddl": "configuration_matching/articulation_close_large_scale.iddl",
@@ -19863,10 +19864,10 @@
      "handle": true
     },
     "joint": {
-     "Rs_int/bottom_cabinet_bamfsz_0": "j_link_4"
+     "Rs_int/bottom_cabinet_bamfsz_1": "j_link_4"
     },
     "handle_key": {
-     "Rs_int/bottom_cabinet_bamfsz_0": "bottom_cabinet__bamfsz"
+     "Rs_int/bottom_cabinet_bamfsz_1": "bottom_cabinet__bamfsz"
     }
    },
    "floor": {
@@ -19876,14 +19877,14 @@
   "scenes": {
    "Rs_int": {
     "rooms": [
-     "kitchen_0"
+     "living_room_0"
     ],
     "bindings": {
      "target": [
-      "bottom_cabinet_bamfsz_0"
+      "bottom_cabinet_bamfsz_1"
      ],
      "floor": {
-      "room": "kitchen_0"
+      "room": "living_room_0"
      }
     },
     "whitelist": {},
@@ -19969,7 +19970,8 @@
     "whitelist": {},
     "blacklist": {}
    }
-  }
+  },
+  "pick_note": "large-scale 23:05: bamfsz_0's drawers face a 0.35 m aisle (trash can; free front 0.0 m on the with-objects trav map; B4's 3.0 m came from the no-object map) -> same model bamfsz_1 in living_room_0 (3.0 m free, handle 0.68 m); first large-articulation instance + demo through grasp(handle) on the probe"
  },
  "configuration_matching-articulation_open_large_scale-bottom_cabinet_no_top": {
   "iddl": "configuration_matching/articulation_open_large_scale.iddl",
