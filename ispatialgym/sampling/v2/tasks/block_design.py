@@ -422,6 +422,8 @@ class BlockDesign(SamplerV2):
         for step, bi in enumerate(order):
             rec = self._block_program(rng, manip, names, poses, goal_pose, plans, order, step, right, toward, table_yaw)
             records.append(rec)
+        for bi in range(n):  # a table flip may have re-chosen the block's table-aligned goal yaw (goal face unchanged)
+            slots[f"slot_{slot_of[bi]}"]["orientation"] = [float(v) for v in goal_pose[bi][1]]
         # --- draft ---------------------------------------------------------------------------------------------------
         for bi in range(n):
             d.object_poses[names[bi]] = poses[bi]
@@ -586,6 +588,12 @@ class BlockDesign(SamplerV2):
                 continue
             chosen = (pair, tilt_pick, tilt_place, yaw, sign, g_pick, place_margin_pose, pre_pick, pre_place, wps)
             break
+        if chosen is None and plan["flips"] and self.gen("block_table_flip", False):
+            # §6.5 flip-on-the-table (owner 2026-09-16 17:10, prep behind ``generation.block_table_flip``): grasp → place on a
+            # free region cell in an intermediate orientation → re-grasp with the other pitch class → place at the slot
+            legs = self._table_flip_chain(rng, manip, names, bi, poses, goal_pose, world_poses, right, toward, table_yaw, surface_z, plan)
+            if legs is not None:
+                return self._table_flip_record(names, bi, step, legs, plan, goal_pose, surface_z, manip, world_poses, order, right, toward)
         if chosen is None:
             self._log_pick_failure("place", manip, names, bi, world_poses, screened, pre_picks, support, block, extra={"per_class": place_diag[:12], "goal_slot_base":
                                    [round(float(v), 3) for v in manip.world_to_base(self._centre(place_pose)[0][:2]).tolist()],
@@ -624,6 +632,146 @@ class BlockDesign(SamplerV2):
             outcomes["col"] = self._brace_push(rec, "col", names[bi], names[top_bi], world_after, direction=toward * -1.0, brace_dir=toward, manip=manip)
         rec["brace"] = "present" if any(v == "present" for v in outcomes.values()) else ("none" if outcomes else "not_needed")
         rec["brace_reasons"] = outcomes
+        return rec
+
+    # ------------------------------------------------------------------ §6.5 flip-on-the-table (prep, ``generation.block_table_flip``)
+
+    def _leg_ik(self, manip: Stance, block, pose_a: TT.Pose, pose_b: TT.Pose, world_poses: Dict[str, TT.Pose], table_yaw: float,
+                place_margin: Optional[th.Tensor] = None) -> Optional[Dict[str, Any]]:
+        """One grasp → place leg of a block from world pose ``pose_a`` to ``pose_b`` (the in-hand rotation R = q_b·q_a⁻¹ is
+        a yaw or a quarter turn about the pinch axis): pick classes = horizontal face pairs × PICK_TILTS_DEG × 4 wrist yaws,
+        pre-pick + pick exact IK (support + block ignored for the pick), pre-place + place exact IK with the block attached,
+        the in-hand waypoints (orbit for a yaw, flip for a quarter turn) screened. Returns the leg record or None."""
+        support = self.obj("support")
+        self._teleport(world_poses)
+        q_a, q_b = TT._t(pose_a[1]), TT._t(pose_b[1])
+        rot = C.qmul(q_b, C.qinv(q_a))  # world rotation of the block over the leg (xyzw)
+        angle = float(C.quat_angle(rot, C.IDENTITY_QUAT))
+        v = TT._t(rot)[:3]
+        axis = (v / th.linalg.norm(v)).tolist() if float(th.linalg.norm(v)) > 1e-6 else None
+        up = TT.up_face(q_a)
+        pairs = [ax for ax in "xyz" if ax != up[1]]
+        if axis is not None and abs(axis[2]) < 0.5:
+            # a quarter turn about a horizontal axis: the pinch must be along that axis (the block turns about the pads)
+            pairs = [p_ for p_ in pairs if abs(float(th.dot(C.quat_rotate(q_a, th.tensor(TT.FACE_AXES["+" + p_])), th.tensor(axis)))) > 0.9]
+        cands = []
+        for pair in pairs:
+            for tilt in PICK_TILTS_DEG:
+                for k in range(4):
+                    yaw = table_yaw + k * math.pi / 2
+                    try:
+                        g = C.cube_grasp(self._centre(pose_a), pair, tilt, yaw, edge=self.edge, tip_clearance=PICK_TIP_CLEARANCE)
+                    except ValueError:
+                        continue
+                    if not g.downward:
+                        continue
+                    place_eef = C.compose(self._centre(pose_b), g.eef_in_block)
+                    if float(C.approach_axis(place_eef[1])[2]) > -0.1:
+                        continue
+                    cands.append((pair, tilt, yaw, g, place_eef))
+        if not cands:
+            return None
+        pre_picks = [[IK.pre_pose(c[3].eef), c[3].eef] for c in cands]
+        ok = self.ikc.screen_pairs(pre_picks, manip, "right", ignore_for_last=[support, block])
+        for i in [i for i, s_ in enumerate(ok.tolist()) if s_][:6]:
+            pair, tilt, yaw, g, place_eef = cands[i]
+            pre_pick = IK.pre_pose(g.eef)
+            if not self.ikc.exact([pre_pick, g.eef], manip, "right", ignore_for_last=[support, block]).ok:
+                continue
+            target_eef = place_eef if place_margin is None else (place_eef[0] + place_margin, place_eef[1])
+            pre_place = IK.pre_pose(target_eef)
+            with TT.posed_in_hand(self, "right", block, C.relative(g.eef, pose_a)):
+                with attached(self.kit, "right", block):
+                    if not self.ikc.exact([pre_place, target_eef], manip, "right", ignore_for_last=[support]).ok:
+                        continue
+                    lift = (g.eef[0] + th.tensor([0.0, 0.0, self._carry_height()]), g.eef[1])
+                    pivot = self._centre(pose_a)[0] + th.tensor([0.0, 0.0, self._carry_height()])
+                    wps = list(C.orbit_waypoints(lift, pivot, rot, n=3)) if angle > 1e-3 else []
+                    if wps and not self.ikc.waypoints_ok([lift] + wps, manip, "right", ignore_all=[support]).ok:
+                        continue
+            q0 = C.qmul(g.eef[1], C.quat_from_axis_angle([0.0, 1.0, 0.0], -math.radians(g.tilt_deg)))
+            return {"face_pair": pair, "tilt_pick_deg": float(g.tilt_deg), "tilt_place_deg": float(_tilt_about_y(q0, target_eef[1])), "yaw_deg": float(math.degrees(g.yaw)),
+                    "pick": pose_to_sidecar(g.eef), "pre_pick": pose_to_sidecar(pre_pick), "place": pose_to_sidecar(target_eef), "pre_place": pose_to_sidecar(pre_place),
+                    "carry_height": float(self._carry_height()), "waypoints": [pose_to_sidecar(w) for w in wps],
+                    "rotation_axis": None if axis is None else [float(x) for x in axis], "rotation_deg": float(math.degrees(angle)),
+                    "block_pose_after": {"position": [float(v) for v in pose_b[0]], "orientation": [float(v) for v in pose_b[1]]}}
+        return None
+
+    def _free_intermediate_cells(self, manip: Stance, names: List[str], bi: int, world_poses: Dict[str, TT.Pose], goal_pose: Dict[int, TT.Pose]) -> List[th.Tensor]:
+        """Region cells free for the intermediate placement: not within ``spacing`` of another block (init or slot) nor of
+        the goal grid, on the top; nearest the block's own cell first."""
+        cells = manip.extras.get("focus_info", {}).get("cells")
+        if cells is None:
+            return []
+        spacing = 0.5 * C.GRIPPER_OPEN_M + FINGER_HALF_THICKNESS + 0.5 * self.edge + 0.03
+        occupied = [self._centre(p)[0][:2] for n, p in world_poses.items() if n != names[bi]] + [self._centre(g)[0][:2] for g in goal_pose.values()]
+        own = self._centre(world_poses[names[bi]])[0][:2]
+        out = [c for c in cells if all(float(th.linalg.norm(c - o)) >= spacing for o in occupied) and float(th.linalg.norm(c - own)) >= spacing
+               and self.top.contains(c, 0.5 * self.edge + 0.02)]
+        out.sort(key=lambda c: float(th.linalg.norm(c - own)))
+        return out
+
+    def _table_flip_chain(self, rng, manip: Stance, names: List[str], bi: int, poses: Dict[int, TT.Pose], goal_pose: Dict[int, TT.Pose], world_poses: Dict[str, TT.Pose],
+                          right: th.Tensor, toward: th.Tensor, table_yaw: float, surface_z: Optional[float], plan: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
+        """Two-leg chain for a block whose goal face is not up. Two quarter turns about *different* horizontal axes compose
+        to a 120° body-diagonal rotation and two about the same axis to 180°, so the only stable two-leg decomposition is
+        **yaw first**: leg 1 yaw-aligns the block (ψ) plus k·90° in hand (an orbit, k ∈ {1, 2, 3}: the goal face moves to a
+        side or to the back) and places it on a free region cell; leg 2 re-grasps it there with the pinch along the new
+        flip axis and turns it by the quarter turn (either sense the IK admits) that brings the goal face up, placing it at
+        the slot. The block's goal orientation becomes the resulting table-aligned quaternion (``goal_pose[bi]`` updated:
+        the pattern constrains the up face only). Both legs pass the exact IK from the manipulation stance; None otherwise."""
+        block = self.objects[names[bi]]
+        q_init, gf = TT._t(poses[bi][1]), TT.up_face(goal_pose[bi][1])
+        cells = self._free_intermediate_cells(manip, names, bi, world_poses, goal_pose)
+        if not cells:
+            return None
+        psi = math.radians(float(plan["yaw_deg"]))
+        for k in (1, 3, 2):
+            q_mid = C.qmul(C.quat_from_yaw(psi + k * math.pi / 2), q_init)
+            ends = []
+            for ax in ([1.0, 0.0, 0.0], [0.0, 1.0, 0.0]):
+                for sgn in (1.0, -1.0):
+                    q_end = C.qmul(C.quat_from_axis_angle(ax, sgn * math.pi / 2), q_mid)
+                    if TT.up_face(q_end) == gf:
+                        ends.append((ax, sgn, q_end))
+            if not ends:
+                continue
+            for cell in cells[:3]:
+                pose_mid = self._root_pose(cell, q_mid, 0.002)
+                leg1 = self._leg_ik(manip, block, poses[bi], pose_mid, world_poses, table_yaw)
+                if leg1 is None:
+                    continue
+                world_mid = dict(world_poses)
+                world_mid[names[bi]] = pose_mid
+                for ax, sgn, q_end in ends:
+                    place_pose = (goal_pose[bi][0], q_end)
+                    if surface_z is not None:
+                        bottom = float(place_pose[0][2]) - self.world.bottom_offset(self.hull, place_pose[1])
+                        place_pose = (place_pose[0] + th.tensor([0.0, 0.0, max(0.0, surface_z + RELEASE_ABOVE_SURFACE - bottom)]), place_pose[1])
+                    leg2 = self._leg_ik(manip, block, pose_mid, place_pose, world_mid, table_yaw, place_margin=_xy3(right) * PLACE_MARGIN + _xy3(toward) * PLACE_MARGIN)
+                    if leg2 is None:
+                        continue
+                    goal_pose[bi] = (goal_pose[bi][0], q_end)
+                    log.info("%s: table flip for %s: yaw %+.0f deg then quarter turn about %s (%+.0f), intermediate cell base %s", self.gp.alias, names[bi],
+                             math.degrees(psi) + k * 90.0, ax, sgn * 90.0, [round(float(v), 2) for v in manip.world_to_base(cell).tolist()])
+                    leg1["kind"], leg2["kind"] = "intermediate (yaw first)", "slot (quarter turn)"
+                    return [leg1, leg2]
+        return None
+
+    def _table_flip_record(self, names, bi, step, legs, plan, goal_pose, surface_z, manip, world_poses, order, right, toward) -> Dict[str, Any]:
+        """Block record of a table-flipped block: the top-level pick / place fields mirror the LAST leg (re-grasp at the
+        intermediate pose → slot) and ``legs`` carries both grasp → place legs in order (record shape proposed to the oracle
+        agent: ``program_block_design`` iterates ``legs`` when present; each leg is its own FOV span, §3.9)."""
+        last = legs[-1]
+        rec: Dict[str, Any] = {"instance": names[bi], "order": step, "face_pair": last["face_pair"], "tilt_pick_deg": last["tilt_pick_deg"], "tilt_place_deg": last["tilt_place_deg"],
+                               "yaw_deg": last["yaw_deg"], "yaw_align_deg": float(plan["yaw_deg"]), "flip_axis": None, "flip_sign": 0,
+                               "pick": last["pick"], "pre_pick": last["pre_pick"], "place": last["place"], "pre_place": last["pre_place"], "carry_height": last["carry_height"],
+                               "goal_face": TT.up_face(goal_pose[bi][1]), "slot": step, "release_surface_z": None if surface_z is None else round(float(surface_z), 4),
+                               "centre_offset": [float(v) for v in self.c_local.tolist()], "flip_mode": "table", "legs": legs,
+                               "intermediate_pose": legs[0]["block_pose_after"]}
+        if last.get("waypoints"):
+            rec["waypoints"] = last["waypoints"]
+        rec["brace"], rec["brace_reasons"] = "none", {"table_flip": "braces not attempted after a table flip (prep)"}
         return rec
 
     def _log_pick_failure(self, stage: str, manip: Stance, names: List[str], bi: int, world_poses: Dict[str, TT.Pose], screened, pre_picks, support, block, extra=None):

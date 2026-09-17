@@ -712,3 +712,32 @@ def test_brace_record_extras_reach_the_f6_sidecar():
     sc = _f6(sd)
     assert sc.problems(check_program=True) == []
     assert sc.contacts.brace.extra["blade_half_thickness_m"] == 0.0084 and sc.contacts.brace.extra["pose_class"] == "blade_0"
+
+
+def test_table_flip_yaw_first_decomposition_exists_for_every_goal_face():
+    """§6.5 flip-on-the-table prep (owner 2026-09-16 17:10): two quarter turns about different horizontal axes compose to a
+    120° body-diagonal rotation, so the two-leg chain is yaw-first (ψ + k·90° in hand, placed on a free cell) followed by
+    ONE quarter turn about a horizontal table axis that brings the goal face up — such a pair exists for every goal side
+    face and init yaw jitter, and the result is table-aligned with the goal face up."""
+    import math
+    import torch as th
+    from ispatialgym.robot import conventions as C
+
+    for gf in ("+x", "-x", "+y", "-y"):
+        for jitter_deg in (0.0, 20.0, -15.0):
+            q_init = C.quat_from_yaw(math.radians(jitter_deg))
+            plan = TT.cube_flip_plan(q_init, gf, 0.0, 45.0)
+            psi = math.radians(plan["yaw_deg"])
+            found = []
+            for k in (1, 2, 3):
+                q_mid = C.qmul(C.quat_from_yaw(psi + k * math.pi / 2), q_init)
+                assert TT.up_face(q_mid) == TT.up_face(q_init)  # the yaw leg keeps the block on its face
+                for ax in ([1.0, 0.0, 0.0], [0.0, 1.0, 0.0]):
+                    for sgn in (1.0, -1.0):
+                        q_end = C.qmul(C.quat_from_axis_angle(ax, sgn * math.pi / 2), q_mid)
+                        if TT.up_face(q_end) == gf:
+                            found.append((k, ax, sgn))
+                            for face in ("+x", "+y", "+z"):
+                                v = C.quat_rotate(q_end, th.tensor(TT.FACE_AXES[face]))
+                                assert max(abs(float(c)) for c in v) > 0.999  # table-aligned
+            assert len(found) == 3, (gf, jitter_deg, found)
