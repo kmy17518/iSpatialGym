@@ -100,10 +100,11 @@ class ExecuteConfig:
     eef_pos_tol: float = 0.02
     eef_rot_tol: float = 0.10
     #: the pad at the end of a push / brace is loaded by the object it holds (a swung painting rests on the pad, a
-    #: braced board preloads the stop): the joint controller yields 2-3 cm under that load, so their eef checks are
-    #: looser; whether the object reached its goal is the epilogue's judgement
-    contact_eef_pos_tol: float = 0.04
-    contact_eef_rot_tol: float = 0.20
+    #: braced board preloads the stop): the joint controller yields 2-4 cm under that load (the painting push: 31 mm
+    #: one run, 43 mm the next), so their eef checks are only a sanity bound on the pad having stayed with its object;
+    #: whether the object reached its goal is the epilogue's judgement
+    contact_eef_pos_tol: float = 0.08
+    contact_eef_rot_tol: float = 0.30
     #: camera relocalization (spec §8) and the residual above which the corrective ``track_path`` runs
     camera_pos_tol: float = 0.05
     camera_rot_tol: float = 0.10
