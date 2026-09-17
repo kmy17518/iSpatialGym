@@ -391,8 +391,16 @@ def generate_holonomic_urdf(
 #:   ``attached_object`` vs ``panda_hand`` / fingers / ``panda_link7``), the object is exempt against the gripper
 #:   body, the wrist camera and the two wrist links; against everything else (the other arm, the torso, the base,
 #:   the world) it is still checked.
+#: * ``torso_link4 <-> arm_link2``: the shoulder-mount sphere of the trunk (r 8 cm at the arm joint) against the upper
+#:   arm's first sphere (r 5.5 cm, 6.5 cm below the joint) sits at the margin in the arms-down rest posture (3.7 mm
+#:   clearance) and inside it as soon as the upper arm turns toward the body: the wall-alignment brace left the right
+#:   upper arm 5.4 mm inside, the sampler's push pre witness for the left arm exactly on the boundary, and every
+#:   plan failed "start / goal configuration in collision" (license plate 0916-163025 / 173228). A grandparent pair
+#:   (torso_link4 - arm_link1 - arm_link2), exempt as cuRobo's stock configs exempt them; the chest sphere
+#:   (``torso_link4`` r 15 cm) and the base still check against the upper arm.
 EXTRA_SELF_COLLISION_IGNORE_PAIRS = (
     ("{arm}_arm_link1", "{arm}_arm_link3"),
+    ("torso_link4", "{arm}_arm_link2"),
     ("attached_object_{arm}_eef_link", "{arm}_gripper_link"),
     ("attached_object_{arm}_eef_link", "{arm}_realsense_link"),
     ("attached_object_{arm}_eef_link", "{arm}_arm_link7"),
