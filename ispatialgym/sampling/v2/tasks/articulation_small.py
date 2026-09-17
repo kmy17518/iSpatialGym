@@ -85,6 +85,7 @@ class ArticulationSmall(SamplerV2):
         self.bands = None
         self.left_bands = None  # the brace arm's contact band (owner 2026-09-16 item 2)
         self.handle_only_band = False
+        self.brace_missing = False  # the last instance is handle-only (D-008 generation.brace_optional)
         self.face_yaw: Optional[float] = None
         #: §5.4 floor support: the customs bind ``support = {"room": R}`` (targets > 0.6 m stand on the room floor)
         self.floor_support = False
@@ -711,13 +712,23 @@ class ArticulationSmall(SamplerV2):
             tried_stances += tried
             if chosen is not None:
                 manip = manip2
+        brace_state = "present"
         if chosen is None:
             self._log_brace_failure(manip, pose, q_values, grasp_pair, target, support, tried_stances)
-            raise Reject("contact_unreachable", f"no brace of {[c[0] for c in cands][:8]} + handle grasp at q_init passes the exact IK from the manipulation stance or "
-                                                f"{len(tried_stances) - 1} second stances ({sorted(set(fails))[:3]})")
+            if not self.gen("brace_optional", False):
+                raise Reject("contact_unreachable", f"no brace of {[c[0] for c in cands][:8]} + handle grasp at q_init passes the exact IK from the manipulation stance or "
+                                                    f"{len(tried_stances) - 1} second stances ({sorted(set(fails))[:3]})")
+            # D-008 (prepared, owner 2026-09-16 21:54; ``generation.brace_optional``): as axial / touching / blocks, the brace is
+            # recorded only when a joint cell exists (here: the two-arm IK from the manipulation or a second stance); otherwise
+            # the instance is handle-only — contacts.brace absent, summary.brace = "none", manipulation arms = [handle_arm]
+            r_h = self.ikc.exact(list(grasp_pair), manip, self.handle_arm, [support, target], cache=False)
+            if not r_h.ok:
+                raise Reject("handle_unreachable", f"handle grasp at q_init fails the exact IK from the manipulation stance ({r_h.reason})")
+            chosen, brace_state = (None, None, None, r_h.q), "none"
+            log.info("%s: BRACE_OPTIONAL handle-only instance (no brace passed at %d stances)", self.gp.alias, len(tried_stances))
         self.record_transition(init, manip)
         kind, b_pre, b_contact, q_both = chosen
-        if self.handle_only_band:
+        if self.handle_only_band and kind is not None:
             brace_extras["pose_class"] = kind
             kind = "body_face"
         # grasp poses at the required waypoints with the target re-posed for each world sync (brace arm locked)
@@ -748,16 +759,19 @@ class ArticulationSmall(SamplerV2):
             if not bool(self.kit.collision_free(q_both, margin=0.01)[0]):
                 raise Reject("stance_collision", "combined brace + handle configuration collides with the scene")
         cam_manip = self.camera_pose_at(manip)
-        for nm, p in (("handle grasp", wp0.eef), ("brace", b_contact)):
+        for nm, p in [("handle grasp", wp0.eef)] + ([("brace", b_contact)] if b_contact is not None else []):
             if not self.ikc.eef_in_frame(p, cam_manip):
                 raise Reject("gripper_not_in_frame", f"{nm} eef pose outside the manipulation image (5 %)")
         TT.whole_body_check_at(self, [init, manip], {tname: pose}, require=True, reason="stance_collision")
         # record
+        manip.arms = [self.handle_arm, self.brace_arm] if b_contact is not None else [self.handle_arm]
         self.sidecar.add_stance(manip)
-        brace_dir = C.approach_axis(b_contact[1])
-        self.sidecar.add_contact(TT.BraceRecord("brace", self.brace_arm, b_pre, b_contact, direction=brace_dir, brace_kind=kind, object=tname,
-                                                extras={"stop_clearance_m": 0.0, **brace_extras}))
-        manip.contacts = ["brace"]
+        if b_contact is not None:
+            brace_dir = C.approach_axis(b_contact[1])
+            self.sidecar.add_contact(TT.BraceRecord("brace", self.brace_arm, b_pre, b_contact, direction=brace_dir, brace_kind=kind, object=tname,
+                                                    extras={"stop_clearance_m": 0.0, **brace_extras}))
+            manip.contacts = ["brace"]
+        manip.extras["brace"] = brace_state
         self.sidecar.articulation = {"object": tname, "joint": self.joint_name, "joint_type": self._joint_type(), "q_init": float(self.q_init), "q_goal": float(self.q_goal),
                                      "waypoints": waypoints, "handle_reach": {kk: v for kk, v in reach.items() if kk != "0.0"}, "passive_from": self.passive_from,
                                      "follow_mode": "arm", "handle_arm": self.handle_arm, "brace_kind": kind, "direction": self.direction}
@@ -779,9 +793,29 @@ class ArticulationSmall(SamplerV2):
         mc = self.choice.models[self.role]
         self.sidecar.describe(tname, mc.category.replace("_", " "))
         self.sidecar.language["goal_numbers"]["joint_delta"] = float(self.q_goal - self.q_init)
-        d.summary.update({"direction": self.direction, "joint": self.joint_name, "q_init": self.q_init, "q_goal": self.q_goal, "brace_kind": kind,
-                          "handle_arm": self.handle_arm, "manipulation_candidate": k, "handle_reach": reach})
+        d.summary.update({"direction": self.direction, "joint": self.joint_name, "q_init": self.q_init, "q_goal": self.q_goal, "brace_kind": kind, "brace": brace_state,
+                          "handle_arm": self.handle_arm, "manipulation_candidate": k, "handle_reach": reach, "second_stance": bool(manip.extras.get("second_stance"))})
+        self.brace_missing = brace_state == "none"
         return d
+
+    # ------------------------------------------------------------------ program check (brace-less small articulation, D-008)
+
+    def program_check(self, draft: Draft) -> Dict[str, Any]:
+        """§3.5 program check. A handle-only instance (``generation.brace_optional``, D-008) is not yet accepted by the F6
+        ``program_articulation_small`` (REQUIRED_BLOCKS: contacts.brace); until oracle-B makes it optional, with
+        ``ISG_PROGRAM_CHECK=stub`` set inside the smoke command a rejection that only asks for ``contacts.brace`` is recorded as
+        ``stub-brace-optional``."""
+        try:
+            return super().program_check(draft)
+        except Reject as e:
+            msg = str(e)
+            if not (getattr(self, "brace_missing", False) and "brace" in msg and TT.program_check_stub()):
+                raise
+            log.warning("%s: program check asks for contacts.brace on a handle-only instance (%s); recorded as stub-brace-optional", self.gp.alias, msg[:200])
+            report = {"mode": "stub-brace-optional", "problems": [], "note": "brace-less small articulation not yet accepted by the oracle program", "error": msg[:300]}
+            self.last_program_check = report
+            draft.summary["program_check"] = report
+            return report
 
     # ------------------------------------------------------------------ hooks
 

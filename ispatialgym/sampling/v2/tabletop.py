@@ -1390,6 +1390,7 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
                                in_frame_fn: Optional[Callable[..., bool]] = None, focus_candidates: Optional[Callable[..., List[Tuple[th.Tensor, Any]]]] = None,
                                stand_offs: Sequence[float] = STAND_OFFS, translates: Sequence[float] = TRANSLATES, n_tilts: int = N_TILT_SAMPLES,
                                angle_classes_deg: Sequence[float] = ANGLE_CLASSES_DEG, margin: float = IN_FRAME_MARGIN, bands: Optional[RB.ReachBands] = None,
+                               class1_when_deep_m: Optional[float] = None,
                                top=None, erosion_extra: float = 0.02, focus_z: Optional[float] = None) -> List[Stance]:
     """§4.5: scan stand-off {0.35, 0.45, 0.55} x translate {0, …, 0.95} x tilt (0 → torso_joint3 limit, ``n_tilts`` samples)
     at the init edge and lateral; (1) whole-body collision check without objects; (2) band = the grid trunk with the
@@ -1456,8 +1457,16 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
             diag.append(f"s={st.stand_off:.2f} t=({st.translate:.2f},{st.tilt:+.2f}): {len(foci)} foci, min axis angle {math.degrees(a_min):.0f}° at base "
                         f"{[round(float(v), 2) for v in st.world_to_base(f_min[:2]).tolist()]}")
     out = classes[0] or classes[1]
-    log.info("phase 2: %d trunk candidates collision-free, %d (stance, focus) pairs within 20°, %d survivors in class %s", len(cands), n_cells, len(out),
-             0 if classes[0] else 1)
+    which = "0" if classes[0] else "1"
+    if class1_when_deep_m is not None and classes[0] and classes[1]:
+        # D-009 B (prepared, owner 2026-09-16 21:54): the tight class puts the focus where the head camera's axis meets the
+        # top — 0.77–0.81 m base-forward at the attachment trunks, beyond the arm's lift / carry reach — so when EVERY
+        # class-0 focus is deeper than ``class1_when_deep_m`` the class-1 survivors are admitted as well (class 0 first)
+        depth0 = [float(c.world_to_base(c.focus[:2])[0]) for c in classes[0]]
+        if min(depth0) > float(class1_when_deep_m):
+            out = classes[0] + classes[1]
+            which = f"0+1 (class-0 foci {min(depth0):.2f}–{max(depth0):.2f} m base-forward, all deeper than {float(class1_when_deep_m):.2f})"
+    log.info("phase 2: %d trunk candidates collision-free, %d (stance, focus) pairs within 20°, %d survivors in class %s", len(cands), n_cells, len(out), which)
     if not out and diag:
         log.info("phase 2: no survivor — per trunk candidate: %s", " | ".join(diag[:24]))
     return out
