@@ -1,6 +1,222 @@
 {
- "updated": "2026-09-16 17:08 PDT",
+ "updated": "2026-09-16 17:28 PDT",
  "entries": [
+  {
+   "id": "configuration_matching-articulation_open_large_scale:0916-171926",
+   "priority": 10,
+   "subtask": "configuration_matching-articulation_open_large_scale",
+   "alias": "configuration_matching-articulation_open_large_scale-bottom_cabinet",
+   "kind": "run",
+   "tro": null,
+   "scene": "office_cubicles_right",
+   "local": false,
+   "state": "running",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:19 PDT",
+   "note": "auto: new fix(es) 0427202 since the last run",
+   "missing_fixes": [
+    "0427202"
+   ],
+   "launched_at": "2026-09-16 17:19 PDT",
+   "pid": 861912,
+   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-articulation_open_large_scale-bottom_cabinet.sched-171927.log"
+  },
+  {
+   "id": "configuration_matching-articulation_close_large_scale:0916-171926",
+   "priority": 11,
+   "subtask": "configuration_matching-articulation_close_large_scale",
+   "alias": "configuration_matching-articulation_close_large_scale-bottom_cabinet",
+   "kind": "run",
+   "tro": null,
+   "scene": "office_cubicles_right",
+   "local": false,
+   "state": "running",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:19 PDT",
+   "note": "auto: new fix(es) 0427202 since the last run",
+   "missing_fixes": [
+    "0427202"
+   ],
+   "launched_at": "2026-09-16 17:19 PDT",
+   "pid": 861913,
+   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-articulation_close_large_scale-bottom_cabinet.sched-171927.log"
+  },
+  {
+   "id": "inter_object_relation_satisfaction-ontop_small_scale:0916-171926",
+   "priority": 20,
+   "subtask": "inter_object_relation_satisfaction-ontop_small_scale",
+   "alias": "inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "running",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:19 PDT",
+   "note": "auto: new fix(es) 6307dd7 since the last run",
+   "missing_fixes": [
+    "6307dd7"
+   ],
+   "launched_at": "2026-09-16 17:19 PDT",
+   "pid": 861917,
+   "log": "runlogs/pilot_20260915/first_demo/logs/inter_object_relation_satisfaction-ontop_small_scale-pack_of_kielbasa-platter-breakfast_ta.sched-171927.log"
+  },
+  {
+   "id": "inter_object_relation_satisfaction-under_small_scale:0916-172358",
+   "priority": 22,
+   "subtask": "inter_object_relation_satisfaction-under_small_scale",
+   "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "running",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:23 PDT",
+   "note": "auto: new fix(es) 625759b, 7737dfe, 0bd9e1f, bcc1478, 6307dd7 since the last run",
+   "missing_fixes": [
+    "625759b",
+    "7737dfe",
+    "0bd9e1f",
+    "bcc1478",
+    "6307dd7"
+   ],
+   "launched_at": "2026-09-16 17:23 PDT",
+   "pid": 869722,
+   "log": "runlogs/pilot_20260915/first_demo/logs/inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table.sched-172359.log"
+  },
+  {
+   "id": "mental_rotation:0916-171350",
+   "priority": 53,
+   "subtask": "mental_rotation",
+   "alias": "mental_rotation-banana",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "running",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:13 PDT",
+   "note": "auto: new fix(es) bcc1478 since the last run",
+   "missing_fixes": [
+    "bcc1478"
+   ],
+   "launched_at": "2026-09-16 17:13 PDT",
+   "pid": 846030,
+   "log": "runlogs/pilot_20260915/first_demo/logs/mental_rotation-banana.sched-171351.log"
+  },
+  {
+   "id": "configuration_matching-block_design:0916-172358",
+   "priority": 55,
+   "subtask": "configuration_matching-block_design",
+   "alias": "configuration_matching-block_design-block_4-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "running",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:23 PDT",
+   "note": "auto: new fix(es) 4f01c3c, 6931c6e, c88a3e3, 01cb9b2, 561f343, d03b21d, 9729372, a98387a, 561f343, b0764a5, 19fcb46, df153e4, b27616b, b0764a5, afbd8ca, 5e30334, 5e30334, 625759b, bcc1478, 35506bf since the last run",
+   "missing_fixes": [
+    "4f01c3c",
+    "6931c6e",
+    "c88a3e3",
+    "01cb9b2",
+    "561f343",
+    "d03b21d",
+    "9729372",
+    "a98387a",
+    "561f343",
+    "b0764a5",
+    "19fcb46",
+    "df153e4",
+    "b27616b",
+    "b0764a5",
+    "afbd8ca",
+    "5e30334",
+    "5e30334",
+    "625759b",
+    "bcc1478",
+    "35506bf"
+   ],
+   "launched_at": "2026-09-16 17:23 PDT",
+   "pid": 869723,
+   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-block_design-block_4-breakfast_table.sched-172359.log"
+  },
+  {
+   "id": "alignment-axial:0916-171351",
+   "priority": 63,
+   "subtask": "alignment-axial",
+   "alias": "alignment-axial-board_game-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "running",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:13 PDT",
+   "note": "auto: new fix(es) bcc1478 since the last run",
+   "missing_fixes": [
+    "bcc1478"
+   ],
+   "launched_at": "2026-09-16 17:13 PDT",
+   "pid": 846031,
+   "log": "runlogs/pilot_20260915/first_demo/logs/alignment-axial-board_game-breakfast_table.sched-171351.log"
+  },
+  {
+   "id": "inter_object_relation_satisfaction-under_large_scale:0916-171927",
+   "priority": 70,
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "running",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:19 PDT",
+   "note": "auto: new fix(es) 7162fe7, 8c93d0b since the last run",
+   "missing_fixes": [
+    "7162fe7",
+    "8c93d0b"
+   ],
+   "launched_at": "2026-09-16 17:19 PDT",
+   "pid": 861918,
+   "log": "runlogs/pilot_20260915/first_demo/logs/inter_object_relation_satisfaction-under_large_scale-sandal-bed-bed.sched-171927.log"
+  },
+  {
+   "id": "inter_object_relation_satisfaction-ontop_large_scale:0916-171927",
+   "priority": 12,
+   "subtask": "inter_object_relation_satisfaction-ontop_large_scale",
+   "alias": "inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": true,
+   "state": "done",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:19 PDT",
+   "note": "auto: new fix(es) 7162fe7 since the last run",
+   "missing_fixes": [
+    "7162fe7"
+   ],
+   "launched_at": "2026-09-16 17:19 PDT",
+   "pid": 861916,
+   "log": "runlogs/pilot_20260915/first_demo/logs/inter_object_relation_satisfaction-ontop_large_scale-box_of_shampoo-sofa-bar.sched-171927.log",
+   "finished_at": "2026-09-16 17:28 PDT",
+   "verdict": {
+    "n_written": 0,
+    "rejections": {
+     "target_placement": 8
+    },
+    "demo": null,
+    "reason": null,
+    "failed": null,
+    "meta": null,
+    "commit": "6307dd7"
+   }
+  },
   {
    "id": "inter_object_relation_satisfaction-under_small_scale:0916-170337",
    "priority": 22,
@@ -18,28 +234,130 @@
     "625759b",
     "7737dfe"
    ]
+  },
+  {
+   "id": "object_scaling:0916-171350",
+   "priority": 52,
+   "subtask": "object_scaling",
+   "alias": "object_scaling-beaker",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "done",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:13 PDT",
+   "note": "auto: new fix(es) bcc1478 since the last run",
+   "missing_fixes": [
+    "bcc1478"
+   ],
+   "launched_at": "2026-09-16 17:13 PDT",
+   "pid": 846029,
+   "log": "runlogs/pilot_20260915/first_demo/logs/object_scaling-beaker.sched-171351.log",
+   "finished_at": "2026-09-16 17:28 PDT",
+   "verdict": {
+    "n_written": 1,
+    "rejections": {},
+    "demo": "success",
+    "reason": null,
+    "failed": null,
+    "meta": "runlogs/pilot_20260915/first_demo/object_scaling/0916-171351/demo/object_scaling-beaker__house_single_floor__target-beaker-rhohgs__0000/meta.json",
+    "commit": "70d9ea2"
+   }
+  },
+  {
+   "id": "configuration_matching-attachment:0916-172358",
+   "priority": 56,
+   "subtask": "configuration_matching-attachment",
+   "alias": "configuration_matching-attachment-lid-teapot-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "cancelled",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:23 PDT",
+   "note": "auto: new fix(es) 5e30334, 5e30334, 625759b, bcc1478 since the last run | cancelled 17:29: launched by a blanket fix (bcc1478) lifting the decision hold; decision fix pending",
+   "missing_fixes": [
+    "5e30334",
+    "5e30334",
+    "625759b",
+    "bcc1478"
+   ],
+   "launched_at": "2026-09-16 17:23 PDT",
+   "pid": 869724,
+   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-attachment-lid-teapot-breakfast_table.sched-172359.log"
+  },
+  {
+   "id": "configuration_matching-articulation_open_small_scale:0916-172358",
+   "priority": 57,
+   "subtask": "configuration_matching-articulation_open_small_scale",
+   "alias": "configuration_matching-articulation_open_small_scale-hinged_jar-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "cancelled",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:23 PDT",
+   "note": "auto: new fix(es) bcc1478 since the last run | cancelled 17:29: launched by a blanket fix (bcc1478) lifting the decision hold; decision fix pending",
+   "missing_fixes": [
+    "bcc1478"
+   ],
+   "launched_at": "2026-09-16 17:23 PDT",
+   "pid": 869725,
+   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-articulation_open_small_scale-hinged_jar-breakfast_table.sched-172359.log"
+  },
+  {
+   "id": "configuration_matching-articulation_close_small_scale:0916-172358",
+   "priority": 58,
+   "subtask": "configuration_matching-articulation_close_small_scale",
+   "alias": "configuration_matching-articulation_close_small_scale-hinged_jar-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "cancelled",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:23 PDT",
+   "note": "auto: no run yet | cancelled 17:29: launched by a blanket fix (bcc1478) lifting the decision hold; decision fix pending",
+   "missing_fixes": [
+    "7a340e4",
+    "fcf7bfc",
+    "c0bbe0f",
+    "c88a3e3",
+    "c0bbe0f",
+    "c2ff425",
+    "d03b21d",
+    "c2ff425",
+    "8561ac0",
+    "bcc1478"
+   ],
+   "launched_at": "2026-09-16 17:23 PDT",
+   "pid": 869726,
+   "log": "runlogs/pilot_20260915/first_demo/logs/configuration_matching-articulation_close_small_scale-hinged_jar-breakfast_table.sched-172359.log"
   }
  ],
  "holds": {
-  "configuration_matching-block_design": {
-   "reason": "awaiting owner decision (tabletop 14:45): the flip pre-place has no IK at any trunk - (a) goal face up at init [generation.block_no_flip], (b) flip on the table, (c) 3 no-flip blocks; staged in staged_decisions.md",
-   "since": "2026-09-16 17:03 PDT"
-  },
   "configuration_matching-attachment": {
-   "reason": "awaiting owner decision: the A1 brace gate rejects 902/1694 partner cells - brace optional for attachment (as axial / blocks) or partner only in the band overlap; staged",
-   "since": "2026-09-16 17:03 PDT"
+   "reason": "owner 17:10 item 2 decided (brace stays; second base pose after the grasp) - tabletop implementing; lifts on its targeted fix-log entry",
+   "since": "2026-09-16 17:28 PDT"
   },
   "configuration_matching-articulation_open_small_scale": {
-   "reason": "awaiting owner decision: hinged_jar best focus 24 deg vs the 20 deg Phase-2 cone - 25 deg for small articulation?; staged",
-   "since": "2026-09-16 17:03 PDT"
+   "reason": "owner 17:10 item 3 decided (25 deg cone) - tabletop implementing; lifts on its targeted fix-log entry",
+   "since": "2026-09-16 17:28 PDT"
   },
   "configuration_matching-articulation_close_small_scale": {
-   "reason": "same decision as open (cone)",
-   "since": "2026-09-16 17:03 PDT"
+   "reason": "same as open (25 deg cone)",
+   "since": "2026-09-16 17:28 PDT"
   },
-  "inter_object_relation_satisfaction-under_small_scale": {
-   "reason": "owner 16:40: re-run as soon as the core's release/settle change lands (fails placed_orientation honestly today); release when the core's fix-log entry appears",
-   "since": "2026-09-16 17:05 PDT"
+  "inter_object_relation_satisfaction-touching": {
+   "reason": "owner 17:10: brace optional (as axial) - core (iors_small + program_check) + oracle (program) implementing; lifts on the fix-log entry",
+   "since": "2026-09-16 17:27 PDT"
+  },
+  "inter_object_relation_satisfaction-nextto": {
+   "reason": "owner 17:10 item 4: closure-roll investigation (agent 52b4fb5f, <= 3 h) then either the closure fix or cylinder equivalences in the gate; item 5 FOV rule (b) re-run follows",
+   "since": "2026-09-16 17:27 PDT"
   }
  }
 }
