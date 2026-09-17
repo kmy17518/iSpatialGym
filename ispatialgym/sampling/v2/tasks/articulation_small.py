@@ -33,6 +33,7 @@ import json
 import logging
 import math
 import os
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -55,6 +56,8 @@ log = logging.getLogger("ispatialgym.sampling.v2")
 SUBTASKS = ("configuration_matching-articulation_open_small_scale", "configuration_matching-articulation_close_small_scale",
             "configuration_matching-articulation_small_scale-open", "configuration_matching-articulation_small_scale-close")
 
+
+ATTEMPT_BUDGET_S = 300.0  # per instance attempt (brace search over the manipulation + second stances)
 
 @register(*SUBTASKS)
 class ArticulationSmall(SamplerV2):
@@ -557,6 +560,7 @@ class ArticulationSmall(SamplerV2):
         fails: List[str] = []
         handle_ok = None
         for kind, (b_pre, b_contact) in cands:
+            self._check_deadline()
             res = TT.brace_second_arm(self, stance, self.handle_arm, grasp_pair, self.brace_arm, [b_pre, b_contact], ignore_work_last=[support, target],
                                       ignore_brace_last=[target])
             if res.ok:
@@ -578,6 +582,10 @@ class ArticulationSmall(SamplerV2):
 
     SECOND_STANCE_LATERALS = (0.10, -0.10, 0.20, -0.20)
     SECOND_STANCE_MAX = 10
+
+    def _check_deadline(self):
+        if time.time() > getattr(self, "_deadline", math.inf):
+            raise Reject("time_budget", f"attempt budget of {self.gen('attempt_budget_s', ATTEMPT_BUDGET_S):.0f} s spent")
 
     def _brace_second_stance(self, manip: Stance, pose: TT.Pose, q_values, grasp_pair, target, support, cam_init):
         """Second stance for the brace + handle pair: the manipulation stance shifted along the edge by
@@ -606,6 +614,7 @@ class ArticulationSmall(SamplerV2):
         for _, dlat, dso, trunk, st in combos:
             if len(tried) >= self.SECOND_STANCE_MAX:
                 break
+            self._check_deadline()
             # the handle-only band (when computed) knows where the handle grasp is feasible per trunk: stances whose target
             # cell is not a handle cell cannot pass (0916-205838: the handle grasp alone passed at 1 of 9 second stances)
             if self.handle_only_band and self.bands is not None and not TT.in_band(self.bands, st, pose[0][:2], tol=1.0)[0]:
@@ -631,16 +640,14 @@ class ArticulationSmall(SamplerV2):
         try:
             out: Dict[str, Any] = {"target_base": [round(float(v), 3) for v in manip.world_to_base(pose[0][:2]).tolist()], "handle_arm": self.handle_arm, "brace_arm": self.brace_arm,
                                    "stances": []}
-            for st in stances:
+            for st in stances[:3]:  # the manipulation stance and the first two second stances (the two-arm verdicts are in the fails)
                 r_h = self.ikc.exact(list(grasp_pair), st, self.handle_arm, [support, target], cache=False)
                 cands, extras = self._brace_candidates_at(st, pose, q_values)
                 rows = []
-                for kind, (b_pre, b_contact) in cands[:12]:
+                for kind, (b_pre, b_contact) in cands[:6]:
                     r_b = self.ikc.exact([b_pre, b_contact], st, self.brace_arm, [target], cache=False)
-                    two = TT.brace_second_arm(self, st, self.handle_arm, grasp_pair, self.brace_arm, [b_pre, b_contact], ignore_work_last=[support, target], ignore_brace_last=[target])
                     pt = b_contact[0]
-                    rows.append(f"{kind}@({float(st.world_to_base(pt[:2])[0]):.2f},{float(st.world_to_base(pt[:2])[1]):+.2f}):"
-                                f"{'B' if r_b.ok else 'b'}{'T' if two.ok else 't'}")  # B/b = brace alone ok / fail, T/t = two-arm ok / fail
+                    rows.append(f"{kind}@({float(st.world_to_base(pt[:2])[0]):.2f},{float(st.world_to_base(pt[:2])[1]):+.2f}):{'B' if r_b.ok else 'b'}")  # brace alone ok / fail
                 out["stances"].append({"trunk": [round(float(st.translate), 2), round(float(st.tilt), 2)], "stand_off": st.stand_off, "target_base": [round(float(v), 2) for v in st.world_to_base(pose[0][:2]).tolist()],
                                        "shift": [st.extras.get("lateral_shift"), st.extras.get("stand_off_shift")], "handle_alone": bool(r_h.ok),
                                        "left_band": self.left_bands is not None, "braces": rows})
@@ -659,7 +666,12 @@ class ArticulationSmall(SamplerV2):
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         init = self.init_stance
         errors = []
+        # per-attempt budget (0916-205838: one attempt took 2356 s in the second-stance search + diagnostics)
+        self._deadline = time.time() + float(self.gen("attempt_budget_s", ATTEMPT_BUDGET_S))
         for k in rng.permutation(len(self.manip_candidates))[:6]:
+            if time.time() > self._deadline:
+                errors.append(f"attempt budget of {self.gen('attempt_budget_s', ATTEMPT_BUDGET_S):.0f} s spent")
+                break
             cand = self.manip_candidates[int(k)]
             manip = cand.with_trunk(cand.translate, cand.tilt, "manipulation")
             manip.focus, manip.arms = cand.focus, [self.handle_arm]
