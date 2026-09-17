@@ -34,7 +34,7 @@
    "time": "2026-09-16 17:38 PDT"
   }
  ],
- "last_seen_ts": "1789605492.423309",
+ "last_seen_ts": "1789605493.000000",
  "handled": [],
  "loop_pid": 908952,
  "subscriptions": "channel/thread subscriptions unavailable (Cursor account not linked to Slack) - polling every 5 min via search; status every 30 min"

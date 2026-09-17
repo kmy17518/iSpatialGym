@@ -71,7 +71,7 @@
    "time": "2026-09-16 17:36 PDT",
    "subtask": "configuration_matching-articulation_open_large_scale",
    "question": "rvunhj_0 (cubicle bottom cabinet, office_cubicles_right) after the floor fix: open = step-5 handle_unreachable \u00d78, close = no_manipulation_stance \u00d78 \u2014 keep working the arm-only class or blacklist rvunhj_0 + rvunhj_5?",
-   "context": "Floor fixed (2893a09: 7 Phase-2 survivors per attempt); step 5 handle [pre, final] exact IK fails (pinch \u22121 \u00d715), the arm reaches j_link_2 only, opening reach \u2264 0.11 from d 0.75\u20130.80; large-scale agent has the edge-pinch approach repair (0427202) \u2014 its loop verdict is pending. Cost of blacklisting: the cabinet-door class disappears (no other cabinet door has \u2265 3 m free run).",
+   "context": "Floor fixed (2893a09: 7 Phase-2 survivors per attempt); step 5 handle [pre, final] exact IK fails (pinch \u22121 \u00d715), the arm reaches j_link_2 only, opening reach \u2264 0.11 from d 0.75\u20130.80; large-scale agent has the edge-pinch approach repair (0427202) \u2014 its loop verdict is pending. Cost of blacklisting: the cabinet-door class disappears (no other cabinet door has \u2265 3 m free run). | 17:39 verdict on 0427202: open no_manipulation_stance x8, close handle_unreachable x6 + no_manipulation_stance x2 -> default applied 17:46: fallback aliases fridge / dishwasher / oven launched in parallel; rvunhj_0 stays open (large-scale agent).",
    "options": [
     "A) keep working the arm-only class (approach repair 0427202, closer stance / torso, hinge-side stance) \u2014 no blacklist until that verdict",
     "B) blacklist rvunhj_0 + rvunhj_5 now, fall back to the fridge / dishwasher / oven aliases (A3 picks 05ce671) for the large-articulation first demo"
