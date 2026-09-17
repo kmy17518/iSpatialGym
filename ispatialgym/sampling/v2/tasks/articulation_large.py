@@ -208,16 +208,18 @@ def bar_axis(handle: Dict[str, Any]) -> List[float]:
     return (ax / n).tolist() if n > 1e-6 else [0.0, 0.0, 0.0]
 
 
-def bar_offsets(handle: Dict[str, Any], steps: Sequence[float] = (0.15, 0.25), end_margin: float = 0.06) -> List[float]:
-    """Grasp offsets along a bar handle (0 first, then ± the steps that keep the pads ``end_margin`` from the bar ends);
-    ``[0.0]`` for knobs / edges / short bars. The slide widens the Phase-2 lattice laterally: the Rs_int drawer's only
-    survivors (λ −0.15…+0.05) stood 2 cm from a coffee table, the 0.64 m bar admits pinches 0.3 m to the side."""
+def bar_offsets(handle: Dict[str, Any], fractions: Sequence[float] = (0.5, 1.0), end_margin: float = 0.06, min_step: float = 0.04) -> List[float]:
+    """Grasp offsets along a bar handle: 0 first, then ± the ``fractions`` of the usable half-length (bar length / 2 −
+    ``end_margin`` for the pads), offsets below ``min_step`` dropped; ``[0.0]`` for knobs / edges / short bars. The
+    slide widens the Phase-2 lattice laterally: the Rs_int drawer's only survivors (λ −0.15…+0.05) stood 2 cm from a
+    coffee table; its 0.40 m bar admits pinches ±0.14 m off centre, a 0.64 m bar ±0.26 m."""
     if handle.get("kind") != "bar" or handle.get("length") is None:
         return [0.0]
     half = float(handle["length"]) / 2 - end_margin
     out = [0.0]
-    for st in steps:
-        if st <= half:
+    for fr in fractions:
+        st = round(fr * half, 3)
+        if st >= min_step:
             out += [float(st), -float(st)]
     return out
 

@@ -512,6 +512,7 @@ def test_bar_axis_and_offsets():
     h = {"kind": "bar", "approach_dir": [-1.0, 0.0, 0.0], "pinch_axis": [0.0, 0.0, -1.0], "length": 0.6424}
     ax = bar_axis(h)
     assert pytest.approx(abs(ax[1]), abs=1e-6) == 1.0 and abs(ax[0]) < 1e-6 and abs(ax[2]) < 1e-6  # the bar runs along y
-    assert bar_offsets(h) == [0.0, 0.15, -0.15, 0.25, -0.25]  # half 0.32 - 0.06 = 0.26 admits both steps
+    assert bar_offsets(h) == [0.0, 0.131, -0.131, 0.261, -0.261]  # usable half 0.3212 - 0.06 = 0.2612: its half and itself
+    assert bar_offsets({"kind": "bar", "length": 0.3959, "approach_dir": [1, 0, 0], "pinch_axis": [0, 0, 1]}) == [0.0, 0.069, -0.069, 0.138, -0.138]
     assert bar_offsets({"kind": "knob"}) == [0.0]
     assert bar_offsets({"kind": "bar", "length": 0.2, "approach_dir": [1, 0, 0], "pinch_axis": [0, 0, 1]}) == [0.0]
