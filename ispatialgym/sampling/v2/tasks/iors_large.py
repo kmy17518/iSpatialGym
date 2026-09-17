@@ -1182,7 +1182,9 @@ class IORSLarge(SamplerV2):
         # ``b`` outside the edge — the whole lane (drop 0.22 m outside → goal 0.07 m inside) stays 0.35–0.45 m ahead, inside
         # the floor reach, and the crouched torso bends along the edge, not into the partner (the frontal stances need
         # s ≥ 0.75 m to keep the deep trunk clear of a bed, which puts the lane 0.46–0.82 m ahead: out of reach)
-        side_ahead = [float(v) for v in (self.gp.gen("push_under_side_ahead_m") or (0.35, 0.45))]
+        # the lane must clear the base rim: with x_ahead = 0.35 the blade start (0.35 m ahead, 6 cm high) sits on the
+        # base's front edge and every push pre-pose fails the IK (run 16:04) — 0.45 m and more only
+        side_ahead = [float(v) for v in (self.gp.gen("push_under_side_ahead_m") or (0.45, 0.55, 0.6))]
         side_b = [float(v) for v in (self.gp.gen("push_under_side_standoff_m") or (0.35, 0.40))]
         yaw_side = math.atan2(float(tangent[1]), float(tangent[0]))  # facing +tangent: the robot's right = inward (the partner side)
         cands: List[Stance] = []
@@ -1235,6 +1237,7 @@ class IORSLarge(SamplerV2):
         # (which stays) keeps the robot from penetrating the floor. Documented relaxation for the push-under stance.
         with self.ikc.ignoring([self.obj("floor")]):
             free = P0.body_free(self, cands)
+        cands_all, free_all = list(cands), free
         deep_fail = [st for st, f in zip(cands, free.tolist()) if not f and st.translate >= 0.95]
         cands = [st for st, f in zip(cands, free.tolist()) if f]
         stats["collision_free"] = len(cands)
@@ -1286,6 +1289,14 @@ class IORSLarge(SamplerV2):
         stats["survivor_trunks"] = sorted({(float(st.translate), round(float(st.tilt), 2)) for st in out_})
         stats["survivor_stand_offs"] = sorted({round(float(st.stand_off), 2) for st in out_})
         stats["survivor_kinds"] = {k: sum(1 for st in out_ if st.extras.get("stance_kind") == k) for k in ("side", "frontal")}
+        stats["side_survivors_by_ahead"] = {str(a): sum(1 for st in out_ if st.extras.get("stance_kind") == "side" and abs(float(st.extras.get("drop_ahead_m", -1)) - a) < 1e-6)
+                                            for a in side_ahead}
+        side_fail = [st for st, f in zip(cands_all, free_all.tolist()) if not f and st.extras.get("stance_kind") == "side" and float(st.extras.get("drop_ahead_m", 0)) >= 0.45]
+        if side_fail and not any(st.extras.get("stance_kind") == "side" and float(st.extras.get("drop_ahead_m", 0)) >= 0.45 for st in out_) \
+                and not getattr(self, "_side_debugged", False):
+            self._side_debugged = True
+            with self.ikc.ignoring([self.obj("floor")]):
+                P0.debug_collisions(self, side_fail[len(side_fail) // 2:len(side_fail) // 2 + 2], arms_excluded=False)
         stats["collision_free_trunks"] = sorted({(float(st.translate), round(float(st.tilt), 2)) for st in cands})
         log.info("%s: push-under stance C at %s edge %s: %d survivors (%s)", self.gp.alias, partner.name, edge.name, len(out_), stats)
         return out_
@@ -1389,7 +1400,7 @@ class IORSLarge(SamplerV2):
             # survivor is tried before the frontal ones
             side = [k for k in order if c_pool[k].extras.get("stance_kind") == "side"]
             front = [k for k in order if c_pool[k].extras.get("stance_kind") != "side"]
-            depth = lambda k: (-float(c_pool[k].translate), float(c_pool[k].tilt))  # noqa: E731
+            depth = lambda k: (-float(c_pool[k].translate), float(c_pool[k].tilt), -float(c_pool[k].extras.get("drop_ahead_m", 0.0)))  # noqa: E731
             order = sorted(side, key=depth) + sorted(front, key=depth)
             n_try = max(12, len(side))
         errors = []
@@ -1422,6 +1433,7 @@ class IORSLarge(SamplerV2):
                     log.info("%s: drop IK debug — %s", self.gp.alias, self.debug_drop_ik(place, release_xy, yaws))
                 errors.append(f"C: F_init ({len(F_init)}) ∩ F_goal ({len(F_goal)}) empty at {'drop' if push else 'goal'} cell {[round(v, 2) for v in release_xy]}")
                 continue
+            fails: Dict[str, int] = {}
             for i in rng.permutation(len(F))[:4]:
                 yaw0, g = F[int(i)]
                 yaw = yaw0 + float(rng.uniform(-TARGET_JITTER, TARGET_JITTER))
@@ -1437,11 +1449,13 @@ class IORSLarge(SamplerV2):
                     t_pose = self.pose_on(xy, yaw, z_init)
                     break
                 if t_pose is None:
+                    fails["target footprint off the init surface"] = fails.get("target footprint off the init surface", 0) + 1
                     continue
                 eef = IK.grasp_pose(t_pose, g.pose)
                 pre = IK.pre_pose(eef)
                 res = self.ikc.exact([pre, eef], manip, "right", ignore_for_last=self.grasp_ignore_objects(), scale_key=self.choice.models["target"].scale, cache=False)
                 if not res.ok:
+                    fails["B: [pre-grasp, grasp] exact IK"] = fails.get("B: [pre-grasp, grasp] exact IK", 0) + 1
                     continue
                 goal = release_pose(release_xy, t_pose[1])
                 place_eef = IK.grasp_pose(goal, g.pose)
@@ -1449,6 +1463,7 @@ class IORSLarge(SamplerV2):
                 with attached(self.kit, "right", target, eef_in_object=g.pose):
                     r2 = self.ikc.exact([pre_place, place_eef], place, "right", ignore_for_last=ignore_place, cache=False)
                 if not r2.ok:
+                    fails[f"C: [pre-place, {'drop' if push else 'place'}] exact IK (attached)"] = fails.get(f"C: [pre-place, {'drop' if push else 'place'}] exact IK (attached)", 0) + 1
                     continue
                 chain = None
                 if push:  # the straight floor push drop → goal from the same stance (closed gripper, floor + target ignored)
@@ -1505,7 +1520,7 @@ class IORSLarge(SamplerV2):
                 if push and floor_name:
                     self.sidecar.describe(floor_name, "floor", push_distance_cm=100.0 * float(chain["distance_m"]))
                 return d
-            errors.append("C: no (yaw, grasp) of F passes the exact IK at B and C")
+            errors.append(f"C (d {place.stand_off:.2f} trunk ({place.translate}, {place.tilt:.1f})): no (yaw, grasp) of F ({len(F)}) passes the exact IK at B and C — {fails}")
         raise Reject("grasp_unreachable", "; ".join(errors[-3:]) if errors else "no placement candidate")
 
     # ------------------------------------------------------------------ push-under: the floor mesh and the deep trunks
