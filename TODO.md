@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 23:19 PDT — 8/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 23:27 PDT — 9/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -136,7 +136,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | alignment-world_vertical | demo run | painting demo in tolerance, not_settled (undamped hook) → large-scale-B: hinge friction/damping in the constraints record + TRO loader (owner 22:05), demo-only re-run | large-scale-B |
 | alignment-world_horizontal | demo run | owner 22:55: hang frame bug — no wall alias carries front/up/level axes, the sampler defaults to the painting frame (+x/+z) → the plate hangs table-flat; large-scale-B: ground_isg writes the reviewed icl frames per model, Reject(missing_frame), unit test, re-sample; + push witness with the brace arm at contact | large-scale-B |
 | alignment-axial | valid demo (pre-dde4f11) | - | - |
-| IORS ontop_small_scale | demo run (pre-fix success) | - | - |
+| IORS ontop_small_scale | valid demo (pre-dde4f11) | - | - |
 | IORS under_small_scale | valid demo (pre-de4e723,ab60baa,dde4f11) | valid (a6d7123, 21:46). D-007 branch: mechanism verified (2e889f3), a passing re-run pending the primary oracle's carry-leg regression (30-waypoint straight leg stalls 25/30) | oracle |
 | IORS inside | valid demo (pre-166005f,de4e723,ab60baa,dde4f11) | valid on f5ae607; re-opened by the core's targeted 1ba5e74 (open pads clear of the support: the failing sprout grasp had its fingertip at the table) — re-run queued | loop |
 | IORS nextto | demo run (pre-fix success) | - | - |
@@ -360,3 +360,4 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026‑09‑16 23:16 PDT agent-e2e: oracle‑B — `meta.binary_branch` written (`2e889f3e`, facts: branch per atom + `binary_branch_fallback` + log); teacup demo‑only 0916‑224214: branch `omnigibson` (no fallback) but the place failed in the primary's straight carry leg (30 waypoints now vs 4 in the 21:27 success, stall 25/30, finish refused 3.74 rad) → the deciding branch of a *passing* teacup run is still pending that fix. **Symmetric closure** `ab60baa7` (blanket): the ramp stops when both pads touch and holds contact width − 1 mm until the AG attaches (per‑finger commands impossible through the 23‑D action) — probe: marker shift 5.0 → 0.8 mm, fingers 7.9/6.8 mm (was 16.9/0.0). Two regressions for the primary oracle: the carry‑leg density/stall (teacup place `plan_failed` ×2) and the witness refinement making touching's grasp approach fail (the 20:24 code grasped the same box).
 - 2026‑09‑16 23:19 PDT agent-e2e: core `dde4f11` (core‑wide, touching / nextto first) — the constant per‑sidecar witness offset was the implicit frame of the virtual base joints (written relative to the sampler's articulation root); witnesses are now canonical (root at the world origin: FK(q) with an identity root lands `base_link` on the recorded `base_pose2d`, `q_frame` stated), polished onto their recorded pose (`fk_residual_m`, > 2 mm → `program_check_failed`), and every chain solve keeps ≥ 0.05 rad from the arm joint limits (`ik_joint_limit` reject otherwise). Relay to the primary oracle: base joints in `ik_witnesses[].q` changed frame, arm joints unchanged. Core next: `program_check` must not mark a handle grasp as carried (drawer base_follow).
 - 2026‑09‑16 23:22 PDT agent-e2e (owner 23:00): table‑loading measurement → oracle‑B (69 demo.hdf5 files, `runlogs/table_loading_20260916/report.md`, `meta.support_disturbance` fact); the `contact_height_extra_m` knob → core (queued behind the handle‑grasp fix; shared helper for axial / block braces); A/B runner → new agent be09c08d (waits for the knob; six aliases × 3 offsets × 8 attempts + demos on idle pods, ≤ 6 at a time, manifest `runlogs/ab_contact_height_20260916/manifest.json`, report with the decision inputs).
+- 2026‑09‑16 23:34 PDT agent-e2e: core `7dc48ed` — a `kind="handle"` grasp no longer sets `carried` (the cabinet stays in the collision world; arm‑mode base_follow handle poses IK‑checked per k with the object's joint at q_k, per‑k witnesses); the drawer alias runs the real program check. Core now on the `contact_height_extra_m` A/B knob (+ `--customs` override for the A/B runs).
