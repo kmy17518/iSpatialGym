@@ -912,7 +912,8 @@ class IORSSmall(SamplerV2):
         p1, q1 = G.t(draft.object_poses[tname][0]), G.t(draft.object_poses[tname][1])
         return {"translation_mm": round(float(th.linalg.norm(p1 - p0)) * 1000, 1), "rotation_deg": round(math.degrees(G.quat_angle(q0, q1)), 1)}
 
-    def reselect_grasp(self, draft: Draft, grasp: GraspRecord, manip: Stance, tname: str, require_pad_clearance: bool = False) -> Optional[str]:
+    def reselect_grasp(self, draft: Draft, grasp: GraspRecord, manip: Stance, tname: str, require_pad_clearance: bool = False,
+                       exclude: Sequence[str] = ()) -> Optional[str]:
         """Try the library grasps (flush tier first, then the rest; all attachable) at the *settled* target pose from the
         manipulation stance — pre-grasp + grasp exactly, support removed for the grasp, the target removed along the
         approach, optionally the open pads clear of the support — and rewrite the grasp record with the first that passes.
@@ -921,7 +922,7 @@ class IORSSmall(SamplerV2):
         order = list(self.grasps_flush) + [g for g in self.grasps if g not in self.grasps_flush]
         for g in order:
             eef_in_object = getattr(g, "pose", None)
-            if eef_in_object is None or (getattr(g, "name", None) == grasp.grasp_name and require_pad_clearance):
+            if eef_in_object is None or (getattr(g, "name", None) == grasp.grasp_name and require_pad_clearance) or getattr(g, "name", None) in exclude:
                 continue
             eef = IK.grasp_pose(t_pose, eef_in_object)
             pre = IK.pre_pose(eef)
@@ -1044,11 +1045,35 @@ class IORSSmall(SamplerV2):
         grasp.extras.update(self.grasp_facts(grasp))
         draft.summary["grasp_facts"] = {k: grasp.extras.get(k) for k in ("pinch_vs_long_axis_deg", "pad_height_above_support_m", "pad_height_above_axis_m",
                                                                           "closing_tilt_deg", "pivot_arm_m")}
-        with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
-            # along the whole descent: the placed-on partner (owner A) and — as the program check's ``place`` rule and the
-            # oracle's descent — the supports (the carried object's sphere fit reaches the table 4-6 cm above the place)
-            res = self.ikc.exact([pre_place, place], manip, grasp.arm, ignore_for_last=ignore, scale_key=self.choice.models["target"].scale, cache=False,
-                                 approached=(self.support_objects() + [self.obj("partner")]) if self.relation != "inside" else self.support_objects())
+        approached_place = (self.support_objects() + [self.obj("partner")]) if self.relation != "inside" else self.support_objects()
+
+        def descent(pre_p: G.Pose, pl: G.Pose):
+            with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
+                # along the whole descent: the placed-on partner (owner A) and — as the program check's ``place`` rule and the
+                # oracle's descent — the supports (the carried object's sphere fit reaches the table 4-6 cm above the place)
+                return self.ikc.exact([pre_p, pl], manip, grasp.arm, ignore_for_last=ignore, scale_key=self.choice.models["target"].scale, cache=False,
+                                      approached=approached_place)
+
+        res = descent(pre_place, place)
+        if not res.ok and res.code and "self-collision (attached_object" in res.reason:
+            # A7 relay (oracle, 2026-09-16 21:07): a collision appearing along the descent between the carried object and the
+            # forearm / torso / head is a genuine infeasibility of *this* grasp yaw / approach class, not a hand-fixed pair
+            # (those are not checked) — try the other library grasps at the settled init pose before rejecting
+            tried = [grasp.grasp_name]
+            for _ in range(len(self.grasps)):
+                chosen = self.reselect_grasp(draft, grasp, manip, tname, exclude=tried)
+                if chosen is None:
+                    break
+                tried.append(chosen)
+                place = IK.grasp_pose((place_pos if self.relation != "inside" else G.t(draft.goal_poses[tname][0]), goal_quat), grasp.eef_in_object)
+                pre_place = IK.pre_pose(place)
+                res = descent(pre_place, place)
+                if res.ok:
+                    log.info("%s: the carried object hit the robot on the descent with the drawn grasp; grasp %s carries clear", self.gp.alias, chosen)
+                    draft.summary["grasp"] = {"key": grasp.grasp_key, "name": grasp.grasp_name, "yaw": grasp.yaw, "reselected_descent_self_collision": True,
+                                              "tried": tried}
+                    grasp.extras.update(self.grasp_facts(grasp))
+                    break
         if not res.ok and res.code:
             raise Reject(res.code, f"pre-place -> place descent from the manipulation stance with the object attached: {res.reason}")
         if not res.ok:

@@ -644,10 +644,28 @@ class IKChecker:
             with self.ignoring(list(ignored)):
                 world_only = bool(self.kit.backend.check_collision(G.t(q).unsqueeze(0), emb_name="whole_body", sync_world=False, self_collision=False, margin=0.0)[0])
             if not world_only:
-                return "self-collision (arm / attached object against the robot's own links)"
+                pairs = self.self_collision_pairs(q)
+                named = ", ".join(f"{a} x {b} ({pen * 1000:.0f} mm)" for (a, b), pen in pairs[:3]) or "arm / attached object against the robot's own links"
+                return f"self-collision ({named})"
         except Exception:  # noqa: BLE001
             pass
         return "collides with the scene (a non-spawned object)"
+
+    def self_collision_pairs(self, q: th.Tensor) -> List[Tuple[Tuple[str, str], float]]:
+        """cuRobo's overlapping self-collision link pairs at ``q`` (``backend.self_collision_pairs``, A7 relay 2026-09-16 21:07):
+        ``[((link_a, link_b), penetration_m), ...]`` worst first; ``attached_object_<arm>_eef_link`` names the carried object."""
+        fn = getattr(self.kit.backend, "self_collision_pairs", None)
+        if fn is None:
+            return []
+        try:
+            out = fn(G.t(q), "whole_body")
+        except Exception:  # noqa: BLE001
+            return []
+        return [(tuple(d["links"]), float(d["penetration"])) for d in out]
+
+    @staticmethod
+    def pairs_involve_attached(pairs: Sequence[Tuple[Tuple[str, str], float]]) -> bool:
+        return any("attached_object" in a or "attached_object" in b for (a, b), _ in pairs)
 
     def track_approach(self, q_pre: th.Tensor, pre: Pose, end: Pose, arm: str, ignore_end: Sequence[Any] = (), ignore_mid: Sequence[Any] = (),
                        q_hint: Optional[th.Tensor] = None) -> Tuple[Optional[th.Tensor], str]:
