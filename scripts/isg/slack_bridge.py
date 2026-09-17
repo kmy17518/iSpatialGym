@@ -216,7 +216,7 @@ def cmd_status(a):
     fleet = load(os.path.join(REPO, "runlogs", "runpod", "fleet.json"), {"pods": {}})["pods"]
     names = {p: (fleet.get(p) or {}).get("name", "?") for p in fleet}
     states = board_states()
-    n_valid = sum(1 for s in states.values() if s["state"] == "valid demo")
+    n_valid = sum(1 for s in states.values() if s["state"].startswith("valid demo"))
     runs = pool_runs()
     pool = [l.strip() for l in open(POOL_FILE) if l.strip()] if os.path.exists(POOL_FILE) else []
     band = [l.strip() for l in open(BAND_FILE) if l.strip()] if os.path.exists(BAND_FILE) else []
@@ -280,9 +280,9 @@ def cmd_status(a):
     if by_role.get("pool"):
         post.append("running: " + ", ".join(sorted(by_role["pool"]))[:900])
     post.append(f"queued: {len(ready)}" + (" — " + ", ".join(short(e['subtask']) for e in ready)[:300] if ready else "") + f" · holds: {len(q.get('holds', {}))} ({', '.join(short(s) for s in q.get('holds', {}))})"[:400])
-    valid_rows = [short(s) for s, v in states.items() if v["state"] == "valid demo"]
+    valid_rows = [short(s) for s, v in states.items() if v["state"].startswith("valid demo")]
     post.append("valid: " + (", ".join(valid_rows) or "-"))
-    waiting = [short(s) for s, v in states.items() if v["state"] != "valid demo" and s not in q.get("holds", {}) and s not in {fd.subtask_of(a2, customs) for a2, _, _ in runs.values()}]
+    waiting = [short(s) for s, v in states.items() if not v["state"].startswith("valid demo") and s not in q.get("holds", {}) and s not in {fd.subtask_of(a2, customs) for a2, _, _ in runs.values()}]
     post.append("waiting for a fix / not running: " + (", ".join(waiting)[:600] or "-"))
     if idle_pool and os.path.exists(IDLE_MD):
         why = [l for l in open(IDLE_MD) if l.startswith("| ") and "| pool |" in l]
@@ -298,7 +298,7 @@ def cmd_valid(a):
     states = board_states()
     ledger = fd.read_jsonl(fd.LEDGER)
     for s, v in states.items():
-        if v["state"] != "valid demo":
+        if not v["state"].startswith("valid demo"):
             continue
         key = f"{s}@{v.get('commit')}"
         if key in st["announced_valid"]:

@@ -282,9 +282,11 @@ def auto_enter(q, customs, inflight, head):
             explain[st] = f"fix commit(s) not in HEAD: {', '.join(not_in_head)}"
             continue
         recs = sorted([r for r in ledger if r["subtask"] == st], key=lambda r: r["time"])
-        valid = [r for r in recs if (r.get("demo") or {}).get("success") and not newest_missing(r.get("code_commit"), req)]
+        # D-005 (C): a valid row (every targeted fix carried) is not re-entered by blanket entries - only by a targeted fix or a RUN:
+        valid = [r for r in recs if (r.get("demo") or {}).get("success") and fd.demo_valid(r, st, fixes)[0]]
         if valid:
-            explain[st] = "valid demo on the board"
+            pre = fd.demo_valid(valid[-1], st, fixes)[1]
+            explain[st] = "valid demo on the board" + (f" (pre-{','.join(pre)}: blanket fixes, final sweep)" if pre else "")
             continue
         if st in inflight:
             explain[st] = f"run in flight (pid {inflight[st][0]['pid']}, {inflight[st][0]['kind']} {inflight[st][0]['alias']})"

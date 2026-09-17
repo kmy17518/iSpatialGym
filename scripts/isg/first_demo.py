@@ -227,10 +227,29 @@ def cmd_fix(args):
     print("fix logged:", rec)
 
 
-def fixes_for(st, fixes):
+BLANKET_MIN = 6  # a fix-log entry naming this many subtasks (or ``*``) is a blanket entry (owner D-005, 2026-09-16 19:36: option C)
+
+
+def is_blanket(f):
+    subs = f.get("subtasks") or []
+    return "*" in subs or len(subs) >= BLANKET_MIN
+
+
+def fixes_for(st, fixes, targeted_only=False):
     """Fix-log entries that bear on the validity of a subtask's demo: ``kind`` facts / note entries (recorded facts, later-list notes)
-    change no behaviour and do not invalidate a demo."""
-    return [f for f in fixes if (f.get("kind") or "fix") not in ("facts", "note") and (st in (f.get("subtasks") or []) or "*" in (f.get("subtasks") or []))]
+    change no behaviour and never invalidate; with ``targeted_only`` the blanket entries (>= BLANKET_MIN subtasks or ``*``) are left
+    out — owner D-005 (C): a row with a valid demo is re-run only by a fix targeted at it or on request; blanket entries mark it
+    ``valid (pre-<sha>)`` and one final validity sweep runs at the end of the pass."""
+    out = [f for f in fixes if (f.get("kind") or "fix") not in ("facts", "note") and (st in (f.get("subtasks") or []) or "*" in (f.get("subtasks") or []))]
+    return [f for f in out if not is_blanket(f)] if targeted_only else out
+
+
+def demo_valid(run, st, fixes):
+    """(valid, blanket fixes the run's code predates). Valid = success + every *targeted* fix affecting the subtask in the run's commit."""
+    req_t = fixes_for(st, fixes, targeted_only=True)
+    ok = all(commit_contains(run.get("code_commit"), f["commit"]) for f in req_t)
+    pre = [f["commit"][:7] for f in fixes_for(st, fixes) if is_blanket(f) and not commit_contains(run.get("code_commit"), f["commit"])]
+    return ok, pre
 
 
 def build_board():
@@ -245,10 +264,10 @@ def build_board():
             d = r.get("demo") or {}
             # validity = the run's commit contains every fix affecting the subtask; the ``dirty`` flag is provenance (the pool syncs
             # the working tree, which is always dirty while several agents edit) and is shown, not used to invalidate
-            valid_code = all(commit_contains(r.get("code_commit"), f["commit"]) for f in req)
+            valid_code, pre_blanket = demo_valid(r, st, fixes)
             has_inst = bool(r.get("tro")) or (r.get("sampling") or {}).get("n_written", 0) > 0
             if d.get("success") and valid_code:
-                rank, state = 4, "valid demo"
+                rank, state = 4, "valid demo" + (f" (pre-{','.join(pre_blanket)})" if pre_blanket else "")
             elif d.get("success"):
                 rank, state = 3, "demo run (pre-fix success)"
             elif d.get("status"):
@@ -279,12 +298,13 @@ def build_board():
             s = best["sampling"]
             verdict = f"sampled n={s.get('n_written')} " + (f"err={str(s.get('error'))[:60]}" if s.get("error") else ", ".join(f"{k} {v}" for k, v in list((s.get("rejections") or {}).items())[:3]))
         rows.append((st, state, m.get("blocking", ""), m.get("owner", ""), fixc, verdict, art or "", last))
-    lines = [f"# First-demo board ({now()})", "", "state ∈ {no instance, instance, demo run, valid demo}; a demo is valid only when its code commit contains every "
-             "fix-log entry affecting the subtask (earlier successes are `pre-fix`).", "",
+    lines = [f"# First-demo board ({now()})", "", "state ∈ {no instance, instance, demo run, valid demo}; a demo is valid when its code commit contains every *targeted* "
+             f"fix-log entry affecting the subtask (< {BLANKET_MIN} subtasks); blanket entries it predates are listed as `valid demo (pre-<sha>)` and are covered by the final "
+             "validity sweep at the end of the pass (owner D-005, option C). Earlier successes missing a targeted fix are `pre-fix`.", "",
              "| subtask | state | blocking item | owner | fixing commits | last verdict | artefact (meta.json) | last change |", "|---|---|---|---|---|---|---|---|"]
     for r in rows:
         lines.append("| " + " | ".join(str(x).replace("|", "/") for x in r) + " |")
-    n_valid = sum(1 for s in states.values() if s == "valid demo")
+    n_valid = sum(1 for s in states.values() if s.startswith("valid demo"))
     lines.insert(1, f"\n**{n_valid} / {len(SUBTASKS)} subtasks with a valid demo.**")
     lines += ["", "## Fix log", "", "| time | commit | subtasks | what | owner |", "|---|---|---|---|---|"]
     for f in fixes:
