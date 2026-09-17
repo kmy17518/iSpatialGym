@@ -1,0 +1,430 @@
+{
+ "1c88jsy46ubecf": {
+  "name": "pilot2-a40-6",
+  "state": "ok",
+  "dirs": {
+   "smoke": {
+    "rsync_rc": 0,
+    "pod_files": 93,
+    "pod_bytes": 43983058,
+    "local_files": 93,
+    "local_bytes": 43983058,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   },
+   "samp": {
+    "rsync_rc": 0,
+    "pod_files": 132,
+    "pod_bytes": 18493119,
+    "local_files": 132,
+    "local_bytes": 18493119,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   }
+  }
+ },
+ "29s7u374iifjbj": {
+  "name": "pilot2-a40-10",
+  "state": "ok",
+  "dirs": {
+   "smoke": {
+    "rsync_rc": 0,
+    "pod_files": 192,
+    "pod_bytes": 90154255,
+    "local_files": 192,
+    "local_bytes": 90154255,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   },
+   "samp": {
+    "rsync_rc": 0,
+    "pod_files": 196,
+    "pod_bytes": 18737927,
+    "local_files": 196,
+    "local_bytes": 18737927,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   }
+  }
+ },
+ "5gm563m9wgnrwc": {
+  "name": "pilot2-l40s-10",
+  "state": "ok",
+  "dirs": {
+   "smoke": {
+    "rsync_rc": 0,
+    "pod_files": 161,
+    "pod_bytes": 84823736,
+    "local_files": 161,
+    "local_bytes": 84823736,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   },
+   "samp": {
+    "rsync_rc": 0,
+    "pod_files": 406,
+    "pod_bytes": 73170175,
+    "local_files": 406,
+    "local_bytes": 73170175,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   }
+  }
+ },
+ "6pdrunfn78iofy": {
+  "name": "pilot2-a40-4",
+  "state": "ok",
+  "dirs": {
+   "smoke": {
+    "rsync_rc": 0,
+    "pod_files": 202,
+    "pod_bytes": 92846131,
+    "local_files": 202,
+    "local_bytes": 92846131,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   },
+   "samp": {
+    "rsync_rc": 0,
+    "pod_files": 206,
+    "pod_bytes": 24106210,
+    "local_files": 206,
+    "local_bytes": 24106210,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   }
+  }
+ },
+ "bl91tuqop45ila": {
+  "name": "pilot2-l40s-2",
+  "state": "ok",
+  "dirs": {
+   "smoke": {
+    "rsync_rc": 0,
+    "pod_files": 160,
+    "pod_bytes": 76595843,
+    "local_files": 160,
+    "local_bytes": 76595843,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   },
+   "samp": {
+    "rsync_rc": 0,
+    "pod_files": 325,
+    "pod_bytes": 23652757,
+    "local_files": 325,
+    "local_bytes": 23652757,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   }
+  }
+ },
+ "bpu6l9bffwaf1y": {
+  "name": "pilot2-l40s-11",
+  "state": "ok",
+  "dirs": {
+   "smoke": {
+    "rsync_rc": 0,
+    "pod_files": 302,
+    "pod_bytes": 133083090,
+    "local_files": 302,
+    "local_bytes": 133083090,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   },
+   "samp": {
+    "rsync_rc": 0,
+    "pod_files": 241,
+    "pod_bytes": 55674469,
+    "local_files": 241,
+    "local_bytes": 55674469,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   }
+  }
+ },
+ "cy0f5t6i58i08v": {
+  "name": "pilot2-l40s-3",
+  "state": "ok",
+  "dirs": {
+   "smoke": {
+    "rsync_rc": 0,
+    "pod_files": 88,
+    "pod_bytes": 37020945,
+    "local_files": 88,
+    "local_bytes": 37020945,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   },
+   "samp": {
+    "rsync_rc": 0,
+    "pod_files": 384,
+    "pod_bytes": 47830691,
+    "local_files": 384,
+    "local_bytes": 47830691,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   }
+  }
+ },
+ "gvua02xnwm4ti6": {
+  "name": "pilot2-a40-9",
+  "state": "ok",
+  "dirs": {
+   "smoke": {
+    "rsync_rc": 0,
+    "pod_files": 189,
+    "pod_bytes": 98078244,
+    "local_files": 189,
+    "local_bytes": 98078244,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   },
+   "samp": {
+    "rsync_rc": 0,
+    "pod_files": 178,
+    "pod_bytes": 15339326,
+    "local_files": 178,
+    "local_bytes": 15339326,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   }
+  }
+ },
+ "h4enpm19l0t3ng": {
+  "name": "smoke2-a40-0",
+  "state": "ok",
+  "dirs": {
+   "smoke": {
+    "rsync_rc": 0,
+    "pod_files": 394,
+    "pod_bytes": 159967012,
+    "local_files": 394,
+    "local_bytes": 159967012,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   },
+   "samp": {
+    "absent": true
+   }
+  }
+ },
+ "htvfrubebp6tnj": {
+  "name": "pilot2-a40-3",
+  "state": "ok",
+  "dirs": {
+   "smoke": {
+    "rsync_rc": 0,
+    "pod_files": 188,
+    "pod_bytes": 84670891,
+    "local_files": 188,
+    "local_bytes": 84670891,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   },
+   "samp": {
+    "rsync_rc": 0,
+    "pod_files": 160,
+    "pod_bytes": 21840787,
+    "local_files": 160,
+    "local_bytes": 21840787,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   }
+  }
+ },
+ "nfgjwzgjajpr5u": {
+  "name": "pilot2-l40s-7",
+  "state": "ok",
+  "dirs": {
+   "smoke": {
+    "rsync_rc": 0,
+    "pod_files": 139,
+    "pod_bytes": 51071526,
+    "local_files": 139,
+    "local_bytes": 51071526,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   },
+   "samp": {
+    "rsync_rc": 0,
+    "pod_files": 360,
+    "pod_bytes": 45122040,
+    "local_files": 360,
+    "local_bytes": 45122040,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   }
+  }
+ },
+ "oliefq3ymuexna": {
+  "name": "pilot2-a40-1",
+  "state": "ok",
+  "dirs": {
+   "smoke": {
+    "rsync_rc": 0,
+    "pod_files": 315,
+    "pod_bytes": 129477027,
+    "local_files": 315,
+    "local_bytes": 129477027,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   },
+   "samp": {
+    "rsync_rc": 0,
+    "pod_files": 219,
+    "pod_bytes": 35414988,
+    "local_files": 219,
+    "local_bytes": 35414988,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   }
+  }
+ },
+ "pjf6451ahyqxll": {
+  "name": "smoke2-a40-1",
+  "state": "ok",
+  "dirs": {
+   "smoke": {
+    "rsync_rc": 0,
+    "pod_files": 353,
+    "pod_bytes": 140865868,
+    "local_files": 353,
+    "local_bytes": 140865868,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   },
+   "samp": {
+    "absent": true
+   }
+  }
+ },
+ "s7m4h2ay2slau4": {
+  "name": "pilot2-l40s-4",
+  "state": "ok",
+  "dirs": {
+   "smoke": {
+    "rsync_rc": 0,
+    "pod_files": 90,
+    "pod_bytes": 42420487,
+    "local_files": 90,
+    "local_bytes": 42420487,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   },
+   "samp": {
+    "rsync_rc": 0,
+    "pod_files": 341,
+    "pod_bytes": 25604828,
+    "local_files": 341,
+    "local_bytes": 25604828,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   }
+  }
+ },
+ "uilwpybjxnekg0": {
+  "name": "smoke2-a40-2",
+  "state": "ok",
+  "dirs": {
+   "smoke": {
+    "rsync_rc": 0,
+    "pod_files": 342,
+    "pod_bytes": 171379466,
+    "local_files": 342,
+    "local_bytes": 171379466,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   },
+   "samp": {
+    "rsync_rc": 0,
+    "pod_files": 8,
+    "pod_bytes": 70180,
+    "local_files": 8,
+    "local_bytes": 70180,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   }
+  }
+ },
+ "xnam1nh3y2706e": {
+  "name": "smoke-l40s-3",
+  "state": "ok",
+  "dirs": {
+   "smoke": {
+    "rsync_rc": 0,
+    "pod_files": 615,
+    "pod_bytes": 288635282,
+    "local_files": 615,
+    "local_bytes": 288635282,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   },
+   "samp": {
+    "rsync_rc": 0,
+    "pod_files": 24,
+    "pod_bytes": 965264,
+    "local_files": 24,
+    "local_bytes": 965264,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   }
+  }
+ },
+ "z2qdfyfyrgcjys": {
+  "name": "pilot2-a40-0",
+  "state": "ok",
+  "dirs": {
+   "smoke": {
+    "rsync_rc": 0,
+    "pod_files": 142,
+    "pod_bytes": 63163341,
+    "local_files": 142,
+    "local_bytes": 63163341,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   },
+   "samp": {
+    "rsync_rc": 0,
+    "pod_files": 227,
+    "pod_bytes": 33160027,
+    "local_files": 227,
+    "local_bytes": 33160027,
+    "missing_or_size_mismatch": 0,
+    "dry_run_left": 0,
+    "err": ""
+   }
+  }
+ }
+}
