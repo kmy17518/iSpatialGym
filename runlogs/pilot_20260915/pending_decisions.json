@@ -199,6 +199,30 @@
    "thread_ts": null,
    "answered_at": "2026-09-16 22:02 PDT",
    "channel": "chat (Slack paused 21:53)"
+  },
+  {
+   "id": "D-010",
+   "time": "2026-09-16 22:54 PDT",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "question": "sandal / bed_rrcvaq_0 push-under: F_goal = 0 at every side-lane drop after four lane variants \u2014 is this pick a yield; should apple-desk-desk carry the under-large first demo?",
+   "context": "Diagnosis from the live run 0916-211327 (edge-end lanes 2cfce47 + frontal offset 8c93d0b + 0.45\u20130.6 m lanes 7162fe7): stance C has 324 survivors; every side lane at d 0.35\u20130.40, \u03bb \u22120.40\u2026+0.42, trunk (0.75, \u22120.9) gives F_init 26 but F_goal 0 \u2014 the blade at the push goal 7 cm inside the bed footprint has no reach cell from any lane (the bed is too low for the blade \u2265 6 cm to travel under its edge); the B3 under-edge probe already showed 0 reachable cells for the sandal at both stand-offs. Earlier runs: 19:01 target_placement \u00d78 (lanes on the base rim), 21:07 rc 124 = one attempt > 2 h (no per-attempt budget; being added, 900 s). The desk partners have ample under-clearance and their floor-under-desk bands exist (12 files).",
+   "options": [
+    "A) apple-desk-desk carries the first demo (launched 23:00 in parallel); sandal/bed_rrcvaq_0 = yield, noted for the later list (a lower blade / bed with clearance)",
+    "B) keep working sandal/bed: diagnose F_goal 0 (bed frame clearance vs blade height), no alias switch",
+    "C) both: apple-desk-desk now and the sandal diagnosis continues at lower priority"
+   ],
+   "default": "C at 23:30 PDT if unanswered (apple-desk already running; the large-scale agent picks the sandal diagnosis up after the Rs_int drawer)",
+   "artefacts": [
+    "runlogs/pilot_20260915/first_demo/inter_object_relation_satisfaction-under_large_scale/0916-211327/remote.log",
+    "runlogs/pilot_20260915/first_demo/inter_object_relation_satisfaction-under_large_scale/0916-190702/"
+   ],
+   "status": "open",
+   "answered_by": null,
+   "answer": null,
+   "applied_commit": null,
+   "thread_ts": "1789624468.783869",
+   "answered_at": null,
+   "channel": "chat + one-off Slack post (owner 22:55 request)"
   }
  ]
 }

@@ -56,12 +56,12 @@
   "owner": "large-scale"
  },
  "alignment-world_vertical": {
-  "blocking": "oracle chain landed (standoff, 3-D arc about the hook, loaded bounds): demo runs to the end in tolerance (0.052 rad) but not_settled \u2014 the frictionless hook (revolute limits: null, no damping) swings undamped after release \u2192 large-scale / TRO: hook joint damping/friction",
-  "owner": "large-scale"
+  "blocking": "painting demo in tolerance, not_settled (undamped hook) \u2192 large-scale-B: hinge friction/damping in the constraints record + TRO loader (owner 22:05), demo-only re-run",
+  "owner": "large-scale-B"
  },
  "alignment-world_horizontal": {
-  "blocking": "push plan_failed = self-collision left_realsense_link vs right_arm_link7 (13 mm) along every path: the sidecar's push witnesses have the brace arm at zeros \u2192 large-scale: two-arm witness for the push pre with the brace arm at its contact",
-  "owner": "large-scale"
+  "blocking": "owner 22:55: hang frame bug \u2014 no wall alias carries front/up/level axes, the sampler defaults to the painting frame (+x/+z) \u2192 the plate hangs table-flat; large-scale-B: ground_isg writes the reviewed icl frames per model, Reject(missing_frame), unit test, re-sample; + push witness with the brace arm at contact",
+  "owner": "large-scale-B"
  },
  "alignment-axial": {
   "blocking": "re-run 20:40 (oracle retreat changes 35be0ee/3eb8e51): plan_failed at retreat \u2192 primary oracle",
@@ -92,7 +92,7 @@
   "owner": "large-scale / loop"
  },
  "inter_object_relation_satisfaction-under_large_scale": {
-  "blocking": "push-under lanes 0.45\u20130.6 m ahead + edge-end laterals + frontal offset 0.25 m right (7162fe7, 8c93d0b, 2cfce47) \u2014 re-run queued/running",
-  "owner": "large-scale / loop"
+  "blocking": "D-010: sandal/bed F_goal 0 at every side lane (bed too low for the blade) \u2014 apple-desk-desk launched 23:00 as the candidate; per-attempt 900 s budget (large-scale-B); default C at 23:30",
+  "owner": "owner (D-010) / large-scale"
  }
 }
