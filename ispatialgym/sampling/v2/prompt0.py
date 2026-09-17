@@ -426,6 +426,14 @@ def phase1_scan(s, face: FaceFrame, beta: float, d_min: float, d_max: float, tar
         x, y, yaw = approach_ray_base(face, beta, d)
         st_["d_tested"] = st_.get("d_tested", 0) + 1
         if not base_ok(s, (x, y)):
+            # which half of base_ok fails (Rs_int drawer 17:44: 287/287 (d, t) failed base_ok in 3 s — floor map or room?)
+            k = "off_trav_map" if not bool(s.kit.trav_free((x, y))) else "outside_rooms"
+            st_[k] = st_.get(k, 0) + 1
+            if k == "outside_rooms" and "room_seen" not in st_:
+                try:
+                    st_["room_seen"] = str(s.world.scene.seg_map.get_room_instance_by_point(th.tensor([x, y])))
+                except Exception:  # noqa: BLE001
+                    st_["room_seen"] = "?"
             continue
         st_["base_ok"] = st_.get("base_ok", 0) + 1
         cands = [ray_stance(face, beta, d, t, 0.0, name) for t in translates]
