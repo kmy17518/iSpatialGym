@@ -18906,7 +18906,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 A applies to all small-articulation aliases (D-012, 2026-09-17 01:00)"
   },
   "constraints": []
  },
@@ -19700,7 +19702,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 A applies to all small-articulation aliases (D-012, 2026-09-17 01:00)"
   },
   "constraints": []
  },
@@ -19807,7 +19811,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 A applies to all small-articulation aliases (D-012, 2026-09-17 01:00)"
   },
   "constraints": []
  },
@@ -19914,7 +19920,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 A applies to all small-articulation aliases (D-012, 2026-09-17 01:00)"
   },
   "constraints": []
  },
@@ -20021,7 +20029,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 A applies to all small-articulation aliases (D-012, 2026-09-17 01:00)"
   },
   "constraints": []
  },
@@ -20128,7 +20138,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 A applies to all small-articulation aliases (D-012, 2026-09-17 01:00)"
   },
   "constraints": []
  },
@@ -20235,7 +20247,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 A applies to all small-articulation aliases (D-012, 2026-09-17 01:00)"
   },
   "constraints": []
  },
@@ -21909,7 +21923,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 A applies to all small-articulation aliases (D-012, 2026-09-17 01:00)"
   },
   "constraints": []
  },
@@ -22703,7 +22719,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 A applies to all small-articulation aliases (D-012, 2026-09-17 01:00)"
   },
   "constraints": []
  },
@@ -22810,7 +22828,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 A applies to all small-articulation aliases (D-012, 2026-09-17 01:00)"
   },
   "constraints": []
  },
@@ -22917,7 +22937,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 A applies to all small-articulation aliases (D-012, 2026-09-17 01:00)"
   },
   "constraints": []
  },
@@ -23024,7 +23046,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 A applies to all small-articulation aliases (D-012, 2026-09-17 01:00)"
   },
   "constraints": []
  },
@@ -23131,7 +23155,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 A applies to all small-articulation aliases (D-012, 2026-09-17 01:00)"
   },
   "constraints": []
  },
@@ -23238,7 +23264,9 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_brace_optional_note": "owner D-008 A applies to all small-articulation aliases (D-012, 2026-09-17 01:00)"
   },
   "constraints": []
  },
@@ -23327,7 +23355,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
@@ -23416,7 +23446,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
@@ -23505,7 +23537,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
@@ -23594,7 +23628,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
@@ -23683,7 +23719,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
@@ -23772,7 +23810,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
@@ -23861,7 +23901,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
@@ -23950,7 +23992,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
@@ -24039,7 +24083,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
@@ -24128,7 +24174,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
@@ -24217,7 +24265,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
@@ -24306,7 +24356,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
@@ -24393,7 +24445,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
@@ -24480,7 +24534,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
@@ -24567,7 +24623,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
@@ -24648,7 +24706,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
@@ -24729,7 +24789,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
@@ -24810,7 +24872,9 @@
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
    "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
   },
   "constraints": []
  },
