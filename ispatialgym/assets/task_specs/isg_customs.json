@@ -17450,7 +17450,12 @@
    },
    "face_patch_half_width_m": 0.1,
    "pinch_axis_vertical_threshold": 0.7,
-   "path_max_m": 3.0
+   "path_max_m": 3.0,
+   "min_reachable_opening": {
+    "revolute_deg": 20.0,
+    "prismatic_m": 0.1
+   },
+   "_min_reachable_opening_note": "first-demo opening (owner D-011 B, 2026-09-17 01:00): the arm-only follow from a fixed stance reaches 9-33 % of a door swing; 20 deg is the first-demo goal minimum for door units (spec 5.3 note); the 50 deg default returns with the hybrid base-follow / chained open"
   },
   "constraints": []
  },
@@ -17548,7 +17553,12 @@
    },
    "face_patch_half_width_m": 0.1,
    "pinch_axis_vertical_threshold": 0.7,
-   "path_max_m": 3.0
+   "path_max_m": 3.0,
+   "min_reachable_opening": {
+    "revolute_deg": 20.0,
+    "prismatic_m": 0.1
+   },
+   "_min_reachable_opening_note": "first-demo opening (owner D-011 B, 2026-09-17 01:00): the arm-only follow from a fixed stance reaches 9-33 % of a door swing; 20 deg is the first-demo goal minimum for door units (spec 5.3 note); the 50 deg default returns with the hybrid base-follow / chained open"
   },
   "constraints": []
  },
@@ -17744,7 +17754,12 @@
    },
    "face_patch_half_width_m": 0.1,
    "pinch_axis_vertical_threshold": 0.7,
-   "path_max_m": 3.0
+   "path_max_m": 3.0,
+   "min_reachable_opening": {
+    "revolute_deg": 20.0,
+    "prismatic_m": 0.1
+   },
+   "_min_reachable_opening_note": "first-demo opening (owner D-011 B, 2026-09-17 01:00): the arm-only follow from a fixed stance reaches 9-33 % of a door swing; 20 deg is the first-demo goal minimum for door units (spec 5.3 note); the 50 deg default returns with the hybrid base-follow / chained open"
   },
   "constraints": []
  },
@@ -17841,7 +17856,12 @@
    },
    "face_patch_half_width_m": 0.1,
    "pinch_axis_vertical_threshold": 0.7,
-   "path_max_m": 3.0
+   "path_max_m": 3.0,
+   "min_reachable_opening": {
+    "revolute_deg": 20.0,
+    "prismatic_m": 0.1
+   },
+   "_min_reachable_opening_note": "first-demo opening (owner D-011 B, 2026-09-17 01:00): the arm-only follow from a fixed stance reaches 9-33 % of a door swing; 20 deg is the first-demo goal minimum for door units (spec 5.3 note); the 50 deg default returns with the hybrid base-follow / chained open"
   },
   "constraints": []
  },
@@ -17938,7 +17958,12 @@
    },
    "face_patch_half_width_m": 0.1,
    "pinch_axis_vertical_threshold": 0.7,
-   "path_max_m": 3.0
+   "path_max_m": 3.0,
+   "min_reachable_opening": {
+    "revolute_deg": 20.0,
+    "prismatic_m": 0.1
+   },
+   "_min_reachable_opening_note": "first-demo opening (owner D-011 B, 2026-09-17 01:00): the arm-only follow from a fixed stance reaches 9-33 % of a door swing; 20 deg is the first-demo goal minimum for door units (spec 5.3 note); the 50 deg default returns with the hybrid base-follow / chained open"
   },
   "constraints": []
  },
@@ -20467,7 +20492,12 @@
    },
    "face_patch_half_width_m": 0.1,
    "pinch_axis_vertical_threshold": 0.7,
-   "path_max_m": 3.0
+   "path_max_m": 3.0,
+   "min_reachable_opening": {
+    "revolute_deg": 20.0,
+    "prismatic_m": 0.1
+   },
+   "_min_reachable_opening_note": "first-demo opening (owner D-011 B, 2026-09-17 01:00): the arm-only follow from a fixed stance reaches 9-33 % of a door swing; 20 deg is the first-demo goal minimum for door units (spec 5.3 note); the 50 deg default returns with the hybrid base-follow / chained open"
   },
   "constraints": []
  },
@@ -20565,7 +20595,12 @@
    },
    "face_patch_half_width_m": 0.1,
    "pinch_axis_vertical_threshold": 0.7,
-   "path_max_m": 3.0
+   "path_max_m": 3.0,
+   "min_reachable_opening": {
+    "revolute_deg": 20.0,
+    "prismatic_m": 0.1
+   },
+   "_min_reachable_opening_note": "first-demo opening (owner D-011 B, 2026-09-17 01:00): the arm-only follow from a fixed stance reaches 9-33 % of a door swing; 20 deg is the first-demo goal minimum for door units (spec 5.3 note); the 50 deg default returns with the hybrid base-follow / chained open"
   },
   "constraints": []
  },
@@ -20761,7 +20796,12 @@
    },
    "face_patch_half_width_m": 0.1,
    "pinch_axis_vertical_threshold": 0.7,
-   "path_max_m": 3.0
+   "path_max_m": 3.0,
+   "min_reachable_opening": {
+    "revolute_deg": 20.0,
+    "prismatic_m": 0.1
+   },
+   "_min_reachable_opening_note": "first-demo opening (owner D-011 B, 2026-09-17 01:00): the arm-only follow from a fixed stance reaches 9-33 % of a door swing; 20 deg is the first-demo goal minimum for door units (spec 5.3 note); the 50 deg default returns with the hybrid base-follow / chained open"
   },
   "constraints": []
  },
@@ -20858,7 +20898,12 @@
    },
    "face_patch_half_width_m": 0.1,
    "pinch_axis_vertical_threshold": 0.7,
-   "path_max_m": 3.0
+   "path_max_m": 3.0,
+   "min_reachable_opening": {
+    "revolute_deg": 20.0,
+    "prismatic_m": 0.1
+   },
+   "_min_reachable_opening_note": "first-demo opening (owner D-011 B, 2026-09-17 01:00): the arm-only follow from a fixed stance reaches 9-33 % of a door swing; 20 deg is the first-demo goal minimum for door units (spec 5.3 note); the 50 deg default returns with the hybrid base-follow / chained open"
   },
   "constraints": []
  },
@@ -20955,7 +21000,12 @@
    },
    "face_patch_half_width_m": 0.1,
    "pinch_axis_vertical_threshold": 0.7,
-   "path_max_m": 3.0
+   "path_max_m": 3.0,
+   "min_reachable_opening": {
+    "revolute_deg": 20.0,
+    "prismatic_m": 0.1
+   },
+   "_min_reachable_opening_note": "first-demo opening (owner D-011 B, 2026-09-17 01:00): the arm-only follow from a fixed stance reaches 9-33 % of a door swing; 20 deg is the first-demo goal minimum for door units (spec 5.3 note); the 50 deg default returns with the hybrid base-follow / chained open"
   },
   "constraints": []
  },

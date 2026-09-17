@@ -798,6 +798,12 @@ instance: the draw, step 5, step 6. Variety comes from β, the step-4 draw and t
 
 ### 5.3 Prompt 1 — articulation, large-scale (open / close)
 
+**First‑demo opening (owner D‑011 B, 2026‑09‑17 01:00).** `generation.min_reachable_opening` (`{"revolute_deg", "prismatic_m"}`, default
+50° / 0.10 m) is lowered per alias to the arm‑reachable opening — 20° on the door units fridge / dishwasher / oven / top_cabinet /
+bottom_cabinet_no_top — as a first‑demo setting only: the arm‑only follow from a fixed stance reaches 9–33 % of a door swing
+(oven 0 %). The 50° minimum returns for those units with the chained open (grasp → pull → release → re‑stance → push the leaf)
+or the hybrid base‑follow (A4 door rule), both in progress in parallel; nothing is blacklisted.
+
 Target bound to a scene articulated object (`bindings.target` names, from the `roles/candidates.csv` scene rows of the task rooms:
 cabinets, fridges, ovens, dishwashers, drawers, doors, iddl `(handle target)` satisfied); one joint per object
 (`roles.target.joint`, `roles.target.handle_key`).
