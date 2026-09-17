@@ -104,12 +104,12 @@
     "runlogs/pilot_20260915/first_demo_board.md",
     "runlogs/pilot_20260915/fix_log.jsonl"
    ],
-   "status": "open",
-   "answered_by": null,
-   "answer": null,
-   "applied_commit": null,
+   "status": "answered",
+   "answered_by": "slack",
+   "answer": "C - freeze valid rows against blanket fixes (targeted fix = < 6 subtasks, or RUN:), blanket entries mark valid (pre-<sha>), one final validity sweep at the end of the pass; agents batch core-wide changes (<= 1 per hour)",
+   "applied_commit": "122702b0",
    "thread_ts": "1789612322.734999",
-   "answered_at": null
+   "answered_at": "2026-09-16 19:38 PDT"
   }
  ]
 }
