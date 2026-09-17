@@ -32,19 +32,19 @@
   "owner": "-"
  },
  "configuration_matching-block_design": {
-  "blocking": "no-flip run 19:03: target_placement x8 \u2192 tabletop adding the place pre-pose diagnostic",
-  "owner": "tabletop"
+  "blocking": "DECISION D-006: last block cannot be pinched into 1 mm gaps (finger-clearance gate 4c66d53a) \u2014 6 mm gaps / oracle push-only tail / 3 blocks; default A 21:00. Pre-pose reach fixed (3a7db49c); flip-on-table prep 0ec0153d behind block_table_flip",
+  "owner": "owner (D-006) / tabletop"
  },
  "configuration_matching-attachment": {
-  "blocking": "19:06: program_check_failed x8 on the second-base-pose sidecar (transitions[].holding) \u2192 oracle program / program_check must accept it (tabletop 58afae2 \u2194 oracle)",
-  "owner": "oracle / tabletop"
+  "blocking": "second base pose (58afae2) + brace faces near/left/far (bd30c0cf) + oracle program travels the recorded stance, brace optional (6baaaa3b) \u2014 scheduler re-run due",
+  "owner": "loop / tabletop"
  },
  "configuration_matching-articulation_open_small_scale": {
-  "blocking": "owner 17:10 (3): Phase-2 cone 25\u00b0 / focus-in-frame for small articulation (tabletop, 20 min) \u2192 hinged_jar loop",
+  "blocking": "25\u00b0 cone landed (aea6bd0a): Phase 2 survives; now contact_unreachable at the brace pre-contact (no brace face + handle grasp passes the two-arm IK) \u2192 tabletop (more brace faces / recorded stance; else brace-optional decision)",
   "owner": "tabletop"
  },
  "configuration_matching-articulation_close_small_scale": {
-  "blocking": "same as open (25\u00b0 cone)",
+  "blocking": "same as open",
   "owner": "tabletop"
  },
  "configuration_matching-articulation_open_large_scale": {

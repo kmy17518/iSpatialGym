@@ -110,6 +110,29 @@
    "applied_commit": "122702b0",
    "thread_ts": "1789612322.734999",
    "answered_at": "2026-09-16 19:38 PDT"
+  },
+  {
+   "id": "D-006",
+   "time": "2026-09-16 20:21 PDT",
+   "subtask": "configuration_matching-block_design",
+   "question": "the last block of the 2\u00d72 grid cannot be pinched into 1 mm gaps (two occupied sides) \u2014 widen the gaps to 6 mm, or let the oracle push the last block into place?",
+   "context": "No-flip run 0916-172359: target_placement \u00d78. Diagnosis (tabletop, 3 pod probes): with slots at edge + 1 mm the attached die's cuRobo sphere fit (~1 cm bulge) collides with a touching placed neighbour (0/24 place poses with neighbours present, 14/24 parked). Fix 4c66d53a ignores placed neighbours for the attached place pose behind a finger-clearance gate (slot gap + 5 mm margin \u2265 8.4 mm fingertip + 2 mm) \u2014 with generation.block_gap_m = 0.001 the gate rejects block 2 of a 2\u00d72 grid: two occupied sides, no pinch pair fits. Pre-pose reach also fixed (regions capped at 0.70 m, 3a7db49c).",
+   "options": [
+    "A) generation.block_gap_m = 0.006 on block_4-breakfast_table (6 mm visible gaps; layout tolerance is 1 cm anyway) \u2014 one customs line, run immediately",
+    "B) keep 1 mm gaps: the last block is placed near its slot and pushed in (oracle program_block_design accepts a push-only tail; today brace + push are required together) \u2014 oracle change, ~1\u20132 h",
+    "C) 3 blocks in an L / row so no block has two occupied sides (generation.n_blocks: 3)"
+   ],
+   "default": "A at 21:00 PDT if unanswered (first demo), B stays the required end-state question for the full 2\u00d72 with 1 mm gaps",
+   "artefacts": [
+    "runlogs/pilot_20260915/first_demo/configuration_matching-block_design/0916-172359/",
+    "runlogs/pilot_20260915/staged_decisions.md"
+   ],
+   "status": "open",
+   "answered_by": null,
+   "answer": null,
+   "applied_commit": null,
+   "thread_ts": "1789615282.028399",
+   "answered_at": null
   }
  ]
 }
