@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 18:32 PDT — 5/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 18:53 PDT — 6/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -126,7 +126,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | camera_relocalization-obstructed | valid demo | tracker corner fix d4a1745 not yet re-demoed | oracle |
 | object_scaling | valid demo | - | - |
 | mental_rotation | valid demo | - | - |
-| disembedding | demo run (pre-fix success) | - | - |
+| disembedding | valid demo | - | - |
 | CM block_design | no instance | owner 17:10 (1): first demo with block_no_flip (35506bf) — loop running (scheduler 17:24); flip-on-the-table sub-chain = required end state, prep workstream (tabletop sampler + oracle program) | tabletop / oracle |
 | CM attachment | no instance | tabletop 58afae2: second base pose between grasp and attach (paths carried, Transition.holding bd10c72) — lid-teapot loop running since 17:38 | loop / tabletop |
 | CM articulation_open_small_scale | no instance | owner 17:10 (3): Phase-2 cone 25° / focus-in-frame for small articulation (tabletop, 20 min) → hinged_jar loop | tabletop |
@@ -297,3 +297,6 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026-09-16 18:21 PDT pod_scheduler: PREEMPTION bl91tuqop45ila (pilot2-l40s-2): band job(s) none running stopped for first-demo work (started 18:11); files parked in /root/samp/queue_preempted, re-dispatched to a band pod by the next tick via the manifest (no band file yet = still remaining)
 - 2026-09-16 18:21 PDT pod_scheduler: role change bands -> pool: bl91tuqop45ila (pilot2-l40s-2); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed)
 - 2026‑09‑16 18:33 PDT agent-e2e: Slack `D-004: B` (18:30) → applied `f8e9aa7` (rvunhj_0/5 blacklisted, Rs_int drawer stays), fix‑logged (large articulation re‑enters on the Rs_int alias), decision record answered_by slack, thread confirmation posted, D‑004 thread subscription closed.
+- 2026-09-16 18:44 PDT pod_scheduler: role change pool -> bands: bpu6l9bffwaf1y (pilot2-l40s-11), usqruny80uunl6 (pilot2-l40s-9); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed)
+- 2026-09-16 18:51 PDT pod_scheduler: role change pool -> bands: 6c5712ggii2ihf (pilot2-a40-2); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed)
+- 2026‑09‑16 18:55 PDT agent-e2e: `[STATUS 18:53]` posted (6/21 valid; disembedding re‑validated on the carry check → `[DEMO-VALID]`); ontop‑small + **under‑small teacup succeeded** (18:34 / 18:36 on `ee7aa9d`) and re‑run on the core's `5851c8b` release‑surface fix before they count; all five A3 large‑articulation units fail at the handle IK (`handle_unreachable` ×8 each) → large‑scale; wall vertical executes the push now, fails `tolerance` (`229c609`). Fix‑log entries of kind `facts` / `note` no longer invalidate demos (`first_demo.fixes_for`); the scheduler's default `--scene` for the bottom_cabinet aliases removed after the blacklist (one run had failed with "scene not in the customs entry").
