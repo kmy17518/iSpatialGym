@@ -504,3 +504,14 @@ def test_stance_records_large_scale_blocks():
     assert d["stances"]["manipulation"]["face"] == "wall" and d["stances"]["manipulation"]["arms"] == ["left", "right"]
     assert d["contacts"]["push"]["mid"] is not None and d["contacts"]["brace"]["kind"] == "below_high"
     assert d["stances"]["init"]["stand_off"] == 1.0
+
+
+def test_bar_axis_and_offsets():
+    from ispatialgym.sampling.v2.tasks.articulation_large import bar_axis, bar_offsets
+
+    h = {"kind": "bar", "approach_dir": [-1.0, 0.0, 0.0], "pinch_axis": [0.0, 0.0, -1.0], "length": 0.6424}
+    ax = bar_axis(h)
+    assert pytest.approx(abs(ax[1]), abs=1e-6) == 1.0 and abs(ax[0]) < 1e-6 and abs(ax[2]) < 1e-6  # the bar runs along y
+    assert bar_offsets(h) == [0.0, 0.15, -0.15, 0.25, -0.25]  # half 0.32 - 0.06 = 0.26 admits both steps
+    assert bar_offsets({"kind": "knob"}) == [0.0]
+    assert bar_offsets({"kind": "bar", "length": 0.2, "approach_dir": [1, 0, 0], "pinch_axis": [0, 0, 1]}) == [0.0]

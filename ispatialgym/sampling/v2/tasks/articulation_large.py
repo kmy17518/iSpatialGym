@@ -199,6 +199,29 @@ def restrict_goal_set(stable: Sequence[float], q_reach: float, lower: float, min
     return []
 
 
+def bar_axis(handle: Dict[str, Any]) -> List[float]:
+    """Unit direction of a bar handle's long axis in the handle's frame: approach × pinch (both recorded, unit)."""
+    a = th.as_tensor(handle["approach_dir"], dtype=th.float32)
+    c = th.as_tensor(handle["pinch_axis"], dtype=th.float32)
+    ax = th.linalg.cross(a, c)
+    n = float(th.linalg.norm(ax))
+    return (ax / n).tolist() if n > 1e-6 else [0.0, 0.0, 0.0]
+
+
+def bar_offsets(handle: Dict[str, Any], steps: Sequence[float] = (0.15, 0.25), end_margin: float = 0.06) -> List[float]:
+    """Grasp offsets along a bar handle (0 first, then ± the steps that keep the pads ``end_margin`` from the bar ends);
+    ``[0.0]`` for knobs / edges / short bars. The slide widens the Phase-2 lattice laterally: the Rs_int drawer's only
+    survivors (λ −0.15…+0.05) stood 2 cm from a coffee table, the 0.64 m bar admits pinches 0.3 m to the side."""
+    if handle.get("kind") != "bar" or handle.get("length") is None:
+        return [0.0]
+    half = float(handle["length"]) / 2 - end_margin
+    out = [0.0]
+    for st in steps:
+        if st <= half:
+            out += [float(st), -float(st)]
+    return out
+
+
 def pinch_classes(pinch_axis_world, kind: str, vertical_threshold: float = 0.7) -> Tuple[str, ...]:
     """§5.3 reach-volume class of the handle grasp: ``fwd_pinch_v`` when |pinch·ẑ| > 0.7 else ``fwd_pinch_h``; a knob
     admits either."""
@@ -401,6 +424,7 @@ class ArticulationLarge(SamplerV2):
             self.definition_id = V1_DEFINITION_ID[self.direction]
         self.target_role = "target" if "target" in self.gp.roles else ("artic" if "artic" in self.gp.roles else "target")
         self.handle: Dict[str, Any] = {}
+        self.bar_offset: float = 0.0  # grasp slide along a bar handle (m, along bar_axis), per attempt
         self.jinfo: Dict[str, Any] = {}
         self.joint_name: Optional[str] = None
         self.joint = None
@@ -504,6 +528,11 @@ class ArticulationLarge(SamplerV2):
             raise Reject("missing_handle", f"{obj.name}/{joint_name}: no bar / knob / edge / reviewer pinch in {path and os.path.relpath(path, REPO_ROOT)} or {HANDLES_CSV}")
         row = ranked[0]
         handle = row.as_handle()
+        # bar length (instance frame) for the grasp slide along the bar (§5.3 bars: any point along the bar is a pinch)
+        for hrec in (jinfo.get("handles") or []):
+            if hrec.get("kind") == handle.get("kind") and hrec.get("length") is not None:
+                handle["length"] = float(hrec["length"])
+                break
         width = handle.get("width")
         if width is not None and not (PINCH_WIDTH_RANGE[0] <= float(width) <= PINCH_WIDTH_RANGE[1]):
             # the reviewer's / record's next pinch inside the range, if any
@@ -574,6 +603,9 @@ class ArticulationLarge(SamplerV2):
         handle = dict(self.handle)
         if self.pinch_sign < 0:
             handle["pinch_axis"] = [-float(v) for v in handle["pinch_axis"]]
+        if abs(float(self.bar_offset)) > 1e-6:
+            ax = bar_axis(handle)
+            handle["contact"] = [float(c) + float(self.bar_offset) * float(a) for c, a in zip(handle["contact"], ax)]
         return C.handle_waypoints(handle, self.jinfo, list(q_values), obj_pose=self.obj_pose())
 
     def joint_index(self) -> int:
@@ -765,33 +797,57 @@ class ArticulationLarge(SamplerV2):
         init = P0.phase1_init_pose(self, self.face_view, beta_max, d_min, d_max, self.target_extent, rng)
         init.name = "init"
         self.sidecar.add_stance(init)
-        # Phase 2: contact set = the h(q_init) grasp of the handle arm
-        h0 = self.h([q_init])[0]
-        classes = pinch_classes(h0.pinch, self.handle.get("kind", "bar"), float(self.gp.gen("pinch_axis_vertical_threshold", 0.7)))
-        contact = P0.ContactSpec("handle", self.arm, h0.eef, h0.pre_grasp, classes=classes, ignore_for_last=[obj])
+        # Phase 2: contact set = the h(q_init) grasp of the handle arm — one Phase 2 per grasp offset along a bar handle
+        # (bar_offsets: 0, ±0.15, ±0.25 m within the bar), the survivors pooled with their offset
         lam_range = tuple(self.lam_range) if self.lam_range else (-0.10, 0.60)
         d_range = (0.35, float(gen_p0.get("d_scan_max_m", 1.10)))
         half = float(self.gp.gen("face_patch_half_width_m", 0.10))
-        patch = th.stack([h0.contact - h0.pinch * half, h0.contact, h0.contact + h0.pinch * half])
+        offsets = [float(v) for v in (self.gp.gen("bar_grasp_offsets_m") or bar_offsets(self.handle))]
+        pool: List[Stance] = []
+        h0_by: Dict[float, C.HandleWaypoint] = {}
+        stats_by: Dict[float, Dict[str, Any]] = {}
+        classes: Tuple[str, ...] = ()
+        for off in offsets:
+            self.bar_offset = off
+            h0 = self.h([q_init])[0]
+            h0_by[off] = h0
+            classes = pinch_classes(h0.pinch, self.handle.get("kind", "bar"), float(self.gp.gen("pinch_axis_vertical_threshold", 0.7)))
+            contact = P0.ContactSpec("handle", self.arm, h0.eef, h0.pre_grasp, classes=classes, ignore_for_last=[obj])
+            patch = th.stack([h0.contact - h0.pinch * half, h0.contact, h0.contact + h0.pinch * half])
 
-        def extra_vis(cam) -> bool:  # §5.3: contact(q_init) and the moving face patch (contact ± 0.10 m along the pinch axis) in frame
-            return P0.in_frame(self, cam, patch)
+            def extra_vis(cam, _patch=patch) -> bool:  # §5.3: contact(q_init) and the moving face patch (± 0.10 m along the pinch axis) in frame
+                return P0.in_frame(self, cam, _patch)
 
-        scope = {"scene": self.world.scene_model, "target": obj.name, "joint": self.joint_name, "q_init": round(q_init, 2), "arm": self.arm,
-                 "sampler": "articulation_large", "class": self.door_class, "lam": [round(v, 2) for v in lam_range]}
-        stats: Dict[str, Any] = {}
-        survivors = P0.phase2_manipulation(self, self.face_manip, [contact], lam_range, [self.arm], d_range, extra_vis, focus=h0.contact, cache_scope=scope,
-                                           cache_contacts=True, stats=stats)
-        if not survivors:
-            raise Reject("no_manipulation_stance", f"Phase 2 left no survivor for {obj.name}/{self.joint_name} at q_init {q_init:.3f} ({stats})")
-        pool = list(survivors)
+            scope = {"scene": self.world.scene_model, "target": obj.name, "joint": self.joint_name, "q_init": round(q_init, 2), "arm": self.arm,
+                     "sampler": "articulation_large", "class": self.door_class, "lam": [round(v, 2) for v in lam_range], "bar_offset": round(off, 3)}
+            stats: Dict[str, Any] = {}
+            survivors = P0.phase2_manipulation(self, self.face_manip, [contact], lam_range, [self.arm], d_range, extra_vis, focus=h0.contact,
+                                               cache_scope=scope, cache_contacts=True, stats=stats)
+            stats_by[off] = stats
+            for st in survivors:
+                st.extras["bar_offset_m"] = off
+            pool += list(survivors)
+        self.bar_offset = 0.0
+        if len(offsets) > 1:
+            log.info("%s: Phase 2 survivors per bar offset: %s", self.gp.alias, {k: sum(1 for st in pool if st.extras.get("bar_offset_m") == k) for k in offsets})
+        if not pool:
+            raise Reject("no_manipulation_stance", f"Phase 2 left no survivor for {obj.name}/{self.joint_name} at q_init {q_init:.3f} ({stats_by})")
         errors: List[str] = []
         for _ in range(min(len(pool), 8)):
-            i, manip = P0.draw_manipulation(self, pool, rng, [self.arm], focus=h0.contact, extra_visibility=extra_vis, clearance_ignore=[self.target])
+            i, manip = P0.draw_manipulation(self, pool, rng, [self.arm], focus=None, extra_visibility=None, clearance_ignore=[self.target])
             pool.pop(i)
             if manip is None:
                 errors.append("drawn tilt fails the re-check")
                 continue
+            self.bar_offset = float(manip.extras.get("bar_offset_m", 0.0))
+            h0 = h0_by[self.bar_offset]
+            manip.focus = h0.contact.clone()
+            patch = th.stack([h0.contact - h0.pinch * half, h0.contact, h0.contact + h0.pinch * half])
+            cam = P0.camera_poses(self, [manip])[0]
+            if not P0.in_frame(self, cam, patch) or not P0.in_frame(self, cam, h0.contact.reshape(1, 3), P0.IN_FRAME_MARGIN):
+                errors.append("drawn tilt: the handle contact / face patch leaves the frame")
+                continue
+            contact = P0.ContactSpec("handle", self.arm, h0.eef, h0.pre_grasp, classes=classes, ignore_for_last=[obj])
             # both closing signs of the pinch (the wrist turned by a half turn about the approach): the reach-volume class is
             # the same, the exact IK is not — one of the two is usually reachable where the other is not
             for sign in (1.0, -1.0):
@@ -1044,7 +1100,7 @@ class ArticulationLarge(SamplerV2):
                                      "q_init": float(q_init), "q_goal": float(q_goal), "waypoints": waypoints, "handle_reach": handle_reach,
                                      "passive_from": pf, "follow_mode": mode, "base_follow": base_follow,
                                      "handle": {"kind": self.handle.get("kind"), "classes": list(contact.classes or ()), "width_m": self.handle.get("width"),
-                                                "pinch_sign": float(self.pinch_sign)},
+                                                "pinch_sign": float(self.pinch_sign), "bar_offset_m": float(self.bar_offset)},
                                      "required_fractions": [fraction_key(k) for k in required], "arm_reach": arm_reach,
                                      "primary_follow_mode": self.mode, "base_follow_blocked": base_follow_reason,
                                      # A4: the class and the stance-side rule behind the follow mode; the goal set of this stance

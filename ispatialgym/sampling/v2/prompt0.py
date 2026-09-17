@@ -730,7 +730,7 @@ def draw_manipulation(s, survivors: Sequence[Stance], rng: np.random.Generator, 
         st = grid.with_trunk(grid.translate, tilt, name)
         st.focus = grid.focus if focus is None else _t(focus)
         st.arms = list(arms)
-        st.extras = {k: v for k, v in grid.extras.items() if k in ("band", "angle_class", "clearance_tier")}
+        st.extras = {k: v for k, v in grid.extras.items() if k in ("band", "angle_class", "clearance_tier", "bar_offset_m")}
         st.extras["grid_tilt"] = grid.tilt
         if not bool(body_free(s, [st], arms_excluded=excl, posture=posture, fingers=fingers)[0]):
             continue
