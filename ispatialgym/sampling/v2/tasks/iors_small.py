@@ -100,6 +100,8 @@ REGRASP_AFTER_ROLL_DEG = 10.0
 #: the open gripper at the grasp configuration keeps this clear of the support (closure probe: a pad on the table makes
 #: the closure asymmetric and knocks the object)
 PAD_SUPPORT_CLEARANCE = 0.002
+#: the pinch centre may sit this far from the object's centre along the closing axis; farther pinches are re-centred
+PINCH_OFFSET_MAX = 0.005
 #: touching brace (axial stop-brace rule): the pads' / blade's outer face this far outside the partner's far face, and the
 #: partner height below which the top-down blade is tried before the pad contacts
 STOP_CLEARANCE = 0.005
@@ -203,6 +205,13 @@ class IORSSmall(SamplerV2):
         if not attachable:
             raise Reject("no_attachable_grasp", f"{self.grasp_key}: every library grasp self-collides once the object is attached")
         self.grasps = attachable
+        # pinch centring (oracle-B, run 0916-202403: a pinch off the object's centre along the closing axis lets one pad reach
+        # the object first and drag it until the other lands - +15.4 mm at the closure): the pinch centre is moved onto
+        # the hull's centre along c when it sits farther than ``pinch_offset_max_m`` from it (the pads close until contact,
+        # so the shift along c changes nothing else); the original offset is recorded per grasp
+        self.grasps, offsets = self.recentre_pinches(self.grasps, tgt)
+        self.template_facts["grasp_pinch_offset_m"] = {k: round(v, 4) for k, v in offsets.items()}
+        self.template_facts["grasps_recentred"] = [k for k, v in offsets.items() if abs(v) > float(self.gen("pinch_offset_max_m", PINCH_OFFSET_MAX))]
         # flush pinch (teacup demo 2026-09-16 14:44: grasp_3's closing axis was inclined 28 deg to the horizontal; the flat
         # pads squeezed the vertical cup wall at two heights, the cup rotated in the hand until the pinch was flush - 16-32
         # deg in the hand, 21 deg at the release, at rest 10 deg on the well slope). The target is placed at its rest
@@ -287,6 +296,43 @@ class IORSSmall(SamplerV2):
                     raise
         raise last
 
+    def pinch_offset(self, eef_in_object: G.Pose) -> float:
+        """Signed offset (m) of the pinch centre (pad centre) from the target hull's centre along the closing axis c, in the
+        object frame: the pads close symmetrically about it, so an offset lets the nearer pad touch first and drag the object."""
+        pos, quat = G.t(eef_in_object[0]), G.t(eef_in_object[1])
+        R = C.quat_to_mat(quat)
+        a, c = R[:, 2], R[:, 1]
+        pc = pos + C.CONTACT_CENTER_Z * a
+        proj = self.hull["target"] @ c
+        mid = 0.5 * float(proj.min() + proj.max())
+        return float(th.dot(pc, c)) - mid
+
+    def recentre_pinches(self, grasps: Sequence[Any], tgt) -> Tuple[List[Any], Dict[str, float]]:
+        """Library grasps with the pinch centre moved onto the hull centre along the closing axis when the offset exceeds
+        ``pinch_offset_max_m`` (a copy of the library record with the shifted position; the attachability screen is re-run on
+        it, a grasp that stops being attachable keeps its original pose). Returns ``(grasps, {name: original offset})``."""
+        import copy
+
+        limit = float(self.gen("pinch_offset_max_m", PINCH_OFFSET_MAX))
+        out: List[Any] = []
+        offsets: Dict[str, float] = {}
+        for g in grasps:
+            off = self.pinch_offset(g.pose)
+            offsets[g.name] = off
+            if abs(off) <= limit:
+                out.append(g)
+                continue
+            c = C.quat_to_mat(G.t(g.pose[1]))[:, 1]
+            shifted = copy.copy(g)
+            shifted.position = G.t(g.pose[0]) - off * c
+            if self.ikc.attachable(tgt, shifted.pose, "right"):
+                log.info("%s: grasp %s pinch centre %+.1f mm off the object's centre along the closing axis - re-centred", self.grasp_key, g.name, off * 1000)
+                out.append(shifted)
+            else:
+                log.info("%s: grasp %s pinch %+.1f mm off centre; the re-centred pose is not attachable - kept as is", self.grasp_key, g.name, off * 1000)
+                out.append(g)
+        return out, offsets
+
     def pinch_vs_long_axis_deg(self, eef_in_object: G.Pose) -> float:
         """Angle (deg, 0-90) between a library grasp's pinch line (closing axis c) and the target's long axis — the largest
         AABB extent in the rest frame (a lying cylinder's axis). 90 = the pads close across the cylinder, 0 = along it."""
@@ -307,6 +353,8 @@ class IORSSmall(SamplerV2):
         if grasp.eef_in_object is None:
             return out
         out["pinch_vs_long_axis_deg"] = round(self.pinch_vs_long_axis_deg(grasp.eef_in_object), 1)
+        out["pinch_offset_m"] = round(self.pinch_offset(grasp.eef_in_object), 4)
+        out["pinch_offset_original_m"] = round(float((self.template_facts.get("grasp_pinch_offset_m") or {}).get(grasp.grasp_name, out["pinch_offset_m"])), 4)
         out["closing_tilt_deg"] = round(self.closing_tilt_deg(grasp.eef_in_object), 1)
         out["pivot_arm_m"] = round(self.pivot_arm(grasp.eef_in_object), 4)
         ext = TT.hull_extents(self.hull["target"], self.rest["target"])
