@@ -48,7 +48,7 @@
   "owner": "owner"
  },
  "configuration_matching-articulation_open_large_scale": {
-  "blocking": "floor fixed (7 Phase-2 survivors/attempt); step 5: handle [pre, final] exact IK fails (pinch -1) x15, arm reaches j_link_2 only to fraction \u2264 0.11 from d 0.75\u20130.80 x8 \u2192 large-scale (stance distance / opening reach); no blacklist before the verdict (owner)",
+  "blocking": "HEAD (floor 2893a09 + A3 05ce671): open handle_unreachable x8 (step 5), close no_manipulation_stance x8 (Phase 2) \u2014 large-scale diagnosing; 10:15 item-5 blacklist question waits on its verdict",
   "owner": "large-scale"
  },
  "configuration_matching-articulation_close_large_scale": {
