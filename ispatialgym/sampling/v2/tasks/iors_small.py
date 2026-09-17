@@ -95,8 +95,6 @@ RELEASE_ABOVE_SURFACE_MIN = 0.003
 #: library grasps whose closing axis is inclined more than this to the horizontal (and the vertical) in the target's rest
 #: frame rotate the object in the hand until the pinch is flush (dropped while a flush grasp remains)
 CLOSING_TILT_MAX_DEG = 12.0
-#: the flush-pinch filter applies to objects at least this many times taller than their footprint width (walls to pivot about)
-FLUSH_PINCH_MIN_ASPECT = 1.2
 #: a target that rolled more than this while settling gets its grasp re-selected at the settled pose
 REGRASP_AFTER_ROLL_DEG = 10.0
 #: touching brace (axial stop-brace rule): the pads' / blade's outer face this far outside the partner's far face, and the
@@ -150,6 +148,7 @@ class IORSSmall(SamplerV2):
         self.release_above_m: Optional[float] = None  # ontop / under: the release height above that surface
         self._touching_place_pos: Optional[th.Tensor] = None  # touching: the nextto position the program places at
         self._brace_gate: Optional[Dict[str, Any]] = None  # touching: the A1 joint band gate verdict of the drawn partner position
+        self.grasps_flush: List[Any] = []  # the flush-pinch tier of ``self.grasps`` (tried first at every focus)
 
     # ------------------------------------------------------------------ numbers (customs generation)
 
@@ -210,19 +209,17 @@ class IORSSmall(SamplerV2):
         self.template_facts["grasp_pivot_arms_m"] = {g.name: round(self.pivot_arm(g.pose), 4) for g in self.grasps}
         self.template_facts["grasp_pinch_vs_long_axis_deg"] = {g.name: round(self.pinch_vs_long_axis_deg(g.pose), 1) for g in self.grasps}
         tilt_max = float(self.gen("closing_tilt_max_deg", CLOSING_TILT_MAX_DEG))
-        ext = TT.hull_extents(self.hull["target"], self.rest["target"])
-        tall = float(ext[2]) >= float(self.gen("flush_pinch_min_aspect", FLUSH_PINCH_MIN_ASPECT)) * min(float(ext[0]), float(ext[1]))
-        # only objects with walls to pivot about (height >= 1.2 x footprint width: cups, jars, boxes) are filtered; a round
-        # apple / sprout has no flat wall to sit flush against and its grasps are all "inclined" (ontop apple probe: F empty)
-        flush = [g for g in self.grasps if tilts[g.name] <= tilt_max] if tall else list(self.grasps)
-        self.template_facts["flush_pinch_filter"] = "applied" if tall else "skipped (not a tall object)"
-        if flush:
-            self.template_facts["grasps_dropped_inclined_pinch"] = [g.name for g in self.grasps if g not in flush]
-            self.grasps = flush
-        else:
-            log.warning("%s: no library grasp pinches flush (closing tilts %s deg > %.0f); keeping all", self.grasp_key,
-                        {k: round(v, 1) for k, v in tilts.items()}, tilt_max)
-            self.template_facts["grasps_dropped_inclined_pinch"] = []
+        # two-tier grasp set: the flush pinches are tried first at every focus (``sample_instance``), the inclined ones only
+        # when the flush set has no feasible (yaw, grasp) there - a round apple keeps its grasps (the earlier hard filter left
+        # F empty), a cup gets a flush pinch whenever one is reachable (the 18:41 teacup drew grasp_3, 28 deg, and only the
+        # corrected release kept it upright)
+        flush = [g for g in self.grasps if tilts[g.name] <= tilt_max]
+        self.grasps_flush = flush if flush else list(self.grasps)
+        self.template_facts["grasps_flush_first"] = [g.name for g in self.grasps_flush]
+        self.template_facts["grasps_inclined_fallback"] = [g.name for g in self.grasps if g not in self.grasps_flush]
+        if not flush:
+            log.info("%s: no library grasp pinches flush (closing tilts %s deg > %.0f); single tier", self.grasp_key,
+                     {k: round(v, 1) for k, v in tilts.items()}, tilt_max)
         self.rest["partner"] = self._partner_rest()
         self.pair = self.pair_admissibility()
         self.template_facts["pair"] = self.pair
@@ -264,6 +261,26 @@ class IORSSmall(SamplerV2):
         self.template_facts.update({"support": self.top.to_json(), "edge": self.edge.to_json(), "init_stance": self.init_stance.to_meta(),
                                     "n_manipulation_candidates": len(self.manip_candidates), "grasp_key": self.grasp_key, "n_grasps": len(self.grasps),
                                     "bands": getattr(getattr(self, "bands", None), "path", None), "H_max": H_max})
+
+    def phase3_two_tier(self, manip: Stance, rng: np.random.Generator):
+        """§4.6 step 1 with the flush pinches first: ``tabletop.phase3_target`` over ``grasps_flush``; when that finds no
+        feasible (yaw, grasp) at the focus and inclined grasps exist, the same draw over every attachable grasp."""
+        tiers = [self.grasps_flush]
+        if len(self.grasps_flush) < len(self.grasps):
+            tiers.append(self.grasps)
+        last = None
+        for i, gs in enumerate(tiers):
+            try:
+                t_pose, grasp = TT.phase3_target(self, manip, rng, gs, self.hull["target"], self.rest["target"], self.support_objects(),
+                                                 top=self.top, scale_key=self.choice.models["target"].scale)
+                if i > 0:
+                    log.info("%s: no flush pinch feasible at the focus; inclined grasp %s drawn", self.gp.alias, grasp.grasp_name)
+                return t_pose, grasp
+            except Reject as e:
+                last = e
+                if e.reason != "grasp_unreachable":
+                    raise
+        raise last
 
     def pinch_vs_long_axis_deg(self, eef_in_object: G.Pose) -> float:
         """Angle (deg, 0-90) between a library grasp's pinch line (closing axis c) and the target's long axis — the largest
@@ -399,8 +416,7 @@ class IORSSmall(SamplerV2):
                 self.sidecar.transitions.clear()
                 self.record_transition(init, manip)
                 # §4.6 step 1: target init pose from the feasible set F at the focus (exact IK confirmation)
-                t_pose, grasp = TT.phase3_target(self, manip, rng, self.grasps, self.hull["target"], self.rest["target"], self.support_objects(),
-                                                 top=self.top, scale_key=self.choice.models["target"].scale)
+                t_pose, grasp = self.phase3_two_tier(manip, rng)
                 # §4.6 step 2: partner on a random side (touching: robot's left) at gap g ∈ [g_lo, D_p]
                 p_pose = self.place_partner(rng, t_pose, manip, cam_init)
                 # §4.6 step 4: every object fully in frame (5 %) in the init image
