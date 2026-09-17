@@ -88,8 +88,13 @@ PUSH_MAX_HEIGHT = 0.30
 PARTNER_MAX_ASPECT = 2.5
 #: inside (owner decision 2026-09-16): the open gripper's lowest point clears the partner's rim by this at the release
 RELEASE_CLEARANCE = 0.02
-#: ontop / under (owner item 3): the object is released this far above the actual surface under its footprint centre
+#: ontop / under (owner item 3): the object is released at most this far above the actual surface under its footprint
+#: centre — half the well depth, at least ``RELEASE_ABOVE_SURFACE_MIN`` (a flat plate)
 RELEASE_ABOVE_SURFACE = 0.01
+RELEASE_ABOVE_SURFACE_MIN = 0.003
+#: library grasps whose closing axis is inclined more than this to the horizontal (and the vertical) in the target's rest
+#: frame rotate the object in the hand until the pinch is flush (dropped while a flush grasp remains)
+CLOSING_TILT_MAX_DEG = 12.0
 #: a target that rolled more than this while settling gets its grasp re-selected at the settled pose
 REGRASP_AFTER_ROLL_DEG = 10.0
 #: touching brace (axial stop-brace rule): the pads' / blade's outer face this far outside the partner's far face, and the
@@ -140,6 +145,7 @@ class IORSSmall(SamplerV2):
         self.goal_side: Optional[str] = None  # nextto / touching: partner side the target goes to ("left" / "right", robot frame)
         self.release: Optional[Dict[str, Any]] = None  # inside: release-height facts of :meth:`release_pose`
         self.release_surface_z: Optional[float] = None  # ontop / under: the raycast surface under the goal footprint centre
+        self.release_above_m: Optional[float] = None  # ontop / under: the release height above that surface
         self._touching_place_pos: Optional[th.Tensor] = None  # touching: the nextto position the program places at
 
     # ------------------------------------------------------------------ numbers (customs generation)
@@ -190,6 +196,24 @@ class IORSSmall(SamplerV2):
         if not attachable:
             raise Reject("no_attachable_grasp", f"{self.grasp_key}: every library grasp self-collides once the object is attached")
         self.grasps = attachable
+        # flush pinch (teacup demo 2026-09-16 14:44: grasp_3's closing axis was inclined 28 deg to the horizontal; the flat
+        # pads squeezed the vertical cup wall at two heights, the cup rotated in the hand until the pinch was flush - 16-32
+        # deg in the hand, 21 deg at the release, at rest 10 deg on the well slope). The target is placed at its rest
+        # orientation, so a grasp's closing axis must be horizontal (or vertical) in the rest frame within
+        # ``closing_tilt_max_deg``; inclined pinches are dropped while a flush grasp remains. The pinch line's distance to the
+        # centroid (``pivot_arm``, gravity torque about the pinch) is recorded per grasp as well.
+        tilts = {g.name: self.closing_tilt_deg(g.pose) for g in self.grasps}
+        self.template_facts["grasp_closing_tilt_deg"] = {k: round(v, 1) for k, v in tilts.items()}
+        self.template_facts["grasp_pivot_arms_m"] = {g.name: round(self.pivot_arm(g.pose), 4) for g in self.grasps}
+        tilt_max = float(self.gen("closing_tilt_max_deg", CLOSING_TILT_MAX_DEG))
+        flush = [g for g in self.grasps if tilts[g.name] <= tilt_max]
+        if flush:
+            self.template_facts["grasps_dropped_inclined_pinch"] = [g.name for g in self.grasps if g not in flush]
+            self.grasps = flush
+        else:
+            log.warning("%s: no library grasp pinches flush (closing tilts %s deg > %.0f); keeping all", self.grasp_key,
+                        {k: round(v, 1) for k, v in tilts.items()}, tilt_max)
+            self.template_facts["grasps_dropped_inclined_pinch"] = []
         self.rest["partner"] = self._partner_rest()
         self.pair = self.pair_admissibility()
         self.template_facts["pair"] = self.pair
@@ -231,6 +255,29 @@ class IORSSmall(SamplerV2):
         self.template_facts.update({"support": self.top.to_json(), "edge": self.edge.to_json(), "init_stance": self.init_stance.to_meta(),
                                     "n_manipulation_candidates": len(self.manip_candidates), "grasp_key": self.grasp_key, "n_grasps": len(self.grasps),
                                     "bands": getattr(getattr(self, "bands", None), "path", None), "H_max": H_max})
+
+    def closing_tilt_deg(self, eef_in_object: G.Pose) -> float:
+        """Inclination (deg) of a library grasp's closing axis to the horizontal *or* the vertical, whichever is nearer, in the
+        target's rest frame: 0 = a flush pinch of a vertical wall (c horizontal) or of the top / bottom faces (c vertical)."""
+        c_obj = C.quat_to_mat(G.t(eef_in_object[1]))[:, 1]
+        c_world = G.rotate(G.t(self.rest["target"]), c_obj)
+        cz = min(1.0, abs(float(c_world[2])))
+        from_horizontal = math.degrees(math.asin(cz))
+        return min(from_horizontal, 90.0 - from_horizontal)
+
+    def pivot_arm(self, eef_in_object: G.Pose) -> float:
+        """Distance (m) from the target hull's centroid to the pinch line of a library grasp: the pad centre
+        (``eef origin + CONTACT_CENTER_Z * a``) along the closing axis c, both in the object frame. Small = the pinch carries
+        the object without a gravity torque about the closing axis (the object does not pivot in the hand)."""
+        pos, quat = G.t(eef_in_object[0]), G.t(eef_in_object[1])
+        R = C.quat_to_mat(quat)
+        a, c = R[:, 2], R[:, 1]
+        pc = pos + C.CONTACT_CENTER_Z * a
+        hull = self.hull["target"]
+        centroid = 0.5 * (hull.min(dim=0).values + hull.max(dim=0).values)
+        d = centroid - pc
+        perp = d - th.dot(d, c) * c
+        return float(th.linalg.norm(perp))
 
     def _partner_rest(self) -> th.Tensor:
         choice = self.choice.models["partner"]
@@ -537,7 +584,13 @@ class IORSSmall(SamplerV2):
             surface = self.release_surface(xy, p_pose, top)
             self.release_surface_z = None if surface is None else surface["z"]
             base_z = top if surface is None else float(surface["z"])
-            z = base_z + float(self.gen("release_above_surface_m", RELEASE_ABOVE_SURFACE)) - float(t_hull[:, 2].min())
+            # release height: half the well depth (rim top - well floor), clamped to [3 mm, release_above_surface_m]: a
+            # shallow saucer well (1.5 cm) gets a 7.5 mm release, a flat plate 3 mm - a tall cup dropped 1 cm onto the
+            # curved well landed on the slope and rested 10 deg tilted (demo 2026-09-16 14:44)
+            depth = max(0.0, top - base_z)
+            above = min(float(self.gen("release_above_surface_m", RELEASE_ABOVE_SURFACE)), max(RELEASE_ABOVE_SURFACE_MIN, 0.5 * depth))
+            self.release_above_m = above
+            z = base_z + above - float(t_hull[:, 2].min())
             return th.tensor([float(xy[0]), float(xy[1]), z]), t_quat
         if self.relation == "inside":
             return self.release_pose(t_quat, t_hull, p_hull_w, p_pose)
@@ -759,7 +812,12 @@ class IORSSmall(SamplerV2):
             ignore = self.support_objects() + [self.obj("partner")]
             if self.relation in ("ontop", "under"):
                 grasp.extras["release_surface_z"] = None if self.release_surface_z is None else round(float(self.release_surface_z), 4)
+                grasp.extras["release_above_m"] = None if self.release_above_m is None else round(float(self.release_above_m), 4)
+                grasp.extras["pivot_arm_m"] = round(self.pivot_arm(grasp.eef_in_object), 4) if grasp.eef_in_object is not None else None
+                grasp.extras["closing_tilt_deg"] = round(self.closing_tilt_deg(grasp.eef_in_object), 1) if grasp.eef_in_object is not None else None
                 draft.summary["release_surface_z"] = grasp.extras["release_surface_z"]
+                draft.summary["release_above_m"] = grasp.extras["release_above_m"]
+                draft.summary["pivot_arm_m"] = grasp.extras["pivot_arm_m"]
         if self.goal_side is not None:
             draft.summary["goal_side"] = self.goal_side
         with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
