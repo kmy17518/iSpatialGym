@@ -1,0 +1,41 @@
+{
+ "announced_valid": {
+  "camera_relocalization-standard@a42b5e5": {
+   "ts": "1789605479.650119",
+   "time": "2026-09-16 17:38 PDT"
+  },
+  "camera_relocalization-obstructed@a42b5e5": {
+   "ts": "1789605480.611689",
+   "time": "2026-09-16 17:38 PDT"
+  },
+  "object_scaling@70d9ea2": {
+   "ts": "1789605483.221269",
+   "time": "2026-09-16 17:38 PDT"
+  },
+  "disembedding@45f026a": {
+   "ts": "1789605486.593829",
+   "time": "2026-09-16 17:38 PDT"
+  },
+  "alignment-axial@70d9ea2": {
+   "ts": "1789605489.272609",
+   "time": "2026-09-16 17:38 PDT"
+  },
+  "inter_object_relation_satisfaction-inside@0bd9e1f": {
+   "ts": "1789605492.423309",
+   "time": "2026-09-16 17:38 PDT"
+  }
+ },
+ "posts": [],
+ "channel": "C0C2D1X2V8E",
+ "rules_ts": "1789605235.494349",
+ "status_posts": [
+  {
+   "ts": "1789605475.182929",
+   "time": "2026-09-16 17:38 PDT"
+  }
+ ],
+ "last_seen_ts": "1789605492.423309",
+ "handled": [],
+ "loop_pid": 908952,
+ "subscriptions": "channel/thread subscriptions unavailable (Cursor account not linked to Slack) - polling every 5 min via search; status every 30 min"
+}

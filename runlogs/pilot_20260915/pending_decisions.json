@@ -1,0 +1,92 @@
+{
+ "decisions": [
+  {
+   "id": "D-001",
+   "time": "2026-09-16 17:36 PDT",
+   "subtask": "configuration_matching-block_design",
+   "question": "the flipped in-hand pre-place has no IK at any trunk \u2014 how does the first demo get its flipped blocks?",
+   "context": "Probe: picks pass at every pitch class; every remaining failure is the pre-place exact IK of the flipped in-hand orientation (carried-tilt flip). Prepared switch generation.block_no_flip (5e30334).",
+   "options": [
+    "A) goal face up at init (generation.block_no_flip: true \u2014 no flip, yaw-align stays)",
+    "B) flip on the table (place in the intermediate orientation, re-grasp, place \u2014 new sub-chain, sampler + oracle)",
+    "C) 3 no-flip blocks"
+   ],
+   "default": "A for the first demo, B as the required end state (prep workstream)",
+   "artefacts": [
+    "runlogs/pilot_20260915/staged_decisions.md",
+    "runlogs/pilot_20260915/first_demo/configuration_matching-block_design/"
+   ],
+   "status": "answered",
+   "answered_by": "chat",
+   "answer": "A now + B required end state (prep workstream, one pod, not blocking the first-demo pass): block_no_flip on block_4-breakfast_table, first-demo loop running; the sampler records a table-flip sub-chain (place intermediate \u2192 re-grasp \u2192 place), the oracle emits grasp \u2192 place \u2192 grasp \u2192 place, QA one FOV span per grasp\u2192release",
+   "applied_commit": "35506bf",
+   "thread_ts": "1789605437.924109",
+   "answered_at": "2026-09-16 17:10 PDT"
+  },
+  {
+   "id": "D-002",
+   "time": "2026-09-16 17:36 PDT",
+   "subtask": "configuration_matching-attachment",
+   "question": "the A1 brace gate rejects 902/1694 partner cells (right / left bands do not overlap) \u2014 brace optional, or keep it?",
+   "context": "Attempts 30\u2013100 s after the batched screening (094cfe3); no instance yet; the joint two-arm placement (work point in the right band AND brace point in the left contact band at one trunk) has no cell for lid/teapot.",
+   "options": [
+    "A) brace optional for attachment (as axial / block design)",
+    "B) partner only in the band overlap (yield drops to the overlap)",
+    "C) keep the brace: record a second base pose after the male grasp from which the left brace and the mating pose are reachable (sidecar transition, oracle executes it holding the object)"
+   ],
+   "default": "C",
+   "artefacts": [
+    "runlogs/pilot_20260915/staged_decisions.md"
+   ],
+   "status": "answered",
+   "answered_by": "chat",
+   "answer": "C \u2014 the brace stays: second base pose (lateral trunk move + torso adjust) recorded after the grasp as a sidecar transition; the oracle executes the recorded move while holding the object, no runtime stance re-planning; brace optional only if the joint placement has no cell after that (tabletop \u2192 oracle; core if a new action type is needed)",
+   "applied_commit": null,
+   "thread_ts": "1789605442.728679",
+   "answered_at": "2026-09-16 17:10 PDT"
+  },
+  {
+   "id": "D-003",
+   "time": "2026-09-16 17:36 PDT",
+   "subtask": "configuration_matching-articulation_open_small_scale",
+   "question": "hinged_jar's best focus is 24\u00b0 off the optical axis vs the 20\u00b0 Phase-2 cone \u2014 relax to 25\u00b0 for small articulation?",
+   "context": "Phase 2 finds 0 (stance, focus) pairs within the 20\u00b0 loose class for the hinged jar (rigid head camera, no independent tilt); 25\u00b0 admits 42 foci over 3 stand-offs. Toolbox = yield (no_workspace), laptop target_placement.",
+   "options": [
+    "A) 25\u00b0 / focus-in-frame loose class for small articulation (same shape as the ontop-large C rule)",
+    "B) keep 20\u00b0 (toolbox / laptop only)"
+   ],
+   "default": "A",
+   "artefacts": [
+    "runlogs/pilot_20260915/staged_decisions.md"
+   ],
+   "status": "answered",
+   "answered_by": "chat",
+   "answer": "A \u2014 25\u00b0 / focus-in-frame for open + close (tabletop implementing, then the hinged_jar loop; spec \u00a76.7)",
+   "applied_commit": null,
+   "thread_ts": "1789605447.457989",
+   "answered_at": "2026-09-16 17:10 PDT"
+  },
+  {
+   "id": "D-004",
+   "time": "2026-09-16 17:36 PDT",
+   "subtask": "configuration_matching-articulation_open_large_scale",
+   "question": "rvunhj_0 (cubicle bottom cabinet, office_cubicles_right) after the floor fix: open = step-5 handle_unreachable \u00d78, close = no_manipulation_stance \u00d78 \u2014 keep working the arm-only class or blacklist rvunhj_0 + rvunhj_5?",
+   "context": "Floor fixed (2893a09: 7 Phase-2 survivors per attempt); step 5 handle [pre, final] exact IK fails (pinch \u22121 \u00d715), the arm reaches j_link_2 only, opening reach \u2264 0.11 from d 0.75\u20130.80; large-scale agent has the edge-pinch approach repair (0427202) \u2014 its loop verdict is pending. Cost of blacklisting: the cabinet-door class disappears (no other cabinet door has \u2265 3 m free run).",
+   "options": [
+    "A) keep working the arm-only class (approach repair 0427202, closer stance / torso, hinge-side stance) \u2014 no blacklist until that verdict",
+    "B) blacklist rvunhj_0 + rvunhj_5 now, fall back to the fridge / dishwasher / oven aliases (A3 picks 05ce671) for the large-articulation first demo"
+   ],
+   "default": "A until the 0427202 verdict lands (\u2264 1 h); if it is still handle_unreachable, run B's fallback aliases in parallel and keep rvunhj_0 open",
+   "artefacts": [
+    "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_open_large_scale/",
+    "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_close_large_scale/"
+   ],
+   "status": "open",
+   "answered_by": null,
+   "answer": null,
+   "applied_commit": null,
+   "thread_ts": "1789605454.155469",
+   "answered_at": null
+  }
+ ]
+}
