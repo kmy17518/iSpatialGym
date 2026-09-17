@@ -405,6 +405,15 @@ away (±90°, 180°); `release_opening_max_m` = the largest symmetric opening th
 oracle's pre-shaped release); when even pinch + 1 cm would sweep it → `Reject("release_sweep")`. Facts (`grasps[k].release_sweep`,
 `summary.release_sweep`) for nextto and touching (touching: at the nextto place the push starts from, facts only).
 
+### Robust `under` / `ontop` (D-007 option A, 2026-09-16 21:17)
+
+`ispatialgym/sampling/predicates.py` — `evaluate_predicate(predicate_cls, *entities)`, the drop-in both `TaskSampler._evaluate`
+(goal check) and `ispatialgym/tasks/ispatialgym_task.py` (`run_isg` / policy evaluation) call instead of OmniGibson's
+`evaluate_bddl_predicate`. Branches for `under` / `ontop`: OmniGibson → probe rays across the contact patch (footprint centre +
+ring at half the footprint radius, 3 mm below the supporting surface, up) → geometry (bottom gap ≤ 8 mm, centre inside the
+support, up axis ≤ 15°). `reset_branches()` / `branches()` / `decided_by()`; the sampler writes `goal_check.binary_branch`
+(+ the last log entries), the task exposes `predicate_branches()` / `reset_predicate_branches()` for `meta.binary_branch`.
+
 ## Status (D2 / D4, 2026-09-15) and gaps
 
 Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,

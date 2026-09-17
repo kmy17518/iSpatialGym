@@ -359,6 +359,44 @@ def test_open_jaw_footprint_clearance_and_release_opening():
     assert cls.open_jaw_clearance(None, (place[0], q_turned), pencil) > 0
 
 
+def test_robust_under_ontop_wrapper_branches(monkeypatch):
+    """D-007 option A: OmniGibson's verdict, then the contact-patch rays, then the geometric branch; the branch is logged."""
+    import omnigibson.utils.bddl_utils as BU
+    from ispatialgym.sampling import predicates as PRED
+
+    class Obj:
+        def __init__(self, name):
+            self.name, self.links, self.initialized = name, {}, True
+
+        def get_position_orientation(self):
+            return th.zeros(3), th.tensor([0.0, 0.0, 0.0, 1.0])
+
+    class Under:  # stands in for bddl's predicate class (only the name is used by the wrapper)
+        pass
+
+    class NextTo:
+        pass
+
+    saucer, cup = Obj("saucer"), Obj("cup")
+    monkeypatch.setattr(BU, "evaluate_bddl_predicate", lambda cls, *ents: False)
+    monkeypatch.setattr(PRED, "support_rays", lambda lower, upper: {"ok": True, "n_hits_on_upper": 3})
+    PRED.reset_branches()
+    assert PRED.evaluate_predicate(Under, saucer, cup) is True
+    assert PRED.branches()[-1]["branch"] == "rays" and PRED.decided_by() == {"under(saucer, cup)": "rays"}
+    monkeypatch.setattr(PRED, "support_rays", lambda lower, upper: {"ok": False})
+    monkeypatch.setattr(PRED, "support_geometry", lambda lower, upper: {"ok": True, "bottom_gap_mm": 1.0})
+    assert PRED.evaluate_predicate(Under, saucer, cup) is True and PRED.branches()[-1]["branch"] == "geometry"
+    monkeypatch.setattr(PRED, "support_geometry", lambda lower, upper: {"ok": False})
+    assert PRED.evaluate_predicate(Under, saucer, cup) is False and PRED.branches()[-1]["branch"] == "none"
+    # ontop(cup, saucer): the saucer supports the cup - the same branches with the roles swapped
+    seen = {}
+    monkeypatch.setattr(PRED, "support_rays", lambda lower, upper: seen.update(lower=lower.name, upper=upper.name) or {"ok": True})
+    assert PRED.evaluate_predicate(type("OnTop", (), {}), cup, saucer) is True and seen == {"lower": "saucer", "upper": "cup"}
+    # other predicates pass straight through (no re-check), OmniGibson True ends the evaluation
+    monkeypatch.setattr(BU, "evaluate_bddl_predicate", lambda cls, *ents: True)
+    assert PRED.evaluate_predicate(NextTo, cup, saucer) is True and PRED.branches()[-1]["branch"] == "omnigibson"
+
+
 def test_straight_approach_detection_and_reject_code():
     """Branch consistency (oracle finding): pre -> end segments are tracked from the pre solution; the failure carries the
     distinct ``approach_untrackable`` code for the callers' Reject."""

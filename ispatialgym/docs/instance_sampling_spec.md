@@ -1384,6 +1384,19 @@ Goal numbers kept from v1 §5.10: ontop / under(small) z = partner top + target 
 from partner rim + 5 mm, xy at the `fillable` meta-link centroid; touching nudges of 1 mm (≤ 25) with physics steps
 between them; partner displacement ≤ 5 mm at the goal; a fixed partner gets no `pose_settled` atom.
 
+**Goal predicates `under` / `ontop` (D-007, option A, 2026-09-16).** OmniGibson's `Under` / `OnTop` shoot one vertical ray
+from the supporting object's own surface point into the resting object; on a physically correct placement the verdict
+flips with sub-millimetre contact (the teacup 1.4 mm from its goal, 2.7° tilt, `under` never true). Both the sampler's
+goal check and the task evaluator (`run_isg`, the policy-evaluation path) evaluate these two atoms through
+`ispatialgym.sampling.predicates.evaluate_predicate`: OmniGibson's verdict, **or** probe rays across the contact patch
+(footprint centre + a ring at half the resting object's footprint radius; each ray starts 3 mm below the supporting
+surface found under that point and goes up, any hit on the resting object counts), **or** the geometric branch (resting
+AABB bottom within 8 mm of the supporting surface under its footprint centre, footprint centre inside the supporting
+top, up axis within 15° of vertical — concave partners whose collision mesh lets rays through). The deciding branch is
+recorded per atom (`goal_check.binary_branch` in the instance summary, `meta.binary_branch` in the demo). The release-
+height rules above (1 cm / half the well depth above the raycast surface) still hold: the wrapper decides the verdict,
+not the placement.
+
 ### 6.12 IORS — ontop / under (large-scale)
 
 Section 5.6. Goal: partner unchanged; target orientation as at init; position = the goal cell (nearest band cell to

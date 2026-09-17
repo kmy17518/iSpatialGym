@@ -29,7 +29,7 @@ from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.termination_conditions.predicate_goal import PredicateGoal
 from omnigibson.termination_conditions.timeout import Timeout
-from omnigibson.utils.bddl_utils import evaluate_bddl_predicate
+from ispatialgym.sampling import predicates as PRED  # robust under / ontop (D-007 option A): the same wrapper the sampler's goal check uses
 from omnigibson.utils.python_utils import classproperty, recursively_convert_to_torch
 
 from ispatialgym.activity.problem import (
@@ -365,7 +365,17 @@ class ISpatialGymTask(BehaviorTask):
         return {k: v for k, v in (self.object_scope or {}).items() if not isinstance(v, GroupEntity)}
 
     def _evaluate_predicate(self, predicate_name, *entities):
-        return evaluate_bddl_predicate(predicate_name, *[self.object_scope[ent] for ent in entities])
+        return PRED.evaluate_predicate(predicate_name, *[self.object_scope[ent] for ent in entities])
+
+    @staticmethod
+    def predicate_branches() -> Dict[str, str]:
+        """``binary_branch``: which wrapper branch (omnigibson / rays / geometry / none) decided each under / ontop atom in
+        the latest evaluations (``ispatialgym.sampling.predicates``; ``reset_predicate_branches`` clears the log)."""
+        return PRED.decided_by()
+
+    @staticmethod
+    def reset_predicate_branches() -> None:
+        PRED.reset_branches()
 
     def update_bddl_scope_metadata(self, env):
         env.scene.write_task_metadata(

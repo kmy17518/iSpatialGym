@@ -53,6 +53,7 @@ from ispatialgym.sampling.spec import ModelChoice, sha256_of_file  # noqa: E402
 from ispatialgym.sampling.tasks.base import Draft, SamplerContext, TaskSampler, _jsonable  # noqa: E402
 from ispatialgym.sampling.tro_writer import validate_and_write  # noqa: E402
 from ispatialgym.sampling.v2 import SAMPLER_VERSION  # noqa: E402
+from ispatialgym.sampling import predicates as PRED  # noqa: E402
 from ispatialgym.sampling.v2 import navigation as NAV  # noqa: E402
 from ispatialgym.sampling.v2 import program_check as PC  # noqa: E402
 from ispatialgym.sampling.v2.ik import IKChecker  # noqa: E402
@@ -388,6 +389,9 @@ class SamplerV2(TaskSampler):
                 "settled_poses": {o.name: [o.get_position_orientation()[0].tolist(), o.get_position_orientation()[1].tolist()] for o in ents},
                 "goal": self.goal_report(status),
                 "robot_parked_at": None if self._park_xy is None else [float(v) for v in self._park_xy],
+                # which branch decided each under / ontop atom (robust predicate wrapper, D-007 option A)
+                "binary_branch": PRED.decided_by(),
+                "binary_branch_log": [e for e in PRED.branches() if e["predicate"] in ("under", "ontop")][-6:],
             }
         finally:
             self.world.restore(state)

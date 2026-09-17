@@ -21,7 +21,7 @@ import torch as th
 from ispatialgym.sampling import robot_utils  # noqa: F401  (warp pinning before omnigibson)
 
 import omnigibson as og  # noqa: E402
-from omnigibson.utils.bddl_utils import evaluate_bddl_predicate  # noqa: E402
+from ispatialgym.sampling import predicates as PRED  # noqa: E402  (robust under / ontop, D-007 option A)
 
 from ispatialgym.activity.problem import AGENT_INSTANCE  # noqa: E402
 from ispatialgym.eval.group_entity import GroupEntity  # noqa: E402
@@ -283,7 +283,7 @@ class TaskSampler:
     # ------------------------------------------------------------------ predicate evaluation
 
     def _evaluate(self, predicate_cls, *names):
-        return evaluate_bddl_predicate(predicate_cls, *[self.scope[n] for n in names])
+        return PRED.evaluate_predicate(predicate_cls, *[self.scope[n] for n in names])
 
     def _refresh_for_predicates(self):
         """Wake every task object and run one *full* simulator step so contact / kinematic / AABB caches see the
@@ -303,6 +303,7 @@ class TaskSampler:
 
     def binary_goal_holds(self) -> Tuple[bool, Any]:
         self._refresh_for_predicates()
+        PRED.reset_branches()
         _, status = self.compiled.check_goal(self._evaluate)
         return set(self.compiled.binary_goal_head_idxs) <= set(status["satisfied"]), status
 
