@@ -616,7 +616,9 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
 def post_retreat(action: Retreat, state, targets, ctx) -> Optional[str]:
     if action.release and state.held_object(action.arm) is not None:
         return "execution"
-    return _eef_reached(state, action.arm, targets["retreat"][-1], _cfg(ctx), "retreat")
+    # a pad leaving a brace / push contact springs back by the joint error it carried under the load (2-3 cm)
+    loaded = isinstance(getattr(action, "after", None), (Brace, Push))
+    return _eef_reached(state, action.arm, targets["retreat"][-1], _cfg(ctx), "retreat", loaded=loaded)
 
 
 # ==========================================================================================
