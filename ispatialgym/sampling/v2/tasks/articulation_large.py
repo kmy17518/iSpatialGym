@@ -483,6 +483,13 @@ class ArticulationLarge(SamplerV2):
         if joint_name is None:
             if not joints:
                 raise Reject("spec", f"{self.gp.alias}: roles.{self.target_role}.joint is required (no annotation to pick the joint from)")
+            # no joint pinned: the joint with a handle whose height is nearest the arm's band (0.75 m) first — the
+            # record order put the bottom drawer (handle 0.33 m) first for Rs_int bamfsz_1 and the reach volume covers
+            # no fwd pinch that low from the Phase-2 trunks (19:48: 822 step-1 survivors, 0 reach the contact set)
+            def _height_key(jd):
+                hs = [h.get("contact_world", [None, None, None])[2] for h in (jd.get("handles") or []) if h.get("contact_world")]
+                return (0 if hs else 1, min((abs(float(z) - 0.75) for z in hs), default=9.0))
+            joints = sorted(joints, key=_height_key)
             joint_name = joints[0]["joint"]
         if joint_name not in obj.joints:
             raise Reject("spec", f"{obj.name} has no joint {joint_name!r} (joints {list(obj.joints)})")
