@@ -68,20 +68,20 @@
   "owner": "-"
  },
  "inter_object_relation_satisfaction-ontop_small_scale": {
-  "blocking": "-",
-  "owner": "-"
+  "blocking": "valid on 6b856ed 18:59; re-opened by the core's 02c700d (two-tier grasp draw) \u2014 re-run scheduled (D-005 asks whether blanket fixes should keep doing this)",
+  "owner": "core / loop"
  },
  "inter_object_relation_satisfaction-under_small_scale": {
-  "blocking": "-",
-  "owner": "-"
+  "blocking": "valid on 6b856ed 19:10 (release surface 5851c8b); re-opened by 02c700d \u2014 re-run scheduled (D-005)",
+  "owner": "core / loop"
  },
  "inter_object_relation_satisfaction-inside": {
-  "blocking": "sweep 18:53 (ee7aa9d): demo failed_grasp at grasp (was valid at 16:35) \u2192 core",
-  "owner": "core"
+  "blocking": "18:53 failed_grasp at grasp (sprout spins out of the pinch?) \u2192 core diagnosing with the new grasp facts; 02c700d re-run scheduled",
+  "owner": "core / loop"
  },
  "inter_object_relation_satisfaction-nextto": {
-  "blocking": "-",
-  "owner": "-"
+  "blocking": "valid on 6b856ed 19:06 (full placed_orientation gate passed); re-opened by 02c700d \u2014 re-run scheduled (D-005); FOV rule (b) monitor still pending (oracle)",
+  "owner": "core / loop"
  },
  "inter_object_relation_satisfaction-touching": {
   "blocking": "core 6de8803: brace optional (push chain required) \u2014 napkins loop launched 18:12; oracle program_touching must accept the brace-less sidecar (queued with the oracle)",

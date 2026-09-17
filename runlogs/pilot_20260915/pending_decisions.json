@@ -87,6 +87,29 @@
    "applied_commit": "f8e9aa7c",
    "thread_ts": "1789605454.155469",
    "answered_at": "2026-09-16 18:31 PDT"
+  },
+  {
+   "id": "D-005",
+   "time": "2026-09-16 19:31 PDT",
+   "subtask": "validity rule (all placing subtasks)",
+   "question": "core-wide sampler fixes keep re-opening rows that already have a valid demo \u2014 keep re-running everything, or freeze valid rows against blanket fixes?",
+   "context": "Today: ontop_small, under_small, nextto and inside turned valid on 6b856ed (18:35\u201319:06) and were re-opened 19:25 by the core's two-tier grasp draw 02c700d (4 subtasks in one entry); earlier bcc1478 / 625759b / dc6a1a5 did the same to object_scaling, mental_rotation, axial, disembedding. Each flip costs ~4 pod-hours and the board oscillates (9/21 \u2192 6/21). The rule as written (06:50): a demo is valid only if its code carries every fix affecting the subtask.",
+   "options": [
+    "A) keep the rule as is \u2014 every affecting fix re-runs the subtask (current behaviour, maximal guarantee)",
+    "B) freeze: a row with a valid demo is re-run only by a fix targeted at it (\u2264 5 subtasks) or on your RUN:; blanket entries mark it 'valid (pre-<sha>)' and the final validity sweep happens once at the end of the pass",
+    "C) B, plus agents batch core-wide changes (\u2264 1 per hour) \u2014 I have already asked the core to batch"
+   ],
+   "default": "A until you answer (the runs are already scheduled); C is my recommendation",
+   "artefacts": [
+    "runlogs/pilot_20260915/first_demo_board.md",
+    "runlogs/pilot_20260915/fix_log.jsonl"
+   ],
+   "status": "open",
+   "answered_by": null,
+   "answer": null,
+   "applied_commit": null,
+   "thread_ts": "1789612322.734999",
+   "answered_at": null
   }
  ]
 }
