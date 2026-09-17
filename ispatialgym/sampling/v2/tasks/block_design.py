@@ -164,8 +164,14 @@ class BlockDesign(SamplerV2):
                 init = TT.phase1b_init_trunk(self, st, self.edge, bands=bands, top=self.top, left_bands=self.left_bands)
                 init = TT.phase1c_lateral(self, init, margins, rng, top=self.top, bands=bands)
                 init.name = "init"
+                # D-009 shape for blocks (prepared, default = today's 8 / 20 deg): with the region depth caps (init cells <= 0.80 m,
+                # slots <= 0.70 m) the 20 deg cone at the arm-friendly trunks (0.5, -0.3..-0.45) meets the top beyond the caps and
+                # only the translate-0.95 trunks survive (blk_diag2 22:28: 2 survivors, both (0.95, 0 / -0.16), every pick
+                # pre-grasp out of reach from that height); a wider loose class (generation.phase2_loose_class_deg ~ 30) lets
+                # those trunks see regions at 0.55-0.70 m
                 cands = TT.phase2_manipulation_stance(self, init, 0.5 * self.edge, target_height=self.edge, focus_candidates=self._regions, in_frame_fn=self._region_in_frame,
-                                                      bands=bands, top=self.top, erosion_extra=0.02 + self.edge, focus_z=self.top.z + 0.5 * self.edge)
+                                                      bands=bands, top=self.top, erosion_extra=0.02 + self.edge, focus_z=self.top.z + 0.5 * self.edge,
+                                                      angle_classes_deg=(float(self.gen("phase2_tight_class_deg", 8.0)), float(self.gen("phase2_loose_class_deg", 20.0))))
                 if not cands:
                     raise Reject("no_manipulation_stance", f"Phase 2 left no region survivor ({getattr(self, '_regions_too_deep', 0)} regions dropped: init cells beyond "
                                                             f"{MAX_REGION_DEPTH:.2f} m or goal slots beyond {MAX_GRID_DEPTH:.2f} m base-forward)")
