@@ -38,8 +38,11 @@ Simulator-free by construction: ``env`` / ``task`` / ``sim`` are duck-typed and 
 
 from __future__ import annotations
 
+import functools
+import json
 import logging
 import math
+import os
 import time
 import traceback
 from dataclasses import dataclass, field
@@ -47,6 +50,7 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tupl
 
 import torch as th
 
+from ispatialgym import ASSETS_ROOT
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.actions import Action, Brace, Place, Push
 from ispatialgym.oracle.execute import check_postcondition, forbidden_contacts, fov_monitored, intended_contacts, is_manipulation, offset_brace, run_action
@@ -58,6 +62,28 @@ from ispatialgym.robot import conventions as C
 log = logging.getLogger(__name__)
 
 AGENT_INSTANCE = "agent.n.01_1"
+
+#: cylinder tags of the placed-orientation demo gate (owner 2026-09-16 17:10 item 4 fallback): ``{"<category>/<model>":
+#: {"axis": "x"|"y"|"z", "tags": [...], ...}}`` built by ``scripts/symmetry/revolution_axes.py`` from the ICL symmetry
+#: survey — the models with a body-of-revolution tag (``xinf`` / ``yinf`` / ``zinf``) about their long axis
+REVOLUTION_AXES_PATH = os.path.join(ASSETS_ROOT, "icl", "revolution_axes.json")
+
+
+@functools.lru_cache(maxsize=None)
+def revolution_axes(path: str = REVOLUTION_AXES_PATH) -> Dict[str, Dict[str, Any]]:
+    """The revolution-axis table (empty when the asset is missing or unreadable — then every object keeps the full error)."""
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except (OSError, ValueError) as e:
+        log.warning("revolution axes table %s not readable (%r): placed objects keep the full orientation error", path, e)
+        return {}
+    return {k: v for k, v in data.items() if not k.startswith("_") and isinstance(v, dict) and v.get("axis") in ("x", "y", "z")}
+
+
+def revolution_axis(category: str, model: str, path: str = REVOLUTION_AXES_PATH) -> Optional[Dict[str, Any]]:
+    """The table entry of ``category/model`` (``axis`` = the object-frame long axis it may roll about), None otherwise."""
+    return revolution_axes(path).get(f"{category}/{model}")
 
 
 @dataclass
@@ -92,11 +118,17 @@ class ExecutorConfig:
     #: demo-collection gates applied after the epilogue (``run_isg --demo-gating``; oracle mode: ``placed_orientation``):
     #: ``placed_orientation`` = every placed object (place / drop / attach, not pushes) must end within its recorded
     #: orientation target's tolerance (``orientation_tolerance``, 0.2 rad default; nearest equivalence, the evaluator's
-    #: own error) — the TRO target keeps ``gating: false`` for the policy evaluation, position stays non-gating
+    #: own error) — the TRO target keeps ``gating: false`` for the policy evaluation, position stays non-gating.
+    #: Cylinders (owner decision 2026-09-16 17:10 item 4, fallback applied after the closure investigation): an object
+    #: with a continuous symmetry about its long axis per the ICL symmetry survey (``assets/icl/revolution_axes.json``:
+    #: marker, pencil, bottles, cans ...) is compared **modulo rotation about that axis** — the angle between its long
+    #: axis now and at the recorded goal (nearest equivalence) against the same tolerance; every other object keeps the
+    #: full error. ``demo_revolution_axes`` switches that equivalence off (full error for everything).
     demo_gating: Tuple[str, ...] = ()
     demo_orientation_tolerance_default: float = 0.2
-    #: ``placed_tilt``: the tilt of a placed object's up axis against the recorded goal's up axis (rad; yaw / roll of a
-    #: symmetric or cylindrical object about its own axis does not fail a demo, a fallen cup does)
+    demo_revolution_axes: bool = True
+    #: ``placed_tilt`` (retracted as the default, owner 2026-09-16 17:10 item 4; the code path stays unused): the tilt of
+    #: a placed object's principal axis against the recorded goal's (rad)
     demo_tilt_tolerance: float = math.radians(15.0)
     #: renders after a checkpoint restore before the (recorded) hold step, so no frame of the rolled-back attempt
     #: survives in the video / dataset (the renderer trails ``load_state`` by 1-2 frames)
@@ -849,7 +881,13 @@ class Executor:
     def placed_orientation_report(self, isg: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
         """Per placed object: the evaluator's final orientation error (its metric and equivalences) against the
         recorded TRO orientation target and tolerance (``demo_orientation_tolerance_default`` when the target has
-        none); ``within`` is None when the object has no orientation target or no error report."""
+        none); ``within`` is None when the object has no orientation target or no error report.
+
+        **Cylinders** (owner 2026-09-16 17:10 item 4, fallback): a placed object whose model carries a continuous symmetry
+        about its long axis in the ICL symmetry survey (:func:`revolution_axis`) is judged modulo rotation about that
+        axis — ``orientation_error`` becomes the angle between the axis now and at the goal (nearest recorded
+        equivalence, :meth:`axis_error`), ``full_error`` keeps the evaluator's reading, ``equivalence`` names the axis;
+        every other object keeps the full error."""
         errs = (isg.get("errors") or {}).get("pose_errors") or {}
         out: Dict[str, Dict[str, Any]] = {}
         for obj in self.placed_objects():
@@ -863,9 +901,56 @@ class Executor:
                 continue
             tol = getattr(tgt, "orientation_tolerance", None)
             tol = float(self.cfg.demo_orientation_tolerance_default if tol is None else tol)
-            out[obj] = {"orientation_error": float(err), "tolerance": tol, "within": float(err) <= tol, "metric": getattr(tgt, "orientation_metric", None),
-                        "target_gating": bool(rep.get("gating", False))}
+            entry: Dict[str, Any] = {"orientation_error": float(err), "tolerance": tol, "within": float(err) <= tol, "metric": getattr(tgt, "orientation_metric", None),
+                                     "target_gating": bool(rep.get("gating", False))}
+            axis = self.revolution_axis_of(obj) if self.cfg.demo_revolution_axes else None
+            if axis is not None and str(getattr(tgt, "frame", "world")) == "world":
+                ax_err = self.axis_error(obj, tgt, axis["axis"])
+                if ax_err is not None:
+                    entry.update({"orientation_error": ax_err, "within": ax_err <= tol, "full_error": float(err),
+                                  "equivalence": f"rotation about the {axis['axis']} axis (revolution, survey tags {axis.get('tags')})",
+                                  "revolution_axis": axis["axis"], "model": axis.get("key")})
+            out[obj] = entry
         return out
+
+    def revolution_axis_of(self, obj: str) -> Optional[Dict[str, Any]]:
+        """The :func:`revolution_axis` entry of a placed object's model (``category`` / ``model`` of the scene object,
+        else parsed from its name ``<category>_<model>_<i>``), None without a tag or without the object."""
+        try:
+            o = self.state.object(obj)
+        except Exception:  # noqa: BLE001
+            return None
+        cat, model = getattr(o, "category", None), getattr(o, "model", None)
+        name = str(getattr(o, "name", "") or "")
+        if (not cat or not model) and name:
+            parts = name.rsplit("_", 2)
+            if len(parts) == 3 and parts[2].isdigit():
+                cat, model = cat or parts[0], model or parts[1]
+        if not cat or not model:
+            return None
+        entry = revolution_axis(str(cat), str(model))
+        if entry is None:
+            return None
+        return {**entry, "key": f"{cat}/{model}"}
+
+    def axis_error(self, obj: str, tgt, axis: str) -> Optional[float]:
+        """The angle (rad) between a placed object's object-frame ``axis`` now and at the recorded goal orientation,
+        minimised over the target's orientation equivalences (the error modulo rotation about that axis)."""
+        try:
+            _, q_cur = self.state.object_pose(obj)
+        except Exception:  # noqa: BLE001
+            return None
+        a = th.zeros(3)
+        a["xyz".index(axis)] = 1.0
+        goal_q = C.as_tensor(getattr(tgt, "orientation")).float()
+        a_goal = C.quat_rotate(goal_q, a)
+        best = None
+        for e in [None] + list(getattr(tgt, "orientation_equivalences", None) or []):
+            q = q_cur if e is None else C.qmul(C.as_tensor(q_cur).float(), C.as_tensor(e).float())
+            a_now = C.quat_rotate(C.as_tensor(q).float(), a)
+            ang = math.acos(max(-1.0, min(1.0, float(th.dot(a_now, a_goal)))))
+            best = ang if best is None or ang < best else best
+        return None if best is None else float(best)
 
     @staticmethod
     def principal_axis(extent) -> Tuple[th.Tensor, str]:

@@ -1103,6 +1103,105 @@ def test_placed_orientation_gates_the_demo_verdict_only(tmp_path):
     assert result["reason"] == "placed_tilt" and abs(result["demo_gating"]["placed_tilt"]["apple.n.01_1"]["tilt_deg"] - 90.0) < 0.5
 
 
+def test_placed_orientation_gate_compares_cylinders_modulo_their_long_axis(tmp_path, monkeypatch):
+    """Owner decision 2026-09-16 17:10 item 4, fallback (the closure investigation ended without its criterion): in the
+    full ``placed_orientation`` gate an object whose model has a continuous symmetry about its long axis in the ICL
+    symmetry survey (``assets/icl/revolution_axes.json``: marker, pencil, bottles) is compared modulo rotation about that
+    axis; a marker rolled 92 deg about its own axis during finger closure (0916-152503: 0.386 rad full error) passes,
+    the same marker standing on its end fails, every untagged object keeps the full error, and the equivalence can be
+    switched off."""
+    from ispatialgym.oracle import executor as EXE
+
+    goal_q = th.tensor([0.0, 0.0, math.sin(0.25), math.cos(0.25)])  # the recorded goal: yaw 0.5 rad, the long axis (x) level
+    table = {"marker/xakoic": {"axis": "x", "tags": ["xinf"], "sources": ["symmetry_near", "geom_near"]}}
+    monkeypatch.setattr(EXE, "revolution_axes", lambda path=EXE.REVOLUTION_AXES_PATH: table)
+    gate = ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("placed_orientation",))
+
+    def world(err_rad, category="marker", model="xakoic", quat_after=None):
+        sc, env = iors_world()
+        goal = _place_goal(sc)
+        obj = env.objects["apple.n.01_1"]
+        obj.category, obj.model = category, model
+        obj.aabb_extent = th.tensor([0.1536, 0.0171, 0.0141])
+        env.task._tro = SimpleNamespace(meta=SimpleNamespace(pose_targets={"apple.n.01_1": SimpleNamespace(frame="world", orientation=goal_q, orientation_tolerance=0.2,
+                                                                                                                 orientation_metric="full", position=None, position_tolerance=None,
+                                                                                                                 orientation_equivalences=[])}))
+
+        def evaluate(env_):
+            d = success_eval("apple.n.01_1", goal, tol=0.08)(env_)
+            d["errors"]["pose_errors"]["apple.n.01_1"].update({"orientation_error": err_rad, "gating": False, "within_tolerance": err_rad <= 0.2})
+            return d
+
+        env.evaluate = evaluate
+        if quat_after is not None:
+
+            def after(step_action):
+                if env.robot._ag_obj_in_hand["right"] is None and float(th.linalg.norm(obj.pos - th.tensor(goal))) < 0.08:
+                    obj.quat = quat_after
+
+            env.after_step = after
+        return sc, env
+
+    rolled = C.qmul(goal_q, th.tensor([math.sin(0.8), 0.0, 0.0, math.cos(0.8)]))  # the goal yaw, then 1.6 rad (92 deg) about the marker's own x
+    standing = C.qmul(goal_q, th.tensor([0.0, math.sin(math.pi / 4), 0.0, math.cos(math.pi / 4)]))  # the long axis pitched up 90 deg
+    # (a) the rolled marker: the evaluator's full error 1.6 rad fails the strict reading, the gate compares modulo the roll -> success
+    sc, env = world(1.6, quat_after=rolled)
+    ex, *_ = make_executor(env, sc, tmp_path / "a", exec_cfg=gate)
+    result = ex.run_program(expand(sc.alias, sc))
+    rep = result["demo_gating"]["placed_orientation"]["apple.n.01_1"]
+    assert result["success"], (result["verdict"], rep)
+    assert rep["within"] is True and rep["orientation_error"] < 0.02 and rep["full_error"] == 1.6 and rep["tolerance"] == 0.2
+    assert rep["revolution_axis"] == "x" and rep["model"] == "marker/xakoic" and "rotation about the x axis" in rep["equivalence"]
+    assert result["demo_gating"]["enabled"] == ["placed_orientation"] and "placed_tilt" in result["demo_gating"]  # the tilt reading is still reported alongside
+    # (b) the same marker standing on its end: the axis error is 90 deg -> placed_orientation
+    sc, env = world(1.6, quat_after=standing)
+    ex, *_ = make_executor(env, sc, tmp_path / "b", exec_cfg=gate)
+    result = ex.run_program(expand(sc.alias, sc))
+    rep = result["demo_gating"]["placed_orientation"]["apple.n.01_1"]
+    assert result["reason"] == "placed_orientation" and abs(rep["orientation_error"] - math.pi / 2) < 0.01 and rep["full_error"] == 1.6
+    # (c) a target equivalence (a half turn about the marker's y) makes the upside-down marker pass the axis reading too
+    sc, env = world(1.6, quat_after=C.qmul(goal_q, th.tensor([0.0, 1.0, 0.0, 0.0])))
+    env.task._tro.meta.pose_targets["apple.n.01_1"].orientation_equivalences = [th.tensor([0.0, 1.0, 0.0, 0.0])]
+    ex, *_ = make_executor(env, sc, tmp_path / "c", exec_cfg=gate)
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["success"] and result["demo_gating"]["placed_orientation"]["apple.n.01_1"]["orientation_error"] < 0.02
+    # (d) an untagged model keeps the full error: the same roll fails
+    sc, env = world(1.6, category="apple", model="omzprq", quat_after=rolled)
+    ex, *_ = make_executor(env, sc, tmp_path / "d", exec_cfg=gate)
+    result = ex.run_program(expand(sc.alias, sc))
+    rep = result["demo_gating"]["placed_orientation"]["apple.n.01_1"]
+    assert result["reason"] == "placed_orientation" and rep["orientation_error"] == 1.6 and "full_error" not in rep and "equivalence" not in rep
+    # (e) the equivalence switched off: the marker's roll fails with the full error
+    sc, env = world(1.6, quat_after=rolled)
+    ex, *_ = make_executor(env, sc, tmp_path / "e", exec_cfg=ExecutorConfig(settle_min_steps=50, settle_fraction=0.2, demo_gating=("placed_orientation",), demo_revolution_axes=False))
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["reason"] == "placed_orientation" and result["demo_gating"]["placed_orientation"]["apple.n.01_1"]["orientation_error"] == 1.6
+    # (f) the category / model fall back to the scene object's name (<category>_<model>_<i>) when the attributes are missing
+    sc, env = world(1.6, quat_after=rolled)
+    obj = env.objects["apple.n.01_1"]
+    del obj.category
+    obj.name = "marker_xakoic_0"
+    ex, *_ = make_executor(env, sc, tmp_path / "f", exec_cfg=gate)
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["success"] and result["demo_gating"]["placed_orientation"]["apple.n.01_1"]["revolution_axis"] == "x"
+
+
+def test_revolution_axes_asset_tags_the_pilot_cylinders():
+    """The committed table (``scripts/symmetry/revolution_axes.py`` over the ICL symmetry survey) carries the nextto pilot's
+    marker and pencil about x, the standing shakers / cans about z, and leaves flat / boxy objects out."""
+    from ispatialgym.oracle import executor as EXE
+
+    table = EXE.revolution_axes()
+    assert table, EXE.REVOLUTION_AXES_PATH
+    assert EXE.revolution_axis("marker", "xakoic")["axis"] == "x" and EXE.revolution_axis("pencil", "hmawzy")["axis"] == "x"
+    assert EXE.revolution_axis("colored_pencil", "acumgp")["axis"] == "x" and EXE.revolution_axis("salt_shaker", "iomwtn")["axis"] == "z"
+    assert EXE.revolution_axis("can_of_soda", "bfrzvk")["axis"] == "z"
+    for key in ("plate/pkkgzc", "apple/omzprq", "box_of_tissues/uglbjc", "box_of_sanitary_napkins/tkrzkb", "spatula/hkvsep"):
+        assert key not in table, key
+    for k, v in table.items():
+        assert v["axis"] in ("x", "y", "z") and f"{v['axis']}inf" in v["tags"] and v["ratio"] >= 1.5, (k, v)
+
+
 def test_epilogue_motion_rule_ignores_rotation_without_an_orientation_target(tmp_path):
     """Owner rule 2026-09-16: in the epilogue motion window an object's rotation counts only when the goal has an
     orientation target for it; a spinning near-spherical object with a stable position passes; a second, 2x

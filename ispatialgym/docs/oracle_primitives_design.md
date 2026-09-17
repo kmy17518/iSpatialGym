@@ -455,9 +455,19 @@ place transit under the rule and pass after the carry‑leg change. **B1K compar
 (`joylo/gello/utils/qa_utils.py::FieldOfViewMetric`, `gripper_changes_outside_fov_limit=0`) requires the gripper in view
 only at grasp / release toggles, measured as any‑gripper‑link visibility by instance segmentation, and would pass that
 episode; ours is deliberately stricter. **Placed‑object gate:** `placed_orientation` (full orientation error vs the
-recorded tolerance) is the demo gate; the `placed_tilt` variant is withdrawn (the nextto roll happened during finger
-closure, not at release) — pending the closure investigation, cylinders may get orientation equivalences (continuous
-symmetry about the long axis) in this gate, everything else stays full.
+recorded tolerance) is the demo gate and the `run_isg --mode oracle` default; the `placed_tilt` variant is withdrawn (the
+nextto roll happened during finger closure, not at release; the code path stays selectable, unused). **Cylinder
+equivalence (owner fallback, applied 2026‑09‑16 20:00 after the closure investigation ended without its criterion —
+`runlogs/closure_probe_20260916/report.md`):** inside this gate an object whose model has a *continuous symmetry about
+its long axis* in the ICL symmetry survey is compared **modulo rotation about that axis** — the gate error is the angle
+between its long axis now and at the recorded goal (nearest recorded equivalence), against the same tolerance; the
+evaluator's full error is reported alongside (`demo_gating.placed_orientation.<obj>.full_error`). The tag table is
+`ispatialgym/assets/icl/revolution_axes.json` (`scripts/symmetry/revolution_axes.py` over `runlogs/symmetry_20260915/
+symmetry.json`: a body‑of‑revolution tag `xinf` / `yinf` / `zinf` in `symmetry`, `symmetry_near`, `geom_exact` or
+`geom_near` about the model's long axis — largest native extent ≥ 1.5 × the middle one; geometry alone counts, a printed
+label breaks the visual symmetry but not the rolling): markers, pencils, bottles, cans, shakers, candles (262 models);
+plates, bowls, boxes and every other object keep the full error (`ExecutorConfig.demo_revolution_axes` switches the
+equivalence off). The TRO targets and the policy evaluation are untouched.
 
 Owner decisions 2026‑09‑16: **`gripper_out_of_fov` is armed unconditionally** from the pre‑pose of every manipulation
 action (grasp, lift, place, push, brace) to the end of the action — a leg whose fingertips never enter the frame is
