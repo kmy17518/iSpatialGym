@@ -147,6 +147,11 @@ class ExecuteConfig:
     #: a contact pre-pose next to an ignored support (wall, table) is reached via a standoff this far away from the
     #: support, planned with the support present, then a straight leg (``reach_pre_pose``)
     pre_pose_standoff_m: float = 0.08
+    #: the carry leg lift end -> pre-place (FOV rule (b), owner 2026-09-16 17:10): ``"straight"`` = a straight Cartesian
+    #: leg (through the recorded ``grasps[k].carry`` waypoint when the sampler wrote one), differential IK with the
+    #: free-leg finish, both ends recorded in frame; ``"trajopt"`` = the former free trajopt transit (the regression
+    #: reference: nextto 0916-152503 swung 40 cm back toward the robot and left the frame for 106 steps)
+    carry_leg: str = "straight"
 
 
 CONFIG = ExecuteConfig()
@@ -580,7 +585,7 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     cfg = _cfg(ctx)
     arm = action.arm
     drop = action.kind == "drop"
-    _hook(ctx, "fov")(False)  # the transit to the pre-place (10 cm back along a tilted approach) may leave the margin
+    # the FOV span opened at the pre-grasp stays open through the carry (rule (b)): no hook here
     on = []
     if getattr(action, "on", None) and not drop:  # a drop keeps its container in the collision world: it must not be touched
         if action.relation in ("on", "into", "under") or action.kind == "attach":
@@ -588,8 +593,18 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
         else:
             on = contact_ignores(state, action.on)  # next to / touching: the partner stays an obstacle, only the shared support leaves
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in on]
-    yield from motions.arm_to(arm, pose=targets["pre_place"], q_hint=_witness(ctx, "pre_place"), ignore_objects=on)
-    _hook(ctx, "fov")(True)  # the descent ends at the recorded (in-frame) place pose
+    carry = list(targets.get("carry") or ())
+    if cfg.carry_leg == "straight" and carry:
+        # the carry leg: a straight Cartesian leg from where the hand is (the lift end) to the recorded pre-place, through
+        # the recorded carry waypoint when there is one; both ends are in frame, so the fingertips stay in frame along it
+        # (the free trajopt transit swung the nextto marker 40 cm back toward the robot and out of the frame). A stall
+        # is finished by ``arm_to`` to the pre-place, as for the lift / retreat legs.
+        finish = _free_leg_finish(state, targets["pre_place"], _witness(ctx, "pre_place"), on, cfg)
+        yield from motions.arm_along(arm, carry, finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+        ctx["carry_leg"] = {"kind": "straight", "waypoints": len(carry), "via_recorded": bool(targets.get("carry_recorded")), "finish": finish.info if finish.used else None}
+    else:
+        yield from motions.arm_to(arm, pose=targets["pre_place"], q_hint=_witness(ctx, "pre_place"), ignore_objects=on)
+        ctx["carry_leg"] = {"kind": "trajopt"}
     finish = ApproachFinish(targets["place"], q_hint=_witness(ctx, "place"), ignore_objects=on, max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
     yield from motions.arm_along(arm, targets["descent"], finish=finish)
     if finish.used:
@@ -598,7 +613,7 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     # support place sets the object down
     yield from motions.gripper(arm, close=False)
     _release(motions, state, arm)
-    _hook(ctx, "fov")(False)  # the retreat leg is the same as a Retreat action: exempt
+    _hook(ctx, "fov")(False)  # the span closes with the release: the retreat legs are unmonitored (rule (b))
     # retreat straight back along -a (up for a top-down pose) before any lateral motion
     yield from motions.arm_along(arm, targets["retreat"])
     if drop:
@@ -627,6 +642,7 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
     if action.release:
         yield from motions.gripper(arm, close=False)
         _release(motions, state, arm)
+        _hook(ctx, "fov")(False)  # the span (a held handle, a brace) closes with the release
     ignore: List[Any] = []
     if getattr(action, "object", None):
         try:
@@ -869,6 +885,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     back = (end_pose[0] - tangent * cfg.push_backoff_m, end_pose[1])
     yield from motions.arm_along(arm, [back], loaded=True)
     ctx["push_end_pose"] = back
+    _hook(ctx, "fov")(False)  # the contact span ends with the contact leg
     yield from _hold_until_still(motions, state, obj, cfg)
     final, _ = push_residual(geom, state, obj, pose0)
     ctx["push_residual"]["final"] = final
@@ -899,6 +916,7 @@ def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Itera
     yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, [], _witness(ctx, "pre"), ctx, cfg)
     _hook(ctx, "fov")(True)
     yield from motions.arm_along(arm, targets["approach"], loaded=True)
+    _hook(ctx, "fov")(False)  # the contact span ends with the contact leg (the brace then holds still)
 
 
 def post_brace(action: Brace, state, targets, ctx) -> Optional[str]:
@@ -960,8 +978,9 @@ EXECUTORS: Dict[type, Tuple[ExecuteFn, PostconditionFn]] = {
 
 #: actions during which the failed-grasp / contact rules of §6.4 apply (finger contacts are what manipulation is)
 MANIPULATION_ACTIONS: Tuple[type, ...] = (Grasp, Lift, Reorient, Place, Push, Brace, BaseFollow, Retreat)
-#: manipulation actions the gripper-in-FOV monitor does not watch: the hand backing off may leave the frame
-FOV_EXEMPT_ACTIONS: Tuple[type, ...] = (Retreat,)
+#: actions the gripper-in-FOV monitor never runs during: none — rule (b) decides per arm by its open span (a retreat
+#: after a release has no open span; a ``Retreat(release=True)`` is watched until it releases)
+FOV_EXEMPT_ACTIONS: Tuple[type, ...] = ()
 
 
 def executor_for(action: Action) -> Tuple[ExecuteFn, PostconditionFn]:
@@ -977,9 +996,10 @@ def is_manipulation(action: Action) -> bool:
 
 
 def fov_monitored(action: Action) -> bool:
-    """Whether the gripper-in-FOV monitor watches ``action`` (manipulation actions except the retreats; the monitor
-    itself arms once the fingertips first enter the frame, ``qa.Monitors``)."""
-    return isinstance(action, MANIPULATION_ACTIONS) and not isinstance(action, FOV_EXEMPT_ACTIONS)
+    """Whether the gripper-in-FOV monitor runs during ``action``: every action of a program (rule (b): which arms are
+    watched is decided by the spans the execute functions open at the pre-grasp / pre-contact and close at the
+    release / end of the contact leg — a carried object's hand is watched through a Transition as well)."""
+    return isinstance(action, Action) and not isinstance(action, FOV_EXEMPT_ACTIONS)
 
 
 def run_action(action: Action, motions: Motions, state, targets: Dict[str, Any], ctx: Optional[Dict[str, Any]] = None) -> Iterator[th.Tensor]:

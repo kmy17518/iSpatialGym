@@ -454,7 +454,19 @@ reference: nextto 0916‑152503 (transit to x 7.25, 106/429 place steps out of f
 place transit under the rule and pass after the carry‑leg change. **B1K comparison:** the replay QA
 (`joylo/gello/utils/qa_utils.py::FieldOfViewMetric`, `gripper_changes_outside_fov_limit=0`) requires the gripper in view
 only at grasp / release toggles, measured as any‑gripper‑link visibility by instance segmentation, and would pass that
-episode; ours is deliberately stricter. **Placed‑object gate:** `placed_orientation` (full orientation error vs the
+episode; ours is deliberately stricter. **Implementation (oracle, 2026‑09‑16 20:xx):** `qa.Monitors` keeps one **span
+per arm** (`fov_span`), opened / closed by the execute functions through `ctx["hooks"]["fov"]` (`set_fov_enabled` acts
+on the action's arms): Grasp opens it after `arm_to(pre_grasp)`; Lift, Reorient, Articulate, BaseFollow and a Transition
+/ Navigate made while holding leave it alone; Place closes it right after the assisted grasp has released (its own
+straight retreat and the Retreat action run with the span closed); `Retreat(release=True)` closes it after the release;
+Push / Brace open it after the pre‑contact and close it after the contact leg (the push's arc + extension + back‑off, the
+brace approach). The monitor runs during every action (`fov_monitored` is true for all; a replay stream passes
+`fov=False`); the acting arm's frames while its span is closed are `fov_idle_out` events. Spans are part of the
+`Checkpoint` (`fov_spans`) and restored on a retry. **Carry leg:** `Place.targets["carry"]` is the straight leg from the
+hand's actual pose at the start of the place (the lift end) to the recorded pre‑place — orientation SLERPed, a pose every
+5 cm — through the sampler's `grasps[k].carry` waypoint when one is recorded (core `dc6a1a5`); `execute_place` tracks it
+with differential IK and the free‑leg `arm_to` finish (as lift / retreat), `notes.carry_leg`; `run_isg --carry-leg
+trajopt` keeps the former free transit as the regression reference. **Placed‑object gate:** `placed_orientation` (full orientation error vs the
 recorded tolerance) is the demo gate and the `run_isg --mode oracle` default; the `placed_tilt` variant is withdrawn (the
 nextto roll happened during finger closure, not at release; the code path stays selectable, unused). **Cylinder
 equivalence (owner fallback, applied 2026‑09‑16 20:00 after the closure investigation ended without its criterion —

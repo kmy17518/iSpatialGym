@@ -569,6 +569,8 @@ def parse_args(argv=None):
                    help="demo-collection gate after the epilogue: placed_orientation = every placed object within its recorded orientation tolerance (full error; "
                         "an object with a continuous symmetry about its long axis per the ICL survey - marker, pencil, bottles - modulo rotation about that axis) "
                         "(auto = on for --mode oracle, off for replay / policy); placed_tilt = the retracted principal-axis tilt variant (unused by default); none")
+    p.add_argument("--carry-leg", default="straight", choices=["straight", "trajopt"],
+                   help="the carry leg lift end -> pre-place: straight Cartesian leg through the recorded carry waypoint (FOV rule (b), default) or the former free trajopt transit (regression reference)")
     p.add_argument("--max-steps", type=int, default=6000, help="episode step budget (30 Hz control steps)")
     p.add_argument("--settle-steps", type=int, default=50, help="no-op window after the program: max(this, 20%% of the action steps)")
     p.add_argument("--retries", type=int, default=1, help="retries per action from its checkpoint")
@@ -746,6 +748,10 @@ def main(argv=None) -> int:
         ex_cfg = ExecutorConfig(max_steps=args.max_steps, retries=args.retries, settle_min_steps=args.settle_steps, goal_image=args.goal_image,
                                 record_state=rec_cfg.hdf5, demo_gating=gating)
         meta["demo_gating_enabled"] = list(gating)
+        from ispatialgym.oracle import execute as _execute
+
+        _execute.CONFIG.carry_leg = args.carry_leg
+        meta["carry_leg"] = args.carry_leg
         executor = Executor(env, task, sidecar, recorder=recorder, motions=motions, monitors=monitors, cfg=ex_cfg, sim=og.sim, state=state,
                             tracked_objects=tracked, cam_key=cam_key)
         executor.last_obs, executor.last_info = obs, info

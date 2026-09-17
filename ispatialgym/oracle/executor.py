@@ -157,6 +157,9 @@ class Checkpoint:
     recorder_steps: int = 0
     env_step: Optional[int] = None
     task_tracking: Dict[str, Any] = field(default_factory=dict)
+    #: the gripper-in-FOV spans open at the checkpoint (rule (b): a span runs from the pre-grasp to the release across
+    #: actions; a retry re-runs the action with the spans as they were)
+    fov_spans: Dict[str, bool] = field(default_factory=dict)
 
 
 #: ``ISpatialGymTask`` success-tracking attributes that a rollback must restore (sticky "first success" steps)
@@ -164,7 +167,7 @@ TASK_TRACKING_ATTRS = ("_first_success_step", "_first_settled_success_step", "_e
 
 
 #: ctx keys the execute functions write for the record (meta.json ``actions[].notes``)
-NOTE_KEYS = ("push_residual", "push_pivot_offset_m", "push_object_drift_m", "approach_finish", "descent_finish", "lift_finish", "retreat_finish", "pre_pose_standoff", "plan_relaxed_links", "push_axis", "idle_arms_moved", "arms_posture", "fingers_set", "plan_ignored", "object_motion",
+NOTE_KEYS = ("push_residual", "push_pivot_offset_m", "push_object_drift_m", "approach_finish", "descent_finish", "lift_finish", "retreat_finish", "pre_pose_standoff", "plan_relaxed_links", "push_axis", "carry_leg", "idle_arms_moved", "arms_posture", "fingers_set", "plan_ignored", "object_motion",
              "camera_error_before_correction", "camera_error", "attached", "preshape_opening_m", "closure_rate_m_per_step")
 
 
@@ -527,6 +530,7 @@ class Executor:
             recorder_steps=self.recorder.n_total if self.recorder is not None else self.n,
             env_step=getattr(self.env, "_current_step", None),
             task_tracking={k: getattr(self.task, k) for k in TASK_TRACKING_ATTRS if hasattr(self.task, k)},
+            fov_spans=self.monitors.fov_spans() if self.monitors is not None and hasattr(self.monitors, "fov_spans") else {},
         )
         return cp
 
@@ -576,6 +580,8 @@ class Executor:
             self.motions.import_state(cp.exec_state)
         if self.monitors is not None:
             self.monitors.reset_ag_reference()
+            if hasattr(self.monitors, "restore_fov_spans"):
+                self.monitors.restore_fov_spans(cp.fov_spans)
         for obj in self.tracked.values():
             if hasattr(obj, "wake"):
                 obj.wake()

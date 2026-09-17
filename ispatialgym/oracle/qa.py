@@ -33,24 +33,28 @@ pinhole model of spec §3.4, only during manipulation actions, ``fov_min_steps``
 budgets. ``QAStats`` counts verdicts per category × action name (§6.4: a sampler-side and a planner-side cause of the
 same symptom stay distinguishable).
 
-**Gripper-in-FOV rule** (pilot red flag 1 + owner decision 2026-09-16 10:15): the sampler guarantees the recorded
-pre-grasp / grasp / pre-place / place / pre-contact / contact poses in frame (spec §3.9, 5 % margin, the shared camera
-FK) — not the idle posture the acting hand starts from (at the manipulation stance the idle right hand sits just
-outside the right image border, u ≈ 1108 of 1080). The rule is therefore:
+**Gripper-in-FOV rule (b)** (owner decision 2026-09-16 17:10, oracle doc 6.4; supersedes the per-action arming of
+10:15): the monitor runs in **spans per acting arm**, continuous from the grasp to the release:
 
-* the monitor is **enabled** by the action's execute function once the pre-pose is reached (``ctx["hooks"]["fov"]
-  (True)`` after ``arm_to(pre_*)`` in Grasp / Place / Push / Brace; actions without a pre-pose — Lift, Reorient,
-  BaseFollow — are enabled from their first step), and **disabled** again once the object is released before a
-  retreat leg (Place);
-* while enabled it is **armed unconditionally**: from the pre-pose to the end of the action the acting arm's
-  fingertips must be in the frame; ``fov_min_steps`` consecutive out-of-frame steps are the ``gripper_out_of_fov``
-  verdict, whether the fingertips left the frame or never entered it (a leg that never entered the frame is a
-  verdict too: ``fov_first_entry_step: null`` and ``fov_out_steps`` in the details). A recorded pre-pose on the
-  margin is a sampler defect, not a reason to soften the monitor;
-* frames while disabled (the transit to the pre-pose, the retreat leg) are counted as ``fov_idle_out`` events, never
-  verdicts;
-* ``Retreat`` is exempt (the hand backing off may leave the frame; nothing about its end pose is recorded or
-  checked) — the executor passes ``fov=False`` for it.
+* a span **opens** when the pre-grasp pose is reached (``ctx["hooks"]["fov"](True)`` after ``arm_to(pre_grasp)`` in
+  Grasp) and stays open through the grasp, the lift, the carry to the pre-place, the descent and the release step —
+  across action boundaries (Lift, Reorient, Articulate, BaseFollow, a Transition / Navigate made while holding);
+* it **closes** after the release (``hooks["fov"](False)`` once the assisted grasp has let go in Place, or in a
+  ``Retreat(release=True)``); the retreat legs and the transit to the next pre-grasp are unmonitored; every grasp →
+  release pair is its own span (disembedding's grasps, block design's blocks, the flip-on-table re-grasp);
+* contact spans (Brace / Push) mirror them: pre-contact reached → end of the contact leg (the brace approach, the push
+  arc with its extension and back-off);
+* while a span is open it is **armed unconditionally**: ``fov_min_steps`` consecutive out-of-frame steps of that arm's
+  fingertips (pinhole projection of spec 3.4, ``fov_margin`` = 5 %) are the ``gripper_out_of_fov`` verdict, whether
+  they left the frame or never entered it on this action (``fov_first_entry_step: null``). A recorded pose on the
+  margin is a sampler defect, not a reason to soften the monitor; the motion consequence is the oracle's: the carry leg
+  lift end → pre-place is a straight Cartesian leg (or through the recorded ``grasps[k].carry`` waypoint), no free
+  trajopt swing;
+* frames of an acting arm whose span is closed (the transit to the pre-pose, the retreat) count as ``fov_idle_out``
+  events, never verdicts. Spans are part of the checkpoint (a retry restores them).
+
+B1K's replay QA (``FieldOfViewMetric``, ``gripper_changes_outside_fov_limit=0``) only needs the gripper in view at the
+grasp / release toggles; this rule is deliberately stricter.
 
 Simulator-free: ``env`` / ``robot`` are duck-typed; the contact API is imported lazily.
 """
@@ -288,6 +292,9 @@ class Monitors:
         self.episode_steps = 0
         self.epilogue = False
         self.fov_active = False
+        #: gripper-in-FOV spans per arm (rule (b)): open from the pre-grasp / pre-contact to the release / end of the
+        #: contact leg, across action boundaries; checkpointed with the episode
+        self.fov_span: Dict[str, bool] = {arm: False for arm in M.ARMS}
         self.forbidden: set = set()
         self.watch: List[Tuple[set, str]] = []
         self.watch_hits: List[int] = []
@@ -304,7 +311,8 @@ class Monitors:
                      fov: Optional[bool] = None, forbidden: Iterable[str] = (), watch: Iterable[Tuple[Iterable[str], str]] = ()) -> None:
         """``intended``: scene object names the action may touch (its ``objects`` resolved to scene names);
         ``held``: scene objects currently in hand (their contacts are the robot's own); ``fov``: whether the
-        gripper-in-FOV monitor watches this action (default: every manipulation action except ``Retreat``);
+        gripper-in-FOV monitor runs during this action at all (default: every action of a program — which arms it
+        watches is decided by the open spans, ``fov_span``; a replay stream passes False);
         ``forbidden``: scene objects no link — the acting fingers included — and no held object may touch, whatever
         the manipulation exemptions (the container of a ``Place(kind="drop")``: a bowl lifted by the opening fingers
         or nudged by the held object is a ``collision``, never a silent success); ``watch``: ``(link names, scene
@@ -339,16 +347,14 @@ class Monitors:
         self._contact_streak = Counter()
         self._pause_streak = 0
         self._fov_streak = Counter()
-        self._fov_first_entry = {arm: None for arm in self.arms}
+        self._fov_first_entry = {arm: None for arm in M.ARMS}
         self._fov_out_steps = Counter()
-        self.fov_enabled = True
 
     def end_action(self) -> None:
         self.action = None
         self.action_index = None
         self.manipulation = False
         self.fov_active = False
-        self.fov_enabled = True
         self.intended = set()
         self.forbidden = set()
         self.watch = []
@@ -359,17 +365,39 @@ class Monitors:
         self._fov_out_steps = Counter()
 
     def set_fov_enabled(self, enabled: bool = True) -> None:
-        """The execute functions' hook: enable the gripper-in-FOV monitor once the pre-pose is reached (armed from
-        that step on), disable it before a retreat leg. Enabling starts a fresh monitored leg (entry step, streaks)."""
-        self.fov_enabled = bool(enabled)
+        """The execute functions' hook (``ctx["hooks"]["fov"]``): open (``True``) / close (``False``) the gripper-in-FOV
+        span of the current action's arms — open once the pre-grasp / pre-contact is reached, closed after the release
+        / the end of the contact leg. Opening starts a fresh leg (entry step, streaks) for those arms."""
+        for arm in (self.arms or ()):
+            self.set_fov_span(arm, enabled)
+
+    def set_fov_span(self, arm: str, open_: bool) -> None:
+        self.fov_span[arm] = bool(open_)
+        self._fov_streak[arm] = 0
+        self._fov_first_entry[arm] = None
+        self._fov_out_steps[arm] = 0
+
+    def fov_spans(self) -> Dict[str, bool]:
+        """The open spans (for the checkpoint)."""
+        return dict(self.fov_span)
+
+    def restore_fov_spans(self, spans: Optional[Dict[str, bool]]) -> None:
+        """Put the spans back as a checkpoint had them (a retry re-runs the action from its start)."""
+        for arm in M.ARMS:
+            self.fov_span[arm] = bool((spans or {}).get(arm, False))
         self._fov_streak = Counter()
-        self._fov_first_entry = {arm: None for arm in self.arms}
+        self._fov_first_entry = {arm: None for arm in M.ARMS}
         self._fov_out_steps = Counter()
 
+    @property
+    def fov_enabled(self) -> bool:
+        """Whether any span is open (compatibility with the per-action flag)."""
+        return any(self.fov_span.values())
+
     def arm_fov(self, arm: Optional[str] = None) -> None:
-        """Enable the gripper-in-FOV monitor (kept for callers of the former explicit arming; the monitor is armed
-        whenever it is enabled)."""
-        self.set_fov_enabled(True)
+        """Open the span of ``arm`` (every acting arm when None)."""
+        for a in ([arm] if arm else list(self.arms or ())):
+            self.set_fov_span(a, True)
 
     def begin_epilogue(self, held: Sequence[Any] = ()) -> None:
         """The final no-op window: pause / FOV monitors off; objects still in hand (held-object tasks) stay the
@@ -524,14 +552,18 @@ class Monitors:
         return C.camera_pose(torso, base_pose=(bp.float(), bq.float()), cam_in_zed=self.cam_in_zed)
 
     def _check_fov(self) -> Optional[Verdict]:
-        if not self.fov_active or self.camera is None or not self.arms:
+        if not self.fov_active or self.camera is None:
+            return None
+        watched = [arm for arm in M.ARMS if self.fov_span.get(arm)]
+        idle = [arm for arm in (self.arms or ()) if not self.fov_span.get(arm)]
+        if not watched and not idle:
             return None
         cam = self.head_camera_pose()
-        for arm in self.arms:
+        for arm in watched + idle:
             ep, eq = self.robot.eef_links[arm].get_position_orientation()
             tip = C.fingertip((ep.float(), eq.float()))
             inside = self.camera.in_frame(cam, tip, self.cfg.fov_margin)
-            if not self.fov_enabled:
+            if arm in idle:
                 if not inside:
                     self.stats.event("fov_idle_out")  # the transit to the pre-pose / the retreat leg: not monitored
                 continue

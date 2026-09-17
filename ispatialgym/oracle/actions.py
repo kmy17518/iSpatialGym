@@ -86,6 +86,7 @@ RETREAT_DIST = 0.10  # retreat along −a after a release / contact
 RETREAT_LITTLE = 0.05  # "move contacting grippers away a little" after a place (§6.1)
 # Waypoint counts follow the F5 rule (poses at k/n, the goal last): ``n`` poses = ``n − 1`` intermediate + the goal.
 N_WAYPOINTS = 3  # poses of a short straight segment (approach, lift, descent, retreat, straight push): 2 + the goal
+CARRY_WAYPOINT_SPACING = 0.05  # the carry leg lift end -> pre-place is a longer straight leg: a pose every 5 cm
 N_INHAND = 4  # in-hand motions of the held-object tasks / attachment: 3 intermediate + the goal (spec §3.9, §6.3)
 N_YAW_ALIGN = 2  # block yaw-align stage (``flip_waypoints`` ``n_yaw``; the sampler's ``orbit_waypoints(..., n=2)``)
 N_FLIP = 3  # block 90° flip stage (``flip_waypoints`` ``n_flip``)
@@ -771,9 +772,13 @@ class Place(Action):
     ``relation`` = the annotation's relation word toward it ("on", "next to", "under"; without ``on`` the whole
     phrase, e.g. "at its slot in the goal grid").
 
-    targets: ``{"pre_place": Pose, "place": Pose, "descent": [Pose, ...], "retreat": [Pose, ...]}`` — recorded
-    ``place`` (and ``pre_place``, else ``pre_pose(place, PRE_DIST)``), straight descent and the retreat to
-    ``pre_pose(place, RETREAT_DIST)`` (``line_waypoints``).
+    targets: ``{"pre_place": Pose, "place": Pose, "descent": [Pose, ...], "retreat": [Pose, ...], "carry": [Pose, ...]}``
+    — recorded ``place`` (and ``pre_place``, else ``pre_pose(place, PRE_DIST)``), straight descent and the retreat to
+    ``pre_pose(place, RETREAT_DIST)`` (``line_waypoints``); ``carry`` = the **carry leg** from where the hand is (the
+    lift end, ``state.eef_pose`` at run time) to the pre-place — straight, orientation SLERPed, through the recorded
+    ``grasps[k].carry`` waypoint when the sampler wrote one (its straight leg was infeasible) — so the fingertips stay
+    in the head camera frame between two recorded in-frame poses (FOV rule (b), owner 2026-09-16 17:10); ``[]`` when
+    the state has no eef pose (the sampler's check, the stub state).
     """
 
     name: str = "place"
@@ -787,7 +792,7 @@ class Place(Action):
     #: instances the action must not touch (QA: forbidden contacts beyond the drop container), e.g. the partner a
     #: push-under drop lands in front of
     avoid: Tuple[str, ...] = ()
-    TARGET_KEYS = ("pre_place", "place", "descent", "retreat")
+    TARGET_KEYS = ("pre_place", "place", "descent", "retreat", "carry")
     KINDS: ClassVar[Tuple[str, ...]] = ("support", "drop", "attach")
 
     def __post_init__(self):
@@ -801,7 +806,38 @@ class Place(Action):
         C = _conventions()
         pre = self.pre_place if self.pre_place is not None else _pre(C, self.place, PRE_DIST)
         back = _pre(C, self.place, RETREAT_DIST)
-        return {"pre_place": pre, "place": self.place, "descent": _line(C, pre, self.place), "retreat": _line(C, self.place, back)}
+        carry, recorded = self._carry_leg(C, sidecar, state, pre)
+        return {"pre_place": pre, "place": self.place, "descent": _line(C, pre, self.place), "retreat": _line(C, self.place, back),
+                "carry": carry, "carry_recorded": recorded}
+
+    def carry_waypoints(self, sidecar) -> List[Pose]:
+        """The sampler's ``grasps[k].carry`` poses for this object / arm (``[]`` when none was recorded)."""
+        for g in getattr(sidecar, "grasps", None) or []:
+            if getattr(g, "object", None) != self.object or getattr(g, "arm", None) not in (None, self.arm):
+                continue
+            raw = (getattr(g, "extra", None) or {}).get("carry") or getattr(g, "carry", None) or []
+            return [_as_pose(w) if not isinstance(w, dict) else Pose.from_dict(w, "grasps[].carry") for w in raw]
+        return []
+
+    def _carry_leg(self, C, sidecar, state, pre: Pose) -> Tuple[List[Pose], bool]:
+        start = None
+        eef = getattr(state, "eef_pose", None)
+        if callable(eef):
+            try:
+                start = _as_pose(eef(self.arm))
+            except Exception:  # noqa: BLE001
+                start = None
+        if start is None:
+            return [], False
+        via = self.carry_waypoints(sidecar)
+        legs: List[Pose] = []
+        a = start
+        for b in via + [pre]:
+            length = math.sqrt(sum((float(x) - float(y)) ** 2 for x, y in zip(b.position, a.position)))
+            n = max(N_WAYPOINTS, int(math.ceil(length / CARRY_WAYPOINT_SPACING)))
+            legs += _as_pose_list(C.line_waypoints(a.tensors(), b.tensors(), n))
+            a = b
+        return legs, bool(via)
 
     def end_pose(self, sidecar, state):
         return _pre(_conventions(), self.place, RETREAT_DIST)

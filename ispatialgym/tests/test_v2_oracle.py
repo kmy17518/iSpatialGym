@@ -1547,12 +1547,14 @@ def test_grasp_plans_to_the_recorded_ik_witness_and_closes_the_residual(tmp_path
 
 
 def test_execute_functions_toggle_the_fov_monitor_around_the_checked_segment(tmp_path):
-    """Grasp / Place enable the gripper-in-FOV monitor once the pre-pose is reached and Place disables it again before
-    its retreat leg (the executor wires ``ctx["hooks"]["fov"]`` to ``Monitors.set_fov_enabled``)."""
+    """FOV rule (b): the grasp opens the acting arm's span once the pre-grasp is reached; nothing touches it through the
+    lift and the carry; the place closes it after the release (the executor wires ``ctx["hooks"]["fov"]`` to
+    ``Monitors.set_fov_enabled``). The carry leg is a straight Cartesian leg (``targets["carry"]``), not a trajopt."""
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
     ex, motions, backend, rec = make_executor(env, sc, tmp_path)
     calls = []
+    spans = []
     orig = ex.monitors.set_fov_enabled
 
     def spy(enabled=True):
@@ -1561,15 +1563,24 @@ def test_execute_functions_toggle_the_fov_monitor_around_the_checked_segment(tmp
 
     ex.monitors.set_fov_enabled = spy
     actions = expand(sc.alias, sc)
+    plans_before_place = None
     for i, a in enumerate(actions[:4]):
+        if i == 3:
+            plans_before_place = sum(1 for c in backend.calls if c in ("plan_pose", "plan_joint"))
         assert ex.run_action(i, a) is None, a.name
+        spans.append(dict(ex.monitors.fov_span))
     by_action = {}
     for idx, en in calls:
         by_action.setdefault(idx, []).append(en)
-    assert by_action[1] == [False, True]  # grasp: transit to the pre-grasp unmonitored, approach on
-    assert 2 not in by_action  # lift: monitored from its first step
-    assert by_action[3] == [False, True, False]  # place: transit off, descent on, retreat leg off
-    assert ex.monitors.fov_enabled  # end_action resets the hook state
+    assert by_action[1] == [False, True]  # grasp: transit to the pre-grasp unmonitored, the span opens at the pre-grasp
+    assert 2 not in by_action  # lift: the span stays open, no hook
+    assert by_action[3] == [False]  # place: no hook before the carry / descent, the span closes after the release
+    assert spans[1]["right"] and spans[2]["right"] and not spans[3]["right"]  # open after the grasp and the lift, closed after the place
+    assert not ex.monitors.fov_enabled  # no span open after the release
+    place_notes = ex.action_records[3].notes
+    assert place_notes["carry_leg"]["kind"] == "straight" and place_notes["carry_leg"]["waypoints"] >= 3
+    if place_notes["carry_leg"]["finish"] is None:  # the carry is differential IK: no trajopt in the place at all
+        assert sum(1 for c in backend.calls if c in ("plan_pose", "plan_joint")) == plans_before_place
 
 
 def test_transition_moves_the_idle_arm_to_its_recorded_posture_before_the_trunk(tmp_path):
@@ -1981,20 +1992,21 @@ def test_fov_pause_and_ghost_hand_monitors():
     mon._contact_api = FakeContacts(lambda s, q: [])
     sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-ontop_small_scale.json"))
     actions = expand(sc.alias, sc)
-    grasp, retreat = actions[1], actions[-1]
-    assert EX.fov_monitored(grasp) and not EX.fov_monitored(retreat) and EX.is_manipulation(retreat)
+    grasp, lift, retreat = actions[1], actions[2], actions[-1]
+    # rule (b): the monitor runs during every action; the spans decide the arms (a retreat after a release has none)
+    assert EX.fov_monitored(grasp) and EX.fov_monitored(retreat) and EX.is_manipulation(retreat)
     out_q = th.tensor([-3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])  # the right eef far behind the robot: outside the frame
     in_q = th.tensor([0.4, 0.0, 0.4, 0.0, 0.0, 0.0, 1.0])  # in front of the robot: in frame
     robot.dq = th.ones(28)
-    # (a) the transit to the pre-pose (the execute hook keeps the monitor disabled): the idle posture out of frame is
-    # not a verdict, only fov_idle_out events
+    # (a) the transit to the pre-grasp (no span open yet): the idle posture out of frame is not a verdict, only
+    # fov_idle_out events
     robot.q[robot.arm_control_idx["right"]] = out_q
     mon.begin_action(grasp, 1, 0, intended={"apple_omzprq_0"}, held=[])
     mon.set_fov_enabled(False)
     assert [mon.check(i) for i in range(1, 8)] == [None] * 7
     assert mon.stats.events["fov_idle_out"] == 7 and mon.stats.by_category == {}
-    # (b) from the pre-pose on the monitor is armed unconditionally (owner 10:15): a leg whose fingertips never enter
-    # the frame is a verdict after fov_min_steps, with fov_first_entry_step null and the out-of-frame step count
+    # (b) the span opens at the pre-grasp and is armed unconditionally: a leg whose fingertips never enter the frame
+    # is a verdict after fov_min_steps, with fov_first_entry_step null and the out-of-frame step count
     mon.set_fov_enabled(True)
     verdicts = [mon.check(i) for i in range(8, 11)]
     assert verdicts[:2] == [None, None] and verdicts[2].category == "gripper_out_of_fov"
@@ -2022,13 +2034,32 @@ def test_fov_pause_and_ghost_hand_monitors():
     robot.q[robot.arm_control_idx["right"]] = out_q
     assert [mon.check(i) for i in range(5, 15)] == [None] * 10
     mon.end_action()
-    # (c) a retreat is exempt even when the hand leaves the frame
+    # (c) a retreat after the release has no open span: the hand may leave the frame (fov_idle_out only)
     mon.begin_action(retreat, 4, 0, intended=set(), held=[])
+    assert mon.fov_active and not mon.fov_enabled
     robot.q[robot.arm_control_idx["right"]] = in_q
     mon.check(20)
     robot.q[robot.arm_control_idx["right"]] = out_q
-    assert [mon.check(i) for i in range(21, 30)] == [None] * 9 and not mon.fov_active
+    assert [mon.check(i) for i in range(21, 30)] == [None] * 9
     mon.end_action()
+    # (d) the span spans actions: opened at the grasp's pre-pose it is still open when the lift begins (no hook), so a
+    # lift / carry that leaves the frame is a verdict; a checkpoint carries the spans and a restore puts them back
+    mon.begin_action(grasp, 1, 0, intended=set(), held=[])
+    robot.q[robot.arm_control_idx["right"]] = in_q
+    mon.set_fov_enabled(True)
+    assert mon.check(30) is None and mon.fov_spans() == {"left": False, "right": True}
+    mon.end_action()
+    spans = mon.fov_spans()
+    mon.begin_action(lift, 2, 0, intended=set(), held=[])
+    assert mon.fov_enabled and mon.fov_span["right"]
+    robot.q[robot.arm_control_idx["right"]] = out_q
+    verdicts = [mon.check(i) for i in range(31, 34)]
+    assert verdicts[:2] == [None, None] and verdicts[2].category == "gripper_out_of_fov"
+    mon.end_action()
+    mon.set_fov_span("right", False)
+    mon.restore_fov_spans(spans)
+    assert mon.fov_span["right"] and not mon.fov_span["left"]
+    mon.set_fov_span("right", False)
     # in frame: the eef in front of the robot -> the pause monitor fires after 4 stationary steps
     robot.q[robot.arm_control_idx["right"]] = in_q
     robot.dq = th.zeros(28)
@@ -2044,8 +2075,8 @@ def test_fov_pause_and_ghost_hand_monitors():
     v = mon.check(11)
     assert v is not None and v.category == "ghost_hand" and v.details["object"] == "apple_0"
     stats = mon.stats.to_dict()
-    assert stats["by_category"] == {"gripper_out_of_fov": 2, "paused": 1, "ghost_hand": 1}  # (b) and (b')
-    assert stats["by_action"]["grasp"] == {"gripper_out_of_fov": 2, "paused": 1}
+    assert stats["by_category"] == {"gripper_out_of_fov": 3, "paused": 1, "ghost_hand": 1}  # (b), (b') and the lift of (d)
+    assert stats["by_action"]["grasp"] == {"gripper_out_of_fov": 2, "paused": 1} and stats["by_action"]["lift"] == {"gripper_out_of_fov": 1}
 
 
 def test_category_of_and_verdict_validation():

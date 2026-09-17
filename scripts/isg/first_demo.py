@@ -201,7 +201,8 @@ def cmd_demo_only(args):
     rel_tro = os.path.relpath(os.path.join(stage, "instances", os.path.basename(tro)), REPO)
     commit, dirty = git("rev-parse", "HEAD"), bool(git("status", "--porcelain", "--", "ispatialgym", "scripts"))
     t0 = time.time()
-    cmd = f"python -m ispatialgym.oracle.run_isg --instance {rel_tro} --mode oracle --out $SMOKE_OUT/demo --video --video-size 540; echo DEMO_EXIT $?"
+    extra = (" " + args.run_isg_args.strip()) if getattr(args, "run_isg_args", "") else ""
+    cmd = f"python -m ispatialgym.oracle.run_isg --instance {rel_tro} --mode oracle --out $SMOKE_OUT/demo --video --video-size 540{extra}; echo DEMO_EXIT $?"
     rc = run_remote(cmd, out_dir, args.timeout)
     demo = parse_meta(os.path.join(out_dir, "demo"))
     sv = None
@@ -377,6 +378,7 @@ def main():
     s.add_argument("--tro", required=True)
     s.add_argument("--timeout", type=int, default=3600)
     s.add_argument("--note", default="")
+    s.add_argument("--run-isg-args", default="", help="extra run_isg arguments appended verbatim (e.g. '--carry-leg trajopt' for a regression reference)")
     s.set_defaults(fn=cmd_demo_only)
     s = sub.add_parser("fix")
     s.add_argument("--commit", required=True)
