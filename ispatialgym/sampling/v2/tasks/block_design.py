@@ -62,7 +62,8 @@ REGION_RADIUS = 0.20
 #: owner 2026-09-16 10:47 ladder: block regions 0.5–0.6 m ahead of the base first, the pitched 30° / 45° picks as the primary
 #: class for every block (straight down last), the pinch 1 mm above the table so the pads get more than ~1 cm of face
 REGION_DEPTH_PREFERRED = 0.55
-MAX_REGION_DEPTH = 0.70  # farthest region cell (m, base-forward): the pick pre-grasps fail beyond (blk_diag 19:45)
+MAX_REGION_DEPTH = 0.80  # farthest init cell (m, base-forward): the probes pass picks to 0.80 m at (0.5, -0.45)
+MAX_GRID_DEPTH = 0.70  # farthest goal slot (m, base-forward): the pre-places fail beyond (blk_diag 19:45)
 GRID_LATERAL_PREFERRED = -0.20  # base-lateral of the goal grid centre: in front of the right shoulder (probe_place_depth 17:59)
 GOOD_TRUNKS = ((0.5, -0.45), (0.5, 0.0), (0.25, -0.3))  # (translate, tilt) the place-depth probe verified for pick + pre-place
 GRID_LATERAL_WINDOW = (-0.40, -0.10)  # base-lateral window of the init cells / slots the right arm's pitched classes reach
@@ -166,8 +167,8 @@ class BlockDesign(SamplerV2):
                 cands = TT.phase2_manipulation_stance(self, init, 0.5 * self.edge, target_height=self.edge, focus_candidates=self._regions, in_frame_fn=self._region_in_frame,
                                                       bands=bands, top=self.top, erosion_extra=0.02 + self.edge, focus_z=self.top.z + 0.5 * self.edge)
                 if not cands:
-                    raise Reject("no_manipulation_stance", f"Phase 2 left no region survivor ({getattr(self, '_regions_too_deep', 0)} regions dropped beyond "
-                                                            f"{MAX_REGION_DEPTH:.2f} m base-forward)")
+                    raise Reject("no_manipulation_stance", f"Phase 2 left no region survivor ({getattr(self, '_regions_too_deep', 0)} regions dropped: init cells beyond "
+                                                            f"{MAX_REGION_DEPTH:.2f} m or goal slots beyond {MAX_GRID_DEPTH:.2f} m base-forward)")
                 # PICK_FAILURE diagnostics (2026-09-16 13:20): every failing pick sat at translate 0.75–0.95 with the pre-grasp of a
                 # tilted pick out of reach (the grasp itself feasible), while the probe passes at (0.5, 0) / (0.75, −0.3):
                 # keep the shallow trunks when Phase 2 offers them
@@ -233,10 +234,14 @@ class BlockDesign(SamplerV2):
             # bonus where the bands overlap); the left band no longer forces the anchor toward λ ≈ 0
             n_left = sum(1 for c in region if self._anchor_braces_in_left_band(c, stance, right, toward)) if self.left_bands is not None else 0
             seen.add(key)
-            # hard depth cap (blk_diag 19:45-20:00: every pick pre-grasp failed the screening at 0.72-0.88 m base-forward and
-            # the far slots' pre-places failed the IK under every condition; the probes pass the picks up to 0.65-0.70 m)
+            # depth caps (blk_diag 19:45-20:00: the far slots' pre-places failed the IK under every condition at 0.74-0.88 m
+            # base-forward, the pick pre-grasps failed the screening at 0.72-0.88 m; the probes pass picks + pre-poses to
+            # 0.65-0.70 m at (0.5, 0) and to 0.80 m at (0.5, -0.45)): the goal grid (pre-places, the tighter reach) within
+            # MAX_GRID_DEPTH of the base, the init cells within MAX_REGION_DEPTH. A 0.70 m cap on every cell dropped all
+            # 867 / 1762 regions of the 20:51 first-demo run (a region spans >= 0.2 m from cells starting at ~0.55 m)
             depth_max = max(float(stance.world_to_base(c)[0]) for c in region)
-            if depth_max > MAX_REGION_DEPTH:
+            grid_depth = max(float(stance.world_to_base(focus + right * (cc * pitch) + toward * (rr * pitch))[0]) for rr in range(2) for cc in range(2))
+            if depth_max > MAX_REGION_DEPTH or grid_depth > MAX_GRID_DEPTH:
                 self._regions_too_deep = getattr(self, "_regions_too_deep", 0) + 1
                 continue
             out.append((focus, {"cells": region, "n_left_band_anchor_cells": n_left, "depth": float(stance.world_to_base(focus)[0]), "depth_max": depth_max}))
