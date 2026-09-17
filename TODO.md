@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 19:49 PDT — 6/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 20:19 PDT — 7/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -126,20 +126,20 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | camera_relocalization-obstructed | valid demo | tracker corner fix d4a1745 not yet re-demoed | oracle |
 | object_scaling | valid demo | - | - |
 | mental_rotation | valid demo | - | - |
-| disembedding | valid demo | - | - |
+| disembedding | valid demo (pre-bcc937d) | - | - |
 | CM block_design | no instance | no-flip run 19:03: target_placement x8 → tabletop adding the place pre-pose diagnostic | tabletop |
 | CM attachment | no instance | 19:06: program_check_failed x8 on the second-base-pose sidecar (transitions[].holding) → oracle program / program_check must accept it (tabletop 58afae2 ↔ oracle) | oracle / tabletop |
 | CM articulation_open_small_scale | no instance | owner 17:10 (3): Phase-2 cone 25° / focus-in-frame for small articulation (tabletop, 20 min) → hinged_jar loop | tabletop |
 | CM articulation_close_small_scale | no instance | same as open (25° cone) | tabletop |
 | CM articulation_open_large_scale | no instance | all five A3 units handle_unreachable x8 (fridge, dishwasher, oven, top_cabinet, no_top); Rs_int drawer running; large-scale: object-inclusive trav map non-traversable within 1.3 m of the cabinet face | large-scale |
 | CM articulation_close_large_scale | no instance | same as open; Rs_int drawer close = Phase-1 no_stance (base_ok instrumented 1c829ae) | large-scale |
-| alignment-world_vertical | demo run | oracle re-runs on 4b2bb60 / 9345c8a: push [execution] again (17:06) → oracle | oracle |
-| alignment-world_horizontal | demo run | oracle re-run on 4b2bb60: push plan_failed again (16:56) → oracle | oracle |
-| alignment-axial | valid demo | - | - |
-| IORS ontop_small_scale | demo run (pre-fix success) | valid on 6b856ed 18:59; re-opened by the core's 02c700d (two-tier grasp draw) — re-run scheduled (D-005 asks whether blanket fixes should keep doing this) | core / loop |
+| alignment-world_vertical | demo run | oracle chain landed (standoff, 3-D arc about the hook, loaded bounds): demo runs to the end in tolerance (0.052 rad) but not_settled — the frictionless hook (revolute limits: null, no damping) swings undamped after release → large-scale / TRO: hook joint damping/friction | large-scale |
+| alignment-world_horizontal | demo run | push plan_failed = self-collision left_realsense_link vs right_arm_link7 (13 mm) along every path: the sidecar's push witnesses have the brace arm at zeros → large-scale: two-arm witness for the push pre with the brace arm at its contact | large-scale |
+| alignment-axial | demo run (pre-fix success) | - | - |
+| IORS ontop_small_scale | valid demo (pre-bcc937d) | valid on 6b856ed 18:59; re-opened by the core's 02c700d (two-tier grasp draw) — re-run scheduled (D-005 asks whether blanket fixes should keep doing this) | core / loop |
 | IORS under_small_scale | demo run (pre-fix success) | valid on 6b856ed 19:10 (release surface 5851c8b); re-opened by 02c700d — re-run scheduled (D-005) | core / loop |
-| IORS inside | demo run (pre-fix success) | 18:53 failed_grasp at grasp (sprout spins out of the pinch?) → core diagnosing with the new grasp facts; 02c700d re-run scheduled | core / loop |
-| IORS nextto | demo run (pre-fix success) | valid on 6b856ed 19:06 (full placed_orientation gate passed); re-opened by 02c700d — re-run scheduled (D-005); FOV rule (b) monitor still pending (oracle) | core / loop |
+| IORS inside | valid demo (pre-bcc937d) | 18:53 failed_grasp at grasp (sprout spins out of the pinch?) → core diagnosing with the new grasp facts; 02c700d re-run scheduled | core / loop |
+| IORS nextto | demo run (pre-fix success) | oracle re-run 0916-181440: relation held, then the opening finger swept the pencil 9 cm at release (pencil 3 cm from the marker inside the open-jaw footprint) → core: partner outside the open-jaw footprint at the place; closure ramp + pre-shape (oracle-B) pending; placed_tilt retraction (oracle-B) | core / oracle-B |
 | IORS touching | no instance | core 6de8803: brace optional (push chain required) — napkins loop launched 18:12; oracle program_touching must accept the brace-less sidecar (queued with the oracle) | loop / oracle |
 | IORS ontop_large_scale | no instance | countertop pair = geometric yield (partner behind stance A) → floor fallback alias queued (local); sofa-bar re-run with the B→C path limit geodesic+3 m (4df6d0a) running locally | large-scale / loop |
 | IORS under_large_scale | no instance | push-under lanes 0.45–0.6 m ahead + edge-end laterals + frontal offset 0.25 m right (7162fe7, 8c93d0b, 2cfce47) — re-run queued/running | large-scale / loop |
@@ -318,3 +318,4 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026-09-16 19:40 PDT pod_scheduler: role change bands -> pool: 8lp72savyk8co4 (pilot2-a40-8), 1qzna64k3s9t8s (pilot2-l40s-1), usqruny80uunl6 (pilot2-l40s-9), 6c5712ggii2ihf (pilot2-a40-2), 88hr6mw4y5i1h8 (smoke2-l40s-1), h7thjdjnyh8qcx (pilot2-l40s-0); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed)
 - 2026-09-16 19:46 PDT pod_scheduler: role change bands -> pool: 4udkfzz52mzpih (pilot2-a40-7), z830mv63m0wjt7 (pilot2-a40-11), z2qdfyfyrgcjys (pilot2-a40-0); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed)
 - 2026‑09‑16 19:52 PDT agent-e2e: closure investigation done (register entry) → a second oracle‑side agent ("oracle‑B") launched for the program‑level items the primary oracle agent has not reached (it has been on the wall push executor since 16:00): touching program without a brace, attachment transition‑while‑holding acceptance, `placed_tilt` retraction + cylinder equivalences in the gate, the closure ramp + pre‑shape patch and the nextto demo‑only re‑run. The primary oracle agent keeps the wall push and then gets FOV rule (b) + the block flip program.
+- 2026‑09‑16 20:20 PDT agent-e2e: primary oracle report — wall chain: push plan ignores the target (`4b2bb60`), standoff planned with the support present (`9345c8a`), 3‑D push arc about the painting's hook axis (`170d02a`), loaded‑contact bounds (`63d0858`/`f5ae607`/`229c609`), retreat from the pad's actual pose with the loaded bound (`35be0ee`/`3eb8e51`), torso↔upper‑arm sphere exemption + held‑arm relaxation (`ab25eef`/`256339f`), trajopt names the blocking pair (`e5e8d1f`). **Vertical painting demo runs to the end in tolerance** but `not_settled`: the frictionless hook swings undamped → large‑scale/TRO (hook damping). Horizontal: `plan_failed` = wrist‑camera ↔ wrist self‑collision along every path because the sidecar's push witnesses have the brace arm at zeros → large‑scale (two‑arm witness). Nextto re‑run: relation held, then the opening finger swept the pencil 9 cm at release → core (partner outside the open‑jaw footprint). The agent's `placed_tilt` default (`0bf2232`, `5bd48ab` principal axis) is retracted by the owner — oracle‑B flips it back. Primary oracle now on FOV rule (b) + carry leg (+ regression on 0916‑152503), the A7 attached‑object exemption for the carried box, and the block flip program.

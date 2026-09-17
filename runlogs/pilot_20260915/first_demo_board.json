@@ -56,12 +56,12 @@
   "owner": "large-scale"
  },
  "alignment-world_vertical": {
-  "blocking": "oracle re-runs on 4b2bb60 / 9345c8a: push [execution] again (17:06) \u2192 oracle",
-  "owner": "oracle"
+  "blocking": "oracle chain landed (standoff, 3-D arc about the hook, loaded bounds): demo runs to the end in tolerance (0.052 rad) but not_settled \u2014 the frictionless hook (revolute limits: null, no damping) swings undamped after release \u2192 large-scale / TRO: hook joint damping/friction",
+  "owner": "large-scale"
  },
  "alignment-world_horizontal": {
-  "blocking": "oracle re-run on 4b2bb60: push plan_failed again (16:56) \u2192 oracle",
-  "owner": "oracle"
+  "blocking": "push plan_failed = self-collision left_realsense_link vs right_arm_link7 (13 mm) along every path: the sidecar's push witnesses have the brace arm at zeros \u2192 large-scale: two-arm witness for the push pre with the brace arm at its contact",
+  "owner": "large-scale"
  },
  "alignment-axial": {
   "blocking": "-",
@@ -80,8 +80,8 @@
   "owner": "core / loop"
  },
  "inter_object_relation_satisfaction-nextto": {
-  "blocking": "valid on 6b856ed 19:06 (full placed_orientation gate passed); re-opened by 02c700d \u2014 re-run scheduled (D-005); FOV rule (b) monitor still pending (oracle)",
-  "owner": "core / loop"
+  "blocking": "oracle re-run 0916-181440: relation held, then the opening finger swept the pencil 9 cm at release (pencil 3 cm from the marker inside the open-jaw footprint) \u2192 core: partner outside the open-jaw footprint at the place; closure ramp + pre-shape (oracle-B) pending; placed_tilt retraction (oracle-B)",
+  "owner": "core / oracle-B"
  },
  "inter_object_relation_satisfaction-touching": {
   "blocking": "core 6de8803: brace optional (push chain required) \u2014 napkins loop launched 18:12; oracle program_touching must accept the brace-less sidecar (queued with the oracle)",
