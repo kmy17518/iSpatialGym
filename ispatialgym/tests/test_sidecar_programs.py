@@ -1020,6 +1020,69 @@ def test_touching_is_push_only_without_a_brace_record():
     assert any("placed target" in p for p in problems), problems
 
 
+@pytest.mark.parametrize("st", ["configuration_matching-articulation_open_small_scale", "configuration_matching-articulation_close_small_scale"])
+def test_small_articulation_is_handle_only_without_a_brace_record(st):
+    """Owner decision D-008 = A (2026-09-16 22:02): the sampler records ``contacts.brace`` only when a joint two-arm cell
+    exists (tabletop ``generation.brace_optional``: ``contacts`` absent, ``summary.brace: none``, manipulation arms =
+    [handle_arm], ``articulation.brace_kind: null``, ``articulation.handle_arm``); the program is then transition →
+    grasp(handle) → articulate → release → retreat; the braced fixture keeps the braced chain."""
+    direction = "open" if "open" in st else "close"
+    assert "contacts.brace" not in REQUIRED_BLOCKS[st] and "articulation" in REQUIRED_BLOCKS[st]
+    with open(os.path.join(VARIANTS, f"{st}__handle_only.json")) as f:
+        d = json.load(f)
+    assert "contacts" not in d and d["summary"]["brace"] == "none" and d["stances"]["manipulation"]["arms"] == ["right"] and d["articulation"]["brace_kind"] is None
+    sc = Sidecar.from_dict(d)
+    assert sc.problems() == [] and sc.validate() is sc and not sc.has_block("contacts.brace")
+    actions = expand(sc.alias, sc)
+    assert [a.name for a in actions] == _TABLE_IN + ["grasp", "base_follow", "retreat"]
+    assert [(a.name, a.arms, a.objects) for a in actions[1:]] == [
+        ("grasp", ("right",), ("toolbox.n.01_1",)),
+        ("base_follow", ("right",), ("toolbox.n.01_1",)),
+        ("retreat", ("right",), ("toolbox.n.01_1",)),
+    ]
+    assert actions[1].kind == "handle" and actions[2].direction == direction and actions[3].release is True and actions[3].after is actions[2]
+    for a in actions:
+        fine, numbers = a.annotate(sc)
+        assert fine and numbers
+    # the handle arm comes from articulation.handle_arm: a left-handed record drives the grasp with the left arm
+    d2 = copy.deepcopy(d)
+    d2["articulation"]["handle_arm"] = "left"
+    d2["stances"]["manipulation"]["arms"] = ["left"]
+    assert [a.arms for a in expand(sc.alias, Sidecar.from_dict(d2))[1:]] == [("left",)] * 3
+    d3 = copy.deepcopy(d)
+    d3["articulation"]["handle_arm"] = "middle"
+    assert any("unknown arm 'middle'" in p for p in Sidecar.from_dict(d3).problems())
+    # the braced fixture keeps brace -> grasp -> articulate -> retreat both
+    braced = load(st)
+    assert [a.name for a in expand(braced.alias, braced)] == EXPECTED_SEQUENCE[st]
+    # a brace record on the handle arm, or on another object, is still rejected
+    d4 = raw(st)
+    d4["contacts"]["brace"]["arm"] = "right"
+    assert any("must use 'left'" in p for p in Sidecar.from_dict(d4).problems())
+    d5 = raw(st)
+    d5["contacts"]["brace"]["object"] = "nothing.n.01_1"
+    assert any("base link" in p or "language.objects has no entry" in p for p in Sidecar.from_dict(d5).problems())
+
+
+def test_small_articulation_braced_stance_lists_both_working_arms():
+    """The sampler records the braced manipulation stance with both working arms (``arms: [handle_arm, brace_arm]``) and
+    the handle arm in ``articulation.handle_arm``; the program takes the handle arm from there (a two-arm stance without the
+    record is resolved as the arm that is not the brace arm)."""
+    st = "configuration_matching-articulation_open_small_scale"
+    with open(os.path.join(VARIANTS, f"{st}__two_arm_stance.json")) as f:
+        d = json.load(f)
+    assert d["stances"]["manipulation"]["arms"] == ["right", "left"] and d["articulation"]["handle_arm"] == "right"
+    sc = Sidecar.from_dict(d)
+    assert sc.problems() == [] and [a.name for a in expand(sc.alias, sc)] == EXPECTED_SEQUENCE[st]
+    assert [a.arms for a in expand(sc.alias, sc)[1:]] == [("left",), ("right",), ("right",), ("right",), ("left",)]
+    d2 = copy.deepcopy(d)
+    d2["articulation"].pop("handle_arm")
+    assert [a.arms for a in expand(sc.alias, Sidecar.from_dict(d2))[1:]] == [("left",), ("right",), ("right",), ("right",), ("left",)]
+    d3 = copy.deepcopy(d2)
+    d3.pop("contacts")
+    assert any("cannot tell the handle arm" in p for p in Sidecar.from_dict(d3).problems())
+
+
 def test_attachment_second_base_pose_is_travelled_while_holding():
     """Owner decision 2026-09-16 17:10 item 2 (spec §6.8; tabletop ``58afae2``, core ``bd10c72``): when the attach pose
     and the brace are not both reachable from the grasp stance the sidecar records an ``attach`` stance reached with the

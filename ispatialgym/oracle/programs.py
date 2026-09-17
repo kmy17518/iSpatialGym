@@ -292,25 +292,56 @@ def program_articulation_large(sc: Sidecar, direction: str = "move") -> List[Act
     return _travel(sc, "init", "manipulation") + [grasp, follow, Retreat(arm=arm, object=art.object, after=follow, release=True)]
 
 
+def _handle_arm(sc: Sidecar, brace) -> str:
+    """The arm that grasps the handle of a small-scale articulation: ``articulation.handle_arm`` (the sampler's record,
+    tabletop ``articulation_small``), else the manipulation stance's ``handle_arm``, else its single working arm, else —
+    two working arms with a brace record — the arm that is not the brace arm."""
+    art = sc.articulation
+    st = sc.stance("manipulation")
+    for src, v in (("articulation.handle_arm", (art.extra or {}).get("handle_arm") if art is not None else None), ("stances.manipulation.handle_arm", st.extra.get("handle_arm"))):
+        if v is not None:
+            if v not in ARMS:
+                raise SidecarError(f"{src}: unknown arm {v!r}")
+            return str(v)
+    arms = st.working_arms
+    if len(arms) == 1:
+        return arms[0]
+    if brace is not None and len(arms) == 2 and brace.arm in arms:
+        return _other_arm(brace.arm)
+    raise SidecarError(f"stances['manipulation'].arms: cannot tell the handle arm from {arms!r} (record articulation.handle_arm)")
+
+
 def program_articulation_small(sc: Sidecar, direction: str = "move") -> List[Action]:
-    """init → manipulation stance → brace the base link (recorded kind) with the brace arm → grasp the handle with the
-    handle arm → move the arm along h(q_k) to the goal (or ``passive_from``) → release → retreat both."""
+    """init → manipulation stance → [brace the base link (recorded kind) with the brace arm, when the sidecar records
+    one] → grasp the handle with the handle arm → move the arm along h(q_k) to the goal (or ``passive_from``) → release
+    → retreat (both, when braced).
+
+    Small articulation = **brace optional** (owner decision D-008 = A, 2026-09-16 22:02; the axial / touching rule): the
+    sampler (tabletop ``articulation_small``, ``generation.brace_optional``) records ``contacts.brace`` only when a joint
+    two-arm cell exists — the handle grasp and the brace pass the exact two-arm IK from the manipulation or a second
+    stance; otherwise the instance is handle-only (``contacts.brace`` absent, ``summary.brace: none``,
+    ``stances.manipulation.arms == [handle_arm]``, ``articulation.brace_kind: null``) and the program is
+    ``transition → grasp(handle) → articulate → release → retreat``. ``articulation.handle_arm`` names the handle arm."""
     art = sc.articulation
     if art is None:
         raise SidecarError("articulation: required for articulation tasks")
     if art.follow_mode != "arm":
         raise SidecarError(f"articulation.follow_mode: small-scale articulation moves the arm, got {art.follow_mode!r}")
-    brace = _brace_contact(sc)
-    arm = _working_arm(sc)
-    if brace.arm != _other_arm(arm):
-        raise SidecarError(f"contacts.brace.arm: the handle arm is {arm!r}, the brace must use {_other_arm(arm)!r}")
-    if brace.object != art.object:
-        raise SidecarError("contacts.brace.object: the brace must act on the articulated object's base link")
-    base_yaw = sc.stance("manipulation").base_pose2d[2]
-    b = Brace(contact=brace, base_yaw=base_yaw)
+    brace = sc.contacts.brace if sc.contacts is not None else None
+    arm = _handle_arm(sc, brace)
+    if brace is not None:
+        if brace.arm != _other_arm(arm):
+            raise SidecarError(f"contacts.brace.arm: the handle arm is {arm!r}, the brace must use {_other_arm(arm)!r}")
+        if brace.object != art.object:
+            raise SidecarError("contacts.brace.object: the brace must act on the articulated object's base link")
     grasp = Grasp(kind="handle", arm=arm, object=art.object, articulation=art)
     follow = BaseFollow(arm=arm, articulation=art, stance=sc.stance("manipulation"), grasp_action=grasp, direction=direction)
-    return _travel(sc, "init", "manipulation") + [
+    head = _travel(sc, "init", "manipulation")
+    if brace is None:
+        return head + [grasp, follow, Retreat(arm=arm, object=art.object, after=follow, release=True)]
+    base_yaw = sc.stance("manipulation").base_pose2d[2]
+    b = Brace(contact=brace, base_yaw=base_yaw)
+    return head + [
         b,
         grasp,
         follow,

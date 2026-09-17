@@ -57,8 +57,10 @@ REQUIRED_BLOCKS: Dict[str, Tuple[str, ...]] = {
     "configuration_matching-block_design": _TABLE + ("blocks",),
     "configuration_matching-articulation_open_large_scale": _TABLE + ("articulation",),
     "configuration_matching-articulation_close_large_scale": _TABLE + ("articulation",),
-    "configuration_matching-articulation_open_small_scale": _TABLE + ("articulation", "contacts.brace"),
-    "configuration_matching-articulation_close_small_scale": _TABLE + ("articulation", "contacts.brace"),
+    # small articulation = brace optional (owner D-008 = A, 2026-09-16 22:02): ``contacts.brace`` is recorded only when a
+    # joint two-arm cell exists, otherwise the handle-only program (grasp -> articulate -> release -> retreat)
+    "configuration_matching-articulation_open_small_scale": _TABLE + ("articulation",),
+    "configuration_matching-articulation_close_small_scale": _TABLE + ("articulation",),
     # attachment keeps the brace (owner 2026-09-16 17:10 item 2): the sampler records it from the grasp stance or from a
     # second base pose (``stances.attach`` + a carried path / holding transition); only when the joint placement has no
     # cell after that is the instance brace-less (``summary.brace: none``), so ``contacts.brace`` is optional here
