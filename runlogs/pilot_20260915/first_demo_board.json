@@ -68,24 +68,24 @@
   "owner": "-"
  },
  "inter_object_relation_satisfaction-ontop_small_scale": {
-  "blocking": "valid on 6b856ed 18:59; re-opened by the core's 02c700d (two-tier grasp draw) \u2014 re-run scheduled (D-005 asks whether blanket fixes should keep doing this)",
-  "owner": "core / loop"
+  "blocking": "-",
+  "owner": "-"
  },
  "inter_object_relation_satisfaction-under_small_scale": {
   "blocking": "valid on 6b856ed 19:10 (release surface 5851c8b); re-opened by 02c700d \u2014 re-run scheduled (D-005)",
   "owner": "core / loop"
  },
  "inter_object_relation_satisfaction-inside": {
-  "blocking": "18:53 failed_grasp at grasp (sprout spins out of the pinch?) \u2192 core diagnosing with the new grasp facts; 02c700d re-run scheduled",
-  "owner": "core / loop"
+  "blocking": "-",
+  "owner": "-"
  },
  "inter_object_relation_satisfaction-nextto": {
   "blocking": "oracle re-run 0916-181440: relation held, then the opening finger swept the pencil 9 cm at release (pencil 3 cm from the marker inside the open-jaw footprint) \u2192 core: partner outside the open-jaw footprint at the place; closure ramp + pre-shape (oracle-B) pending; placed_tilt retraction (oracle-B)",
   "owner": "core / oracle-B"
  },
  "inter_object_relation_satisfaction-touching": {
-  "blocking": "core 6de8803: brace optional (push chain required) \u2014 napkins loop launched 18:12; oracle program_touching must accept the brace-less sidecar (queued with the oracle)",
-  "owner": "loop / oracle"
+  "blocking": "first instance written 20:21 (push-only sidecar accepted by 6baaaa3); demo plan_failed at grasp \u2192 oracle",
+  "owner": "oracle-B"
  },
  "inter_object_relation_satisfaction-ontop_large_scale": {
   "blocking": "countertop pair = geometric yield (partner behind stance A) \u2192 floor fallback alias queued (local); sofa-bar re-run with the B\u2192C path limit geodesic+3 m (4df6d0a) running locally",
