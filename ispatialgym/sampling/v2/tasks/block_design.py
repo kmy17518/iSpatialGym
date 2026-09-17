@@ -632,8 +632,11 @@ class BlockDesign(SamplerV2):
         # classes whose wrist stays on the robot's side first (PLACE_FACTORS 19:45: at 0.7 m base-forward the pre-poses whose
         # lean puts the wrist beyond the block, 0.74 m forward and 11 cm up, fail the IK under every condition while the
         # grasp poses pass; the pre-grasp / pre-place reach decides at the far cells)
-        screened.sort(key=lambda c: float(manip.world_to_base(IK.pre_pose(c[5].eef)[0][:2])[0]) + float(manip.world_to_base(IK.pre_pose(c[6])[0][:2])[0]))
-        pre_picks = [[IK.pre_pose(c[5].eef), c[5].eef] for c in screened]
+        # pre-pose distances (prepared knobs, defaults = the §3.6 convention 10 cm): probe_place_depth 17:59 - a 5 cm pre-place
+        # passes 1.5-2x as many cells as 10 cm at the arm-friendly trunks; the oracle follows the recorded pre_place / pre_pick
+        d_pick, d_place = float(self.gen("pre_pick_dist_m", C.PRE_DIST)), float(self.gen("pre_place_dist_m", C.PRE_DIST))
+        screened.sort(key=lambda c: float(manip.world_to_base(IK.pre_pose(c[5].eef, d_pick)[0][:2])[0]) + float(manip.world_to_base(IK.pre_pose(c[6], d_place)[0][:2])[0]))
+        pre_picks = [[IK.pre_pose(c[5].eef, d_pick), c[5].eef] for c in screened]
         ok_pick = self.ikc.screen_pairs(pre_picks, manip, "right", ignore_for_last=[support, block])
         idx = [i for i, s in enumerate(ok_pick.tolist()) if s]
         if not idx:
@@ -643,14 +646,14 @@ class BlockDesign(SamplerV2):
         place_diag: List[str] = []
         for i in idx:  # sorted: the wrist-on-the-robot's-side classes first
             pair, tilt_pick, tilt_place, yaw, sign, g_pick, place_eef = screened[i]
-            pre_pick = IK.pre_pose(g_pick.eef)
+            pre_pick = IK.pre_pose(g_pick.eef, d_pick)
             res = self.ikc.exact([pre_pick, g_pick.eef], manip, "right", ignore_for_last=[support, block])
             if not res.ok:
                 place_diag.append(f"{pair}/t{tilt_pick:+.0f}/y{math.degrees(yaw) % 360:.0f}: pick exact {res.reason}")
                 continue
             # place (and pre-place) with the block in hand; the world: placed blocks at their slots, this block removed (attached)
             place_margin_pose = (place_eef[0] + _xy3(right) * PLACE_MARGIN + _xy3(toward) * PLACE_MARGIN, place_eef[1])
-            pre_place = IK.pre_pose(place_margin_pose)
+            pre_place = IK.pre_pose(place_margin_pose, d_place)
             with TT.posed_in_hand(self, "right", block, C.relative(g_pick.eef, pick_pose)):
                 with attached(self.kit, "right", block):
                     res_p = self.ikc.exact([pre_place, place_margin_pose], manip, "right", ignore_for_last=place_ignore)
