@@ -310,6 +310,46 @@ def test_program_check_tracker_handle_grasp_carries_nothing():
     assert tr.carried == "block.n.01_1"
 
 
+def test_program_check_tracker_locks_the_brace_arm_until_its_retreat():
+    """Owner 2026‑09‑16 22:55 item 3 (wall horizontal 0916‑212037: push witnesses solved with the brace arm at zeros ran the
+    push arm through the braced arm): after a ``brace`` the bracing arm is locked at its contact witness for every action
+    of the other arm (push, the push arm's retreat); its own retreat releases it; the acting arm is never locked."""
+    sd = SidecarDraft("alias", "alignment")
+    sd.add_stance(Stance("init", (0.0, 0.0, 0.0), 0.5))
+    tr = PC._Tracker(sd)
+
+    class A:
+        def __init__(self, name, arms, **kw):
+            self.name = name
+            self.arms = tuple(arms)
+            self.__dict__.update(kw)
+
+    class Robot:
+        arm_control_idx = {"left": th.tensor([10, 12, 14, 16, 18, 20, 22]), "right": th.tensor([11, 13, 15, 17, 19, 21, 23])}
+
+    class Kit:
+        robot = Robot()
+
+    class Sampler:
+        kit = Kit()
+
+    q = [0.0] * 28
+    for i, v in zip(Robot.arm_control_idx["right"].tolist(), [0.1, -2.5, -0.5, -1.6, 2.2, 0.6, -0.05]):
+        q[i] = v
+    brace, push = A("brace", ["right"]), A("push", ["left"])
+    assert tr.locked_arms(brace) == {} and tr.locked_arms(push) == {}
+    tr.after(brace, {"pre": {"q": [0.0] * 28}, "contact": {"q": q}, "approach": {"q": q}}, Sampler())
+    locked = tr.locked_arms(push)
+    assert list(locked) == ["right"] and th.allclose(locked["right"], th.tensor([0.1, -2.5, -0.5, -1.6, 2.2, 0.6, -0.05]))
+    assert tr.locked_arms(A("retreat", ["right"])) == {}  # the bracing arm's own actions are never locked against itself
+    tr.after(push, {"pre": {"q": [0.0] * 28}}, Sampler())
+    assert list(tr.locked_arms(A("retreat", ["left"]))) == ["right"]  # the push arm retreats while the brace still holds
+    tr.after(A("retreat", ["left"]), {"retreat": {"q": [0.0] * 28}}, Sampler())
+    assert list(tr.locked_arms(A("retreat", ["right"], release=True))) == []
+    tr.after(A("retreat", ["right"], release=True), {"retreat": {"q": [0.0] * 28}}, Sampler())
+    assert tr.arm_q == {}
+
+
 def test_program_check_ignore_sets_mirror_the_sampler():
     """Large-scale A4/A5/A8: a brace approach runs along the wall -> the supports are removed for every waypoint (as for a
     push), the braced object only at the contact; explicit ``ignore_every`` / ``ignore_last`` on the record win."""

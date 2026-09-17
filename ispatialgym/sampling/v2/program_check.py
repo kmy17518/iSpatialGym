@@ -237,10 +237,13 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
         except Exception as e:
             raise Reject("program_check_failed", f"targets() failed: {e!r}", action=name)
         stance_name, carried = tracker.before(action)
-        n, witnesses = check_action_targets(sidecar, sampler, action, targets, stance_name, carried)
-        tracker.after(action)
+        locked = tracker.locked_arms(action)
+        n, witnesses = check_action_targets(sidecar, sampler, action, targets, stance_name, carried, locked_arms=locked)
+        tracker.after(action, witnesses, sampler)
         entry = {"index": i, "name": name, "arms": list(getattr(action, "arms", ()) or []), "objects": list(getattr(action, "objects", ()) or []),
                  "stance": stance_name, "carried": carried, "n_poses": n, "witnesses": witnesses}
+        if locked:
+            entry["locked_arms"] = sorted(locked)  # the other arm(s) held at their contact configuration while these poses were solved
         report["actions"].append(entry)
     # the recorded joint solutions (28-D, arm joints + trunk + fingers meaningful) per checked end pose: D5 verifies them as
     # witnesses (FK + collision) instead of re-solving the randomised IK
@@ -251,7 +254,11 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
 
 class _Tracker:
     """Where the robot is and what it holds while the program runs: ``Navigate`` -> ``path.to``, ``Transition`` ->
-    ``transition.to``; ``Grasp`` picks up ``object`` (held until ``Place``)."""
+    ``transition.to``; ``Grasp`` picks up ``object`` (held until ``Place``); ``Brace`` parks its arm at the contact
+    configuration until that arm's ``Retreat`` (``arm_q``: the witnesses of the other arm's actions in between are
+    solved with the bracing arm locked there — owner 2026‑09‑16 22:55 item 3: the horizontal push witnesses solved
+    with the brace arm at the stance posture put the push arm in a branch that runs through the braced arm,
+    ``left_realsense_link`` vs ``right_arm_link7`` 13 mm along every path, demo 0916‑212037)."""
 
     def __init__(self, sidecar: SidecarDraft):
         self.stance = "init"
@@ -259,6 +266,13 @@ class _Tracker:
         # the held-object tasks start with the object in the hand (§6.3): the init stance records ``carried``
         self.carried: Optional[str] = init.carried if init is not None else None
         self.sidecar = sidecar
+        #: arm -> its 7 arm-joint values while it braces (from the brace action's ``contact`` witness)
+        self.arm_q: Dict[str, th.Tensor] = {}
+
+    def locked_arms(self, action) -> Dict[str, th.Tensor]:
+        """The arms held at a contact configuration while ``action`` runs (never the acting arm itself)."""
+        acting = set(getattr(action, "arms", ()) or [])
+        return {a: q for a, q in self.arm_q.items() if a not in acting}
 
     def before(self, action) -> Tuple[str, Optional[str]]:
         name = getattr(action, "name", "")
@@ -278,7 +292,7 @@ class _Tracker:
                     stance = k
         return stance, carried
 
-    def after(self, action) -> None:
+    def after(self, action, witnesses: Optional[Dict[str, Any]] = None, sampler=None) -> None:
         name = getattr(action, "name", "")
         if name == "navigate" and getattr(action, "path", None) is not None:
             self.stance = action.path.to
@@ -291,6 +305,16 @@ class _Tracker:
             self.carried = getattr(action, "object", None) if getattr(action, "kind", "library") != "handle" else None
         elif name == "place":
             self.carried = None
+        arms = list(getattr(action, "arms", ()) or [])
+        if name == "brace" and arms and witnesses and sampler is not None:
+            # the brace hand stays at its contact until its own retreat: its solved contact configuration locks the arm for
+            # every action of the other arm in between (the push and the push arm's retreat)
+            w = witnesses.get("contact") or witnesses.get("approach")
+            if w is not None and w.get("q") is not None:
+                q = th.tensor(w["q"], dtype=th.float32)
+                self.arm_q[arms[0]] = q[sampler.kit.robot.arm_control_idx[arms[0]]].clone()
+        elif name == "retreat" and arms:
+            self.arm_q.pop(arms[0], None)
 
 
 def check_base_follow_handles(sidecar: SidecarDraft, sampler, action, targets: Dict[str, Any], stance: Stance, arm: str, witnesses: Dict[str, Any]) -> int:
@@ -427,12 +451,19 @@ def _explicit_ignores(rec, sampler) -> Optional[Tuple[List[Any], List[Any]]]:
     return _resolve(src.get("ignore_last")), _resolve(src.get("ignore_every"))
 
 
-def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, stance_name: str, carried: Optional[str]) -> Tuple[int, Dict[str, Any]]:
+def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, stance_name: str, carried: Optional[str],
+                         locked_arms: Optional[Dict[str, th.Tensor]] = None) -> Tuple[int, Dict[str, Any]]:
     """IK / collision check of every eef pose / waypoint list in ``targets`` from the recorded stance ``stance_name``
     (its recorded configuration: working arm untucked, idle arm in its posture, trunk of the stance) with the ``carried``
     object attached to the carrying arm and posed in the hand. Base-pose targets (paths, transitions, base-follow) are
     whole-body collision-checked at the stance trunk. Returns ``(number of poses checked, witnesses)`` where
-    ``witnesses`` maps each target key to ``{"pose": {position, orientation}, "q": [28 joints]}`` of the end pose."""
+    ``witnesses`` maps each target key to ``{"pose": {position, orientation}, "q": [28 joints]}`` of the end pose.
+
+    ``locked_arms`` (owner 2026‑09‑16 22:55 item 3): arm -> 7 arm-joint values of an arm that holds a contact while this
+    action runs (the brace arm at its contact during the push and the push arm's retreat): those arms are **locked at
+    that configuration** for every IK / collision check here — a two-arm exact IK as the wall / axial modules solve it —
+    instead of the stance's idle posture; a pre-pose without a solution in that world is a rejection
+    (``program_check_failed``), never a witness the oracle has to plan through the braced arm."""
     from ispatialgym.sampling.sim_utils import Reject
     from ispatialgym.sampling.v2 import navigation as NAV
     from ispatialgym.sampling.v2.navigation import attached
@@ -441,6 +472,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     arms = list(getattr(action, "arms", ()) or ["right"])
     arm = arms[0]
     stance: Stance = sidecar.stance(stance_name)
+    locked = {a: q for a, q in (locked_arms or {}).items() if a != arm}
     carried_obj = sampler.objects.get(carried) if carried else None
     g = sidecar.grasp_of(carried) if carried else None
     eef_in_object = g.eef_in_object if g is not None else None
@@ -461,6 +493,13 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     if name == "base_follow" and isinstance(targets, dict) and targets.get("mode") != "base":
         n += check_base_follow_handles(sidecar, sampler, action, targets, stance, arm, witnesses)
     attach_arm = (g.arm if g is not None and g.arm else arm) if carried_obj is not None else None
+    # the IK seed / locked-joint source: the stance configuration, with every arm that holds a contact put at it
+    q_seed = None
+    if locked:
+        q_seed = sampler.ikc.q_locked(stance, fingers=fingers).clone()
+        for a, qa in locked.items():
+            q_seed[sampler.kit.robot.arm_control_idx[a]] = th.as_tensor(qa, dtype=th.float32)
+    where = f"stance {stance_name}, arm {arm}, carried {carried}" + (f", {'/'.join(sorted(locked))} arm locked at its contact" if locked else "")
     with attached(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object):
         for key, poses in iter_pose_targets(targets):
             if key.split(".")[0] in skip_keys:
@@ -470,14 +509,15 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                 # removed for it as along the tracked chain (owner A) - with it in the world the open pads straddling the
                 # target pass or fail at margin 0 by millimetres (teacup 18:41: 'grasp: exact IK failed at pose 1 of 1')
                 res = sampler.ikc.exact(poses, stance, arm, ignore_for_last=ignore_last + ignore_all + list(approached or []), cache=False, fingers=fingers,
-                                        approached=approached)
+                                        approached=approached, q_seed=q_seed)
             else:
-                res = sampler.ikc.waypoints_ok(poses, stance, arm, ignore_for_last=ignore_last, ignore_all=ignore_all, cache=False, fingers=fingers, approached=approached)
+                res = sampler.ikc.waypoints_ok(poses, stance, arm, ignore_for_last=ignore_last, ignore_all=ignore_all, cache=False, fingers=fingers, approached=approached,
+                                               q_seed=q_seed)
             n += len(poses)
             if not res.ok:
                 # a straight approach without a configuration in the pre pose's IK branch is its own reason (the oracle
                 # cannot track it: plan_failed); everything else is program_check_failed
-                raise Reject(res.code or "program_check_failed", f"{key}: {res.reason} (stance {stance_name}, arm {arm}, carried {carried})", action=name)
+                raise Reject(res.code or "program_check_failed", f"{key}: {res.reason} ({where})", action=name)
             if res.q is not None:
                 last = poses[-1]
                 # the witness the oracle re-uses (primary oracle 2026-09-16 23:06): polished onto the recorded pose (FK residual
