@@ -530,11 +530,6 @@ class ArticulationLarge(SamplerV2):
             raise Reject("missing_handle", f"{obj.name}/{joint_name}: no bar / knob / edge / reviewer pinch in {path and os.path.relpath(path, REPO_ROOT)} or {HANDLES_CSV}")
         row = ranked[0]
         handle = row.as_handle()
-        # bar length (instance frame) for the grasp slide along the bar (§5.3 bars: any point along the bar is a pinch)
-        for hrec in (jinfo.get("handles") or []):
-            if hrec.get("kind") == handle.get("kind") and hrec.get("length") is not None:
-                handle["length"] = float(hrec["length"])
-                break
         width = handle.get("width")
         if width is not None and not (PINCH_WIDTH_RANGE[0] <= float(width) <= PINCH_WIDTH_RANGE[1]):
             # the reviewer's / record's next pinch inside the range, if any
@@ -543,6 +538,11 @@ class ArticulationLarge(SamplerV2):
                 row, handle = alt[0], alt[0].as_handle()
             else:
                 raise Reject("missing_handle", f"{obj.name}/{joint_name}: pinch width {1000 * float(width):.0f} mm outside {[1000 * w for w in PINCH_WIDTH_RANGE]} mm")
+        # bar length (instance frame) for the grasp slide along the bar (§5.3 bars: any point along the bar is a pinch)
+        for hrec in (jinfo.get("handles") or []):
+            if hrec.get("kind") == handle.get("kind") and hrec.get("length") is not None:
+                handle["length"] = float(hrec["length"])
+                break
         jt = obj.joints[joint_name]
         jinfo.setdefault("type", "RevoluteJoint" if jt.is_revolute else "PrismaticJoint")
         jinfo.setdefault("lower", float(jt.lower_limit))
