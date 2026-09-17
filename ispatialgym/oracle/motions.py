@@ -75,6 +75,9 @@ class MotionsConfig:
     #: joint-space convergence tolerance for streamed trajectories (rad) and the loose bound that fails the motion
     joint_tol: float = 0.02
     joint_tol_loose: float = 0.08
+    #: a contact leg (a push arc, a brace approach) ends with the pad pressing on the object: the position-controlled
+    #: joints settle with a steady error that reflects the contact force, not a tracking failure
+    joint_tol_loaded: float = 0.25
     #: how long to keep holding the final waypoint while waiting for convergence (steps)
     settle_steps: int = 90
     #: eef speed of ``arm_along`` (m/s, rad/s) and the densification resolution of its waypoint lists (m, rad)
@@ -335,7 +338,7 @@ class Motions:
             if float(self.robot.get_joint_velocities().abs().max()) < vel_tol:
                 return
 
-    def _wait_converged(self, arms: Sequence[str], trunk: bool, tol: float, max_steps: int) -> Iterator[th.Tensor]:
+    def _wait_converged(self, arms: Sequence[str], trunk: bool, tol: float, max_steps: int, loose: Optional[float] = None) -> Iterator[th.Tensor]:
         def err() -> float:
             return max([self.state.arm_error(a) for a in arms] + ([self.state.trunk_error()] if trunk else [0.0]))
 
@@ -344,8 +347,10 @@ class Motions:
                 return
             yield self._emit()
         e = err()
-        if e > self.cfg.joint_tol_loose:
+        if e > (self.cfg.joint_tol_loose if loose is None else loose):
             raise SkillError("execution", f"joints did not converge (max err {e:.3f} rad)", arms=list(arms), trunk=trunk, err_rad=e)
+        if e >= tol:
+            log.info("joints settled %.3f rad off their targets (accepted%s)", e, ", contact leg" if loose is not None else "")
 
     # ------------------------------------------------------------------ gripper
 
@@ -405,9 +410,10 @@ class Motions:
 
     # ------------------------------------------------------------------ joint trajectory streaming
 
-    def execute_joint_trajectory(self, q_traj: th.Tensor, arms: Sequence[str], trunk: bool = False, tol: Optional[float] = None) -> Iterator[th.Tensor]:
+    def execute_joint_trajectory(self, q_traj: th.Tensor, arms: Sequence[str], trunk: bool = False, tol: Optional[float] = None, loaded: bool = False) -> Iterator[th.Tensor]:
         """Stream a ``(T, 28)`` joint trajectory (one waypoint per control step) for the given groups, then hold the
-        last waypoint until the joints converge."""
+        last waypoint until the joints converge (``loaded``: a contact leg, the steady error under the contact force
+        is accepted up to ``joint_tol_loaded``)."""
         q_traj = C.as_tensor(q_traj)
         if len(q_traj) > self.cfg.trajectory_max_steps:
             raise SkillError("timeout", f"trajectory of {len(q_traj)} steps exceeds the budget {self.cfg.trajectory_max_steps}")
@@ -415,7 +421,7 @@ class Motions:
         for q in q_traj:
             self.state.set_from_q(q, arms=arms, trunk=trunk)
             yield self._emit()
-        yield from self._wait_converged(arms, trunk, tol or self.cfg.joint_tol, self.cfg.settle_steps)
+        yield from self._wait_converged(arms, trunk, tol or self.cfg.joint_tol, self.cfg.settle_steps, loose=self.cfg.joint_tol_loaded if loaded else None)
         if trunk:
             self.trunk = TrunkState.from_q(self.state.trunk_target, translate_rate=self.cfg.trunk_translate_rate, tilt_rate=self.cfg.trunk_tilt_rate)
 
@@ -535,7 +541,7 @@ class Motions:
         return dense
 
     def arm_along(self, arm: str, waypoints: Sequence[Any], speed: Optional[float] = None, finish: Optional["ApproachFinish"] = None,
-                  soft_pos_tol: Optional[float] = None) -> Iterator[th.Tensor]:
+                  soft_pos_tol: Optional[float] = None, loaded: bool = False) -> Iterator[th.Tensor]:
         """Track a given eef waypoint list with damped-least-squares differential IK on the arm's joints (trunk and
         base locked), streamed at ``speed`` (m/s; ``cartesian_speed``). The list is densified to the tracking
         resolution and every waypoint is reached in order; no collision veto (contact motions must touch — the QA
@@ -599,7 +605,7 @@ class Motions:
                                    "by": "witness" if finish.q_hint is not None else "curobo_ik"}
                     return
             raise SkillError("plan_failed", f"arm_along({arm}): {res.status}", stage="diff_ik", n_waypoints=len(waypoints), **{k_: v for k_, v in diag.items() if k_ in ("fail_index", "pos_err", "rot_err")})
-        yield from self.execute_joint_trajectory(self._retime(res.q_traj, steps), arms=[arm])
+        yield from self.execute_joint_trajectory(self._retime(res.q_traj, steps), arms=[arm], loaded=loaded)
 
     # ------------------------------------------------------------------ base
 
