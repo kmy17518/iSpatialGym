@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 21:46 PDT — 8/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 21:52 PDT — 10/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -136,10 +136,10 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | alignment-world_vertical | demo run | oracle chain landed (standoff, 3-D arc about the hook, loaded bounds): demo runs to the end in tolerance (0.052 rad) but not_settled — the frictionless hook (revolute limits: null, no damping) swings undamped after release → large-scale / TRO: hook joint damping/friction | large-scale |
 | alignment-world_horizontal | demo run | push plan_failed = self-collision left_realsense_link vs right_arm_link7 (13 mm) along every path: the sidecar's push witnesses have the brace arm at zeros → large-scale: two-arm witness for the push pre with the brace arm at its contact | large-scale |
 | alignment-axial | valid demo | re-run 20:40 (oracle retreat changes 35be0ee/3eb8e51): plan_failed at retreat → primary oracle | oracle |
-| IORS ontop_small_scale | demo run (pre-fix success) | - | - |
+| IORS ontop_small_scale | valid demo (pre-de4e723) | - | - |
 | IORS under_small_scale | valid demo (pre-de4e723) | D-007 A landed (core 5555526: robust under/ontop predicate, branch logged) — re-run queued | loop |
 | IORS inside | valid demo (pre-166005f,de4e723) | valid on f5ae607; re-opened by the core's targeted 1ba5e74 (open pads clear of the support: the failing sprout grasp had its fingertip at the table) — re-run queued | loop |
-| IORS nextto | demo run (pre-fix success) | closure ramp + pre-shape (bcc937d): 0.386 → 0.038 rad; the release still flings the pencil (blocked lower pad snaps open in the retreat) → oracle-B staged / rate-limited release; gate = placed_orientation with cylinder equivalences (38258f0) | oracle-B |
+| IORS nextto | valid demo | closure ramp + pre-shape (bcc937d): 0.386 → 0.038 rad; the release still flings the pencil (blocked lower pad snaps open in the retreat) → oracle-B staged / rate-limited release; gate = placed_orientation with cylinder equivalences (38258f0) | oracle-B |
 | IORS touching | demo run | push spans the measured gap at the place + tolerance margin (core a6d7123); pre-grasp joint jump / grasp plan → primary oracle; re-run queued | loop / oracle |
 | IORS ontop_large_scale | no instance | countertop pair = geometric yield (partner behind stance A) → floor fallback alias queued (local); sofa-bar re-run with the B→C path limit geodesic+3 m (4df6d0a) running locally | large-scale / loop |
 | IORS under_large_scale | no instance | push-under lanes 0.45–0.6 m ahead + edge-end laterals + frontal offset 0.25 m right (7162fe7, 8c93d0b, 2cfce47) — re-run queued/running | large-scale / loop |
@@ -332,3 +332,5 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026‑09‑16 21:40 PDT agent-e2e: core — **D‑007 A landed** (`5555526`): `ispatialgym.sampling.predicates.evaluate_predicate` shared by the sampler's goal check and `ISpatialGymTask` (OmniGibson verdict → contact‑patch rays from 3 mm below the support surface → geometry branch; `goal_check.binary_branch` in the summary, `predicate_branches()` for `meta.binary_branch`; spec §6.11); touching push spans the measured gap at the place + the place tolerance + 5 mm (`a6d7123`; run 0916‑202403 had a 2.74 cm arc against a 4.1 cm executed gap). Both targeted → re‑runs queued.
 - 2026-09-16 21:43 PDT pod_scheduler: role change pool -> bands: z2qdfyfyrgcjys (pilot2-a40-0); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed)
 - 2026‑09‑16 21:50 PDT agent-e2e (side chat, note only): owner decisions 21:46 recorded in the register — wall hinge damping (do it), the five appliance aliases in parallel with the Rs_int drawer, coverage check 0 misses, D‑007 A landed `5555526`. No launches made from the side chat.
+- 2026-09-16 21:50 PDT pod_scheduler: role change pool -> bands: xnam1nh3y2706e (smoke-l40s-3), cy0f5t6i58i08v (pilot2-l40s-3); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed)
+- 2026‑09‑16 21:54 PDT agent-e2e (owner 21:53): **Slack bridge paused** until the owner says "resume slack messaging" — status loop stopped, channel + D‑006 thread subscriptions closed, no posts / no reply handling; `pending_decisions.json`, `status.md`, the board and the ledger keep updating locally (D‑006 answered by default A; nothing open). Last posts: `[STATUS 21:52]` (10/21 valid) + four `[DEMO-VALID]` (axial, teacup, nextto, ontop‑small).
