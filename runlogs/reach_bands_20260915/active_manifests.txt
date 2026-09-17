@@ -1,2 +1,0 @@
-runlogs/reach_bands_20260915/jobs_shampoo_countertops.json
-runlogs/reach_bands_20260915/jobs_w3_heldout.json
