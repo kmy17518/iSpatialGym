@@ -515,4 +515,5 @@ def test_bar_axis_and_offsets():
     assert bar_offsets(h) == [0.0, 0.131, -0.131, 0.261, -0.261]  # usable half 0.3212 - 0.06 = 0.2612: its half and itself
     assert bar_offsets({"kind": "bar", "length": 0.3959, "approach_dir": [1, 0, 0], "pinch_axis": [0, 0, 1]}) == [0.0, 0.069, -0.069, 0.138, -0.138]
     assert bar_offsets({"kind": "knob"}) == [0.0]
-    assert bar_offsets({"kind": "bar", "length": 0.2, "approach_dir": [1, 0, 0], "pinch_axis": [0, 0, 1]}) == [0.0]
+    assert bar_offsets({"kind": "bar", "length": 0.2, "approach_dir": [1, 0, 0], "pinch_axis": [0, 0, 1]}) == [0.0, 0.04, -0.04]  # usable half 0.04
+    assert bar_offsets({"kind": "bar", "length": 0.15, "approach_dir": [1, 0, 0], "pinch_axis": [0, 0, 1]}) == [0.0]  # below the 4 cm step
