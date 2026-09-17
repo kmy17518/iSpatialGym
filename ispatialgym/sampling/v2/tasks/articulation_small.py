@@ -186,6 +186,12 @@ class ArticulationSmall(SamplerV2):
             centre = self.hull.mean(dim=0)
             if float(th.dot(perp[:2], (centre - hinge)[:2])) < 0:
                 perp = -perp
+            if self.direction == "close":
+                # close starts from the stable open state; a free hinge holds only past vertical (hinged jar: the upper
+                # limit 2.618 rad alone held in the 22:26 / 23:14 runs), where the lid lies flipped over the hinge — with the
+                # free edge toward the robot the open handle ends up behind the body (0/225 handle cells, no_workspace x3);
+                # the hinge toward the robot puts the open lid's handle on the robot's side
+                perp = -perp
             outward = perp
         outward[2] = 0.0
         return C.unit(outward)
@@ -236,9 +242,9 @@ class ArticulationSmall(SamplerV2):
         if self.direction == "open":
             self.q_init, self.q_goal = self.lower, float(np.random.default_rng(self.ctx.base_seed).choice(self.stable))
         else:
-            # close: the init is a stable open value (§6.6); the LEAST open one — the handle of a lid resting 150 deg back
-            # (hinged jar, first-demo runs 0916-205838 / 214238: q_init 2.618) lies behind the body and no handle cell exists
-            # at any trunk ('no_workspace'), while the 75 deg state the open variant reaches has 10-22 cells per trunk
+            # close: the init is a stable open value (§6.6), the least open one (a free hinge usually holds only at the upper
+            # limit: the hinged jar's stable set was {2.618} in the 22:26 / 23:14 runs; the facing rule turns the hinge toward
+            # the robot for close so that the open lid's handle is on the robot's side, see _facing_local)
             self.q_init, self.q_goal = float(min(self.stable)), self.lower
         self.required, self.passive_from = self._required_waypoints(target)
         # H_max at q_init, half extent at q_init
