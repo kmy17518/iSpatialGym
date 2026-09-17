@@ -38,7 +38,7 @@ import torch as th
 
 from ispatialgym.robot import conventions as C
 from ispatialgym.sampling import geometry as G
-from ispatialgym.sampling.constraints import Hinge, create_hinge, remove_hinge
+from ispatialgym.sampling.constraints import HINGE_STOP_DECEL_RAD_S2, HINGE_VISCOUS_TAU_S, Hinge, create_hinge, hinge_resistance, remove_hinge
 from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft, _jsonable
 from ispatialgym.sampling.tro_writer import pose_target
@@ -920,12 +920,26 @@ class AlignmentWall(SamplerV2):
         remove_hinge(self.hinge)
         self.hinge = None
 
+    def hinge_resistance(self) -> Dict[str, float]:
+        """§7 hinge friction / damping of the wall hinge (owner 2026‑09‑16 22:05): from the target's inertia about the
+        hinge axis (its mass and the canonical extents perpendicular to the front axis = width along the wall × height),
+        friction = I_n · ``generation.hinge_stop_decel_rad_s2`` (5 rad/s²), damping = I_n / ``generation.
+        hinge_viscous_tau_s`` (0.02 s) — :func:`ispatialgym.sampling.constraints.hinge_resistance`."""
+        _, w, h = self.dims()
+        mass = float(self.target.mass)
+        if not (mass > 0):
+            raise Reject("spec", f"{self.tname}: the spawned target reports mass {mass} (the hinge resistance needs its inertia)")
+        return hinge_resistance(mass, (w, h), decel=float(self.param("hinge_stop_decel_rad_s2", HINGE_STOP_DECEL_RAD_S2)),
+                                tau=float(self.param("hinge_viscous_tau_s", HINGE_VISCOUS_TAU_S)))
+
     def apply_draft_extras(self, draft: Draft):
         target, wall = self.target, self.wall
         self._clear_hinge()
         link = next((l for l in wall.links.values() if l.prim_path == self._spot["wall_link"]), None)
         anchor = self.com_world(target)
-        self.hinge = create_hinge(target, anchor, self._spot["normal"], parent_link=link)
+        res = self.hinge_resistance()
+        self.hinge = create_hinge(target, anchor, self._spot["normal"], parent_link=link, friction=res["friction"], damping=res["damping"],
+                                  facts={k: v for k, v in res.items() if k not in ("friction", "damping")})
         target.keep_still()
         target.enable_gravity()
         import omnigibson as og
@@ -933,6 +947,7 @@ class AlignmentWall(SamplerV2):
         og.sim.step_physics()
         target.keep_still()
         draft.extras["constraints"] = [self.hinge.to_tro(self.tname, self.bindings.one(self.wall_role).name)]
+        draft.summary["hinge"] = {"friction_nm": res["friction"], "damping_nms_per_rad": res["damping"], "inertia_kgm2": res["inertia_kgm2"], "mass_kg": res["mass_kg"]}
 
     def settle_entities(self, draft: Draft):
         return [self.target]

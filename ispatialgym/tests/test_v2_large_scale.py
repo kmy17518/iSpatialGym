@@ -587,3 +587,25 @@ def test_bar_axis_and_offsets():
     assert bar_offsets({"kind": "knob"}) == [0.0]
     assert bar_offsets({"kind": "bar", "length": 0.2, "approach_dir": [1, 0, 0], "pinch_axis": [0, 0, 1]}) == [0.0, 0.04, -0.04]  # usable half 0.04
     assert bar_offsets({"kind": "bar", "length": 0.15, "approach_dir": [1, 0, 0], "pinch_axis": [0, 0, 1]}) == [0.0]  # below the 4 cm step
+
+
+def test_wall_hinge_resistance_record():
+    """Owner 2026‑09‑16 22:05 (spec §7): the wall hinge record carries a Coulomb friction torque and a viscous damping from
+    the target's inertia about the hinge axis (I_n = m (w² + h²) / 12): friction = I_n · 10 rad/s², damping = I_n / 0.02 s;
+    the frictionless (axial) record has neither key; the loader-side drive reads them back as the drive's max force and
+    per-degree damping."""
+    from ispatialgym.sampling import constraints as K
+
+    res = K.hinge_resistance(2.25, (0.354, 0.2946))  # the painting_s070 of demo 0916-150205 (probe 2026-09-16 23:24)
+    assert res["inertia_kgm2"] == pytest.approx(2.25 * (0.354**2 + 0.2946**2) / 12)
+    assert res["friction"] == pytest.approx(res["inertia_kgm2"] * 10.0) and res["damping"] == pytest.approx(res["inertia_kgm2"] / 0.02)
+    assert 0.3 < res["friction"] < 0.5 and 1.5 < res["damping"] < 2.5  # the painting: ~0.4 N·m (≈ 1.6 N at the pad), Coulomb down to 0.2 rad/s
+    h = K.Hinge("/World/x/isg_hinge", "painting", "walls", "base_link", th.tensor([1.0, 2.0, 1.45]), th.tensor([0.0, -1.0, 0.0]),
+                friction=res["friction"], damping=res["damping"], facts={k: v for k, v in res.items() if k not in ("friction", "damping")})
+    rec = h.to_tro("painting.n.01_1", "wall.n.01_1")
+    assert rec["type"] == "revolute" and rec["limits"] is None and rec["friction"] == pytest.approx(res["friction"]) and rec["damping"] == pytest.approx(res["damping"])
+    assert "clamp(-damping * omega, +-friction)" in rec["drive"] and rec["resistance_facts"]["mass_kg"] == 2.25
+    plain = K.Hinge("/World/y/isg_hinge", "board_game", "table", "base_link", th.zeros(3), th.tensor([0.0, 0.0, 1.0])).to_tro("board_game.n.01_1", "table.n.01_1")
+    assert "friction" not in plain and "damping" not in plain and "drive" not in plain  # the axial table hinge stays frictionless
+    # the loader's drive: absent keys keep a frictionless hinge (no drive at all)
+    assert K.apply_hinge_drive.__doc__ and "π / 180" in K.apply_hinge_drive.__doc__

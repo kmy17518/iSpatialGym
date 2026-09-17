@@ -362,7 +362,10 @@ class InstanceLoader:
                 raise LoadError("error", f"constraint parent {rec['parent']!r} not found")
             link_name = rec.get("parent_link") or parent.root_link_name
             parent_link = parent.links[link_name]
-        return create_hinge(child, th.tensor(rec["anchor_position"], dtype=th.float32), th.tensor(rec["axis"], dtype=th.float32), parent_link=parent_link)
+        # §7 hinge friction / damping (owner 2026-09-16 22:05): the wall hinge record carries a Coulomb torque + viscous
+        # damping, applied as the joint's angular drive (sampling.constraints.apply_hinge_drive); absent = frictionless (axial)
+        return create_hinge(child, th.tensor(rec["anchor_position"], dtype=th.float32), th.tensor(rec["axis"], dtype=th.float32), parent_link=parent_link,
+                            friction=rec.get("friction"), damping=rec.get("damping"))
 
     def _restore_constraints(self, records: List[dict]) -> List[dict]:
         out = []
@@ -372,8 +375,9 @@ class InstanceLoader:
                 raise LoadError("error", f"unsupported constraint type {rec.get('type')!r}")
             h = self._create_hinge(rec)
             self.hinges.append(h)
-            out.append({"child": rec["child"], "parent": rec.get("parent"), "prim_path": h.prim_path})
-            log.info("hinge restored: %s about %s at %s", rec["child"], [round(v, 3) for v in rec["axis"]], [round(v, 3) for v in rec["anchor_position"]])
+            out.append({"child": rec["child"], "parent": rec.get("parent"), "prim_path": h.prim_path, "friction": h.friction, "damping": h.damping})
+            log.info("hinge restored: %s about %s at %s (friction %s N·m, damping %s N·m·s/rad)", rec["child"], [round(v, 3) for v in rec["axis"]],
+                     [round(v, 3) for v in rec["anchor_position"]], None if h.friction is None else round(h.friction, 4), None if h.damping is None else round(h.damping, 4))
         if self.hinges:
             og.sim.update_handles()
         return out

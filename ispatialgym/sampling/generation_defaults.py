@@ -76,6 +76,10 @@ ALIGNMENT_WALL_COMMON: Dict[str, Any] = {
     "max_deviation_deg": 25.0,  # §5.5 A8: |δ| > 25° is beyond the one-stroke push (two-stroke push = later, D list)
     "stance_arm_posture": "tucked",  # §5.5 A6: the two-arm manipulation stance is checked / driven in with hanging arms, closed pads
     "hinge_drift_max_rad": 0.03,  # §5.5 hinge drift ≤ 0.03 rad after settling
+    # §7 hinge resistance (owner 2026-09-16 22:05): friction = I_n · decel (Coulomb torque), damping = I_n / tau (viscous), I_n = the
+    # target's inertia about the hinge axis; the COM hinge has no restoring torque, so a frictionless one never settles
+    "hinge_stop_decel_rad_s2": 10.0,
+    "hinge_viscous_tau_s": 0.02,
     "min_visible_objects": 5,  # §5.5 ≥ 5 objects with ≥ 200 px in the init render
     "min_object_pixels": 200,  # §5.5
     "region_seed_step_m": 0.25,  # §5.5 wall spots from support_regions (0.25 m seeding)

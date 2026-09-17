@@ -525,8 +525,10 @@ The sampler only guarantees what the loader can reproduce. Beyond the BEHAVIOR o
 `load_tro_instance` restores, after **every** `scene.reset()`:
 
 - `constraints` — the COM hinges of the alignment tasks (revolute joint parent = support root link or wall, child =
-  target, anchor = COM, axis as recorded) are re-created; the table hinge sits 1 mm below the top so the object
-  cannot rock; a hinge that is missing at evaluation is a loader error, not a free-spinning object.
+  target, anchor = COM, axis as recorded) are re-created **with the recorded hinge resistance** (§7: `friction` /
+  `damping` of the wall hinge as the joint's angular drive; absent = frictionless, the axial table hinge); the table
+  hinge sits 1 mm below the top so the object cannot rock; a hinge that is missing at evaluation is a loader error,
+  not a free-spinning object.
 - `grasps` — the held object of object scaling / mental rotation: the object is placed at
   `grasps[0].object_pose_in_eef_frame`, the recorded finger joints are applied and the assisted grasp is attached
   before the first policy step; an attach failure fails the load (`grasp_restore_failed`), it never silently starts
@@ -1475,6 +1477,23 @@ not a schema version. Each block is consumed by a named action of the oracle doc
 `transitions` → `Transition`, `grasps` → `Grasp` / `Lift` / `Place`, `contacts.push` → `Push`, `contacts.brace` →
 `Brace`, `articulation` → `BaseFollow`, `blocks` → the block-design program, `goal` → `SetTorso`, `language` → every
 action's annotation).
+
+**TRO `constraints` record (the hinge the loader re-creates, 3.14).** `{"type": "revolute", "child", "parent",
+"parent_link", "anchor_position", "axis", "limits": null, "friction", "damping", "drive", "resistance_facts"}`.
+`friction` (N·m, Coulomb torque) and `damping` (N·m·s/rad, viscous) are the **hinge resistance** of the wall alignment
+hinge (owner 2026‑09‑16 22:05): the hinge sits at the COM, so gravity exerts no restoring torque and a frictionless
+joint keeps whatever angular velocity the last contact left (vertical painting demo 0916‑194735: 0.25–0.6 rad/s for
+the whole settle window, `not_settled`). The sampler sets both from the target's inertia about the hinge axis
+I_n = m (w² + h²) / 12 (mass of the spawned target, canonical width × height perpendicular to the front axis):
+`friction = I_n · 10 rad/s²` (`generation.hinge_stop_decel_rad_s2`; pod probe 2026‑09‑16 23:24 on the painting_s070
+instance, 2.25 kg, I_n = 0.040 kg·m²: a 0.5 / 1.0 rad/s kick settles in 0.43 / 0.53 s with 0.022 / 0.080 rad of drift —
+at 5 rad/s² 0.040 / 0.155 rad; the push works against ≈ 1.6 N at the pad), `damping = I_n / 0.02 s`
+(`generation.hinge_viscous_tau_s`: the Coulomb regime reaches down to friction / damping = 0.2 rad/s, then a 20 ms
+exponential creep). The loader applies them as a `UsdPhysics.DriveAPI` angular drive on the joint (stiffness 0, target
+velocity 0, `damping` per deg/s = damping · π/180, `maxForce` = friction): PhysX's implicit force-limited damped
+spring gives torque = clamp(−damping · ω, ±friction) — recorded verbatim in `drive`; `physxJoint:jointFriction` is not
+usable (articulation joints only; the hinge is a plain joint). `resistance_facts` = the mass, extents and inertia the
+values came from. The axial table hinge (6.10) records neither key: frictionless as before.
 
 ## 8. Error tolerances
 
