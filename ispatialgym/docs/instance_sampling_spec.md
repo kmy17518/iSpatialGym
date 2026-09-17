@@ -1217,6 +1217,22 @@ and placed at its slot — grasp → place(intermediate) → grasp → place, ev
 grasp / place (two grasp records per flipped block, each its own FOV span, §3.9); the carried‑tilt flip (pick tilt →
 place tilt) is no longer the flip mechanism.
 
+*Implementation (`block_design.py`, `0ec0153d`, behind `generation.block_table_flip`, default off):* two quarter turns
+about different horizontal axes compose to a 120° body‑diagonal rotation and two about the same axis to 180°, so the only
+two‑leg chain through a stable intermediate pose is **yaw first**: leg 1 grasps the block at init, turns it in hand by
+ψ + k·90° (k ∈ {1, 3, 2}: an orbit about the vertical, the goal face moves to a side or to the back) and places it on a
+free region cell (≥ spacing from every other block's init pose and slot, nearest the block's own cell first); leg 2
+re‑grasps it there with the pinch **along** the remaining flip axis and turns it by the one quarter turn about that
+horizontal table axis that brings the goal face up (both senses offered to the IK), placing it at the slot. The block's
+goal orientation becomes the resulting table‑aligned quaternion (the pattern constrains the up face only; `target_slots`
+updated). Each leg passes pre‑pick + pick exact IK, pre‑place + place exact IK with the block attached and the in‑hand
+orbit waypoints. Record shape (proposed to the oracle agent): the block record's top‑level `pick / pre_pick / place /
+pre_place / waypoints / tilt_*` mirror the **last** leg, `flip_mode: "table"`, `legs: [leg, leg]` in execution order with
+per‑leg `face_pair, tilt_pick_deg, tilt_place_deg, yaw_deg, pick, pre_pick, place, pre_place, waypoints, carry_height,
+rotation_axis, rotation_deg, block_pose_after`, and `intermediate_pose`; `program_block_design` iterates `legs` when
+present (grasp → place(intermediate) → grasp → place). Braces are not attempted after a table flip in this prep
+(`brace: none`).
+
 
 - Goal pattern from `generation.patterns` (or `--variant`); the top-left block in the init image is the anchor: its
   position stays, its goal orientation is the table-aligned orientation with the pattern's top face up reached by the
@@ -1251,6 +1267,11 @@ angle ∈ S, goal = closed limit. Pose unchanged (scene object).
 class is 25° / focus‑in‑frame (the same shape as the ontop‑large C rule; the hinged jar's best focus lies 24° off the
 optical axis and 25° admits 42 foci over 3 stand‑offs).
 
+*Implementation (`articulation_small.py`, `aea6bd0a`):* `phase2_manipulation_stance(..., angle_classes_deg=(8°, 25°))` with
+`generation.phase2_tight_class_deg` / `phase2_loose_class_deg` overriding the two classes per alias; the in‑frame hook stays
+the small‑articulation one (target hull + handle contact + at least one near / own‑side brace point in frame), i.e. the
+loose class is "focus within 25° of the optical axis and the target in frame", the same shape as the ontop‑large C rule.
+
 
 Section 5.4. Root pose measured only (0.03 / 0.20); joint goals as 6.6.
 
@@ -1262,6 +1283,22 @@ torso adjust, both arms' IK verified there, all poses in frame) and the sidecar 
 between grasp and attach; the oracle executes that recorded move holding the object — no runtime re‑planning of the
 stance (no‑fallback principle). Only when the joint placement has no cell after that is the brace optional (as axial /
 block design).
+
+*Implementation (`attachment.py`, `58afae21`):* after the male grasp at the manipulation stance the partner placement,
+attach pose, SLERP reorientation and left brace are derived **from the grasp stance first** (A1 joint placement required:
+partner cell in the attach‑reach band and its brace face point in the left contact band at that trunk, two‑arm exact IK
+with the attach arm locked). Failing that, the **second base pose** search: the grasp stance shifted along the edge by
+±0.10 / ±0.20 / ±0.30 m with the trunk kept or moved to (0.5, 0) / (0.25, −0.3), on free floor and whole‑body
+collision‑free, at most 6 evaluated; from each the same derivation with the carried male (the lift pose translated with
+the base; SLERP waypoints checked from that stance; attach and brace eef poses in frame from that stance's camera). The
+sidecar records the stance as `stances[].name = "attach"` (`carried = male`), the base move as `paths[]`
+`manipulation → attach` with `carried = male` (local path checked with the male attached) and, when the trunk differs,
+`transitions[]` `manipulation → attach` with `holding = male`; the grasp record's `pre_place` / `place` (attach poses) and
+`waypoints` belong to the attach stance (`grasps[].extras.attach_stance`). The oracle program (7deabbed) travels
+`_travel(sc, "manipulation", "attach", carried=male)` before the reorientation when the `attach` stance exists. Only when
+no partner cell satisfies the joint placement from any of these stances is the attach derived brace‑less
+(`summary.brace = "none"`, `contacts.brace` absent); a brace‑less sidecar is not yet accepted by `Sidecar.problems()`
+(REQUIRED_BLOCKS) — smoke runs use `ISG_PROGRAM_CHECK=stub` for that case only. Per‑attempt budget 360 s.
 
 
 Init per section 4 with: partner (female) upright on a cell of the attach-reach band, target (male) at the focus with
