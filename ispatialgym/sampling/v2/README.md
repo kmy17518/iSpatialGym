@@ -171,7 +171,7 @@ it also calls `tabletop.edge_candidates` (per-edge retry when Phase 1c rejects a
 `stances.in_band(point_base, cells)` / `stances.brace_placement_admissible(work_base, brace_base, right_cells, left_cells)`
 (pure, 6 cm cell tolerance) gate a two-arm placement: the pushed end / work point ∈ right band AND the brace point ∈ left
 contact band *of the same trunk*, then the exact two-arm IK (`IKChecker.exact_both_arms(..., fingers=FINGER_CLOSED)`).
-`iors_small` applies it to touching (`touching_points` = target right face / partner far face; `Reject("brace_off_band")` — a distinct reason for the board; the optional-brace rule of axial is not applied to touching yet, owner).
+`iors_small` applies it to touching (`touching_points` = target right face at the place position / partner far face) as a **preference** (owner 2026-09-16 17:10, the axial rule): a partner position that passes the joint gate enables the brace; the push chain alone is the requirement, `contacts.brace` is recorded only when the gate passed and a two-arm candidate passes the exact IK (`summary.brace.present: true|false` with the gate verdict / the failed candidates); push-only instances have a right-arm manipulation stance and no `contacts.brace` (program check: `contacts.push` required, `contacts.brace` optional).
 The left contact band is looked up by `iors_small.left_contact_band_cells` against the APIs to come: `tabletop.ensure_
 contact_bands(s, arm="left", height=h)` then `reach_bands.ReachBands.load(scene, support, mode="contact", arm="left",
 height_class=h)`; until one exists the gate is recorded as `template_facts.left_contact_band = "unavailable"` and the

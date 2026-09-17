@@ -147,6 +147,7 @@ class IORSSmall(SamplerV2):
         self.release_surface_z: Optional[float] = None  # ontop / under: the raycast surface under the goal footprint centre
         self.release_above_m: Optional[float] = None  # ontop / under: the release height above that surface
         self._touching_place_pos: Optional[th.Tensor] = None  # touching: the nextto position the program places at
+        self._brace_gate: Optional[Dict[str, Any]] = None  # touching: the A1 joint band gate verdict of the drawn partner position
 
     # ------------------------------------------------------------------ numbers (customs generation)
 
@@ -491,30 +492,32 @@ class IORSSmall(SamplerV2):
         if self.relation != "touching":
             return TT.place_partner(self, rng, t_pose, self.hull["target"], self.hull["partner"], self.rest["partner"], manip, side, ranges[side],
                                     top=self.top, cam=cam, margin=self.margin_support, min_gap=self.gap_min)
-        # A1: the push work point (target's right face) must lie in the right band and the brace point (partner's far /
-        # left face) in the left contact band of the same trunk before the two-arm IK (§4.6 step 6) is attempted
+        # A1 with the brace optional (owner 2026-09-16 17:10, the axial rule): a partner position whose push work point (the
+        # target's right face at the *place* position) lies in the right band and whose brace point (partner's far / left
+        # face) lies in the left contact band of the same trunk is preferred and enables the brace; otherwise the last
+        # drawn position is kept and the instance becomes push-only (``self._brace_gate`` tells ``touching_contacts``)
         right_cells = self.bands.band(manip.translate, manip.tilt) if getattr(self, "bands", None) is not None else None
         left_cells = left_contact_band_cells(self, (manip.translate, manip.tilt), TT.height_of(self.hull["partner"], self.rest["partner"]))
         self.template_facts["left_contact_band"] = "unavailable" if left_cells is None else int(len(left_cells))
         errors = []
-        n_tried = 0
+        p_pose = None
         for _ in range(8):
             p_pose = TT.place_partner(self, rng, t_pose, self.hull["target"], self.hull["partner"], self.rest["partner"], manip, side, ranges[side],
                                       top=self.top, cam=cam, margin=self.margin_support, min_gap=self.gap_min)
             if left_cells is None or right_cells is None:
-                return p_pose  # the joint band gate cannot run yet (recorded); the exact two-arm IK remains the gate
-            # the push starts at the *place* (nextto) position: the work point is the target's right face there
-            work, brace = self.touching_points(self.place_pose_for(t_pose, p_pose, manip), p_pose, manip)
-            n_tried += 1
-            if brace_placement_admissible(manip.world_to_base(work[:2]), manip.world_to_base(brace[:2]), right_cells, left_cells):
+                self._brace_gate = {"ok": None, "why": "left contact band unavailable"}  # unknown: the two-arm IK decides
                 return p_pose
+            work, brace = self.touching_points(self.place_pose_for(t_pose, p_pose, manip), p_pose, manip)
             w_b, b_b = manip.world_to_base(work[:2]), manip.world_to_base(brace[:2])
+            if brace_placement_admissible(w_b, b_b, right_cells, left_cells):
+                self._brace_gate = {"ok": True, "work_base": [round(float(v), 3) for v in w_b], "brace_base": [round(float(v), 3) for v in b_b],
+                                    "right_cells": int(len(right_cells)), "left_cells": int(len(left_cells))}
+                return p_pose
             errors.append(f"work {[round(float(v), 2) for v in w_b]} {'in' if in_band(w_b, right_cells) else 'OFF'} right band / brace "
                           f"{[round(float(v), 2) for v in b_b]} {'in' if in_band(b_b, left_cells) else 'OFF'} left band")
-        # distinct reason for the board (owner: touching may get axial's optional-brace rule later; until then the joint
-        # band gate rejects as ``brace_off_band``)
-        raise Reject("brace_off_band", f"none of {n_tried} partner positions puts the push point in the right band ({len(right_cells)} cells) and the brace "
-                                       f"point in the left contact band ({len(left_cells)} cells) at trunk ({manip.translate}, {manip.tilt:.2f}); e.g. {errors[-2:]}")
+        self._brace_gate = {"ok": False, "why": f"none of 8 partner positions puts the push point in the right band ({len(right_cells)} cells) and the brace point "
+                                                f"in the left contact band ({len(left_cells)} cells) at trunk ({manip.translate}, {manip.tilt:.2f}); e.g. {errors[-2:]}"}
+        return p_pose
 
     def place_pose_for(self, t_pose: G.Pose, p_pose: G.Pose, manip: Stance) -> G.Pose:
         """Target pose at its *place* position for a drafted partner pose: the nearer-side rule of ``goal_pose`` with the
@@ -860,8 +863,17 @@ class IORSSmall(SamplerV2):
         if self.relation == "touching":
             self.touching_contacts(draft, manip)
             c = self.sidecar.contacts
-            self.require_in_frame(cam, {"push pre-contact": c["push"].pre, "push contact": c["push"].contact, "push goal": c["push"].goal,
-                                        "brace pre-contact": c["brace"].pre, "brace contact": c["brace"].contact})
+            poses = {"push pre-contact": c["push"].pre, "push contact": c["push"].contact, "push goal": c["push"].goal}
+            if "brace" in c:
+                # a brace whose poses leave the frame is dropped (push-only) rather than rejecting the instance
+                brace_poses = {"brace pre-contact": c["brace"].pre, "brace contact": c["brace"].contact}
+                if all(self.ikc.eef_in_frame(p, cam) for p in brace_poses.values() if p is not None):
+                    poses.update(brace_poses)
+                else:
+                    self.sidecar.contacts.pop("brace", None)
+                    manip.arms, manip.contacts = ["right"], ["push"]
+                    draft.summary["brace"] = {"present": False, "why": "brace poses outside the manipulation image (5 %)", "gate": (self._brace_gate or {})}
+            self.require_in_frame(cam, poses)
 
     def require_in_frame(self, cam: G.Pose, poses: Dict[str, Optional[G.Pose]]):
         """Every given eef pose must project inside the manipulation image with the 5 % margin (``IKChecker.eef_in_frame``
@@ -894,31 +906,52 @@ class IORSSmall(SamplerV2):
         # one put the right pre-contact out of reach on 5/8 attempts of the sanitary-napkins loop); brace candidates in
         # order (pads on the far face / top-down blade beside it, ``touching_brace_candidates``)
         why: List[str] = []
-        chosen = None
         t_hull_w = self.world.hull_at(self.hull["target"], t_pose)
         t_face_z = (float(t_hull_w[:, 2].min()), float(t_hull_w[:, 2].max()))
+        gate = self._brace_gate or {"ok": None, "why": "no gate verdict"}
+        try_brace = gate.get("ok") is not False  # False = no joint two-arm placement at this trunk: push-only from the start
+        ignore_push = self.support_objects() + [self.obj("target")]
+        ignore_brace = self.support_objects() + [self.obj("partner")]
+        push_chosen = None  # (kind, pre, init, goal, extras, q of the right arm)
+        brace_chosen = None  # (pre, contact, kind, extras)
         for push_kind, push_init, push_extras in self.touching_push_candidates(manip, p_init, t_face_z, direction):
             push_goal = (push_init[0] + direction * dist, push_init[1])
             push_pre = IK.pre_pose(push_init)
-            for pre, contact, kind, extras in self.touching_brace_candidates(manip, b_point, face_z, -direction):
-                res = self.ikc.exact_both_arms(("right", [push_pre, push_init, push_goal]), ("left", [pre, contact]), manip,
-                                               self.support_objects() + [self.obj("target")], self.support_objects() + [self.obj("partner")], fingers=IK.FINGER_CLOSED)
-                if res.ok:
-                    chosen = (push_kind, push_pre, push_init, push_goal, push_extras, pre, contact, kind, extras)
-                    break
-                why.append(f"{push_kind}/{kind}: {res.reason}")
-                if res.reason.startswith("right"):
-                    break  # the push chain itself fails: no brace candidate can change that
-            if chosen is not None:
-                break
-        if chosen is None:
-            raise Reject("contact_unreachable", f"touching push / brace: {'; '.join(why[-3:]) or 'no brace candidate (partner face reaches the palm section)'}")
-        push_kind, push_pre, push_init, push_goal, push_extras, pre, contact, kind, extras = chosen
+            # (1) the push chain on its own - the requirement (brace optional, owner 2026-09-16 17:10: the axial rule)
+            r_push = self.ikc.exact([push_pre, push_init, push_goal], manip, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
+            if not r_push.ok:
+                why.append(f"{push_kind}: right: {r_push.reason}")
+                continue
+            push_chosen = (push_kind, push_pre, push_init, push_goal, push_extras)
+            # (2) a brace when the joint band gate admitted the position: the first two-arm candidate that passes
+            if try_brace:
+                for pre, contact, kind, extras in self.touching_brace_candidates(manip, b_point, face_z, -direction):
+                    res = self.ikc.exact_both_arms(("right", [push_pre, push_init, push_goal]), ("left", [pre, contact]), manip,
+                                                   ignore_push, ignore_brace, fingers=IK.FINGER_CLOSED)
+                    if res.ok:
+                        brace_chosen = (pre, contact, kind, extras)
+                        break
+                    why.append(f"{push_kind}/{kind}: {res.reason}")
+            break
+        if push_chosen is None:
+            raise Reject("contact_unreachable", f"touching push: no push candidate passes the exact IK from the manipulation stance ({'; '.join(why[-3:])})")
+        push_kind, push_pre, push_init, push_goal, push_extras = push_chosen
         draft.summary.setdefault("touching", {}).update({"push_kind": push_kind, **{k: v for k, v in push_extras.items() if v is not None}})
         self.sidecar.add_contact(ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname, extras=dict(push_extras, pose_class=push_kind)))
-        self.sidecar.add_contact(TT.BraceRecord("brace", "left", pre, contact, direction=-direction, brace_kind=kind, object=pname, extras=extras))
-        draft.summary["brace"] = {"kind": kind, **{k: v for k, v in extras.items() if v is not None}}
-        manip.arms = ["right", "left"]
+        if brace_chosen is not None:
+            pre, contact, kind, extras = brace_chosen
+            self.sidecar.add_contact(TT.BraceRecord("brace", "left", pre, contact, direction=-direction, brace_kind=kind, object=pname, extras=extras))
+            draft.summary["brace"] = {"present": True, "kind": kind, "gate": gate, **{k: v for k, v in extras.items() if v is not None}}
+            manip.arms = ["right", "left"]
+            manip.contacts = ["push", "brace"]
+        else:
+            # push-only touching: ``contacts.brace`` absent, the manipulation stance right-arm only; the program is
+            # transition -> push -> retreat (oracle agent 7deabbed); ``summary.brace.present`` = False, why recorded
+            draft.summary["brace"] = {"present": False, "gate": gate, "candidates_failed": len([w for w in why if "/" in w]),
+                                      "why": "; ".join(why[-3:]) if try_brace else str(gate.get("why"))}
+            manip.arms = ["right"]
+            manip.contacts = ["push"]
+            self.sidecar.contacts.pop("brace", None)
 
     def touching_push_candidates(self, manip: Stance, face_point: th.Tensor, face_z: Tuple[float, float], direction: th.Tensor):
         """Push poses of the closed right gripper at the target's right face (``face_point``, mid height), pushing along
