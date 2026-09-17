@@ -71,7 +71,9 @@ REQUIRED_BLOCKS: Dict[str, Tuple[str, ...]] = {
     "inter_object_relation_satisfaction-under_small_scale": _TABLE + ("grasps",),
     "inter_object_relation_satisfaction-inside": _TABLE + ("grasps",),
     "inter_object_relation_satisfaction-nextto": _TABLE + ("grasps",),
-    "inter_object_relation_satisfaction-touching": _TABLE + ("grasps", "contacts.push", "contacts.brace"),
+    # touching is brace-optional like axial (owner decision 2026-09-16 17:10; core ``6de8803``): ``contacts.brace`` is
+    # recorded only when the joint two-arm placement exists, the push chain is required, the push closure is the stop
+    "inter_object_relation_satisfaction-touching": _TABLE + ("grasps", "contacts.push"),
 }
 SUBTASKS: Tuple[str, ...] = tuple(REQUIRED_BLOCKS)
 

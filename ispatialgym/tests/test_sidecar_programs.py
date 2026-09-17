@@ -936,6 +936,45 @@ def test_axial_is_push_only_without_a_brace_record():
     assert any("right gripper pushes" in p for p in problems), problems
 
 
+def test_touching_is_push_only_without_a_brace_record():
+    """Owner decision 2026-09-16 17:10 (the axial rule for touching; core ``6de8803`` records ``contacts.brace`` only
+    when the joint placement exists): without it the program is the nextto chain (transition → grasp → lift → place at
+    the nextto position → retreat) followed by push → retreat, the push closure being the stop; with the brace record
+    the braced chain stays; the 17:54 / 18:30 / 18:53 napkins runs failed here with ``contacts.brace: required``."""
+    st = "inter_object_relation_satisfaction-touching"
+    assert "contacts.brace" not in REQUIRED_BLOCKS[st] and {"grasps", "contacts.push"} <= set(REQUIRED_BLOCKS[st])
+    with open(os.path.join(VARIANTS, f"{st}__push_only.json")) as f:
+        d = json.load(f)
+    assert "brace" not in d["contacts"] and d["summary"]["brace"]["present"] is False
+    sc = Sidecar.from_dict(d)
+    assert sc.problems() == [] and sc.validate() is sc and not sc.has_block("contacts.brace")
+    actions = expand(sc.alias, sc)
+    assert [a.name for a in actions] == _TABLE_IN + _PICK + _PLACE + ["push", "retreat"]
+    assert [(a.name, a.arms, a.objects) for a in actions[-2:]] == [
+        ("push", ("right",), ("can_of_soda.n.01_1",)),
+        ("retreat", ("right",), ("can_of_soda.n.01_1",)),
+    ]
+    assert actions[-1].after is actions[-2] and actions[-1].release is False
+    assert all("brace" not in a.name for a in actions)
+    # the annotation still reads without the partner's brace entry being used
+    for a in actions:
+        fine, numbers = a.annotate(sc)
+        assert fine and numbers
+    # the braced fixture keeps the braced chain
+    braced = load(st)
+    assert [a.name for a in expand(braced.alias, braced)] == EXPECTED_SEQUENCE[st]
+    # a left-arm push-only record is still rejected (spec §6.11: the right gripper pushes the target)
+    d2 = copy.deepcopy(d)
+    d2["contacts"]["push"]["arm"] = "left"
+    problems = Sidecar.from_dict(d2).problems()
+    assert any("right gripper pushes" in p for p in problems), problems
+    # a push-only record whose push acts on the partner instead of the placed target is rejected
+    d3 = copy.deepcopy(d)
+    d3["contacts"]["push"]["object"] = "mug.n.04_1"
+    problems = Sidecar.from_dict(d3).problems()
+    assert any("placed target" in p for p in problems), problems
+
+
 
 @pytest.mark.parametrize(
     "subtask,mutate,match",

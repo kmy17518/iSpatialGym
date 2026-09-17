@@ -373,18 +373,29 @@ def program_iors_small(sc: Sidecar, relation: str = "ontop") -> List[Action]:
 
 
 def program_iors_touching(sc: Sidecar) -> List[Action]:
-    """as nextto to the recorded nextto position, then brace the partner's far side with the left gripper and push the
-    target toward the partner with the right gripper until touching → retreat both."""
+    """as nextto to the recorded nextto position, then [brace the partner's far side with the left gripper, when the
+    sidecar records one] and push the target toward the partner with the right gripper until touching → retreat.
+
+    Touching = **brace optional** (owner decision 2026-09-16 17:10, the axial rule of 08:10): the sampler records
+    ``contacts.brace`` only when the A1 joint two-arm placement admits the partner position and a two-arm candidate
+    passes the exact IK (core ``6de8803``: ``summary.brace.present``); without it the instance is push-only —
+    ``transition → grasp → lift → carry → place (nextto position) → retreat → push → retreat`` — and the oracle's push
+    closure (hold at the goal, residual re-push, ``execute_push``) is the stop, as for ``program_alignment_axial``."""
     g = _single_grasp(sc, "pre_grasp", "carry_height", "place", "place_on")
-    push, brace = _push_contact(sc), _brace_contact(sc)
-    if push.arm != "right" or brace.arm != "left":
+    push = _push_contact(sc)
+    brace = sc.contacts.brace if sc.contacts is not None else None
+    if push.arm != "right" or (brace is not None and brace.arm != "left"):
         raise SidecarError("touching: the right gripper pushes the target and the left gripper braces the partner (spec §6.11)")
     if push.object != g.object:
         raise SidecarError("contacts.push.object: the push must act on the placed target")
-    if brace.object != g.place_on:
+    if brace is not None and brace.object != g.place_on:
         raise SidecarError("contacts.brace.object: the brace must hold the partner (grasps[0].place_on)")
     base_yaw = sc.stance("manipulation").base_pose2d[2]
-    return program_iors_small(sc, "nextto") + _brace_push_retreat(sc, brace, push, base_yaw)
+    head = program_iors_small(sc, "nextto")
+    if brace is None:
+        p = Push(contact=push, base_yaw=base_yaw)
+        return head + [p, Retreat(arm=push.arm, object=push.object, after=p)]
+    return head + _brace_push_retreat(sc, brace, push, base_yaw)
 
 
 # ----------------------------------------------------------------------------------------------------------------
