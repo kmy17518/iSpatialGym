@@ -61,14 +61,17 @@ def main():
             print(f"{pid}: no ssh", file=sys.stderr)
             continue
         try:
-            r = rp.ssh_run(*ep, "ls /root/samp/*/*.npz 2>/dev/null; echo ---; cat /root/samp/current.txt 2>/dev/null; echo ---; ls /root/samp/queue 2>/dev/null | wc -l",
-                           capture=True, timeout=60)
+            r = rp.ssh_run(*ep, "ls /root/samp/*/*.npz 2>/dev/null; echo ---; for f in /root/samp/running/*.job; do [ -f \"$f\" ] && cut -f1 \"$f\"; done; echo ---; "
+                           "ls /root/samp/queue 2>/dev/null | wc -l", capture=True, timeout=60)
         except SystemExit:
             print(f"{pid}: ssh failed", file=sys.stderr)
             continue
         parts = (r.stdout or "").split("---")
         d = {os.path.basename(os.path.dirname(l.strip())) for l in parts[0].splitlines() if l.strip()}
-        cur = parts[1].strip() if len(parts) > 1 else ""
+        # in progress = the .job file in /root/samp/running/ (the runner moves it there at the start, to finished/ at the end);
+        # current.txt is written at the start and never cleared between jobs (2026-09-16 16:50: 12 of 15 idle band pods read
+        # as "running" from it) and done.txt keeps the lines of earlier attempts of a re-queued job
+        cur = parts[1].strip().splitlines()[0].strip() if len(parts) > 1 and parts[1].strip() else ""
         per_pod[pid] = {"name": fleet["pods"].get(pid, {}).get("name"), "done": sorted(d), "running": cur, "queued": int(parts[2].strip() or 0) if len(parts) > 2 else None}
         done |= d
         if cur:

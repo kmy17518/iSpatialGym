@@ -1,0 +1,45 @@
+{
+ "updated": "2026-09-16 17:08 PDT",
+ "entries": [
+  {
+   "id": "inter_object_relation_satisfaction-under_small_scale:0916-170337",
+   "priority": 22,
+   "subtask": "inter_object_relation_satisfaction-under_small_scale",
+   "alias": "inter_object_relation_satisfaction-under_small_scale-teacup-saucer-breakfast_table",
+   "kind": "run",
+   "tro": null,
+   "scene": null,
+   "local": false,
+   "state": "held",
+   "added_by": "rule",
+   "added_at": "2026-09-16 17:03 PDT",
+   "note": "auto: new fix(es) 625759b, 7737dfe since the last run",
+   "missing_fixes": [
+    "625759b",
+    "7737dfe"
+   ]
+  }
+ ],
+ "holds": {
+  "configuration_matching-block_design": {
+   "reason": "awaiting owner decision (tabletop 14:45): the flip pre-place has no IK at any trunk - (a) goal face up at init [generation.block_no_flip], (b) flip on the table, (c) 3 no-flip blocks; staged in staged_decisions.md",
+   "since": "2026-09-16 17:03 PDT"
+  },
+  "configuration_matching-attachment": {
+   "reason": "awaiting owner decision: the A1 brace gate rejects 902/1694 partner cells - brace optional for attachment (as axial / blocks) or partner only in the band overlap; staged",
+   "since": "2026-09-16 17:03 PDT"
+  },
+  "configuration_matching-articulation_open_small_scale": {
+   "reason": "awaiting owner decision: hinged_jar best focus 24 deg vs the 20 deg Phase-2 cone - 25 deg for small articulation?; staged",
+   "since": "2026-09-16 17:03 PDT"
+  },
+  "configuration_matching-articulation_close_small_scale": {
+   "reason": "same decision as open (cone)",
+   "since": "2026-09-16 17:03 PDT"
+  },
+  "inter_object_relation_satisfaction-under_small_scale": {
+   "reason": "owner 16:40: re-run as soon as the core's release/settle change lands (fails placed_orientation honestly today); release when the core's fix-log entry appears",
+   "since": "2026-09-16 17:05 PDT"
+  }
+ }
+}

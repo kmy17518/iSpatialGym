@@ -24,3 +24,5 @@ Everything here resumes without recomputation: the manifests and progress ledger
 - Pre-fix demos (120, `demos/demos.jsonl`): mental_rotation 50/52, object_scaling 42/44, camera standard 2/2, ontop-small 8/10, nextto 6/9 —
   all `pre-fix` under the validity rule (sampled before `7a340e4`); re-demo per subtask through `first_demo.py` (one instance each first).
 - Remaining pre-fix instances not yet demoed: none pending (the full set was stopped at the pause).
+
+- 2026-09-16 17:08 PDT pod_scheduler: role change bands -> pool: h7thjdjnyh8qcx (pilot2-l40s-0), bl91tuqop45ila (pilot2-l40s-2), cy0f5t6i58i08v (pilot2-l40s-3), s7m4h2ay2slau4 (pilot2-l40s-4), nfgjwzgjajpr5u (pilot2-l40s-7), usqruny80uunl6 (pilot2-l40s-9), 5gm563m9wgnrwc (pilot2-l40s-10), 6pdrunfn78iofy (pilot2-a40-4), rzcqsre0b89792 (pilot2-a40-5), 4udkfzz52mzpih (pilot2-a40-7), 8lp72savyk8co4 (pilot2-a40-8), gvua02xnwm4ti6 (pilot2-a40-9), 29s7u374iifjbj (pilot2-a40-10), z830mv63m0wjt7 (pilot2-a40-11); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed); coverage chunks stay paused
