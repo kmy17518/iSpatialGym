@@ -1031,12 +1031,27 @@ class IORSLarge(SamplerV2):
     # ------------------------------------------------------------------ stance C (placement)
 
     def placement_candidates(self, init_xy) -> List[Stance]:
-        """§5.6 stance C survivors for an init pose: base square to the partner edge nearest ``init_xy``, stand-off
-        {0.35, 0.45, 0.55}, lateral along the edge minus margins, trunk from the band; goal cell per relation;
-        visibility per relation; the best angle class (each survivor carries its ``goal_cell`` in ``extras``)."""
+        """§5.6 stance C survivors for an init pose: base square to the partner edge nearest ``init_xy`` — when that edge
+        admits no stance (no free floor in front of it: countertop-floor 20:24, edge +v ``base_ok 0``), the other
+        edges follow in order of distance from the init pose (§5.6 wording proposed: "the nearest edge that admits a
+        stance") — stand-off {0.35, 0.45, 0.55}, lateral along the edge minus margins, trunk from the band; goal cell
+        per relation; visibility per relation; the best angle class (each survivor carries its ``goal_cell`` in
+        ``extras``)."""
+        p = th.as_tensor([float(init_xy[0]), float(init_xy[1])])
+        edges = sorted(self.place["edges"], key=lambda e: float(th.linalg.norm(e.mid - p)))
+        tried = []
+        for edge in edges:
+            out = self._placement_candidates_at(edge, init_xy)
+            if out:
+                if tried:
+                    log.info("%s: stance C: edge(s) %s nearest the init pose admit no stance; %s taken", self.gp.alias, tried, edge.name)
+                return out
+            tried.append(edge.name)
+        return []
+
+    def _placement_candidates_at(self, edge: EdgeFrame, init_xy) -> List[Stance]:
         partner = self.partner
         half = self.place["half"]
-        edge = nearest_edge(self.place["edges"], init_xy)
         if self.push_under:
             return self.push_under_candidates(edge, init_xy)
         rb = self.band("tabletop", partner) if self.relation == "ontop" else self.band("floor", None, partner)
