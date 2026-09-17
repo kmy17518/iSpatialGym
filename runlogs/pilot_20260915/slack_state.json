@@ -66,7 +66,7 @@
    "time": "2026-09-16 19:22 PDT"
   }
  ],
- "last_seen_ts": "1789608641.375089",
+ "last_seen_ts": "1789612608.833099",
  "handled": [
   {
    "ts": "1789606289.709209",
@@ -80,13 +80,21 @@
    "id": "D-004",
    "answer": "B",
    "applied": "f8e9aa7c"
+  },
+  {
+   "ts": "1789612608.833099",
+   "kind": "decision",
+   "id": "D-005",
+   "answer": "C",
+   "applied": "122702b0"
   }
  ],
  "loop_pid": 908952,
  "subscriptions": {
   "channel": "sub_a6770b43-defc-43ce-ad09-8a57c0e3e86e",
   "note": "subscribed 17:50 PDT after the account link; the 5-min poll loop was stopped, status loop (30 min) continues",
-  "D-004_closed": "sub_e90d53ab\u2026 unsubscribed 18:32 (answered)"
+  "D-004_closed": "sub_e90d53ab\u2026 unsubscribed 18:32 (answered)",
+  "D-005_closed": "sub_34229f9f\u2026 unsubscribed 19:41 (answered)"
  },
  "status_note": null
 }
