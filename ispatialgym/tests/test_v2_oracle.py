@@ -1073,6 +1073,34 @@ def test_placed_orientation_gates_the_demo_verdict_only(tmp_path):
     ex, *_ = make_executor(env, sc, tmp_path / "g", exec_cfg=tilt_cfg)
     result = ex.run_program(expand(sc.alias, sc))
     assert result["success"] and result["demo_gating"]["placed_tilt"]["apple.n.01_1"]["tilt_deg"] < 1.0
+    # (f) an elongated object (a marker lying flat, native bbox 15 x 1.7 x 1.4 cm) is judged on its long axis: a 92
+    # deg roll about that axis at release (the pilot nextto re-run) is not a tip; standing up on its end is
+    sc, env = world(0.46)
+    marker = env.objects["apple.n.01_1"]
+    marker.aabb_extent = th.tensor([0.1536, 0.0171, 0.0141])
+
+    def roll_about_x(step_action):
+        if env.robot._ag_obj_in_hand["right"] is None and float(th.linalg.norm(marker.pos - th.tensor(_place_goal(sc)))) < 0.08:
+            marker.quat = C.qmul(th.tensor([0.0, 0.0, math.sin(0.25), math.cos(0.25)]), th.tensor([math.sin(0.8), 0.0, 0.0, math.cos(0.8)]))  # goal yaw, then 1.6 rad about the marker's own x
+
+    env.after_step = roll_about_x
+    ex, *_ = make_executor(env, sc, tmp_path / "h", exec_cfg=tilt_cfg)
+    result = ex.run_program(expand(sc.alias, sc))
+    rep = result["demo_gating"]["placed_tilt"]["apple.n.01_1"]
+    assert result["success"] and rep["axis"] == "x" and rep["rule"] == "long" and rep["tilt_deg"] < 1.0, (result["verdict"], rep)
+    assert result["demo_gating"]["placed_orientation"]["apple.n.01_1"]["within"] is False
+    sc, env = world(0.46)
+    marker = env.objects["apple.n.01_1"]
+    marker.aabb_extent = th.tensor([0.1536, 0.0171, 0.0141])
+
+    def stand_up(step_action):
+        if env.robot._ag_obj_in_hand["right"] is None and float(th.linalg.norm(marker.pos - th.tensor(_place_goal(sc)))) < 0.08:
+            marker.quat = C.qmul(th.tensor([0.0, 0.0, math.sin(0.25), math.cos(0.25)]), th.tensor([0.0, math.sin(math.pi / 4), 0.0, math.cos(math.pi / 4)]))  # the long axis pitched up 90 deg
+
+    env.after_step = stand_up
+    ex, *_ = make_executor(env, sc, tmp_path / "i", exec_cfg=tilt_cfg)
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["reason"] == "placed_tilt" and abs(result["demo_gating"]["placed_tilt"]["apple.n.01_1"]["tilt_deg"] - 90.0) < 0.5
 
 
 def test_epilogue_motion_rule_ignores_rotation_without_an_orientation_target(tmp_path):

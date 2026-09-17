@@ -867,10 +867,33 @@ class Executor:
                         "target_gating": bool(rep.get("gating", False))}
         return out
 
+    @staticmethod
+    def principal_axis(extent) -> Tuple[th.Tensor, str]:
+        """The object-frame axis whose tilt says whether a placed object tipped: the **long** axis of an elongated
+        object (one native extent >= 2x both others: a marker, a pencil, a bottle - lying or standing, it may roll
+        about that axis freely), the **thin** axis (the face normal) of a flat one (one extent <= half of both
+        others: a plate, a book, a board - it may spin on its face), else the object's **up** axis (+z: a cup, a
+        bowl, an apple - it may yaw). Returns ``(unit axis in the object frame, rule)``."""
+        e = [float(v) for v in C.as_tensor(extent).reshape(-1)[:3].tolist()]
+        order = sorted(range(3), key=lambda k: e[k])
+        lo, mid, hi = e[order[0]], e[order[1]], e[order[2]]
+        axis = th.zeros(3)
+        if hi >= 2.0 * mid and hi > 0:
+            axis[order[2]] = 1.0
+            return axis, "long"
+        if lo <= 0.5 * mid and mid > 0:
+            axis[order[0]] = 1.0
+            return axis, "thin"
+        axis[2] = 1.0
+        return axis, "up"
+
     def placed_tilt_report(self) -> Dict[str, Dict[str, Any]]:
-        """Per placed object: the angle between its current up axis (object frame +z in world) and the recorded goal's
-        up axis, minimised over the target's orientation equivalences; ``within`` against ``demo_tilt_tolerance``
-        (None without an orientation target). The sampler's ``goal_tipped`` guard in oracle terms."""
+        """Per placed object: the angle between its principal axis now and at the recorded goal orientation
+        (:meth:`principal_axis` from the native bounding box: the long axis of a marker, the face normal of a plate,
+        +z otherwise), minimised over the target's orientation equivalences; ``within`` against
+        ``demo_tilt_tolerance`` (None without an orientation target). A roll of a lying marker about its own axis,
+        the yaw of a cup, the spin of a plate on its face do not tilt that axis; a fallen cup or a marker standing on
+        its end do. The sampler's ``goal_tipped`` guard in oracle terms."""
         out: Dict[str, Dict[str, Any]] = {}
         for obj in self.placed_objects():
             tgt = self.state.pose_target(obj) if hasattr(self.state, "pose_target") else None
@@ -883,16 +906,26 @@ class Executor:
             except Exception:  # noqa: BLE001
                 out[obj] = {"tilt_rad": None, "tolerance_rad": None, "within": None, "note": "no object pose"}
                 continue
+            extent = None
+            try:
+                o = self.state.object(obj)
+                extent = getattr(o, "native_bbox", None)
+                if extent is None:
+                    extent = getattr(o, "aabb_extent", None)
+            except Exception:  # noqa: BLE001
+                extent = None
+            axis, rule = self.principal_axis(extent) if extent is not None else (th.tensor([0.0, 0.0, 1.0]), "up")
             goal_q = C.as_tensor(goal_q).float()
-            up_goal = C.quat_rotate(goal_q, th.tensor([0.0, 0.0, 1.0]))
+            a_goal = C.quat_rotate(goal_q, axis)
             best = None
             for e in [None] + list(getattr(tgt, "orientation_equivalences", None) or []):
                 q = q_cur if e is None else C.qmul(q_cur, C.as_tensor(e).float())
-                up = C.quat_rotate(q, th.tensor([0.0, 0.0, 1.0]))
-                ang = math.acos(max(-1.0, min(1.0, float(th.dot(up, up_goal)))))
+                a_now = C.quat_rotate(q, axis)
+                ang = math.acos(max(-1.0, min(1.0, float(th.dot(a_now, a_goal)))))
                 best = ang if best is None or ang < best else best
             tol = float(self.cfg.demo_tilt_tolerance)
-            out[obj] = {"tilt_rad": float(best), "tilt_deg": math.degrees(best), "tolerance_rad": tol, "tolerance_deg": math.degrees(tol), "within": float(best) <= tol}
+            out[obj] = {"tilt_rad": float(best), "tilt_deg": math.degrees(best), "tolerance_rad": tol, "tolerance_deg": math.degrees(tol), "within": float(best) <= tol,
+                        "axis": "xyz"[int(th.argmax(axis))], "rule": rule, "extent": None if extent is None else [round(float(v), 4) for v in C.as_tensor(extent).reshape(-1)[:3].tolist()]}
         return out
 
     def orientation_targets(self, isg: Optional[Dict[str, Any]] = None) -> set:
