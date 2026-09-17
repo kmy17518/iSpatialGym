@@ -1927,8 +1927,8 @@ def build_parser() -> argparse.ArgumentParser:
                     "mesh SDF at the voxel centres - the static objects near the stance, the support (its own layer, switched off for the grasp pose) "
                     "and the ground-like objects; spawned objects (placed trays, the target) stay meshes in a %d-slot store. ~25x cheaper per batched IK "
                     "call on an RTX 4090; marginal cells can differ (interpolation between voxel centres). Recorded as schedule.collision" % SDF_MESH_CACHE)
-    ap.add_argument("--sdf-res", type=float, default=SDF_RES, help=f"--collision sdf-grid: voxel size (m), default {SDF_RES} (3.6 x 3.6 x 2.95 m grid: 38 M voxels = "
-                    "76 MB float16 per layer, three layers; 0.005 = 1.8 GB)")
+    ap.add_argument("--sdf-res", type=float, default=SDF_RES, help=f"--collision sdf-grid: voxel size (m), default {SDF_RES} (3.6 x 3.6 x 3.0 m grid: 39 M voxels = "
+                    "78 MB float16 per layer, three layers; 0.02 gave the same bands at 1/8 of that, 0.005 = 1.9 GB and ~10 GB of GPU while sampling)")
     ap.add_argument("--sdf-mesh-cache", type=int, default=SDF_MESH_CACHE, help=f"--collision sdf-grid: capacity of the mesh store for the spawned objects (default {SDF_MESH_CACHE}; "
                     "~0.6 ms per slot per batched IK call)")
     ap.add_argument("--sdf-cache-dir", default=None, help="--collision sdf-grid: directory of the sampled layers (<key>.npz float16 + <key>.json), shared by every band of a "
