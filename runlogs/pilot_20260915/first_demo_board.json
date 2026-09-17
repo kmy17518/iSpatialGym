@@ -32,12 +32,12 @@
   "owner": "-"
  },
  "configuration_matching-block_design": {
-  "blocking": "owner 17:10 (1): first demo with block_no_flip (35506bf) \u2014 loop running (scheduler 17:24); flip-on-the-table sub-chain = required end state, prep workstream (tabletop sampler + oracle program)",
-  "owner": "tabletop / oracle"
+  "blocking": "no-flip run 19:03: target_placement x8 \u2192 tabletop adding the place pre-pose diagnostic",
+  "owner": "tabletop"
  },
  "configuration_matching-attachment": {
-  "blocking": "tabletop 58afae2: second base pose between grasp and attach (paths carried, Transition.holding bd10c72) \u2014 lid-teapot loop running since 17:38",
-  "owner": "loop / tabletop"
+  "blocking": "19:06: program_check_failed x8 on the second-base-pose sidecar (transitions[].holding) \u2192 oracle program / program_check must accept it (tabletop 58afae2 \u2194 oracle)",
+  "owner": "oracle / tabletop"
  },
  "configuration_matching-articulation_open_small_scale": {
   "blocking": "owner 17:10 (3): Phase-2 cone 25\u00b0 / focus-in-frame for small articulation (tabletop, 20 min) \u2192 hinged_jar loop",
@@ -48,7 +48,7 @@
   "owner": "tabletop"
  },
  "configuration_matching-articulation_open_large_scale": {
-  "blocking": "D-004 = B (18:30): rvunhj_0/5 blacklisted (f8e9aa7); candidates fridge (handle_unreachable x8), dishwasher / oven / top_cabinet (running), bottom_cabinet_no_top (handle_unreachable x8), Rs_int drawer (base_ok diagnosis) \u2014 large-scale fixing what they hit",
+  "blocking": "all five A3 units handle_unreachable x8 (fridge, dishwasher, oven, top_cabinet, no_top); Rs_int drawer running; large-scale: object-inclusive trav map non-traversable within 1.3 m of the cabinet face",
   "owner": "large-scale"
  },
  "configuration_matching-articulation_close_large_scale": {
@@ -68,23 +68,20 @@
   "owner": "-"
  },
  "inter_object_relation_satisfaction-ontop_small_scale": {
-  "pre_fix_demo": true,
-  "blocking": "-",
-  "owner": "-",
-  "artefact": "runlogs/pilot_20260915/demos/inter_object_relation_satisfaction-ontop_small_scale-apple-plate-\u2026__0000/\u2026/meta.json",
-  "last_change": "2026-09-16 04:37 PDT"
- },
- "inter_object_relation_satisfaction-under_small_scale": {
-  "blocking": "core 6307dd7: the cup rotated in the hand at the grasp (grasp_3 closing axis 28\u00b0 off horizontal) \u2192 flush pinches only + release at half the well depth; loop running (17:24)",
-  "owner": "core / loop"
- },
- "inter_object_relation_satisfaction-inside": {
   "blocking": "-",
   "owner": "-"
  },
+ "inter_object_relation_satisfaction-under_small_scale": {
+  "blocking": "-",
+  "owner": "-"
+ },
+ "inter_object_relation_satisfaction-inside": {
+  "blocking": "sweep 18:53 (ee7aa9d): demo failed_grasp at grasp (was valid at 16:35) \u2192 core",
+  "owner": "core"
+ },
  "inter_object_relation_satisfaction-nextto": {
-  "blocking": "owner 17:10 (4): placed_tilt withdrawn (roll happens during finger closure, 24.6\u00b0); closure-roll investigation on a pod (\u2264 3 h, agent 52b4fb5f: grasp height +5/+10 mm, closure speed, attach-on-first-contact; marker/pencil/bottle) \u2192 else cylinder equivalences in the gate; (5) FOV rule (b) + carry leg re-run",
-  "owner": "oracle / investigation"
+  "blocking": "-",
+  "owner": "-"
  },
  "inter_object_relation_satisfaction-touching": {
   "blocking": "core 6de8803: brace optional (push chain required) \u2014 napkins loop launched 18:12; oracle program_touching must accept the brace-less sidecar (queued with the oracle)",
