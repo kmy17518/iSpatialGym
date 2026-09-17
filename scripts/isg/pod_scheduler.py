@@ -237,8 +237,10 @@ def auto_enter(q, customs, inflight, head):
     for st in fd.SUBTASKS:
         req = fd.fixes_for(st, fixes)
         hold = q.get("holds", {}).get(st)
-        if hold and any(f["time"] > hold.get("since", "") for f in req):  # a fix logged after the hold lifts it (the decision landed)
-            log(f"hold on {st} lifted: fix {[f['commit'][:7] for f in req if f['time'] > hold.get('since', '')]} logged after {hold.get('since')}")
+        # a *targeted* fix logged after the hold lifts it (the decision landed); blanket entries (core-wide, > 5 subtasks) do not
+        lifting = [f for f in req if f["time"] > hold.get("since", "") and len(f.get("subtasks") or []) <= 5] if hold else []
+        if lifting:
+            log(f"hold on {st} lifted: targeted fix {[f['commit'][:7] for f in lifting]} logged after {hold.get('since')}")
             q["holds"].pop(st, None)
             hold = None
         if hold:
