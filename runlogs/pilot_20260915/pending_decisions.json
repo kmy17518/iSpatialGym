@@ -205,7 +205,7 @@
    "time": "2026-09-16 22:54 PDT",
    "subtask": "inter_object_relation_satisfaction-under_large_scale",
    "question": "sandal / bed_rrcvaq_0 push-under: F_goal = 0 at every side-lane drop after four lane variants \u2014 is this pick a yield; should apple-desk-desk carry the under-large first demo?",
-   "context": "Diagnosis from the live run 0916-211327 (edge-end lanes 2cfce47 + frontal offset 8c93d0b + 0.45\u20130.6 m lanes 7162fe7): stance C has 324 survivors; every side lane at d 0.35\u20130.40, \u03bb \u22120.40\u2026+0.42, trunk (0.75, \u22120.9) gives F_init 26 but F_goal 0 \u2014 the blade at the push goal 7 cm inside the bed footprint has no reach cell from any lane (the bed is too low for the blade \u2265 6 cm to travel under its edge); the B3 under-edge probe already showed 0 reachable cells for the sandal at both stand-offs. Earlier runs: 19:01 target_placement \u00d78 (lanes on the base rim), 21:07 rc 124 = one attempt > 2 h (no per-attempt budget; being added, 900 s). The desk partners have ample under-clearance and their floor-under-desk bands exist (12 files).",
+   "context": "Diagnosis from the live run 0916-211327 (edge-end lanes 2cfce47 + frontal offset 8c93d0b + 0.45\u20130.6 m lanes 7162fe7): stance C has 324 survivors; every side lane at d 0.35\u20130.40, \u03bb \u22120.40\u2026+0.42, trunk (0.75, \u22120.9) gives F_init 26 but F_goal 0 \u2014 the blade at the push goal 7 cm inside the bed footprint has no reach cell from any lane (the bed is too low for the blade \u2265 6 cm to travel under its edge); the B3 under-edge probe already showed 0 reachable cells for the sandal at both stand-offs. Earlier runs: 19:01 target_placement \u00d78 (lanes on the base rim), 21:07 rc 124 = one attempt > 2 h (no per-attempt budget; being added, 900 s). The desk partners have ample under-clearance and their floor-under-desk bands exist (12 files). | 23:10: apple-desk-desk failed setup no_init_surface (the desk has no free edge for the init) -> apple-desk-floor + pencil-sofa-sofa launched as candidates; large-scale recommends the briefcase pick (B3: 7 reachable cells at s0.6; no alias grounded yet - D1 ~20 min) or a higher drop.",
    "options": [
     "A) apple-desk-desk carries the first demo (launched 23:00 in parallel); sandal/bed_rrcvaq_0 = yield, noted for the later list (a lower blade / bed with clearance)",
     "B) keep working sandal/bed: diagnose F_goal 0 (bed frame clearance vs blade height), no alias switch",
@@ -223,6 +223,29 @@
    "thread_ts": "1789624468.783869",
    "answered_at": null,
    "channel": "chat + one-off Slack post (owner 22:55 request)"
+  },
+  {
+   "id": "D-011",
+   "time": "2026-09-16 23:09 PDT",
+   "subtask": "configuration_matching-articulation_open_large_scale",
+   "question": "door units under arm-only follow reach 9-33 % of the swing (oven 0 %), below the 50 deg minimum: first large-articulation demo = the Rs_int drawer, doors deferred to the hybrid base-follow?",
+   "context": "Large-scale 23:05 (runs 0916-174508/175255/182152): step 5 passes on every A3 unit, but the arm-only follow from a fixed stance reaches top_cabinet 9-18 %, dishwasher 11-33 %, oven 0 % (horizontal-axis flap), rvunhj_0 close 67 % (90 -> 30 deg; the rest needs a leaf push) -> honest yields under the 50 deg minimum (A4). The Rs_int drawer bamfsz_1 (base-mode follow) wrote the first large-articulation instance; its demo passed navigate/transition/grasp and needs two code fixes (core program_check 'carried' after a handle grasp; oracle ghost_hand tracking the handle link) - both assigned. Asked in chat (Slack paused).",
+   "options": [
+    "A) the drawer carries the first demo (bamfsz_1 bound on both aliases, fix-logged); door units -> later list with the hybrid base-follow (A4 door rule), no blacklist",
+    "B) lower min_reachable_opening for door units to what the arm reaches (20-30 deg) so a door demo counts now",
+    "C) implement the hybrid base-follow now (~half a day, large-scale agent)"
+   ],
+   "default": "A at 23:45 PDT if unanswered",
+   "artefacts": [
+    "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_open_large_scale/probe-0916-2216-rsint_bamfsz_1/"
+   ],
+   "status": "open",
+   "answered_by": null,
+   "answer": null,
+   "applied_commit": null,
+   "thread_ts": null,
+   "answered_at": null,
+   "channel": "chat (Slack paused)"
   }
  ]
 }
