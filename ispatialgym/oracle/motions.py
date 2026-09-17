@@ -86,7 +86,7 @@ class MotionsConfig:
     witness_residual_accept_rot: float = 0.05
     #: the witness is refined by the collision-aware IK of the recorded pose seeded at it when that solution stays
     #: within this joint distance (the same branch); the sampler's witnesses miss their poses by 3-15 mm
-    witness_refine_max_jump: float = 0.3
+    witness_refine_max_jump: float = 0.6
     #: how long to keep holding the final waypoint while waiting for convergence (steps)
     settle_steps: int = 90
     #: eef speed of ``arm_along`` (m/s, rad/s) and the densification resolution of its waypoint lists (m, rad)
@@ -852,7 +852,11 @@ class Motions:
             diag = dict(getattr(res, "diagnostics", None) or {})
             k = diag.get("fail_index")
             stall = diag.get("pos_err")
-            if finish is not None and diag.get("stage") == "diff_ik" and k is not None and stall is not None and not diag.get("at_lower") and not diag.get("at_upper"):
+            at_limit = bool(diag.get("at_lower") or diag.get("at_upper"))
+            # a stall at a joint limit is finished only toward a recorded witness (a known configuration of the end
+            # pose; the touching approach slides along right_arm_joint2's limit, as the sampler's own approach witnesses
+            # do), a free finish from a limit stall would just pick another branch
+            if finish is not None and diag.get("stage") == "diff_ik" and k is not None and stall is not None and (not at_limit or finish.q_hint is not None):
                 remaining = sum(float(th.linalg.norm(dense[i][0] - dense[i - 1][0])) for i in range(max(k, 1), len(dense)))
                 remaining += stall
                 if stall <= finish.max_stall and remaining <= finish.max_remaining:
