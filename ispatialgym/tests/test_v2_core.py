@@ -340,6 +340,25 @@ def test_per_role_scale_default_and_template_id_tag():
     assert TemplateChoice.from_json(scaled.to_json()).template_id == scaled.template_id
 
 
+def test_open_jaw_footprint_clearance_and_release_opening():
+    """Owner 2026-09-16 20:29 (nextto re-run: the opening finger swept the pencil 9 cm): the partner must lie outside the
+    swept open-jaw footprint at the place; the largest release opening that clears it by 1 cm is a fact for the oracle."""
+    from ispatialgym.robot import conventions as C
+    from ispatialgym.sampling.v2.tasks import iors_small as M
+
+    cls = [c for c in vars(M).values() if isinstance(c, type) and hasattr(c, "open_jaw_clearance")][0]
+    table = 0.8126
+    q = C.eef_quat(th.tensor([0.0, 0.0, -1.0]), th.tensor([0.0, 1.0, 0.0]))  # top-down pinch, jaw opening along +-y
+    place = (th.tensor([0.0, 0.0, table + C.FINGERTIP_LENGTH + 0.004]), q)  # fingertips 4 mm above the table
+    pencil = th.tensor([[x, 0.03, table + z] for x in (-0.09, 0.0, 0.09) for z in (0.0, 0.007)])  # 3 cm off along the jaw
+    assert cls.open_jaw_clearance(None, place, pencil) < 0
+    assert cls.open_jaw_opening_max(None, place, pencil) < 0.017 + 0.01  # even the least releasing opening sweeps it
+    far = pencil + th.tensor([0.0, 0.06, 0.0])  # 9 cm off: outside the 7.2 cm half jaw
+    assert cls.open_jaw_clearance(None, place, far) > 0 and cls.open_jaw_opening_max(None, place, far) == pytest.approx(C.GRIPPER_OPEN_M)
+    q_turned = C.eef_quat(th.tensor([0.0, 0.0, -1.0]), th.tensor([1.0, 0.0, 0.0]))  # jaw turned 90 deg away from the partner
+    assert cls.open_jaw_clearance(None, (place[0], q_turned), pencil) > 0
+
+
 def test_straight_approach_detection_and_reject_code():
     """Branch consistency (oracle finding): pre -> end segments are tracked from the pre solution; the failure carries the
     distinct ``approach_untrackable`` code for the callers' Reject."""

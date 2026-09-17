@@ -153,6 +153,7 @@ class IORSSmall(SamplerV2):
         self._brace_gate: Optional[Dict[str, Any]] = None  # touching: the A1 joint band gate verdict of the drawn partner position
         self.grasps_flush: List[Any] = []  # the flush-pinch tier of ``self.grasps`` (tried first at every focus)
         self._reselected_q: Optional[th.Tensor] = None  # grasp configuration of the last re-selected grasp
+        self.release_sweep: Optional[Dict[str, Any]] = None  # nextto / touching: open-jaw footprint facts of the place
 
     # ------------------------------------------------------------------ numbers (customs generation)
 
@@ -667,8 +668,111 @@ class IORSSmall(SamplerV2):
             # partner's right face, the brace holds its left face; a target starting left of the partner contradicts that
             raise Reject("touching_side", f"target init lateral {lat_init:+.2f} is left of the partner centre {0.5 * float(p_lat.min() + p_lat.max()):+.2f}")
         depth_t, _ = st.local(t_pose[0])
+        if self.relation == "nextto":
+            lat, t_quat = self.avoid_release_sweep(st, depth_t, lat, t_quat, lat_init, p_lat, p_hull_w, gap)
         xy = st.world(depth_t, lat)
         return th.tensor([float(xy[0]), float(xy[1]), float(t_pose[0][2])]), t_quat
+
+    # -- open-jaw footprint at the release (oracle nextto re-run 0916-181440: the opening finger swept the pencil 9 cm) --
+
+    def open_jaw_clearance(self, place_eef: G.Pose, obstacle_pts: th.Tensor, open_width: float = C.GRIPPER_OPEN_M, retreat: float = C.PRE_DIST) -> float:
+        """Signed clearance (m) of ``obstacle_pts`` (world) from the **swept open-jaw footprint** of a place eef pose: the box
+        the opened fingers sweep from the release up through the retreat, in the eef frame — along a from
+        ``PAD_Z_RANGE[0] - retreat`` to ``FINGERTIP_LENGTH``, along c ±(``open_width`` / 2 + finger thickness + 1 cm), along
+        x ±(finger half width + 1 cm). Positive = every point outside by at least that much; negative = a point inside."""
+        pos, quat = G.t(place_eef[0]), G.t(place_eef[1])
+        R = C.quat_to_mat(quat)
+        local = (G.t(obstacle_pts) - pos) @ R  # columns of R = eef axes -> coordinates (x, c, a)
+        hx = FINGER_HALF_WIDTH + 0.01
+        hc = 0.5 * float(open_width) + FINGER_THICKNESS + 0.01
+        a_lo, a_hi = float(C.PAD_Z_RANGE[0]) - float(retreat), float(C.FINGERTIP_LENGTH)
+        dx = local[:, 0].abs() - hx
+        dc = local[:, 1].abs() - hc
+        da = th.maximum(a_lo - local[:, 2], local[:, 2] - a_hi)
+        return float(th.stack([dx, dc, da], dim=1).max(dim=1).values.min())
+
+    def open_jaw_opening_max(self, place_eef: G.Pose, obstacle_pts: th.Tensor, retreat: float = C.PRE_DIST) -> float:
+        """Largest symmetric release opening (m) whose swept jaw keeps 1 cm from the obstacle points that lie within the
+        jaw's x / a extents: ``2 * (min |c| - finger thickness - 1 cm)``; the full ``GRIPPER_OPEN_M`` when none does."""
+        pos, quat = G.t(place_eef[0]), G.t(place_eef[1])
+        R = C.quat_to_mat(quat)
+        local = (G.t(obstacle_pts) - pos) @ R
+        hx = FINGER_HALF_WIDTH + 0.01
+        a_lo, a_hi = float(C.PAD_Z_RANGE[0]) - float(retreat), float(C.FINGERTIP_LENGTH)
+        in_xa = (local[:, 0].abs() <= hx) & (local[:, 2] >= a_lo) & (local[:, 2] <= a_hi)
+        if not bool(in_xa.any()):
+            return float(C.GRIPPER_OPEN_M)
+        c_min = float(local[in_xa, 1].abs().min())
+        return max(0.0, min(float(C.GRIPPER_OPEN_M), 2.0 * (c_min - FINGER_THICKNESS - 0.01)))
+
+    def avoid_release_sweep(self, st: Stance, depth_t: float, lat: float, t_quat: th.Tensor, lat_init: float, p_lat: th.Tensor, p_hull_w: th.Tensor,
+                            gap: float) -> Tuple[float, th.Tensor]:
+        """nextto (owner 2026-09-16 20:29): the partner must lie outside the open-jaw footprint at the place; otherwise the
+        place moves along the nextto bound away from the partner (gap up to g_NT - 3 mm), then — when the target's orientation
+        is free — the place yaw turns the jaw away (±90°, 180°). ``self.release_sweep`` records the clearance, the remedy and
+        the largest release opening that clears the partner by 1 cm (``release_opening_max_m``, for the oracle)."""
+        tname = self.bindings.one("target").name
+        grasp = self.sidecar.grasp_of(tname)
+        self.release_sweep = None
+        if grasp is None or grasp.eef_in_object is None:
+            return lat, t_quat
+        g_nt = float(self.pair.get("g_NT", 0.03))
+        z = float(self.top.z) if self.top is not None else 0.0
+        t_hull0 = self.hull["target"]
+
+        def place_of(lat_v: float, quat: th.Tensor) -> G.Pose:
+            xy = st.world(depth_t, lat_v)
+            t_hull = G.local_points_world(t_hull0, (th.zeros(3), quat))
+            return IK.grasp_pose((th.tensor([float(xy[0]), float(xy[1]), z - float(t_hull[:, 2].min()) + 0.005]), quat), grasp.eef_in_object)
+
+        def lat_of(quat: th.Tensor, gap_v: float) -> float:
+            t_hull = G.local_points_world(t_hull0, (th.zeros(3), quat))
+            t_l = t_hull[:, :2] @ st.tangent
+            return nearer_side_lateral(lat_init, (float(p_lat.min()), float(p_lat.max())), (float(t_l.min()), float(t_l.max())), gap_v)[1]
+
+        c0 = self.open_jaw_clearance(place_of(lat, t_quat), p_hull_w)
+        rec: Dict[str, Any] = {"clearance_m": round(c0, 4), "remedy": None, "open_width_m": C.GRIPPER_OPEN_M}
+        best_lat, best_quat, best_c = lat, t_quat, c0
+        if c0 < 0:
+            # (a) along the nextto bound: the AABB gap may grow to just under g_NT (the predicate: norm(gap) < g_NT + adjacency)
+            for gap_v in (g_nt - 0.006, g_nt - 0.003):
+                if gap_v <= gap:
+                    continue
+                lat_v = lat_of(t_quat, gap_v)
+                c_v = self.open_jaw_clearance(place_of(lat_v, t_quat), p_hull_w)
+                if c_v > best_c:
+                    best_lat, best_c = lat_v, c_v
+                    rec.update({"remedy": f"gap {gap_v:.3f}", "gap_m": round(gap_v, 4)})
+                if best_c >= 0:
+                    break
+        if best_c < 0 and self.target_orientation_free():
+            # (b) the place yaw turns the jaw away from the partner (the target's orientation is not constrained)
+            for yaw_deg in (90.0, -90.0, 180.0):
+                q_yaw = G.compose((th.zeros(3), G.quat_from_yaw(math.radians(yaw_deg))), (th.zeros(3), t_quat))[1]  # world yaw applied to the rest pose
+                for gap_v in (gap, g_nt - 0.003):
+                    lat_v = lat_of(q_yaw, gap_v)
+                    c_v = self.open_jaw_clearance(place_of(lat_v, q_yaw), p_hull_w)
+                    if c_v > best_c:
+                        best_lat, best_quat, best_c = lat_v, q_yaw, c_v
+                        rec.update({"remedy": f"yaw {yaw_deg:+.0f} deg, gap {gap_v:.3f}", "yaw_deg": yaw_deg, "gap_m": round(gap_v, 4)})
+                if best_c >= 0:
+                    break
+        # the largest symmetric release opening that clears the partner by 1 cm at the chosen place (the oracle may open
+        # only this far: closure probe 'pre-shaped opening'); the pinch width + 1 cm is the least that releases the object
+        opening_max = self.open_jaw_opening_max(place_of(best_lat, best_quat), p_hull_w) if best_c < 0 else float(C.GRIPPER_OPEN_M)
+        ext = TT.hull_extents(t_hull0, self.rest["target"])
+        pinch = float(min(ext[0], ext[1]))
+        rec.update({"clearance_after_m": round(best_c, 4), "release_opening_max_m": round(max(0.0, opening_max), 4), "pinch_width_m": round(pinch, 4),
+                    "partner_inside_jaw": best_c < 0})
+        self.release_sweep = rec
+        if best_c < 0 and opening_max < pinch + 0.01:
+            raise Reject("release_sweep", f"the partner lies {-best_c * 1000:.0f} mm inside the open-jaw footprint at every admissible place (gap up to g_NT - 3 mm"
+                                          f"{', yaw turned' if self.target_orientation_free() else ''}); even an opening of pinch + 1 cm ({pinch + 0.01:.3f} m) would sweep it")
+        return best_lat, best_quat
+
+    def target_orientation_free(self) -> bool:
+        tols = self.gen("tolerances") or {}
+        return "orientation_metric" in tols and tols["orientation_metric"] is None
 
     def release_surface(self, xy: th.Tensor, p_pose: G.Pose, top_z: float) -> Optional[Dict[str, Any]]:
         """``SimWorld.surface_z_under`` at the goal xy (ray from 30 cm above the partner's top, the target ignored) when the
@@ -915,6 +1019,16 @@ class IORSSmall(SamplerV2):
             place = IK.grasp_pose((place_pos, goal_quat), grasp.eef_in_object)
             pre_place = IK.pre_pose(place)
             ignore = self.support_objects() + [self.obj("partner")]
+            if self.relation in ("nextto", "touching"):
+                # open-jaw footprint facts at the recorded place (touching: the nextto position the push starts from)
+                p_now = self.obj("partner").get_position_orientation()
+                p_hull_now = self.world.hull_at(self.hull["partner"], (p_now[0].float(), p_now[1].float()))
+                c_place = self.open_jaw_clearance(place, p_hull_now)
+                rec = dict(self.release_sweep or {})
+                rec.update({"clearance_at_place_m": round(c_place, 4), "partner_inside_jaw_at_place": c_place < 0,
+                            "release_opening_max_m": round(self.open_jaw_opening_max(place, p_hull_now), 4)})
+                grasp.extras["release_sweep"] = rec
+                draft.summary["release_sweep"] = rec
             if self.relation in ("ontop", "under"):
                 grasp.extras["release_surface_z"] = None if self.release_surface_z is None else round(float(self.release_surface_z), 4)
                 grasp.extras["release_above_m"] = None if self.release_above_m is None else round(float(self.release_above_m), 4)

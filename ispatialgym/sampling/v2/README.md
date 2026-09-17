@@ -394,6 +394,17 @@ recorded as **`grasps[k].carry: [pose]`** (`waypoint_policy` notes it, `summary.
 `Reject("carry_infeasible")`. Skipped when the place is made from a `placement` stance (large-scale: base move) or the
 orientation changes along the carry (held-object rotation).
 
+### Open-jaw footprint at the release (owner 2026-09-16 20:29)
+
+nextto re-run 0916-181440: the opening finger swept the pencil 9 cm. `iors_small.open_jaw_clearance(place_eef, pts)` =
+signed clearance of the partner's hull from the box the opened fingers sweep from the release up through the retreat
+(eef frame: a from `PAD_Z_RANGE[0] − PRE_DIST` to `FINGERTIP_LENGTH`, c ±(`GRIPPER_OPEN_M`/2 + finger thickness + 1 cm),
+x ±(finger half width + 1 cm)). nextto (`avoid_release_sweep` in `goal_pose`): a partner inside moves the place along
+the nextto bound (gap up to g_NT − 3 mm), then — when the target's orientation is free — the place yaw turns the jaw
+away (±90°, 180°); `release_opening_max_m` = the largest symmetric opening that still clears the partner by 1 cm (for the
+oracle's pre-shaped release); when even pinch + 1 cm would sweep it → `Reject("release_sweep")`. Facts (`grasps[k].release_sweep`,
+`summary.release_sweep`) for nextto and touching (touching: at the nextto place the push starts from, facts only).
+
 ## Status (D2 / D4, 2026-09-15) and gaps
 
 Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,
