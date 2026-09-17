@@ -48,12 +48,12 @@
   "owner": "tabletop"
  },
  "configuration_matching-articulation_open_large_scale": {
-  "blocking": "D-004: large-scale verdict = blacklist rvunhj_0 (8 mm bar / 7 mm knobs < 15 mm pinch \u2192 edge-pinch fallback, follow \u2264 25\u00b0) unless the owner relaxes the pinch minimum; fallbacks running: fridge / dishwasher / oven / top_cabinet / bottom_cabinet_no_top; Rs_int drawer bamfsz_0 (19.7 mm bar, base mode) queued open+close after the base_ok instrumentation 1c829ae",
-  "owner": "owner (D-004) / large-scale"
+  "blocking": "D-004 = B (18:30): rvunhj_0/5 blacklisted (f8e9aa7); candidates fridge (handle_unreachable x8), dishwasher / oven / top_cabinet (running), bottom_cabinet_no_top (handle_unreachable x8), Rs_int drawer (base_ok diagnosis) \u2014 large-scale fixing what they hit",
+  "owner": "large-scale"
  },
  "configuration_matching-articulation_close_large_scale": {
-  "blocking": "same as open (close sweep follows \u2264 25\u00b0 from 90\u00b0 on rvunhj_0; 9a3e678 records the honest fraction); Rs_int drawer queued",
-  "owner": "owner (D-004) / large-scale"
+  "blocking": "same as open; Rs_int drawer close = Phase-1 no_stance (base_ok instrumented 1c829ae)",
+  "owner": "large-scale"
  },
  "alignment-world_vertical": {
   "blocking": "oracle re-runs on 4b2bb60 / 9345c8a: push [execution] again (17:06) \u2192 oracle",

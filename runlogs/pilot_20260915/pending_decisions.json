@@ -81,12 +81,12 @@
     "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_open_large_scale/",
     "runlogs/pilot_20260915/first_demo/configuration_matching-articulation_close_large_scale/"
    ],
-   "status": "open",
-   "answered_by": null,
-   "answer": null,
-   "applied_commit": null,
+   "status": "answered",
+   "answered_by": "slack",
+   "answer": "B - blacklist rvunhj_0 + rvunhj_5 (both directions); candidates fridge / dishwasher / oven / top_cabinet / bottom_cabinet_no_top + the Rs_int drawer",
+   "applied_commit": "f8e9aa7c",
    "thread_ts": "1789605454.155469",
-   "answered_at": null
+   "answered_at": "2026-09-16 18:31 PDT"
   }
  ]
 }

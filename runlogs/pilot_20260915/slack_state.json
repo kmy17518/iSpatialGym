@@ -42,20 +42,27 @@
    "time": "2026-09-16 18:21 PDT"
   }
  ],
- "last_seen_ts": "1789606289.709209",
+ "last_seen_ts": "1789608641.375089",
  "handled": [
   {
    "ts": "1789606289.709209",
    "kind": "question",
    "thread": "1789605454.155469",
    "action": "answered in thread; top_cabinet + bottom_cabinet_no_top launched"
+  },
+  {
+   "ts": "1789608641.375089",
+   "kind": "decision",
+   "id": "D-004",
+   "answer": "B",
+   "applied": "f8e9aa7c"
   }
  ],
  "loop_pid": 908952,
  "subscriptions": {
   "channel": "sub_a6770b43-defc-43ce-ad09-8a57c0e3e86e",
-  "D-004": "sub_e90d53ab-1c6e-409a-85bd-cc7337959528",
-  "note": "subscribed 17:50 PDT after the account link; the 5-min poll loop was stopped, status loop (30 min) continues"
+  "note": "subscribed 17:50 PDT after the account link; the 5-min poll loop was stopped, status loop (30 min) continues",
+  "D-004_closed": "sub_e90d53ab\u2026 unsubscribed 18:32 (answered)"
  },
  "status_note": null
 }
