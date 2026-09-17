@@ -94,6 +94,11 @@ PUSH_UNDER_DROP_AHEAD_M = (0.25, 0.60)
 PUSH_UNDER_CLEARANCE_M = 0.005      # blade clearance to the target's back face at the push start
 #: trunks that reach the floor (B3 floor bands, A6 recompute: cells only at translate ≥ 0.75, tilt ≤ −0.9)
 FLOOR_TRUNKS = ((0.75, -0.9), (0.75, -1.2), (0.95, -0.9), (0.95, -1.2))
+#: per-attempt time budget (owner 2026‑09‑16 22:55 item 4; as attachment's 094cfe3): run 0916‑190702 spent > 2 h in one push-under
+#: attempt (6 B candidates × up to 56 C candidates × the F_goal feasible sets) and hit the 7200 s run timeout with nothing
+#: written and no rejection recorded — the attempt now stops with ``Reject("time_budget")`` naming the stage it reached
+#: (``generation.attempt_budget_s`` overrides)
+ATTEMPT_BUDGET_S = 900.0
 
 
 class _NullContext:
@@ -1407,13 +1412,27 @@ class IORSLarge(SamplerV2):
         quat = G.qmul(G.quat_from_yaw(yaw), self.rest)
         return th.tensor([float(xy[0]), float(xy[1]), z + self.world.bottom_offset(self.hull, quat) + 0.003]), quat
 
+    # ------------------------------------------------------------------ per-attempt budget
+
+    def _check_deadline(self, stage: str) -> None:
+        """Per-attempt time budget (``ATTEMPT_BUDGET_S``): the attempt stops with ``Reject("time_budget")`` naming the stage
+        it reached once the budget is spent (a > 2 h attempt is a bug, not a search)."""
+        deadline = getattr(self, "_deadline", math.inf)
+        if time.time() > deadline:
+            spent = time.time() - getattr(self, "_attempt_t0", deadline)
+            raise Reject("time_budget", f"attempt budget of {self.num('attempt_budget_s', ATTEMPT_BUDGET_S):.0f} s spent ({spent:.0f} s) at {stage}",
+                         stage=stage)
+
     def sample_instance(self, rng: np.random.Generator) -> Draft:
         init: Stance = self.surface["init"]
         self.sidecar.add_stance(init)
         kind = self.surface["kind"]
         b_pool = list(self.surface["manip"])
         errors: List[str] = []
-        for _ in range(min(6, len(b_pool))):
+        self._attempt_t0 = time.time()
+        self._deadline = self._attempt_t0 + float(self.num("attempt_budget_s", ATTEMPT_BUDGET_S))
+        for i_b in range(min(6, len(b_pool))):
+            self._check_deadline(f"B candidate {i_b + 1} of {min(6, len(b_pool))}")
             kb = int(rng.integers(len(b_pool)))
             b_grid = b_pool.pop(kb)
             manip = b_grid.with_trunk(b_grid.translate, b_grid.tilt, "manipulation")
@@ -1439,6 +1458,8 @@ class IORSLarge(SamplerV2):
                                   "init_stance": P0.summarize_stance(init), "manipulation_stance": P0.summarize_stance(manip)})
                 return d
             except Reject as e:
+                if e.reason == "time_budget":
+                    raise  # the attempt is over, not this B candidate
                 errors.append(f"B candidate: {e.reason}: {e}")
                 self.sidecar.stances.pop("manipulation", None)
                 self.sidecar.stances.pop("placement", None)
@@ -1470,7 +1491,8 @@ class IORSLarge(SamplerV2):
             order = sorted(side, key=depth) + sorted(front, key=depth)
             n_try = max(12, len(side))
         errors = []
-        for kc in order[:n_try]:
+        for i_c, kc in enumerate(order[:n_try]):
+            self._check_deadline(f"C candidate {i_c + 1} of {min(n_try, len(order))} (F_goal feasible set) at B ({manip.translate}, {manip.tilt:.2f})")
             place = c_pool[int(kc)].with_trunk(c_pool[int(kc)].translate, c_pool[int(kc)].tilt, "placement")
             place.focus, place.arms = c_pool[int(kc)].focus, ["right"]
             place.extras = dict(c_pool[int(kc)].extras)
@@ -1501,6 +1523,7 @@ class IORSLarge(SamplerV2):
                 continue
             fails: Dict[str, int] = {}
             for i in rng.permutation(len(F))[:4]:
+                self._check_deadline(f"F draw at C candidate {i_c + 1} (exact IK at B / C{', push chain' if push else ''})")
                 yaw0, g = F[int(i)]
                 yaw = yaw0 + float(rng.uniform(-TARGET_JITTER, TARGET_JITTER))
                 t_pose = None
@@ -1538,6 +1561,7 @@ class IORSLarge(SamplerV2):
                         errors.append("C: push chain unreachable")
                         continue
                 # B -> C with the object attached (§3.7 ≤ max_partner_geodesic + 1 m; §3.8 transition)
+                self._check_deadline(f"B -> C path / transition at C candidate {i_c + 1}")
                 self.sidecar.add_stance(manip)
                 self.sidecar.add_stance(place)
                 try:

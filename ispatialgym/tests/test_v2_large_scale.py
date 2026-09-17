@@ -609,3 +609,26 @@ def test_wall_hinge_resistance_record():
     assert "friction" not in plain and "damping" not in plain and "drive" not in plain  # the axial table hinge stays frictionless
     # the loader's drive: absent keys keep a frictionless hinge (no drive at all)
     assert K.apply_hinge_drive.__doc__ and "π / 180" in K.apply_hinge_drive.__doc__
+
+
+def test_push_under_attempt_budget_rejects_time_budget_with_the_stage():
+    """Owner 2026‑09‑16 22:55 item 4 (run 0916‑190702: > 2 h in one push-under attempt, rc 124, nothing recorded): the
+    per-attempt budget (900 s, ``generation.attempt_budget_s``) stops the attempt with ``Reject("time_budget")`` naming the
+    stage reached; before the deadline the check is silent."""
+    import time
+
+    from ispatialgym.sampling.sim_utils import Reject
+
+    class S:
+        def num(self, key, default):
+            return default
+
+    s = S()
+    assert IL.ATTEMPT_BUDGET_S == 900.0
+    s._attempt_t0 = time.time()
+    s._deadline = s._attempt_t0 + 100.0
+    IL.IORSLarge._check_deadline(s, "C candidate 3 of 56 (F_goal feasible set)")  # silent before the deadline
+    s._deadline = s._attempt_t0 - 1.0
+    with pytest.raises(Reject) as e:
+        IL.IORSLarge._check_deadline(s, "C candidate 3 of 56 (F_goal feasible set)")
+    assert e.value.reason == "time_budget" and "C candidate 3 of 56" in str(e.value) and e.value.details.get("stage", "").startswith("C candidate")
