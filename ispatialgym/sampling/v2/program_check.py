@@ -426,8 +426,22 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                 raise Reject(res.code or "program_check_failed", f"{key}: {res.reason} (stance {stance_name}, arm {arm}, carried {carried})", action=name)
             if res.q is not None:
                 last = poses[-1]
+                # the witness the oracle re-uses (primary oracle 2026-09-16 23:06): polished onto the recorded pose (FK residual
+                # <= 2 mm, else program_check_failed), joint-limit margin recorded, and its virtual base joints re-expressed for
+                # a robot root at the world origin so FK(q) with an identity root lands base_link on the recorded base_pose2d
+                # (the sampler's root stood elsewhere: a constant per-sidecar world offset in the oracle's FK check)
+                ign_w = ignore_last + ignore_all + list(approached or [])
+                q_pol, residual = sampler.ikc.polish_witness(res.q, last, arm, ignore=ign_w)
+                if residual > sampler.ikc.WITNESS_RESIDUAL_MAX:
+                    raise Reject("program_check_failed", f"{key}: witness FK residual {residual * 1000:.1f} mm > {sampler.ikc.WITNESS_RESIDUAL_MAX * 1000:.0f} mm "
+                                                         f"after polishing (stance {stance_name}, arm {arm})", action=name)
+                margin, joint = sampler.ikc.joint_limit_margin(q_pol, arm)
                 witnesses[key] = {"pose": {"position": [round(float(v), 5) for v in last[0].tolist()], "orientation": [round(float(v), 6) for v in last[1].tolist()]},
-                                  "q": [round(float(v), 5) for v in res.q.tolist()], "n_waypoints": len(poses)}
+                                  "q": [round(float(v), 5) for v in sampler.ikc.canonical_q(q_pol, stance).tolist()],
+                                  "q_frame": "root at the world origin (identity pose, z = 0): FK(q) puts base_link at base_pose2d on the measured floor",
+                                  "base_pose2d": [float(v) for v in stance.base_pose2d], "floor_z": round(float(sampler.kit.floor_z), 4),
+                                  "fk_residual_m": round(residual, 5), "joint_limit_margin_rad": round(margin, 4), "joint_limit_nearest": joint,
+                                  "n_waypoints": len(poses)}
         # base poses: a transition's drive-back pose is visited with the departing trunk (arrival) and the arriving trunk
         # (after the sweep), the drive-in pose with the arriving trunk only; a path's goal with the stance trunk
         checks: List[Tuple[Tuple[float, float, float], Tuple[float, float]]] = []

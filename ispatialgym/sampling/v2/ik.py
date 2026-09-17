@@ -206,7 +206,11 @@ class IKResult:
     def code(self) -> str:
         """Distinct rejection code carried by the reason (``approach_untrackable``: a straight approach whose end pose has
         no configuration in the pre pose's IK branch), else ``""`` — callers use ``res.code or "<their reason>"``."""
-        return "approach_untrackable" if self.reason.startswith("approach_untrackable") else ""
+        if self.reason.startswith("approach_untrackable"):
+            return "approach_untrackable"
+        if self.reason.startswith("ik_joint_limit"):
+            return "ik_joint_limit"
+        return ""
 
 
 class IKChecker:
@@ -505,6 +509,21 @@ class IKChecker:
                 q, why = self.track_approach(q, poses[i - 1], p, arm, ignore_end=ign, ignore_mid=near, q_hint=q0)
                 if q is None:
                     break
+                m_lim, jn = self.joint_limit_margin(q, arm)
+                if m_lim < self.JOINT_LIMIT_MARGIN:
+                    # the tracked end configuration sits on a joint limit (touching: right_arm_joint2 at its limit on every
+                    # witness - the oracle's approach stalled 11 mm short): re-solve the end pose with margin and track the
+                    # segment backward so the pre witness follows that branch; fail the chain when no such branch exists
+                    with self.ignoring(list(ign) + list(near)):
+                        q_alt, why_lim = self.away_from_limits(q, p, arm, q0)
+                    q_pre2 = None
+                    if q_alt is not None and not th.equal(q_alt, q):
+                        q_pre2, why_b = self.track_segment(q_alt, p, poses[i - 1], arm, ignore_mid=near, ignore_end=(), ignore_start=ign)
+                    if q_pre2 is None:
+                        q, why = None, why_lim or f"ik_joint_limit: {jn} within {m_lim * 1000:.0f} mrad of its limit at the end of the tracked approach"
+                        break
+                    q = q_alt
+                    self._last_track_start = q_pre2.clone()
                 qs.append(q)
                 if qs and len(qs) >= 2:
                     qs[-2] = self._last_track_start.clone()
@@ -529,12 +548,92 @@ class IKChecker:
                 if q is None:
                     why = f"exact IK failed at pose {i + 1} of {n}"
                     break
+                with self.ignoring(ign):
+                    q, why_lim = self.away_from_limits(q, p, arm, q0)
+                if q is None:
+                    why = why_lim
+                    break
             qs.append(q)
             self.solutions[(arm, self._pose_key(p))] = q.clone()
         res = IKResult(q is not None, q, "" if q is not None else why, len(poses))
         if key is not None and res.ok:  # a failure may be a random miss of the solver: only witnesses are cached
             cache_put(key, {"ok": True, "q": q.tolist(), "qs": [None if x is None else x.tolist() for x in qs]})
         return res
+
+    # -- witness quality (primary oracle 2026-09-16 23:06) ---------------------------------------------------------------
+    #: a chain witness must keep this much room (rad) to every arm joint limit: the oracle's straight approach / descent from
+    #: it stalls at the limit otherwise (touching 0916-223613: right_arm_joint2 at -3.139, limit -3.142, plan_failed at grasp)
+    JOINT_LIMIT_MARGIN = 0.05
+    #: FK(q) of a recorded witness must reach its pose within this (m) after polishing
+    WITNESS_RESIDUAL_MAX = 0.002
+
+    def joint_limit_margin(self, q: th.Tensor, arm: str) -> Tuple[float, str]:
+        """``(smallest distance of the arm joints to a limit in rad, that joint's name)``."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        idx = self.kit.robot.arm_control_idx[arm]
+        lo = self.kit.robot.joint_lower_limits[idx].float()
+        hi = self.kit.robot.joint_upper_limits[idx].float()
+        qa = G.t(q)[idx]
+        margins = th.minimum(qa - lo, hi - qa)
+        k = int(th.argmin(margins))
+        names = M.ARM_JOINTS[arm]
+        return float(margins[k]), names[k] if k < len(names) else f"{arm}_arm_joint{k + 1}"
+
+    def away_from_limits(self, q: th.Tensor, pose: Pose, arm: str, q0: th.Tensor, tries: int = 4) -> Tuple[Optional[th.Tensor], str]:
+        """Keep ``q`` when its arm joints are >= ``JOINT_LIMIT_MARGIN`` from every limit; otherwise re-solve ``pose`` from other
+        seeds (the remembered neighbours, then the solver's random seeds) and return the solution with the largest margin
+        when it meets the bound, else ``(None, reason)``."""
+        m, jn = self.joint_limit_margin(q, arm)
+        if m >= self.JOINT_LIMIT_MARGIN:
+            return q, ""
+        best, best_m = q, m
+        seeds = self._retry_seeds(q0, pose, arm) + [q0] * max(0, tries - 1)
+        for q_s in seeds[:tries]:
+            q_alt = self.kit.ik(pose, q_s, arm=arm)
+            if q_alt is None:
+                continue
+            m_alt, _ = self.joint_limit_margin(q_alt, arm)
+            if m_alt > best_m:
+                best, best_m = q_alt, m_alt
+            if best_m >= self.JOINT_LIMIT_MARGIN:
+                return best, ""
+        m_b, jn_b = self.joint_limit_margin(best, arm)
+        return None, f"ik_joint_limit: {jn_b} within {m_b * 1000:.0f} mrad of its limit at the pose (every solution found; the approach from it would stall)"
+
+    def polish_witness(self, q: th.Tensor, pose: Pose, arm: str, ignore: Sequence[Any] = ()) -> Tuple[th.Tensor, float]:
+        """``(q', residual_m)``: a few damped-least-squares iterations drive the arm from ``q`` onto ``pose`` exactly (the IK
+        accepts 5 mm, the recorded witness should reach the recorded pose); the polished configuration is kept only when
+        it stays collision-free (``ignore`` removed) and within the joint-limit margin. The residual is |FK(q') - pose|."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        best = G.t(q).clone()
+        try:
+            res = self.kit.backend.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(pose[0]), G.t(pose[1]))}], q_start=best, pos_tol=1e-3, rot_tol=5e-3,
+                                                 max_iters=40, check_collisions=False, sync_world=False, max_joint_step=0.3)
+            if res.success and res.q_traj is not None:
+                cand = res.q_traj[-1].clone()
+                with self.ignoring(list(ignore)):
+                    free = bool(self.kit.collision_free(cand, margin=0.0)[0])
+                if free and self.joint_limit_margin(cand, arm)[0] >= self.JOINT_LIMIT_MARGIN * 0.5:
+                    best = cand
+        except Exception as e:  # noqa: BLE001 - polishing is best effort
+            log.debug("witness polish failed: %r", e)
+        return best, self.fk_residual(best, pose, arm)
+
+    def fk_residual(self, q: th.Tensor, pose: Pose, arm: str) -> float:
+        """|FK(q) - pose| (m) of the eef in the current robot root frame."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        eef = self.kit.fk([M.EEF_LINK[arm]], G.t(q))[M.EEF_LINK[arm]]
+        return float(th.linalg.norm(G.t(eef[0]) - G.t(pose[0])))
+
+    def canonical_q(self, q: th.Tensor, stance: Stance) -> th.Tensor:
+        """``q`` with the virtual base joints re-expressed relative to a robot root at the **world origin** (identity pose,
+        z = 0) so that FK with an identity root puts ``base_link`` at the stance's recorded ``base_pose2d`` on the measured floor
+        — the configuration a sidecar consumer can FK without knowing where the sampler's articulation root stood."""
+        x, y, yaw = (float(v) for v in stance.base_pose2d)
+        return C.q_with_base_pose(G.t(q), x, y, yaw, root_pose2d=(0.0, 0.0, 0.0), base_z=float(self.kit.floor_z) + C.NOMINAL_BASE_Z, root_z=0.0)
 
     # -- straight approaches (branch consistency) -----------------------------------------------------------------
     #: dense tracking step along an approach (m), the largest joint change allowed per dense step (rad), the largest

@@ -414,6 +414,19 @@ ring at half the footprint radius, 3 mm below the supporting surface, up) → ge
 support, up axis ≤ 15°). `reset_branches()` / `branches()` / `decided_by()`; the sampler writes `goal_check.binary_branch`
 (+ the last log entries), the task exposes `predicate_branches()` / `reset_predicate_branches()` for `meta.binary_branch`.
 
+### Witness quality (primary oracle 2026-09-16 23:06)
+
+- **Joint-limit margin**: every chain witness keeps ≥ 0.05 rad to each arm joint limit (`IKChecker.JOINT_LIMIT_MARGIN`); a
+  solution on a limit is re-solved from other seeds (`away_from_limits`), a tracked end configuration on a limit is
+  re-solved and the segment tracked backward; none → `ik_joint_limit` (`IKResult.code`). Touching 0916-223613 had every
+  witness with `right_arm_joint2` 2.8 mrad from its limit and the oracle's approach stalled there.
+- **Polished, self-describing witnesses** (`program_check`): each `ik_witnesses[].q` is driven onto its recorded pose by a few
+  DLS iterations (`polish_witness`; FK residual recorded as `fk_residual_m`, > 2 mm → `program_check_failed`), carries
+  `joint_limit_margin_rad` / `joint_limit_nearest`, and its virtual base joints are re-expressed for a **robot root at the
+  world origin** (`canonical_q`; `q_frame` says so, `base_pose2d` / `floor_z` alongside): FK(q) with an identity root puts
+  `base_link` on the recorded stance — the sampler's articulation root stood elsewhere, which showed as a constant
+  per-sidecar world offset in the oracle's FK check.
+
 ## Status (D2 / D4, 2026-09-15) and gaps
 
 Implemented: §2.3 customs reading + write-back (`problem.py`, reads D1's `isg_customs.json`: `roles.<role>.{grasp_keys,

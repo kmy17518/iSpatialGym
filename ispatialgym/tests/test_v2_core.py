@@ -413,6 +413,7 @@ def test_straight_approach_detection_and_reject_code():
     turned = (th.tensor([1.0, 0.0, 1.0]), C.eef_quat(th.tensor([0.0, 0.0, -1.0]), th.tensor([1.0, 0.0, 0.0])))
     assert not IK.is_approach(turned, grasp)  # 90 deg wrist turn: not a straight same-orientation segment
     assert IK.IKResult(False, None, "approach_untrackable: joint jump 2.9 rad at waypoint 4").code == "approach_untrackable"
+    assert IK.IKResult(False, None, "ik_joint_limit: right_arm_joint2 within 3 mrad of its limit at the pose").code == "ik_joint_limit"
     assert IK.IKResult(False, None, "exact IK failed at pose 2 of 2").code == ""
 
 
