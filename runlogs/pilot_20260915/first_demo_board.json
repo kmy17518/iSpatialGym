@@ -72,8 +72,8 @@
   "owner": "-"
  },
  "inter_object_relation_satisfaction-under_small_scale": {
-  "blocking": "D-007 A landed (core 5555526: robust under/ontop predicate, branch logged) \u2014 re-run queued",
-  "owner": "loop"
+  "blocking": "valid (a6d7123, 21:46). D-007 branch: mechanism verified (2e889f3), a passing re-run pending the primary oracle's carry-leg regression (30-waypoint straight leg stalls 25/30)",
+  "owner": "oracle"
  },
  "inter_object_relation_satisfaction-inside": {
   "blocking": "valid on f5ae607; re-opened by the core's targeted 1ba5e74 (open pads clear of the support: the failing sprout grasp had its fingertip at the table) \u2014 re-run queued",
