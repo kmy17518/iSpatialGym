@@ -151,10 +151,10 @@
    ],
    "status": "answered",
    "answered_by": "slack",
-   "answer": "default A applied at 21:17 (unanswered at 21:15): robust Under evaluator for concave partners (multi-ray, origin below the partner top, any hit) - assigned to the core; B not applied",
-   "applied_commit": null,
+   "answer": "default A applied: robust under/ontop wrapper ispatialgym.sampling.predicates.evaluate_predicate (OmniGibson -> contact-patch rays -> geometry; deciding branch logged as meta.binary_branch / goal_check.binary_branch), shared by the sampler goal check and the task evaluator",
+   "applied_commit": "5555526",
    "thread_ts": "1789615821.434969",
-   "answered_at": "2026-09-16 21:18 PDT"
+   "answered_at": "2026-09-16 21:38 PDT"
   }
  ]
 }

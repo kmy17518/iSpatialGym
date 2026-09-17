@@ -118,7 +118,7 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 
 ## First-demo board (mirror)
 
-<!-- first-demo-board --> _2026-09-16 21:37 PDT — 7/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
+<!-- first-demo-board --> _2026-09-16 21:38 PDT — 7/21 valid; full board: `runlogs/pilot_20260915/first_demo_board.md`_
 
 | subtask | state | blocking | owner |
 |---|---|---|---|
@@ -137,10 +137,10 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 | alignment-world_horizontal | demo run | push plan_failed = self-collision left_realsense_link vs right_arm_link7 (13 mm) along every path: the sidecar's push witnesses have the brace arm at zeros → large-scale: two-arm witness for the push pre with the brace arm at its contact | large-scale |
 | alignment-axial | valid demo | re-run 20:40 (oracle retreat changes 35be0ee/3eb8e51): plan_failed at retreat → primary oracle | oracle |
 | IORS ontop_small_scale | demo run (pre-fix success) | - | - |
-| IORS under_small_scale | demo run (pre-fix success) | D-007 default A applied 21:17: robust Under evaluator → core; teacup placements are physically correct (1.4 mm, 2.7°) | core |
+| IORS under_small_scale | demo run (pre-fix success) | D-007 A landed (core 5555526: robust under/ontop predicate, branch logged) — re-run queued | loop |
 | IORS inside | valid demo (pre-166005f,de4e723) | valid on f5ae607; re-opened by the core's targeted 1ba5e74 (open pads clear of the support: the failing sprout grasp had its fingertip at the table) — re-run queued | loop |
 | IORS nextto | demo run (pre-fix success) | closure ramp + pre-shape (bcc937d): 0.386 → 0.038 rad; the release still flings the pencil (blocked lower pad snaps open in the retreat) → oracle-B staged / rate-limited release; gate = placed_orientation with cylinder equivalences (38258f0) | oracle-B |
-| IORS touching | demo run | first two instances written (push-only program 0a81f739); 0916-202403 executed the whole chain, not_reached: the recorded 18 mm push left the boxes 2.3 cm apart (sampler push length vs gap → core; residual cap → primary oracle); pre-grasp joint jump → primary oracle | core / oracle |
+| IORS touching | demo run | push spans the measured gap at the place + tolerance margin (core a6d7123); pre-grasp joint jump / grasp plan → primary oracle; re-run queued | loop / oracle |
 | IORS ontop_large_scale | no instance | countertop pair = geometric yield (partner behind stance A) → floor fallback alias queued (local); sofa-bar re-run with the B→C path limit geodesic+3 m (4df6d0a) running locally | large-scale / loop |
 | IORS under_large_scale | no instance | push-under lanes 0.45–0.6 m ahead + edge-end laterals + frontal offset 0.25 m right (7162fe7, 8c93d0b, 2cfce47) — re-run queued/running | large-scale / loop |
 <!-- /first-demo-board -->
@@ -328,3 +328,4 @@ Columns: id | item | needs | where | owner | status | artefact / notes
 - 2026‑09‑16 21:22 PDT agent-e2e: core `260ff93` — `approach_untrackable` names cuRobo's overlapping self‑collision pair (`IKChecker.self_collision_pairs`); a place descent blocked by the carried object against forearm / torso / head re‑selects the library grasp at the settled pose (touching / nextto). Core now on D‑007 A (shared robust `Under` wrapper for the sampler goal check + task evaluator, branch recorded) and the touching push length vs gap (0916‑202403).
 - 2026-09-16 21:37 PDT pod_scheduler: role change pool -> bands: m48tuedy95bu05 (smoke2-l40s-0), rzcqsre0b89792 (pilot2-a40-5), 8lp72savyk8co4 (pilot2-a40-8), 1qzna64k3s9t8s (pilot2-l40s-1); queued jobs moved: none (queues were empty); files updated: smoke/pods.txt, rb/pods.txt, pods_bands.txt (owner rule 11:05: one role per pod, nothing finished recomputed)
 - 2026‑09‑16 21:38 PDT agent-e2e (owner 21:35): **10 idle pool pods terminated** — L40S `m48tuedy95bu05` smoke2‑l40s‑0, `1qzna64k3s9t8s` pilot2‑l40s‑1, `usqruny80uunl6` pilot2‑l40s‑9, `88hr6mw4y5i1h8` smoke2‑l40s‑1, `h7thjdjnyh8qcx` pilot2‑l40s‑0; A40 `rzcqsre0b89792` pilot2‑a40‑5, `8lp72savyk8co4` pilot2‑a40‑8, `6c5712ggii2ihf` pilot2‑a40‑2, `4udkfzz52mzpih` pilot2‑a40‑7, `z830mv63m0wjt7` pilot2‑a40‑11 (all lock‑free and process‑free at termination; ≈ −$7.90/h). Pool now 16 pods (15 running + `z2qdfyfyrgcjys` pilot2‑a40‑0 spare) + 1 band pod; pod files and lock files updated; the scheduler's preemption / role rules unchanged.
+- 2026‑09‑16 21:40 PDT agent-e2e: core — **D‑007 A landed** (`5555526`): `ispatialgym.sampling.predicates.evaluate_predicate` shared by the sampler's goal check and `ISpatialGymTask` (OmniGibson verdict → contact‑patch rays from 3 mm below the support surface → geometry branch; `goal_check.binary_branch` in the summary, `predicate_branches()` for `meta.binary_branch`; spec §6.11); touching push spans the measured gap at the place + the place tolerance + 5 mm (`a6d7123`; run 0916‑202403 had a 2.74 cm arc against a 4.1 cm executed gap). Both targeted → re‑runs queued.

@@ -72,8 +72,8 @@
   "owner": "-"
  },
  "inter_object_relation_satisfaction-under_small_scale": {
-  "blocking": "D-007 default A applied 21:17: robust Under evaluator \u2192 core; teacup placements are physically correct (1.4 mm, 2.7\u00b0)",
-  "owner": "core"
+  "blocking": "D-007 A landed (core 5555526: robust under/ontop predicate, branch logged) \u2014 re-run queued",
+  "owner": "loop"
  },
  "inter_object_relation_satisfaction-inside": {
   "blocking": "valid on f5ae607; re-opened by the core's targeted 1ba5e74 (open pads clear of the support: the failing sprout grasp had its fingertip at the table) \u2014 re-run queued",
@@ -84,8 +84,8 @@
   "owner": "oracle-B"
  },
  "inter_object_relation_satisfaction-touching": {
-  "blocking": "first two instances written (push-only program 0a81f739); 0916-202403 executed the whole chain, not_reached: the recorded 18 mm push left the boxes 2.3 cm apart (sampler push length vs gap \u2192 core; residual cap \u2192 primary oracle); pre-grasp joint jump \u2192 primary oracle",
-  "owner": "core / oracle"
+  "blocking": "push spans the measured gap at the place + tolerance margin (core a6d7123); pre-grasp joint jump / grasp plan \u2192 primary oracle; re-run queued",
+  "owner": "loop / oracle"
  },
  "inter_object_relation_satisfaction-ontop_large_scale": {
   "blocking": "countertop pair = geometric yield (partner behind stance A) \u2192 floor fallback alias queued (local); sofa-bar re-run with the B\u2192C path limit geodesic+3 m (4df6d0a) running locally",
