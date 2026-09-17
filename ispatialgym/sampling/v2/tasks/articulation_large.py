@@ -1107,7 +1107,9 @@ class ArticulationLarge(SamplerV2):
                 with self.kit.ignoring([obj]):
                     free = bool(self.kit.collision_free(q_b, margin=P0.COLLISION_MARGIN)[0])
                 if not free:
-                    raise Reject("base_follow_infeasible", f"whole body collides at b_{k:g} (target at q_{k:g} removed from the check)")
+                    dbg = P0.debug_collision_q(self, q_b, f"base-follow b_{k:g} = {[round(v, 3) for v in b]}", ignore=[obj])
+                    raise Reject("base_follow_infeasible", f"whole body collides at b_{k:g} (target at q_{k:g} removed from the check; "
+                                                           f"ground={dbg.get('no_ground')} margin0={dbg.get('margin0')} objects={dbg.get('objects_at_spheres')})")
                 if not leaf_clear_of_base(self.moving_link_footprint(), b[:2]):
                     raise Reject("base_follow_infeasible", f"the moving link sweeps into the base footprint at q_{k:g}")
                 poses = NAV.stride_poses([prev, b], NAV.STRIDE_M)

@@ -37,6 +37,7 @@ classes) take no simulator and are unit-tested in ``tests/test_v2_large_scale.py
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import math
 from dataclasses import dataclass, field
@@ -393,6 +394,54 @@ def debug_collisions(s, stances: Sequence[Stance], arms_excluded: bool, margin: 
         desc = [([round(float(v), 2) for v in (sp[i, :3] + rp.cpu()[:3]).tolist()], round(float(sp[i, 3]), 3)) for i in bad[:6]]
         log.info("collision debug %s d=%.2f λ=%.2f t=%.2f k=%.2f: %s; %d penetrating spheres (world pos, r) %s", st.name, st.stand_off or 0.0, st.lateral, st.translate,
                  st.tilt, verdicts, len(bad), desc)
+
+
+def debug_collision_q(s, q: th.Tensor, label: str, margin: float = COLLISION_MARGIN, ignore: Sequence[Any] = ()) -> Dict[str, Any]:
+    """Diagnostic of one 28-D configuration: verdicts with / without the ground obstacles and at margin 0, the penetrating
+    spheres (world position, radius, z) and the scene objects whose AABB (inflated 5 cm) contains them."""
+    out: Dict[str, Any] = {}
+    try:
+        from curobo._src.geom.collision.buffer_collision import CollisionBuffer
+        from curobo._src.robot.kinematics.kinematics_state import KinematicsState
+    except Exception:  # noqa: BLE001
+        return out
+    be = s.kit.backend
+    entry = be.kin_entry("whole_body")
+    dev = be.device_cfg.device
+    with s.ikc.ignoring(list(ignore)) if ignore else contextlib.nullcontext():
+        s.kit._ensure_synced()
+        out["collides"] = bool(be.check_collision(q.unsqueeze(0), emb_name="whole_body", sync_world=False, self_collision=True, margin=margin)[0])
+        out["no_self"] = bool(be.check_collision(q.unsqueeze(0), emb_name="whole_body", sync_world=False, self_collision=False, margin=margin)[0])
+        out["margin0"] = bool(be.check_collision(q.unsqueeze(0), emb_name="whole_body", sync_world=False, self_collision=False, margin=0.0)[0])
+        try:
+            be._ground_obstacles_enabled(False)
+            out["no_ground"] = bool(be.check_collision(q.unsqueeze(0), emb_name="whole_body", sync_world=False, self_collision=False, margin=margin)[0])
+        finally:
+            be._ground_obstacles_enabled(True)
+        js = be._active_js(entry, q.unsqueeze(0))
+        state = entry.fk.compute_kinematics(js)
+        spheres = state.robot_spheres.reshape(1, 1, -1, 4).contiguous()
+        buf = CollisionBuffer.from_shape(spheres.shape, be.device_cfg)
+        d0 = be.checker.get_sphere_collision(KinematicsState(robot_spheres=spheres), buf, th.ones(1, device=dev), th.full((1,), float(margin), device=dev)).reshape(-1)
+    sp = spheres.reshape(-1, 4).cpu()
+    bad = (d0 > 0).nonzero().flatten().tolist()
+    rp = be.root_pose()[0].cpu()
+    pts = [(sp[i, :3] + rp[:3]) for i in bad]
+    out["n_penetrating"] = len(bad)
+    out["spheres"] = [([round(float(v), 2) for v in p.tolist()], round(float(sp[i, 3]), 3)) for p, i in zip(pts[:6], bad[:6])]
+    hits: Dict[str, int] = {}
+    for obj in getattr(s.world.scene, "objects", []):
+        try:
+            lo, hi = obj.aabb
+        except Exception:  # noqa: BLE001
+            continue
+        lo, hi = th.as_tensor(lo) - 0.05, th.as_tensor(hi) + 0.05
+        n = sum(1 for p in pts if bool(((p >= lo) & (p <= hi)).all()))
+        if n:
+            hits[obj.name] = n
+    out["objects_at_spheres"] = dict(sorted(hits.items(), key=lambda kv: -kv[1])[:5])
+    log.info("collision debug %s: %s", label, out)
+    return out
 
 
 def trunk_sweep_free(s, base_pose2d: Pose2D, translates: Sequence[float] = SWEEP_TRANSLATES, margin: float = COLLISION_MARGIN) -> bool:
