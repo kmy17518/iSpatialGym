@@ -454,7 +454,7 @@ class FakeEnv:
             r.q[r.arm_control_idx[a]] = action[idx[f"arm_{a}"]]
             cmd = float(action[idx[f"gripper_{a}"]])
             fingers = r.q[r.gripper_control_idx[a]]
-            target = 0.0 if cmd < 0 else 0.05
+            target = 0.05 * (max(-1.0, min(1.0, cmd)) + 1.0) / 2.0  # JoyLo smooth mode: the command is the finger target (-1 = closed, +1 = 50 mm)
             r.q[r.gripper_control_idx[a]] = fingers + th.clamp(target - fingers, -0.01, 0.01)
             # assisted grasp: closing near an object attaches it; opening releases it. ``ag_fail_next`` refuses whole
             # closures (open -> close transitions), like an assisted grasp that never sees both pads on the object.
@@ -1385,6 +1385,95 @@ def test_gripper_and_state_roundtrip():
     assert not m.gripper_closed("right")
     m.import_state(st)
     assert m.gripper_closed("right") and m.tracker is None
+
+
+def test_gripper_closure_ramp_and_preshaped_opening():
+    """Owner decision 2026-09-16 17:10 item 4 (closure probe): ``gripper(close, rate)`` ramps the smooth-mode command so the
+    finger target moves at most ``rate`` per control step from the current opening to closed (both pads track the same
+    target; the stock step command follows), ``gripper_opening`` holds a pre-shaped opening (pinch width / 2 + margin)."""
+    robot = FakeRobot()
+    env = FakeEnv(robot, {})
+    m = Motions(env, FakeBackend(robot), MotionsConfig(gripper_steps=30))
+    idx = robot.gripper_control_idx["right"]
+    drive(env, m.gripper("right", close=False))
+    assert abs(float(robot.q[idx].max()) - 0.05) < 1e-6
+    # the pre-shaped opening: the command holds the fingers at 17.9 mm (the marker's 15.9 mm pinch + 10 mm margin)
+    cmds = []
+    env.after_step = lambda a: cmds.append(float(a[robot.controller_action_idx["gripper_right"]]))
+    n = drive(env, m.gripper_opening("right", 0.5 * 0.01585 + 0.010))
+    assert n == m.cfg.gripper_preshape_steps == 12 and len(set(cmds)) == 1
+    assert abs(cmds[0] - (2.0 * 0.017925 / 0.05 - 1.0)) < 1e-6 and abs(float(robot.q[idx].max()) - 0.017925) < 1e-6
+    assert abs(m.gripper_command("right", 0.05) - 1.0) < 1e-6 and abs(m.gripper_command("right", 0.0) + 1.0) < 1e-6 and abs(m.gripper_command("right", 0.9) - 1.0) < 1e-6
+    # the ramped closure from the pre-shaped opening: the command's finger target falls by exactly 2.25 mm per step
+    # (8 ramp steps for 17.9 mm), then the stock -1 command; without an object the fingers end at 0
+    cmds.clear()
+    drive(env, m.gripper("right", close=True, rate=0.00225))
+    targets = [0.05 * (c + 1.0) / 2.0 for c in cmds]
+    ramp = [t for t in targets if t > 1e-9]
+    assert len(ramp) == 7 and all(abs((ramp[i] - ramp[i + 1]) - 0.00225) < 1e-6 for i in range(len(ramp) - 1)), ramp
+    assert abs(ramp[0] - (0.017925 - 0.00225)) < 1e-6 and cmds[len(ramp)] == -1.0 and cmds[-1] == -1.0
+    assert float(robot.q[idx].max()) < 1e-6 and m.gripper_closed("right")
+    # from fully open the ramp takes 22 steps (50 mm / 2.25 mm); with an object in reach the assisted grasp attaches during the
+    # ramp and the closure finishes with the full command
+    drive(env, m.gripper("right", close=False))
+    cmds.clear()
+    drive(env, m.gripper("right", close=True, rate=0.00225))
+    assert len([t for t in (0.05 * (c + 1.0) / 2.0 for c in cmds) if t > 1e-9]) == 22
+    drive(env, m.gripper("right", close=False))
+    ep, _ = robot.eef_pose("right")
+    env.objects["ball"] = FakeObject("ball_0", ep.tolist())
+    cmds.clear()
+    drive(env, m.gripper("right", close=True, rate=0.00225))
+    assert robot._ag_obj_in_hand["right"] is env.objects["ball"] and cmds[-1] == -1.0
+    n_ramp = len([t for t in (0.05 * (c + 1.0) / 2.0 for c in cmds) if t > 1e-9])
+    assert 10 < n_ramp < 22  # the ramp stopped at the attach (fingers < 30 mm in the fake), the -1 command finished
+    # no rate (opening, or a push / brace closure): the stock step command alone
+    drive(env, m.gripper("right", close=False))
+    cmds.clear()
+    drive(env, m.gripper("right", close=True))
+    assert set(cmds) == {-1.0}
+    env.after_step = None
+
+
+def test_grasp_preshapes_from_the_library_pinch_width_and_closes_with_the_ramp(tmp_path):
+    """``execute_grasp`` pre-shapes the opening to pinch width / 2 + ``gripper_preshape_margin`` (the apple's library grasp:
+    73.4 mm -> 46.7 mm per finger) before the descent and closes with ``gripper_close_rate``; both are recorded in the
+    action's notes; a cube / handle grasp or a library entry without a width keeps the full opening."""
+    sc, env = iors_world()
+    env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
+    cmds = []
+    robot = env.robot
+    env.after_step = lambda a: cmds.append(float(a[robot.controller_action_idx["gripper_right"]]))
+    ex, motions, *_ = make_executor(env, sc, tmp_path)
+    assert motions.cfg.gripper_close_rate == 0.00225 and motions.cfg.gripper_preshape_margin == 0.010
+    result = ex.run_program(expand(sc.alias, sc))
+    assert result["success"], result["verdict"]
+    grasp = result["actions"][1]
+    assert grasp["name"] == "grasp"
+    assert abs(grasp["notes"]["preshape_opening_m"] - (0.5 * 0.0734 + 0.010)) < 1e-6 and grasp["notes"]["closure_rate_m_per_step"] == 0.00225
+    # the command sequence: open (+1), the pre-shaped opening (0.868), the ramp down at <= 2.25 mm per step, then -1
+    pre = 2.0 * (0.5 * 0.0734 + 0.010) / 0.05 - 1.0
+    assert any(abs(c - pre) < 1e-6 for c in cmds)
+    i0 = next(i for i, c in enumerate(cmds) if abs(c - pre) < 1e-6)
+    i1 = next(i for i in range(i0, len(cmds)) if cmds[i] == -1.0)
+    steps = [0.05 * (a - b) / 2.0 for a, b in zip(cmds[i0:i1 - 1], cmds[i0 + 1:i1])]
+    assert steps and all(-1e-9 <= s <= 0.00225 + 1e-9 for s in steps), steps
+    assert EX.grasp_pinch_width(expand(sc.alias, sc)[1]) == 0.0734
+    # no width / not a library grasp -> no pre-shape
+    from ispatialgym.oracle.actions import Grasp as GraspAction
+    from ispatialgym.oracle.sidecar import GraspRecord
+    g = sc.grasps[0]
+    assert EX.grasp_pinch_width(GraspAction(kind="library", arm="right", object=g.object, grasp=GraspRecord(**{**{k: getattr(g, k) for k in GraspRecord.KNOWN if hasattr(g, k)}, "grasp_key": "no_such_key"}))) is None
+    motions.cfg.gripper_preshape_margin = None
+    cmds.clear()
+    sc2, env2 = iors_world()
+    env2.evaluate = success_eval("apple.n.01_1", _place_goal(sc2), tol=0.08)
+    env2.after_step = lambda a: cmds.append(float(a[env2.robot.controller_action_idx["gripper_right"]]))
+    ex2, motions2, *_ = make_executor(env2, sc2, tmp_path / "b")
+    motions2.cfg.gripper_preshape_margin = None
+    result2 = ex2.run_program(expand(sc2.alias, sc2))
+    assert result2["success"] and "preshape_opening_m" not in result2["actions"][1]["notes"]
+    assert not any(abs(c - pre) < 1e-6 for c in cmds)
 
 
 # ==========================================================================================

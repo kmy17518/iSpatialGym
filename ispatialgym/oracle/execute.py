@@ -443,6 +443,22 @@ def post_set_torso(action: SetTorso, state, targets, ctx) -> Optional[str]:
 # ==========================================================================================
 
 
+def grasp_pinch_width(action: Grasp) -> Optional[float]:
+    """The pinch width (m) of a library grasp — ``Grasp.meta["width"]`` of the library candidate (15.9 mm for
+    ``marker__xakoic/grasp_1``); None for a cube / handle grasp or an older library entry without it (fully open)."""
+    if action.kind != "library" or action.grasp is None:
+        return None
+    try:
+        width = (C.grasp_entry(action.grasp.grasp_key, action.grasp.grasp_name).meta or {}).get("width")
+    except Exception:  # noqa: BLE001  (a library entry the run cannot resolve keeps the full opening)
+        return None
+    try:
+        width = float(width)
+    except (TypeError, ValueError):
+        return None
+    return width if math.isfinite(width) and width > 0 else None
+
+
 def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
     arm = action.arm
     _hook(ctx, "fov")(False)  # the idle posture / the transit to the pre-grasp are not the sampler's to guarantee
@@ -458,10 +474,20 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     cfg = _cfg(ctx)
     finish = ApproachFinish(targets["grasp"], q_hint=_witness(ctx, "grasp"), ignore_objects=[obj] + list(supports), max_stall=cfg.approach_finish_max_stall,
                             max_remaining=cfg.approach_finish_max_remaining)
+    # pre-shaped opening (owner 2026-09-16 17:10 item 4, closure probe): pads at pinch width / 2 + margin before the descent,
+    # so the lower pad of a tilted grasp clears the table (the fully open pad stood on it: approach 9 mm short, one pad 3
+    # steps late, the cylinder rolled 19-77 deg) and the tap-to-pinch gap is <= 1 cm per side
+    width = grasp_pinch_width(action)
+    if width is not None and motions.cfg.gripper_preshape_margin is not None:
+        opening = 0.5 * width + float(motions.cfg.gripper_preshape_margin)
+        yield from motions.gripper_opening(arm, opening)
+        ctx["preshape_opening_m"] = opening
     yield from motions.arm_along(arm, targets["approach"], finish=finish)
     if finish.used:
         ctx["approach_finish"] = finish.info
-    yield from motions.gripper(arm, close=True)
+    # ramped closure (2.25 mm / step, a quarter of the free speed): both pads reach the object in the same step
+    yield from motions.gripper(arm, close=True, rate=motions.cfg.gripper_close_rate)
+    ctx["closure_rate_m_per_step"] = motions.cfg.gripper_close_rate
     held = state.held_object(arm)
     if held is not obj:
         raise SkillError("failed_grasp", f"{action.object} not in the {arm} hand after closing", in_hand=None if held is None else held.name)

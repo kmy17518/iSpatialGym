@@ -101,6 +101,19 @@ class MotionsConfig:
     diff_ik_joint_speed: float = 1.0
     #: gripper actuation wait (steps)
     gripper_steps: int = 60
+    #: grasp closure ramp (owner decision 2026-09-16 17:10 item 4, closure probe ``runlogs/closure_probe_20260916``): the
+    #: smooth-mode gripper command is ramped so the finger target moves at most this far per control step (m) from the
+    #: current opening to closed. The stock step command drives both fingers at the joint's 0.25 m/s limit; on a tilted
+    #: tabletop grasp the lower pad rubs the table and arrives 3 steps after the other pad, which knocks the un-pinched
+    #: cylinder along the table and rolls it like a wheel (marker: 19-77 deg, demo 0916-152503: 24.6 deg). At 2.25 mm/step
+    #: (a quarter of the free closing speed) both pads track the target and a centred object is pinched before it rolls:
+    #: 0.1 / 2.9 / -3.2 deg on the marker (4.5 mm/step: -0.8 / -1.8 / 13.1 deg). None = the step command.
+    gripper_close_rate: Optional[float] = 0.00225
+    #: pre-shaped opening before a grasp descent: fingers at pinch width / 2 + this margin (m) so the lower pad of a
+    #: tilted grasp clears the table (the fully open pad stood on it); None = fully open
+    gripper_preshape_margin: Optional[float] = 0.010
+    #: hold steps of the pre-shaped opening before the descent
+    gripper_preshape_steps: int = 12
     #: base tracking (paths) and base-follow (articulation) tracker configurations
     base_tracker: BaseTrackerConfig = field(default_factory=BaseTrackerConfig)
     base_follow_speed: float = 0.15  # m/s along the recorded b_k
@@ -354,12 +367,49 @@ class Motions:
 
     # ------------------------------------------------------------------ gripper
 
-    def gripper(self, arm: str, close: bool, steps: Optional[int] = None) -> Iterator[th.Tensor]:
-        """Open / close the gripper and wait until the fingers stop moving (or an assisted grasp engages)."""
-        self.state.set_gripper(arm, close)
-        self.state.stop_base()
-        steps = self.cfg.gripper_steps if steps is None else int(steps)
+    def _gripper_limits(self, arm: str) -> Tuple[float, float]:
         idx = self.robot.gripper_control_idx[arm]
+        return float(self.robot.joint_lower_limits[idx].float().mean()), float(self.robot.joint_upper_limits[idx].float().mean())
+
+    def gripper_command(self, arm: str, q_m: float) -> float:
+        """The smooth-mode gripper command holding the fingers at opening ``q_m`` per finger (linear in [-1, 1] between
+        the joint limits; the closure probe's ``2·(q − lo)/(hi − lo) − 1``)."""
+        lo, hi = self._gripper_limits(arm)
+        q_m = min(hi, max(lo, float(q_m)))
+        return max(-1.0, min(1.0, 2.0 * (q_m - lo) / (hi - lo) - 1.0))
+
+    def gripper_opening(self, arm: str, q_m: float, steps: Optional[int] = None) -> Iterator[th.Tensor]:
+        """Hold the fingers at opening ``q_m`` per finger (smooth-mode command; the pre-shaped opening of a grasp,
+        ``execute_grasp``: pinch width / 2 + ``gripper_preshape_margin`` before the descent so no pad stands on the
+        table)."""
+        self.state.gripper_cmd[arm] = self.gripper_command(arm, q_m)
+        self.state.stop_base()
+        for _ in range(int(self.cfg.gripper_preshape_steps if steps is None else steps)):
+            yield self._emit()
+
+    def gripper(self, arm: str, close: bool, steps: Optional[int] = None, rate: Optional[float] = None) -> Iterator[th.Tensor]:
+        """Open / close the gripper and wait until the fingers stop moving (or an assisted grasp engages).
+
+        ``rate`` (m per control step, closing only; ``execute_grasp`` passes ``cfg.gripper_close_rate``) ramps the
+        smooth-mode command from the current opening to closed so both pads track the same target and reach the object
+        in the same step even while one pad rubs the table (closure probe 2026-09-16: the stock step command let the
+        free pad knock the un-pinched cylinder along the table and roll it 19-77 deg); the stock step command follows
+        the ramp (and is the whole command without a rate, or when opening)."""
+        self.state.stop_base()
+        idx = self.robot.gripper_control_idx[arm]
+        if close and rate:
+            lo, hi = self._gripper_limits(arm)
+            q_target = float(self.robot.get_joint_positions()[idx].float().mean())
+            n = 0
+            while q_target > lo + 1e-6:
+                q_target = max(lo, q_target - float(rate))
+                self.state.gripper_cmd[arm] = self.gripper_command(arm, q_target)
+                yield self._emit()
+                n += 1
+                if n > 10 and self.held_object(arm) is not None:
+                    break  # attached: finish with the full command below
+        self.state.set_gripper(arm, close)
+        steps = self.cfg.gripper_steps if steps is None else int(steps)
         for i in range(steps):
             yield self._emit()
             if i > 10:
