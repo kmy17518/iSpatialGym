@@ -1024,11 +1024,26 @@ class Retreat(Action):
         super().__post_init__()
 
     def _segment(self, sidecar, state) -> Tuple[Pose, Pose]:
+        """From where the hand **is** (``state.eef_pose`` at run time: a brace / push pad pressing on its object sits
+        a few cm short of the recorded contact under the load — a retreat that first drove to the recorded contact
+        shoved the painting 0.6 rad off its goal), ``distance`` along the recorded end pose's −a (the direction the
+        sampler validated); from the recorded pose when the state has none (the sampler's check, the stub state)."""
         C = _conventions()
-        start = self.after.end_pose(sidecar, state)
-        if start is None:
+        recorded = self.after.end_pose(sidecar, state)
+        if recorded is None:
             raise SidecarError(f"retreat: the preceding action {self.after.name} leaves no eef pose")
-        return start, _pre(C, start, self.distance)
+        clear = _pre(C, recorded, self.distance)
+        start = None
+        eef = getattr(state, "eef_pose", None)
+        if callable(eef):
+            try:
+                start = _as_pose(eef(self.arm))
+            except Exception:  # noqa: BLE001
+                start = None
+        if start is None:
+            return recorded, clear
+        offset = [float(b - a) for a, b in zip(recorded.position, clear.position)]
+        return start, start.translated(offset)
 
     def targets(self, sidecar, state):
         C = _conventions()
