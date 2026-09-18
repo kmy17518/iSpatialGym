@@ -773,9 +773,14 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
         here = as_world_pose(state.eef_pose(arm))
         n = escape_direction(state, here, supports)
         if n is not None:
-            escape = (here[0] + n * cfg.contact_retreat_escape_m, here[1])
-            leg = [escape] + leg
-            ctx["retreat_escape"] = {"direction": [round(float(v), 3) for v in n.tolist()], "distance_m": cfg.contact_retreat_escape_m}
+            # the whole leg runs along the escape direction (the recorded clear pose of a wall push lies 8 cm DOWN the
+            # face - the pad's approach axis is vertical there - and the transit to it dragged the painting's edge:
+            # 0917-224633, +0.13 rad); the postcondition is judged on this end pose
+            far = max(float(getattr(action, "distance", 0.0) or 0.0), cfg.contact_retreat_escape_m, 0.10)
+            leg = [(here[0] + n * cfg.contact_retreat_escape_m, here[1]), (here[0] + n * far, here[1])]
+            targets["retreat"] = leg
+            finish = _free_leg_finish(state, leg[-1], None, ignore, cfg)
+            ctx["retreat_escape"] = {"direction": [round(float(v), 3) for v in n.tolist()], "distance_m": far}
     try:
         yield from motions.arm_along(arm, leg, finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
     except SkillError as e:
