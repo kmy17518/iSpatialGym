@@ -1225,7 +1225,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     # the box, so the long pre-pose descent was a redundant "down, then down again" (0918-014040)
     pre_pose = targets["pre"]
     q_hint_pre = _witness(ctx, "pre")
-    if action.contact.mid is None and cfg.push_pre_dist_m is not None:
+    if action.contact.mid is None and cfg.push_pre_dist_m is not None and not pitched_class:  # a pitched blade keeps its recorded pre-pose (the shortened one sits at the table)
         p_pre, q_pre = as_world_pose(targets["pre"])
         p_init, _ = as_world_pose(targets["waypoints"][0])
         a_dir = C.approach_axis(q_pre)
