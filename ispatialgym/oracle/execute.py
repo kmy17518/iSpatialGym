@@ -136,6 +136,11 @@ class ExecuteConfig:
     push_residual_min_m: float = 0.005
     push_residual_max_fraction: float = 0.25
     push_backoff_m: float = 0.02
+    #: (owner 2026-09-17 23:39) a push leg stops once the object's residual to its TRO goal is within this fraction of the
+    #: goal tolerance (arcs / lines) instead of driving the pad to the recorded end
+    push_stop_at_goal: bool = True
+    push_stop_frac_arc: float = 0.15
+    push_stop_frac_line: float = 0.0
     #: (rush 2026-09-17) a line push still short after the arm's extension is closed by driving the base along the push
     #: direction with the arm locked, up to this far (m; 0 disables), at this speed (m/s), to this tracker tolerance (m)
     push_base_nudge_max_m: float = 0.06
@@ -750,12 +755,15 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
     arm = action.arm
     if action.release:
         held = state.held_object(arm)
-        articulated = held is not None and bool(getattr(held, "n_joints", 0) or len(getattr(held, "joints", {}) or {}))
-        # a handle of an articulated object is released with the full opening at once (no staged release: the assisted
-        # grasp would re-grasp the handle during the retreat and the door cannot follow the hand)
-        yield from motions.gripper(arm, close=False, staged=not articulated)
-        _release(motions, state, arm)
-        _hook(ctx, "fov")(False)  # the span (a held handle, a brace) closes with the release
+        if held is not None:
+            articulated = bool(getattr(held, "n_joints", 0) or len(getattr(held, "joints", {}) or {}))
+            # a handle of an articulated object is released with the full opening at once (no staged release: the assisted
+            # grasp would re-grasp the handle during the retreat and the door cannot follow the hand)
+            yield from motions.gripper(arm, close=False, staged=not articulated)
+            _release(motions, state, arm)
+        # a brace holds nothing: its closed fist leaves as it is (owner 2026-09-17 23:39: no gripper opening at the
+        # brace retreat); the contact span still closes here
+        _hook(ctx, "fov")(False)
     ignore: List[Any] = []
     if getattr(action, "object", None):
         try:
@@ -772,15 +780,30 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
         supports = contact_ignores(state, action.object) if getattr(action, "object", None) else []
         here = as_world_pose(state.eef_pose(arm))
         n = escape_direction(state, here, supports)
-        if n is not None:
-            # the whole leg runs along the escape direction (the recorded clear pose of a wall push lies 8 cm DOWN the
-            # face - the pad's approach axis is vertical there - and the transit to it dragged the painting's edge:
-            # 0917-224633, +0.13 rad); the postcondition is judged on this end pose
-            far = max(float(getattr(action, "distance", 0.0) or 0.0), cfg.contact_retreat_escape_m, 0.10)
-            leg = [(here[0] + n * cfg.contact_retreat_escape_m, here[1]), (here[0] + n * far, here[1])]
+        # owner 2026-09-17 23:39: a pad leaves its contact RADIALLY - away from the object's centre in the support plane
+        # (the pad at the painting's left edge goes left, the one at the top edge goes up; a table push backs off
+        # opposite the push) - then off the support along the escape normal. The recorded clear pose of the wall push
+        # lies 8 cm DOWN the face (the pad's approach axis is vertical there) and the transit to it dragged the
+        # painting's edge (0917-224633, +0.13 rad); the postcondition is judged on the new end pose
+        radial = None
+        try:
+            centre = C.as_tensor(state.object_pose(action.object)[0]).reshape(-1)[:3].float()
+            radial = here[0].float() - centre
+            if n is not None:
+                radial = radial - n * float(th.dot(radial, n))
+            radial = radial / float(th.linalg.norm(radial)) if float(th.linalg.norm(radial)) > 1e-3 else None
+        except Exception:  # noqa: BLE001
+            radial = None
+        if radial is not None or n is not None:
+            d1 = radial if radial is not None else n
+            out = cfg.contact_retreat_escape_m
+            far = max(float(getattr(action, "distance", 0.0) or 0.0), 2 * out)
+            end = here[0] + d1 * far + (n * out if (n is not None and radial is not None) else 0.0)
+            leg = [(here[0] + d1 * out, here[1]), (end, here[1])]
             targets["retreat"] = leg
             finish = _free_leg_finish(state, leg[-1], None, ignore, cfg)
-            ctx["retreat_escape"] = {"direction": [round(float(v), 3) for v in n.tolist()], "distance_m": far}
+            ctx["retreat_escape"] = {"radial": None if radial is None else [round(float(v), 3) for v in radial.tolist()],
+                                     "normal": None if n is None else [round(float(v), 3) for v in n.tolist()], "distance_m": far}
     try:
         yield from motions.arm_along(arm, leg, finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
     except SkillError as e:
@@ -961,6 +984,36 @@ def push_tangent(geom: PushGeometry, pose) -> th.Tensor:
     return d / max(float(th.linalg.norm(d)), 1e-9)
 
 
+def _push_leg(motions: Motions, state, arm: str, obj: str, waypoints: Sequence[Any], geom: "PushGeometry", pose0, cfg: ExecuteConfig,
+              ctx: Dict[str, Any], label: str, partial: bool = False) -> Iterator[th.Tensor]:
+    """A pad leg with the pushed object watched (owner 2026-09-17 23:39): the leg **stops as soon as the object has
+    reached its goal** (``push_stop_at_goal``; residual measured against the TRO target within ``push_stop_frac_*`` of
+    its tolerance) instead of driving the pad to the recorded end - the recorded arc rotates the painting further than
+    the goal (0917-224633: -0.25 rad), and a pad driven on against a blocked target loads the arm and the base (the
+    base sprang forward when the pad left) and squeezes the target against the brace (+0.1 rad relaxation)."""
+    sign = 1.0 if geom.kind == "line" else math.copysign(1.0, geom.angle)
+    tgt = state.pose_target(obj) if hasattr(state, "pose_target") else None
+    tol = None
+    if tgt is not None:
+        tol = getattr(tgt, "orientation_tolerance" if geom.kind == "arc" else "position_tolerance", None)
+    margin = None if tol is None else float(tol) * (cfg.push_stop_frac_arc if geom.kind == "arc" else cfg.push_stop_frac_line)
+    gen = motions.arm_along(arm, waypoints, loaded=True, partial=partial)
+    k = 0
+    for a in gen:
+        yield a
+        k += 1
+        if not cfg.push_stop_at_goal or margin is None:
+            continue
+        res, src = push_residual(geom, state, obj, pose0)
+        if res is None or src not in ("goal_position", "goal_orientation"):
+            continue
+        if float(res) * sign <= margin:
+            log.info("%s(%s): the object reached its goal (%s residual %.4f <= %.4f) after %d steps -> the pad stops here", label, obj, src, float(res) * sign, margin, k)
+            ctx.setdefault("push_stopped", []).append({"leg": label, "steps": k, "residual": float(res) * sign})
+            gen.close()
+            return
+
+
 def _hold_until_still(motions: Motions, state, obj: str, cfg: ExecuteConfig) -> Iterator[th.Tensor]:
     """Hold the arm (pad in contact) until the object's pose stops changing between steps."""
     prev = state.object_pose(obj)
@@ -1016,7 +1069,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         off = off - geom.axis * float(th.dot(off, geom.axis))
         ctx["push_pivot_offset_m"] = float(th.linalg.norm(off))  # the arc's axis vs the object's COM
         ctx["push_axis"] = [round(float(v), 3) for v in geom.axis.tolist()]
-    yield from motions.arm_along(arm, targets["waypoints"], loaded=True)
+    yield from _push_leg(motions, state, arm, obj, targets["waypoints"], geom, pose0, cfg, ctx, "push")
     # 1. hold with the pad in contact until the object is still, then measure the residual to the goal
     yield from _hold_until_still(motions, state, obj, cfg)
     residual, source = push_residual(geom, state, obj, pose0)
@@ -1039,7 +1092,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         if forward and rmin <= abs(residual) <= cap:
             ext = extend_push(geom, end_pose, residual)
             log.info("push(%s): residual %.4f %s (%s) -> pushing on along the extended %s", obj, residual, "rad" if geom.kind == "arc" else "m", source, geom.kind)
-            yield from motions.arm_along(arm, ext, loaded=True, partial=True)  # best-effort: a stall keeps what it achieved
+            yield from _push_leg(motions, state, arm, obj, ext, geom, pose0, cfg, ctx, "re-push", partial=True)  # best-effort: a stall keeps what it achieved
             yield from _hold_until_still(motions, state, obj, cfg)
             end_pose = as_world_pose(state.eef_pose(arm))  # where the pad actually is (a partial extension ends short of ext[-1])
             after, _ = push_residual(geom, state, obj, pose0)
