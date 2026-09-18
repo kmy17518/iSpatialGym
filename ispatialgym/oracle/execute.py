@@ -939,9 +939,9 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         if forward and rmin <= abs(residual) <= cap:
             ext = extend_push(geom, end_pose, residual)
             log.info("push(%s): residual %.4f %s (%s) -> pushing on along the extended %s", obj, residual, "rad" if geom.kind == "arc" else "m", source, geom.kind)
-            yield from motions.arm_along(arm, ext, loaded=True)
+            yield from motions.arm_along(arm, ext, loaded=True, partial=True)  # best-effort: a stall keeps what it achieved
             yield from _hold_until_still(motions, state, obj, cfg)
-            end_pose = as_world_pose(ext[-1])
+            end_pose = as_world_pose(state.eef_pose(arm))  # where the pad actually is (a partial extension ends short of ext[-1])
             after, _ = push_residual(geom, state, obj, pose0)
             ctx["push_residual"]["extended_by"] = residual
             ctx["push_residual"]["after"] = after

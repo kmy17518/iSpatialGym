@@ -829,7 +829,7 @@ class Motions:
         return dense
 
     def arm_along(self, arm: str, waypoints: Sequence[Any], speed: Optional[float] = None, finish: Optional["ApproachFinish"] = None,
-                  soft_pos_tol: Optional[float] = None, loaded: bool = False) -> Iterator[th.Tensor]:
+                  soft_pos_tol: Optional[float] = None, loaded: bool = False, partial: bool = False) -> Iterator[th.Tensor]:
         """Track a given eef waypoint list with damped-least-squares differential IK on the arm's joints (trunk and
         base locked), streamed at ``speed`` (m/s; ``cartesian_speed``). The list is densified to the tracking
         resolution and every waypoint is reached in order; no collision veto (contact motions must touch — the QA
@@ -914,6 +914,12 @@ class Motions:
                     finish.used = True
                     finish.info = {"stall_m": stall, "remaining_m": remaining, "converged": int(diag.get("converged", 0)), "n_dense": len(dense), "by": by}
                     return
+            if partial and diag.get("stage") == "diff_ik" and res.q_traj is not None and len(res.q_traj) > 1:
+                # a best-effort leg (the residual re-push, rush 2026-09-17): the converged prefix is executed, the
+                # caller measures what it achieved (touching 0917-205741: the extension stalled 3/5 at the reach limit)
+                log.warning("arm_along(%s): %s -> executing the %d converged waypoints only (best-effort leg)", arm, res.status, int(diag.get("converged", 0)))
+                yield from self.execute_joint_trajectory(self._retime(res.q_traj, steps[: len(res.q_traj) - 1]), arms=[arm], loaded=loaded)
+                return
             raise SkillError("plan_failed", f"arm_along({arm}): {res.status}", stage="diff_ik", n_waypoints=len(waypoints), **{k_: v for k_, v in diag.items() if k_ in ("fail_index", "pos_err", "rot_err")})
         yield from self.execute_joint_trajectory(self._retime(res.q_traj, steps), arms=[arm], loaded=loaded)
 
