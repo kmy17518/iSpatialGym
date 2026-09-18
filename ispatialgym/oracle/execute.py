@@ -690,7 +690,11 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
     cfg = _cfg(ctx)
     arm = action.arm
     if action.release:
-        yield from motions.gripper(arm, close=False)
+        held = state.held_object(arm)
+        articulated = held is not None and bool(getattr(held, "n_joints", 0) or len(getattr(held, "joints", {}) or {}))
+        # a handle of an articulated object is released with the full opening at once (no staged release: the assisted
+        # grasp would re-grasp the handle during the retreat and the door cannot follow the hand)
+        yield from motions.gripper(arm, close=False, staged=not articulated)
         _release(motions, state, arm)
         _hook(ctx, "fov")(False)  # the span (a held handle, a brace) closes with the release
     ignore: List[Any] = []

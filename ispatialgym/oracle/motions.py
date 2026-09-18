@@ -522,7 +522,8 @@ class Motions:
         v = float(v)
         return None if v >= hi - 1e-6 else min(hi, max(lo, v))
 
-    def gripper(self, arm: str, close: bool, steps: Optional[int] = None, rate: Optional[float] = None, opening: Optional[float] = None) -> Iterator[th.Tensor]:
+    def gripper(self, arm: str, close: bool, steps: Optional[int] = None, rate: Optional[float] = None, opening: Optional[float] = None,
+                staged: bool = True) -> Iterator[th.Tensor]:
         """Open / close the gripper and wait until the fingers stop moving (or an assisted grasp engages).
 
         Closing: ``rate`` (m per control step; ``execute_grasp`` passes ``cfg.gripper_close_rate``) ramps the smooth-mode
@@ -584,7 +585,10 @@ class Motions:
             self.state.set_gripper(arm, True)
         else:
             stage = None
-            if self.held_object(arm) is not None:
+            if self.held_object(arm) is not None and staged:
+                # (staged=False: a handle of an articulated object - OmniGibson's assisted grasp treats any command short
+                # of fully open as "applying grasp" and re-grasps the handle during the retreat, then the door cannot
+                # follow the hand: dishwasher 0917-210503 "drifted 42 cm off the right hand while grasped")
                 stage = opening if opening is not None else self.release_stage_opening(arm)
                 if stage is not None:
                     stage = min(hi, max(lo, float(stage)))
