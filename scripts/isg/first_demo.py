@@ -193,7 +193,10 @@ def cmd_demo_only(args):
     out_dir = os.path.join(FD, st, run_id)
     # stage the template dir under the synced inputs
     tdir = os.path.dirname(os.path.dirname(tro))
-    stage = os.path.join(REPO, "runlogs", "smoke_inputs", "first_demo", alias, os.path.basename(tdir))
+    # staged per source run: two instances of the same alias share the template basename, and the stale staged copy
+    # shadowed the new one (2026-09-18 15:01: the demo loaded the old TRO while the ledger named the new)
+    run_key = os.path.basename(os.path.dirname(os.path.dirname(tdir))) or "run"
+    stage = os.path.join(REPO, "runlogs", "smoke_inputs", "first_demo", alias, f"{run_key}__{os.path.basename(tdir)}")
     if not os.path.exists(os.path.join(stage, "template.json")):
         import shutil
 
