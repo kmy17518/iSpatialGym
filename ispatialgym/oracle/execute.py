@@ -154,6 +154,8 @@ class ExecuteConfig:
     free_leg_finish_max_remaining: float = 0.6
     #: a free-space retreat whose finish is rejected is accepted when it ends within this of its end pose (m)
     retreat_partial_accept_m: float = 0.04
+    #: a pad leaving a brace / push contact first moves this far straight away from the supports (escape_direction) (m; 0 = off)
+    contact_retreat_escape_m: float = 0.05
     #: a contact pre-pose next to an ignored support (wall, table) is reached via a standoff this far away from the
     #: support, planned with the support present, then a straight leg (``reach_pre_pose``)
     pre_pose_standoff_m: float = 0.08
@@ -710,8 +712,21 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
         except Exception:  # noqa: BLE001
             ignore = []
     finish = _free_leg_finish(state, targets["retreat"][-1], _witness(ctx, "retreat"), ignore, cfg)
+    leg = list(targets["retreat"])
+    if isinstance(getattr(action, "after", None), (Brace, Push)) and cfg.contact_retreat_escape_m > 0:
+        # rush 2026-09-17: a pad leaving a contact first moves straight away from the supports (the wall normal / up from a
+        # table: escape_direction, as the pre-pose standoff) before the leg to the recorded clear pose - that single
+        # straight leg has a component along the face and rubbed the painting from +0.053 to +0.135 rad (0917-213345;
+        # a back-off along the pad's own approach axis slid 9 cm down the face instead, 0917-214548)
+        supports = contact_ignores(state, action.object) if getattr(action, "object", None) else []
+        here = as_world_pose(state.eef_pose(arm))
+        n = escape_direction(state, here, supports)
+        if n is not None:
+            escape = (here[0] + n * cfg.contact_retreat_escape_m, here[1])
+            leg = [escape] + leg
+            ctx["retreat_escape"] = {"direction": [round(float(v), 3) for v in n.tolist()], "distance_m": cfg.contact_retreat_escape_m}
     try:
-        yield from motions.arm_along(arm, targets["retreat"], finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+        yield from motions.arm_along(arm, leg, finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
     except SkillError as e:
         # rush 2026-09-17 (touching 0917-204511): the converged prefix of the leg is executed before the finish is
         # rejected (witness and cuRobo IK both in another branch); a free-space retreat that already stands within
