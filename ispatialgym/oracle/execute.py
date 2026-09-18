@@ -156,6 +156,8 @@ class ExecuteConfig:
     #: as long as the finger section still covers this much of the face
     push_palm_clear_m: float = 0.005
     push_palm_min_face_m: float = 0.03
+    #: first choice for a palm overlap: pitch the blade about its fingertips by this (deg; 0 = never), palm leaning away from the face
+    push_palm_pitch_deg: float = 30.0
     #: (rush) a place whose hand ends horizontally short of the recorded place pose by (min, max] is closed with the base, arm locked
     place_base_nudge_min_m: float = 0.005
     place_base_nudge_max_m: float = 0.04
@@ -996,6 +998,45 @@ def push_tangent(geom: PushGeometry, pose) -> th.Tensor:
 PALM_FROM_TIP_M = 0.07
 
 
+def _pitched_blade(motions: Motions, state, arm: str, targets: Dict[str, Any], pitch: float) -> Optional[Dict[str, Any]]:
+    """The recorded top-down blade push pitched by ``pitch`` (rad) about the fingertip contact line so the palm leans
+    away from the pushed face: the approach axis a' = cos·(recorded a) + sin·(push direction) (from the palm toward the
+    tips: down and toward the object), every eef origin re-derived from its recorded fingertip point, the closing axis
+    kept, the pre-pose 10 cm back along −a'. Returned only when the collision-aware IK reaches both the pre-pose and the
+    first contact pose from the current configuration (``R1ProCuRobo.solve_ik``); None otherwise."""
+    try:
+        d = C.as_tensor(targets["direction"]).reshape(-1)[:3].float()
+        d = d / max(float(th.linalg.norm(d)), 1e-9)
+        p0, q0 = as_world_pose(targets["waypoints"][0])
+        a = C.approach_axis(q0)
+        c = C.closing_axis(q0)
+        a2 = C.unit(a * math.cos(pitch) + d * math.sin(pitch))
+        if abs(float(th.dot(a2, c))) > 0.2:
+            return None
+        quat = C.eef_quat(a2, c)
+
+        def re_origin(pose):
+            p, q = as_world_pose(pose)
+            tip = p + C.FINGERTIP_LENGTH * C.approach_axis(q)
+            return tip - C.FINGERTIP_LENGTH * a2
+
+        wps = [Pose(position=[float(v) for v in re_origin(w).tolist()], orientation=[float(v) for v in quat.tolist()]) for w in targets["waypoints"]]
+        pre_p = re_origin(targets["waypoints"][0]) - a2 * float(C.PRE_DIST)
+        pre = Pose(position=[float(v) for v in pre_p.tolist()], orientation=[float(v) for v in quat.tolist()])
+        q_seed = motions.robot.get_joint_positions()
+        for pose in (pre, wps[0]):
+            sol = motions.backend.solve_ik(f"{arm}_arm", {M.EEF_LINK[arm]: as_world_pose(pose)}, q_seed=q_seed, sync_world=True)
+            if sol is None:
+                log.info("push: pitched blade (%.0f deg) not reachable here (%s) - falling back to the raised blade", math.degrees(pitch), "pre-pose" if pose is pre else "contact")
+                return None
+        out = dict(targets)
+        out["pre"], out["waypoints"] = pre, wps
+        return out
+    except Exception as e:  # noqa: BLE001 - the pitch is an option, never a failure
+        log.info("push: pitched blade unavailable (%r)", e)
+        return None
+
+
 def _base_nudge(motions: Motions, state, arm: str, obj: str, direction, left: float, cfg: ExecuteConfig, label: str) -> Iterator[th.Tensor]:
     """Drive the base ``left`` (+ overshoot) along the push ``direction`` with the arm locked at its joints (the door
     base-follow mechanism): the pad in contact pushes the object the rest of the way when the arm sits at its reach
@@ -1108,7 +1149,19 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         palm_z = float(tip_z) + PALM_FROM_TIP_M
         if top_z is not None and palm_z < top_z + cfg.push_palm_clear_m:
             dz = top_z + cfg.push_palm_clear_m - palm_z
-            if float(tip_z) + dz <= top_z - cfg.push_palm_min_face_m:
+            pitched = None
+            if cfg.push_palm_pitch_deg > 0:
+                # first choice: PITCH the blade about its fingertip contact line, palm leaning away from the face (the
+                # sampler's pitched classes) - the fingers keep pushing LOW on the face (a vertical blade raised for palm
+                # clearance pushes 7.8 cm up an 11 cm box, tilts it, and the box rocks back when the pad leaves:
+                # 0918-015654 / 0918-021730); adopted only when its pre-pose and contact pose are reachable here
+                pitched = _pitched_blade(motions, state, arm, targets, math.radians(cfg.push_palm_pitch_deg))
+            if pitched is not None:
+                targets = pitched
+                ctx["push_palm_pitch_deg"] = cfg.push_palm_pitch_deg
+                log.info("push(%s): the blade's palm line (%.3f) would overlap the object's top (%.3f) -> blade pitched %.0f deg about the fingertips, palm leaning away from the face",
+                         obj, palm_z, top_z, cfg.push_palm_pitch_deg)
+            elif float(tip_z) + dz <= top_z - cfg.push_palm_min_face_m:
                 lift = th.tensor([0.0, 0.0, dz])
 
                 def _lifted(pose):
