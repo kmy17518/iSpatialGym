@@ -1383,7 +1383,7 @@ class IORSSmall(SamplerV2):
         pitches = [float(p) for p in (self.gen("push_blade_pitches_deg", None) or [0.0])]
         for pitch in [p for p in TT.approach_pitch_order(None) if p in pitches]:
             z_tip = z0 + 0.005
-            if bool(self.gen("blade_toward_com", True)):
+            if bool(self.gen("blade_toward_com", False)):  # off since 2026-09-18 16:00: the 2 cm raise put the recorded retreat's clear pose at the reach limit (0918-154421: 4/8 'retreat: exact IK failed'); the oracle raises the pad at run time for the palm
                 # owner 2026-09-17 23:39: push nearer the centre of mass - the finger section (centre ~3.5 cm above the
                 # tips) is centred on the face's mid height when the face allows it, else it stays at the face bottom
                 z_tip = max(z_tip, min(float(face_point[2]) - 0.035, z1 - 0.03))
