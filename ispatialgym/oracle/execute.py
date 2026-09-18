@@ -157,7 +157,7 @@ class ExecuteConfig:
     push_palm_clear_m: float = 0.005
     push_palm_min_face_m: float = 0.03
     #: first choice for a palm overlap: pitch the blade about its fingertips by this (deg; 0 = never), palm leaning away from the face
-    push_palm_pitch_deg: float = 30.0
+    push_palm_pitch_deg: float = 0.0  # 30 deg pitched the napkins box 15 deg (0918-023627); the raise keeps it within 1-6 deg
     #: (rush) a place whose hand ends horizontally short of the recorded place pose by (min, max] is closed with the base, arm locked
     place_base_nudge_min_m: float = 0.005
     place_base_nudge_max_m: float = 0.04
