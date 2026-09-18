@@ -679,10 +679,14 @@ class Articulation:
         """The waypoints the oracle drives through: every k > 0 up to and including ``passive_from`` (or all when
         ``passive_from`` is ``None``), in order (spec §5.3 "up to passive_from or q_goal")."""
         out = []
+        # rush 2026-09-17 (branch rush-20260917-2100): ISG_FOLLOW_IGNORE_PASSIVE=1 drives through every waypoint to q_goal -
+        # the dishwasher record's passive_from 0.75 assumed the door swings on by itself, the asset's joint friction held it
+        # at 0.25 rad (0917-212441: layout_reached false, error 0.098 > 0.05)
+        ignore_passive = os.environ.get("ISG_FOLLOW_IGNORE_PASSIVE", "0") == "1"
         for f, key in self.fractions():
             if f <= 0.0:
                 continue
-            if self.passive_from is not None and f > self.passive_from + 1e-9:
+            if self.passive_from is not None and not ignore_passive and f > self.passive_from + 1e-9:
                 break
             out.append((f, key))
         return out

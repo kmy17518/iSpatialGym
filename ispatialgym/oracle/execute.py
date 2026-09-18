@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Dict, Iterator, List, Optional, Protocol, Sequence, Tuple
 
@@ -1052,7 +1053,8 @@ def post_base_follow(action: BaseFollow, state, targets, ctx) -> Optional[str]:
     tol = joint_tolerance(art)
     span = art.q_goal - art.q_init
     sign = 1.0 if span >= 0 else -1.0
-    q_target = art.q_at(art.passive_from) if art.passive_from is not None else art.q_goal
+    ignore_passive = os.environ.get("ISG_FOLLOW_IGNORE_PASSIVE", "0") == "1"  # rush: the follow drove to q_goal (sidecar.followed_fractions)
+    q_target = art.q_at(art.passive_from) if (art.passive_from is not None and not ignore_passive) else art.q_goal
     progress = sign * (q - art.q_init)
     if progress >= sign * (q_target - art.q_init) - tol:
         return None
