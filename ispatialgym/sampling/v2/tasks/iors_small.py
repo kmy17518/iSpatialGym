@@ -1393,7 +1393,10 @@ class IORSSmall(SamplerV2):
             # face that reaches the palm section of a vertical blade (z1 above the fingers' 7 cm) is only pushed by a
             # PITCHED blade - the palm leans away from the face by ~ PALM_FROM_TIP·sin(pitch) - never by the 0° one,
             # whose stand-off (finger profile only) puts the wider palm inside the face
-            if z1 > z_tip + TT.PALM_FROM_TIP and pitch < float(self.gen("blade_palm_min_pitch_deg", 30.0)):
+            # (default 0 = off since 2026-09-18 15:45: ``pitched_approach`` leans the blade FORWARD, about the push axis, so
+            # a pitched blade does not move the palm away from a face lying to the pad's side - the 45 deg blade of
+            # 0918-144517 knocked the box over; the oracle raises a vertical blade until its palm clears the face top)
+            if z1 > z_tip + TT.PALM_FROM_TIP and pitch < float(self.gen("blade_palm_min_pitch_deg", 0.0)):
                 # fallback (after the pitched blades, which come first in the order): the vertical blade RAISED so that its
                 # palm clears the face top - the finger section pushes the top PALM_FROM_TIP of the face (re-sample
                 # 0918-010325: every pitched blade fails the exact IK from the stance)
