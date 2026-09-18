@@ -1377,7 +1377,11 @@ class IORSSmall(SamplerV2):
         yield "push_h", IK.contact_eef(fp, d), {"blade_half_thickness_m": None, **pad_facts}
         yield "push_v", IK.contact_eef(fp, d, closing=th.tensor([0.0, 0.0, 1.0])), {"blade_half_thickness_m": None, **pad_facts}
         raised_fallback = None
-        for pitch in TT.approach_pitch_order(None):
+        # owner 2026-09-18 15:50: a sideways push uses the VERTICAL blade only - ``pitched_approach`` leans the blade about the
+        # push axis, so a pitched finger side meets the face obliquely and yaws the box (0918-153503: 45 deg blade, 29 deg yaw,
+        # contact lost); ``generation.push_blade_pitches_deg`` lists the admissible pitches
+        pitches = [float(p) for p in (self.gen("push_blade_pitches_deg", None) or [0.0])]
+        for pitch in [p for p in TT.approach_pitch_order(None) if p in pitches]:
             z_tip = z0 + 0.005
             if bool(self.gen("blade_toward_com", True)):
                 # owner 2026-09-17 23:39: push nearer the centre of mass - the finger section (centre ~3.5 cm above the
