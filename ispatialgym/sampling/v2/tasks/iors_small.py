@@ -1311,6 +1311,7 @@ class IORSSmall(SamplerV2):
         pad_facts = {"height_extra_m": requested_height_extra(self), "height_extra_effective_m": round(pad_lift, 4), "height_extra_clip_reason": pad_why}
         yield "push_h", IK.contact_eef(fp, d), {"blade_half_thickness_m": None, **pad_facts}
         yield "push_v", IK.contact_eef(fp, d, closing=th.tensor([0.0, 0.0, 1.0])), {"blade_half_thickness_m": None, **pad_facts}
+        raised_fallback = None
         for pitch in TT.approach_pitch_order(None):
             z_tip = z0 + 0.005
             if bool(self.gen("blade_toward_com", True)):
@@ -1328,6 +1329,12 @@ class IORSSmall(SamplerV2):
             # PITCHED blade - the palm leans away from the face by ~ PALM_FROM_TIP·sin(pitch) - never by the 0° one,
             # whose stand-off (finger profile only) puts the wider palm inside the face
             if z1 > z_tip + TT.PALM_FROM_TIP and pitch < float(self.gen("blade_palm_min_pitch_deg", 30.0)):
+                # fallback (after the pitched blades, which come first in the order): the vertical blade RAISED so that its
+                # palm clears the face top - the finger section pushes the top PALM_FROM_TIP of the face (re-sample
+                # 0918-010325: every pitched blade fails the exact IK from the stance)
+                z_hi_tip = z1 - TT.PALM_FROM_TIP + 0.005
+                if bool(self.gen("blade_palm_clear_fallback", True)) and z_hi_tip <= z1 - 0.03:
+                    raised_fallback = (z_hi_tip,)  # yielded after the pitched blades (below)
                 continue
             so = TT.blade_standoff((z0, z_face_hi), z_tip, pitch, clearance, side=False)
             if so is None:
@@ -1339,6 +1346,23 @@ class IORSSmall(SamplerV2):
                 yield f"push_blade_{pitch:.0f}{'' if c_sign > 0 else '-'}", (origin, C.eef_quat(a_vec, c_sign * outward)), {
                     "blade_half_thickness_m": half, "stop_clearance_m": clearance, "blade_standoff_m": standoff, "fingertip_z": z_tip,
                     "height_extra_m": requested_height_extra(self), "height_extra_effective_m": round(blade_lift, 4), "height_extra_clip_reason": blade_why}
+        if raised_fallback is not None:
+            yield from self._raised_blade(manip, face_point, (z0, z1), d, outward, clearance, raised_fallback[0])
+
+    def _raised_blade(self, manip: Stance, face_point: th.Tensor, face_z: Tuple[float, float], d: th.Tensor, outward: th.Tensor, clearance: float, z_tip: float):
+        """The vertical (0 deg) blade with its fingertips at ``z_tip`` = face top − PALM_FROM_TIP: the palm stands above
+        the face, the finger section covers the face's top part. Yielded after every pitched blade failed."""
+        z0, z1 = face_z
+        so = TT.blade_standoff((z0, z1), z_tip, 0.0, clearance, side=False)
+        if so is None:
+            return
+        standoff, half = so
+        a_vec = TT.pitched_approach(0.0, manip.forward)
+        origin = th.tensor([float(face_point[0]), float(face_point[1]), z_tip + C.FINGERTIP_LENGTH]) + outward * standoff
+        for c_sign in (1.0, -1.0):
+            yield f"push_blade_0_high{'' if c_sign > 0 else '-'}", (origin, C.eef_quat(a_vec, c_sign * outward)), {
+                "blade_half_thickness_m": half, "stop_clearance_m": clearance, "blade_standoff_m": standoff, "fingertip_z": z_tip,
+                "palm_clear": True, "height_extra_m": requested_height_extra(self), "height_extra_effective_m": 0.0, "height_extra_clip_reason": "palm_clear"}
 
     def touching_brace_candidates(self, manip: Stance, b_point: th.Tensor, face_z: Tuple[float, float], a_face: th.Tensor):
         """Brace poses of the closed left gripper at the partner's far (robot-left) face, in the order to try — the axial

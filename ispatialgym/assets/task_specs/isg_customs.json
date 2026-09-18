@@ -54356,7 +54356,7 @@
    }
   },
   "generation": {
-   "joint_limit_margin_rad": 0.01,
+   "joint_limit_margin_rad": 0.0,
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {
@@ -54466,7 +54466,7 @@
    }
   },
   "generation": {
-   "joint_limit_margin_rad": 0.01,
+   "joint_limit_margin_rad": 0.0,
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {
@@ -54576,7 +54576,7 @@
    }
   },
   "generation": {
-   "joint_limit_margin_rad": 0.01,
+   "joint_limit_margin_rad": 0.0,
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {
@@ -54688,7 +54688,7 @@
    }
   },
   "generation": {
-   "joint_limit_margin_rad": 0.01,
+   "joint_limit_margin_rad": 0.0,
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {
@@ -54800,7 +54800,7 @@
    }
   },
   "generation": {
-   "joint_limit_margin_rad": 0.01,
+   "joint_limit_margin_rad": 0.0,
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {
@@ -54912,7 +54912,7 @@
    }
   },
   "generation": {
-   "joint_limit_margin_rad": 0.01,
+   "joint_limit_margin_rad": 0.0,
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {
@@ -55017,7 +55017,7 @@
    }
   },
   "generation": {
-   "joint_limit_margin_rad": 0.01,
+   "joint_limit_margin_rad": 0.0,
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {
@@ -55122,7 +55122,7 @@
    }
   },
   "generation": {
-   "joint_limit_margin_rad": 0.01,
+   "joint_limit_margin_rad": 0.0,
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {
@@ -55227,7 +55227,7 @@
    }
   },
   "generation": {
-   "joint_limit_margin_rad": 0.01,
+   "joint_limit_margin_rad": 0.0,
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {
