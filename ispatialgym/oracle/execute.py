@@ -1172,7 +1172,14 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     # and shook the table)
     extra = getattr(action.contact, "extra", None) or {}
     tip_z = extra.get("fingertip_z")
-    if cfg.push_palm_clear_m >= 0 and tip_z is not None and extra.get("blade_half_thickness_m") is not None and not extra.get("palm_clear"):
+    # a pitched blade class (push_blade_30 / 45 / 60, the sampler's palm-away candidates) already keeps its palm off the face
+    pitched_class = False
+    try:
+        cls = str(extra.get("pose_class") or "")
+        pitched_class = cls.startswith("push_blade_") and float(cls[len("push_blade_"):].rstrip("-")) >= 30.0
+    except (TypeError, ValueError):
+        pitched_class = False
+    if cfg.push_palm_clear_m >= 0 and tip_z is not None and extra.get("blade_half_thickness_m") is not None and not extra.get("palm_clear") and not pitched_class:
         try:
             top_z = float(C.as_tensor(state.object(obj).aabb[1]).reshape(-1)[2])
         except Exception:  # noqa: BLE001
