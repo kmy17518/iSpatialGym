@@ -120,17 +120,18 @@ def brace_candidate_order(height: float, width: float, kinds: Sequence[str] = BR
     return out
 
 
-def leveling_tangent(E_low, C_, normal, delta: float) -> th.Tensor:
+def leveling_tangent(E_low, C_, normal, delta: float, rises: bool = True) -> th.Tensor:
     """Unit push direction at E_low: the tangent of the circle about C through E_low carried by the rotation that
-    brings the object from its tilt δ (about ``normal``) back to level (−δ), signed so the low end rises (t·ẑ > 0)."""
+    brings the object from its tilt δ (about ``normal``) back to level (−δ), signed so the low end rises (t·ẑ > 0).
+    ``rises=False``: the same at the HIGH end (``generation.push_end: "high"``), signed so that end descends."""
     n = th.as_tensor(normal, dtype=th.float32)
     r = th.as_tensor(E_low, dtype=th.float32) - th.as_tensor(C_, dtype=th.float32)
     t = th.cross(n, r, dim=0) * (-1.0 if delta > 0 else 1.0)
     if float(th.linalg.norm(t)) < 1e-9:
         raise ValueError("E_low coincides with the hinge")
     t = t / th.linalg.norm(t)
-    if float(t[2]) < 0:
-        t = -t  # the low end rises
+    if (float(t[2]) < 0) if rises else (float(t[2]) > 0):
+        t = -t  # the low end rises / the high end descends
     return t
 
 
@@ -370,9 +371,14 @@ class AlignmentWall(SamplerV2):
         level_axis_t = G.rotate(pose_t[1], self.side)  # ℓ_δ = the level axis rotated by δ
         E_low, E_high = extreme_points(pts_t, level_axis_t, band)
         E_low, E_high = on_plane(E_low, mid_plane, n), on_plane(E_high, mid_plane, n)
-        # push: tangent about C through E_low, signed so the low end rises; c = n
-        a_push = leveling_tangent(E_low, C_, n, delta)
-        push_init = C.contact_eef(E_low, a_push, closing=n)
+        # push: tangent about C through E_low, signed so the low end rises; c = n. ``generation.push_end: "high"``
+        # (owner 2026-09-17 23:39) pushes the HIGH end down instead - the arm on the high end's side pushes from above,
+        # the other arm braces (the brace kinds below stay valid stops: below_high under the descending end, above_low
+        # over the rising end); the geometry keys keep their names (E_low = the pushed end's counterpart)
+        push_high = str(self.param("push_end", "low")).lower() == "high"
+        E_push = E_high if push_high else E_low
+        a_push = leveling_tangent(E_push, C_, n, delta, rises=not push_high)
+        push_init = C.contact_eef(E_push, a_push, closing=n)
         arc = C.arc_waypoints(push_init, C_, n, -delta, n=2)  # [δ/2, goal] (the material point carried, a re-tangent)
         push_mid, push_goal = arc[0], arc[1]
         push_pre = C.pre_pose(push_init)
@@ -394,7 +400,7 @@ class AlignmentWall(SamplerV2):
             c_in = C.unit(th.cross(a_v, n, dim=0))
             c_out = C.unit(th.cross(c_in, a_v, dim=0))  # the third axis (n-like, ⟂ a')
             for label, closing in (("in+", c_in), ("in-", -c_in), ("n+", c_out), ("n-", -c_out)):
-                init_v = C.contact_eef(E_low, a_v, closing=closing)
+                init_v = C.contact_eef(E_push, a_v, closing=closing)
                 arc_v = C.arc_waypoints(init_v, C_, n, -delta, n=2)
                 push_variants.append({"wrist": f"p{pitch_deg:.0f}/{label}", "pitch_deg": pitch_deg, "pre": C.pre_pose(init_v), "init": init_v, "mid": arc_v[0], "goal": arc_v[1]})
         # brace candidates on the level pose; E_high's side along the level axis
@@ -424,10 +430,10 @@ class AlignmentWall(SamplerV2):
                     pre_a = C.pre_pose(eef_w)
                     pre = (pre_a[0] + off_wall * n, pre_a[1]) if off_wall else pre_a
                     braces.append({"kind": kind, "B": B, "a": a_v, "pose": eef_w, "pre": pre, "wrist": f"p{pitch_deg:.0f}/{label}", "pitch_deg": pitch_deg})
-        push_arm = push_arm_of(E_low, C_, th.tensor([float(n[1]), -float(n[0]), 0.0]))
-        return {"pose_tilted": pose_t, "pose_level": pose_l, "hull_tilted": pts_t, "hull_level": pts_l, "C": C_, "E_low": E_low, "E_high": E_high,
+        push_arm = push_arm_of(E_push, C_, th.tensor([float(n[1]), -float(n[0]), 0.0]))  # the arm on the pushed end's side
+        return {"pose_tilted": pose_t, "pose_level": pose_l, "hull_tilted": pts_t, "hull_level": pts_l, "C": C_, "E_low": E_low, "E_high": E_high, "E_push": E_push,
                 "push": {"pre": push_pre, "init": push_init, "mid": push_mid, "goal": push_goal, "direction": a_push, "arm": push_arm,
-                         "distance": float(th.linalg.norm(push_goal[0] - push_init[0])), "variants": push_variants},
+                         "distance": float(th.linalg.norm(push_goal[0] - push_init[0])), "variants": push_variants, "end": "high" if push_high else "low"},
                 "braces": braces, "brace_arm": other_arm(push_arm), "delta": delta}
 
     def brace_clear(self, geo: Dict[str, Any], brace: Dict[str, Any]) -> bool:
@@ -479,7 +485,7 @@ class AlignmentWall(SamplerV2):
         cams = P0.camera_poses(self, [st for st, _ in reach])
         classed = []
         for (st, ok), cam in zip(reach, cams):
-            pts = th.stack([geo["C"], geo["E_low"], ok[0]["B"]])
+            pts = th.stack([geo["C"], geo.get("E_push", geo["E_low"]), ok[0]["B"]])  # the pushed end in frame
             if not P0.in_frame(self, cam, pts):
                 continue
             ang = P0.axis_angle(self, cam, geo["C"])
@@ -746,7 +752,7 @@ class AlignmentWall(SamplerV2):
         errors: List[str] = []
 
         def extra_vis(cam, _geo=geo) -> bool:
-            return P0.in_frame(self, cam, th.stack([_geo["C"], _geo["E_low"]]))
+            return P0.in_frame(self, cam, th.stack([_geo["C"], _geo.get("E_push", _geo["E_low"])]))
 
         posture, fingers = self.stance_posture()
         done = False
