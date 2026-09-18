@@ -519,11 +519,13 @@ class Monitors:
                 self._ag_ref.pop(arm, None)
                 continue
             ep, eq = self.robot.eef_links[arm].get_position_orientation()
-            op, oq = self._ag_body(arm, obj).get_position_orientation()
+            body = self._ag_body(arm, obj)
+            op, oq = body.get_position_orientation()
             rel = C.relative((op.float(), oq.float()), (ep.float(), eq.float()))
             ref = self._ag_ref.get(arm)
             if ref is None or ref[0] is not obj:
                 self._ag_ref[arm] = (obj, rel)
+                log.info("ghost_hand reference for %s: %s", obj.name, "the object root" if body is obj else f"link {getattr(body, 'name', '?')}")
                 continue
             dp = float(th.linalg.norm(rel[0] - ref[1][0]))
             da = C.quat_angle(rel[1], ref[1][1])
@@ -537,9 +539,13 @@ class Monitors:
         the root stays put while the door swings, so a root-vs-hand comparison reports a ghost hand on every honest
         articulation (dishwasher 0917-010945: "drifted 5.2 cm / 8 deg" at base_follow)."""
         params = (getattr(self.robot, "_ag_obj_constraint_params", None) or {}).get(arm) or {}
-        path = params.get("ag_link_prim_path")
+        links = getattr(obj, "links", None) or {}
+        name = params.get("target_link_name")  # OmniGibson 3.9 (robot.py constraint_params)
+        if name and name in links:
+            return links[name]
+        path = params.get("ag_link_prim_path")  # older OmniGibson (manipulation_robot.py)
         if path:
-            for link in (getattr(obj, "links", None) or {}).values():
+            for link in links.values():
                 if getattr(link, "prim_path", None) == path:
                     return link
         return obj
