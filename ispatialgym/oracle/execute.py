@@ -652,8 +652,18 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     yield from motions.gripper(arm, close=False)
     _release(motions, state, arm)
     _hook(ctx, "fov")(False)  # the span closes with the release: the retreat legs are unmonitored (rule (b))
-    # retreat straight back along -a (up for a top-down pose) before any lateral motion
-    yield from motions.arm_along(arm, targets["retreat"])
+    # retreat straight back along -a (up for a top-down pose) before any lateral motion; a free-space leg after the
+    # release: a differential-IK stall is finished by arm_to like the Retreat action's leg (touching 0917-203045: the
+    # place retreat stalled at waypoint 2/12 with a 7 mm residual, no joint at a limit, and failed the place)
+    ignore_retreat: List[Any] = list(on)
+    try:
+        ignore_retreat.append(state.object(action.object))  # the object just set down sits right under the pads
+    except Exception:  # noqa: BLE001
+        pass
+    finish = _free_leg_finish(state, targets["retreat"][-1], _witness(ctx, "retreat"), ignore_retreat, cfg)
+    yield from motions.arm_along(arm, targets["retreat"], finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+    if finish.used:
+        ctx["retreat_finish"] = finish.info
     if drop:
         yield from motions.hold(cfg.drop_settle_steps)  # the object falls and comes to rest in the container
     else:
