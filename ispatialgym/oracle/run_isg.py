@@ -364,8 +364,19 @@ class InstanceLoader:
             parent_link = parent.links[link_name]
         # §7 hinge friction / damping (owner 2026-09-16 22:05): the wall hinge record carries a Coulomb torque + viscous
         # damping, applied as the joint's angular drive (sampling.constraints.apply_hinge_drive); absent = frictionless (axial)
+        # rush 2026-09-17 (branch rush-20260917-2100): ISG_HINGE_FRICTION_SCALE / ISG_HINGE_DAMPING_SCALE multiply the record's
+        # values at load time (painting 0917-211738: push in tolerance at +0.037 rad, then the departing pads shoved it
+        # to -0.39 rad - the record's resistance holds a coasting painting, not a shoved one). Default 1 = the record.
+        friction, damping = rec.get("friction"), rec.get("damping")
+        f_scale, d_scale = float(os.environ.get("ISG_HINGE_FRICTION_SCALE", "1")), float(os.environ.get("ISG_HINGE_DAMPING_SCALE", "1"))
+        if friction is not None and f_scale != 1.0:
+            friction = friction * f_scale
+        if damping is not None and d_scale != 1.0:
+            damping = damping * d_scale
+        if f_scale != 1.0 or d_scale != 1.0:
+            log.warning("hinge %s: friction x%.1f, damping x%.1f (ISG_HINGE_*_SCALE override)", rec["child"], f_scale, d_scale)
         return create_hinge(child, th.tensor(rec["anchor_position"], dtype=th.float32), th.tensor(rec["axis"], dtype=th.float32), parent_link=parent_link,
-                            friction=rec.get("friction"), damping=rec.get("damping"))
+                            friction=friction, damping=damping)
 
     def _restore_constraints(self, records: List[dict]) -> List[dict]:
         out = []
