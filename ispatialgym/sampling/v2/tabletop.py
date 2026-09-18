@@ -1513,6 +1513,7 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
                                      f"{len(yaws)} yaws x {len(grasps)} grasps)")
     name = object_name or s.bindings.one("target").name
     fails = {"support": 0, "ik": 0}
+    last_reason = ""
     for i in rng.permutation(len(F)):
         yaw0, g = F[int(i)]
         yaw = float(yaw0) + float(rng.uniform(-jitter, jitter))
@@ -1528,12 +1529,13 @@ def phase3_target(s, manip: Stance, rng, grasps: Sequence[Any], hull: th.Tensor,
             res = s.ikc.exact([pre, eef], manip, arm, ignore_for_last=list(ignore_for_grasp), scale_key=scale_key)
             if not res.ok:
                 fails["ik"] += 1
+                last_reason = res.reason
                 continue
             finger_q = list(getattr(g, "finger_q", []) or []) or None
             rec = GraspRecord(name, arm, getattr(g, "key", None), getattr(g, "name", None), yaw, pre, eef, finger_q=finger_q, eef_in_object=eef_of(g))
             rec.stance = manip.name
             return pose, rec
-    _reject("grasp_unreachable", f"F ({len(F)} pairs) exhausted without an exact-IK confirmation ({fails})")
+    _reject("grasp_unreachable", f"F ({len(F)} pairs) exhausted without an exact-IK confirmation ({fails}; last: {last_reason[:160]})")
 
 
 # ----------------------------------------------------------------------------------------------------------------
