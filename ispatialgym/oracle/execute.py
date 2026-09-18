@@ -144,8 +144,10 @@ class ExecuteConfig:
     #: (rush 2026-09-17) a line push still short after the arm's extension is closed by driving the base along the push
     #: direction with the arm locked, up to this far (m; 0 disables), at this speed (m/s), to this tracker tolerance (m)
     push_base_nudge_max_m: float = 0.06
+    push_base_nudge_min_m: float = 0.003
     push_base_nudge_speed: float = 0.05
     push_base_nudge_tol_m: float = 0.008
+    push_base_nudge_overshoot_m: float = 0.004
     #: (rush) a straight push's pad poses follow the object's actual planar offset from its recorded start, up to this (m; 0 = off)
     push_recentre_max_m: float = 0.06
     #: (owner 2026-09-18 01:33) a recorded top-down blade is raised so its palm stands this far above the object's top (m; < 0 = off),
@@ -1146,15 +1148,20 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         #     moved the box 0 mm, 3 cm short) is closed with the base: the arm locked at its joints, the base driven
         #     along the push direction by what is still missing (the door base-follow mechanism), pad in contact
         left, _ = push_residual(geom, state, obj, pose0)
-        if geom.kind == "line" and cfg.push_base_nudge_max_m > 0 and left is not None and rmin <= left <= cfg.push_base_nudge_max_m:
+        if geom.kind == "line" and cfg.push_base_nudge_max_m > 0 and left is not None and cfg.push_base_nudge_min_m <= left <= cfg.push_base_nudge_max_m:
             d = C.as_tensor(targets["direction"]).reshape(-1)[:3].float()
             d = d / max(float(th.linalg.norm(d)), 1e-9)
+            # the nudge goes a little past the goal (a touching goal is contact: a residual of a few mm is not touching)
+            # and the tracker's tolerance shrinks with the distance (0918-014040: a 7 mm nudge inside the 8 mm tolerance
+            # never moved the base)
+            move = left + cfg.push_base_nudge_overshoot_m
+            tol = min(cfg.push_base_nudge_tol_m, max(0.002, 0.5 * left))
             x, y, yaw = state.base_pose2d()
-            goal2d = [x + float(d[0]) * left, y + float(d[1]) * left, yaw]
-            log.info("push(%s): %.1f cm still missing with the arm at its reach boundary -> nudging the base %.1f cm along the push direction, arm locked", obj, left * 100, left * 100)
+            goal2d = [x + float(d[0]) * move, y + float(d[1]) * move, yaw]
+            log.info("push(%s): %.1f cm still missing with the arm at its reach boundary -> nudging the base %.1f cm along the push direction (tol %.0f mm), arm locked", obj, left * 100, move * 100, tol * 1000)
             q = motions.robot.get_joint_positions()
             motions.state.arm_target[arm] = q[motions.robot.arm_control_idx[arm]].clone().float()
-            tcfg = replace(motions.cfg.base_tracker, v_max=(cfg.push_base_nudge_speed, cfg.push_base_nudge_speed, 0.2), pos_tol=cfg.push_base_nudge_tol_m)
+            tcfg = replace(motions.cfg.base_tracker, v_max=(cfg.push_base_nudge_speed, cfg.push_base_nudge_speed, 0.2), pos_tol=tol)
             try:
                 yield from motions.track_path([goal2d], tracker_cfg=tcfg)
             except SkillError as e:  # a tracker time-out keeps what the nudge achieved
