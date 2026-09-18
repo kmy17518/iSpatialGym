@@ -548,8 +548,13 @@ def program_iors_touching(sc: Sidecar) -> List[Action]:
         raise SidecarError("contacts.push.object: the push must act on the placed target")
     if brace is not None and brace.object != g.place_on:
         raise SidecarError("contacts.brace.object: the brace must hold the partner (grasps[0].place_on)")
-    base_yaw = sc.stance("manipulation").base_pose2d[2]
     head = program_iors_small(sc, "nextto")
+    # owner 2026-09-18 16:32: a recorded second base pose ``push`` (the base moves along the edge after the place so the push
+    # happens where the grasp did relative to the robot) is travelled after the place retreat, nothing in hand
+    push_stance = "push" if "push" in sc.stances else "manipulation"
+    if push_stance == "push":
+        head = head + _travel(sc, "manipulation", "push")
+    base_yaw = sc.stance(push_stance).base_pose2d[2]
     if brace is None:
         p = Push(contact=push, base_yaw=base_yaw)
         return head + [p, Retreat(arm=push.arm, object=push.object, after=p)]

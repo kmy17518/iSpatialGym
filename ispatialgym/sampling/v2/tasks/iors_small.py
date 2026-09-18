@@ -630,6 +630,10 @@ class IORSSmall(SamplerV2):
             if not ranges:
                 raise Reject("partner_placement", f"no side admits a partner centre inside the band (λ ∈ [{lam_min:.2f}, {lam_max:.2f}] at depth "
                                                   f"{depth_t:.2f}) with g ∈ [{g_lo:.2f}, {g_hi:.2f}]" if len(near) else "band has no cell at the target's depth")
+        elif self.relation == "touching" and bool(self.gen("push_stance", True)) and bool(self.gen("reach_screen_place", True)):
+            # touching with the push stance (owner 2026-09-18 16:32): the place is judged by the exact-IK screening of the
+            # draw (``reach_screen_place``) and the push by its own stance - the band cut on the place gap is not applied
+            ranges = {sd: (g_lo, g_hi) for sd in sides}
         elif getattr(self, "bands", None) is not None:
             # nextto / touching: the target's *place* position (its origin at the goal gap — touching: the nextto position
             # the push starts from) must be a band lateral at the target's depth, else the place IK of §6.11 fails
@@ -1261,7 +1265,13 @@ class IORSSmall(SamplerV2):
         # the pre-poses join the check (owner 2026-09-16 10:15 item 1b): the oracle's FOV monitor arms from the pre-pose
         self.require_in_frame(cam, {"pre-grasp": grasp.pre_grasp, "grasp": grasp.grasp, "pre-place": pre_place, "place": place})
         if self.relation == "touching":
-            self.touching_contacts(draft, manip)
+            # owner 2026-09-18 16:32: after the place the base moves along the edge to a ``push`` stance so the push happens
+            # where the grasp did relative to the robot (the place lies left of the right arm's band otherwise)
+            push_st = self.push_stance(draft, manip)
+            st_push = push_st if push_st is not None else manip
+            if push_st is not None:
+                cam = self.camera_pose_at(push_st)
+            self.touching_contacts(draft, st_push)
             c = self.sidecar.contacts
             poses = {"push pre-contact": c["push"].pre, "push contact": c["push"].contact, "push goal": c["push"].goal}
             if "brace" in c:
@@ -1274,6 +1284,57 @@ class IORSSmall(SamplerV2):
                     manip.arms, manip.contacts = ["right"], ["push"]
                     draft.summary["brace"] = {"present": False, "why": "brace poses outside the manipulation image (5 %)", "gate": (self._brace_gate or {})}
             self.require_in_frame(cam, poses)
+
+    def brace_gate_at(self, st: Stance, t_place_pose: G.Pose, p_pose: G.Pose) -> Dict[str, Any]:
+        """A1 joint band gate at stance ``st``: the push work point (target's right face at the place) in the right band and the
+        brace point (partner's far face) in the left contact band of the same trunk (``brace_placement_admissible``)."""
+        right_cells = self.bands.band(st.translate, st.tilt) if getattr(self, "bands", None) is not None else None
+        left_cells = left_contact_band_cells(self, (st.translate, st.tilt), TT.height_of(self.hull["partner"], self.rest["partner"]))
+        if left_cells is None or right_cells is None:
+            return {"ok": None, "why": "left contact band unavailable"}
+        work, brace = self.touching_points(t_place_pose, p_pose, st)
+        w_b, b_b = st.world_to_base(work[:2]), st.world_to_base(brace[:2])
+        ok = brace_placement_admissible(w_b, b_b, right_cells, left_cells)
+        return {"ok": bool(ok), "stance": st.name, "work_base": [round(float(v), 3) for v in w_b], "brace_base": [round(float(v), 3) for v in b_b],
+                "right_cells": int(len(right_cells)), "left_cells": int(len(left_cells)),
+                **({} if ok else {"why": f"work {'in' if in_band(w_b, right_cells) else 'OFF'} right band / brace {'in' if in_band(b_b, left_cells) else 'OFF'} left band at {st.name}"})}
+
+    def push_stance(self, draft: Draft, manip: Stance) -> Optional[Stance]:
+        """Touching (owner 2026-09-18 16:32): a second base pose for the push. The target is set down (nextto position) to
+        the robot's LEFT of where it was grasped, often outside the right arm's band; instead of pushing from the
+        manipulation stance the base moves along the edge by exactly that lateral offset (a recorded path, same trunk),
+        so the push contact lies where the grasp did relative to the robot. Returns the recorded ``push`` stance, or None
+        when the shift is below ``push_stance_min_shift_m`` or the feature is off (``generation.push_stance``)."""
+        if self.relation != "touching" or not bool(self.gen("push_stance", True)):
+            return None
+        tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
+        place_pos = getattr(self, "_touching_place_pos", None)
+        if place_pos is None:
+            place_pos = th.tensor(draft.pose_targets[tname]["position"])
+        goal_quat = G.t(draft.goal_poses[tname][1])
+        init_pos = G.t(draft.object_poses[tname][0])
+        _, lat_place = manip.local(G.t(place_pos)[:2])
+        _, lat_init = manip.local(init_pos[:2])
+        dlat = float(lat_place - lat_init)
+        if abs(dlat) < float(self.gen("push_stance_min_shift_m", 0.02)):
+            return None
+        target_xy = G.t(manip.base_xy) + G.t(manip.tangent) * dlat
+        cands = [manip.shifted(lateral=manip.lateral + s * dlat, name="push") for s in (1.0, -1.0)]  # the edge frame's lateral sign
+        st = min(cands, key=lambda c: float(th.linalg.norm(G.t(c.base_xy) - target_xy)))
+        st = st.with_trunk(manip.translate, manip.tilt, "push")
+        st.focus, st.arms = G.t(place_pos).clone(), ["right"]
+        p_now = self.obj("partner").get_position_orientation()
+        p_pose = (p_now[0].clone().float(), p_now[1].clone().float())
+        t_place_pose = (G.t(place_pos), goal_quat)
+        TT.whole_body_check_at(self, [st], {tname: t_place_pose, pname: p_pose}, require=True, reason="stance_collision")
+        self.sidecar.add_stance(st)
+        path = self.record_path(manip, st)  # Reject(no_path | path_collision) fails the attempt
+        st.extras.update({"second_base_pose": True, "lateral_shift_m": round(dlat, 4), "path_length_m": getattr(path, "length_m", None),
+                          "rule": "push where the grasp was: base moved along the edge by (place lateral - init lateral)"})
+        self._brace_gate = self.brace_gate_at(st, t_place_pose, p_pose)
+        self.sidecar.set_goal(st.base_pose2d, st.translate, st.tilt, arms="same")  # the goal observation is taken from the push stance
+        draft.summary["push_stance"] = {"lateral_shift_m": round(dlat, 4), "base_pose2d": [float(v) for v in st.base_pose2d], "brace_gate": self._brace_gate}
+        return st
 
     def require_in_frame(self, cam: G.Pose, poses: Dict[str, Optional[G.Pose]]):
         """Every given eef pose must project inside the manipulation image with the 5 % margin (``IKChecker.eef_in_frame``
@@ -1342,10 +1403,14 @@ class IORSSmall(SamplerV2):
             raise Reject("contact_unreachable", f"touching push: no push candidate passes the exact IK from the manipulation stance ({'; '.join(why[-3:])})")
         push_kind, push_pre, push_init, push_goal, push_extras = push_chosen
         draft.summary.setdefault("touching", {}).update({"push_kind": push_kind, **{k: v for k, v in push_extras.items() if v is not None}})
-        self.sidecar.add_contact(ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname, extras=dict(push_extras, pose_class=push_kind)))
+        push_rec = ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname, extras=dict(push_extras, pose_class=push_kind))
+        push_rec.stance = manip.name  # the stance the chain was checked from ("manipulation" or the second base pose "push")
+        self.sidecar.add_contact(push_rec)
         if brace_chosen is not None:
             pre, contact, kind, extras = brace_chosen
-            self.sidecar.add_contact(TT.BraceRecord("brace", "left", pre, contact, direction=-direction, brace_kind=kind, object=pname, extras=extras))
+            brace_rec = TT.BraceRecord("brace", "left", pre, contact, direction=-direction, brace_kind=kind, object=pname, extras=extras)
+            brace_rec.stance = manip.name
+            self.sidecar.add_contact(brace_rec)
             draft.summary["brace"] = {"present": True, "kind": kind, "gate": gate, **{k: v for k, v in extras.items() if v is not None}}
             manip.arms = ["right", "left"]
             manip.contacts = ["push", "brace"]
