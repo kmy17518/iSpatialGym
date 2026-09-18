@@ -574,7 +574,8 @@ class IKChecker:
         if q is not None and self.WITNESS_RESIDUAL_AT_DRAW is not None:
             # reach quality (owner 2026-09-18 01:33): the last witness must reach its pose once polished - a solution the IK
             # accepted within its tolerance but 1 cm short lies beyond the arm's reach in this branch
-            ign_last = list(ignore_for_last) + list(approached or [])
+            near_last = list(approached) if approached is not None else self.approached_objects(poses[-1])  # the grasped / touched object straddled by the pads
+            ign_last = list(ignore_for_last) + list(near_last)
             q_pol, residual = self.polish_witness(q, poses[-1], arm, ignore=ign_last)
             if residual > self.WITNESS_RESIDUAL_AT_DRAW:
                 m_lim, jn = self.joint_limit_margin(q, arm)
