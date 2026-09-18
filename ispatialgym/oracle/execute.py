@@ -1000,7 +1000,10 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     #    measure the residual the object is left with (a swung painting settles back onto the backed-off pad)
     tangent = push_tangent(geom, end_pose)
     back = (end_pose[0] - tangent * cfg.push_backoff_m, end_pose[1])
-    yield from motions.arm_along(arm, [back], loaded=True)
+    if cfg.push_backoff_m > 0:
+        yield from motions.arm_along(arm, [back], loaded=True)
+    else:
+        back = end_pose  # rush: ISG_PUSH_BACKOFF_M=0 keeps the pad on the target (the brace retreats first, ISG_BRACE_RETREATS_FIRST)
     ctx["push_end_pose"] = back
     _hook(ctx, "fov")(False)  # the contact span ends with the contact leg
     yield from _hold_until_still(motions, state, obj, cfg)

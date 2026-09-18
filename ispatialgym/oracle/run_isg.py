@@ -767,6 +767,10 @@ def main(argv=None) -> int:
 
         _execute.CONFIG.carry_leg = args.carry_leg
         meta["carry_leg"] = args.carry_leg
+        if os.environ.get("ISG_PUSH_BACKOFF_M") is not None:  # rush 2026-09-17: 0 keeps the push pad on the target until its retreat
+            _execute.CONFIG.push_backoff_m = float(os.environ["ISG_PUSH_BACKOFF_M"])
+            meta["push_backoff_m"] = _execute.CONFIG.push_backoff_m
+        meta["rush_env"] = {k: v for k, v in os.environ.items() if k.startswith("ISG_")}
         executor = Executor(env, task, sidecar, recorder=recorder, motions=motions, monitors=monitors, cfg=ex_cfg, sim=og.sim, state=state,
                             tracked_objects=tracked, cam_key=cam_key)
         executor.last_obs, executor.last_info = obs, info

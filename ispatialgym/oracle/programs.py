@@ -27,6 +27,7 @@ small-scale programs, the two wall alignments share ``program_alignment_wall``, 
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import replace
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -133,6 +134,16 @@ def _brace_push_retreat(sc: Sidecar, brace, push, base_yaw: float) -> List[Actio
         raise SidecarError(f"brace and push both use the {brace.arm} arm")
     b = Brace(contact=brace, base_yaw=base_yaw)
     p = Push(contact=push, base_yaw=base_yaw)
+    if os.environ.get("ISG_BRACE_RETREATS_FIRST", "0") == "1":
+        # rush 2026-09-17: the brace pad leaves first while the push pad still holds the target - the brace caught the
+        # painting with ~1 cm of penetration and its departure let the painting relax +0.05 rad toward the short side
+        # (0917-220043 / 0917-214548); with the push pad still in contact that relaxation is blocked
+        return [
+            b,
+            p,
+            Retreat(arm=brace.arm, object=brace.object, after=b, release=True),
+            Retreat(arm=push.arm, object=push.object, after=p),
+        ]
     return [
         b,
         p,
