@@ -143,6 +143,10 @@ class ExecuteConfig:
     push_base_nudge_tol_m: float = 0.008
     #: (rush) a straight push's pad poses follow the object's actual planar offset from its recorded start, up to this (m; 0 = off)
     push_recentre_max_m: float = 0.06
+    #: (rush) a place whose hand ends horizontally short of the recorded place pose by (min, max] is closed with the base, arm locked
+    place_base_nudge_min_m: float = 0.005
+    place_base_nudge_max_m: float = 0.04
+    place_base_nudge_tol_m: float = 0.004
     #: approach / descent finish (owner rule 2026-09-16): when the straight differential-IK segment stalls with a
     #: residual below ``approach_finish_max_stall`` (m) and no more than ``approach_finish_max_remaining`` (m) of the
     #: segment left, the converged prefix is executed and the last part is planned by ``arm_to`` to the end pose — to
@@ -681,6 +685,29 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     yield from motions.arm_along(arm, targets["descent"], finish=finish)
     if finish.used:
         ctx["descent_finish"] = finish.info
+    # rush 2026-09-17: the hand ends the descent short of the recorded place pose by a systematic ~1-1.5 cm (the witness
+    # configuration's reach in the simulator is less than the sampler's model: no joint limit, no singularity, the DLS
+    # converges onto the reach sphere); the shortfall is closed with the BASE, arm locked, before the release - the
+    # recorded push (gap + tolerance + 5 mm) then covers the gap (touching 0917-223915: place 1.45 cm short, push
+    # extension at the reach boundary yawed the box 30 deg)
+    if cfg.place_base_nudge_max_m > 0:
+        short = as_world_pose(targets["place"])[0].float() - as_world_pose(state.eef_pose(arm))[0].float()
+        short[2] = 0.0
+        dist = float(th.linalg.norm(short))
+        if cfg.place_base_nudge_min_m < dist <= cfg.place_base_nudge_max_m:
+            x, y, yaw = state.base_pose2d()
+            goal2d = [x + float(short[0]), y + float(short[1]), yaw]
+            log.info("place(%s): the hand is %.1f mm short of the recorded place pose -> nudging the base by that, arm locked", action.object, dist * 1000)
+            q = motions.robot.get_joint_positions()
+            motions.state.arm_target[arm] = q[motions.robot.arm_control_idx[arm]].clone().float()
+            tcfg = replace(motions.cfg.base_tracker, v_max=(cfg.push_base_nudge_speed, cfg.push_base_nudge_speed, 0.2), pos_tol=cfg.place_base_nudge_tol_m)
+            try:
+                yield from motions.track_path([goal2d], tracker_cfg=tcfg)
+            except SkillError as e:
+                log.warning("place(%s): base nudge did not settle (%s); keeping what it achieved", action.object, e.message)
+            yield from motions.settle(max_steps=cfg.place_settle_steps // 2)
+            after = as_world_pose(targets["place"])[0].float() - as_world_pose(state.eef_pose(arm))[0].float()
+            ctx["place_base_nudge"] = {"short_m": [round(float(v), 4) for v in short.tolist()], "after_m": round(float(th.linalg.norm(after[:2])), 4)}
     # open at the recorded place pose: a drop releases right there (above the rim, no contact with the container), a
     # support place sets the object down
     yield from motions.gripper(arm, close=False)
