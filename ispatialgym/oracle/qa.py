@@ -514,8 +514,14 @@ class Monitors:
         ag = getattr(self.robot, "_ag_obj_in_hand", None)
         if not ag:
             return None
+        constraints = getattr(self.robot, "_ag_constraints", None)
+        if constraints is None:
+            constraints = getattr(self.robot, "_ag_obj_constraints", None)
+        releasing = getattr(self.robot, "_ag_release_counter", None) or {}
         for arm, obj in ag.items():
-            if obj is None:
+            # OmniGibson removes the AG constraint the moment the open command arrives but keeps _ag_obj_in_hand set
+            # through its release window: the object is free (a released door swings), not a ghost in the hand
+            if obj is None or (isinstance(constraints, dict) and constraints.get(arm) is None) or releasing.get(arm) is not None:
                 self._ag_ref.pop(arm, None)
                 continue
             ep, eq = self.robot.eef_links[arm].get_position_orientation()
