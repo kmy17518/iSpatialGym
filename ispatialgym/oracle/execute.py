@@ -146,6 +146,8 @@ class ExecuteConfig:
     #: free-space legs (lift / retreat) are finished by ``arm_to`` to their end pose from any stall (no contact made)
     free_leg_finish_max_stall: float = 0.03
     free_leg_finish_max_remaining: float = 0.6
+    #: a free-space retreat whose finish is rejected is accepted when it ends within this of its end pose (m)
+    retreat_partial_accept_m: float = 0.04
     #: a contact pre-pose next to an ignored support (wall, table) is reached via a standoff this far away from the
     #: support, planned with the support present, then a straight leg (``reach_pre_pose``)
     pre_pose_standoff_m: float = 0.08
@@ -698,7 +700,19 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
         except Exception:  # noqa: BLE001
             ignore = []
     finish = _free_leg_finish(state, targets["retreat"][-1], _witness(ctx, "retreat"), ignore, cfg)
-    yield from motions.arm_along(arm, targets["retreat"], finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+    try:
+        yield from motions.arm_along(arm, targets["retreat"], finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+    except SkillError as e:
+        # rush 2026-09-17 (touching 0917-204511): the converged prefix of the leg is executed before the finish is
+        # rejected (witness and cuRobo IK both in another branch); a free-space retreat that already stands within
+        # retreat_partial_accept_m of its end pose is accepted as partial and judged with the loaded tolerance
+        if e.reason != "plan_failed":
+            raise
+        dp, _ = _pose_error(state.eef_pose(arm), targets["retreat"][-1])
+        if dp > cfg.retreat_partial_accept_m:
+            raise
+        log.warning("retreat: the leg ends %.1f mm short of its end pose (finish rejected: %s) - accepted as a partial free-space retreat", dp * 1000, e.message)
+        ctx["retreat_partial_m"] = dp
     if finish.used:
         ctx["retreat_finish"] = finish.info
 
@@ -707,7 +721,7 @@ def post_retreat(action: Retreat, state, targets, ctx) -> Optional[str]:
     if action.release and state.held_object(action.arm) is not None:
         return "execution"
     # a pad leaving a brace / push contact springs back by the joint error it carried under the load (2-3 cm)
-    loaded = isinstance(getattr(action, "after", None), (Brace, Push))
+    loaded = isinstance(getattr(action, "after", None), (Brace, Push)) or ctx.get("retreat_partial_m") is not None
     return _eef_reached(state, action.arm, targets["retreat"][-1], _cfg(ctx), "retreat", loaded=loaded)
 
 
