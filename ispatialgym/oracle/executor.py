@@ -54,7 +54,7 @@ import torch as th
 from ispatialgym import ASSETS_ROOT
 from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.actions import Action, Brace, Place, Push
-from ispatialgym.oracle.execute import check_postcondition, forbidden_contacts, fov_monitored, intended_contacts, is_manipulation, offset_brace, run_action
+from ispatialgym.oracle.execute import check_postcondition, forbidden_contacts, fov_monitored, intended_contacts, is_manipulation, offset_brace, run_action, shorten_push
 from ispatialgym.oracle.motions import Motions, SkillError
 from ispatialgym.oracle.qa import CameraModel, Monitors, QAStats, Verdict, category_of
 from ispatialgym.oracle.recorder import PHASE_GOAL, PHASE_ORACLE, PHASE_SETTLE, Recorder, to_uint8_rgb
@@ -123,6 +123,8 @@ class ExecutorConfig:
     #: the short side by ~0.07 rad when the pads leave: painting 0917-220043 push +0.053 -> final 0.129)
     brace_retry_aim_frac: float = 0.4
     brace_retry_aim_bias_rad: float = 0.05
+    #: (rush) an arc overshoot with no brace catch shortens the recorded arc (shorten_push) instead of moving the brace
+    push_shorten_on_free_overshoot: bool = True
     #: demo-collection gates applied after the epilogue (``run_isg --demo-gating``; oracle mode: ``placed_orientation``):
     #: ``placed_orientation`` = every placed object (place / drop / attach, not pushes) must end within its recorded
     #: orientation target's tolerance (``orientation_tolerance``, 0.2 rad default; nearest equivalence, the evaluator's
@@ -1007,35 +1009,47 @@ class Executor:
         retries: List[Dict[str, Any]] = []
         history: List[Tuple[float, str]] = []  # (brace offset, reason) of every out-of-tolerance push so far
         offset = 0.0
+        shorten = 0.0  # rad the recorded arc is shortened by (overshoot with no brace catch: push less, brace unchanged)
         verdict: Optional[Verdict] = None
         self._defer_commit = True
         try:
             for k in range(self.cfg.brace_retries + 1):
                 brace_k = brace if offset == 0.0 else offset_brace(brace, offset)
+                push_k = shorten_push(push, shorten) if shorten > 0 else push
                 verdict = self.run_action(index, brace_k)
                 if verdict is not None:
                     break
                 watch = [(list(M.FINGER_LINKS[brace.contact.arm]) + [M.GRIPPER_LINK[brace.contact.arm]], push.contact.object)]
-                verdict = self.run_action(index + 1, push, watch=watch)
+                verdict = self.run_action(index + 1, push_k, watch=watch)
                 if verdict is not None:
                     break
                 outcome = self.push_outcome(push, self.last_ctx)
+                outcome["shortened_rad"] = shorten
                 self.action_records[-1].notes["push_outcome"] = outcome
                 if outcome["reason"] is None or k == self.cfg.brace_retries:
                     if outcome["reason"] is not None:
                         log.warning("braced push: %s residual %.4f > tolerance %.4f after %d brace retries; the epilogue decides", outcome["reason"], outcome["residual"], outcome["tolerance"], k)
                     break
                 history.append((offset, outcome["reason"]))
-                over = [o for o, r in history if r == "overshoot"]
-                short = [o for o, r in history if r == "short"]
-                if over and short:
-                    new_offset = 0.5 * (over[-1] + short[-1])  # the residual flipped sign: bisect the bracket
+                centre = float((outcome.get("aim") or {}).get("centre", 0.0))
+                if outcome["reason"] == "overshoot" and outcome["brace_hits"] == 0 and self.cfg.push_shorten_on_free_overshoot and push.contact.mid is not None:
+                    # the target swept past the goal without touching the brace: the pad's arc rotates it too far - push
+                    # less (aim at the ladder centre), keep the brace where it is
+                    shorten += abs(float(outcome["residual"])) - abs(centre)
+                    new_offset = offset
+                    log.warning("braced push: overshoot (residual %.4f, tolerance %.4f, no brace catch) -> the arc is shortened by %.3f rad in total and re-pushed",
+                                outcome["residual"], outcome["tolerance"], shorten)
                 else:
-                    same = [o for o, r in history if r == outcome["reason"]]
-                    rungs = ladder[outcome["reason"]]
-                    new_offset = float(rungs[len(same) - 1]) if len(same) <= len(rungs) else float(same[-1] + (rungs[-1] - rungs[-2]))
-                log.warning("braced push: %s (residual %.4f, tolerance %.4f, brace hits %d) -> re-brace at %+.0f mm along the brace direction and re-push",
-                            outcome["reason"], outcome["residual"], outcome["tolerance"], outcome["brace_hits"], -new_offset * 1000)
+                    over = [o for o, r in history if r == "overshoot"]
+                    short = [o for o, r in history if r == "short"]
+                    if over and short:
+                        new_offset = 0.5 * (over[-1] + short[-1])  # the residual flipped sign: bisect the bracket
+                    else:
+                        same = [o for o, r in history if r == outcome["reason"]]
+                        rungs = ladder[outcome["reason"]]
+                        new_offset = float(rungs[len(same) - 1]) if len(same) <= len(rungs) else float(same[-1] + (rungs[-1] - rungs[-2]))
+                    log.warning("braced push: %s (residual %.4f, tolerance %.4f, brace hits %d) -> re-brace at %+.0f mm along the brace direction and re-push",
+                                outcome["reason"], outcome["residual"], outcome["tolerance"], outcome["brace_hits"], -new_offset * 1000)
                 dropped = [r.to_dict() for r in self.action_records[first_record:]]
                 del self.action_records[first_record:]
                 retries.append({"attempt": k, "offset_m": offset, "reason": outcome["reason"], "residual": outcome["residual"], "tolerance": outcome["tolerance"],

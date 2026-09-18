@@ -611,6 +611,28 @@ def offset_brace(brace: Brace, offset_m: float) -> Brace:
     return Brace(contact=contact, base_yaw=brace.base_yaw)
 
 
+def shorten_push(push: Push, shorten_rad: float) -> Push:
+    """(rush 2026-09-17) The arc push with its swept angle reduced by ``shorten_rad``: init stays, mid / goal are the
+    recorded init rotated about the recorded arc's pivot by half / all of the shortened angle (painting: the pad's arc
+    is about the hook while the painting hinges at its centre, so it rotates ~0.25 rad more than the pad sweeps; an
+    overshoot with no brace catch is corrected by pushing less, not by moving the brace)."""
+    c = push.contact
+    if c.mid is None or shorten_rad <= 0:
+        return push
+    geom = push_geometry(c.waypoints, c.direction)
+    if geom.kind != "arc":
+        return push
+    angle = float(geom.angle)
+    new_angle = math.copysign(max(abs(angle) - float(shorten_rad), 0.05), angle)
+
+    def rotated(frac: float) -> Pose:
+        p, q = _rotate_pose_about(c.init, geom.pivot, new_angle * frac, geom.axis)
+        return Pose(position=[float(v) for v in p.tolist()], orientation=[float(v) for v in q.tolist()])
+
+    contact = replace(c, mid=rotated(0.5), goal=rotated(1.0), extra={**c.extra, "shortened_rad": float(shorten_rad), "swept_rad": new_angle})
+    return Push(contact=contact, base_yaw=push.base_yaw)
+
+
 def intended_contacts(action: Action) -> Tuple[str, ...]:
     """The bddl instances an action may touch (the QA collision whitelist): its ``objects`` plus ``touches`` (the floor
     of a push-under), except that a ``Place(kind="drop")`` must not touch its container (owner decision 2026-09-16:

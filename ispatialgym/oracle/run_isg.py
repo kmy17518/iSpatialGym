@@ -770,6 +770,10 @@ def main(argv=None) -> int:
         if os.environ.get("ISG_PUSH_BACKOFF_M") is not None:  # rush 2026-09-17: 0 keeps the push pad on the target until its retreat
             _execute.CONFIG.push_backoff_m = float(os.environ["ISG_PUSH_BACKOFF_M"])
             meta["push_backoff_m"] = _execute.CONFIG.push_backoff_m
+        if os.environ.get("ISG_AIM_BIAS_RAD") is not None:  # rush: the braced-push ladder's arc aim (overshoot side, rad)
+            ex_cfg.brace_retry_aim_bias_rad = float(os.environ["ISG_AIM_BIAS_RAD"])
+        if os.environ.get("ISG_AIM_FRAC") is not None:
+            ex_cfg.brace_retry_aim_frac = float(os.environ["ISG_AIM_FRAC"])
         meta["rush_env"] = {k: v for k, v in os.environ.items() if k.startswith("ISG_")}
         executor = Executor(env, task, sidecar, recorder=recorder, motions=motions, monitors=monitors, cfg=ex_cfg, sim=og.sim, state=state,
                             tracked_objects=tracked, cam_key=cam_key)
