@@ -501,6 +501,13 @@ class IORSSmall(SamplerV2):
                 self.apply_height_extra_to_grasp(grasp, t_pose, manip)  # A/B knob generation.contact_height_extra_m (0 = no-op)
                 # §4.6 step 2: partner on a random side (touching: robot's left) at gap g ∈ [g_lo, D_p]
                 p_pose = self.place_partner(rng, t_pose, manip, cam_init)
+                if self.edge_aligned():
+                    d.summary["edge_alignment"] = {
+                        "edge_yaw_deg": round(math.degrees(math.atan2(float(manip.tangent[1]), float(manip.tangent[0]))), 1),
+                        "target_inhand_yaw_deg": round(math.degrees(self.edge_yaw_delta(self.hull["target"], t_pose[1], manip)), 1),
+                        "partner_yaw_deg": round(math.degrees(G.yaw_of(p_pose[1])), 1),
+                        "partner_residual_deg": round(math.degrees(self.edge_yaw_delta(self.hull["partner"], p_pose[1], manip)), 2),
+                    }
                 # §4.6 step 4: every object fully in frame (5 %) in the init image
                 for role, pose in (("target", t_pose), ("partner", p_pose)):
                     if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull[role], pose)):
@@ -660,9 +667,13 @@ class IORSSmall(SamplerV2):
         self.template_facts["left_contact_band"] = "unavailable" if left_cells is None else int(len(left_cells))
         errors = []
         p_pose = None
-        for _ in range(8):
+        # edge alignment (owner 2026-09-18 13:50): the partner's footprint axes along the support edge - the two aligned
+        # footprints (long side along / across the edge) alternate over the tries; None = the random yaw of the record
+        yaw0 = self.edge_yaw_delta(self.hull["partner"], self.rest["partner"], manip) if self.edge_aligned() else None
+        for i in range(8):
+            yaw_i = None if yaw0 is None else yaw0 + (i % 2) * (math.pi / 2)
             p_pose = TT.place_partner(self, rng, t_pose, self.hull["target"], self.hull["partner"], self.rest["partner"], manip, side, ranges[side],
-                                      top=self.top, cam=cam, margin=self.margin_support, min_gap=self.gap_min)
+                                      top=self.top, cam=cam, margin=self.margin_support, min_gap=self.gap_min, yaw=yaw_i)
             if left_cells is None or right_cells is None:
                 self._brace_gate = {"ok": None, "why": "left contact band unavailable"}  # unknown: the two-arm IK decides
                 return p_pose
@@ -678,10 +689,49 @@ class IORSSmall(SamplerV2):
                                                 f"in the left contact band ({len(left_cells)} cells) at trunk ({manip.translate}, {manip.tilt:.2f}); e.g. {errors[-2:]}"}
         return p_pose
 
+    # ------------------------------------------------------------------ edge alignment (owner 2026-09-18 13:50 / 14:28)
+
+    def edge_aligned(self) -> bool:
+        """Touching (owner 2026-09-18 13:50): the partner is spawned with its footprint axes along the support edge and the
+        target's goal / place orientation is the edge-aligned yaw nearest its init yaw (an in-hand rotation <= 45 deg) -
+        the boxes meet face to face; ``generation.edge_aligned`` (default on for touching)."""
+        return self.relation == "touching" and bool(self.gen("edge_aligned", True))
+
+    def footprint_axis_angle(self, hull: th.Tensor, quat) -> float:
+        """World angle (rad, modulo pi/2) of the minimum-area bounding rectangle of the hull's footprint at ``quat``."""
+        pts = self.world.footprint(hull, (th.zeros(3), G.t(quat)))
+        best = None
+        n = len(pts)
+        for i in range(n):
+            e = pts[(i + 1) % n] - pts[i]
+            if float(th.linalg.norm(e)) < 1e-6:
+                continue
+            ang = math.atan2(float(e[1]), float(e[0]))
+            c, s = math.cos(ang), math.sin(ang)
+            u = pts[:, 0] * c + pts[:, 1] * s
+            v = -pts[:, 0] * s + pts[:, 1] * c
+            area = float((u.max() - u.min()) * (v.max() - v.min()))
+            if best is None or area < best[0]:
+                best = (area, ang)
+        return 0.0 if best is None else best[1] % (math.pi / 2)
+
+    def edge_yaw_delta(self, hull: th.Tensor, quat, manip: Stance) -> float:
+        """Smallest world yaw (rad, in [-pi/4, pi/4]) that turns the footprint at ``quat`` onto the stance's edge frame."""
+        phi = math.atan2(float(manip.tangent[1]), float(manip.tangent[0]))
+        theta = self.footprint_axis_angle(hull, quat)
+        return (phi - theta + math.pi / 4) % (math.pi / 2) - math.pi / 4
+
+    def edge_aligned_quat(self, hull: th.Tensor, quat, manip: Stance) -> th.Tensor:
+        """``quat`` turned about world z by :meth:`edge_yaw_delta`."""
+        return G.qmul(G.quat_from_yaw(self.edge_yaw_delta(hull, quat, manip)), G.t(quat))
+
+    def target_goal_quat(self, t_pose: G.Pose, manip: Stance) -> th.Tensor:
+        return self.edge_aligned_quat(self.hull["target"], t_pose[1], manip) if self.edge_aligned() else G.t(t_pose[1])
+
     def place_pose_for(self, t_pose: G.Pose, p_pose: G.Pose, manip: Stance) -> G.Pose:
         """Target pose at its *place* position for a drafted partner pose: the nearer-side rule of ``goal_pose`` with the
         place gap (nextto: g_NT - 1 cm; touching: the same, the push closes it)."""
-        t_quat = t_pose[1]
+        t_quat = self.target_goal_quat(t_pose, manip)
         t_hull = G.local_points_world(self.hull["target"], (th.zeros(3), t_quat))
         p_hull_w = self.world.hull_at(self.hull["partner"], p_pose)
         p_lat = (p_hull_w[:, :2] - manip.base_xy) @ manip.tangent
@@ -731,11 +781,12 @@ class IORSSmall(SamplerV2):
         touches the partner (:meth:`release_pose`; the drop test of the goal check settles it, the settled pose is the
         recorded goal); nextto / touching -> the position closest to the init pose that satisfies the predicate: the
         target goes on the partner **side facing its init position** (nextto: AABB gap < g_NT; touching: contact,
-        nudged in the goal check). ``self.goal_side`` = ``"left"`` / ``"right"`` (robot frame) records the chosen side."""
-        t_quat = t_pose[1]
+        nudged in the goal check). ``self.goal_side`` = ``"left"`` / ``"right"`` (robot frame) records the chosen side.
+        Touching with :meth:`edge_aligned`: the goal orientation is the edge-aligned yaw nearest the init yaw."""
+        st = self.sidecar.stance("manipulation")
+        t_quat = self.target_goal_quat(t_pose, st)
         t_hull = G.local_points_world(self.hull["target"], (th.zeros(3), t_quat))
         p_hull_w = self.world.hull_at(self.hull["partner"], p_pose)
-        st = self.sidecar.stance("manipulation")
         self.goal_side = None
         if self.relation in ("ontop", "under"):
             xy = (p_hull_w[:, :2].max(dim=0).values + p_hull_w[:, :2].min(dim=0).values) / 2
