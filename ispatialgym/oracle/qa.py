@@ -519,7 +519,7 @@ class Monitors:
                 self._ag_ref.pop(arm, None)
                 continue
             ep, eq = self.robot.eef_links[arm].get_position_orientation()
-            op, oq = obj.get_position_orientation()
+            op, oq = self._ag_body(arm, obj).get_position_orientation()
             rel = C.relative((op.float(), oq.float()), (ep.float(), eq.float()))
             ref = self._ag_ref.get(arm)
             if ref is None or ref[0] is not obj:
@@ -530,6 +530,19 @@ class Monitors:
             if dp > self.cfg.ghost_pos or da > self.cfg.ghost_rot:
                 return self._verdict("ghost_hand", f"{obj.name} drifted {dp * 100:.1f} cm / {math.degrees(da):.0f} deg off the {arm} hand while grasped", arm=arm, object=obj.name)
         return None
+
+    def _ag_body(self, arm: str, obj: Any) -> Any:
+        """The body the assisted grasp is attached to: for an articulated object (cabinet, dishwasher, door) the
+        grasped *link* (handle / leaf; ``_ag_obj_constraint_params[arm]["ag_link_prim_path"]``), not the object root -
+        the root stays put while the door swings, so a root-vs-hand comparison reports a ghost hand on every honest
+        articulation (dishwasher 0917-010945: "drifted 5.2 cm / 8 deg" at base_follow)."""
+        params = (getattr(self.robot, "_ag_obj_constraint_params", None) or {}).get(arm) or {}
+        path = params.get("ag_link_prim_path")
+        if path:
+            for link in (getattr(obj, "links", None) or {}).values():
+                if getattr(link, "prim_path", None) == path:
+                    return link
+        return obj
 
     # -- pause -----------------------------------------------------------------------------------------------------
 
