@@ -1009,11 +1009,12 @@ def _pitched_blade(motions: Motions, state, arm: str, targets: Dict[str, Any], p
         d = d / max(float(th.linalg.norm(d)), 1e-9)
         p0, q0 = as_world_pose(targets["waypoints"][0])
         a = C.approach_axis(q0)
-        c = C.closing_axis(q0)
-        a2 = C.unit(a * math.cos(pitch) + d * math.sin(pitch))
-        if abs(float(th.dot(a2, c))) > 0.2:
+        k = th.linalg.cross(a, d)  # horizontal axis perpendicular to the approach and the push: rotating about it leans the palm back
+        if float(th.linalg.norm(k)) < 1e-6:
             return None
-        quat = C.eef_quat(a2, c)
+        rot = C.quat_from_axis_angle(k / th.linalg.norm(k), pitch)  # rot(a) = a cos + d sin: tips toward the object, palm away
+        a2 = C.unit(C.quat_rotate(rot, a))
+        quat = C.qmul(rot, q0)  # the closing axis (along the push for a blade) turns with it
 
         def re_origin(pose):
             p, q = as_world_pose(pose)
