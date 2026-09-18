@@ -1106,6 +1106,13 @@ class Retreat(Action):
     def targets(self, sidecar, state):
         C = _conventions()
         start, end = self._segment(sidecar, state)
+        # rush 2026-09-17: after a contact (push / brace) the pad first backs off along its OWN approach axis from where
+        # it actually is, then goes to the recorded clear pose - the single straight leg from the actual pad pose to the
+        # recorded clear pose has a tangential component that rubs the face (painting 0917-213345: the push pad's retreat
+        # dragged the painting from +0.053 back to +0.135 rad; the third push had ended in tolerance)
+        if isinstance(self.after, (Push, Brace)) and callable(getattr(state, "eef_pose", None)):
+            first = _pre(C, start, min(float(self.distance), 0.05))
+            return {"retreat": _line(C, start, first) + _line(C, first, end)}
         return {"retreat": _line(C, start, end)}
 
     def end_pose(self, sidecar, state):
