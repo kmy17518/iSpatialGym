@@ -1156,6 +1156,12 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         rec0 = C.as_tensor(tgt0.position).reshape(-1)[:3].float() - d0 * float(action.contact.distance_m)
         off = C.as_tensor(state.object_pose(obj)[0]).reshape(-1)[:3].float() - rec0
         off[2] = 0.0
+        # along the push line the pad only moves BACK (the object farther from the goal than recorded); an object that
+        # landed nearer the partner keeps the recorded start - the pad pushes air first and the closed-loop stop ends
+        # the push (0918-150927: a 45 deg blade shifted 3.5 cm toward the box descended onto it, joints blocked 0.16 rad)
+        along = float(th.dot(off, d0))
+        if along > 0:
+            off = off - d0 * along
         if 0.003 < float(th.linalg.norm(off)) <= cfg.push_recentre_max_m:
             def _shifted(pose):
                 p, q = as_world_pose(pose)
