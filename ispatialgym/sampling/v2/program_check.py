@@ -546,8 +546,15 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                 # (the sampler's root stood elsewhere: a constant per-sidecar world offset in the oracle's FK check)
                 ign_w = ignore_last + ignore_all + list(approached or [])
                 q_pol, residual = sampler.ikc.polish_witness(res.q, last, arm, ignore=ign_w)
-                if residual > sampler.ikc.WITNESS_RESIDUAL_MAX:
-                    raise Reject("program_check_failed", f"{key}: witness FK residual {residual * 1000:.1f} mm > {sampler.ikc.WITNESS_RESIDUAL_MAX * 1000:.0f} mm "
+                # a pre-pose (pre_grasp / pre_place / pre-contact) is a free-space pose 10 cm off its contact: the oracle's
+                # approach finish closes a residual there, so a problem may allow more (generation.witness_residual_pre_m;
+                # owner 2026-09-18 01:01 touching: witnesses on joint 2's limit sit 9-12 mm short of the pre_grasp); the end
+                # poses keep WITNESS_RESIDUAL_MAX
+                limit = float(sampler.ikc.WITNESS_RESIDUAL_MAX)
+                if str(key).startswith("pre"):
+                    limit = float(sampler.gp.gen("witness_residual_pre_m", limit))
+                if residual > limit:
+                    raise Reject("program_check_failed", f"{key}: witness FK residual {residual * 1000:.1f} mm > {limit * 1000:.0f} mm "
                                                          f"after polishing (stance {stance_name}, arm {arm})", action=name)
                 margin, joint = sampler.ikc.joint_limit_margin(q_pol, arm)
                 witnesses[key] = {"pose": {"position": [round(float(v), 5) for v in last[0].tolist()], "orientation": [round(float(v), 6) for v in last[1].tolist()]},
