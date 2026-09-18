@@ -147,7 +147,9 @@ class ExecuteConfig:
     push_base_nudge_min_m: float = 0.003
     push_base_nudge_speed: float = 0.05
     push_base_nudge_tol_m: float = 0.008
-    push_base_nudge_overshoot_m: float = 0.004
+    push_base_nudge_overshoot_m: float = 0.006
+    #: further nudge rounds when the object rocks back after the pad's back-off (a blade high on a box tilts it)
+    push_renudge_rounds: int = 2
     #: (rush) a straight push's pad poses follow the object's actual planar offset from its recorded start, up to this (m; 0 = off)
     push_recentre_max_m: float = 0.06
     #: (owner 2026-09-18 01:33) a recorded top-down blade is raised so its palm stands this far above the object's top (m; < 0 = off),
@@ -994,6 +996,28 @@ def push_tangent(geom: PushGeometry, pose) -> th.Tensor:
 PALM_FROM_TIP_M = 0.07
 
 
+def _base_nudge(motions: Motions, state, arm: str, obj: str, direction, left: float, cfg: ExecuteConfig, label: str) -> Iterator[th.Tensor]:
+    """Drive the base ``left`` (+ overshoot) along the push ``direction`` with the arm locked at its joints (the door
+    base-follow mechanism): the pad in contact pushes the object the rest of the way when the arm sits at its reach
+    boundary. The nudge goes a little past the goal (a touching goal is contact) and the tracker's tolerance shrinks with
+    the distance (0918-014040: a 7 mm nudge inside the 8 mm tolerance never moved the base)."""
+    d = C.as_tensor(direction).reshape(-1)[:3].float()
+    d = d / max(float(th.linalg.norm(d)), 1e-9)
+    move = float(left) + cfg.push_base_nudge_overshoot_m
+    tol = min(cfg.push_base_nudge_tol_m, max(0.002, 0.5 * float(left)))
+    x, y, yaw = state.base_pose2d()
+    goal2d = [x + float(d[0]) * move, y + float(d[1]) * move, yaw]
+    log.info("%s(%s): %.1f mm still missing with the arm at its reach boundary -> nudging the base %.1f mm along the push direction (tol %.0f mm), arm locked",
+             label, obj, float(left) * 1000, move * 1000, tol * 1000)
+    q = motions.robot.get_joint_positions()
+    motions.state.arm_target[arm] = q[motions.robot.arm_control_idx[arm]].clone().float()
+    tcfg = replace(motions.cfg.base_tracker, v_max=(cfg.push_base_nudge_speed, cfg.push_base_nudge_speed, 0.2), pos_tol=tol)
+    try:
+        yield from motions.track_path([goal2d], tracker_cfg=tcfg)
+    except SkillError as e:  # a tracker time-out keeps what the nudge achieved
+        log.warning("%s(%s): base nudge did not settle (%s); keeping what it achieved", label, obj, e.message)
+
+
 def _push_leg(motions: Motions, state, arm: str, obj: str, waypoints: Sequence[Any], geom: "PushGeometry", pose0, cfg: ExecuteConfig,
               ctx: Dict[str, Any], label: str, partial: bool = False) -> Iterator[th.Tensor]:
     """A pad leg with the pushed object watched (owner 2026-09-17 23:39): the leg **stops as soon as the object has
@@ -1149,23 +1173,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         #     along the push direction by what is still missing (the door base-follow mechanism), pad in contact
         left, _ = push_residual(geom, state, obj, pose0)
         if geom.kind == "line" and cfg.push_base_nudge_max_m > 0 and left is not None and cfg.push_base_nudge_min_m <= left <= cfg.push_base_nudge_max_m:
-            d = C.as_tensor(targets["direction"]).reshape(-1)[:3].float()
-            d = d / max(float(th.linalg.norm(d)), 1e-9)
-            # the nudge goes a little past the goal (a touching goal is contact: a residual of a few mm is not touching)
-            # and the tracker's tolerance shrinks with the distance (0918-014040: a 7 mm nudge inside the 8 mm tolerance
-            # never moved the base)
-            move = left + cfg.push_base_nudge_overshoot_m
-            tol = min(cfg.push_base_nudge_tol_m, max(0.002, 0.5 * left))
-            x, y, yaw = state.base_pose2d()
-            goal2d = [x + float(d[0]) * move, y + float(d[1]) * move, yaw]
-            log.info("push(%s): %.1f cm still missing with the arm at its reach boundary -> nudging the base %.1f cm along the push direction (tol %.0f mm), arm locked", obj, left * 100, move * 100, tol * 1000)
-            q = motions.robot.get_joint_positions()
-            motions.state.arm_target[arm] = q[motions.robot.arm_control_idx[arm]].clone().float()
-            tcfg = replace(motions.cfg.base_tracker, v_max=(cfg.push_base_nudge_speed, cfg.push_base_nudge_speed, 0.2), pos_tol=tol)
-            try:
-                yield from motions.track_path([goal2d], tracker_cfg=tcfg)
-            except SkillError as e:  # a tracker time-out keeps what the nudge achieved
-                log.warning("push(%s): base nudge did not settle (%s); keeping what it achieved", obj, e.message)
+            yield from _base_nudge(motions, state, arm, obj, targets["direction"], left, cfg, "push")
             yield from _hold_until_still(motions, state, obj, cfg)
             end_pose = as_world_pose(state.eef_pose(arm))
             after_nudge, _ = push_residual(geom, state, obj, pose0)
@@ -1183,6 +1191,27 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     _hook(ctx, "fov")(False)  # the contact span ends with the contact leg
     yield from _hold_until_still(motions, state, obj, cfg)
     final, _ = push_residual(geom, state, obj, pose0)
+    # 3b. (owner 2026-09-18 01:33) a line push whose object rocks back once the pad leaves (0918-015654: pushed 1 mm past
+    #     the touching position, +8 mm back at the back-off - a blade high on a box tilts it) is closed in further rounds:
+    #     re-approach along the push line to the object, nudge the base by what reopened (the settled, upright object
+    #     needs less push each round), back off, measure; up to push_renudge_rounds
+    rounds = 0
+    while (geom.kind == "line" and cfg.push_renudge_rounds > rounds and final is not None and cfg.push_base_nudge_min_m <= final <= cfg.push_base_nudge_max_m
+           and cfg.push_backoff_m > 0):
+        rounds += 1
+        log.info("push(%s): %.1f mm reopened after the back-off -> re-nudge round %d", obj, final * 1000, rounds)
+        _hook(ctx, "fov")(True)
+        yield from motions.arm_along(arm, [end_pose], loaded=True, partial=True)  # back onto the face along the push line
+        yield from _base_nudge(motions, state, arm, obj, targets["direction"], final, cfg, f"re-nudge {rounds}")
+        yield from _hold_until_still(motions, state, obj, cfg)
+        end_pose = as_world_pose(state.eef_pose(arm))
+        back = (end_pose[0] - tangent * cfg.push_backoff_m, end_pose[1])
+        yield from motions.arm_along(arm, [back], loaded=True)
+        ctx["push_end_pose"] = back
+        _hook(ctx, "fov")(False)
+        yield from _hold_until_still(motions, state, obj, cfg)
+        final, _ = push_residual(geom, state, obj, pose0)
+        ctx["push_residual"].setdefault("renudge", []).append({"round": rounds, "final": final})
     ctx["push_residual"]["final"] = final
     p_now = C.as_tensor(state.object_pose(obj)[0]).float()
     ctx["push_object_drift_m"] = float(th.linalg.norm(p_now - C.as_tensor(pose0[0]).float()))
