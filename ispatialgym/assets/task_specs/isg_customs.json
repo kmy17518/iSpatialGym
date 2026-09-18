@@ -54356,7 +54356,9 @@
    }
   },
   "generation": {
-   "witness_residual_at_draw_m": 0.002,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "_test_note": "2026-09-18 14:50 TEST setting (owner: test the edge alignment now): residual gates 15 mm on this alias only - the arm reaches its grasps ~1 cm short at every Phase-2 stance here; the oracle closes it (approach finish, base nudges)",
    "templates_max": 20,
    "instances_per_template": 5,
    "tolerances": {

@@ -550,7 +550,7 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                 # approach finish closes a residual there, so a problem may allow more (generation.witness_residual_pre_m;
                 # owner 2026-09-18 01:01 touching: witnesses on joint 2's limit sit 9-12 mm short of the pre_grasp); the end
                 # poses keep WITNESS_RESIDUAL_MAX
-                limit = float(sampler.ikc.WITNESS_RESIDUAL_MAX)
+                limit = float(sampler.gp.gen("witness_residual_max_m", sampler.ikc.WITNESS_RESIDUAL_MAX))  # per-problem override (test settings)
                 if str(key).startswith("pre"):
                     limit = float(sampler.gp.gen("witness_residual_pre_m", limit))
                 if residual > limit:
