@@ -180,6 +180,8 @@ class ExecuteConfig:
     #: a contact pre-pose next to an ignored support (wall, table) is reached via a standoff this far away from the
     #: support, planned with the support present, then a straight leg (``reach_pre_pose``)
     pre_pose_standoff_m: float = 0.08
+    #: (owner 2026-09-18 12:42) no standoff when the pre-pose is already this clear of every support (m): planned directly
+    pre_pose_standoff_skip_m: float = 0.08
     #: the carry leg lift end -> pre-place (FOV rule (b), owner 2026-09-16 17:10): ``"straight"`` = a straight Cartesian
     #: leg (through the recorded ``grasps[k].carry`` waypoint when the sampler wrote one), differential IK with the
     #: free-leg finish, both ends recorded in frame; ``"trajopt"`` = the former free trajopt transit (the regression
@@ -253,6 +255,22 @@ def escape_direction(state, pose, objects: Sequence[Any], near: float = 0.15) ->
     return None if n < 1e-6 else total / n
 
 
+def support_clearance(state, pose, objects: Sequence[Any]) -> Optional[float]:
+    """Smallest distance (m) from ``pose``'s position to the AABBs of ``objects``; None without a measurable object."""
+    p = as_world_pose(pose)[0]
+    best = None
+    for o in objects:
+        try:
+            lo, hi = o.aabb
+        except Exception:  # noqa: BLE001
+            continue
+        lo, hi = C.as_tensor(lo).float(), C.as_tensor(hi).float()
+        nearest = th.minimum(th.maximum(p, lo), hi)
+        d = float(th.linalg.norm(p - nearest))
+        best = d if best is None else min(best, d)
+    return best
+
+
 def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[Any], through: Sequence[Any], q_hint, ctx: Dict[str, Any], cfg: "ExecuteConfig") -> Iterator[th.Tensor]:
     """Reach a contact pre-pose that the sampler checked with its supports ignored (a wall / table 2 cm from the
     pads). The supports leave the collision world only for the **last straight leg**: the trajopt goes to a standoff
@@ -267,6 +285,16 @@ def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[An
     n = escape_direction(state, pre, supports)
     if n is None:
         yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(supports) + list(through))
+        if getattr(motions, "last_relaxed_links", None):
+            ctx["plan_relaxed_links"] = list(motions.last_relaxed_links)
+        return
+    clearance = support_clearance(state, pre, supports)
+    if clearance is not None and clearance >= cfg.pre_pose_standoff_skip_m:
+        # owner 2026-09-18 12:42 (1): a pre-pose already this clear of its supports (a table push's pre-pose 10-16 cm
+        # above the table) is planned directly with the supports present - the standoff excursion (up 8 cm, then down
+        # again) was a redundant raise before the descent; the wall contacts (pre-pose 2-5 cm off the wall) keep it
+        ctx["pre_pose_standoff"] = {"skipped": True, "clearance_m": round(clearance, 3)}
+        yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(through))
         if getattr(motions, "last_relaxed_links", None):
             ctx["plan_relaxed_links"] = list(motions.last_relaxed_links)
         return
