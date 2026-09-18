@@ -534,12 +534,14 @@ class IORSSmall(SamplerV2):
                     obj_at_place = self.place_pose_for(t_pose, p_pose, manip) if self.relation == "touching" else self.goal_pose(t_pose, p_pose)
                     place_guess = IK.grasp_pose(obj_at_place, grasp.eef_in_object)
                     ign_place = self.support_objects() + ([self.obj("partner")] if self.relation != "inside" else [])
+                    # touching (owner 2026-09-18 16:32): the place is made from the second base pose the box is carried to
+                    st_place = (self.push_stance_for(manip, G.t(t_pose[0]), G.t(obj_at_place[0])) if self.relation == "touching" else None) or manip
                     with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
-                        res_place = self.ikc.exact([IK.pre_pose(place_guess), place_guess], manip, grasp.arm, ignore_for_last=ign_place,
+                        res_place = self.ikc.exact([IK.pre_pose(place_guess), place_guess], st_place, grasp.arm, ignore_for_last=ign_place,
                                                    scale_key=self.choice.models["target"].scale, cache=False, approached=ign_place)
                     if not res_place.ok:
                         raise Reject(res_place.code or "place_unreachable", f"place screening at the draw (candidate {int(k)}, trunk {manip.translate}, "
-                                                                            f"{manip.tilt:.2f}): {res_place.reason}")
+                                                                            f"{manip.tilt:.2f}, from the {st_place.name} stance): {res_place.reason}")
                 # carry height: the target (bottom at the table at init) clears the partner's top by 3 cm on the way
                 grasp.carry_height = max(float(self.gen("carry_clearance_m", 0.03)), TT.height_of(self.hull["partner"], self.rest["partner"]) + float(self.gen("carry_clearance_m", 0.03)))
                 d.object_poses[tname] = t_pose
@@ -1204,12 +1206,16 @@ class IORSSmall(SamplerV2):
         draft.summary["grasp_facts"] = {k: grasp.extras.get(k) for k in ("pinch_vs_long_axis_deg", "pad_height_above_support_m", "pad_height_above_axis_m",
                                                                           "closing_tilt_deg", "pivot_arm_m")}
         approached_place = (self.support_objects() + [self.obj("partner")]) if self.relation != "inside" else self.support_objects()
+        # touching (owner 2026-09-18 16:32): the box is carried to a second base pose along the edge (recorded path, in hand)
+        # and placed / pushed from there - the place descent and the contacts are checked from that stance
+        work = self.push_stance(draft, manip, grasp) if self.relation == "touching" else None
+        st_place = work if work is not None else manip
 
         def descent(pre_p: G.Pose, pl: G.Pose):
             with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
                 # along the whole descent: the placed-on partner (owner A) and — as the program check's ``place`` rule and the
                 # oracle's descent — the supports (the carried object's sphere fit reaches the table 4-6 cm above the place)
-                return self.ikc.exact([pre_p, pl], manip, grasp.arm, ignore_for_last=ignore, scale_key=self.choice.models["target"].scale, cache=False,
+                return self.ikc.exact([pre_p, pl], st_place, grasp.arm, ignore_for_last=ignore, scale_key=self.choice.models["target"].scale, cache=False,
                                       approached=approached_place)
 
         res = descent(pre_place, place)
@@ -1233,22 +1239,22 @@ class IORSSmall(SamplerV2):
                     grasp.extras.update(self.grasp_facts(grasp))
                     break
         if not res.ok and res.code:
-            raise Reject(res.code, f"pre-place -> place descent from the manipulation stance with the object attached: {res.reason}")
+            raise Reject(res.code, f"pre-place -> place descent from the {st_place.name} stance with the object attached: {res.reason}")
         if not res.ok:
             # diagnostics only on failure (which pose, and whether the attached object / the world / the reach is the cause)
             def _ok(r):
                 return "ok" if r.ok else "fail"
 
-            r_pre = self.ikc.exact([pre_place], manip, grasp.arm, cache=False)
-            r_place = self.ikc.exact([place], manip, grasp.arm, ignore_for_last=ignore, cache=False)
+            r_pre = self.ikc.exact([pre_place], st_place, grasp.arm, cache=False)
+            r_place = self.ikc.exact([place], st_place, grasp.arm, ignore_for_last=ignore, cache=False)
             everything = [o for o in self.world.scene.objects if self.world.obstacle_filter(o)]
             with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
-                r_pre_obj = self.ikc.exact([pre_place], manip, grasp.arm, cache=False)
-                r_pre_obj_ign = self.ikc.exact([pre_place], manip, grasp.arm, ignore_for_last=ignore, cache=False)
-                r_place_obj = self.ikc.exact([place], manip, grasp.arm, ignore_for_last=ignore, cache=False)
-                r_place_obj_free = self.ikc.exact([place], manip, grasp.arm, ignore_for_last=everything, cache=False)
-            _, lat = manip.local(goal_pos[:2])
-            raise Reject("place_unreachable", f"pre-place / place fail the exact IK from the manipulation stance with the object attached "
+                r_pre_obj = self.ikc.exact([pre_place], st_place, grasp.arm, cache=False)
+                r_pre_obj_ign = self.ikc.exact([pre_place], st_place, grasp.arm, ignore_for_last=ignore, cache=False)
+                r_place_obj = self.ikc.exact([place], st_place, grasp.arm, ignore_for_last=ignore, cache=False)
+                r_place_obj_free = self.ikc.exact([place], st_place, grasp.arm, ignore_for_last=everything, cache=False)
+            _, lat = st_place.local(goal_pos[:2])
+            raise Reject("place_unreachable", f"pre-place / place fail the exact IK from the {st_place.name} stance with the object attached "
                                               f"(without the object: pre-place {_ok(r_pre)}, place {_ok(r_place)}; with the object: pre-place {_ok(r_pre_obj)}, "
                                               f"pre-place ignoring support+partner {_ok(r_pre_obj_ign)}, place {_ok(r_place_obj)}, place ignoring every object "
                                               f"{_ok(r_place_obj_free)}; goal lateral {lat:+.2f} m, trunk ({manip.translate}, {manip.tilt:.2f}), stand-off {manip.stand_off})")
@@ -1262,16 +1268,14 @@ class IORSSmall(SamplerV2):
         if not r_lift.ok:
             raise Reject(r_lift.code or "lift_unreachable", f"lift ({grasp.carry_height:.2f} m above the grasp) fails with the object attached: {r_lift.reason}")
         cam = self.camera_pose_at(manip)
+        cam_place = cam if work is None else self.camera_pose_at(work)
         # the pre-poses join the check (owner 2026-09-16 10:15 item 1b): the oracle's FOV monitor arms from the pre-pose
-        self.require_in_frame(cam, {"pre-grasp": grasp.pre_grasp, "grasp": grasp.grasp, "pre-place": pre_place, "place": place})
+        self.require_in_frame(cam, {"pre-grasp": grasp.pre_grasp, "grasp": grasp.grasp})
+        self.require_in_frame(cam_place, {"pre-place": pre_place, "place": place})
         if self.relation == "touching":
-            # owner 2026-09-18 16:32: after the place the base moves along the edge to a ``push`` stance so the push happens
-            # where the grasp did relative to the robot (the place lies left of the right arm's band otherwise)
-            push_st = self.push_stance(draft, manip)
-            st_push = push_st if push_st is not None else manip
-            if push_st is not None:
-                cam = self.camera_pose_at(push_st)
-            self.touching_contacts(draft, st_push)
+            # the push (+ brace) from the stance the box was placed from (the second base pose when recorded)
+            cam = cam_place
+            self.touching_contacts(draft, st_place)
             c = self.sidecar.contacts
             poses = {"push pre-contact": c["push"].pre, "push contact": c["push"].contact, "push goal": c["push"].goal}
             if "brace" in c:
@@ -1299,22 +1303,16 @@ class IORSSmall(SamplerV2):
                 "right_cells": int(len(right_cells)), "left_cells": int(len(left_cells)),
                 **({} if ok else {"why": f"work {'in' if in_band(w_b, right_cells) else 'OFF'} right band / brace {'in' if in_band(b_b, left_cells) else 'OFF'} left band at {st.name}"})}
 
-    def push_stance(self, draft: Draft, manip: Stance) -> Optional[Stance]:
-        """Touching (owner 2026-09-18 16:32): a second base pose for the push. The target is set down (nextto position) to
-        the robot's LEFT of where it was grasped, often outside the right arm's band; instead of pushing from the
-        manipulation stance the base moves along the edge by exactly that lateral offset (a recorded path, same trunk),
-        so the push contact lies where the grasp did relative to the robot. Returns the recorded ``push`` stance, or None
-        when the shift is below ``push_stance_min_shift_m`` or the feature is off (``generation.push_stance``)."""
+    def push_stance_for(self, manip: Stance, init_pos: th.Tensor, place_pos: th.Tensor) -> Optional[Stance]:
+        """Touching (owner 2026-09-18 16:32): the second base pose ``push`` = the manipulation stance moved along the edge by
+        (place lateral - init lateral), same trunk, so the box - carried there in hand - is set down and pushed where it was
+        grasped relative to the robot (the nextto position lies to the robot's left of the grasp, past the right arm's
+        band). Pure geometry (nothing recorded); None when the shift is below ``push_stance_min_shift_m`` or the feature is
+        off (``generation.push_stance``)."""
         if self.relation != "touching" or not bool(self.gen("push_stance", True)):
             return None
-        tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
-        place_pos = getattr(self, "_touching_place_pos", None)
-        if place_pos is None:
-            place_pos = th.tensor(draft.pose_targets[tname]["position"])
-        goal_quat = G.t(draft.goal_poses[tname][1])
-        init_pos = G.t(draft.object_poses[tname][0])
         _, lat_place = manip.local(G.t(place_pos)[:2])
-        _, lat_init = manip.local(init_pos[:2])
+        _, lat_init = manip.local(G.t(init_pos)[:2])
         dlat = float(lat_place - lat_init)
         if abs(dlat) < float(self.gen("push_stance_min_shift_m", 0.02)):
             return None
@@ -1323,17 +1321,37 @@ class IORSSmall(SamplerV2):
         st = min(cands, key=lambda c: float(th.linalg.norm(G.t(c.base_xy) - target_xy)))
         st = st.with_trunk(manip.translate, manip.tilt, "push")
         st.focus, st.arms = G.t(place_pos).clone(), ["right"]
+        st.extras.update({"second_base_pose": True, "lateral_shift_m": round(dlat, 4),
+                          "rule": "place and push where the grasp was: base moved along the edge by (place lateral - init lateral), box in hand"})
+        return st
+
+    def push_stance(self, draft: Draft, manip: Stance, grasp: GraspRecord) -> Optional[Stance]:
+        """Record the ``push`` stance of ``push_stance_for``: whole-body check with the objects at the place, the path
+        manipulation -> push carried (the box posed in the hand per the grasp record; ``paths[].carried``), the brace gate
+        and the goal observation stance re-evaluated there. ``Reject(stance_collision | no_path | path_collision)``."""
+        tname, pname = self.bindings.one("target").name, self.bindings.one("partner").name
+        place_pos = getattr(self, "_touching_place_pos", None)
+        if place_pos is None:
+            place_pos = th.tensor(draft.pose_targets[tname]["position"])
+        st = self.push_stance_for(manip, G.t(draft.object_poses[tname][0]), G.t(place_pos))
+        if st is None:
+            return None
+        goal_quat = G.t(draft.goal_poses[tname][1])
         p_now = self.obj("partner").get_position_orientation()
         p_pose = (p_now[0].clone().float(), p_now[1].clone().float())
         t_place_pose = (G.t(place_pos), goal_quat)
         TT.whole_body_check_at(self, [st], {tname: t_place_pose, pname: p_pose}, require=True, reason="stance_collision")
         self.sidecar.add_stance(st)
-        path = self.record_path(manip, st)  # Reject(no_path | path_collision) fails the attempt
-        st.extras.update({"second_base_pose": True, "lateral_shift_m": round(dlat, 4), "path_length_m": getattr(path, "length_m", None),
-                          "rule": "push where the grasp was: base moved along the edge by (place lateral - init lateral)"})
+        self.kit.sync_world()
+        path = self.record_path(manip, st, carried=tname, arm=grasp.arm)  # Reject(no_path | path_collision) fails the attempt
+        st.carried = tname
+        st.extras["path_length_m"] = getattr(path, "length_m", None)
         self._brace_gate = self.brace_gate_at(st, t_place_pose, p_pose)
         self.sidecar.set_goal(st.base_pose2d, st.translate, st.tilt, arms="same")  # the goal observation is taken from the push stance
-        draft.summary["push_stance"] = {"lateral_shift_m": round(dlat, 4), "base_pose2d": [float(v) for v in st.base_pose2d], "brace_gate": self._brace_gate}
+        draft.summary["push_stance"] = {"lateral_shift_m": st.extras["lateral_shift_m"], "base_pose2d": [float(v) for v in st.base_pose2d],
+                                        "path_length_m": st.extras["path_length_m"], "brace_gate": self._brace_gate}
+        log.info("%s: push stance recorded %+.3f m along the edge (path %.2f m, box in hand)", self.gp.alias, st.extras["lateral_shift_m"],
+                 float(st.extras["path_length_m"] or 0.0))
         return st
 
     def require_in_frame(self, cam: G.Pose, poses: Dict[str, Optional[G.Pose]]):
