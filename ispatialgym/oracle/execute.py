@@ -141,6 +141,8 @@ class ExecuteConfig:
     push_base_nudge_max_m: float = 0.06
     push_base_nudge_speed: float = 0.05
     push_base_nudge_tol_m: float = 0.008
+    #: (rush) a straight push's pad poses follow the object's actual planar offset from its recorded start, up to this (m; 0 = off)
+    push_recentre_max_m: float = 0.06
     #: approach / descent finish (owner rule 2026-09-16): when the straight differential-IK segment stalls with a
     #: residual below ``approach_finish_max_stall`` (m) and no more than ``approach_finish_max_remaining`` (m) of the
     #: segment left, the converged prefix is executed and the last part is planned by ``arm_to`` to the end pose — to
@@ -931,6 +933,25 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     except Exception:  # noqa: BLE001
         through = []
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in list(supports) + through]
+    # rush 2026-09-17: a straight push is re-centred on the object's ACTUAL planar position - the recorded pad poses
+    # assume the object at goal - direction x distance_m (the recorded place); a box placed 1-3 cm off is met off-centre
+    # and yaws under the push (touching 0917-215342: 35 deg, orientation tolerance 0.2 rad)
+    tgt0 = state.pose_target(obj) if hasattr(state, "pose_target") else None
+    if action.contact.mid is None and cfg.push_recentre_max_m > 0 and tgt0 is not None and getattr(tgt0, "position", None) is not None:
+        d0 = C.as_tensor(targets["direction"]).reshape(-1)[:3].float()
+        d0 = d0 / max(float(th.linalg.norm(d0)), 1e-9)
+        rec0 = C.as_tensor(tgt0.position).reshape(-1)[:3].float() - d0 * float(action.contact.distance_m)
+        off = C.as_tensor(state.object_pose(obj)[0]).reshape(-1)[:3].float() - rec0
+        off[2] = 0.0
+        if 0.003 < float(th.linalg.norm(off)) <= cfg.push_recentre_max_m:
+            def _shifted(pose):
+                p, q = as_world_pose(pose)
+                return Pose(position=[float(v) for v in (p + off).tolist()], orientation=[float(v) for v in q.tolist()])
+            targets = dict(targets)
+            targets["pre"] = _shifted(targets["pre"])
+            targets["waypoints"] = [_shifted(w) for w in targets["waypoints"]]
+            ctx["push_recentre_m"] = [round(float(v), 4) for v in off.tolist()]
+            log.info("push(%s): object %.1f cm off its recorded start position -> pad pre-pose and waypoints shifted by %s", obj, float(th.linalg.norm(off)) * 100, ctx["push_recentre_m"])
     yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, through, _witness(ctx, "pre"), ctx, cfg)
     _hook(ctx, "fov")(True)
     pose0 = tuple(x.clone() for x in state.object_pose(obj))
