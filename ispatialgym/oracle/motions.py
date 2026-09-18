@@ -897,10 +897,20 @@ class Motions:
                                 "IK witness" if finish.q_hint is not None else "cuRobo IK")
                     if res.q_traj is not None and len(res.q_traj) > 1:
                         yield from self.execute_joint_trajectory(self._retime(res.q_traj, steps[: len(res.q_traj) - 1]), arms=[arm])
-                    yield from self.arm_to(arm, pose=finish.pose, q_hint=finish.q_hint, ignore_objects=finish.ignore_objects, max_excursion=finish.max_excursion)
+                    by = "witness" if finish.q_hint is not None else "curobo_ik"
+                    try:
+                        yield from self.arm_to(arm, pose=finish.pose, q_hint=finish.q_hint, ignore_objects=finish.ignore_objects, max_excursion=finish.max_excursion)
+                    except SkillError as e:
+                        # the recorded witness sits in another IK branch (touching 0917-203700 retreat: 3.29 rad away): the
+                        # plan is rejected before any motion, so finish without the hint - cuRobo's IK from the current
+                        # configuration, still bounded by max_excursion (a stall at a limit keeps the witness-only rule)
+                        if finish.q_hint is None or e.details.get("excursion") is None or at_limit:
+                            raise
+                        log.warning("arm_along(%s): finish toward the witness rejected (%s) -> finishing by cuRobo IK in the current branch", arm, e.message)
+                        by = "curobo_ik_fallback"
+                        yield from self.arm_to(arm, pose=finish.pose, q_hint=None, ignore_objects=finish.ignore_objects, max_excursion=finish.max_excursion)
                     finish.used = True
-                    finish.info = {"stall_m": stall, "remaining_m": remaining, "converged": int(diag.get("converged", 0)), "n_dense": len(dense),
-                                   "by": "witness" if finish.q_hint is not None else "curobo_ik"}
+                    finish.info = {"stall_m": stall, "remaining_m": remaining, "converged": int(diag.get("converged", 0)), "n_dense": len(dense), "by": by}
                     return
             raise SkillError("plan_failed", f"arm_along({arm}): {res.status}", stage="diff_ik", n_waypoints=len(waypoints), **{k_: v for k_, v in diag.items() if k_ in ("fail_index", "pos_err", "rot_err")})
         yield from self.execute_joint_trajectory(self._retime(res.q_traj, steps), arms=[arm], loaded=loaded)
