@@ -185,6 +185,9 @@ class RecorderConfig:
     lerobot_repo_id: Optional[str] = None
     lerobot_robot_type: str = "r1pro"
     lerobot_vcodec: str = "hevc"
+    #: (run_isg --dev) name of an env external sensor (``obs["external"][name]["rgb"]``) written to ``external_rgb.mp4``
+    #: next to the head video - the JoyLo replay viewpoint over the robot's shoulder
+    external_camera: Optional[str] = None
 
 
 class Recorder:
@@ -218,6 +221,9 @@ class Recorder:
         self.video_path = os.path.join(out_dir, "head_rgb.mp4") if self.cfg.video else None
         self._writer = None
         self.video_error: Optional[str] = None
+        self.external_video_path = os.path.join(out_dir, "external_rgb.mp4") if (self.cfg.video and self.cfg.external_camera) else None
+        self._ext_writer = None
+        self.external_video_error: Optional[str] = None
         self.last_rgb: Optional[np.ndarray] = None
         self.reset_obs = None
         self._last_obs_lerobot: Optional[Dict[str, Any]] = None
@@ -240,6 +246,15 @@ class Recorder:
     def head_frame(self, obs) -> Optional[np.ndarray]:
         try:
             return to_uint8_rgb(self._robot_obs(obs)[self.cam_key]["rgb"])
+        except Exception:  # noqa: BLE001
+            return None
+
+    def external_frame(self, obs) -> Optional[np.ndarray]:
+        """The rgb of the configured external sensor (``obs["external"][name]``), None without one."""
+        if not self.cfg.external_camera or not isinstance(obs, dict):
+            return None
+        try:
+            return to_uint8_rgb(obs["external"][self.cfg.external_camera]["rgb"])
         except Exception:  # noqa: BLE001
             return None
 
@@ -297,6 +312,18 @@ class Recorder:
             self.video_error = repr(e)
             self._writer = None
             log.warning("video writer unavailable (%r); recording without video", e)
+        if self.external_video_path:
+            try:
+                import imageio.v2 as imageio
+
+                self._ext_writer = imageio.get_writer(
+                    self.external_video_path, fps=self.fps, codec="libx264", pixelformat="yuv420p", macro_block_size=8,
+                    ffmpeg_params=["-crf", str(self.cfg.video_crf), "-preset", "veryfast"],
+                )
+            except Exception as e:  # noqa: BLE001
+                self.external_video_error = repr(e)
+                self._ext_writer = None
+                log.warning("external video writer unavailable (%r)", e)
 
     # ------------------------------------------------------------------ LeRobot
 
@@ -418,6 +445,10 @@ class Recorder:
             self.last_rgb = frame
             if self._writer is not None:
                 self._pending_frames["video"].append(_Frame(frame, self.cfg.frame_buffer))
+        if self._ext_writer is not None:
+            ext = self.external_frame(obs)
+            if ext is not None:
+                self._pending_frames["external"].append(_Frame(ext, self.cfg.frame_buffer))
         if self.dataset is not None and self._last_obs_lerobot is not None:
             self._pending_lerobot.append(self._lerobot_frame(self._last_obs_lerobot, action, reward, terminated, truncated, action_index, self.current_task))
         if self.dataset is not None:
@@ -444,6 +475,9 @@ class Recorder:
         if self._writer is not None:
             for fr in self._pending_frames["video"]:
                 self._write_video_frame(fr.array())
+        if self._ext_writer is not None:
+            for fr in self._pending_frames["external"]:
+                self._write_video_frame(fr.array(), external=True)
         if self.dataset is not None:
             for frame in self._pending_lerobot:
                 self._add_lerobot_frame(frame)
@@ -496,14 +530,23 @@ class Recorder:
         self._pending_frames = defaultdict(list)
         self._pending_lerobot = []
 
-    def _write_video_frame(self, frame: np.ndarray) -> None:
+    def _write_video_frame(self, frame: np.ndarray, external: bool = False) -> None:
         try:
             if self.cfg.video_size and frame.shape[0] != self.cfg.video_size:
                 from PIL import Image
 
                 frame = np.asarray(Image.fromarray(frame).resize((self.cfg.video_size, self.cfg.video_size), Image.BILINEAR))
-            self._writer.append_data(frame)
+            (self._ext_writer if external else self._writer).append_data(frame)
         except Exception as e:  # noqa: BLE001
+            if external:
+                self.external_video_error = repr(e)
+                log.warning("external video frame dropped (%r); closing that writer", e)
+                try:
+                    self._ext_writer.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                self._ext_writer = None
+                return
             self.video_error = repr(e)
             log.warning("video frame dropped (%r); closing the writer", e)
             self._close_writer()
@@ -564,6 +607,12 @@ class Recorder:
             except Exception:  # noqa: BLE001
                 pass
             self._writer = None
+        if self._ext_writer is not None:
+            try:
+                self._ext_writer.close()
+            except Exception:  # noqa: BLE001
+                pass
+            self._ext_writer = None
 
     def close(self, meta: dict, qa: Optional[Dict[str, Any]] = None, success: bool = False) -> Dict[str, Any]:
         """Flush everything; returns the paths written (``None`` where a sink was off or failed)."""
@@ -579,6 +628,10 @@ class Recorder:
             log.warning("annotations.json not written: %r", e)
         if self.video_path and self._writer is None and self.video_error is None and os.path.exists(self.video_path):
             out["video"] = self.video_path
+        if self.external_video_path:
+            out["external_video"] = self.external_video_path if (self.external_video_error is None and os.path.exists(self.external_video_path)) else None
+            if self.external_video_error:
+                out["external_video_error"] = self.external_video_error
         if self.cfg.hdf5 and self.n > 0:
             try:
                 out["hdf5"] = self._write_hdf5(meta, ann)

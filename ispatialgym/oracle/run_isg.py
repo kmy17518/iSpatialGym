@@ -148,6 +148,9 @@ def robot_name_from_tro(tro: TROFile, default: str = DEFAULT_ROBOT_NAME) -> str:
     return key.split(":", 1)[0] if key and ":" in key else default
 
 
+EXTERNAL_CAMERA_NAME = "external_sensor0"  # --dev: the JoyLo replay over-the-shoulder viewpoint
+
+
 def build_env_config(template_dir: str, meta: dict, tro: TROFile, tro_path: str, activity: str, did: int, robot_name: str, image_size: int, proprio: bool = True) -> dict:
     """Evaluator configuration (mirrors ``validate_instances.py``) with the robot spawned at the TRO base pose so the
     holonomic base's virtual joints stay near zero."""
@@ -259,6 +262,20 @@ class InstanceLoader:
                 with gm.unlocked():
                     setattr(gm, name, value)
         self.cfg = build_env_config(self.template_dir, self.tmeta, self.tro, self.tro_path, self.activity, self.did, self.robot_name, self.image_size)
+        if getattr(self, "external_camera", False):
+            # --dev (owner 2026-09-17 23:39): the BEHAVIOR / JoyLo replay external viewpoint - a camera on the robot's
+            # base link over its shoulder, looking down-forward (render_instances.render_template) - recorded next to
+            # the head video as external_rgb.mp4
+            self.cfg["env"]["external_sensors"] = [{
+                "sensor_type": "VisionSensor",
+                "name": EXTERNAL_CAMERA_NAME,
+                "relative_prim_path": f"/controllable__r1pro__{self.robot_name}/base_link/{EXTERNAL_CAMERA_NAME}",
+                "modalities": ["rgb"],
+                "sensor_kwargs": {"image_height": self.image_size, "image_width": self.image_size, "horizontal_aperture": 40.0},
+                "position": th.tensor([-0.4, 0.0, 2.0], dtype=th.float32),
+                "orientation": th.tensor([0.2706, -0.2706, -0.6533, 0.6533], dtype=th.float32),
+                "pose_frame": "parent",
+            }]
         self.env = og.Environment(configs=self.cfg)
         from ispatialgym.sampling.scene_variants import block_trav_map_from_meta, patch_trav_map_from_meta
 
@@ -577,6 +594,7 @@ def parse_args(argv=None):
     p.add_argument("--out", default=None, help="output root; the run goes to <out>/<iid>/ (default: <template_dir>/runs)")
     p.add_argument("--record", default="full", choices=["full", "hdf5", "video"], help="full = hdf5 + LeRobot; hdf5 = hdf5 only; video = mp4 / meta only")
     p.add_argument("--video", action="store_true", help="record the head camera RGB to <out>/<iid>/head_rgb.mp4")
+    p.add_argument("--dev", action="store_true", help="development recording: also the JoyLo over-the-shoulder external viewpoint (external_rgb.mp4, with --video)")
     p.add_argument("--video-size", type=int, default=None, help="downscale video frames to this square size")
     p.add_argument("--goal-image", action="store_true", help="capture the goal image after the settled check (>= 3 renders) and write goal_observation into the TRO")
     p.add_argument("--no-goal-override", action="store_true", help="do not write the settled values back into the TRO goal poses")
@@ -656,6 +674,8 @@ def main(argv=None) -> int:
 
     try:
         loader = InstanceLoader(args.instance, robot_name=args.robot_name, image_size=args.image_size, head_aperture=args.head_aperture)
+        loader.external_camera = bool(args.dev)
+        meta["dev"] = bool(args.dev)
         iid, tro_path = loader.iid, loader.tro_path
         out_root = args.out or os.path.join(loader.template_dir, "runs")
         out_dir = os.path.join(out_root, iid)
@@ -749,7 +769,8 @@ def main(argv=None) -> int:
         state = SimState(env, task, robot, cam_key, cam_in_zed=cam_in_zed)
         monitors = Monitors(env, robot, QAConfig(max_episode_steps=args.max_steps), cam_key=cam_key, cam_in_zed=cam_in_zed)
         rec_cfg = RecorderConfig(hdf5=args.record in ("full", "hdf5"), lerobot=args.record == "full", video=args.video, video_size=args.video_size,
-                                 all_cameras=args.all_cameras, frame_buffer=args.frame_buffer)
+                                 all_cameras=args.all_cameras, frame_buffer=args.frame_buffer,
+                                 external_camera=EXTERNAL_CAMERA_NAME if args.dev else None)
         recorder = Recorder(out_dir, env, robot, cam_key, tracked, fps=int(loader.cfg["env"]["action_frequency"]), cfg=rec_cfg,
                             task_name=loader.activity.replace("_", " "), instance_id=iid)
         if sidecar is not None:
