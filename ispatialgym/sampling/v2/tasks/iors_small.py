@@ -1313,11 +1313,21 @@ class IORSSmall(SamplerV2):
         yield "push_v", IK.contact_eef(fp, d, closing=th.tensor([0.0, 0.0, 1.0])), {"blade_half_thickness_m": None, **pad_facts}
         for pitch in TT.approach_pitch_order(None):
             z_tip = z0 + 0.005
+            if bool(self.gen("blade_toward_com", True)):
+                # owner 2026-09-17 23:39: push nearer the centre of mass - the finger section (centre ~3.5 cm above the
+                # tips) is centred on the face's mid height when the face allows it, else it stays at the face bottom
+                z_tip = max(z_tip, min(float(face_point[2]) - 0.035, z1 - 0.03))
             blade_lift, blade_why = contact_height_extra(self, "blade", fingertip_z=z_tip, band_top_z=z1)
             z_tip += blade_lift
             # a push needs the blade on the lower part of the face only (unlike a stop brace, which the whole face may
             # meet): faces taller than the finger section are pushed over their lowest ``PALM_FROM_TIP`` (7 cm)
             z_face_hi = min(z1, z_tip + TT.PALM_FROM_TIP - 0.005)
+            # owner 2026-09-17 23:39 (touching 0917-22*: the palm pressed the sanitary-napkins box and shook the table): a
+            # face that reaches the palm section of a vertical blade (z1 above the fingers' 7 cm) is only pushed by a
+            # PITCHED blade - the palm leans away from the face by ~ PALM_FROM_TIP·sin(pitch) - never by the 0° one,
+            # whose stand-off (finger profile only) puts the wider palm inside the face
+            if z1 > z_tip + TT.PALM_FROM_TIP and pitch < float(self.gen("blade_palm_min_pitch_deg", 30.0)):
+                continue
             so = TT.blade_standoff((z0, z_face_hi), z_tip, pitch, clearance, side=False)
             if so is None:
                 continue  # nothing of the face above the tips: no blade push
