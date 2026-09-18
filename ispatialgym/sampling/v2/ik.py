@@ -210,6 +210,8 @@ class IKResult:
             return "approach_untrackable"
         if self.reason.startswith("ik_joint_limit"):
             return "ik_joint_limit"
+        if self.reason.startswith("ik_reach"):
+            return "ik_reach"
         return ""
 
 
@@ -217,7 +219,7 @@ class IKChecker:
     """§3.6 / §3.9 IK checks over a ``RobotKit``. Stateless apart from the kit and the cache namespace."""
 
     def __init__(self, kit, cache_scope: Optional[Dict[str, Any]] = None, default_working_arms: Sequence[str] = ("right",),
-                 joint_limit_margin: Optional[float] = None):
+                 joint_limit_margin: Optional[float] = None, witness_residual_at_draw: Optional[float] = None):
         self.kit = kit
         self.cache_scope = dict(cache_scope or {})  # scene / rooms / placed objects: part of every cache key
         if joint_limit_margin is not None:
@@ -226,6 +228,13 @@ class IKChecker:
             # across margins
             self.JOINT_LIMIT_MARGIN = float(joint_limit_margin)
             self.cache_scope["joint_limit_margin"] = round(float(joint_limit_margin), 4)
+        #: (owner 2026-09-18 01:33, (a)) reach quality at the DRAW: when set (m), ``exact`` polishes the chain's last witness
+        #: onto its pose and rejects the chain (``ik_reach``) when FK cannot get within this of the pose - the IK's own
+        #: tolerance accepts poses ~1 cm beyond the reach boundary (joint 2 on its limit), which the program check would
+        #: reject 20-60 s later and the oracle's straight legs stall on
+        self.WITNESS_RESIDUAL_AT_DRAW: Optional[float] = None if witness_residual_at_draw is None else float(witness_residual_at_draw)
+        if self.WITNESS_RESIDUAL_AT_DRAW is not None:
+            self.cache_scope["witness_residual_at_draw"] = round(self.WITNESS_RESIDUAL_AT_DRAW, 4)
         #: the task's working arm(s) (``generation.arm``; core sets it) for stances the search checks before the module names them
         self.default_working_arms = list(default_working_arms)
         #: (arm, rounded pose) -> 28-D solution of a successful exact solve; cuRobo's remaining seeds are random, so a
@@ -562,6 +571,19 @@ class IKChecker:
                     break
             qs.append(q)
             self.solutions[(arm, self._pose_key(p))] = q.clone()
+        if q is not None and self.WITNESS_RESIDUAL_AT_DRAW is not None:
+            # reach quality (owner 2026-09-18 01:33): the last witness must reach its pose once polished - a solution the IK
+            # accepted within its tolerance but 1 cm short lies beyond the arm's reach in this branch
+            ign_last = list(ignore_for_last) + list(approached or [])
+            q_pol, residual = self.polish_witness(q, poses[-1], arm, ignore=ign_last)
+            if residual > self.WITNESS_RESIDUAL_AT_DRAW:
+                m_lim, jn = self.joint_limit_margin(q, arm)
+                q, why = None, (f"ik_reach: witness FK residual {residual * 1000:.1f} mm > {self.WITNESS_RESIDUAL_AT_DRAW * 1000:.0f} mm at pose {n} of {n} "
+                                f"(the pose lies at the arm's reach boundary; {jn} {m_lim * 1000:.0f} mrad from its limit)")
+            else:
+                q = q_pol
+                qs[-1] = q
+                self.solutions[(arm, self._pose_key(poses[-1]))] = q.clone()
         res = IKResult(q is not None, q, "" if q is not None else why, len(poses))
         if key is not None and res.ok:  # a failure may be a random miss of the solver: only witnesses are cached
             cache_put(key, {"ok": True, "q": q.tolist(), "qs": [None if x is None else x.tolist() for x in qs]})

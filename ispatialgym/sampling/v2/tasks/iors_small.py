@@ -519,6 +519,20 @@ class IORSSmall(SamplerV2):
                         if not self.ikc.eef_in_frame(pose, cam_manip):
                             raise Reject("gripper_not_in_frame", f"{what} eef pose outside the manipulation image (5 %) for candidate {int(k)} "
                                                                  f"(trunk {manip.translate}, {manip.tilt:.2f})")
+                # (owner 2026-09-18 01:33, (a)) reach screening of the place at the draw: the pre-place -> place descent with the
+                # object attached must pass the exact IK (margin + reach quality) from THIS candidate's stance - else the
+                # next candidate is tried instead of the attempt dying in the goal check 20-60 s later (touching re-samples
+                # 0917-235350 .. 0918-011947: 5/8 attempts lost to ik_joint_limit / witness residual at the place descent)
+                if bool(self.gen("reach_screen_place", True)):
+                    obj_at_place = self.place_pose_for(t_pose, p_pose, manip) if self.relation == "touching" else self.goal_pose(t_pose, p_pose)
+                    place_guess = IK.grasp_pose(obj_at_place, grasp.eef_in_object)
+                    ign_place = self.support_objects() + ([self.obj("partner")] if self.relation != "inside" else [])
+                    with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
+                        res_place = self.ikc.exact([IK.pre_pose(place_guess), place_guess], manip, grasp.arm, ignore_for_last=ign_place,
+                                                   scale_key=self.choice.models["target"].scale, cache=False, approached=ign_place)
+                    if not res_place.ok:
+                        raise Reject(res_place.code or "place_unreachable", f"place screening at the draw (candidate {int(k)}, trunk {manip.translate}, "
+                                                                            f"{manip.tilt:.2f}): {res_place.reason}")
                 # carry height: the target (bottom at the table at init) clears the partner's top by 3 cm on the way
                 grasp.carry_height = max(float(self.gen("carry_clearance_m", 0.03)), TT.height_of(self.hull["partner"], self.rest["partner"]) + float(self.gen("carry_clearance_m", 0.03)))
                 d.object_poses[tname] = t_pose

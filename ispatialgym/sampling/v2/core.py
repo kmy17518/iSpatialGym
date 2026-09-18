@@ -244,9 +244,11 @@ class SamplerV2(TaskSampler):
         self.sidecar = SidecarDraft(self.gp.alias, self.gp.family)
         arm = self.gp.gen("arm", "right")
         default_arms = ["right"] if arm in (None, "auto", "right") else (["left"] if arm == "left" else ["right", "left"])
-        margin = self.gp.gen("joint_limit_margin_rad", None)  # None = IKChecker.JOINT_LIMIT_MARGIN (0.05); touching aliases relax it
+        margin = self.gp.gen("joint_limit_margin_rad", None)  # None = IKChecker.JOINT_LIMIT_MARGIN (0.05)
+        reach = self.gp.gen("witness_residual_at_draw_m", None)  # (a) reach quality at the draw: last witness within this of its pose
         self.ikc = IKChecker(self.kit, {"scene": self.world.scene_model, "rooms": sorted(self.world.loaded_rooms or []), "floor_z": self.kit.floor_z},
-                             default_working_arms=default_arms, joint_limit_margin=None if margin is None else float(margin))
+                             default_working_arms=default_arms, joint_limit_margin=None if margin is None else float(margin),
+                             witness_residual_at_draw=None if reach is None else float(reach))
         self.rejection_log = RejectionLog(keep=3)
         self.counters: Dict[str, int] = {}  # scene_reset, attempts, ... (not rejections)
         self.instance_seeds: List[int] = []

@@ -148,6 +148,10 @@ class ExecuteConfig:
     push_base_nudge_tol_m: float = 0.008
     #: (rush) a straight push's pad poses follow the object's actual planar offset from its recorded start, up to this (m; 0 = off)
     push_recentre_max_m: float = 0.06
+    #: (owner 2026-09-18 01:33) a recorded top-down blade is raised so its palm stands this far above the object's top (m; < 0 = off),
+    #: as long as the finger section still covers this much of the face
+    push_palm_clear_m: float = 0.005
+    push_palm_min_face_m: float = 0.03
     #: (rush) a place whose hand ends horizontally short of the recorded place pose by (min, max] is closed with the base, arm locked
     place_base_nudge_min_m: float = 0.005
     place_base_nudge_max_m: float = 0.04
@@ -984,6 +988,10 @@ def push_tangent(geom: PushGeometry, pose) -> th.Tensor:
     return d / max(float(th.linalg.norm(d)), 1e-9)
 
 
+#: length of the closed fingers' section from the tip to the palm (m; ``sampling.v2.tabletop.PALM_FROM_TIP`` = FINGER_PROFILE[-1][0])
+PALM_FROM_TIP_M = 0.07
+
+
 def _push_leg(motions: Motions, state, arm: str, obj: str, waypoints: Sequence[Any], geom: "PushGeometry", pose0, cfg: ExecuteConfig,
               ctx: Dict[str, Any], label: str, partial: bool = False) -> Iterator[th.Tensor]:
     """A pad leg with the pushed object watched (owner 2026-09-17 23:39): the leg **stops as soon as the object has
@@ -1059,6 +1067,36 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
             targets["waypoints"] = [_shifted(w) for w in targets["waypoints"]]
             ctx["push_recentre_m"] = [round(float(v), 4) for v in off.tolist()]
             log.info("push(%s): object %.1f cm off its recorded start position -> pad pre-pose and waypoints shifted by %s", obj, float(th.linalg.norm(off)) * 100, ctx["push_recentre_m"])
+    # (owner 2026-09-18 01:33, (b)) palm clearance of a recorded top-down blade: the fingers' section is PALM_FROM_TIP
+    # (7 cm) long, above it the palm is wider than the blade stand-off assumed - when the object's top rises above the
+    # palm line the pad (pre-pose + waypoints) is raised until the palm stands push_palm_clear_m above the top, as long as
+    # the finger section still covers >= push_palm_min_face_m of the face (touching 0917-22*: the palm pressed the box
+    # and shook the table)
+    extra = getattr(action.contact, "extra", None) or {}
+    tip_z = extra.get("fingertip_z")
+    if cfg.push_palm_clear_m >= 0 and tip_z is not None and extra.get("blade_half_thickness_m") is not None and not extra.get("palm_clear"):
+        try:
+            top_z = float(C.as_tensor(state.object(obj).aabb[1]).reshape(-1)[2])
+        except Exception:  # noqa: BLE001
+            top_z = None
+        palm_z = float(tip_z) + PALM_FROM_TIP_M
+        if top_z is not None and palm_z < top_z + cfg.push_palm_clear_m:
+            dz = top_z + cfg.push_palm_clear_m - palm_z
+            if float(tip_z) + dz <= top_z - cfg.push_palm_min_face_m:
+                lift = th.tensor([0.0, 0.0, dz])
+
+                def _lifted(pose):
+                    p, q = as_world_pose(pose)
+                    return Pose(position=[float(v) for v in (p + lift).tolist()], orientation=[float(v) for v in q.tolist()])
+
+                targets = dict(targets)
+                targets["pre"] = _lifted(targets["pre"])
+                targets["waypoints"] = [_lifted(w) for w in targets["waypoints"]]
+                ctx["push_palm_lift_m"] = round(dz, 4)
+                log.info("push(%s): the blade's palm line (%.3f) would overlap the object's top (%.3f) -> pad raised %.1f cm, palm %.0f mm clear", obj, palm_z, top_z, dz * 100, cfg.push_palm_clear_m * 1000)
+            else:
+                log.warning("push(%s): the object's top (%.3f) reaches the blade's palm section (palm line %.3f) and raising the pad would leave < %.0f mm of face - pushing as recorded",
+                            obj, top_z, palm_z, cfg.push_palm_min_face_m * 1000)
     yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, through, _witness(ctx, "pre"), ctx, cfg)
     _hook(ctx, "fov")(True)
     pose0 = tuple(x.clone() for x in state.object_pose(obj))
