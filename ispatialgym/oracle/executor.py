@@ -114,8 +114,10 @@ class ExecutorConfig:
     goal_image_renders: int = 10
     #: brace retry ladder (owner 2026-09-16 05:26 / 05:39): retries of a braced push whose residual is out of tolerance,
     #: with the brace moved by these offsets (m) outward (short) / inward (overshoot) along its recorded direction
-    brace_retries: int = 2
-    brace_retry_offsets_m: Tuple[float, ...] = (0.005, 0.010)
+    #: (rush 2026-09-17: 4 retries; when the residual has flipped sign across retries the next offset bisects the last
+    #: overshoot / short offsets - the painting demo alternated -0.27 -> +0.14 rad on the two-rung ladder)
+    brace_retries: int = 4
+    brace_retry_offsets_m: Tuple[float, ...] = (0.005, 0.010, 0.015, 0.020)
     #: demo-collection gates applied after the epilogue (``run_isg --demo-gating``; oracle mode: ``placed_orientation``):
     #: ``placed_orientation`` = every placed object (place / drop / attach, not pushes) must end within its recorded
     #: orientation target's tolerance (``orientation_tolerance``, 0.2 rad default; nearest equivalence, the evaluator's
@@ -989,6 +991,7 @@ class Executor:
         first_record = len(self.action_records)
         ladder = {"short": self.cfg.brace_retry_offsets_m, "overshoot": tuple(-o for o in self.cfg.brace_retry_offsets_m)}
         retries: List[Dict[str, Any]] = []
+        history: List[Tuple[float, str]] = []  # (brace offset, reason) of every out-of-tolerance push so far
         offset = 0.0
         verdict: Optional[Verdict] = None
         self._defer_commit = True
@@ -1008,7 +1011,15 @@ class Executor:
                     if outcome["reason"] is not None:
                         log.warning("braced push: %s residual %.4f > tolerance %.4f after %d brace retries; the epilogue decides", outcome["reason"], outcome["residual"], outcome["tolerance"], k)
                     break
-                new_offset = float(ladder[outcome["reason"]][k])
+                history.append((offset, outcome["reason"]))
+                over = [o for o, r in history if r == "overshoot"]
+                short = [o for o, r in history if r == "short"]
+                if over and short:
+                    new_offset = 0.5 * (over[-1] + short[-1])  # the residual flipped sign: bisect the bracket
+                else:
+                    same = [o for o, r in history if r == outcome["reason"]]
+                    rungs = ladder[outcome["reason"]]
+                    new_offset = float(rungs[len(same) - 1]) if len(same) <= len(rungs) else float(same[-1] + (rungs[-1] - rungs[-2]))
                 log.warning("braced push: %s (residual %.4f, tolerance %.4f, brace hits %d) -> re-brace at %+.0f mm along the brace direction and re-push",
                             outcome["reason"], outcome["residual"], outcome["tolerance"], outcome["brace_hits"], -new_offset * 1000)
                 dropped = [r.to_dict() for r in self.action_records[first_record:]]
