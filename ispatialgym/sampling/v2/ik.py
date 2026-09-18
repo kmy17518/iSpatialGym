@@ -216,9 +216,16 @@ class IKResult:
 class IKChecker:
     """§3.6 / §3.9 IK checks over a ``RobotKit``. Stateless apart from the kit and the cache namespace."""
 
-    def __init__(self, kit, cache_scope: Optional[Dict[str, Any]] = None, default_working_arms: Sequence[str] = ("right",)):
+    def __init__(self, kit, cache_scope: Optional[Dict[str, Any]] = None, default_working_arms: Sequence[str] = ("right",),
+                 joint_limit_margin: Optional[float] = None):
         self.kit = kit
         self.cache_scope = dict(cache_scope or {})  # scene / rooms / placed objects: part of every cache key
+        if joint_limit_margin is not None:
+            # per-problem margin (``generation.joint_limit_margin_rad``; owner 2026-09-18 01:01: relaxed for touching) - the
+            # instance attribute shadows the class default below; part of the cache scope so witnesses are not shared
+            # across margins
+            self.JOINT_LIMIT_MARGIN = float(joint_limit_margin)
+            self.cache_scope["joint_limit_margin"] = round(float(joint_limit_margin), 4)
         #: the task's working arm(s) (``generation.arm``; core sets it) for stances the search checks before the module names them
         self.default_working_arms = list(default_working_arms)
         #: (arm, rounded pose) -> 28-D solution of a successful exact solve; cuRobo's remaining seeds are random, so a

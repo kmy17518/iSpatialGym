@@ -244,8 +244,9 @@ class SamplerV2(TaskSampler):
         self.sidecar = SidecarDraft(self.gp.alias, self.gp.family)
         arm = self.gp.gen("arm", "right")
         default_arms = ["right"] if arm in (None, "auto", "right") else (["left"] if arm == "left" else ["right", "left"])
+        margin = self.gp.gen("joint_limit_margin_rad", None)  # None = IKChecker.JOINT_LIMIT_MARGIN (0.05); touching aliases relax it
         self.ikc = IKChecker(self.kit, {"scene": self.world.scene_model, "rooms": sorted(self.world.loaded_rooms or []), "floor_z": self.kit.floor_z},
-                             default_working_arms=default_arms)
+                             default_working_arms=default_arms, joint_limit_margin=None if margin is None else float(margin))
         self.rejection_log = RejectionLog(keep=3)
         self.counters: Dict[str, int] = {}  # scene_reset, attempts, ... (not rejections)
         self.instance_seeds: List[int] = []
@@ -253,7 +254,7 @@ class SamplerV2(TaskSampler):
         self.height_extra_last: Optional[Dict[str, Any]] = None  # the A/B knob's last verdict (``lift_contact_height`` / ``annotate_height_extra``)
         self.template_meta.update({"alias": self.gp.alias, "subtask": self.subtask, "scene": self.scene, "sampler_version": SAMPLER_VERSION,
                                    "spec_hash": self.gp.spec_hash(), "choice": self.choice.to_json(), "rooms": list(self.gp.rooms(self.scene)),
-                                   "customs": self.gp.customs_path})
+                                   "customs": self.gp.customs_path, "joint_limit_margin_rad": float(self.ikc.JOINT_LIMIT_MARGIN)})
         self.variant = ctx.variant
         self.last_program_check: Optional[Dict[str, Any]] = None
         self._park_xy: Optional[th.Tensor] = None
