@@ -203,7 +203,7 @@ def cmd_demo_only(args):
     t0 = time.time()
     extra = (" " + args.run_isg_args.strip()) if getattr(args, "run_isg_args", "") else ""
     cmd = f"python -m ispatialgym.oracle.run_isg --instance {rel_tro} --mode oracle --out $SMOKE_OUT/demo --video --video-size 540{extra}; echo DEMO_EXIT $?"
-    rc = run_remote(cmd, out_dir, args.timeout)
+    rc = run_local(cmd, out_dir, args.timeout) if getattr(args, "local", False) else run_remote(cmd, out_dir, args.timeout)
     demo = parse_meta(os.path.join(out_dir, "demo"))
     sv = None
     sc = tro.replace("-tro_state.json", ".oracle.json")
@@ -212,7 +212,7 @@ def cmd_demo_only(args):
             sv = json.load(open(sc)).get("sampler_version")
         except Exception:
             pass
-    rec = {"time": now(), "kind": "demo-only", "subtask": st, "alias": alias, "run_id": run_id, "out": os.path.relpath(out_dir, REPO), "rc": rc,
+    rec = {"time": now(), "kind": "demo-only" + (" (local)" if getattr(args, "local", False) else ""), "subtask": st, "alias": alias, "run_id": run_id, "out": os.path.relpath(out_dir, REPO), "rc": rc,
            "wall_s": round(time.time() - t0), "code_commit": commit, "dirty": dirty, "sampler_version": sv, "sampling": None,
            "tro": os.path.relpath(tro, REPO), "demo": demo and {**demo, "meta": os.path.relpath(demo["meta"], REPO)}, "note": args.note}
     append_jsonl(LEDGER, rec)
@@ -379,6 +379,7 @@ def main():
     s.add_argument("--timeout", type=int, default=3600)
     s.add_argument("--note", default="")
     s.add_argument("--run-isg-args", default="", help="extra run_isg arguments appended verbatim (e.g. '--carry-leg trajopt' for a regression reference)")
+    s.add_argument("--local", action="store_true", help="run on this machine's GPU instead of the pool (one at a time, >= 12 GB free)")
     s.set_defaults(fn=cmd_demo_only)
     s = sub.add_parser("fix")
     s.add_argument("--commit", required=True)
