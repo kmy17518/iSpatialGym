@@ -1075,7 +1075,9 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     residual, source = push_residual(geom, state, obj, pose0)
     ctx["push_residual"] = {"kind": geom.kind, "value": residual, "source": source, "recorded": geom.total,
                             "angle_sign": (math.copysign(1.0, geom.angle) if geom.kind == "arc" else 1.0)}
-    end_pose = as_world_pose(targets["waypoints"][-1])
+    # the pad's end pose: where it actually stopped when the leg ended at the goal (0917-235415: judged against the
+    # recorded arc end, 64 mm / 0.47 rad away -> 'postcondition of push failed'), else the recorded end
+    end_pose = as_world_pose(state.eef_pose(arm)) if ctx.get("push_stopped") else as_world_pose(targets["waypoints"][-1])
     # 2. re-push the residual once when it is in the push's sense and the recorded arc / line allows the extension
     if residual is not None:
         forward = residual * (1.0 if geom.kind == "line" else math.copysign(1.0, geom.angle)) > 0
