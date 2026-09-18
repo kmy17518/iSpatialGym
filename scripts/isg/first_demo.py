@@ -202,7 +202,8 @@ def cmd_demo_only(args):
     commit, dirty = git("rev-parse", "HEAD"), bool(git("status", "--porcelain", "--", "ispatialgym", "scripts"))
     t0 = time.time()
     extra = (" " + args.run_isg_args.strip()) if getattr(args, "run_isg_args", "") else ""
-    cmd = f"python -m ispatialgym.oracle.run_isg --instance {rel_tro} --mode oracle --out $SMOKE_OUT/demo --video --video-size 540{extra}; echo DEMO_EXIT $?"
+    envp = "".join(f"{kv} " for kv in (getattr(args, "env", None) or []) if "=" in kv)  # KEY=VAL prefixes (pod and local alike)
+    cmd = f"{envp}python -m ispatialgym.oracle.run_isg --instance {rel_tro} --mode oracle --out $SMOKE_OUT/demo --video --video-size 540{extra}; echo DEMO_EXIT $?"
     rc = run_local(cmd, out_dir, args.timeout) if getattr(args, "local", False) else run_remote(cmd, out_dir, args.timeout)
     demo = parse_meta(os.path.join(out_dir, "demo"))
     sv = None
@@ -380,6 +381,7 @@ def main():
     s.add_argument("--note", default="")
     s.add_argument("--run-isg-args", default="", help="extra run_isg arguments appended verbatim (e.g. '--carry-leg trajopt' for a regression reference)")
     s.add_argument("--local", action="store_true", help="run on this machine's GPU instead of the pool (one at a time, >= 12 GB free)")
+    s.add_argument("--env", action="append", default=[], help="KEY=VAL prefixed to the run_isg command (repeatable; works on pods too)")
     s.set_defaults(fn=cmd_demo_only)
     s = sub.add_parser("fix")
     s.add_argument("--commit", required=True)
