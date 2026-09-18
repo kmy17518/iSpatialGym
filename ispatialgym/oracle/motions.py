@@ -108,7 +108,9 @@ class MotionsConfig:
     diff_ik_max_iters: int = 100
     #: a waypoint the iterations leave within these residuals is accepted (a straight approach stalling 2.1 mm short
     #: of the 2 mm tolerance is not a failed approach; the eef postcondition is 2 cm)
-    diff_ik_soft_pos_tol: float = 5e-3
+    #: (rush 2026-09-17: 1 cm - the touching runs 0917-2030xx..2051xx stall at 5-7 mm on descents / pushes with no joint
+    #: at a limit and no singularity; the eef postcondition is 2 cm and push outcomes are measured on the object)
+    diff_ik_soft_pos_tol: float = 1e-2
     diff_ik_soft_rot_tol: float = 3e-2
     #: soft residual accepted on free-space legs (lift / retreat: the eef postcondition is 2 cm)
     diff_ik_soft_pos_tol_free: float = 1e-2
