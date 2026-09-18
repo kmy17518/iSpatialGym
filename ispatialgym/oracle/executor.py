@@ -118,6 +118,11 @@ class ExecutorConfig:
     #: overshoot / short offsets - the painting demo alternated -0.27 -> +0.14 rad on the two-rung ladder)
     brace_retries: int = 4
     brace_retry_offsets_m: Tuple[float, ...] = (0.005, 0.010, 0.015, 0.020)
+    #: (rush) the ladder keeps climbing while retries remain until the residual lies within aim_frac x tolerance of the aim
+    #: centre; for arcs the centre is biased to the overshoot side by aim_bias_rad (the two-pad squeeze relaxes toward
+    #: the short side by ~0.07 rad when the pads leave: painting 0917-220043 push +0.053 -> final 0.129)
+    brace_retry_aim_frac: float = 0.4
+    brace_retry_aim_bias_rad: float = 0.05
     #: demo-collection gates applied after the epilogue (``run_isg --demo-gating``; oracle mode: ``placed_orientation``):
     #: ``placed_orientation`` = every placed object (place / drop / attach, not pushes) must end within its recorded
     #: orientation target's tolerance (``orientation_tolerance``, 0.2 rad default; nearest equivalence, the evaluator's
@@ -971,11 +976,20 @@ class Executor:
         first = int(self.isg.get("first_success_step", -1) or -1)
         hits = [h for h in (ctx.get("watch_hits") or []) if first < 0 or h < first]
         out["brace_hits"] = len(hits)
-        if out["in_tolerance"]:
+        # rush 2026-09-17: the ladder aims at a fraction of the tolerance (brace_retry_aim_frac) - a two-pad squeeze
+        # relaxes by ~0.07 rad when the pads leave (painting 0917-220043: push ended at +0.053 of 0.08, final 0.129);
+        # a residual inside the tolerance but above the aim still climbs the ladder while retries remain
+        # arcs: the aim is biased to the overshoot side by the expected relaxation (brace_retry_aim_bias_rad; the pads'
+        # penetration recovers toward the short side once they leave); lines keep the aim centred on the goal
+        centre = -float(getattr(self.cfg, "brace_retry_aim_bias_rad", 0.0)) if kind == "arc" else 0.0
+        half = float(tol) * float(getattr(self.cfg, "brace_retry_aim_frac", 1.0))
+        out["aim"] = {"centre": centre, "half": half}
+        out["aimed"] = abs(signed - centre) <= half
+        if out["in_tolerance"] and out["aimed"]:
             return out
-        if signed < 0:
+        if signed < centre:
             out["reason"] = "overshoot"
-        elif hits:
+        elif hits or out["in_tolerance"]:
             out["reason"] = "short"
         return out
 
