@@ -135,6 +135,11 @@ class ExecuteConfig:
     push_residual_min_m: float = 0.005
     push_residual_max_fraction: float = 0.25
     push_backoff_m: float = 0.02
+    #: (rush 2026-09-17) a line push still short after the arm's extension is closed by driving the base along the push
+    #: direction with the arm locked, up to this far (m; 0 disables), at this speed (m/s), to this tracker tolerance (m)
+    push_base_nudge_max_m: float = 0.06
+    push_base_nudge_speed: float = 0.05
+    push_base_nudge_tol_m: float = 0.008
     #: approach / descent finish (owner rule 2026-09-16): when the straight differential-IK segment stalls with a
     #: residual below ``approach_finish_max_stall`` (m) and no more than ``approach_finish_max_remaining`` (m) of the
     #: segment left, the converged prefix is executed and the last part is planned by ``arm_to`` to the end pose — to
@@ -953,6 +958,28 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
             ctx["push_residual"]["skipped"] = "beyond the recorded arc"
         elif not forward and abs(residual) >= rmin:
             ctx["push_residual"]["skipped"] = "overshoot (a pad cannot pull)"
+        # 2b. (rush 2026-09-17) a line push whose arm sits at its reach boundary (touching 0917-211018: the extension
+        #     moved the box 0 mm, 3 cm short) is closed with the base: the arm locked at its joints, the base driven
+        #     along the push direction by what is still missing (the door base-follow mechanism), pad in contact
+        left, _ = push_residual(geom, state, obj, pose0)
+        if geom.kind == "line" and cfg.push_base_nudge_max_m > 0 and left is not None and rmin <= left <= cfg.push_base_nudge_max_m:
+            d = C.as_tensor(targets["direction"]).reshape(-1)[:3].float()
+            d = d / max(float(th.linalg.norm(d)), 1e-9)
+            x, y, yaw = state.base_pose2d()
+            goal2d = [x + float(d[0]) * left, y + float(d[1]) * left, yaw]
+            log.info("push(%s): %.1f cm still missing with the arm at its reach boundary -> nudging the base %.1f cm along the push direction, arm locked", obj, left * 100, left * 100)
+            q = motions.robot.get_joint_positions()
+            motions.state.arm_target[arm] = q[motions.robot.arm_control_idx[arm]].clone().float()
+            tcfg = replace(motions.cfg.base_tracker, v_max=(cfg.push_base_nudge_speed, cfg.push_base_nudge_speed, 0.2), pos_tol=cfg.push_base_nudge_tol_m)
+            try:
+                yield from motions.track_path([goal2d], tracker_cfg=tcfg)
+            except SkillError as e:  # a tracker time-out keeps what the nudge achieved
+                log.warning("push(%s): base nudge did not settle (%s); keeping what it achieved", obj, e.message)
+            yield from _hold_until_still(motions, state, obj, cfg)
+            end_pose = as_world_pose(state.eef_pose(arm))
+            after_nudge, _ = push_residual(geom, state, obj, pose0)
+            ctx["push_residual"]["base_nudge_m"] = left
+            ctx["push_residual"]["after_nudge"] = after_nudge
     # 3. back off along the reversed push direction so the retreat does not rub the pad up the object's face, then
     #    measure the residual the object is left with (a swung painting settles back onto the backed-off pad)
     tangent = push_tangent(geom, end_pose)
