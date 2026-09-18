@@ -182,6 +182,8 @@ class ExecuteConfig:
     pre_pose_standoff_m: float = 0.08
     #: (owner 2026-09-18 12:42) no standoff when the pre-pose is already this clear of every support (m): planned directly
     pre_pose_standoff_skip_m: float = 0.08
+    #: (owner 2026-09-18 12:42) a straight push's pre-pose sits this far above / before its first contact pose (m; None = the record's 10 cm)
+    push_pre_dist_m: Optional[float] = 0.04
     #: the carry leg lift end -> pre-place (FOV rule (b), owner 2026-09-16 17:10): ``"straight"`` = a straight Cartesian
     #: leg (through the recorded ``grasps[k].carry`` waypoint when the sampler wrote one), differential IK with the
     #: free-leg finish, both ends recorded in frame; ``"trajopt"`` = the former free trajopt transit (the regression
@@ -1205,7 +1207,21 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
             else:
                 log.warning("push(%s): the object's top (%.3f) reaches the blade's palm section (palm line %.3f) and raising the pad would leave < %.0f mm of face - pushing as recorded",
                             obj, top_z, palm_z, cfg.push_palm_min_face_m * 1000)
-    yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, through, _witness(ctx, "pre"), ctx, cfg)
+    # owner 2026-09-18 12:42 (1): a straight table push's pre-pose is brought down to push_pre_dist_m above the first
+    # contact pose along the recorded approach (the record's 10 cm) - the hand arrives from the place retreat high above
+    # the box, so the long pre-pose descent was a redundant "down, then down again" (0918-014040)
+    pre_pose = targets["pre"]
+    q_hint_pre = _witness(ctx, "pre")
+    if action.contact.mid is None and cfg.push_pre_dist_m is not None:
+        p_pre, q_pre = as_world_pose(targets["pre"])
+        p_init, _ = as_world_pose(targets["waypoints"][0])
+        a_dir = C.approach_axis(q_pre)
+        along = float(th.dot(p_init - p_pre, a_dir))  # the recorded pre distance along the approach (positive: pre before init)
+        if along > cfg.push_pre_dist_m + 0.005:
+            pre_pose = Pose(position=[float(v) for v in (p_init - a_dir * cfg.push_pre_dist_m).tolist()], orientation=[float(v) for v in q_pre.tolist()])
+            q_hint_pre = None  # the recorded witness belongs to the recorded pre-pose; cuRobo plans the lowered one
+            ctx["push_pre_dist_m"] = cfg.push_pre_dist_m
+    yield from reach_pre_pose(motions, state, arm, pre_pose, supports, through, q_hint_pre, ctx, cfg)
     _hook(ctx, "fov")(True)
     pose0 = tuple(x.clone() for x in state.object_pose(obj))
     ctx["object_pose0"] = pose0
