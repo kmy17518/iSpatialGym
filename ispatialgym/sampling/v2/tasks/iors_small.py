@@ -1321,7 +1321,8 @@ class IORSSmall(SamplerV2):
             z_tip += blade_lift
             # a push needs the blade on the lower part of the face only (unlike a stop brace, which the whole face may
             # meet): faces taller than the finger section are pushed over their lowest ``PALM_FROM_TIP`` (7 cm)
-            z_face_hi = min(z1, z_tip + TT.PALM_FROM_TIP - 0.005)
+            # (the finger section is PALM_FROM_TIP long along the finger axis: pitched, it covers cos(pitch) of that in height)
+            z_face_hi = min(z1, z_tip + (TT.PALM_FROM_TIP - 0.005) * math.cos(math.radians(pitch)))
             # owner 2026-09-17 23:39 (touching 0917-22*: the palm pressed the sanitary-napkins box and shook the table): a
             # face that reaches the palm section of a vertical blade (z1 above the fingers' 7 cm) is only pushed by a
             # PITCHED blade - the palm leans away from the face by ~ PALM_FROM_TIP·sin(pitch) - never by the 0° one,
