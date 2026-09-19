@@ -43,9 +43,8 @@ from __future__ import annotations
 
 import logging
 import math
-import os
 from dataclasses import dataclass, field, replace
-from typing import Any, Callable, Dict, Iterator, List, Optional, Protocol, Sequence, Tuple
+from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Protocol, Sequence, Tuple
 
 import torch as th
 
@@ -121,6 +120,18 @@ class ExecuteConfig:
     drop_settle_steps: int = 30
     follow_settle_steps: int = 45
     set_torso_settle_steps: int = 45
+    #: closed-loop articulation follow (2026-09-18, dishwasher 0917-213723): the follow is judged on the MOVED JOINT, not
+    #: on the arm - it stops as soon as the joint is within ``follow_stop_frac`` of its tolerance from q_goal
+    #: (``follow_stop_at_goal``), the arm's stored deflection is unwound (``follow_unwind``: hold target := measured
+    #: joints, so the drives stop pressing and the release shoves nothing) and the hold ends once the joint is still
+    #: (``follow_still_rad`` per step for ``follow_still_steps`` steps, at most ``follow_settle_steps``). The former
+    #: arm-side waits (90 steps for a joint error the door's friction never let close + 45 steps for phantom joint
+    #: velocities of saturated drives) paused the demo 4.5 s with the door already open.
+    follow_stop_at_goal: bool = True
+    follow_stop_frac: float = 0.25
+    follow_unwind: bool = True
+    follow_still_rad: float = 5e-4
+    follow_still_steps: int = 5
     #: push closure (owner rule 2026-09-16, execution accuracy): after the recorded arc / line the pad holds in contact
     #: until the object is still (at least ``push_hold_min_steps``, at most ``push_settle_max_steps``; still = below
     #: ``push_still_pos`` / ``push_still_rot`` per step for ``push_still_steps`` steps), the residual to the goal is
@@ -140,6 +151,9 @@ class ExecuteConfig:
     #: goal tolerance (arcs / lines) instead of driving the pad to the recorded end
     push_stop_at_goal: bool = True
     push_stop_frac_arc: float = 0.15
+    #: handle grasps (articulation) attach the assisted grasp with a FixedJoint instead of OmniGibson's SphericalJoint for
+    #: links behind a movable joint (2026-09-18: the lid did not turn with the hand, ghost_hand 29 deg on a 4 cm lever)
+    handle_grasp_fixed_ag: bool = True
     push_stop_frac_line: float = 0.0
     #: (rush 2026-09-17) a line push still short after the arm's extension is closed by driving the base along the push
     #: direction with the arm locked, up to this far (m; 0 disables), at this speed (m/s), to this tracker tolerance (m)
@@ -349,6 +363,26 @@ def _hook(ctx: Dict[str, Any], name: str):
     """An executor hook (``ctx["hooks"][name]``; a no-op without an executor): ``fov(enabled)`` enables / disables
     the gripper-in-FOV monitor around the checked segment of the action (``qa.Monitors`` arming rule)."""
     return (ctx.get("hooks") or {}).get(name) or (lambda *a, **k: None)
+
+
+def _patch_ag_joint_type(robot, joint_type: Optional[str]) -> None:
+    """Force the assisted-grasp joint type OmniGibson picks for the next attachment (``robot._get_assisted_grasp_joint_type``:
+    FixedJoint for rigid bodies, SphericalJoint for a link behind a movable joint). ``joint_type`` = ``"FixedJoint"`` installs
+    the override (objects the stock rule refuses - too heavy - stay refused), ``None`` restores the stock method."""
+    if joint_type is None:
+        orig = getattr(robot, "_isg_ag_joint_type_orig", None)
+        if orig is not None:
+            robot._get_assisted_grasp_joint_type = orig
+            del robot._isg_ag_joint_type_orig
+        return
+    if getattr(robot, "_isg_ag_joint_type_orig", None) is None:
+        robot._isg_ag_joint_type_orig = robot._get_assisted_grasp_joint_type
+
+    def forced(target_obj, target_link_name, _orig=robot._isg_ag_joint_type_orig, _kind=joint_type):
+        stock = _orig(target_obj, target_link_name)
+        return None if stock is None else _kind
+
+    robot._get_assisted_grasp_joint_type = forced
 
 
 def _witness(ctx: Dict[str, Any], key: str):
@@ -590,8 +624,23 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     if finish.used:
         ctx["approach_finish"] = finish.info
     # ramped closure (2.25 mm / step, a quarter of the free speed): both pads reach the object in the same step
-    yield from motions.gripper(arm, close=True, rate=motions.cfg.gripper_close_rate)
+    # 2026-09-18 (blender cwkvib 0918-225935, ghost_hand "drifted 2 cm / 29 deg" at the follow): OmniGibson attaches an assisted
+    # grasp on a link behind a movable joint (a lid, a door leaf) with a SPHERICAL joint at the contact point - the hand can
+    # turn without turning the link, and the arm's arc-tracking slack (1 cm) is tens of degrees on a 4 cm handle lever. A
+    # handle pinched across a 13 mm tab transmits torque in reality: handle grasps attach with a FIXED joint (the only
+    # kind the follow was designed for; the dishwasher survived the spherical one only through its 30 cm lever)
+    fixed_ag = cfg.handle_grasp_fixed_ag and action.kind == "handle"
+    if fixed_ag:
+        _patch_ag_joint_type(motions.robot, "FixedJoint")
+    try:
+        yield from motions.gripper(arm, close=True, rate=motions.cfg.gripper_close_rate)
+    finally:
+        if fixed_ag:
+            _patch_ag_joint_type(motions.robot, None)
     ctx["closure_rate_m_per_step"] = motions.cfg.gripper_close_rate
+    if fixed_ag:
+        params = (getattr(motions.robot, "_ag_obj_constraint_params", None) or {}).get(arm) or {}
+        ctx["ag_joint_type"] = params.get("joint_type")
     held = state.held_object(arm)
     if held is not obj:
         raise SkillError("failed_grasp", f"{action.object} not in the {arm} hand after closing", in_hand=None if held is None else held.name)
@@ -974,12 +1023,19 @@ def _yaw_residual(goal_q: th.Tensor, cur_q: th.Tensor, equivalences: Sequence[An
     return _axis_residual(goal_q, cur_q, th.tensor([0.0, 0.0, 1.0]), equivalences)
 
 
-def push_residual(geom: PushGeometry, state, obj: str, pose0) -> Tuple[Optional[float], str]:
+def push_residual(geom: PushGeometry, state, obj: str, pose0, art: Optional[Dict[str, Any]] = None) -> Tuple[Optional[float], str]:
     """How much of the push is still missing, signed in the push's own sense: for an arc the object rotation still
     needed about +z (rad), for a line the displacement still needed along ``direction`` (m). Measured against the
     task's **goal** (the TRO pose target of the pushed object, world frame, nearest orientation equivalence) when it
     has one, else against the recorded motion (swept angle / distance minus what the object did since the push
-    began). Returns ``(residual, source)``; ``(None, reason)`` when nothing can be measured."""
+    began). Returns ``(residual, source)``; ``(None, reason)`` when nothing can be measured.
+
+    ``art`` (small articulation stage 2, 2026-09-18: ``contacts.push.articulation`` = ``{joint, q_to, ...}``): the pushed
+    body is a **link** of ``obj`` on its own joint - the root does not move, the residual is the joint's remaining travel
+    ``q_to − q`` in the arc's sense (the pad and the lid turn about the same hinge by the same angle)."""
+    if art is not None and geom.kind == "arc":
+        q_now = float(state.joint_position(obj, art["joint"]))
+        return math.copysign(1.0, geom.angle) * (float(art["q_to"]) - q_now), "goal_orientation"
     p, q = state.object_pose(obj)
     p, q = C.as_tensor(p).float(), C.as_tensor(q).float()
     tgt = getattr(state, "pose_target", lambda name: None)(obj)
@@ -1102,6 +1158,9 @@ def _push_leg(motions: Motions, state, arm: str, obj: str, waypoints: Sequence[A
     tol = None
     if tgt is not None:
         tol = getattr(tgt, "orientation_tolerance" if geom.kind == "arc" else "position_tolerance", None)
+    art = ctx.get("push_articulation")
+    if art is not None and art.get("tolerance") is not None:
+        tol = float(art["tolerance"])  # the joint target's tolerance (small articulation stage 2)
     margin = None if tol is None else float(tol) * (cfg.push_stop_frac_arc if geom.kind == "arc" else cfg.push_stop_frac_line)
     gen = motions.arm_along(arm, waypoints, loaded=True, partial=partial)
     k = 0
@@ -1110,7 +1169,7 @@ def _push_leg(motions: Motions, state, arm: str, obj: str, waypoints: Sequence[A
         k += 1
         if not cfg.push_stop_at_goal or margin is None:
             continue
-        res, src = push_residual(geom, state, obj, pose0)
+        res, src = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
         if res is None or src not in ("goal_position", "goal_orientation"):
             continue
         if float(res) * sign <= margin:
@@ -1141,8 +1200,12 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     _hook(ctx, "fov")(False)
     yield from motions.gripper(arm, close=True)
     supports = contact_ignores(state, obj)  # the wall / table the target rests against (sampler rule: ignored along the chain)
+    extra0 = getattr(action.contact, "extra", None) or {}
     try:
-        through = [state.object(obj)]  # the pushed object leaves the collision world for the push plan (program_check._ignore_for)
+        # the pushed object leaves the collision world for the push plan (program_check._ignore_for) - except an articulated
+        # lid (stage 2): the hand travels from the released handle on one side of the standing lid to the underside pre-pose on
+        # the other, and a plan through the lid would knock it off its brake
+        through = [] if isinstance(extra0.get("articulation"), dict) else [state.object(obj)]
     except Exception:  # noqa: BLE001
         through = []
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in list(supports) + through]
@@ -1177,6 +1240,11 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     # the finger section still covers >= push_palm_min_face_m of the face (touching 0917-22*: the palm pressed the box
     # and shook the table)
     extra = getattr(action.contact, "extra", None) or {}
+    # small articulation stage 2 (2026-09-18): the pushed body is the lid link on its joint - residuals / stop-at-goal /
+    # the motion check read the joint (push_residual(..., art)), not the root pose
+    ctx["push_articulation"] = dict(extra["articulation"]) if isinstance(extra.get("articulation"), dict) else None
+    if ctx["push_articulation"] is not None:
+        ctx["push_q0"] = float(state.joint_position(obj, ctx["push_articulation"]["joint"]))
     tip_z = extra.get("fingertip_z")
     # a pitched blade class (push_blade_30 / 45 / 60, the sampler's palm-away candidates) already keeps its palm off the face
     pitched_class = False
@@ -1247,7 +1315,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     yield from _push_leg(motions, state, arm, obj, targets["waypoints"], geom, pose0, cfg, ctx, "push")
     # 1. hold with the pad in contact until the object is still, then measure the residual to the goal
     yield from _hold_until_still(motions, state, obj, cfg)
-    residual, source = push_residual(geom, state, obj, pose0)
+    residual, source = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
     ctx["push_residual"] = {"kind": geom.kind, "value": residual, "source": source, "recorded": geom.total,
                             "angle_sign": (math.copysign(1.0, geom.angle) if geom.kind == "arc" else 1.0)}
     # the pad's end pose: where it actually stopped when the leg ended at the goal (0917-235415: judged against the
@@ -1263,6 +1331,8 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         cap = cfg.push_residual_max_fraction * geom.total
         tgt = getattr(state, "pose_target", lambda name: None)(obj)
         tol = getattr(tgt, "orientation_tolerance" if geom.kind == "arc" else "position_tolerance", None) if tgt is not None else None
+        if ctx.get("push_articulation") is not None and ctx["push_articulation"].get("tolerance") is not None:
+            tol = float(ctx["push_articulation"]["tolerance"])
         if tol is not None:
             cap = max(cap, 2.0 * float(tol))
         ctx["push_residual"]["repush_cap"] = cap
@@ -1272,7 +1342,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
             yield from _push_leg(motions, state, arm, obj, ext, geom, pose0, cfg, ctx, "re-push", partial=True)  # best-effort: a stall keeps what it achieved
             yield from _hold_until_still(motions, state, obj, cfg)
             end_pose = as_world_pose(state.eef_pose(arm))  # where the pad actually is (a partial extension ends short of ext[-1])
-            after, _ = push_residual(geom, state, obj, pose0)
+            after, _ = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
             ctx["push_residual"]["extended_by"] = residual
             ctx["push_residual"]["after"] = after
         elif forward and abs(residual) > cap:
@@ -1282,12 +1352,12 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         # 2b. (rush 2026-09-17) a line push whose arm sits at its reach boundary (touching 0917-211018: the extension
         #     moved the box 0 mm, 3 cm short) is closed with the base: the arm locked at its joints, the base driven
         #     along the push direction by what is still missing (the door base-follow mechanism), pad in contact
-        left, _ = push_residual(geom, state, obj, pose0)
+        left, _ = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
         if geom.kind == "line" and cfg.push_base_nudge_max_m > 0 and left is not None and cfg.push_base_nudge_min_m <= left <= cfg.push_base_nudge_max_m:
             yield from _base_nudge(motions, state, arm, obj, targets["direction"], left, cfg, "push")
             yield from _hold_until_still(motions, state, obj, cfg)
             end_pose = as_world_pose(state.eef_pose(arm))
-            after_nudge, _ = push_residual(geom, state, obj, pose0)
+            after_nudge, _ = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
             ctx["push_residual"]["base_nudge_m"] = left
             ctx["push_residual"]["after_nudge"] = after_nudge
     # 3. back off along the reversed push direction so the retreat does not rub the pad up the object's face, then
@@ -1301,7 +1371,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
     ctx["push_end_pose"] = back
     _hook(ctx, "fov")(False)  # the contact span ends with the contact leg
     yield from _hold_until_still(motions, state, obj, cfg)
-    final, _ = push_residual(geom, state, obj, pose0)
+    final, _ = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
     # 3b. (owner 2026-09-18 01:33) a line push whose object rocks back once the pad leaves (0918-015654: pushed 1 mm past
     #     the touching position, +8 mm back at the back-off - a blade high on a box tilts it) is closed in further rounds:
     #     re-approach along the push line to the object, nudge the base by what reopened (the settled, upright object
@@ -1321,7 +1391,7 @@ def execute_push(action: Push, motions: Motions, state, targets, ctx) -> Iterato
         ctx["push_end_pose"] = back
         _hook(ctx, "fov")(False)
         yield from _hold_until_still(motions, state, obj, cfg)
-        final, _ = push_residual(geom, state, obj, pose0)
+        final, _ = push_residual(geom, state, obj, pose0, ctx.get("push_articulation"))
         ctx["push_residual"].setdefault("renudge", []).append({"round": rounds, "final": final})
     ctx["push_residual"]["final"] = final
     p_now = C.as_tensor(state.object_pose(obj)[0]).float()
@@ -1333,6 +1403,11 @@ def post_push(action: Push, state, targets, ctx) -> Optional[str]:
     verdict = _eef_reached(state, action.contact.arm, ctx.get("push_end_pose", targets["waypoints"][-1]), cfg, "push", loaded=True)
     if verdict is not None:
         return verdict
+    art = ctx.get("push_articulation")
+    if art is not None and ctx.get("push_q0") is not None:
+        dq = abs(float(state.joint_position(action.contact.object, art["joint"])) - float(ctx["push_q0"]))
+        ctx["object_motion"] = (0.0, dq)
+        return None if dq > cfg.moved_rot else "no_motion"
     before = ctx.get("object_pose0")
     if before is None:
         return None
@@ -1345,7 +1420,14 @@ def execute_brace(action: Brace, motions: Motions, state, targets, ctx) -> Itera
     cfg = _cfg(ctx)
     arm = action.contact.arm
     _hook(ctx, "fov")(False)
-    yield from motions.gripper(arm, close=True)
+    opening = (getattr(action.contact, "extra", None) or {}).get("fingers_opening_m")
+    if opening is not None:
+        # a WIDE stop (owner 2026-09-19 00:49): the fingers pre-shaped to the recorded opening so both tips land on the braced
+        # face, spread along it - a lever arm against the pivot a single closed tip cannot resist (touching 0918-224622: the
+        # partner yawed 0.8 deg about the point stop and the pair lost contact)
+        yield from motions.gripper_opening(arm, float(opening))
+    else:
+        yield from motions.gripper(arm, close=True)
     supports = contact_ignores(state, action.contact.object)  # the wall / table the braced object rests against
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in supports]
     yield from reach_pre_pose(motions, state, arm, targets["pre"], supports, [], _witness(ctx, "pre"), ctx, cfg)
@@ -1364,17 +1446,64 @@ def joint_tolerance(art) -> float:
     return max(0.05 if art.joint_type == "revolute" else 0.01, 0.10 * span)
 
 
+def _hold_until_joint_still(motions: Motions, state, obj: str, joint: str, cfg: ExecuteConfig) -> Generator[th.Tensor, None, Tuple[int, float]]:
+    """Hold (arm targets as they are) until the articulated joint stops changing between steps — ``follow_still_rad``
+    per step for ``follow_still_steps`` consecutive steps —, at most ``follow_settle_steps``. Returns ``(steps, q)``
+    (read it with ``yield from``)."""
+    prev = state.joint_position(obj, joint)
+    still, n = 0, 0
+    for n in range(1, int(cfg.follow_settle_steps) + 1):
+        yield from motions.hold(1)
+        q = state.joint_position(obj, joint)
+        still = still + 1 if abs(q - prev) < cfg.follow_still_rad else 0
+        prev = q
+        if still >= cfg.follow_still_steps:
+            break
+    return n, prev
+
+
 def execute_base_follow(action: BaseFollow, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
+    """Move the joint with the handle grasped, **judged on the joint** (the door), not on the arm: the recorded handle
+    path (arm mode) / base poses (base mode) are followed until the joint is within ``follow_stop_frac`` of its
+    tolerance from q_goal, or the recorded motion ends; the arm's stored deflection is then unwound (the drives stop
+    pressing on a door its friction already holds) and the hold ends once the joint is still."""
     cfg = _cfg(ctx)
     art = action.articulation
-    ctx["q0"] = state.joint_position(art.object, art.joint)
+    q0 = state.joint_position(art.object, art.joint)
+    ctx["q0"] = q0
+    tol = joint_tolerance(art)
+    sign = 1.0 if art.q_goal - art.q_init >= 0 else -1.0
+    band = cfg.follow_stop_frac * tol
+    note: Dict[str, Any] = {"mode": targets["mode"], "q0": q0, "stop_band_rad": band}
+
+    def reached() -> bool:
+        return sign * (state.joint_position(art.object, art.joint) - art.q_goal) >= -band
+
     if targets["mode"] == "base":
         if not targets.get("base_poses"):
             raise SkillError("plan_failed", "base_follow: no recorded base poses in base mode", stage="targets")
-        yield from motions.base_follow(targets["base_poses"], action.arm)
+        gen = motions.base_follow(targets["base_poses"], action.arm)
     else:
-        yield from motions.arm_along(action.arm, targets["handle_poses"])
-    yield from motions.settle(max_steps=cfg.follow_settle_steps)
+        gen = motions.arm_along(action.arm, targets["handle_poses"], converge=False)
+    k = 0
+    for a in gen:
+        yield a
+        k += 1
+        if cfg.follow_stop_at_goal and reached():
+            q = state.joint_position(art.object, art.joint)
+            log.info("base_follow(%s): %s/%s at %.4f reached the goal band (%.4f ± %.4f) after %d steps -> the follow stops here", action.arm, art.object, art.joint, q,
+                     art.q_goal, band, k)
+            note["stopped_at_goal"] = {"steps": k, "q": q}
+            gen.close()
+            break
+    note["motion_steps"] = k
+    if cfg.follow_unwind:
+        # the drives stop pressing on the door: the hold target becomes the measured configuration (the wind-up under
+        # the friction load stays in the record); the release then imparts nothing
+        note["unwind_rad"] = motions.unwind(action.arm)
+    hold_steps, q_end = yield from _hold_until_joint_still(motions, state, art.object, art.joint, cfg)
+    note.update({"hold_steps": hold_steps, "q_end": q_end, "shortfall_rad": sign * (art.q_goal - q_end)})
+    ctx["follow"] = note
 
 
 def post_base_follow(action: BaseFollow, state, targets, ctx) -> Optional[str]:
@@ -1386,8 +1515,11 @@ def post_base_follow(action: BaseFollow, state, targets, ctx) -> Optional[str]:
     tol = joint_tolerance(art)
     span = art.q_goal - art.q_init
     sign = 1.0 if span >= 0 else -1.0
-    ignore_passive = os.environ.get("ISG_FOLLOW_IGNORE_PASSIVE", "0") == "1"  # rush: the follow drove to q_goal (sidecar.followed_fractions)
-    q_target = art.q_at(art.passive_from) if (art.passive_from is not None and not ignore_passive) else art.q_goal
+    # a recorded passive continuation (the sampler's probe: released at that waypoint the link swings on to q_goal by
+    # itself) ends the hand's part there, as does a stage-2 ``follow_to`` (the fist push takes the joint on); otherwise
+    # the hand takes the joint to q_goal
+    stop = art.follow_to
+    q_target = art.q_at(stop) if stop is not None else art.q_goal
     progress = sign * (q - art.q_init)
     if progress >= sign * (q_target - art.q_init) - tol:
         return None

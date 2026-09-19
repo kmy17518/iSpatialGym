@@ -17,6 +17,13 @@ registers the object depends on sub-millimetre contact / penetration (teacup on 
    centre, the footprint centre inside the supporting object's top footprint, the resting object's up axis within
    ``UP_AXIS_MAX_DEG`` of vertical (a concave partner whose collision mesh lets the rays through).
 
+``touching`` (owner 2026-09-19 00:49): OmniGibson's ``Touching`` is a PhysX contact report, which at rest between two
+free-standing objects with zero normal force is a 0.1 mm lottery (touching 0918-200452 vs 0918-203047 / 224622: the same
+final geometry to 0.1 mm, one read True for 260 steps, the others False). After an OmniGibson False the **geometry** branch
+measures the separation of the two objects' convex hulls (the collision boundary points against the other hull's
+half-spaces, exact for a face-to-face contact, a lower bound otherwise) and accepts a gap up to ``TOUCHING_GAP_MAX_M``
+(3 mm; ``ISG_TOUCHING_GAP_MAX_M`` overrides).
+
 Every evaluation appends ``{"predicate", "entities", "branch", "ok", "detail"}`` to the branch log (``reset_branches`` /
 ``branches``); the callers copy it into ``goal_check.binary_branch`` (sampler) and ``meta.binary_branch`` (evaluator) so the
 ledger shows which branch decided. Other predicates pass straight through.
@@ -24,6 +31,7 @@ ledger shows which branch decided. Other predicates pass straight through.
 from __future__ import annotations
 
 import math
+import os
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import torch as th
@@ -33,6 +41,7 @@ RAY_LENGTH_M = 0.40
 BOTTOM_GAP_MAX_M = 0.008
 UP_AXIS_MAX_DEG = 15.0
 RING_POINTS = 8
+TOUCHING_GAP_MAX_M = float(os.environ.get("ISG_TOUCHING_GAP_MAX_M", "0.003"))
 
 _BRANCHES: List[Dict[str, Any]] = []
 
@@ -60,23 +69,30 @@ def decided_by() -> Dict[str, str]:
     writes as ``binary_branch``."""
     out: Dict[str, str] = {}
     for e in _BRANCHES:
-        if e["predicate"] in ("under", "ontop"):
+        if e["predicate"] in ("under", "ontop", "touching"):
             out[f"{e['predicate']}({', '.join(e['entities'])})"] = e["branch"]
     return out
 
 
 def evaluate_predicate(predicate_cls, *entities) -> bool:
-    """Drop-in for ``evaluate_bddl_predicate`` with the robust ``under`` / ``ontop`` re-checks (module docstring)."""
+    """Drop-in for ``evaluate_bddl_predicate`` with the robust ``under`` / ``ontop`` / ``touching`` re-checks (module docstring)."""
     from omnigibson.utils.bddl_utils import evaluate_bddl_predicate
 
     name = str(getattr(predicate_cls, "__name__", predicate_cls)).lower()
     ok = bool(evaluate_bddl_predicate(predicate_cls, *entities))
-    if name not in ("under", "ontop") or len(entities) != 2 or any(e is None or not _is_object(e) for e in entities):
+    if name not in ("under", "ontop", "touching") or len(entities) != 2 or any(e is None or not _is_object(e) for e in entities):
         _log(name, entities, "omnigibson", ok)
         return ok
     if ok:
         _log(name, entities, "omnigibson", True)
         return True
+    if name == "touching":
+        try:
+            t = touching_geometry(entities[0], entities[1])
+        except Exception as e:  # noqa: BLE001 - a geometry failure must not turn into a verdict
+            t = {"ok": False, "error": repr(e)}
+        _log(name, entities, "geometry" if t.get("ok") else "none", bool(t.get("ok")), t)
+        return bool(t.get("ok"))
     # under(a, b): a is under b -> a supports b; ontop(a, b): a rests on b -> b supports a
     lower, upper = (entities[0], entities[1]) if name == "under" else (entities[1], entities[0])
     try:
@@ -104,6 +120,53 @@ def evaluate_predicate(predicate_cls, *entities) -> bool:
 
 def _is_object(e: Any) -> bool:
     return hasattr(e, "links") and hasattr(e, "get_position_orientation")
+
+
+def _boundary_points(obj: Any) -> th.Tensor:
+    """World collision boundary points (the convex-hull vertices of every link's collision geometry)."""
+    try:
+        import omnigibson as og
+
+        og.sim.sync_physx_to_fabric()  # the boundary points read the render-side transforms (sim_utils.local_hull)
+    except Exception:  # noqa: BLE001
+        pass
+    pts = [p for p in (link.collision_boundary_points_world for link in getattr(obj, "links", {}).values()) if p is not None and len(p)]
+    return th.cat([th.as_tensor(p).float() for p in pts], dim=0) if pts else th.zeros(0, 3)
+
+
+def hull_gap(points_a: th.Tensor, points_b: th.Tensor) -> float:
+    """Separation of the convex hulls of two point sets: max over the hull-of-b half-spaces of the signed distance of a's
+    points, minimised over a's points, and vice versa; the smaller of the two. Exact for a face-to-face contact (the
+    contact face's vertices against the other face's plane), a lower bound for edge / corner contacts; negative when the
+    hulls interpenetrate."""
+    import numpy as np
+    from scipy.spatial import ConvexHull
+
+    hulls = {id(points_a): ConvexHull(points_a.numpy().astype(np.float64)), id(points_b): ConvexHull(points_b.numpy().astype(np.float64))}
+
+    def surface_points(pts: th.Tensor) -> th.Tensor:
+        # the hull vertices plus every hull triangle's centroid and edge midpoints: two faces overlapping only partially
+        # (each overhanging the other) have no vertex inside the other's extent, and vertices alone would overestimate
+        h = hulls[id(pts)]
+        tri = pts[th.as_tensor(h.simplices, dtype=th.long)]  # (n_tri, 3, 3)
+        extra = th.cat([tri.mean(dim=1), (tri[:, 0] + tri[:, 1]) / 2, (tri[:, 1] + tri[:, 2]) / 2, (tri[:, 0] + tri[:, 2]) / 2], dim=0)
+        return th.cat([pts, extra], dim=0)
+
+    def one_way(pts: th.Tensor, hull_pts: th.Tensor) -> float:
+        eq = th.as_tensor(hulls[id(hull_pts)].equations).float()  # n·x + d <= 0 inside
+        signed = surface_points(pts) @ eq[:, :3].T + eq[:, 3]  # (n_pts, n_faces)
+        return float(signed.max(dim=1).values.min())
+
+    return min(one_way(points_a, points_b), one_way(points_b, points_a))
+
+
+def touching_geometry(a: Any, b: Any) -> Dict[str, Any]:
+    """Geometric touching: the two objects' convex hulls within ``TOUCHING_GAP_MAX_M`` of each other (or interpenetrating)."""
+    pa, pb = _boundary_points(a), _boundary_points(b)
+    if len(pa) < 4 or len(pb) < 4:
+        return {"ok": False, "why": "no collision boundary points"}
+    gap = hull_gap(pa, pb)
+    return {"ok": gap <= TOUCHING_GAP_MAX_M, "gap_m": round(gap, 5), "gap_max_m": TOUCHING_GAP_MAX_M}
 
 
 def _link_paths(obj: Any) -> List[str]:

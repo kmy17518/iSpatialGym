@@ -34,6 +34,9 @@ from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecor
 RETREAT_DIST_M = 0.10  # oracle ``actions.RETREAT_DIST``: a place ends this far back along the approach (release + lift-off)
 RETREAT_LITTLE_M = 0.05  # oracle ``actions.RETREAT_LITTLE``: the retreat after a place
 
+#: Tip-to-tip spread of the CLOSED fingers (the finger joints sit at y = ±0.0135 in the gripper link; URDF ``gripper_finger_joint``):
+#: a wide stop with tip spread ``s`` pre-shapes each finger to ``(s - CLOSED_TIP_SPREAD_M) / 2``.
+CLOSED_TIP_SPREAD_M = 0.027
 #: Wrist turns of a blade push in the order to try (owner 2026-09-18 19:39): the wrist camera (``right_realsense_link``, three
 #: r 1.8 cm spheres 4-7 cm to the side of the gripper at the palm-line height) lies on the eef's -y side; ``eef_quat(a, c·outward)``
 #: puts eef +y = c·outward, so c = +1 hangs the camera over the pushed object's top and c = -1 turns it away from it. The camera
@@ -1404,7 +1407,7 @@ class IORSSmall(SamplerV2):
                     continue
                 if not with_brace:
                     return push_kind
-                for i, (b_pre, b_contact, b_kind, _bx) in enumerate(self.touching_brace_candidates(st, b_point, face_z, -direction)):
+                for i, (b_pre, b_contact, b_kind, _bx) in enumerate(self.touching_brace_candidates(st, b_point, face_z, -direction, partner_hull_w=p_hull, push_point=p_init)):
                     if i >= n_brace:
                         break
                     if self.hand_overlap(b_contact, "partner", p_pose) is not None:
@@ -1598,7 +1601,7 @@ class IORSSmall(SamplerV2):
                 push_chosen = (push_kind, push_pre, push_init, push_goal, push_extras)
                 # (2) a brace when the joint band gate admitted the position: the first two-arm candidate that passes
                 if try_brace:
-                    for pre, contact, kind, extras in self.touching_brace_candidates(manip, b_point, face_z, -direction):
+                    for pre, contact, kind, extras in self.touching_brace_candidates(manip, b_point, face_z, -direction, partner_hull_w=p_hull, push_point=p_init):
                         overlap = self.hand_overlap(contact, "partner", p_pose)  # camera / knuckles / body vs the braced partner
                         if overlap is not None:
                             why.append(f"{push_kind}/{kind}: {overlap}")
@@ -1795,7 +1798,28 @@ class IORSSmall(SamplerV2):
                 "blade_half_thickness_m": half, "stop_clearance_m": clearance, "blade_standoff_m": standoff, "fingertip_z": z_tip,
                 "palm_clear": True, "height_extra_m": requested_height_extra(self), "height_extra_effective_m": 0.0, "height_extra_clip_reason": "palm_clear"}
 
-    def touching_brace_candidates(self, manip: Stance, b_point: th.Tensor, face_z: Tuple[float, float], a_face: th.Tensor):
+    def wide_stop_spread(self, partner_hull_w: th.Tensor, b_point: th.Tensor, outward: th.Tensor, side_h: th.Tensor, s_push: float,
+                         spreads: Sequence[float] = (0.09, 0.07, 0.05), end_margin: float = 0.01, face_depth_tol: float = 0.01, band: float = 0.03) -> Optional[float]:
+        """Owner 2026-09-19 00:49 rule for a WIDE stop (both fingertips on the braced face, spread along it): the largest
+        ``spreads`` value whose two landing points ``s_push ± s/2`` lie on the far face's flat run with ``end_margin`` to its
+        ends. The flat run = the side coordinates of the hull points within ``face_depth_tol`` of the face's outermost
+        offset in the ``band`` around the brace height — a protrusion at one end leaves only its own points there (a short
+        run: no wide stop), a face shorter than the smallest spread + margins gets none either. None = narrow (closed) stop."""
+        z_b = float(b_point[2])
+        pts = partner_hull_w[(partner_hull_w[:, 2] > z_b - band) & (partner_hull_w[:, 2] < z_b + band)]
+        if len(pts) < 2:
+            return None
+        off = pts[:, :2] @ outward[:2]
+        face = pts[off >= float(off.max()) - face_depth_tol]
+        s = face[:, :2] @ side_h[:2]
+        s_min, s_max = float(s.min()) + end_margin, float(s.max()) - end_margin
+        for spread in spreads:
+            if s_min <= s_push - spread / 2 and s_push + spread / 2 <= s_max:
+                return float(spread)
+        return None
+
+    def touching_brace_candidates(self, manip: Stance, b_point: th.Tensor, face_z: Tuple[float, float], a_face: th.Tensor,
+                                  partner_hull_w: Optional[th.Tensor] = None, push_point: Optional[th.Tensor] = None):
         """Brace poses of the closed left gripper at the partner's far (robot-left) face, in the order to try — the axial
         stop-brace rule instead of the former 12 mm pad-slab at the face point: (1) the pads on the face, pad centre
         ``STOP_CLEARANCE`` outside it (closing axis vertical then horizontal, either wrist turn); (2) the top-down blade
@@ -1820,6 +1844,24 @@ class IORSSmall(SamplerV2):
             tip_pre = float(self.gen("push_tip_pre_dist_m", 0.05))
             heights = [max(float(b_point[2]), z0 + float(self.gen("brace_tip_min_above_m", 0.055))), min(z1 - 0.01, z0 + 0.075)]
             heights = sorted({round(h, 4) for h in heights if h + 0.01 <= z1}, reverse=True)  # the higher first: the body further off the table
+            # WIDE stop first when the rule admits it (``wide_stop_spread``): the fingers pre-shaped so both tips land on the far
+            # face straddling the push line - the lever arm against the pivot a point stop cannot resist (0918-224622: the
+            # partner yawed 0.8 deg about the closed tips and the pair lost contact). Camera-up wrist turn, same pose family.
+            if heights and partner_hull_w is not None and bool(self.gen("brace_wide_stop", True)):
+                s_b = float(G.t(b_point)[:2] @ side_h[:2])
+                s_push = float(G.t(push_point)[:2] @ side_h[:2]) if push_point is not None else s_b
+                spread = self.wide_stop_spread(partner_hull_w, b_point, outward, side_h, s_push, spreads=[float(v) for v in self.gen("brace_wide_spreads_m", [0.09, 0.07, 0.05])])
+                if spread is not None:
+                    q_open = max(0.0, min(C.FINGER_OPEN, (spread - CLOSED_TIP_SPREAD_M) / 2))  # per-finger joint value for that tip spread
+                    tip_pt = th.tensor([float(b_point[0]), float(b_point[1]), heights[0]]) + side_h * (s_push - s_b)
+                    h_brace = C.default_closing_axis(a)
+                    pose = C.fingertip_eef(tip_pt, a, -h_brace, clearance)  # eef +y = -h: the camera (eef -x side) up
+                    contact = (G.t(pose[0]), G.t(pose[1]))
+                    yield IK.pre_pose(contact, tip_pre), contact, "brace_wide_h-", {
+                        "blade_half_thickness_m": None, "stop_clearance_m": clearance, "pose_class": "brace_wide_h-", "tip_front": True, "pitch_deg": 0.0,
+                        "pre_dist_m": tip_pre, "contact_z": round(heights[0], 4), "fingers_opening_m": round(q_open, 4), "stop_width_m": spread,
+                        "push_line_side_m": round(s_push - s_b, 4), "height_extra_m": requested_height_extra(self),
+                        "height_extra_effective_m": round(heights[0] - float(b_point[2]), 4), "height_extra_clip_reason": "gripper body above the table"}
             for pitch in [float(p) for p in (self.gen("brace_tip_pitches_deg", None) or [0.0, 15.0])]:
                 # pitched: the hand comes from above-left pointing down-right; the body 9.7 cm behind the tips rises 9.7·sin(pitch) cm
                 th_p = math.radians(pitch)

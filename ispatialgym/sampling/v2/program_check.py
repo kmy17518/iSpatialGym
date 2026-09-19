@@ -501,6 +501,10 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
     # pose 1 of 3 ... after push' on 7/16 attempts of touching 0918-181010)
     after_name = getattr(getattr(action, "after", None), "name", None)
     fingers = 0.0 if name in ("push", "brace") or (name == "retreat" and after_name == "push") else None
+    if name == "brace":  # a wide stop braces with the fingers pre-shaped open (owner 2026-09-19 00:49)
+        wide = (getattr(getattr(action, "contact", None), "extra", None) or {}).get("fingers_opening_m")
+        if wide is not None:
+            fingers = float(wide)
     # base-follow in base mode: the handle poses h(q_k) are reached by driving the base, not by the arm from the stance;
     # in arm mode they are checked one by one with the articulated object at q_k (``check_base_follow_handles``), not as a
     # chain against the object frozen at q_init (closing: the hand moves into where the open front was)
