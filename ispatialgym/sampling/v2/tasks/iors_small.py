@@ -1534,7 +1534,8 @@ class IORSSmall(SamplerV2):
                                                 f"lateral {l_i:+.2f} z {float(p_init[2]):.2f}, face z {t_face_z[0]:.2f}-{t_face_z[1]:.2f}, trunk {manip.translate}, "
                                                 f"{manip.tilt:.2f}; {'; '.join(why[-3:])})")
         push_kind, push_pre, push_init, push_goal, push_extras = push_chosen
-        draft.summary.setdefault("touching", {}).update({"push_kind": push_kind, **{k: v for k, v in push_extras.items() if v is not None}})
+        draft.summary.setdefault("touching", {}).update({"push_kind": push_kind, "classes_failed": why[:6], **{k: v for k, v in push_extras.items() if v is not None}})
+        log.info("%s: touching push class %s from the %s stance%s", self.gp.alias, push_kind, manip.name, f" (failed before it: {'; '.join(why[:3])})" if why else "")
         push_rec = ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname, extras=dict(push_extras, pose_class=push_kind))
         push_rec.stance = manip.name  # the stance the chain was checked from ("manipulation" or the second base pose "push")
         self.sidecar.add_contact(push_rec)
@@ -1610,7 +1611,11 @@ class IORSSmall(SamplerV2):
                 # palm recedes from the face by h·tan(lean)): the raised blade pushed the top 4 cm of the 11 cm box and it
                 # tipped instead of sliding - each base nudge closed 10.9 mm and the same 10.9 mm reopened at the back-off
                 # (0918-184752: touching held during the push, lost at the last step)
-                yield from self._leaning_blade(manip, face_point, (z0, z1), d, outward, clearance, z_tip, float(self.gen("blade_lean_deg", 20.0)))
+                # the tips ``blade_lean_tip_above_m`` above the face bottom: leaning, the fingertip's leading edge dips below the tip
+                # height (~half thickness · sin lean) and 5 mm above the table it collides with the table at the contact pose
+                # (0918-190236: the leaning blade lost to the raised one)
+                z_lean_tip = z0 + float(self.gen("blade_lean_tip_above_m", 0.025))
+                yield from self._leaning_blade(manip, face_point, (z0, z1), d, outward, clearance, z_lean_tip, float(self.gen("blade_lean_deg", 20.0)))
             if pitch == 0.0 and z1 > z_tip + TT.PALM_FROM_TIP and bool(self.gen("blade_palm_clear_first", True)):
                 # owner 2026-09-18 18:45: a face taller than the finger section is pushed by the RAISED vertical blade first (palm
                 # ``blade_palm_clear_m`` above the face top, validated by the chain check) - the low blade's palm overlaps the top
