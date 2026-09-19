@@ -495,8 +495,12 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
         arm = g.arm
     ignore_last, ignore_all = _ignore_for(action, sampler, carried)
     approached = _approached_for(action, sampler)
-    # push / brace contacts are made with closed pads (§3.6 contact eef poses; the gripper closes before the pre-contact)
-    fingers = 0.0 if name in ("push", "brace") else None
+    # push / brace contacts are made with closed pads (§3.6 contact eef poses; the gripper closes before the pre-contact); the
+    # push arm retreats still closed (the brace arm releases first: ``_brace_push_retreat``) - checked open, the spread pads
+    # at 3 cm above the push goal reached past the narrow box into the partner it now touches ('retreat: exact IK failed at
+    # pose 1 of 3 ... after push' on 7/16 attempts of touching 0918-181010)
+    after_name = getattr(getattr(action, "after", None), "name", None)
+    fingers = 0.0 if name in ("push", "brace") or (name == "retreat" and after_name == "push") else None
     # base-follow in base mode: the handle poses h(q_k) are reached by driving the base, not by the arm from the stance;
     # in arm mode they are checked one by one with the articulated object at q_k (``check_base_follow_handles``), not as a
     # chain against the object frozen at q_init (closing: the hand moves into where the open front was)
