@@ -671,15 +671,17 @@ class SamplerV2(TaskSampler):
         return self.sidecar.add_transition(tr)
 
     def record_path(self, frm: Stance, to: Stance, carried: Optional[str] = None, arm: Optional[str] = None, max_length_m: Optional[float] = None,
-                    blocked: Sequence[Any] = (), force_global: bool = False, trunk: Optional[Tuple[float, float]] = None) -> PathRecord:
+                    blocked: Sequence[Any] = (), force_global: bool = False, trunk: Optional[Tuple[float, float]] = None,
+                    arm_q: Optional[Dict[str, th.Tensor]] = None) -> PathRecord:
         """§3.7 path between two recorded stances, checked at the departing stance's trunk (``trunk`` overrides) with the
-        carried object attached (posed in the hand per its grasp record); ``force_global`` plans on the eroded map end to
+        carried object attached (posed in the hand per its grasp record); ``arm_q`` (per arm) fixes the arm posture of the
+        drive (a carry: the lift configuration the oracle drives with); ``force_global`` plans on the eroded map end to
         end; ``Reject(no_path | path_collision | path_too_long)``."""
         carried = carried or to.carried or frm.carried
         obj, arm, eef_in_object = self.carried_attachment(carried, arm)
         try:
             p = NAV.plan_path(self.kit, frm, to, carried=carried, carried_obj=obj, carried_arm=arm, rooms=self.gp.rooms(self.scene) or self.world.rooms,
-                              blocked=blocked, max_length_m=max_length_m, trunk=trunk, eef_in_object=eef_in_object, force_global=force_global)
+                              blocked=blocked, max_length_m=max_length_m, trunk=trunk, eef_in_object=eef_in_object, force_global=force_global, arm_q=arm_q)
         except NAV.NavigationError as e:
             raise Reject(e.reason, str(e))
         return self.sidecar.add_path(p)

@@ -1343,7 +1343,16 @@ class IORSSmall(SamplerV2):
         TT.whole_body_check_at(self, [st], {tname: t_place_pose, pname: p_pose}, require=True, reason="stance_collision")
         self.sidecar.add_stance(st)
         self.kit.sync_world()
-        path = self.record_path(manip, st, carried=tname, arm=grasp.arm)  # Reject(no_path | path_collision) fails the attempt
+        # the drive is swept with the arm at the LIFT configuration (the box carry_height above the grasp, as the oracle drives
+        # it), not the stance's untucked arms - the box posed in the untucked hand stands inside the table (0918-165104)
+        lift_end = (G.t(grasp.grasp[0]) + th.tensor([0.0, 0.0, float(grasp.carry_height)]), G.t(grasp.grasp[1]))
+        with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
+            r_lift = self.ikc.exact([lift_end], manip, grasp.arm, ignore_for_last=self.support_objects(), cache=False)
+        arm_q = None
+        if r_lift.ok and r_lift.q is not None:
+            idx = self.kit.robot.arm_control_idx
+            arm_q = {"right": r_lift.q[idx["right"]].clone(), "left": r_lift.q[idx["left"]].clone()}
+        path = self.record_path(manip, st, carried=tname, arm=grasp.arm, arm_q=arm_q)  # Reject(no_path | path_collision) fails the attempt
         st.carried = tname
         st.extras["path_length_m"] = getattr(path, "length_m", None)
         self._brace_gate = self.brace_gate_at(st, t_place_pose, p_pose)
