@@ -1389,7 +1389,7 @@ class IORSSmall(SamplerV2):
         dist = self.push_distance(gap)
         ignore_push = self.support_objects() + [self.obj("target")]
         ignore_brace = self.support_objects() + [self.obj("partner")]
-        n_brace = int(self.gen("brace_search_candidates", 8))
+        n_brace = int(self.gen("brace_search_candidates", 12))
         with self.posed("target", t_place_pose):
             for push_kind, push_init, _extras in self.touching_push_candidates(st, p_init, t_face_z, direction):
                 push_goal = (push_init[0] + direction * dist, push_init[1])
@@ -1837,18 +1837,32 @@ class IORSSmall(SamplerV2):
                 blade_lift, blade_why = contact_height_extra(self, "blade", fingertip_z=z_tip, band_top_z=z1)
                 z_tip += blade_lift  # the fingertips just above the support: the fingers span the face height
                 so = TT.blade_standoff((z0, z1), z_tip, pitch, clearance, side=False)
+                raised = False
                 if so is None:
-                    continue  # the face reaches the palm section: no blade contact
+                    # the face reaches the palm section (the 8 cm tissue box vs the 7 cm finger section: no blade brace was ever
+                    # generated for it). Owner 2026-09-18 21:20: the RAISED vertical blade instead - tips at face top -
+                    # PALM_FROM_TIP + palm clearance, the finger section on the face's top part, palm / knuckles / camera above
+                    # it; the left arm comes from ABOVE the partner, not across the right forearm at its push goal (the
+                    # horizontal brace_tip classes pass alone but collide in the two-arm solve, 0918-211933)
+                    if pitch != 0.0:
+                        continue
+                    z_tip = z1 - TT.PALM_FROM_TIP + float(self.gen("blade_palm_clear_m", 0.025))
+                    so = TT.blade_standoff((z0, z1), z_tip, 0.0, clearance, side=False)
+                    if so is None:
+                        continue
+                    raised, blade_lift, blade_why = True, z_tip - (z0 + 0.005), "palm_clear"
                 standoff, half = so
                 a_vec = TT.pitched_approach(pitch, manip.forward)
                 origin = th.tensor([float(b_point[0]), float(b_point[1]), z_tip + C.FINGERTIP_LENGTH * math.cos(math.radians(pitch))]) + outward * standoff
-                for c_sign in (1.0, -1.0):
+                name = f"blade_{pitch:.0f}{'_high' if raised else ''}"
+                for c_sign in PUSH_WRIST_TURNS:  # the wrist camera away from the partner first
                     contact = (origin, C.eef_quat(a_vec, c_sign * outward))
-                    yield IK.pre_pose(contact), contact, f"blade_{pitch:.0f}{'' if c_sign > 0 else '-'}", {
-                        "blade_half_thickness_m": half, "stop_clearance_m": clearance, "blade_standoff_m": standoff, "fingertip_z": z_tip, "pose_class": f"blade_{pitch:.0f}",
-                        "height_extra_m": requested_height_extra(self), "height_extra_effective_m": round(blade_lift, 4), "height_extra_clip_reason": blade_why}
+                    yield IK.pre_pose(contact), contact, f"{name}{'' if c_sign > 0 else '-'}", {
+                        "blade_half_thickness_m": half, "stop_clearance_m": clearance, "blade_standoff_m": standoff, "fingertip_z": z_tip, "pose_class": name,
+                        "palm_clear": raised, "height_extra_m": requested_height_extra(self), "height_extra_effective_m": round(blade_lift, 4), "height_extra_clip_reason": blade_why}
 
-        order = (blades, side_contacts) if (z1 - z0) < THIN_PARTNER_HEIGHT else (side_contacts, blades)
+        # blades before the side contacts: the side classes hang the camera down / need the hand across the right forearm
+        order = (blades, side_contacts)
         for gen in order:
             yield from gen()
 
