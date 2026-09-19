@@ -1605,6 +1605,12 @@ class IORSSmall(SamplerV2):
                 if bool(self.gen("blade_palm_clear_fallback", True)) and z_hi_tip <= z1 - 0.03:
                     raised_fallback = (z_hi_tip,)  # yielded after the pitched blades (below)
                 continue
+            if pitch == 0.0 and z1 > z_tip + TT.PALM_FROM_TIP and float(self.gen("blade_lean_deg", 20.0)) > 0:
+                # owner 2026-09-18 19:05: a tall face is pushed LOW by a blade leaning along the push axis (fingertips lead, the
+                # palm recedes from the face by h·tan(lean)): the raised blade pushed the top 4 cm of the 11 cm box and it
+                # tipped instead of sliding - each base nudge closed 10.9 mm and the same 10.9 mm reopened at the back-off
+                # (0918-184752: touching held during the push, lost at the last step)
+                yield from self._leaning_blade(manip, face_point, (z0, z1), d, outward, clearance, z_tip, float(self.gen("blade_lean_deg", 20.0)))
             if pitch == 0.0 and z1 > z_tip + TT.PALM_FROM_TIP and bool(self.gen("blade_palm_clear_first", True)):
                 # owner 2026-09-18 18:45: a face taller than the finger section is pushed by the RAISED vertical blade first (palm
                 # ``blade_palm_clear_m`` above the face top, validated by the chain check) - the low blade's palm overlaps the top
@@ -1625,6 +1631,31 @@ class IORSSmall(SamplerV2):
                     "height_extra_m": requested_height_extra(self), "height_extra_effective_m": round(blade_lift, 4), "height_extra_clip_reason": blade_why}
         if raised_fallback is not None:
             yield from self._raised_blade(manip, face_point, (z0, z1), d, outward, clearance, raised_fallback[0])
+
+    def _leaning_blade(self, manip: Stance, face_point: th.Tensor, face_z: Tuple[float, float], d: th.Tensor, outward: th.Tensor, clearance: float,
+                       z_tip: float, lean_deg: float):
+        """The closed blade with its fingertips ``z_tip`` (5 mm above the face bottom) and the hand leaning ``lean_deg`` along
+        the push direction (approach = down rotated toward ``d``): the fingertips lead, every higher finger section recedes
+        from the face by h·tan(lean), so only the tips touch (below the centre of mass: the box slides, no tipping) and the
+        palm never reaches the face. Stand-off = the largest protrusion of the finger profile toward the face + clearance."""
+        z0, z1 = face_z
+        theta = math.radians(float(lean_deg))
+        d3 = th.tensor([float(d[0]), float(d[1]), 0.0])
+        d3 = d3 / max(float(th.linalg.norm(d3)), 1e-9)
+        a_vec = C.unit(th.tensor([0.0, 0.0, -math.cos(theta)]) + d3 * math.sin(theta))
+        protrude, h_prev = 0.0, 0.0
+        for h, half in TT.FINGER_PROFILE:  # a section spans (h_prev, h]; its lowest point protrudes the most
+            protrude = max(protrude, float(half) - h_prev * math.tan(theta))
+            h_prev = float(h)
+        standoff = protrude + float(clearance)
+        # eef origin = fingertip - a·FINGERTIP_LENGTH, the tips ``standoff`` outside the face at ``z_tip``
+        tip = th.tensor([float(face_point[0]), float(face_point[1]), float(z_tip)]) + outward * standoff
+        origin = tip - a_vec * C.FINGERTIP_LENGTH
+        for c_sign in (1.0, -1.0):
+            yield f"push_blade_lean{lean_deg:.0f}{'' if c_sign > 0 else '-'}", (origin, C.eef_quat(a_vec, c_sign * outward)), {
+                "blade_half_thickness_m": float(TT.FINGER_PROFILE[0][1]), "stop_clearance_m": clearance, "blade_standoff_m": standoff, "fingertip_z": float(z_tip),
+                "palm_clear": True, "lean_deg": float(lean_deg), "height_extra_m": requested_height_extra(self), "height_extra_effective_m": 0.0,
+                "height_extra_clip_reason": "leaning_blade"}
 
     def _raised_blade(self, manip: Stance, face_point: th.Tensor, face_z: Tuple[float, float], d: th.Tensor, outward: th.Tensor, clearance: float, z_tip: float):
         """The vertical (0 deg) blade with its fingertips at ``z_tip`` = face top − PALM_FROM_TIP: the palm stands above
