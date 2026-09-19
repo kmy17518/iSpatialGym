@@ -1319,7 +1319,30 @@ class IORSSmall(SamplerV2):
                 "right_cells": int(len(right_cells)), "left_cells": int(len(left_cells)),
                 **({} if ok else {"why": f"work {'in' if in_band(w_b, right_cells) else 'OFF'} right band / brace {'in' if in_band(b_b, left_cells) else 'OFF'} left band at {st.name}"})}
 
-    def push_stance_for(self, manip: Stance, t_place_pose: G.Pose) -> Optional[Stance]:
+    def push_chain_feasible(self, st: Stance, t_place_pose: G.Pose, p_pose: G.Pose) -> Optional[str]:
+        """The first push class whose [pre, init, goal] chain and retreat clear pose pass the exact IK from ``st`` with the box
+        posed at the place (the checks ``touching_contacts`` repeats when recording); None when no class passes."""
+        tangent = st.tangent
+        direction = th.tensor([float(tangent[0]), float(tangent[1]), 0.0])
+        p_init, _ = self.touching_points(t_place_pose, p_pose, st)
+        t_hull_w = self.world.hull_at(self.hull["target"], t_place_pose)
+        t_face_z = (float(t_hull_w[:, 2].min()), float(t_hull_w[:, 2].max()))
+        p_hull = self.world.hull_at(self.hull["partner"], p_pose)
+        gap = float((p_hull[:, :2] @ tangent).min() - (t_hull_w[:, :2] @ tangent).max())
+        dist = self.push_distance(gap)
+        ignore_push = self.support_objects() + [self.obj("target")]
+        with self.posed("target", t_place_pose):
+            for push_kind, push_init, _extras in self.touching_push_candidates(st, p_init, t_face_z, direction):
+                push_goal = (push_init[0] + direction * dist, push_init[1])
+                r = self.ikc.exact([IK.pre_pose(push_init), push_init, push_goal], st, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
+                if not r.ok:
+                    continue
+                r2 = self.ikc.exact([IK.pre_pose(push_goal)], st, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
+                if r2.ok:
+                    return push_kind
+        return None
+
+    def push_stance_for(self, manip: Stance, t_place_pose: G.Pose, lateral: Optional[float] = None) -> Optional[Stance]:
         """Touching (owner 2026-09-18 16:32): the second base pose ``push`` = the manipulation stance moved along the edge, same
         trunk, so that the push contact (the placed box's right face) lies at ``push_contact_lateral_m`` from the robot's centre
         line (default -0.12: every push that worked had it 7-18 cm right of centre; at -0.05 the right arm crosses the body
@@ -1332,7 +1355,8 @@ class IORSSmall(SamplerV2):
         t_hull = self.world.hull_at(self.hull["target"], t_place_pose)
         right_face_xy = t_hull[int(th.argmin(t_hull[:, :2] @ tangent)), :2]
         _, lat_work = manip.local(right_face_xy)
-        dlat = float(lat_work - float(self.gen("push_contact_lateral_m", -0.12)))
+        want = float(self.gen("push_contact_lateral_m", -0.12)) if lateral is None else float(lateral)
+        dlat = float(lat_work - want)
         if abs(dlat) < float(self.gen("push_stance_min_shift_m", 0.02)):
             return None
         target_xy = G.t(manip.base_xy) + G.t(tangent) * dlat
@@ -1354,11 +1378,26 @@ class IORSSmall(SamplerV2):
             place_pos = th.tensor(draft.pose_targets[tname]["position"])
         goal_quat = G.t(draft.goal_poses[tname][1])
         t_place_pose = (G.t(place_pos), goal_quat)
-        st = self.push_stance_for(manip, t_place_pose)
-        if st is None:
-            return None
         p_now = self.obj("partner").get_position_orientation()
         p_pose = (p_now[0].clone().float(), p_now[1].clone().float())
+        # the contact lateral is searched (default -0.12 first, then further right / nearer): the first stance from which a push
+        # class passes the chain + retreat clear pose (0918-174815: at -0.12 alone joint 4 / the clear pose failed 9/16 attempts)
+        laterals = [float(v) for v in (self.gen("push_contact_laterals_m", None) or [self.gen("push_contact_lateral_m", -0.12), -0.16, -0.20, -0.08])]
+        st, tried, manip_ok = None, [], False
+        for lat in laterals:
+            cand = self.push_stance_for(manip, t_place_pose, lateral=lat)  # None = the manipulation stance already puts the contact there
+            kind = self.push_chain_feasible(cand if cand is not None else manip, t_place_pose, p_pose)
+            tried.append(f"{lat:+.2f}{' (manipulation)' if cand is None else ''}: {kind or 'no class'}")
+            if kind is not None:
+                if cand is None:
+                    manip_ok = True
+                st = cand
+                break
+        draft.summary.setdefault("touching", {})["push_stance_search"] = tried
+        if st is None:
+            if manip_ok:
+                return None  # the manipulation stance itself passes: no second base pose
+            raise Reject("contact_unreachable", f"touching push: no push class passes from any push stance lateral ({'; '.join(tried)})")
         try:
             TT.whole_body_check_at(self, [st], {tname: t_place_pose, pname: p_pose}, require=True, reason="stance_collision")
         finally:
@@ -1443,6 +1482,12 @@ class IORSSmall(SamplerV2):
                 r_push = self.ikc.exact([push_pre, push_init, push_goal], manip, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
                 if not r_push.ok:
                     why.append(f"{push_kind}: right: {r_push.reason}")
+                    continue
+                # the oracle's retreat after the push ends 10 cm back along the approach axis from the push GOAL (above it for a
+                # blade): a class whose clear pose has no configuration dies in the program check (9/16 of 0918-173814)
+                r_ret = self.ikc.exact([IK.pre_pose(push_goal)], manip, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
+                if not r_ret.ok:
+                    why.append(f"{push_kind}: retreat clear pose: {r_ret.reason}")
                     continue
                 push_chosen = (push_kind, push_pre, push_init, push_goal, push_extras)
                 # (2) a brace when the joint band gate admitted the position: the first two-arm candidate that passes
