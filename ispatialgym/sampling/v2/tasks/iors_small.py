@@ -1409,7 +1409,8 @@ class IORSSmall(SamplerV2):
                         break
                     if self.hand_overlap(b_contact, "partner", p_pose) is not None:
                         continue
-                    res = self.ikc.exact_both_arms(("right", [pre, push_init, push_goal]), ("left", [b_pre, b_contact]), st, ignore_push, ignore_brace, fingers=IK.FINGER_CLOSED)
+                    with self.posed("target", (G.t(t_place_pose[0]) + direction * dist, G.t(t_place_pose[1]))):  # the box where the push leaves it
+                        res = self.ikc.exact_both_arms(("right", [pre, push_init, push_goal]), ("left", [b_pre, b_contact]), st, ignore_push, ignore_brace, fingers=IK.FINGER_CLOSED)
                     if res.ok:
                         return f"{push_kind}+{b_kind}"
                 return None  # the push class passes but no brace joins it from this stance
@@ -1602,8 +1603,13 @@ class IORSSmall(SamplerV2):
                         if overlap is not None:
                             why.append(f"{push_kind}/{kind}: {overlap}")
                             continue
-                        res = self.ikc.exact_both_arms(("right", [push_pre, push_init, push_goal]), ("left", [pre, contact]), manip,
-                                                       ignore_push, ignore_brace, fingers=IK.FINGER_CLOSED)
+                        # owner 2026-09-18 22:29: the two-arm solve locks the right arm at its push GOAL - with the box still at the
+                        # place in the collision world the right fingertips sit ~5 cm inside it and every whole-body configuration
+                        # is 'in collision' whatever the left arm does (every brace class failed at its first pose while passing
+                        # alone, 0918-211933 .. 220534); the box is posed where the push leaves it
+                        with self.posed("target", (G.t(t_pose[0]) + direction * dist, G.t(t_pose[1]))):
+                            res = self.ikc.exact_both_arms(("right", [push_pre, push_init, push_goal]), ("left", [pre, contact]), manip,
+                                                           ignore_push, ignore_brace, fingers=IK.FINGER_CLOSED)
                         if res.ok:
                             brace_chosen = (pre, contact, kind, extras)
                             break
