@@ -24226,7 +24226,10 @@
    "symmetry_match_fraction": 0.9,
    "grasp_metalink_clearance_m": 0.01,
    "phase2_class1_when_deep_m": 0.65,
-   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 (attachment lid / teapot): brace_search false = the one-arm sequence 'pick up the lid with the right arm -> move to the place stance -> place the lid on the teapot opening' (no partner brace, no two-arm search; a recorded place stance only when the grasp stance does not reach the attach pose); witness_residual_pre_m 15 mm = the 0917-010834 program-check failures were pre_grasp witnesses 12-17 mm short at joint 2's limit, which the oracle's approach finish closes (as the touching aliases)"
   },
   "constraints": []
  },
@@ -24317,7 +24320,10 @@
    "symmetry_match_fraction": 0.9,
    "grasp_metalink_clearance_m": 0.01,
    "phase2_class1_when_deep_m": 0.65,
-   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 (attachment lid / teapot): brace_search false = the one-arm sequence 'pick up the lid with the right arm -> move to the place stance -> place the lid on the teapot opening' (no partner brace, no two-arm search; a recorded place stance only when the grasp stance does not reach the attach pose); witness_residual_pre_m 15 mm = the 0917-010834 program-check failures were pre_grasp witnesses 12-17 mm short at joint 2's limit, which the oracle's approach finish closes (as the touching aliases)"
   },
   "constraints": []
  },
@@ -24408,7 +24414,10 @@
    "symmetry_match_fraction": 0.9,
    "grasp_metalink_clearance_m": 0.01,
    "phase2_class1_when_deep_m": 0.65,
-   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward"
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 (attachment lid / teapot): brace_search false = the one-arm sequence 'pick up the lid with the right arm -> move to the place stance -> place the lid on the teapot opening' (no partner brace, no two-arm search; a recorded place stance only when the grasp stance does not reach the attach pose); witness_residual_pre_m 15 mm = the 0917-010834 program-check failures were pre_grasp witnesses 12-17 mm short at joint 2's limit, which the oracle's approach finish closes (as the touching aliases)"
   },
   "constraints": []
  },

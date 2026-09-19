@@ -360,16 +360,25 @@ class Attachment(SamplerV2):
         # step 2 (+ §6.8 owner 2026-09-16 17:10): the partner on an attach-reach cell with the attach pose and the left brace
         # reachable — from the grasp stance first; else from a recorded SECOND BASE POSE (lateral trunk move + torso adjust,
         # both arms verified there, the male carried: paths[] / transitions[] manipulation -> attach with the male held);
-        # only when the joint placement has no cell anywhere is the brace optional (summary.brace = none)
-        att = self._attach_and_brace(rng, manip, manip, m_pose, grasp, cam_init, require_joint=True)
-        work_st, brace_state = manip, "present"
-        if att is None:
-            att, work_st = self._second_base_pose(rng, manip, m_pose, grasp, cam_init, tname)
+        # only when the joint placement has no cell anywhere is the brace optional (summary.brace = none).
+        # ``generation.brace_search`` false (owner 2026-09-19, lid / teapot: "pick up the lid with the right arm -> move to the
+        # place stance -> place the lid on the teapot opening"): no brace at all — the one-arm attach from the grasp stance,
+        # else from a recorded place stance (the same second-base-pose mechanism, the left arm idle); the two-arm search that
+        # burnt the 360 s attempt budget on every candidate (0916-205838 .. 0917-010834) is skipped
+        brace_search = bool(self.gen("brace_search", True))
+        att, work_st, brace_state = None, manip, "present"
+        if brace_search:
+            att = self._attach_and_brace(rng, manip, manip, m_pose, grasp, cam_init, require_joint=True)
+            if att is None:
+                att, work_st = self._second_base_pose(rng, manip, m_pose, grasp, cam_init, tname)
         if att is None:
             self._check_deadline()
-            log.info("%s: BRACE_FALLBACK no joint placement from the grasp stance or a second base pose: %s", self.gp.alias, json.dumps(self._att_fails, default=str))
-            att = self._attach_and_brace(rng, manip, manip, m_pose, grasp, cam_init, require_joint=False)
+            if brace_search:
+                log.info("%s: BRACE_FALLBACK no joint placement from the grasp stance or a second base pose: %s", self.gp.alias, json.dumps(self._att_fails, default=str))
+            att = self._attach_and_brace(rng, manip, manip, m_pose, grasp, cam_init, require_joint=False, brace=brace_search)
             work_st, brace_state = manip, "none"
+            if att is None and not brace_search:
+                att, work_st = self._second_base_pose(rng, manip, m_pose, grasp, cam_init, tname, require_joint=False, brace=False)
             if att is None:
                 raise Reject("partner_placement", f"no partner cell with a reachable attach pose from the grasp stance or a second base pose ({self._att_fails})")
             if att.get("brace") is not None:
@@ -455,16 +464,17 @@ class Attachment(SamplerV2):
 
     # ------------------------------------------------------------------ §6.8 attach + brace from a stance, second base pose
 
-    def _attach_and_brace(self, rng, manip: Stance, st: Stance, m_pose: TT.Pose, grasp, cam_init, require_joint: bool) -> Optional[Dict[str, Any]]:
+    def _attach_and_brace(self, rng, manip: Stance, st: Stance, m_pose: TT.Pose, grasp, cam_init, require_joint: bool, brace: bool = True) -> Optional[Dict[str, Any]]:
         """Partner placement + attach pose + SLERP reorientation + left brace, all from stance ``st`` (the grasp stance
         ``manip`` or a second base pose; the male grasped at ``manip``). ``require_joint``: the partner cell must satisfy
         the A1 joint placement (brace point in the left contact band at ``st``'s trunk) and the brace two-arm IK must pass;
-        with it False the brace is optional (recorded when it passes). Returns the attach facts or None (reasons in
-        ``self._att_fails[st.name]``)."""
+        with it False the brace is optional (recorded when it passes); ``brace`` False = no brace is even tried (the one-arm
+        attach of ``generation.brace_search`` false). Returns the attach facts or None (reasons in ``self._att_fails[st.name]``)."""
         male, female, support = self.obj(self.t_role), self.obj(self.p_role), self.obj("support")
         fails = {"distance": 0, "support": 0, "gap": 0, "frame": 0, "brace_off_band": 0, "brace_class_failed": 0, "screen": 0, "ik": 0, "slerp": 0, "brace_ik": 0}
         self._att_fails = getattr(self, "_att_fails", {})
-        self._att_fails[f"{st.name}@lat{st.lateral:+.2f}/trunk({st.translate:.2f},{st.tilt:+.2f}){'' if require_joint else '/brace-optional'}"] = fails
+        tag = "" if require_joint else ("/brace-optional" if brace else "/no-brace")
+        self._att_fails[f"{st.name}@lat{st.lateral:+.2f}/trunk({st.translate:.2f},{st.tilt:+.2f}){tag}"] = fails
         cells = TT.band_cells_world(self.attach_bands, st)
         if len(cells) == 0:
             fails["no_cells"] = 1
@@ -544,35 +554,37 @@ class Attachment(SamplerV2):
                                  "; ".join(f"wp{i}: z_top+{float(pz[0][2]) - float(self.top.z):.2f} m, base {[round(float(v), 2) for v in st.world_to_base(pz[0][:2]).tolist()]}, "
                                            f"approach z {float(C.approach_axis(pz[1])[2]):+.2f}" for i, pz in enumerate(seq)))
                         continue
-                    brace = None
-                    if joint_ok:
+                    brace_rec = None
+                    if joint_ok and brace:
                         for pre_c, c_pose, kind in self._brace_candidates(st, point, b_dir, brace_classes):
                             self._check_deadline()
                             res_b = TT.brace_second_arm(self, st, "right", [eef_pre, eef_attach], "left", [pre_c, c_pose], ignore_work_last=[support, female],
                                                         ignore_brace_last=[support, female])
                             if res_b.ok:
-                                brace = (pre_c, c_pose, kind)
+                                brace_rec = (pre_c, c_pose, kind)
                                 break
-                    if joint_ok and brace is None:
+                    if joint_ok and brace and brace_rec is None:
                         fails["brace_ik"] += 1
                         if require_joint:
                             continue
-            return {"f_pose": pose, "attach": eef_attach, "pre_attach": eef_pre, "wps": wps, "carry": carry, "lift": lift, "brace": brace, "b_dir": b_dir,
+            return {"f_pose": pose, "attach": eef_attach, "pre_attach": eef_pre, "wps": wps, "carry": carry, "lift": lift, "brace": brace_rec, "b_dir": b_dir,
                     "point": point}
         return None
 
-    def _second_base_pose(self, rng, manip: Stance, m_pose: TT.Pose, grasp, cam_init, tname: str):
+    def _second_base_pose(self, rng, manip: Stance, m_pose: TT.Pose, grasp, cam_init, tname: str, require_joint: bool = True, brace: bool = True):
         """§6.8 (owner 2026-09-16 17:10): when the attach pose and the left brace are not both reachable from the grasp
         stance, a second base pose — the grasp stance shifted along the edge by ``SECOND_BASE_LATERALS`` with the trunk kept
         or moved to an arm-friendly grid trunk — from which the attach / brace facts are re-derived with the male carried
-        (both arms' exact IK there); on free floor and whole-body collision-free. Returns ``(facts, stance)`` or
-        ``(None, manip)``."""
+        (both arms' exact IK there); on free floor and whole-body collision-free. With ``brace`` False it is the one-arm
+        PLACE STANCE of ``generation.brace_search`` false (the attach pose alone must be reachable). Returns ``(facts,
+        stance)`` or ``(None, manip)``."""
         male = self.obj(self.t_role)
         tried, skipped = 0, {"no_floor": 0, "stance_collision": 0}
+        what = "attach + brace" if brace else "the one-arm attach"
         for dlat in SECOND_BASE_LATERALS:
             for trunk in ((manip.translate, manip.tilt), (0.5, 0.0), (0.25, -0.3)):
                 if tried >= SECOND_BASE_MAX_TRIES:
-                    log.info("%s: second base pose: none of %d stances reaches attach + brace (%s)", self.gp.alias, tried, skipped)
+                    log.info("%s: second base pose: none of %d stances reaches %s (%s)", self.gp.alias, tried, what, skipped)
                     return None, manip
                 self._check_deadline()
                 st = manip.shifted(lateral=manip.lateral + dlat, name="attach").with_trunk(trunk[0], trunk[1], "attach")
@@ -588,11 +600,11 @@ class Attachment(SamplerV2):
                     skipped["stance_collision"] += 1
                     continue
                 tried += 1
-                att = self._attach_and_brace(rng, manip, st, m_pose, grasp, cam_init, require_joint=True)
+                att = self._attach_and_brace(rng, manip, st, m_pose, grasp, cam_init, require_joint=require_joint, brace=brace)
                 if att is not None:
-                    log.info("%s: second base pose: lateral %+.2f, trunk (%.2f, %+.2f) reaches the attach pose and the brace", self.gp.alias, dlat, trunk[0], trunk[1])
+                    log.info("%s: second base pose: lateral %+.2f, trunk (%.2f, %+.2f) reaches %s", self.gp.alias, dlat, trunk[0], trunk[1], what)
                     return att, st
-        log.info("%s: second base pose: none of %d stances reaches attach + brace (%s)", self.gp.alias, tried, skipped)
+        log.info("%s: second base pose: none of %d stances reaches %s (%s)", self.gp.alias, tried, what, skipped)
         return None, manip
 
     def _partner_brace_point(self, f_pose: TT.Pose, manip: Stance) -> Tuple[th.Tensor, th.Tensor]:

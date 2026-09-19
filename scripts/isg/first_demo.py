@@ -168,7 +168,10 @@ def cmd_run(args):
     commit, dirty = git("rev-parse", "HEAD"), bool(git("status", "--porcelain", "--", "ispatialgym", "scripts"))
     t0 = time.time()
     scene = f" --scene {args.scene}" if args.scene else ""
-    cmd = (f"python -m ispatialgym.sampling.sample_isg --alias {args.alias}{scene} --templates 1 --instances-per-template 1 --max-attempts {args.max_attempts} "
+    # --customs: an experiment's copy of the customs (repo-relative, under runlogs/smoke_inputs/ so remote_run syncs it); the
+    # template keeps its own copy, so run_isg reads the same list
+    customs_opt = f" --customs {os.path.relpath(os.path.abspath(args.customs), REPO)}" if getattr(args, "customs", None) else ""
+    cmd = (f"python -m ispatialgym.sampling.sample_isg --alias {args.alias}{scene}{customs_opt} --templates 1 --instances-per-template 1 --max-attempts {args.max_attempts} "
            f"--seed {args.seed} --no-write-back --out $SMOKE_OUT/inst --log-level INFO; echo SAMPLE_EXIT $?; "
            f"tro=$(ls $SMOKE_OUT/inst/*/*/instances/*-tro_state.json 2>/dev/null | head -1); "
            f"if [ -n \"$tro\" ]; then echo TRO=$tro; python -m ispatialgym.oracle.run_isg --instance \"$tro\" --mode oracle --out $SMOKE_OUT/demo --video --video-size 540; echo DEMO_EXIT $?; fi")
@@ -379,6 +382,7 @@ def main():
     s.add_argument("--seed", type=int, default=0)
     s.add_argument("--timeout", type=int, default=5400)
     s.add_argument("--note", default="")
+    s.add_argument("--customs", default=None, help="experiment copy of the customs for sample_isg (repo-relative, under runlogs/smoke_inputs/)")
     s.set_defaults(fn=cmd_run)
     s = sub.add_parser("demo-only")
     s.add_argument("--tro", required=True)

@@ -87,6 +87,8 @@ class PrivilegedState(Protocol):
     def camera_pose(self) -> Tuple[th.Tensor, th.Tensor]: ...
     def trunk(self) -> Tuple[float, float]: ...
     def attached(self, child: str, parent: str) -> bool: ...
+    def attachment_offset(self, child: str, parent: str) -> Optional[Dict[str, Any]]: ...  # live meta-link offset + correcting transform
+    def attach(self, child: str, parent: str) -> bool: ...  # AttachedTo.set_value(True) at the current poses
 
 
 @dataclass
@@ -176,6 +178,13 @@ class ExecuteConfig:
     place_base_nudge_min_m: float = 0.005
     place_base_nudge_max_m: float = 0.04
     place_base_nudge_tol_m: float = 0.004
+    #: (2026-09-19, attachment) at an attach place the male / female meta-link offset is read from the live world; above these
+    #: the hand is corrected by the male -> female transform (a short Cartesian leg, at most ``attach_correct_max_m``) before
+    #: the assisted grasp is dropped and ``AttachedTo.set_value(True)`` snaps the residual and creates the fixed joint
+    attach_correct_min_m: float = 0.003
+    attach_correct_min_rad: float = 0.03
+    attach_correct_max_m: float = 0.06
+    attach_settle_steps: int = 20
     #: approach / descent finish (owner rule 2026-09-16): when the straight differential-IK segment stalls with a
     #: residual below ``approach_finish_max_stall`` (m) and no more than ``approach_finish_max_remaining`` (m) of the
     #: segment left, the converged prefix is executed and the last part is planned by ``arm_to`` to the end pose — to
@@ -802,6 +811,8 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
             yield from motions.settle(max_steps=cfg.place_settle_steps // 2)
             after = as_world_pose(targets["place"])[0].float() - as_world_pose(state.eef_pose(arm))[0].float()
             ctx["place_base_nudge"] = {"short_m": [round(float(v), 4) for v in short.tolist()], "after_m": round(float(th.linalg.norm(after[:2])), 4)}
+    if action.kind == "attach" and action.on:
+        yield from _attach_at_place(action, motions, state, ctx)
     # open at the recorded place pose: a drop releases right there (above the rim, no contact with the container), a
     # support place sets the object down
     yield from motions.gripper(arm, close=False)
@@ -823,6 +834,55 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
         yield from motions.hold(cfg.drop_settle_steps)  # the object falls and comes to rest in the container
     else:
         yield from motions.settle(max_steps=cfg.place_settle_steps)
+
+
+def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th.Tensor]:
+    """The BEHAVIOR attachment at the place pose (2026-09-19; attachment lid / teapot 0916-205838: the hand reached the
+    recorded attach pose within a millimetre, opened, and the lid fell through the collision-filtered teapot onto the
+    table — nothing on the demo side ever created the attachment, and OmniGibson's contact-triggered auto-attach cannot
+    fire between the filtered members).
+
+    The male / female meta-link offset is read from the live world (the recorded pose does not know the in-hand slip of
+    the closure or the descent's shortfall). Above ``attach_correct_min_*`` the hand is moved by the male -> female
+    transform — the part is rigid in the hand, so ``T_eef' = T_female @ inv(T_male) @ T_eef`` — as a short Cartesian leg
+    (closed-loop correction on the object, not a fallback). Then the assisted grasp is dropped and, in the same step,
+    ``AttachedTo.set_value(True)`` snaps the millimetre residual and creates the fixed joint, so the part never
+    free-falls; the fingers open afterwards. A residual beyond OmniGibson's 5 cm / 15 deg does not attach and the
+    postcondition fails as before (``ctx["attach"]`` records the offsets for the audit)."""
+    cfg = _cfg(ctx)
+    arm = action.arm
+    getter = getattr(state, "attachment_offset", None)
+    off = getter(action.object, action.on) if getter is not None else None
+    rec: Dict[str, Any] = {"offset_before": None if off is None else {k: v for k, v in off.items() if k != "fix"}}
+    ctx["attach"] = rec
+    if off is None:
+        log.warning("place(%s): no attachment meta-link pair with %s; releasing without an explicit attach", action.object, action.on)
+        return
+    log.info("place(%s): attach offset %.1f mm / %.1f deg (male %s -> female %s of %s)", action.object, off["pos_m"] * 1000, math.degrees(off["rot_rad"]),
+             off["male_link"], off["female_link"], action.on)
+    if (off["pos_m"] > cfg.attach_correct_min_m or off["rot_rad"] > cfg.attach_correct_min_rad) and off["pos_m"] <= cfg.attach_correct_max_m:
+        p, q = state.eef_pose(arm)
+        target = C.compose(off["fix"], (p.float(), q.float()))
+        try:
+            yield from motions.arm_along(arm, [target], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+            yield from motions.settle(max_steps=cfg.attach_settle_steps)
+        except SkillError as e:
+            log.warning("place(%s): the attach correction leg did not complete (%s); attaching from where the hand is", action.object, e.message)
+            rec["correction_error"] = e.message
+        off2 = getter(action.object, action.on)
+        rec["offset_after_correction"] = None if off2 is None else {k: v for k, v in off2.items() if k != "fix"}
+        if off2 is not None:
+            log.info("place(%s): after the correction %.1f mm / %.1f deg", action.object, off2["pos_m"] * 1000, math.degrees(off2["rot_rad"]))
+    # drop the assisted grasp and attach in one step (no physics in between): the snap acts on a free part
+    if state.held_object(arm) is not None:
+        state.robot.release_grasp_immediately(arm)
+    motions.backend.detach_object(arm)
+    ok = bool(state.attach(action.object, action.on))
+    rec["attached"] = ok
+    if ok:
+        log.info("place(%s): attached to %s (fixed attachment joint)", action.object, action.on)
+    else:
+        log.warning("place(%s): AttachedTo.set_value(True) refused at the place pose (meta links beyond 5 cm / 15 deg?)", action.object)
 
 
 def post_place(action: Place, state, targets, ctx) -> Optional[str]:

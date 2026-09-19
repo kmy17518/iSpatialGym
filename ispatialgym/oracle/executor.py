@@ -307,7 +307,7 @@ TASK_TRACKING_ATTRS = ("_first_success_step", "_first_settled_success_step", "_e
 
 #: ctx keys the execute functions write for the record (meta.json ``actions[].notes``)
 NOTE_KEYS = ("push_residual", "push_pivot_offset_m", "push_object_drift_m", "approach_finish", "descent_finish", "lift_finish", "retreat_finish", "pre_pose_standoff", "plan_relaxed_links", "push_axis", "carry_leg", "idle_arms_moved", "arms_posture", "fingers_set", "plan_ignored", "object_motion",
-             "camera_error_before_correction", "camera_error", "attached", "preshape_opening_m", "closure_rate_m_per_step", "release_stage_m")
+             "camera_error_before_correction", "camera_error", "attached", "preshape_opening_m", "closure_rate_m_per_step", "release_stage_m", "attach")
 
 
 def _jsonable(x):
@@ -503,6 +503,56 @@ class SimState:
         if AttachedTo not in c.states:
             return False
         return bool(c.states[AttachedTo].get_value(p))
+
+    def attachment_links(self, child: str, parent: str):
+        """``(male link of child, female link of parent)`` OmniGibson would join — the first candidate pair whose female
+        link is free, in ``AttachedTo._find_attachment_links``'s own order; ``None`` when the pair has no matching
+        attachment meta links."""
+        from omnigibson.object_states import AttachedTo
+
+        c, p = self.object(child), self.object(parent)
+        if AttachedTo not in c.states or AttachedTo not in p.states:
+            return None
+        cands = c.states[AttachedTo]._get_parent_candidates(p) or {}
+        for child_name, parent_names in cands.items():
+            for parent_name in sorted(parent_names):
+                if p.states[AttachedTo].children.get(parent_name) is None:
+                    return c.states[AttachedTo].links[child_name], p.states[AttachedTo].links[parent_name]
+        return None
+
+    def attachment_offset(self, child: str, parent: str) -> Optional[Dict[str, Any]]:
+        """Live male-vs-female meta-link offset of the attachment pair: ``pos_m`` / ``rot_rad`` (what OmniGibson's 5 cm /
+        15 deg snap test reads) and ``fix`` = the world transform ``T_female @ inv(T_male)`` that would carry the male
+        frame onto the female one (applied to the hand pose it is the closed-loop correction of the place)."""
+        pair = self.attachment_links(child, parent)
+        if pair is None:
+            return None
+        male, female = pair
+        mp, mq = (x.float().clone() for x in male.get_position_orientation())
+        fp, fq = (x.float().clone() for x in female.get_position_orientation())
+        fix = C.compose((fp, fq), C.invert((mp, mq)))
+        return {
+            "pos_m": float(th.linalg.norm(fp - mp)),
+            "rot_rad": C.quat_angle(mq, fq),
+            "delta_pos": [round(float(v), 4) for v in (fp - mp).tolist()],
+            "male_link": male.body_name,
+            "female_link": female.body_name,
+            "fix": fix,
+        }
+
+    def attach(self, child: str, parent: str) -> bool:
+        """The BEHAVIOR attachment of ``child`` to ``parent`` at their current poses — ``AttachedTo.set_value(True)``, the
+        same call the sampler's goal check makes: when the meta links lie within OmniGibson's 5 cm / 15 deg the child is
+        snapped onto the female frame and the fixed attachment joint is created; otherwise nothing changes and False is
+        returned."""
+        from omnigibson.object_states import AttachedTo
+
+        c, p = self.object(child), self.object(parent)
+        if AttachedTo not in c.states:
+            return False
+        if c.states[AttachedTo].get_value(p):
+            return True
+        return bool(c.states[AttachedTo].set_value(p, True))
 
     def q28(self) -> th.Tensor:
         return self.robot.get_joint_positions().clone().float()
