@@ -536,7 +536,7 @@ class IORSSmall(SamplerV2):
                     place_guess = IK.grasp_pose(obj_at_place, grasp.eef_in_object)
                     ign_place = self.support_objects() + ([self.obj("partner")] if self.relation != "inside" else [])
                     # touching (owner 2026-09-18 16:32): the place is made from the second base pose the box is carried to
-                    st_place = (self.push_stance_for(manip, G.t(t_pose[0]), G.t(obj_at_place[0])) if self.relation == "touching" else None) or manip
+                    st_place = (self.push_stance_for(manip, obj_at_place) if self.relation == "touching" else None) or manip
                     with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
                         res_place = self.ikc.exact([IK.pre_pose(place_guess), place_guess], st_place, grasp.arm, ignore_for_last=ign_place,
                                                    scale_key=self.choice.models["target"].scale, cache=False, approached=ign_place)
@@ -1319,26 +1319,29 @@ class IORSSmall(SamplerV2):
                 "right_cells": int(len(right_cells)), "left_cells": int(len(left_cells)),
                 **({} if ok else {"why": f"work {'in' if in_band(w_b, right_cells) else 'OFF'} right band / brace {'in' if in_band(b_b, left_cells) else 'OFF'} left band at {st.name}"})}
 
-    def push_stance_for(self, manip: Stance, init_pos: th.Tensor, place_pos: th.Tensor) -> Optional[Stance]:
-        """Touching (owner 2026-09-18 16:32): the second base pose ``push`` = the manipulation stance moved along the edge by
-        (place lateral - init lateral), same trunk, so the box - carried there in hand - is set down and pushed where it was
-        grasped relative to the robot (the nextto position lies to the robot's left of the grasp, past the right arm's
-        band). Pure geometry (nothing recorded); None when the shift is below ``push_stance_min_shift_m`` or the feature is
-        off (``generation.push_stance``)."""
+    def push_stance_for(self, manip: Stance, t_place_pose: G.Pose) -> Optional[Stance]:
+        """Touching (owner 2026-09-18 16:32): the second base pose ``push`` = the manipulation stance moved along the edge, same
+        trunk, so that the push contact (the placed box's right face) lies at ``push_contact_lateral_m`` from the robot's centre
+        line (default -0.12: every push that worked had it 7-18 cm right of centre; at -0.05 the right arm crosses the body
+        and joints 2 / 3 sit on their limits, 0918-173814). The box is carried there in hand and set down from there.
+        Pure geometry (nothing recorded); None when the shift is below ``push_stance_min_shift_m`` or the feature is off
+        (``generation.push_stance``)."""
         if self.relation != "touching" or not bool(self.gen("push_stance", True)):
             return None
-        _, lat_place = manip.local(G.t(place_pos)[:2])
-        _, lat_init = manip.local(G.t(init_pos)[:2])
-        dlat = float(lat_place - lat_init)
+        tangent = manip.tangent
+        t_hull = self.world.hull_at(self.hull["target"], t_place_pose)
+        right_face_xy = t_hull[int(th.argmin(t_hull[:, :2] @ tangent)), :2]
+        _, lat_work = manip.local(right_face_xy)
+        dlat = float(lat_work - float(self.gen("push_contact_lateral_m", -0.12)))
         if abs(dlat) < float(self.gen("push_stance_min_shift_m", 0.02)):
             return None
-        target_xy = G.t(manip.base_xy) + G.t(manip.tangent) * dlat
+        target_xy = G.t(manip.base_xy) + G.t(tangent) * dlat
         cands = [manip.shifted(lateral=manip.lateral + s * dlat, name="push") for s in (1.0, -1.0)]  # the edge frame's lateral sign
         st = min(cands, key=lambda c: float(th.linalg.norm(G.t(c.base_xy) - target_xy)))
         st = st.with_trunk(manip.translate, manip.tilt, "push")
-        st.focus, st.arms = G.t(place_pos).clone(), ["right"]
-        st.extras.update({"second_base_pose": True, "lateral_shift_m": round(dlat, 4),
-                          "rule": "place and push where the grasp was: base moved along the edge by (place lateral - init lateral), box in hand"})
+        st.focus, st.arms = G.t(t_place_pose[0]).clone(), ["right"]
+        st.extras.update({"second_base_pose": True, "lateral_shift_m": round(dlat, 4), "push_contact_lateral_m": round(float(lat_work - dlat), 4),
+                          "rule": "base moved along the edge (box in hand) so the push contact lies at push_contact_lateral_m from the centre line"})
         return st
 
     def push_stance(self, draft: Draft, manip: Stance, grasp: GraspRecord) -> Optional[Stance]:
@@ -1349,13 +1352,13 @@ class IORSSmall(SamplerV2):
         place_pos = getattr(self, "_touching_place_pos", None)
         if place_pos is None:
             place_pos = th.tensor(draft.pose_targets[tname]["position"])
-        st = self.push_stance_for(manip, G.t(draft.object_poses[tname][0]), G.t(place_pos))
+        goal_quat = G.t(draft.goal_poses[tname][1])
+        t_place_pose = (G.t(place_pos), goal_quat)
+        st = self.push_stance_for(manip, t_place_pose)
         if st is None:
             return None
-        goal_quat = G.t(draft.goal_poses[tname][1])
         p_now = self.obj("partner").get_position_orientation()
         p_pose = (p_now[0].clone().float(), p_now[1].clone().float())
-        t_place_pose = (G.t(place_pos), goal_quat)
         try:
             TT.whole_body_check_at(self, [st], {tname: t_place_pose, pname: p_pose}, require=True, reason="stance_collision")
         finally:
