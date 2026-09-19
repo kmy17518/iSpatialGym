@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import math
+from contextlib import contextmanager
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -1289,6 +1290,21 @@ class IORSSmall(SamplerV2):
                     draft.summary["brace"] = {"present": False, "why": "brace poses outside the manipulation image (5 %)", "gate": (self._brace_gate or {})}
             self.require_in_frame(cam, poses)
 
+    @contextmanager
+    def posed(self, role: str, pose: G.Pose):
+        """The role's object teleported to ``pose`` (collision world synced) for the block, then put back exactly where it was."""
+        obj = self.obj(role)
+        prev = obj.get_position_orientation()
+        obj.set_position_orientation(G.t(pose[0]), G.t(pose[1]))
+        obj.keep_still()
+        self.kit.sync_world()
+        try:
+            yield
+        finally:
+            obj.set_position_orientation(prev[0], prev[1])
+            obj.keep_still()
+            self.kit.sync_world()
+
     def brace_gate_at(self, st: Stance, t_place_pose: G.Pose, p_pose: G.Pose) -> Dict[str, Any]:
         """A1 joint band gate at stance ``st``: the push work point (target's right face at the place) in the right band and the
         brace point (partner's far face) in the left contact band of the same trunk (``brace_placement_admissible``)."""
@@ -1413,27 +1429,31 @@ class IORSSmall(SamplerV2):
         ignore_brace = self.support_objects() + [self.obj("partner")]
         push_chosen = None  # (kind, pre, init, goal, extras, q of the right arm)
         brace_chosen = None  # (pre, contact, kind, extras)
-        for push_kind, push_init, push_extras in self.touching_push_candidates(manip, p_init, t_face_z, direction):
-            push_goal = (push_init[0] + direction * dist, push_init[1])
-            push_pre = IK.pre_pose(push_init)
-            # (1) the push chain on its own - the requirement (brace optional, owner 2026-09-16 17:10: the axial rule)
-            r_push = self.ikc.exact([push_pre, push_init, push_goal], manip, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
-            if not r_push.ok:
-                why.append(f"{push_kind}: right: {r_push.reason}")
-                continue
-            push_chosen = (push_kind, push_pre, push_init, push_goal, push_extras)
-            # (2) a brace when the joint band gate admitted the position: the first two-arm candidate that passes
-            if try_brace:
-                for pre, contact, kind, extras in self.touching_brace_candidates(manip, b_point, face_z, -direction):
-                    res = self.ikc.exact_both_arms(("right", [push_pre, push_init, push_goal]), ("left", [pre, contact]), manip,
-                                                   ignore_push, ignore_brace, fingers=IK.FINGER_CLOSED)
-                    if res.ok:
-                        brace_chosen = (pre, contact, kind, extras)
-                        break
-                    why.append(f"{push_kind}/{kind}: {res.reason}")
-            break
+        # the collision world holds the target at its INIT pose, but the push happens after the place: the box is posed at the
+        # place for the chain's checks (the pre-contact of the placed box lies inside the box at its init pose otherwise -
+        # 0918-170804: 'exact IK failed at pose 1 of 3' on 6/12 attempts)
+        with self.posed("target", t_pose):
+            for push_kind, push_init, push_extras in self.touching_push_candidates(manip, p_init, t_face_z, direction):
+                push_goal = (push_init[0] + direction * dist, push_init[1])
+                push_pre = IK.pre_pose(push_init)
+                # (1) the push chain on its own - the requirement (brace optional, owner 2026-09-16 17:10: the axial rule)
+                r_push = self.ikc.exact([push_pre, push_init, push_goal], manip, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
+                if not r_push.ok:
+                    why.append(f"{push_kind}: right: {r_push.reason}")
+                    continue
+                push_chosen = (push_kind, push_pre, push_init, push_goal, push_extras)
+                # (2) a brace when the joint band gate admitted the position: the first two-arm candidate that passes
+                if try_brace:
+                    for pre, contact, kind, extras in self.touching_brace_candidates(manip, b_point, face_z, -direction):
+                        res = self.ikc.exact_both_arms(("right", [push_pre, push_init, push_goal]), ("left", [pre, contact]), manip,
+                                                       ignore_push, ignore_brace, fingers=IK.FINGER_CLOSED)
+                        if res.ok:
+                            brace_chosen = (pre, contact, kind, extras)
+                            break
+                        why.append(f"{push_kind}/{kind}: {res.reason}")
+                break
         if push_chosen is None:
-            raise Reject("contact_unreachable", f"touching push: no push candidate passes the exact IK from the manipulation stance ({'; '.join(why[-3:])})")
+            raise Reject("contact_unreachable", f"touching push: no push candidate passes the exact IK from the {manip.name} stance ({'; '.join(why[-3:])})")
         push_kind, push_pre, push_init, push_goal, push_extras = push_chosen
         draft.summary.setdefault("touching", {}).update({"push_kind": push_kind, **{k: v for k, v in push_extras.items() if v is not None}})
         push_rec = ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname, extras=dict(push_extras, pose_class=push_kind))
