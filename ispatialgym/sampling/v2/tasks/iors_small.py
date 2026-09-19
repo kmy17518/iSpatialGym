@@ -1340,7 +1340,13 @@ class IORSSmall(SamplerV2):
         p_now = self.obj("partner").get_position_orientation()
         p_pose = (p_now[0].clone().float(), p_now[1].clone().float())
         t_place_pose = (G.t(place_pos), goal_quat)
-        TT.whole_body_check_at(self, [st], {tname: t_place_pose, pname: p_pose}, require=True, reason="stance_collision")
+        try:
+            TT.whole_body_check_at(self, [st], {tname: t_place_pose, pname: p_pose}, require=True, reason="stance_collision")
+        finally:
+            # the box goes back to its init pose: the program check and the grasp checks read the live world (0918-170003: the
+            # box left at the place, 3-6 cm from the init, made the checker's grasp IK fail on 4/12 attempts)
+            self.obj("target").set_position_orientation(*[G.t(v) for v in draft.object_poses[tname]])
+            self.obj("target").keep_still()
         self.sidecar.add_stance(st)
         self.kit.sync_world()
         # the drive is swept with the arm at the LIFT configuration (the box carry_height above the grasp, as the oracle drives
