@@ -195,12 +195,14 @@ def cmd_demo_only(args):
     tdir = os.path.dirname(os.path.dirname(tro))
     # staged per source run: two instances of the same alias share the template basename, and the stale staged copy
     # shadowed the new one (2026-09-18 15:01: the demo loaded the old TRO while the ledger named the new)
-    run_key = os.path.basename(os.path.dirname(os.path.dirname(tdir))) or "run"
+    # tdir = <run>/inst/<alias>/<template>: the run id is three levels up (the earlier key took 'inst', so every run staged to the
+    # same directory and the first copy won - 0918-202215 replayed an old instance without the push stance); the copy is
+    # refreshed every time (cheap) so a staged directory can never shadow its source
+    run_key = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(tdir)))) or "run"
     stage = os.path.join(REPO, "runlogs", "smoke_inputs", "first_demo", alias, f"{run_key}__{os.path.basename(tdir)}")
-    if not os.path.exists(os.path.join(stage, "template.json")):
-        import shutil
+    import shutil
 
-        shutil.copytree(tdir, stage, ignore=shutil.ignore_patterns("renders", "validation", "*.png"), dirs_exist_ok=True)
+    shutil.copytree(tdir, stage, ignore=shutil.ignore_patterns("renders", "validation", "*.png"), dirs_exist_ok=True)
     rel_tro = os.path.relpath(os.path.join(stage, "instances", os.path.basename(tro)), REPO)
     commit, dirty = git("rev-parse", "HEAD"), bool(git("status", "--porcelain", "--", "ispatialgym", "scripts"))
     t0 = time.time()
