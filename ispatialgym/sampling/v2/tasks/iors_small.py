@@ -1607,9 +1607,12 @@ class IORSSmall(SamplerV2):
                 continue
             if pitch == 0.0 and z1 > z_tip + TT.PALM_FROM_TIP and bool(self.gen("blade_palm_clear_first", True)):
                 # owner 2026-09-18 18:45: a face taller than the finger section is pushed by the RAISED vertical blade first (palm
-                # 5 mm clear of the face top, validated by the chain check) - the low blade's palm overlaps the top and the
-                # oracle raised it 3.9 cm at run time to an unvalidated pose: 'joints did not converge 0.087 rad' (0918-182409)
-                yield from self._raised_blade(manip, face_point, (z0, z1), d, outward, clearance, z1 - TT.PALM_FROM_TIP + 0.005)
+                # ``blade_palm_clear_m`` above the face top, validated by the chain check) - the low blade's palm overlaps the top
+                # and the oracle raised it 3.9 cm at run time to an unvalidated pose: 'joints did not converge 0.087 rad'
+                # (0918-182409); with 5 mm of clearance the wider palm / knuckle came down ON the box's top edge as the blade
+                # descended beside the face (0918-183535, same error) - 2.5 cm by default
+                palm_clear = float(self.gen("blade_palm_clear_m", 0.025))
+                yield from self._raised_blade(manip, face_point, (z0, z1), d, outward, clearance, z1 - TT.PALM_FROM_TIP + palm_clear)
             so = TT.blade_standoff((z0, z_face_hi), z_tip, pitch, clearance, side=False)
             if so is None:
                 continue  # nothing of the face above the tips: no blade push
