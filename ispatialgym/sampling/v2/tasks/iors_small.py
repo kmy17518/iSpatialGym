@@ -34,6 +34,20 @@ from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecor
 RETREAT_DIST_M = 0.10  # oracle ``actions.RETREAT_DIST``: a place ends this far back along the approach (release + lift-off)
 RETREAT_LITTLE_M = 0.05  # oracle ``actions.RETREAT_LITTLE``: the retreat after a place
 
+#: Wrist turns of a blade push in the order to try (owner 2026-09-18 19:39): the wrist camera (``right_realsense_link``, three
+#: r 1.8 cm spheres 4-7 cm to the side of the gripper at the palm-line height) lies on the eef's -y side; ``eef_quat(a, c·outward)``
+#: puts eef +y = c·outward, so c = +1 hangs the camera over the pushed object's top and c = -1 turns it away from it. The camera
+#: contacting the box top pushed the robot down against the table (demos 0918-190236 / 191811: robot and table shaking).
+PUSH_WRIST_TURNS = (-1.0, 1.0)
+#: Hand geometry beyond the finger profile, sphere centres in the EEF frame (gripper-link spheres of
+#: ``r1pro_description_curobo_default.yaml`` mapped by ``EEF_IN_GRIPPER`` (0, 0, -0.06; rpy 0, pi, 0): p_eef = (-x, y, -(z + 0.06)))
+#: — what the IK collision check does not see against the pushed object (ignored at the contact pose, §3.6).
+HAND_SPHERES_EEF: Dict[str, Tuple[Tuple[Tuple[float, float, float], ...], float]] = {
+    "wrist camera": (((-0.056, -0.002, -0.076), (-0.056, -0.030, -0.076), (-0.056, -0.057, -0.076)), 0.018),
+    "knuckle": (((-0.015, -0.042, -0.0675), (0.015, -0.042, -0.0675), (-0.015, 0.042, -0.0675), (0.015, 0.042, -0.0675)), 0.015),
+    "gripper body": (((0.0, 0.0, -0.097),), 0.04),
+}
+
 log = logging.getLogger("ispatialgym.sampling.v2")
 
 RELATION_OF_SUBTASK = {
@@ -1331,6 +1345,33 @@ class IORSSmall(SamplerV2):
                 "right_cells": int(len(right_cells)), "left_cells": int(len(left_cells)),
                 **({} if ok else {"why": f"work {'in' if in_band(w_b, right_cells) else 'OFF'} right band / brace {'in' if in_band(b_b, left_cells) else 'OFF'} left band at {st.name}"})}
 
+    def hand_overlap(self, eef_pose: G.Pose, role: str, obj_pose: G.Pose, margin: float = 0.005) -> Optional[str]:
+        """Which part of the hand beyond the finger profile (``HAND_SPHERES_EEF``: wrist camera, knuckles, gripper body) comes
+        within ``margin`` of the role's hull box at ``obj_pose`` for the eef pose — None when all clear. The IK check ignores the
+        pushed object at its contact pose, so the camera hanging over the box top was invisible to it (owner 2026-09-18 19:39)."""
+        hull = G.t(self.hull[role])
+        lo, hi = hull.min(dim=0).values, hull.max(dim=0).values
+        inv = C.invert((G.t(obj_pose[0]), G.t(obj_pose[1])))
+        eef = (G.t(eef_pose[0]), G.t(eef_pose[1]))
+        worst = None
+        for part, (centres, r) in HAND_SPHERES_EEF.items():
+            pts_o = C.transform_points(inv, C.transform_points(eef, th.tensor(centres, dtype=th.float32)))
+            d = th.clamp(lo - pts_o, min=0.0) + th.clamp(pts_o - hi, min=0.0)
+            dist = float(th.linalg.norm(d, dim=1).min())
+            if dist < r + margin and (worst is None or dist - r < worst[1]):
+                worst = (part, dist - r)
+        if worst is None:
+            return None
+        return f"{worst[0]} {worst[1] * 1000:+.0f} mm from the box (margin {margin * 1000:.0f} mm)"
+
+    def push_hand_overlap(self, push_init: G.Pose, push_goal: G.Pose, t_place_pose: G.Pose, direction: th.Tensor, dist: float) -> Optional[str]:
+        """The hand at the push contact (box at the place) and at the push goal (box pushed ``dist``): the first overlap, or None."""
+        bad = self.hand_overlap(push_init, "target", t_place_pose)
+        if bad is None:
+            pushed = (G.t(t_place_pose[0]) + G.t(direction) * float(dist), G.t(t_place_pose[1]))
+            bad = self.hand_overlap(push_goal, "target", pushed)
+        return bad
+
     def push_chain_feasible(self, st: Stance, t_place_pose: G.Pose, p_pose: G.Pose) -> Optional[str]:
         """The first push class whose [pre, init, goal] chain and retreat clear pose pass the exact IK from ``st`` with the box
         posed at the place (the checks ``touching_contacts`` repeats when recording); None when no class passes."""
@@ -1346,6 +1387,8 @@ class IORSSmall(SamplerV2):
         with self.posed("target", t_place_pose):
             for push_kind, push_init, _extras in self.touching_push_candidates(st, p_init, t_face_z, direction):
                 push_goal = (push_init[0] + direction * dist, push_init[1])
+                if self.push_hand_overlap(push_init, push_goal, t_place_pose, direction, dist) is not None:
+                    continue
                 r = self.ikc.exact([IK.pre_pose(push_init), push_init, push_goal], st, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
                 if not r.ok:
                     continue
@@ -1506,6 +1549,11 @@ class IORSSmall(SamplerV2):
             for push_kind, push_init, push_extras in self.touching_push_candidates(manip, p_init, t_face_z, direction):
                 push_goal = (push_init[0] + direction * dist, push_init[1])
                 push_pre = IK.pre_pose(push_init)
+                # (0) the hand beyond the finger profile (wrist camera, knuckles, body) clear of the box at the contact and the goal
+                overlap = self.push_hand_overlap(push_init, push_goal, t_pose, direction, dist)
+                if overlap is not None:
+                    why.append(f"{push_kind}: {overlap}")
+                    continue
                 # (1) the push chain on its own - the requirement (brace optional, owner 2026-09-16 17:10: the axial rule)
                 r_push = self.ikc.exact([push_pre, push_init, push_goal], manip, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
                 if not r_push.ok:
@@ -1634,7 +1682,7 @@ class IORSSmall(SamplerV2):
             standoff, half = so
             a_vec = TT.pitched_approach(pitch, manip.forward)
             origin = th.tensor([float(face_point[0]), float(face_point[1]), z_tip + C.FINGERTIP_LENGTH * math.cos(math.radians(pitch))]) + outward * standoff
-            for c_sign in (1.0, -1.0):
+            for c_sign in PUSH_WRIST_TURNS:
                 yield f"push_blade_{pitch:.0f}{'' if c_sign > 0 else '-'}", (origin, C.eef_quat(a_vec, c_sign * outward)), {
                     "blade_half_thickness_m": half, "stop_clearance_m": clearance, "blade_standoff_m": standoff, "fingertip_z": z_tip,
                     "height_extra_m": requested_height_extra(self), "height_extra_effective_m": round(blade_lift, 4), "height_extra_clip_reason": blade_why}
@@ -1660,7 +1708,7 @@ class IORSSmall(SamplerV2):
         # eef origin = fingertip - a·FINGERTIP_LENGTH, the tips ``standoff`` outside the face at ``z_tip``
         tip = th.tensor([float(face_point[0]), float(face_point[1]), float(z_tip)]) + outward * standoff
         origin = tip - a_vec * C.FINGERTIP_LENGTH
-        for c_sign in (1.0, -1.0):
+        for c_sign in PUSH_WRIST_TURNS:
             yield f"push_blade_lean{lean_deg:.0f}{'' if c_sign > 0 else '-'}", (origin, C.eef_quat(a_vec, c_sign * outward)), {
                 "blade_half_thickness_m": float(TT.FINGER_PROFILE[0][1]), "stop_clearance_m": clearance, "blade_standoff_m": standoff, "fingertip_z": float(z_tip),
                 "palm_clear": True, "lean_deg": float(lean_deg), "height_extra_m": requested_height_extra(self), "height_extra_effective_m": 0.0,
@@ -1676,7 +1724,7 @@ class IORSSmall(SamplerV2):
         standoff, half = so
         a_vec = TT.pitched_approach(0.0, manip.forward)
         origin = th.tensor([float(face_point[0]), float(face_point[1]), z_tip + C.FINGERTIP_LENGTH]) + outward * standoff
-        for c_sign in (1.0, -1.0):
+        for c_sign in PUSH_WRIST_TURNS:
             yield f"push_blade_0_high{'' if c_sign > 0 else '-'}", (origin, C.eef_quat(a_vec, c_sign * outward)), {
                 "blade_half_thickness_m": half, "stop_clearance_m": clearance, "blade_standoff_m": standoff, "fingertip_z": z_tip,
                 "palm_clear": True, "height_extra_m": requested_height_extra(self), "height_extra_effective_m": 0.0, "height_extra_clip_reason": "palm_clear"}
