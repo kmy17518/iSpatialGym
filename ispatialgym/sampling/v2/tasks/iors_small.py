@@ -1605,6 +1605,11 @@ class IORSSmall(SamplerV2):
                 if bool(self.gen("blade_palm_clear_fallback", True)) and z_hi_tip <= z1 - 0.03:
                     raised_fallback = (z_hi_tip,)  # yielded after the pitched blades (below)
                 continue
+            if pitch == 0.0 and z1 > z_tip + TT.PALM_FROM_TIP and bool(self.gen("blade_palm_clear_first", True)):
+                # owner 2026-09-18 18:45: a face taller than the finger section is pushed by the RAISED vertical blade first (palm
+                # 5 mm clear of the face top, validated by the chain check) - the low blade's palm overlaps the top and the
+                # oracle raised it 3.9 cm at run time to an unvalidated pose: 'joints did not converge 0.087 rad' (0918-182409)
+                yield from self._raised_blade(manip, face_point, (z0, z1), d, outward, clearance, z1 - TT.PALM_FROM_TIP + 0.005)
             so = TT.blade_standoff((z0, z_face_hi), z_tip, pitch, clearance, side=False)
             if so is None:
                 continue  # nothing of the face above the tips: no blade push
