@@ -1409,9 +1409,9 @@ class IORSSmall(SamplerV2):
                         break
                     if self.hand_overlap(b_contact, "partner", p_pose) is not None:
                         continue
-                    with self.posed("target", (G.t(t_place_pose[0]) + direction * dist, G.t(t_place_pose[1]))):  # the box where the push leaves it
+                    with self.posed("target", (G.t(t_place_pose[0]) + direction * dist, G.t(t_place_pose[1]))), self.ikc.ignoring([self.obj("target")]):
                         res = self.ikc.exact_both_arms(("right", [pre, push_init, push_goal]), ("left", [b_pre, b_contact]), st, ignore_push, ignore_brace, fingers=IK.FINGER_CLOSED)
-                    if res.ok:
+                    if res.ok and self.ikc.exact([IK.pre_pose(b_contact, RETREAT_DIST_M)], st, "left", ignore_for_last=ignore_brace, cache=False).ok:
                         return f"{push_kind}+{b_kind}"
                 return None  # the push class passes but no brace joins it from this stance
         return None
@@ -1607,10 +1607,19 @@ class IORSSmall(SamplerV2):
                         # place in the collision world the right fingertips sit ~5 cm inside it and every whole-body configuration
                         # is 'in collision' whatever the left arm does (every brace class failed at its first pose while passing
                         # alone, 0918-211933 .. 220534); the box is posed where the push leaves it
-                        with self.posed("target", (G.t(t_pose[0]) + direction * dist, G.t(t_pose[1]))):
+                        # the target leaves the collision world for the two-arm solve: the right tips locked 5 mm before its face sit
+                        # inside the checker's margin ('collides with target', 0918-223037 attempt 2) - the push chain itself was
+                        # validated above with its own ignores; the brace is 20 cm away from it
+                        with self.posed("target", (G.t(t_pose[0]) + direction * dist, G.t(t_pose[1]))), self.ikc.ignoring([self.obj("target")]):
                             res = self.ikc.exact_both_arms(("right", [push_pre, push_init, push_goal]), ("left", [pre, contact]), manip,
                                                            ignore_push, ignore_brace, fingers=IK.FINGER_CLOSED)
                         if res.ok:
+                            # the brace arm's retreat after its release (oracle: 10 cm back along the approach, fingers open) must have
+                            # a configuration too - 0918-223037 attempt 0 died in the program check on left_arm_joint7's limit there
+                            r_ret = self.ikc.exact([IK.pre_pose(contact, RETREAT_DIST_M)], manip, "left", ignore_for_last=ignore_brace, cache=False)
+                            if not r_ret.ok:
+                                why.append(f"{push_kind}/{kind}: brace retreat clear pose: {r_ret.reason}")
+                                continue
                             brace_chosen = (pre, contact, kind, extras)
                             break
                         # diagnostic (owner 2026-09-18 20:48): the left chain on its own, the right arm at the stance posture - a pass
