@@ -585,8 +585,27 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                 checks.append((goal, to_trunk))
         for pose2d, trunk in checks:
             r_arm, l_arm, _ = sampler.ikc.arm_vectors(stance)
-            ok, _ = NAV.path_collision_free(sampler.kit, [pose2d], trunk, q_arms={"right": r_arm, "left": l_arm})
+            q_arms = {"right": r_arm, "left": l_arm}
+            drive_ctx = attached(sampler.kit, None, None)
+            if carried_obj is not None and g is not None and attach_arm and name in ("navigate", "transition"):
+                # a carried drive (touching / attachment second base pose, owner 2026-09-18 16:32): the object rides in the hand
+                # at the LIFT configuration of the departing stance (as the oracle drives it) - not at its init pose beside the
+                # untucked arm of the arriving stance (0918-171641: 'base pose ... collides' on 4/12 attempts)
+                frm_name = getattr(getattr(action, "path", None), "frm", None) or getattr(getattr(action, "transition", None), "frm", None)
+                frm_st = sidecar.stances.get(frm_name) if frm_name else None
+                if frm_st is not None and getattr(g, "grasp", None) is not None:
+                    lift_end = (th.as_tensor(g.grasp[0], dtype=th.float32) + th.tensor([0.0, 0.0, float(g.carry_height or 0.0)]), th.as_tensor(g.grasp[1], dtype=th.float32))
+                    supports = list(sampler.support_objects()) if hasattr(sampler, "support_objects") else []
+                    with attached(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object):
+                        r_lift = sampler.ikc.exact([lift_end], frm_st, attach_arm, ignore_for_last=supports, cache=False)
+                    if r_lift.ok and r_lift.q is not None:
+                        q_arms[attach_arm] = r_lift.q[sampler.kit.robot.arm_control_idx[attach_arm]].clone()
+                drive_ctx = attached(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object)
+            with drive_ctx:
+                ok, _ = NAV.path_collision_free(sampler.kit, [pose2d], trunk, q_arms=q_arms)
             n += 1
             if not ok:
-                raise Reject("program_check_failed", f"base pose {tuple(round(v, 3) for v in pose2d)} collides at trunk {trunk}", action=name)
+                raise Reject("program_check_failed", f"base pose {tuple(round(v, 3) for v in pose2d)} collides at trunk {trunk}"
+                                                     f"{' (carried ' + str(carried) + ' in the lifted hand)' if carried_obj is not None and name in ('navigate', 'transition') else ''}",
+                             action=name)
     return n, witnesses
