@@ -1453,7 +1453,10 @@ class IORSSmall(SamplerV2):
                         why.append(f"{push_kind}/{kind}: {res.reason}")
                 break
         if push_chosen is None:
-            raise Reject("contact_unreachable", f"touching push: no push candidate passes the exact IK from the {manip.name} stance ({'; '.join(why[-3:])})")
+            d_i, l_i = manip.local(G.t(p_init)[:2])
+            raise Reject("contact_unreachable", f"touching push: no push candidate passes the exact IK from the {manip.name} stance (push init at depth {d_i:.2f} "
+                                                f"lateral {l_i:+.2f} z {float(p_init[2]):.2f}, face z {t_face_z[0]:.2f}-{t_face_z[1]:.2f}, trunk {manip.translate}, "
+                                                f"{manip.tilt:.2f}; {'; '.join(why[-3:])})")
         push_kind, push_pre, push_init, push_goal, push_extras = push_chosen
         draft.summary.setdefault("touching", {}).update({"push_kind": push_kind, **{k: v for k, v in push_extras.items() if v is not None}})
         push_rec = ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname, extras=dict(push_extras, pose_class=push_kind))
