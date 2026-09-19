@@ -1570,6 +1570,10 @@ class IORSSmall(SamplerV2):
                 # (2) a brace when the joint band gate admitted the position: the first two-arm candidate that passes
                 if try_brace:
                     for pre, contact, kind, extras in self.touching_brace_candidates(manip, b_point, face_z, -direction):
+                        overlap = self.hand_overlap(contact, "partner", p_pose)  # camera / knuckles / body vs the braced partner
+                        if overlap is not None:
+                            why.append(f"{push_kind}/{kind}: {overlap}")
+                            continue
                         res = self.ikc.exact_both_arms(("right", [push_pre, push_init, push_goal]), ("left", [pre, contact]), manip,
                                                        ignore_push, ignore_brace, fingers=IK.FINGER_CLOSED)
                         if res.ok:
@@ -1761,6 +1765,23 @@ class IORSSmall(SamplerV2):
         z0, z1 = face_z
         clearance = float(self.gen("stop_clearance_m", STOP_CLEARANCE))
 
+        # owner 2026-09-18 20:48: the FINGERTIP-FRONT brace first, mirrored from the push class that made 0918-200452 - the left
+        # hand horizontal along -push direction, the closed tips ``clearance`` before the partner's far face, wrist camera UP
+        # (closing = -default: the camera lies on the eef's -x side, the default turn hung it at the table), the contact raised
+        # to ``z0 + brace_tip_min_above_m`` so the gripper body (r 4 cm, 9.7 cm behind the tips) clears the table - at the
+        # partner's mid height (0.85 on a 0.81 table) it sat on it and every brace pre-pose failed the IK. 5 cm pre.
+        z_tip_brace = max(float(b_point[2]), z0 + float(self.gen("brace_tip_min_above_m", 0.055)))
+        if z_tip_brace + 0.01 <= z1 and bool(self.gen("brace_tip_first", True)):
+            tip_pt = th.tensor([float(b_point[0]), float(b_point[1]), z_tip_brace])
+            h_brace = C.default_closing_axis(a)
+            tip_pre = float(self.gen("push_tip_pre_dist_m", 0.05))
+            for c_sign in PUSH_WRIST_TURNS:
+                pose = C.fingertip_eef(tip_pt, a, c_sign * h_brace, clearance)
+                contact = (G.t(pose[0]), G.t(pose[1]))
+                yield IK.pre_pose(contact, tip_pre), contact, f"brace_tip_h{'' if c_sign > 0 else '-'}", {
+                    "blade_half_thickness_m": None, "stop_clearance_m": clearance, "pose_class": f"brace_tip_h{'' if c_sign > 0 else '-'}", "tip_front": True,
+                    "pre_dist_m": tip_pre, "contact_z": round(z_tip_brace, 4), "height_extra_m": requested_height_extra(self), "height_extra_effective_m": round(z_tip_brace - float(b_point[2]), 4),
+                    "height_extra_clip_reason": "gripper body above the table"}
         pad_lift, pad_why = contact_height_extra(self, "brace", pad_center_z=float(b_point[2]), band_top_z=z1)  # A/B knob
         pad_facts = {"height_extra_m": requested_height_extra(self), "height_extra_effective_m": round(pad_lift, 4), "height_extra_clip_reason": pad_why}
 
