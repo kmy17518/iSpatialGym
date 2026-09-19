@@ -1579,7 +1579,10 @@ class IORSSmall(SamplerV2):
                         if res.ok:
                             brace_chosen = (pre, contact, kind, extras)
                             break
-                        why.append(f"{push_kind}/{kind}: {res.reason}")
+                        # diagnostic (owner 2026-09-18 20:48): the left chain on its own, the right arm at the stance posture - a pass
+                        # here names the two-arm combination (self-collision / the locked right arm) as the blocker
+                        alone = self.ikc.exact([pre, contact], manip, "left", ignore_for_last=ignore_brace, cache=False, fingers=IK.FINGER_CLOSED)
+                        why.append(f"{push_kind}/{kind}: {res.reason} [left alone: {'ok' if alone.ok else alone.reason}]")
                 break
         if push_chosen is None:
             d_i, l_i = manip.local(G.t(p_init)[:2])
@@ -1770,18 +1773,25 @@ class IORSSmall(SamplerV2):
         # (closing = -default: the camera lies on the eef's -x side, the default turn hung it at the table), the contact raised
         # to ``z0 + brace_tip_min_above_m`` so the gripper body (r 4 cm, 9.7 cm behind the tips) clears the table - at the
         # partner's mid height (0.85 on a 0.81 table) it sat on it and every brace pre-pose failed the IK. 5 cm pre.
-        z_tip_brace = max(float(b_point[2]), z0 + float(self.gen("brace_tip_min_above_m", 0.055)))
-        if z_tip_brace + 0.01 <= z1 and bool(self.gen("brace_tip_first", True)):
-            tip_pt = th.tensor([float(b_point[0]), float(b_point[1]), z_tip_brace])
-            h_brace = C.default_closing_axis(a)
+        if bool(self.gen("brace_tip_first", True)):
             tip_pre = float(self.gen("push_tip_pre_dist_m", 0.05))
-            for c_sign in PUSH_WRIST_TURNS:
-                pose = C.fingertip_eef(tip_pt, a, c_sign * h_brace, clearance)
-                contact = (G.t(pose[0]), G.t(pose[1]))
-                yield IK.pre_pose(contact, tip_pre), contact, f"brace_tip_h{'' if c_sign > 0 else '-'}", {
-                    "blade_half_thickness_m": None, "stop_clearance_m": clearance, "pose_class": f"brace_tip_h{'' if c_sign > 0 else '-'}", "tip_front": True,
-                    "pre_dist_m": tip_pre, "contact_z": round(z_tip_brace, 4), "height_extra_m": requested_height_extra(self), "height_extra_effective_m": round(z_tip_brace - float(b_point[2]), 4),
-                    "height_extra_clip_reason": "gripper body above the table"}
+            heights = [max(float(b_point[2]), z0 + float(self.gen("brace_tip_min_above_m", 0.055))), min(z1 - 0.01, z0 + 0.075)]
+            heights = sorted({round(h, 4) for h in heights if h + 0.01 <= z1}, reverse=True)  # the higher first: the body further off the table
+            for pitch in [float(p) for p in (self.gen("brace_tip_pitches_deg", None) or [0.0, 15.0])]:
+                # pitched: the hand comes from above-left pointing down-right; the body 9.7 cm behind the tips rises 9.7·sin(pitch) cm
+                th_p = math.radians(pitch)
+                a_p = C.unit(a * math.cos(th_p) + th.tensor([0.0, 0.0, -math.sin(th_p)]))
+                h_brace = C.default_closing_axis(a_p)
+                for z_tip_brace in heights:
+                    tip_pt = th.tensor([float(b_point[0]), float(b_point[1]), z_tip_brace])
+                    for c_sign in PUSH_WRIST_TURNS:
+                        pose = C.fingertip_eef(tip_pt, a_p, c_sign * h_brace, clearance)
+                        contact = (G.t(pose[0]), G.t(pose[1]))
+                        kind = f"brace_tip_h{'' if c_sign > 0 else '-'}{'' if pitch == 0 else f'_p{pitch:.0f}'}{'' if z_tip_brace == heights[0] else '_lo'}"
+                        yield IK.pre_pose(contact, tip_pre), contact, kind, {
+                            "blade_half_thickness_m": None, "stop_clearance_m": clearance, "pose_class": kind, "tip_front": True, "pitch_deg": pitch,
+                            "pre_dist_m": tip_pre, "contact_z": round(z_tip_brace, 4), "height_extra_m": requested_height_extra(self),
+                            "height_extra_effective_m": round(z_tip_brace - float(b_point[2]), 4), "height_extra_clip_reason": "gripper body above the table"}
         pad_lift, pad_why = contact_height_extra(self, "brace", pad_center_z=float(b_point[2]), band_top_z=z1)  # A/B knob
         pad_facts = {"height_extra_m": requested_height_extra(self), "height_extra_effective_m": round(pad_lift, 4), "height_extra_clip_reason": pad_why}
 
