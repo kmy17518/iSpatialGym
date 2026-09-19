@@ -1606,16 +1606,20 @@ class IORSSmall(SamplerV2):
                 if bool(self.gen("blade_palm_clear_fallback", True)) and z_hi_tip <= z1 - 0.03:
                     raised_fallback = (z_hi_tip,)  # yielded after the pitched blades (below)
                 continue
-            if pitch == 0.0 and z1 > z_tip + TT.PALM_FROM_TIP and float(self.gen("blade_lean_deg", 20.0)) > 0:
+            leans = self.gen("blade_lean_deg", [20.0, 12.0, 8.0])
+            leans = [float(v) for v in (leans if isinstance(leans, (list, tuple)) else [leans]) if float(v) > 0]
+            if pitch == 0.0 and z1 > z_tip + TT.PALM_FROM_TIP and leans:
                 # owner 2026-09-18 19:05: a tall face is pushed LOW by a blade leaning along the push axis (fingertips lead, the
                 # palm recedes from the face by h·tan(lean)): the raised blade pushed the top 4 cm of the 11 cm box and it
                 # tipped instead of sliding - each base nudge closed 10.9 mm and the same 10.9 mm reopened at the back-off
-                # (0918-184752: touching held during the push, lost at the last step)
-                # the tips ``blade_lean_tip_above_m`` above the face bottom: leaning, the fingertip's leading edge dips below the tip
-                # height (~half thickness · sin lean) and 5 mm above the table it collides with the table at the contact pose
-                # (0918-190236: the leaning blade lost to the raised one)
+                # (0918-184752: touching held during the push, lost at the last step). Leans in order: 20 deg has no pre-pose
+                # IK at these stances (0918-191811, the wrist roll at its limit); at 12 deg the thick finger section touches at
+                # ~ the centre-of-mass height and the palm still recedes 1.5 cm.
+                # The tips ``blade_lean_tip_above_m`` above the face bottom: leaning, the fingertip's leading edge dips below the tip
+                # height and 5 mm above the table collided with it at the contact pose (0918-190236)
                 z_lean_tip = z0 + float(self.gen("blade_lean_tip_above_m", 0.025))
-                yield from self._leaning_blade(manip, face_point, (z0, z1), d, outward, clearance, z_lean_tip, float(self.gen("blade_lean_deg", 20.0)))
+                for lean in leans:
+                    yield from self._leaning_blade(manip, face_point, (z0, z1), d, outward, clearance, z_lean_tip, lean)
             if pitch == 0.0 and z1 > z_tip + TT.PALM_FROM_TIP and bool(self.gen("blade_palm_clear_first", True)):
                 # owner 2026-09-18 18:45: a face taller than the finger section is pushed by the RAISED vertical blade first (palm
                 # ``blade_palm_clear_m`` above the face top, validated by the chain check) - the low blade's palm overlaps the top
