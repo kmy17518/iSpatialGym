@@ -1372,18 +1372,24 @@ class IORSSmall(SamplerV2):
             bad = self.hand_overlap(push_goal, "target", pushed)
         return bad
 
-    def push_chain_feasible(self, st: Stance, t_place_pose: G.Pose, p_pose: G.Pose) -> Optional[str]:
+    def push_chain_feasible(self, st: Stance, t_place_pose: G.Pose, p_pose: G.Pose, with_brace: bool = False) -> Optional[str]:
         """The first push class whose [pre, init, goal] chain and retreat clear pose pass the exact IK from ``st`` with the box
-        posed at the place (the checks ``touching_contacts`` repeats when recording); None when no class passes."""
+        posed at the place (the checks ``touching_contacts`` repeats when recording); None when no class passes. With
+        ``with_brace`` the class must also admit a left brace in the two-arm solve (``exact_both_arms``, the right arm locked
+        at its push goal) — the first ``brace_search_candidates`` brace candidates are tried; the returned kind is then
+        ``"<push kind>+<brace kind>"``."""
         tangent = st.tangent
         direction = th.tensor([float(tangent[0]), float(tangent[1]), 0.0])
-        p_init, _ = self.touching_points(t_place_pose, p_pose, st)
+        p_init, b_point = self.touching_points(t_place_pose, p_pose, st)
         t_hull_w = self.world.hull_at(self.hull["target"], t_place_pose)
         t_face_z = (float(t_hull_w[:, 2].min()), float(t_hull_w[:, 2].max()))
         p_hull = self.world.hull_at(self.hull["partner"], p_pose)
+        face_z = (float(p_hull[:, 2].min()), float(p_hull[:, 2].max()))
         gap = float((p_hull[:, :2] @ tangent).min() - (t_hull_w[:, :2] @ tangent).max())
         dist = self.push_distance(gap)
         ignore_push = self.support_objects() + [self.obj("target")]
+        ignore_brace = self.support_objects() + [self.obj("partner")]
+        n_brace = int(self.gen("brace_search_candidates", 8))
         with self.posed("target", t_place_pose):
             for push_kind, push_init, _extras in self.touching_push_candidates(st, p_init, t_face_z, direction):
                 push_goal = (push_init[0] + direction * dist, push_init[1])
@@ -1394,8 +1400,19 @@ class IORSSmall(SamplerV2):
                 if not r.ok:
                     continue
                 r2 = self.ikc.exact([IK.pre_pose(push_goal)], st, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
-                if r2.ok:
+                if not r2.ok:
+                    continue
+                if not with_brace:
                     return push_kind
+                for i, (b_pre, b_contact, b_kind, _bx) in enumerate(self.touching_brace_candidates(st, b_point, face_z, -direction)):
+                    if i >= n_brace:
+                        break
+                    if self.hand_overlap(b_contact, "partner", p_pose) is not None:
+                        continue
+                    res = self.ikc.exact_both_arms(("right", [pre, push_init, push_goal]), ("left", [b_pre, b_contact]), st, ignore_push, ignore_brace, fingers=IK.FINGER_CLOSED)
+                    if res.ok:
+                        return f"{push_kind}+{b_kind}"
+                return None  # the push class passes but no brace joins it from this stance
         return None
 
     def place_infeasible_why(self, st: Stance, t_place_pose: G.Pose, grasp: GraspRecord) -> Optional[str]:
@@ -1453,23 +1470,34 @@ class IORSSmall(SamplerV2):
         # the contact lateral is searched (default -0.12 first, then further right / nearer): the first stance from which a push
         # class passes the chain + retreat clear pose (0918-174815: at -0.12 alone joint 4 / the clear pose failed 9/16 attempts)
         laterals = [float(v) for v in (self.gen("push_contact_laterals_m", None) or [self.gen("push_contact_lateral_m", -0.12), -0.16, -0.20, -0.08])]
+        # owner 2026-09-18 20:48: a lateral from which the push AND a left brace pass together is preferred (the push shoves both
+        # boxes; from the first push-feasible lateral the brace failed the two-arm solve while the left arm alone reached it,
+        # 0918-210216); the first push-only lateral is the fallback
         st, tried, manip_ok = None, [], False
+        fallback: Optional[Tuple[Optional[Stance], bool]] = None  # (stance or None for the manipulation stance, manip_ok)
+        want_brace = bool(self.gen("brace_stance_search", True)) and (self._brace_gate or {}).get("ok") is not False
         for lat in laterals:
             cand = self.push_stance_for(manip, t_place_pose, lateral=lat)  # None = the manipulation stance already puts the contact there
             probe = cand if cand is not None else manip
             kind = self.push_chain_feasible(probe, t_place_pose, p_pose)
             place_why = self.place_infeasible_why(probe, t_place_pose, grasp) if kind is not None else None
-            tried.append(f"{lat:+.2f}{' (manipulation)' if cand is None else ''}: {kind or 'no class'}{'; place: ' + place_why if place_why else ''}")
+            both = self.push_chain_feasible(probe, t_place_pose, p_pose, with_brace=True) if (kind is not None and place_why is None and want_brace) else None
+            tried.append(f"{lat:+.2f}{' (manipulation)' if cand is None else ''}: {kind or 'no class'}{'; place: ' + place_why if place_why else ''}"
+                         f"{'; brace: ' + both.split('+', 1)[1] if both else ('; brace: none' if kind and not place_why and want_brace else '')}")
             if kind is not None and place_why is None:
-                if cand is None:
-                    manip_ok = True
-                st = cand
-                break
+                if both is not None or not want_brace:
+                    st, manip_ok = cand, cand is None
+                    break
+                if fallback is None:
+                    fallback = (cand, cand is None)
+        if st is None and fallback is not None:
+            st, manip_ok = fallback
         draft.summary.setdefault("touching", {})["push_stance_search"] = tried
         if st is None:
             if manip_ok:
                 return None  # the manipulation stance itself passes: no second base pose
             raise Reject("contact_unreachable", f"touching push: no push class passes from any push stance lateral ({'; '.join(tried)})")
+        log.info("%s: push stance search: %s", self.gp.alias, " | ".join(tried))
         try:
             TT.whole_body_check_at(self, [st], {tname: t_place_pose, pname: p_pose}, require=True, reason="stance_collision")
         finally:
