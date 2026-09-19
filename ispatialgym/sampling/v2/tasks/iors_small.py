@@ -1389,7 +1389,8 @@ class IORSSmall(SamplerV2):
                 push_goal = (push_init[0] + direction * dist, push_init[1])
                 if self.push_hand_overlap(push_init, push_goal, t_place_pose, direction, dist) is not None:
                     continue
-                r = self.ikc.exact([IK.pre_pose(push_init), push_init, push_goal], st, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
+                pre = IK.pre_pose(push_init, float(_extras.get("pre_dist_m") or IK.PRE_DIST))
+                r = self.ikc.exact([pre, push_init, push_goal], st, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
                 if not r.ok:
                     continue
                 r2 = self.ikc.exact([IK.pre_pose(push_goal)], st, "right", ignore_for_last=ignore_push, cache=False, fingers=IK.FINGER_CLOSED)
@@ -1548,7 +1549,7 @@ class IORSSmall(SamplerV2):
         with self.posed("target", t_pose):
             for push_kind, push_init, push_extras in self.touching_push_candidates(manip, p_init, t_face_z, direction):
                 push_goal = (push_init[0] + direction * dist, push_init[1])
-                push_pre = IK.pre_pose(push_init)
+                push_pre = IK.pre_pose(push_init, float(push_extras.get("pre_dist_m") or IK.PRE_DIST))
                 # (0) the hand beyond the finger profile (wrist camera, knuckles, body) clear of the box at the contact and the goal
                 overlap = self.push_hand_overlap(push_init, push_goal, t_pose, direction, dist)
                 if overlap is not None:
@@ -1583,7 +1584,7 @@ class IORSSmall(SamplerV2):
                                                 f"{manip.tilt:.2f}; {'; '.join(why[-3:])})")
         push_kind, push_pre, push_init, push_goal, push_extras = push_chosen
         draft.summary.setdefault("touching", {}).update({"push_kind": push_kind, "classes_failed": why[:6], **{k: v for k, v in push_extras.items() if v is not None}})
-        log.info("%s: touching push class %s from the %s stance%s", self.gp.alias, push_kind, manip.name, f" (failed before it: {'; '.join(why[:3])})" if why else "")
+        log.info("%s: touching push class %s from the %s stance%s", self.gp.alias, push_kind, manip.name, f" (failed before it: {'; '.join(why[:10])})" if why else "")
         push_rec = ContactRecord("push", "right", push_pre, push_init, None, push_goal, direction, dist, object=tname, extras=dict(push_extras, pose_class=push_kind))
         push_rec.stance = manip.name  # the stance the chain was checked from ("manipulation" or the second base pose "push")
         self.sidecar.add_contact(push_rec)
@@ -1620,6 +1621,21 @@ class IORSSmall(SamplerV2):
         pad_lift, pad_why = contact_height_extra(self, "push", pad_center_z=float(face_point[2]), band_top_z=z1)
         fp = G.t(face_point) + th.tensor([0.0, 0.0, pad_lift])
         pad_facts = {"height_extra_m": requested_height_extra(self), "height_extra_effective_m": round(pad_lift, 4), "height_extra_clip_reason": pad_why}
+        # owner 2026-09-18 19:39 / 20:10: FINGERTIP-FRONT pushes at the face's mid height first - the hand horizontal along the
+        # push direction, the closed tips ``clearance`` before the face (``fingertip_eef``; ``contact_eef`` puts the pad centre
+        # on the face, tips 3 cm inside the box). Pushing at the centre-of-mass height the tall narrow box slides; every blade
+        # pushed it 9 cm up and it fell over (0918-194552: z 0.867 -> 0.848). Horizontal closing: the knuckles beside the
+        # pads, the wrist camera 7.6 cm behind the tips (never over the box), the gripper body ~1.5 cm above the table at the
+        # mid height; ``pre_dist`` 5 cm (the 10 cm pre 10 cm to the right of the face was out of IK reach on every attempt).
+        # A vertical closing hangs the camera 6-7 cm below / above the pads: only the camera-UP turn is admissible.
+        h_axis = C.default_closing_axis(d)
+        tip_pre = float(self.gen("push_tip_pre_dist_m", 0.05))
+        for c_sign in PUSH_WRIST_TURNS:
+            pose = C.fingertip_eef(fp, d, c_sign * h_axis, clearance)
+            yield f"push_tip_h{'' if c_sign > 0 else '-'}", (G.t(pose[0]), G.t(pose[1])), {"blade_half_thickness_m": None, "pre_dist_m": tip_pre, "tip_front": True,
+                                                                                            "stop_clearance_m": clearance, **pad_facts}
+        pose = C.fingertip_eef(fp, d, th.tensor([0.0, 0.0, -1.0]), clearance)  # eef +y = down: the camera (eef -y side) points up
+        yield "push_tip_v-", (G.t(pose[0]), G.t(pose[1])), {"blade_half_thickness_m": None, "pre_dist_m": tip_pre, "tip_front": True, "stop_clearance_m": clearance, **pad_facts}
         yield "push_h", IK.contact_eef(fp, d), {"blade_half_thickness_m": None, **pad_facts}
         yield "push_v", IK.contact_eef(fp, d, closing=th.tensor([0.0, 0.0, 1.0])), {"blade_half_thickness_m": None, **pad_facts}
         raised_fallback = None
