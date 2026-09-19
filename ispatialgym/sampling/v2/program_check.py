@@ -520,6 +520,8 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
         for a, qa in locked.items():
             q_seed[sampler.kit.robot.arm_control_idx[a]] = th.as_tensor(qa, dtype=th.float32)
     where = f"stance {stance_name}, arm {arm}, carried {carried}" + (f", {'/'.join(sorted(locked))} arm locked at its contact" if locked else "")
+    if name == "retreat" and getattr(action, "after", None) is not None:
+        where += f", after {getattr(action.after, 'name', type(action.after).__name__)}"
     with attached(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object):
         for key, poses in iter_pose_targets(targets):
             if key.split(".")[0] in skip_keys:

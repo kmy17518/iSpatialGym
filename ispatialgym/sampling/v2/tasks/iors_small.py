@@ -31,6 +31,9 @@ from ispatialgym.sampling.v2.core import SamplerV2, annotate_height_extra, conta
 from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Stance
 
+RETREAT_DIST_M = 0.10  # oracle ``actions.RETREAT_DIST``: a place ends this far back along the approach (release + lift-off)
+RETREAT_LITTLE_M = 0.05  # oracle ``actions.RETREAT_LITTLE``: the retreat after a place
+
 log = logging.getLogger("ispatialgym.sampling.v2")
 
 RELATION_OF_SUBTASK = {
@@ -1260,6 +1263,15 @@ class IORSSmall(SamplerV2):
                                               f"pre-place ignoring support+partner {_ok(r_pre_obj_ign)}, place {_ok(r_place_obj)}, place ignoring every object "
                                               f"{_ok(r_place_obj_free)}; goal lateral {lat:+.2f} m, trunk ({manip.translate}, {manip.tilt:.2f}), stand-off {manip.stand_off})")
         grasp.pre_place, grasp.place = pre_place, place
+        if self.relation == "touching":
+            # the oracle's place ends 10 cm back along the approach (release + lift-off) and its retreat goes 5 cm further: the
+            # pose 15 cm back from the place, fingers open, the released box ignored, must have a configuration (the program
+            # check's 'retreat: exact IK failed / joint 6-7 at the limit (stance push)' on 6/16 attempts of 0918-175907)
+            clear = IK.pre_pose(place, RETREAT_DIST_M + RETREAT_LITTLE_M)
+            r_clear = self.ikc.exact([clear], st_place, grasp.arm, ignore_for_last=self.support_objects() + [self.obj("target")], cache=False)
+            if not r_clear.ok:
+                raise Reject(r_clear.code or "place_unreachable", f"place retreat clear pose ({(RETREAT_DIST_M + RETREAT_LITTLE_M) * 100:.0f} cm back along the "
+                                                                 f"approach) from the {st_place.name} stance: {r_clear.reason}")
         # the lift (oracle ``Lift``): grasp pose raised by carry_height with the object attached, support ignored (the
         # object leaves it); the pre-place is where the carry ends, so the lift end must be IK-feasible too
         lift_end = (G.t(grasp.grasp[0]) + th.tensor([0.0, 0.0, float(grasp.carry_height)]), G.t(grasp.grasp[1]))
@@ -1342,6 +1354,20 @@ class IORSSmall(SamplerV2):
                     return push_kind
         return None
 
+    def place_infeasible_why(self, st: Stance, t_place_pose: G.Pose, grasp: GraspRecord) -> Optional[str]:
+        """Why the place of the carried box from ``st`` fails (pre-place -> place descent with the box attached, then the
+        15 cm clear pose of the release + retreat with the box ignored), or None when both pass."""
+        place = IK.grasp_pose(t_place_pose, grasp.eef_in_object)
+        ign = self.support_objects() + [self.obj("partner")]
+        with attached(self.kit, grasp.arm, self.obj("target"), eef_in_object=grasp.eef_in_object):
+            r = self.ikc.exact([IK.pre_pose(place), place], st, grasp.arm, ignore_for_last=ign, scale_key=self.choice.models["target"].scale, cache=False, approached=ign)
+        if not r.ok:
+            return f"descent: {r.reason}"
+        r2 = self.ikc.exact([IK.pre_pose(place, RETREAT_DIST_M + RETREAT_LITTLE_M)], st, grasp.arm, ignore_for_last=self.support_objects() + [self.obj("target")], cache=False)
+        if not r2.ok:
+            return f"clear pose: {r2.reason}"
+        return None
+
     def push_stance_for(self, manip: Stance, t_place_pose: G.Pose, lateral: Optional[float] = None) -> Optional[Stance]:
         """Touching (owner 2026-09-18 16:32): the second base pose ``push`` = the manipulation stance moved along the edge, same
         trunk, so that the push contact (the placed box's right face) lies at ``push_contact_lateral_m`` from the robot's centre
@@ -1386,9 +1412,11 @@ class IORSSmall(SamplerV2):
         st, tried, manip_ok = None, [], False
         for lat in laterals:
             cand = self.push_stance_for(manip, t_place_pose, lateral=lat)  # None = the manipulation stance already puts the contact there
-            kind = self.push_chain_feasible(cand if cand is not None else manip, t_place_pose, p_pose)
-            tried.append(f"{lat:+.2f}{' (manipulation)' if cand is None else ''}: {kind or 'no class'}")
-            if kind is not None:
+            probe = cand if cand is not None else manip
+            kind = self.push_chain_feasible(probe, t_place_pose, p_pose)
+            place_why = self.place_infeasible_why(probe, t_place_pose, grasp) if kind is not None else None
+            tried.append(f"{lat:+.2f}{' (manipulation)' if cand is None else ''}: {kind or 'no class'}{'; place: ' + place_why if place_why else ''}")
+            if kind is not None and place_why is None:
                 if cand is None:
                     manip_ok = True
                 st = cand
