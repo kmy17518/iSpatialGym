@@ -1412,6 +1412,12 @@ class IORSLarge(SamplerV2):
         quat = G.qmul(G.quat_from_yaw(yaw), self.rest)
         return th.tensor([float(xy[0]), float(xy[1]), z + self.world.bottom_offset(self.hull, quat) + 0.003]), quat
 
+    def yaws(self) -> List[float]:
+        """The object yaws screened for F_init / F_goal: ``generation.n_yaws`` equal steps (default 16 - the 8 of the reach
+        bands leave 2-4 feasible pairs for a floor pick at the crouch)."""
+        n = int(self.num("n_yaws", 16))
+        return [k * 2.0 * math.pi / n for k in range(n)]
+
     # ------------------------------------------------------------------ legs A -> B and B -> C (owner 2026‑09‑19 21:56)
 
     def _drop_leg_records(self, to: str) -> None:
@@ -1533,25 +1539,39 @@ class IORSLarge(SamplerV2):
         errors: List[str] = []
         self._attempt_t0 = time.time()
         self._deadline = self._attempt_t0 + float(self.num("attempt_budget_s", ATTEMPT_BUDGET_S))
-        for i_b in range(min(6, len(b_pool))):
-            self._check_deadline(f"B candidate {i_b + 1} of {min(6, len(b_pool))}")
+        focus_xy = self.surface["c_t"] if kind == "floor" else None
+        z_init = self.surface["z"]
+        yaws = self.yaws()
+        # F_init pre-screen (countertop-floor 0919-222621: F_init 2-4 pairs per B at the floor crouch, 6 B tried blind and the
+        # attempt spent its 900 s): the screening IK of F_init needs no leg, so it runs first over up to ``b_prescreen`` random B
+        # candidates and the coupling starts from the B with the most (yaw, grasp) pairs
+        n_pre = int(self.num("b_prescreen", 8))
+        pre: List[Tuple[int, Stance, List[Any]]] = []
+        for i_b in range(min(n_pre, len(b_pool))):
+            self._check_deadline(f"F_init pre-screen of B candidate {i_b + 1} of {min(n_pre, len(b_pool))}")
             kb = int(rng.integers(len(b_pool)))
             b_grid = b_pool.pop(kb)
             manip = b_grid.with_trunk(b_grid.translate, b_grid.tilt, "manipulation")
             manip.focus, manip.arms = b_grid.focus, ["right"]
+            fxy = focus_xy if focus_xy is not None else manip.focus[:2]
+            F_b = self.ikc.feasible_sets([fxy], yaws, self.grasps, lambda xy, yaw: self.pose_on(xy, yaw, z_init), manip, "right", self.grasp_ignore_objects()).get(0, [])
+            pre.append((len(F_b), manip, F_b))
+        pre.sort(key=lambda t: -t[0])
+        self.template_facts.setdefault("F_init_prescreen", []).append([n for n, _, _ in pre])
+        log.info("%s: F_init pre-screen over %d B candidates (%d yaws): %s", self.gp.alias, len(pre), len(yaws), [n for n, _, _ in pre])
+        n_couple = int(self.num("b_candidates_max", 6))
+        for i_b, (n_f, manip, F_init) in enumerate(pre[:n_couple]):
+            self._check_deadline(f"B candidate {i_b + 1} of {min(n_couple, len(pre))}")
             self.sidecar.transitions.clear()
             self.sidecar.paths.clear()
             try:
+                if not F_init:
+                    raise Reject("grasp_unreachable", "empty feasible set F_init at B's focus cell")
                 # A -> B (§3.7 / §3.8; owner 2026-09-19 21:56 (ii)); floor class: the floor mesh out of the sweep / drive-in checks
                 # like stance B itself
                 with self._floor_relaxed():
                     leg_ab = self.record_leg_a_b(init, manip)
                 focus_xy = self.surface["c_t"] if kind == "floor" else manip.focus[:2]
-                z_init = self.surface["z"]
-                F_init = self.ikc.feasible_sets([focus_xy], YAWS, self.grasps, lambda xy, yaw: self.pose_on(xy, yaw, z_init), manip, "right", self.grasp_ignore_objects())
-                F_init = F_init.get(0, [])
-                if not F_init:
-                    raise Reject("grasp_unreachable", "empty feasible set F_init at B's focus cell")
                 c_pool = self.placement_candidates(focus_xy)
                 if not c_pool:
                     raise Reject("no_placement_stance", "no stance C survivor for this init pose")
@@ -1633,7 +1653,7 @@ class IORSLarge(SamplerV2):
                 errors.append(f"C: F_init ({len(F_init)}) ∩ F_goal ({len(F_goal)}) empty at {'drop' if push else 'goal'} cell {[round(v, 2) for v in release_xy]}")
                 continue
             fails: Dict[str, int] = {}
-            for i in rng.permutation(len(F))[:4]:
+            for i in rng.permutation(len(F))[:int(self.num("f_draws_max", 8))]:
                 self._check_deadline(f"F draw at C candidate {i_c + 1} (exact IK at B / C{', push chain' if push else ''})")
                 yaw0, g = F[int(i)]
                 yaw = yaw0 + float(rng.uniform(-TARGET_JITTER, TARGET_JITTER))

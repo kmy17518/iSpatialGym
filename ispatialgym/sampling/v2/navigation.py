@@ -62,11 +62,27 @@ def transition_standoffs(s: float, step: float = TRANSITION_STEP, extra_max: flo
     return [round(float(s) + k * step, 6) for k in range(n + 1)]
 
 
+#: densest trunk motion between two checked sweep samples (owner 2026-09-19 21:56 carry legs: the 5-sample sweep of a
+#: (0, 0) -> (0.95, -1.2) transition moved the held sandal ~25 cm between samples and stepped over the 4 cm table top it
+#: then brushed in the demo, 0919-221909 action 6)
+SWEEP_MAX_TRANSLATE_STEP = 0.05
+SWEEP_MAX_TILT_STEP = 0.10
+
+
+def sweep_samples(trunk_from: Tuple[float, float], trunk_to: Tuple[float, float], n: int = TRANSITION_SAMPLES) -> int:
+    """The number of sweep samples for a trunk motion: at least ``n``, and enough that no sample step exceeds
+    ``SWEEP_MAX_TRANSLATE_STEP`` / ``SWEEP_MAX_TILT_STEP``."""
+    dt, dk = abs(float(trunk_to[0]) - float(trunk_from[0])), abs(float(trunk_to[1]) - float(trunk_from[1]))
+    return max(int(n), int(math.ceil(dt / SWEEP_MAX_TRANSLATE_STEP)) + 1, int(math.ceil(dk / SWEEP_MAX_TILT_STEP)) + 1)
+
+
 def trunk_sweep(trunk_from: Tuple[float, float], trunk_to: Tuple[float, float], n: int = TRANSITION_SAMPLES) -> List[Tuple[float, float]]:
-    """``n`` trunk samples strictly between (and including) the two trunk values, linear in (translate, tilt)."""
+    """Trunk samples between (and including) the two trunk values, linear in (translate, tilt): ``n`` of them, or more
+    when the motion is large (:func:`sweep_samples`)."""
     (t0, k0), (t1, k1) = trunk_from, trunk_to
     if n <= 1:
         return [(float(t1), float(k1))]
+    n = sweep_samples(trunk_from, trunk_to, n)
     return [(t0 + (t1 - t0) * i / (n - 1), k0 + (k1 - k0) * i / (n - 1)) for i in range(n)]
 
 
