@@ -603,11 +603,13 @@ class SamplerV2(TaskSampler):
         self.kit.sync_world()
         bad = []
         for st in stances:
-            # a stance that carries an object is checked with it attached (posed in the hand) and its support ignored
+            # a stance that carries an object is checked with it attached (posed in the hand) and its support ignored; the holding
+            # arm at its lift configuration when the task recorded one (``carry_arm_q``: the object rides where the oracle holds it)
             obj, arm, eef_in_object = self.carried_attachment(st.carried)
+            arm_q = {f"{arm}_arm": self.carry_arm_q[st.carried]} if (obj is not None and st.carried in self.carry_arm_q) else {}
             with NAV.attached(self.kit, arm if obj is not None else None, obj, eef_in_object=eef_in_object):
                 with self.ikc.ignoring([obj] if obj is not None else []):
-                    if not self.ikc.stance_collision_free(st):
+                    if not self.ikc.stance_collision_free(st, **arm_q):
                         bad.append(st.name)
         if bad:
             raise Reject("stance_collision_with_objects", f"stances {bad} collide with the objects placed (trunks {[(s.translate, round(s.tilt, 2)) for s in stances if s.name in bad]})")

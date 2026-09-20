@@ -1478,6 +1478,9 @@ class IORSLarge(SamplerV2):
         Fallback: the drive at B's trunk (the earlier behaviour) with the arrival transition. Returns the path record."""
         if q_lift_arm is not None:
             self.record_carry_arm_q(tname, "right", q_lift_arm)
+        # the placement stance is reached WITH the object in hand: the objects-placed check attaches it there (and ignores it at
+        # its init pose - 0920-004500: stance C 'collided' with the target still standing on its floor cell next to C)
+        place.carried = tname
         errors: List[str] = []
         for tt in self.travel_trunks(init, manip):
             if abs(tt[0] - manip.translate) < 1e-6 and abs(tt[1] - manip.tilt) < 1e-6:
