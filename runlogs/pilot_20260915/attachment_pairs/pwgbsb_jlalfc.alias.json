@@ -1,0 +1,100 @@
+{
+ "configuration_matching-attachment-lid-teapot-breakfast_table": {
+  "iddl": "configuration_matching/attachment.iddl",
+  "definition_id": 30,
+  "roles": {
+   "target": {
+    "category": "lid",
+    "sampleable": true,
+    "require": {
+     "grasps": "attachment"
+    },
+    "representative": "pwgbsb",
+    "orientation_equivalences": {
+     "lid/pwgbsb": [
+      "zinf"
+     ]
+    },
+    "grasp_keys": {
+     "lid/pwgbsb": "lid__pwgbsb"
+    }
+   },
+   "partner": {
+    "category": "teapot",
+    "sampleable": true,
+    "representative": "jlalfc",
+    "orientation_equivalences": {
+     "teapot/jlalfc": []
+    }
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "lid": [
+       "pwgbsb"
+      ]
+     },
+     "partner": {
+      "teapot": [
+       "jlalfc"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "lid": {
+       "bemtjd": "ground_isg 2026-09-16: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.01,
+    "orientation": 0.15
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_gap_min_m": 0.08,
+   "partner_centre_distance_min_m": 0.18,
+   "pre_attach_back_m": 0.1,
+   "reorientation_waypoints": 3,
+   "symmetry_slab_m": 0.005,
+   "symmetry_match_fraction": 0.9,
+   "grasp_metalink_clearance_m": 0.01,
+   "phase2_class1_when_deep_m": 0.65,
+   "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 (attachment lid / teapot): brace_search false = the one-arm sequence 'pick up the lid with the right arm -> move to the place stance -> place the lid on the teapot opening' (no partner brace, no two-arm search; a recorded place stance only when the grasp stance does not reach the attach pose); witness_residual_pre_m 15 mm = the 0917-010834 program-check failures were pre_grasp witnesses 12-17 mm short at joint 2's limit, which the oracle's approach finish closes (as the touching aliases)",
+   "_pair_note": "owner 2026-09-19: second attachment pair lid/pwgbsb -> teapot/jlalfc (constraints_compatible partner_of, pwgbsbparent); grasps lid__pwgbsb (5 rows flagged one_finger, tolerated)",
+   "_gap_note": "2026-09-19 20:50 (owner): intermediate partner separation for this pair (0.04/0.08 -> the wrist camera grazed the spout on the pre-grasp swing; 0.12/0.25 -> the SLERP to the far pre-attach stalled); + tracked SLERP, place stance when the carry does not track, over-the-top pre-grasp approach when the partner is within 0.35 m",
+   "grasp_height_extra_m": 0.006,
+   "_grasp_height_note": "2026-09-19 23:10: +6 mm (clip 8.6 mm: pad end 5 mm under the knob top) so the fingertips (1.9 cm below the eef) clear the flat dish at r 2.5 cm once the pads open to the measured 24-30 mm knob + 10 mm"
+  },
+  "constraints": []
+ }
+}
