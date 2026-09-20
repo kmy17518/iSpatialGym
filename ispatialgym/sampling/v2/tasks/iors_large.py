@@ -1709,7 +1709,15 @@ class IORSLarge(SamplerV2):
             fails: Dict[str, int] = {}
             # pairs of F tried per C: the push-under chain search (4 pitches x 2 wrist turns x exact IK) is the expensive leg, so the
             # push mode keeps the earlier 4 draws (0919-233031: 8 draws x 12 C candidates spent the 900 s budget on attempts 0 and 2)
-            for i in rng.permutation(len(F))[:int(self.num("f_draws_max", 4 if push else 8))]:
+            draw_order = list(rng.permutation(len(F)))
+            if push:
+                # the blade sits half an extent behind the object centre: the LONG axis along the push puts the blade goal ~7 cm
+                # closer to the base (sandal: 0.72 vs 0.78-0.80 m ahead - the chain solved only at the long-axis yaws, 0919-211642;
+                # every short-axis chain of 0920-052659 had no IK at its goal) - longest extent first, random within a bucket
+                d_push = th.as_tensor(place.extras["push_dir"], dtype=th.float32)
+                ext = {i: self.half_extent_along(G.qmul(G.quat_from_yaw(float(F[i][0]) + d_yaw), self.rest), d_push) for i in range(len(F))}
+                draw_order.sort(key=lambda i: -round(ext[i], 2))
+            for i in draw_order[:int(self.num("f_draws_max", 4 if push else 8))]:
                 self._check_deadline(f"F draw at C candidate {i_c + 1} (exact IK at B / C{', push chain' if push else ''})")
                 yaw0, g = F[int(i)]
                 yaw = yaw0 + float(rng.uniform(-TARGET_JITTER, TARGET_JITTER))
