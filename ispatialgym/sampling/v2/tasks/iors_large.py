@@ -1746,18 +1746,31 @@ class IORSLarge(SamplerV2):
                     grasp.extras.update({"place_kind": "drop", "drop_height_m": float(self.num("drop_height_m", PUSH_UNDER_DROP_HEIGHT_M)),
                                          "drop_cell": [float(v) for v in cd], "goal_cell": [float(v) for v in gc], "then": "push_under"})
                 self.sidecar.add_grasp(grasp)
-                q_lift = self.lift_arm_q(manip, eef, grasp.carry_height, target, g.pose)
-                if q_lift is None:
-                    log.info("%s: lift pose from B has no IK solution; the carry is checked with the stance posture", self.gp.alias)
-                try:
-                    path_bc = self.record_carry_leg(init, manip, place, tname, q_lift, max_len)
-                except Reject as e:
-                    errors.append(f"C: {e.reason}: {e}")
+                # carry-height ladder (0920-014945: with the hand frozen at a 12 cm lift over the table, the arrival sweep into the
+                # push-under crouch at C dragged the held sandal through the table top and into the floor at every s_T) - the lift
+                # is raised until the departure sweep, the carry and the arrival sweep are free; the oracle lifts by the recorded height
+                path_bc, carry_errors = None, []
+                for h in [float(v) for v in (self.gp.gen("carry_heights_m") or (grasp.carry_height, 0.25, 0.35))]:
+                    q_lift = self.lift_arm_q(manip, eef, h, target, g.pose)
+                    if q_lift is None:
+                        carry_errors.append(f"lift {h:.2f} m: no IK solution from B")
+                        continue
+                    grasp.carry_height = h
+                    try:
+                        with self._floor_relaxed():  # the floor mesh out (deep-crouch 1 cm margin, as the stance / program checks); the ground slab stays
+                            path_bc = self.record_carry_leg(init, manip, place, tname, q_lift, max_len)
+                        if h > 0.12 + 1e-6:
+                            log.info("%s: carry height raised to %.2f m (%s)", self.gp.alias, h, "; ".join(carry_errors) or "first that clears")
+                        break
+                    except Reject as e:
+                        carry_errors.append(f"lift {h:.2f} m: {e.reason}: {e}")
+                        self._drop_leg_records("placement")
+                        self.record_carry_arm_q(tname, "right", None)
+                if path_bc is None:
+                    errors.append("C: carry leg: " + "; ".join(carry_errors[-3:]))
                     fails["B -> C path / transition"] = fails.get("B -> C path / transition", 0) + 1
                     self.sidecar.stances.pop("placement", None)
                     self.sidecar.grasps.clear()
-                    self.record_carry_arm_q(tname, "right", None)
-                    self._drop_leg_records("placement")
                     break
                 if push:
                     self.sidecar.add_contact(PushUnderRecord("right", chain["pre"], chain["start"], chain["mid"], chain["goal"], chain["direction"], chain["distance_m"],
