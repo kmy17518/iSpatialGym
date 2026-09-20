@@ -593,11 +593,43 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
         q_seed = sampler.ikc.q_locked(stance, fingers=fingers).clone()
         for a, qa in locked.items():
             q_seed[sampler.kit.robot.arm_control_idx[a]] = th.as_tensor(qa, dtype=th.float32)
+    elif q_seed_prev is not None and (name in _END_KEY or name == "push"):
+        # the acting arm continues from the previous action's end (block design chaining) / a press's recorded branch (q_hint);
+        # trunk / other arm from the stance
+        q_seed = sampler.ikc.q_locked(stance, fingers=fingers).clone()
+        idx = sampler.kit.robot.arm_control_idx[arm]
+        q_seed[idx] = th.as_tensor(q_seed_prev, dtype=th.float32)[idx]
+    if name == "grasp" and getattr(action, "kind", None) == "cube" and getattr(sidecar, "blocks", None):
+        # a block's grasp IK is seeded with the sampler's pick configuration (``blocks[].pick_q``): the branch its tracked legs passed in
+        pq = _block_pick_q(sidecar, sampler, getattr(action, "object", None))
+        if pq is not None:
+            q_seed = sampler.ikc.q_locked(stance, fingers=fingers).clone()
+            q_seed[sampler.kit.robot.arm_control_idx[arm]] = th.tensor(pq, dtype=th.float32)
+    end_q_raw: Optional[th.Tensor] = None
+    end_key = _END_KEY.get(name)
     where = f"stance {stance_name}, arm {arm}, carried {carried}" + (f", {'/'.join(sorted(locked))} arm locked at its contact" if locked else "")
     if name == "retreat" and getattr(action, "after", None) is not None:
         where += f", after {getattr(action.after, 'name', type(action.after).__name__)}"
-    with attached(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object):
-        for key, poses in iter_pose_targets(targets):
+    if name in ("push", "brace") and getattr(action, "contact", None) is not None:
+        c_ = action.contact
+        where += f", {name} of {getattr(c_, 'object', None)} {(getattr(c_, 'extra', None) or {}).get('pose_class') or ''}".rstrip()
+    pose_targets = list(iter_pose_targets(targets))
+    if name == "push" and isinstance(targets, dict) and _is_pack_push(sidecar, action):
+        # a packing push (block design, owner 2026-09-19 21:47) is verified as the oracle executes it: ``arm_to(pre)`` then
+        # ``arm_along(init -> goal)`` from the pre's configuration - ONE chain pre -> init -> ... -> goal tracked from the pre's
+        # branch (the sampler's ``_pack_pushes`` checks this very chain). Checked as "pre" alone + "waypoints" from a fresh IK at
+        # init, the init pose landed in a branch that collides with the neighbour cube 2-4 mm from the blade (0920-101139: 7/8
+        # attempts 'waypoints: exact IK failed at pose 1 of 3 ... collides with <neighbour>')
+        pre_l = [(k, p_) for k, p_ in pose_targets if k == "pre"]
+        wps_l = [(k, p_) for k, p_ in pose_targets if k == "waypoints"]
+        if pre_l and wps_l:
+            rest = [(k, p_) for k, p_ in pose_targets if k not in ("pre", "waypoints")]
+            pose_targets = [("waypoints", list(pre_l[0][1]) + list(wps_l[0][1]))] + rest
+    # a floor-level push whose blade runs below the cuRobo ground slab's padding (``contacts.push.ground_ignored``, IORS push-under
+    # 2026-09-20): the sampler solved the chain with the slab off, so is it checked; the oracle tracks the legs without a veto
+    slab_off = bool(name == "push" and ((getattr(getattr(action, "contact", None), "extra", None) or {}).get("ground_ignored")))
+    with attached(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object), sampler.ikc.ignoring([], ground=not slab_off):
+        for key, poses in pose_targets:
             if key.split(".")[0] in skip_keys:
                 continue
             if len(poses) == 1:

@@ -147,13 +147,29 @@ class _Ignoring:
     reason (attached objects, removed objects) are left alone. Falls back to ``RobotKit.ignoring`` (two world syncs)
     when the backend has no per-mesh switch."""
 
-    def __init__(self, kit, objs: List[Any]):
+    def __init__(self, kit, objs: List[Any], ground: bool = True):
         self.kit = kit
         self.objs = objs
+        self.ground = ground  # False: the cuRobo ground slab (``R1ProCuRobo.GROUND_SLAB_NAME``) is switched off too (floor-level pushes)
         self.names: List[str] = []
         self._fallback = None
+        self._slab_off = False
+
+    def _slab(self, enabled: bool) -> bool:
+        backend = self.kit.backend
+        cub = getattr(getattr(getattr(backend, "checker", None), "data", None), "cuboids", None)
+        name = getattr(backend, "GROUND_SLAB_NAME", "__ground__")
+        try:
+            if cub is not None and name in cub.names[0]:
+                cub.set_enabled(name, enabled)
+                return True
+        except Exception:  # noqa: BLE001 - a backend without the slab
+            return False
+        return False
 
     def __enter__(self):
+        if not self.ground:
+            self._slab_off = self._slab(False)
         if not self.objs:
             return self
         backend = self.kit.backend
@@ -178,6 +194,9 @@ class _Ignoring:
         return self
 
     def __exit__(self, *exc):
+        if self._slab_off:
+            self._slab(True)
+            self._slab_off = False
         if self._fallback is not None:
             self._fallback.__exit__(*exc)
             return False
@@ -243,11 +262,14 @@ class IKChecker:
         self.solutions: Dict[Tuple[str, Tuple[float, ...]], th.Tensor] = {}
         self._last_track_start: Optional[th.Tensor] = None  # pre-pose configuration of the last tracked approach
 
-    def ignoring(self, objs: Sequence[Any]):
+    def ignoring(self, objs: Sequence[Any], ground: bool = True):
         """Context manager: ``objs`` leave the cuRobo collision world for the queries inside (§3.6 "support ignored for the
         grasp pose only"). Their collision meshes are switched off by name (``R1ProCuRobo._mesh_enable``, what
-        ``attach_object`` does) instead of the two full world re-syncs of ``RobotKit.ignoring`` (0.5–13 s each)."""
-        return _Ignoring(self.kit, list(objs))
+        ``attach_object`` does) instead of the two full world re-syncs of ``RobotKit.ignoring`` (0.5–13 s each).
+        ``ground=False`` also switches the cuRobo ground slab off (a floor-level push whose fingertips run < 4 cm above the
+        floor: the padded fingertip spheres penetrate the slab while the real fingers do not; the oracle tracks the push
+        legs without a collision veto)."""
+        return _Ignoring(self.kit, list(objs), ground=ground)
 
     @staticmethod
     def _pose_key(pose: Pose) -> Tuple[float, ...]:
@@ -757,6 +779,77 @@ class IKChecker:
                 return None, "approach_untrackable: the end configuration collides"
         return traj[-1].clone(), "ok"
 
+    #: the oracle's ``Motions._densify`` resolution of a tracked eef chain (``MotionsConfig.cartesian_step`` / ``cartesian_rot_step``)
+    TRACK_STEP_M = 0.01
+    TRACK_STEP_RAD = 0.05
+
+    def track_chain(self, q_from: th.Tensor, waypoints: Sequence[Pose], arm: str, ignore: Sequence[Any] = (), ignore_end: Sequence[Any] = (),
+                    soft_stall_m: Optional[float] = None, clear_links: Sequence[str] = (), clear_margin: float = 0.0) -> Tuple[Optional[th.Tensor], str]:
+        """Differential-IK tracking of a whole eef chain (a reorient: yaw-align orbit, in-hand flip) from ``q_from`` (which
+        reaches ``waypoints[0]``) exactly as the oracle's ``arm_along`` tracks it - every segment densified by position
+        (``TRACK_STEP_M``) AND rotation (``TRACK_STEP_RAD``), no joint step above ``APPROACH_MAX_STEP`` - the configurations
+        collision-free with ``ignore`` removed (the last one with ``ignore_end`` removed too). ``track_segment`` densifies by
+        position only, so a rotation in place (block design 0919-140558: the anchor's 11 deg yaw-align on a 45 deg pitched pinch,
+        'joint jump 0.23 rad at waypoint 4' in the demo) was checked in 2 steps where the oracle takes 4 and drifts along a
+        singular direction. Returns ``(q_end, "ok")`` or ``(None, reason)``.
+
+        ``soft_stall_m``: the oracle finishes a free-space leg (lift, carry, descent, retreat) whose differential IK *stalls* -
+        no joint jump, residual below this - by ``arm_to`` to the leg's end pose (``ApproachFinish``); with it set, such a stall
+        is finished here by the exact IK of the end pose seeded from the last tracked configuration and the chain passes
+        (``"ok (stall .. mm finished)"``). A joint jump or a collision fails the chain either way; a reorient (no finish in the
+        oracle) is checked without it."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        wps = [(G.t(w[0]), G.t(w[1])) for w in waypoints]
+        if len(wps) < 2:
+            return G.t(q_from).clone(), "ok"
+        dense: List[Pose] = []
+        for a, b in zip(wps[:-1], wps[1:]):
+            dist = float(th.linalg.norm(b[0] - a[0]))
+            ang = float(C.quat_angle(a[1], b[1]))
+            n = max(1, int(math.ceil(max(dist / self.TRACK_STEP_M, ang / self.TRACK_STEP_RAD))))
+            dense.extend(tuple(w) for w in C.line_waypoints(a, b, n))
+        self.kit._ensure_synced()
+        with self.ignoring(list(ignore)):
+            res = self.kit.backend.solve_ik_path(f"{arm}_arm", [{M.EEF_LINK[arm]: (G.t(w[0]), G.t(w[1]))} for w in dense], q_start=G.t(q_from),
+                                                 check_collisions=False, sync_world=False, max_joint_step=self.APPROACH_MAX_STEP, max_iters=60)
+        self.kit.stats["ik_calls"] = self.kit.stats.get("ik_calls", 0) + 1
+        finished = ""
+        if not res.success:
+            diag = dict(getattr(res, "diagnostics", None) or {})
+            stall = diag.get("pos_err")
+            if soft_stall_m is not None and diag.get("stage") == "diff_ik" and stall is not None and float(stall) <= float(soft_stall_m) and res.q_traj is not None and len(res.q_traj) > 0:
+                # the oracle's finish: plan to the end pose from where the tracking stalled (here: its exact IK seeded there)
+                q_last = res.q_traj[-1].clone()
+                with self.ignoring(list(ignore) + list(ignore_end)):
+                    q_fin = self.kit.ik(wps[-1], q_last, arm=arm)
+                if q_fin is None:
+                    return None, f"approach_untrackable: chain tracking ({len(dense)} dense poses): {res.status}; the end pose has no IK from the stall either"
+                traj = th.cat([res.q_traj, q_fin.unsqueeze(0)], dim=0)
+                finished = f" (stall {float(stall) * 1000:.1f} mm at dense pose {diag.get('fail_index')} finished by IK)"
+            else:
+                return None, f"approach_untrackable: chain tracking ({len(dense)} dense poses): {res.status}"
+        else:
+            traj = res.q_traj
+        with self.ignoring(list(ignore)):
+            free = self.kit.collision_free(traj[1:-1], margin=0.0) if len(traj) > 2 else th.ones(0, dtype=th.bool)
+        if len(free) and not bool(free.all()):
+            bad = [i + 1 for i, f in enumerate(free.tolist()) if not f]
+            return None, f"approach_untrackable: {len(bad)}/{len(free)} tracked chain configurations collide ({self._collision_blame(traj[bad[0]], list(ignore))})"
+        with self.ignoring(list(ignore) + list(ignore_end)):
+            if not bool(self.kit.collision_free(traj[-1], margin=0.0)[0]):
+                return None, "approach_untrackable: the tracked chain's end configuration collides"
+        if clear_links and clear_margin > 0.0:
+            # ``clear_links`` (the arm links, not the hand) keep ``clear_margin`` from the world along the whole chain: the oracle's QA
+            # fails a grasp on any arm-table contact (block design 0919-171511: right_arm_link5 / 4 brushed the table edge during
+            # the pitched approach, the end configurations 12 mm clear)
+            with self.ignoring(list(ignore) + list(ignore_end)):
+                clear = self.kit.links_clear(traj, clear_links, clear_margin)
+            if not bool(clear.all()):
+                bad = [i for i, c in enumerate(clear.tolist()) if not c]
+                return None, f"arm_proximity: {len(bad)}/{len(clear)} tracked configurations put an arm link within {clear_margin * 1000:.0f} mm of the world (first at dense pose {bad[0]})"
+        return traj[-1].clone(), "ok" + finished
+
     def _collision_blame(self, q: th.Tensor, ignored: Sequence[Any]) -> str:
         """Diagnostic: which spawned object (or 'scene / self') a colliding configuration collides with — each spawned
         object is removed in turn on top of ``ignored``."""
@@ -858,11 +951,16 @@ class IKChecker:
     # -- waypoints ----------------------------------------------------------------------------------------------
     def waypoints_ok(self, waypoints: Sequence[Pose], stance: Stance, arm: str = "right", policy: str = "screen_mid_exact_ends",
                      ignore_for_last: Sequence[Any] = (), ignore_all: Sequence[Any] = (), q_seed: Optional[th.Tensor] = None,
-                     scale_key: Any = None, cache: bool = True, fingers: Optional[float] = None, approached: Optional[Sequence[Any]] = None) -> IKResult:
+                     scale_key: Any = None, cache: bool = True, fingers: Optional[float] = None, approached: Optional[Sequence[Any]] = None,
+                     track_dense: bool = False) -> IKResult:
         """§3.9: screening IK at the intermediate waypoints, exact IK at the two endpoints (``policy`` names what was
         checked and is recorded as ``waypoint_policy``). ``ignore_all`` objects are removed for every waypoint (the
         carried object's own support along a lift), ``ignore_for_last`` for the final pose only. ``cache=False`` for
-        re-checks that must not hit a cached verdict (program check, ``validate_instances``)."""
+        re-checks that must not hit a cached verdict (program check, ``validate_instances``).
+
+        ``track_dense`` (block design, owner 2026-09-19): a chain that is not a straight approach (a reorient) is additionally
+        tracked from the first pose's solution by :meth:`track_chain` at the oracle's densification, so the recorded chain
+        is one the oracle's ``arm_along`` follows without a joint jump; the returned configuration is the tracked end."""
         wps = list(waypoints)
         if len(wps) < 2:
             return self.exact(wps, stance, arm, ignore_for_last, q_seed=q_seed, scale_key=scale_key, cache=cache, fingers=fingers, approached=approached)
@@ -887,6 +985,12 @@ class IKChecker:
             if not bool(ok.all()):
                 bad = [i + 1 for i, s in enumerate(ok.tolist()) if not s]
                 return IKResult(False, None, f"waypoints {bad} of {len(wps)} fail the screening IK", len(wps))
+        if track_dense:
+            q_end, why = self.track_chain(r0.q, wps, arm, ignore=list(ignore_all), ignore_end=list(ignore_for_last))
+            if q_end is None:
+                return IKResult(False, None, why, len(wps))
+            self.solutions[(arm, self._pose_key(wps[-1]))] = q_end.clone()
+            return IKResult(True, q_end, policy + "+tracked", len(wps))
         return IKResult(True, r1.q, policy, len(wps))
 
     # -- attached objects ---------------------------------------------------------------------------------------

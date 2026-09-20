@@ -560,17 +560,22 @@ class IORSLarge(SamplerV2):
         proj = pts @ d
         return float(proj.max() - proj.min()) / 2
 
+    #: below this fingertip height above the floor the cuRobo ground slab flags the padded fingertip spheres (first-demo loop
+    #: 2026-09-16: every push pre-pose failed the IK at z_push = 4.5 cm) - the slab is switched off for such a chain's IK
+    SLAB_TIP_M = 0.045
+
     def push_height(self, pitch_deg: float) -> Tuple[float, float]:
-        """``(z_push, z_tip)`` of the floor blade: the eef origin at ¾ of the target height, clamped to 6–9 cm above the
-        floor (``push_height_min_m``): the fingertips then sit ≥ 4 cm above the floor — the cuRobo ground slab (which the
-        floor-ignore does not remove) flags fingertip spheres closer than that (first-demo loop 2026‑09‑16: every push
-        pre-pose failed the IK at z_push = 4.5 cm while the drop grasp 11 cm up was feasible from the same stance)."""
+        """``(z_push, z_tip)`` of the floor blade: the fingertips at ``push_tip_frac`` (½) of the target's height above the
+        floor, at least ``push_tip_clearance_m`` (1.5 cm) and at most 5 cm up; the eef origin ``FINGERTIP_LENGTH·cos(pitch)``
+        above the tips. The old rule (eef origin at ¾ of the height, fingertips ≥ 4 cm up for the cuRobo ground slab) ran
+        the blade over a 4.5 cm sandal: it caught the strap near the middle and moved the sandal 17 cm of the 29 cm
+        (0920-143722, 12 cm short of the goal cell). A blade below ``SLAB_TIP_M`` has its IK solved with the slab off."""
         height = float(self.place["height"])
-        z_min = float(self.num("push_height_min_m", 0.06))
-        z_push = self.floor_z + min(max(0.75 * height, z_min), 0.09)
+        frac = float(self.num("push_tip_frac", 0.5))
+        clear = float(self.num("push_tip_clearance_m", 0.015))
+        z_tip = self.floor_z + max(clear, min(frac * height, 0.05))
         drop = C.FINGERTIP_LENGTH * math.cos(math.radians(float(pitch_deg)))
-        z_push = max(z_push, self.floor_z + 0.04 + drop)
-        return z_push, z_push - drop
+        return z_tip + drop, z_tip
 
     def _push_under_chain(self, place: Stance, quat, drop_xy, goal_xy, d2) -> Optional[Dict[str, Any]]:
         """The straight floor-level push from the drop position to the goal cell, exact IK from stance C (closed gripper,
@@ -598,16 +603,17 @@ class IORSLarge(SamplerV2):
             start = th.tensor([float(cd[0]), float(cd[1]), z_push]) - d3 * (half_d + standoff)
             goal = th.tensor([float(gc[0]), float(gc[1]), z_push]) - d3 * (half_d + standoff)
             mid = 0.5 * (start + goal)
+            low = (z_tip - self.floor_z) < self.SLAB_TIP_M
             for c_sign in (1.0, -1.0):
                 q = C.eef_quat(a_vec, c_sign * d3)
                 poses = [(start, q), (mid, q), (goal, q)]
                 pre = C.pre_pose(poses[0])
-                with self.ikc.ignoring([floor, target]):
+                with self.ikc.ignoring([floor, target], ground=not low):
                     res = self.ikc.exact([pre] + poses, place, "right", cache=False, fingers=C.FINGER_CLOSED)
                 if res.ok:
                     return {"pre": pre, "start": poses[0], "mid": poses[1], "goal": poses[2], "direction": d3, "distance_m": distance, "pitch_deg": float(pitch),
                             "blade_standoff_m": float(standoff), "push_height_m": float(z_push - self.floor_z), "half_extent_m": half_d, "wrist_sign": c_sign,
-                            "fingertip_z_m": float(z_tip - self.floor_z)}
+                            "fingertip_z_m": float(z_tip - self.floor_z), "ground_ignored": bool(low)}
                 why.append(f"pitch {pitch:.0f}{'' if c_sign > 0 else '-'}: {res.reason}")
         log.info("%s: push-under chain unreachable from stance C (d %.2f λ %+.2f trunk %s; start %s, goal %s in base): %s", self.gp.alias, place.stand_off or 0.0,
                  place.lateral, (place.translate, round(place.tilt, 2)),
@@ -1955,6 +1961,7 @@ class IORSLarge(SamplerV2):
                     self.sidecar.add_contact(PushUnderRecord("right", chain["pre"], chain["start"], chain["mid"], chain["goal"], chain["direction"], chain["distance_m"],
                                                              tname, stance="push" if push_st is not None else "placement", pitch_deg=chain["pitch_deg"], blade_standoff_m=chain["blade_standoff_m"],
                                                              push_height_m=chain["push_height_m"], half_extent_m=chain["half_extent_m"], fingertip_z_m=chain["fingertip_z_m"],
+                                                             ground_ignored=bool(chain.get("ground_ignored", False)),
                                                              drop_cell=[float(v) for v in cd], goal_cell=[float(v) for v in gc], partner=pname))
                 cam = self.camera_pose_at(init)
                 if not self.frustum_ok(cam, self.hull_corners_world(self.hull, t_pose), 0.05):
