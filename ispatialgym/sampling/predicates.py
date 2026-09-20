@@ -178,10 +178,23 @@ def attachment_alignment(child: Any, parent: Any, equivalences: Optional[Sequenc
     return best
 
 
+def held_by_robot(obj: Any) -> bool:
+    """``obj`` is in a robot's assisted grasp (``_ag_obj_in_hand``) in its scene."""
+    scene = getattr(obj, "scene", None)
+    for robot in getattr(scene, "robots", None) or []:
+        ag = getattr(robot, "_ag_obj_in_hand", None) or {}
+        if any(o is obj or (o is not None and getattr(o, "name", None) == getattr(obj, "name", None)) for o in ag.values()):
+            return True
+    return False
+
+
 def attach_if_aligned(child: Any, parent: Any, equivalences: Optional[Sequence[Sequence[float]]] = None) -> Dict[str, Any]:
     """The BEHAVIOR attachment of ``child`` to ``parent`` when :func:`attachment_alignment` passes: ``AttachedTo.set_value(True,
     bypass_alignment_checking=True)`` snaps the child onto the female frame (its own thresholds were met modulo the symmetry)
-    and creates the fixed joint. Returns the alignment record with ``attached``."""
+    and creates the fixed joint. Never while a robot holds the child (0919-174551: the evaluator's per-step check joined the
+    lid to the teapot halfway down the place descent, still in the hand, and snapped it 4 cm out of the grasp path — the
+    part must be released first, as the goal's ``(not (grasped ...))`` atoms say; the oracle drops the assisted grasp before
+    its own attach). Returns the alignment record with ``attached``."""
     from omnigibson.object_states import AttachedTo
 
     a = attachment_alignment(child, parent, equivalences)
@@ -190,6 +203,9 @@ def attach_if_aligned(child: Any, parent: Any, equivalences: Optional[Sequence[S
         return a
     if not a.get("ok"):
         a["attached"] = False
+        return a
+    if held_by_robot(child):
+        a.update({"attached": False, "reason": "held by a robot"})
         return a
     pair = (a["child_link"], a["parent_link"])
     if a.get("first_free_pair") is not None and tuple(a["first_free_pair"]) != pair:
