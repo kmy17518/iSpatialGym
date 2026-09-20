@@ -421,7 +421,9 @@ class Attachment(SamplerV2):
         grasp.carry_height = float(carry)
         grasp.waypoints = wps
         grasp.pre_place, grasp.place = pre_attach, attach
-        grasp.extras.update({"attach_stance": work_st.name, "lift": [float(v) for v in lift[0]] if lift is not None else None})
+        grasp.extras.update({"attach_stance": work_st.name, "lift": [float(v) for v in lift[0]] if lift is not None else None,
+                             "slerp_policy": att.get("slerp_policy")})
+        self._record_approach_standoff(grasp, f_pose, manip)  # over-the-top pre-grasp approach when the partner stands near the male
         # owner item 3 (release height): the attach pose is fixed by the mating links (no release above a surface), but the
         # surface under the male's footprint centre at the goal (the female's mating face) is recorded for the audit
         grasp.extras["release_surface_z"] = None
@@ -455,6 +457,34 @@ class Attachment(SamplerV2):
                           "joint_placement": {"left_band": self.left_bands is not None}})
         self.brace_missing = brace_state == "none"
         return d
+
+    # ------------------------------------------------------------------ over-the-top pre-grasp approach (owner 2026-09-19 20:42)
+
+    def _record_approach_standoff(self, grasp, f_pose: TT.Pose, manip: Stance) -> None:
+        """When the partner stands within ``generation.partner_near_m`` (0.35 m, hull-to-grasp horizontal distance) of the
+        male's grasp, the grasp record carries ``approach_standoff_m`` (``generation.grasp_approach_standoff_m``, 0.12): the
+        oracle reaches the pre-grasp through a standoff that far back along the approach axis (above a top-down grasp) and a
+        straight leg, instead of the free trajopt that swung the open hand at table height past the partner (pwgbsb /
+        jlalfc 0919-173115 / 181512: the wrist camera grazed the 29 cm teapot's spout). Recorded only when the standoff pose
+        passes the exact IK at the grasp stance. Facts on the record."""
+        near = float(self.gen("partner_near_m", 0.35))
+        dist = float(self.gen("grasp_approach_standoff_m", 0.12))
+        if grasp.grasp is None or grasp.pre_grasp is None or dist <= 0.0:
+            return
+        pts = C.transform_points((TT._t(f_pose[0]), TT._t(f_pose[1])), TT._t(self.hull[self.p_role]))
+        g_xy = TT._t(grasp.grasp[0])[:2]
+        d_xy = float(th.linalg.norm(pts[:, :2] - g_xy, dim=1).min())
+        grasp.extras["partner_distance_m"] = round(d_xy, 4)
+        if d_xy > near:
+            return
+        standoff = C.pre_pose((TT._t(grasp.pre_grasp[0]), TT._t(grasp.pre_grasp[1])), dist)
+        res = self.ikc.exact([standoff], manip, grasp.arm, ignore_for_last=[self.obj("support")], scale_key=self.choice.models[self.t_role].scale, cache=False)
+        if res.ok:
+            grasp.extras["approach_standoff_m"] = dist
+            log.info("%s: partner %.2f m from the grasp -> over-the-top pre-grasp approach recorded (standoff %.2f m)", self.gp.alias, d_xy, dist)
+        else:
+            grasp.extras["approach_standoff_reason"] = f"standoff pose fails the exact IK ({res.reason})"
+            log.info("%s: partner %.2f m from the grasp but the %.2f m standoff has no IK (%s): direct approach kept", self.gp.alias, d_xy, dist, res.reason)
 
     # ------------------------------------------------------------------ hand envelope vs the partner (0919-160750)
 
@@ -623,10 +653,16 @@ class Attachment(SamplerV2):
                     # the lift clears the table; the SLERP waypoints carry the male up to the pre-attach pose above the partner. The
                     # carry height ladder (owner item 2 / att_diag2: a 12 cm lift of a grasp at 0.8 m base-forward has no IK)
                     r_w, lift, wps = None, None, []
+                    # the SLERP is TRACKED from the lift's solution at the oracle's densification (track_dense, as block design's
+                    # reorients; owner 2026-09-19 20:42): 32-seed IK at every waypoint said "reachable" for a pre-attach 25 cm from the
+                    # lift while the oracle's differential IK stalled 13.7 mm short at waypoint 24/29 (pwgbsb / jlalfc 0919-185350 /
+                    # 193702) - a chain the arm cannot follow in one branch is rejected here, so the place stance (second base pose,
+                    # brace False) is recorded instead
+                    tracked = bool(self.gen("slerp_tracked", True))
                     for carry in CARRY_HEIGHTS:
                         lift = (grasp.grasp[0] + th.tensor([0.0, 0.0, carry]) + shift, grasp.grasp[1])  # the carried male moves with the base
                         wps = [(TT._t(p[0]), TT._t(p[1])) for p in C.line_waypoints(lift, eef_pre, int(self.g("reorientation_waypoints")) + 1)]
-                        r_w = self.ikc.waypoints_ok([lift] + wps, st, "right", ignore_all=[support])
+                        r_w = self.ikc.waypoints_ok([lift] + wps, st, "right", ignore_all=[support], track_dense=tracked)
                         if r_w.ok:
                             break
                     if not r_w.ok:
@@ -650,7 +686,7 @@ class Attachment(SamplerV2):
                         if require_joint:
                             continue
             return {"f_pose": pose, "attach": eef_attach, "pre_attach": eef_pre, "wps": wps, "carry": carry, "lift": lift, "brace": brace_rec, "b_dir": b_dir,
-                    "point": point}
+                    "point": point, "slerp_policy": r_w.reason}
         return None
 
     def _second_base_pose(self, rng, manip: Stance, m_pose: TT.Pose, grasp, cam_init, tname: str, require_joint: bool = True, brace: bool = True):

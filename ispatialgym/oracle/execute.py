@@ -341,6 +341,44 @@ def reach_pre_pose(motions: Motions, state, arm: str, pre, supports: Sequence[An
     yield from motions.arm_along(arm, [pre], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
 
 
+def _grasp_extra_float(action: Grasp, key: str) -> Optional[float]:
+    """A positive float fact of the grasp record (``grasps[].<key>``), None otherwise."""
+    extra = getattr(getattr(action, "grasp", None), "extra", None)
+    v = extra.get(key) if isinstance(extra, dict) else None
+    try:
+        v = float(v) if v is not None else None
+    except (TypeError, ValueError):
+        return None
+    return v if v is not None and math.isfinite(v) and v > 0 else None
+
+
+def reach_via_standoff(motions: Motions, arm: str, pre, distance: float, q_hint, ignore: Sequence[Any], ctx: Dict[str, Any]) -> Iterator[th.Tensor]:
+    """Over-the-top approach of a grasp pre-pose (attachment, owner 2026-09-19 20:42; ``grasps[].approach_standoff_m`` recorded
+    by the sampler when the partner stands near the male): the trajopt goes to a standoff ``distance`` further back along the
+    approach axis (above a top-down grasp) with the scene present, then a straight leg closes the standoff — the free trajopt to
+    the pre-grasp swung the open hand at table height past the partner and the wrist camera grazed the 29 cm teapot's spout
+    (pwgbsb / jlalfc 0919-173115 / 181512). The standoff is taken in the pre-grasp witness's IK branch when it can be tracked
+    from it (``standoff_configuration``); a standoff plan that fails falls back to the direct plan."""
+    p, q = as_world_pose(pre)
+    standoff = (p - C.approach_axis(q) * float(distance), q)
+    rec: Dict[str, Any] = {"distance_m": float(distance)}
+    ctx["approach_standoff"] = rec
+    q_standoff = standoff_configuration(motions, arm, pre, standoff, q_hint) if q_hint is not None else None
+    try:
+        if q_standoff is not None:
+            rec["branch"] = "witness"
+            yield from motions.arm_to(arm, q=q_standoff, ignore_objects=list(ignore))
+        else:
+            rec["branch"] = "planner"
+            yield from motions.arm_to(arm, pose=standoff, ignore_objects=list(ignore))
+    except SkillError as e:
+        log.warning("grasp(%s): the standoff plan failed (%s); direct plan to the pre-grasp", arm, e.message)
+        rec["fallback"] = e.message
+        yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(ignore))
+        return
+    yield from motions.arm_along(arm, [pre], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+
+
 def standoff_configuration(motions: Motions, arm: str, pre, standoff, q_hint) -> Optional[th.Tensor]:
     """The joint configuration (28-D) of ``standoff`` in the branch of the pre-pose witness ``q_hint``: differential IK
     from the witness along the straight leg pre -> standoff (no collision check: the leg is the one the hand will
@@ -615,7 +653,11 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     grasp_from = (getattr(action.grasp, "extra", None) or {}).get("grasp_from") if action.grasp is not None else None
     supports = contact_ignores(state, action.object, extra=(grasp_from,) if grasp_from else ())
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in supports]
-    yield from motions.arm_to(arm, pose=targets["pre_grasp"], q_hint=_witness(ctx, "pre_grasp"), ignore_objects=supports)
+    standoff_m = _grasp_extra_float(action, "approach_standoff_m")
+    if standoff_m:
+        yield from reach_via_standoff(motions, arm, targets["pre_grasp"], standoff_m, _witness(ctx, "pre_grasp"), supports, ctx)
+    else:
+        yield from motions.arm_to(arm, pose=targets["pre_grasp"], q_hint=_witness(ctx, "pre_grasp"), ignore_objects=supports)
     _hook(ctx, "fov")(True)  # from the pre-grasp on the fingertips enter the frame and must stay (recorded grasp pose in frame)
     obj = state.object(action.object)
     cfg = _cfg(ctx)
