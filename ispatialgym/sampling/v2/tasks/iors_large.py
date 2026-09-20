@@ -1048,15 +1048,31 @@ class IORSLarge(SamplerV2):
         ``extras``)."""
         p = th.as_tensor([float(init_xy[0]), float(init_xy[1])])
         edges = sorted(self.place["edges"], key=lambda e: float(th.linalg.norm(e.mid - p)))
-        tried = []
-        for edge in edges:
+        allow = self.gp.gen("placement_edges")  # optional whitelist of partner edge names (+x / -x / +y / -y; top-raster edge names for ontop)
+        if allow:
+            edges = [e for e in edges if e.name in set(allow)] or edges
+        # owner 2026-09-20 09:50: the survivors of EVERY edge are pooled (nearest edge first, ``extras.edge_rank``) - the coupling
+        # decides; the nearest edge alone boxed the table probe in (the room behind the short end blocks every drive-back pose
+        # of the carry arrival, 0920-092254). ``generation.placement_pool_edges = false`` restores "the nearest edge that admits
+        # a stance" (spec 5.6 wording)
+        pool = self.gp.gen("placement_pool_edges", True) is not False
+        tried, out_all = [], []
+        for rank, edge in enumerate(edges):
             out = self._placement_candidates_at(edge, init_xy)
             if out:
-                if tried:
-                    log.info("%s: stance C: edge(s) %s nearest the init pose admit no stance; %s taken", self.gp.alias, tried, edge.name)
-                return out
-            tried.append(edge.name)
-        return []
+                for st in out:
+                    st.extras["edge_rank"] = rank
+                if not pool:
+                    if tried:
+                        log.info("%s: stance C: edge(s) %s nearest the init pose admit no stance; %s taken", self.gp.alias, tried, edge.name)
+                    return out
+                out_all += out
+            else:
+                tried.append(edge.name)
+        if pool and out_all:
+            log.info("%s: stance C: %d survivors pooled over the edges %s%s", self.gp.alias, len(out_all), [e.name for e in edges if e.name not in tried],
+                     f" (no stance at {tried})" if tried else "")
+        return out_all
 
     def _placement_candidates_at(self, edge: EdgeFrame, init_xy) -> List[Stance]:
         partner = self.partner
@@ -1677,10 +1693,13 @@ class IORSLarge(SamplerV2):
             # lateral -0.40..-0.16 only, and the one chain that ever solved (0919-211642) ran at lateral -0.25; the centred lane
             # (offset 0) tied with it in the order and 482 centred chains failed their pre-pose in 0920-040824
             lane = lambda k: 0 if abs(float(c_pool[k].extras.get("lane_offset_m", 0.0))) > 1e-6 else 1  # noqa: E731
-            depth = lambda k: (-float(c_pool[k].translate), float(c_pool[k].tilt), -float(c_pool[k].extras.get("drop_ahead_m", 0.0)), lane(k))  # noqa: E731
-            reach = lambda k: (lane(k), abs(float(c_pool[k].extras.get("drop_ahead_m", 0.0)) - float(ahead_pref)), -float(c_pool[k].translate), float(c_pool[k].tilt))  # noqa: E731
+            erank = lambda k: int(c_pool[k].extras.get("edge_rank", 0))  # noqa: E731  (the nearest allowed partner edge first)
+            depth = lambda k: (erank(k), -float(c_pool[k].translate), float(c_pool[k].tilt), -float(c_pool[k].extras.get("drop_ahead_m", 0.0)), lane(k))  # noqa: E731
+            reach = lambda k: (erank(k), lane(k), abs(float(c_pool[k].extras.get("drop_ahead_m", 0.0)) - float(ahead_pref)), -float(c_pool[k].translate), float(c_pool[k].tilt))  # noqa: E731
             order = sorted(side, key=depth) + sorted(front, key=reach if ahead_pref is not None else depth)
             n_try = max(12, len(side))
+        else:
+            order.sort(key=lambda k: int(c_pool[k].extras.get("edge_rank", 0)))  # ontop / place variants: nearest edge first, random within
         yaw_step = 2.0 * math.pi / max(1, len(self.yaws()))  # the screening grid (yaw buckets of the caches / the intersection)
         chain_cache: Dict[Tuple[int, int], Optional[Dict[str, Any]]] = {}  # (C index, yaw bucket) -> push chain (push-under: the chain depends on the yaw only)
         b_ik_cache: Dict[Tuple[int, str], Optional[Tuple[float, G.Pose, G.Pose, G.Pose]]] = {}  # (yaw bucket, grasp) -> (yaw, target pose, grasp eef, pre-grasp) at B, None = infeasible
