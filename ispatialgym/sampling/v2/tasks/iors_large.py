@@ -1537,19 +1537,25 @@ class IORSLarge(SamplerV2):
         rel = th.tensor([float(lift[0][0]), float(lift[0][1])]) - base_xy
         lat_lift = float(rel @ left)
         out: List[Tuple[G.Pose, List[G.Pose], th.Tensor]] = []
+        why: List[str] = []
         for ahead, lat, raise_m in (self.gp.gen("carry_poses") or self.CARRY_POSES):
             lat_v = lat_lift if lat is None else float(lat)
             xy = base_xy + fwd * float(ahead) + left * lat_v
             carry = (th.tensor([float(xy[0]), float(xy[1]), float(lift[0][2]) + float(raise_m)]), lift[1])
+            tag = f"({float(ahead):.2f}, {lat_v:+.2f}, z {float(carry[0][2]):.2f})"
             with attached(self.kit, "right", target, eef_in_object=eef_in_object):
                 r = self.ikc.exact([carry], manip, "right", cache=False)
                 if not r.ok or r.q is None:
+                    why.append(f"{tag}: IK {r.reason}")
                     continue
                 wps = list(C.line_waypoints(lift, carry, 4))
                 ok = self.ikc.waypoints_ok([lift] + wps, manip, "right", cache=False)
             if not ok.ok:
+                why.append(f"{tag}: line from the lift {ok.reason}")
                 continue
             out.append((carry, wps, r.q[self.kit.robot.arm_control_idx["right"]].clone()))
+        log.info("%s: carry poses from B (lift %.2f m at %s in base): %d feasible%s", self.gp.alias, carry_height,
+                 [round(float(v), 2) for v in P0.to_base_frame(lift[0], manip.base_pose2d, P0.base_z(self)).tolist()], len(out), ("; " + "; ".join(why)) if why else "")
         return out
 
     def lift_arm_q(self, manip: Stance, eef: G.Pose, carry_height: float, target, eef_in_object) -> Optional[th.Tensor]:
