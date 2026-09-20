@@ -685,7 +685,16 @@ def post_lift(action: Lift, state, targets, ctx) -> Optional[str]:
 
 
 def execute_reorient(action: Reorient, motions: Motions, state, targets, ctx) -> Iterator[th.Tensor]:
-    yield from motions.arm_along(action.arm, targets["waypoints"])
+    # a free-space in-hand leg (the SLERP carry of attachment, the held-object reorientations): a differential-IK stall
+    # anywhere on it is finished by ``arm_to`` to the recorded end pose (its ``end`` witness first), like the lift / retreat /
+    # carry legs — attachment 0919-185350 (lid pwgbsb -> teapot jlalfc, pre-attach 25 cm from the lift): the SLERP stalled at
+    # waypoint 24/29 with a 13.7 mm residual, no joint at a limit, no singularity (the reach boundary of the start branch)
+    cfg = _cfg(ctx)
+    finish = _free_leg_finish(state, targets["waypoints"][-1], _witness(ctx, "end") if _witness(ctx, "end") is not None else _witness(ctx, "waypoints"),
+                              contact_ignores(state, action.object), cfg)
+    yield from motions.arm_along(action.arm, targets["waypoints"], finish=finish, soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+    if finish.used:
+        ctx["reorient_finish"] = finish.info
 
 
 def post_reorient(action: Reorient, state, targets, ctx) -> Optional[str]:
