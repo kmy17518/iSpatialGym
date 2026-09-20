@@ -1584,7 +1584,7 @@ class IORSLarge(SamplerV2):
         # max(geodesic + extra, 2 × geodesic) — the base rounds the support / partner between B and C (D1: raise the default)
         max_len = max(geo + self.num("path_max_extra_m", 3.0), 2.0 * geo)
         order = list(rng.permutation(len(c_pool)))
-        n_try = 6
+        n_try = int(self.num("c_candidates_max", 12))  # C survivors tried per B candidate (the per-attempt budget bounds the total)
         if self.push_under:
             # side stances first (the frontal ones put the lane out of the floor reach — see push_under_candidates), the
             # deepest trunk first within a kind (B3: the floor is reached at translate 0.95 / tilt −1.2 only); every side
@@ -1613,8 +1613,15 @@ class IORSLarge(SamplerV2):
             # the release pose: the goal cell (ontop / under by placement) or the drop cell outside the edge (push-under)
             release_xy = cd if push else gc
             release_pose = (lambda xy, quat: self.drop_pose_at(xy, quat)) if push else (lambda xy, quat: self.goal_pose_at(xy, quat))
-            F_goal = self.ikc.feasible_sets([release_xy], yaws, self.grasps, lambda xy, yaw: release_pose(xy, G.qmul(G.quat_from_yaw(yaw), self.rest)), place, "right",
-                                            ignore_place).get(0, [])
+            # A carried object keeps its yaw RELATIVE TO THE ROBOT (no re-grasp), so at C its world yaw is the init yaw plus
+            # the base-yaw change B -> C: F_goal is screened at yaw + d_yaw and intersected with F_init by the init yaw
+            # (``generation.carry_yaw = "world"`` restores the spec §5.6 wording "goal yaw = init world yaw", which holds
+            # only when B and C share a base yaw - countertop-floor 0916-231451: F_init 3-21 / F_goal 0-5 / F empty on
+            # every candidate). The goal orientation written to the TRO is the rotated one.
+            d_yaw = 0.0 if str(self.gp.gen("carry_yaw", "relative")) == "world" else float(place.yaw - manip.yaw)
+            F_goal = self.ikc.feasible_sets([release_xy], [y + d_yaw for y in yaws], self.grasps,
+                                            lambda xy, yaw: release_pose(xy, G.qmul(G.quat_from_yaw(yaw), self.rest)), place, "right", ignore_place).get(0, [])
+            F_goal = [(y - d_yaw, g) for y, g in F_goal]
             F = intersect_feasible(F_init, F_goal)
             if push:
                 log.info("%s: push-under C try %s d %.2f λ %+.2f trunk (%.2f, %.1f): F_init %d, F_goal %d, F %d at drop %s", self.gp.alias, place.extras.get("stance_kind"),
@@ -1650,7 +1657,8 @@ class IORSLarge(SamplerV2):
                 if not res.ok:
                     fails["B: [pre-grasp, grasp] exact IK"] = fails.get("B: [pre-grasp, grasp] exact IK", 0) + 1
                     continue
-                goal = release_pose(release_xy, t_pose[1])
+                goal_quat = G.qmul(G.quat_from_yaw(d_yaw), t_pose[1]) if abs(d_yaw) > 1e-9 else t_pose[1]
+                goal = release_pose(release_xy, goal_quat)
                 place_eef = IK.grasp_pose(goal, g.pose)
                 pre_place = IK.pre_pose(place_eef)
                 with attached(self.kit, "right", target, eef_in_object=g.pose):
@@ -1660,7 +1668,7 @@ class IORSLarge(SamplerV2):
                     continue
                 chain = None
                 if push:  # the straight floor push drop → goal from the same stance (closed gripper, floor + target ignored)
-                    chain = self._push_under_chain(place, t_pose[1], cd, gc, place.extras["push_dir"])
+                    chain = self._push_under_chain(place, goal_quat, cd, gc, place.extras["push_dir"])
                     if chain is None:
                         errors.append("C: push chain unreachable")
                         continue
@@ -1707,7 +1715,9 @@ class IORSLarge(SamplerV2):
                 d.robot_q = self.stance_q(init)
                 d.base_pose2d = tuple(init.base_pose2d)
                 d.summary.update({"goal_cell": gc, "grasp": {"key": g.key, "name": g.name, "yaw": yaw}, "placement_stance": P0.summarize_stance(place),
-                                  "path_length_m": place.extras["path_length_m"], "F_init": len(F_init), "F_goal": len(F_goal), "F": len(F)})
+                                  "path_length_m": place.extras["path_length_m"], "F_init": len(F_init), "F_goal": len(F_goal), "F": len(F),
+                                  # the carried object's yaw follows the base: goal orientation = init orientation rotated by C.yaw - B.yaw
+                                  "goal_quat": [float(v) for v in goal_quat], "carry_yaw_offset_rad": round(d_yaw, 4)})
                 if push:
                     d.summary["push_under"] = {"drop_cell": [float(v) for v in cd], "distance_m": chain["distance_m"], "pitch_deg": chain["pitch_deg"],
                                                "blade_standoff_m": chain["blade_standoff_m"], "push_height_m": chain["push_height_m"], "half_extent_m": chain["half_extent_m"],
@@ -1747,10 +1757,15 @@ class IORSLarge(SamplerV2):
 
     # ------------------------------------------------------------------ goal (§5.6 / §6.12)
 
+    def goal_quat_of(self, draft: Draft) -> th.Tensor:
+        """The target's goal orientation: the init orientation rotated by the base-yaw change B -> C (``summary.goal_quat``,
+        relative carry yaw), the init orientation itself under ``carry_yaw = "world"``."""
+        gq = draft.summary.get("goal_quat")
+        return th.tensor([float(v) for v in gq]) if gq is not None else draft.object_poses[self.tname][1]
+
     def goal(self, draft: Draft):
         tname = self.tname
-        t_pose = draft.object_poses[tname]
-        goal = self.goal_pose_at(draft.summary["goal_cell"], t_pose[1])
+        goal = self.goal_pose_at(draft.summary["goal_cell"], self.goal_quat_of(draft))
         draft.goal_poses[tname] = goal
         draft.pose_targets[tname] = full_pose_target(goal[0], goal[1], self.tol("position", 0.03), self.tol("orientation", 0.20))
         place = self.sidecar.stance("placement")
@@ -1758,7 +1773,7 @@ class IORSLarge(SamplerV2):
 
     def after_settle(self, draft: Draft):
         tname = self.tname
-        goal = self.goal_pose_at(draft.summary["goal_cell"], draft.object_poses[tname][1])
+        goal = self.goal_pose_at(draft.summary["goal_cell"], self.goal_quat_of(draft))
         draft.goal_poses[tname] = goal
         tgt = draft.pose_targets[tname]
         tgt["position"], tgt["orientation"] = [float(v) for v in goal[0]], [float(v) for v in goal[1]]
