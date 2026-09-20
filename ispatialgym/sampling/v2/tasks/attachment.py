@@ -176,8 +176,27 @@ class Attachment(SamplerV2):
         fp, fq = female.get_position_orientation()
         pp, pq = parent_link.get_position_orientation()
         self.parent_link_in_female = C.relative((pp.float(), pq.float()), (fp.float(), fq.float()))
-        # insertion axis (female meta link +z) in the female root frame
-        self.insertion_axis_local = C.quat_rotate(self.parent_link_in_female[1], th.tensor([0.0, 0.0, 1.0]))
+        # insertion axis in the female root frame: the direction from the partner's hull centroid to the female meta link (the
+        # side from which the male can approach without passing through the partner: up for a bottle neck / socket / pot
+        # top, away from the wall for a nail, the underside for a deck) when it is well-defined; the meta link's +z only as
+        # the fallback — BEHAVIOR's attachment frames need only match between male and female, not point along the
+        # insertion (cork/ncxgpe -> wine_bottle/inkqch: both frames (0.5, -0.5, 0.5, 0.5), +z along the bottle's -y, so the
+        # +z rule put the pre-attach 10 cm beside the neck and slid the cork in sideways)
+        axis_geo = TT._t(self.parent_link_in_female[0]) - TT._t(self.hull[self.p_role]).mean(dim=0)  # both in the female root frame
+        axis_z = C.unit(C.quat_rotate(self.parent_link_in_female[1], th.tensor([0.0, 0.0, 1.0])))
+        facts: Dict[str, Any] = {"source": "meta link +z", "axis": [round(float(v), 4) for v in axis_z]}
+        self.insertion_axis_local = axis_z
+        if float(th.linalg.norm(axis_geo)) > float(self.gen("insertion_axis_min_offset_m", 0.02)):
+            geo = C.unit(axis_geo)
+            angle = math.degrees(math.acos(max(-1.0, min(1.0, float(th.dot(geo, axis_z))))))
+            facts.update({"centroid_to_female": [round(float(v), 4) for v in geo], "angle_deg": round(angle, 1)})
+            if angle > float(self.gen("insertion_axis_max_deviation_deg", 45.0)):
+                # the annotation's +z is not the approach direction (a teapot's +z is within 8 deg of it and stays exact)
+                self.insertion_axis_local = geo
+                facts["source"] = "centroid->female"
+                facts["axis"] = facts["centroid_to_female"]
+        self.template_facts["insertion_axis"] = facts
+        log.info("%s: insertion axis %s", self.gp.alias, json.dumps(facts))
         self.symmetry = self._symmetry_equivalences(male, child_link)
         support = self.obj("support")
         self.top = self.support_top(support)
