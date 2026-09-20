@@ -1507,7 +1507,16 @@ class IORSLarge(SamplerV2):
             try:
                 dep = self.record_departure_transition(manip, place, tt, carried=tname, arm="right")
                 start = NAV.departure_pose(manip, dep.stand_off)
-                path = self.record_path(manip, place, carried=tname, arm="right", max_length_m=max_len, trunk=tt, start_pose2d=start)
+                try:
+                    path = self.record_path(manip, place, carried=tname, arm="right", max_length_m=max_len, trunk=tt, start_pose2d=start)
+                except Reject as e:
+                    if e.reason != "path_collision":
+                        raise
+                    # the local (un-eroded) shortest path hugs the partner's corner with the object out front (0920-100543: stride 4/35
+                    # at the table end); the eroded global map keeps the body's distance
+                    self._drop_leg_records(place.name)
+                    dep = self.record_departure_transition(manip, place, tt, carried=tname, arm="right")
+                    path = self.record_path(manip, place, carried=tname, arm="right", max_length_m=max_len, trunk=tt, start_pose2d=start, force_global=True)
                 # a carry into a deep crouch backs off further before the sweep (the hand frozen at the lift pose swings ~0.5 m
                 # forward / 0.9 m down): s_T up to stand-off + generation.carry_transition_extra_m (1.0)
                 self.record_transition(manip, place, carried=tname, arm="right", trunk_from=tt, extra_max=self.num("carry_transition_extra_m", 1.0))
@@ -1522,7 +1531,13 @@ class IORSLarge(SamplerV2):
                 errors.append(f"travel trunk {tuple(round(v, 2) for v in tt)}: {e.reason}: {e}")
         # fallback: drive at B's trunk (the object low in the crouch), the trunk set at C's pre-place stand-off
         try:
-            path = self.record_path(manip, place, carried=tname, arm="right", max_length_m=max_len)
+            try:
+                path = self.record_path(manip, place, carried=tname, arm="right", max_length_m=max_len)
+            except Reject as e:
+                if e.reason != "path_collision":
+                    raise
+                self._drop_leg_records(place.name)
+                path = self.record_path(manip, place, carried=tname, arm="right", max_length_m=max_len, force_global=True)
             self.record_transition(manip, place, carried=tname, arm="right", extra_max=self.num("carry_transition_extra_m", 1.0))
             log.info("%s: B -> C carry: no travel trunk admits straighten-then-navigate (%s); driving at B's trunk %s", self.gp.alias, "; ".join(errors),
                      (manip.translate, round(manip.tilt, 2)))
@@ -1624,7 +1639,17 @@ class IORSLarge(SamplerV2):
             fxy = focus_xy if focus_xy is not None else manip.focus[:2]
             F_b = self.ikc.feasible_sets([fxy], yaws, self.grasps, lambda xy, yaw: self.pose_on(xy, yaw, z_init), manip, "right", self.grasp_ignore_objects()).get(0, [])
             pre.append((len(F_b), manip, F_b))
-        pre.sort(key=lambda t: -t[0])
+        # order: a COMPACT grasp first (the target cell's distance ahead of the base, 10 cm buckets) among the B candidates whose F_init
+        # has at least ``b_prescreen_min_f`` pairs, then the larger F_init - a grasp 0.85 m out over the table (0920-100542/3) leaves an
+        # extended arm that neither lifts higher nor rounds the table corner while carrying; ``b_prescreen_order = "f"`` restores F-only
+        min_f = int(self.num("b_prescreen_min_f", 8))
+        if str(self.gp.gen("b_prescreen_order", "compact")) == "compact":
+            def _ahead(m: Stance) -> float:
+                f = m.focus[:2] if m.focus is not None else m.base_xy
+                return float((th.as_tensor(f, dtype=th.float32) - m.base_xy) @ m.forward)
+            pre.sort(key=lambda t: (0 if t[0] >= min_f else 1, round(_ahead(t[1]), 1), -t[0]))
+        else:
+            pre.sort(key=lambda t: -t[0])
         self.template_facts.setdefault("F_init_prescreen", []).append([n for n, _, _ in pre])
         log.info("%s: F_init pre-screen over %d B candidates (%d yaws): %s", self.gp.alias, len(pre), len(yaws), [n for n, _, _ in pre])
         n_couple = int(self.num("b_candidates_max", 6))
@@ -1774,7 +1799,7 @@ class IORSLarge(SamplerV2):
                 d_push = th.as_tensor(place.extras["push_dir"], dtype=th.float32)
                 ext = {i: self.half_extent_along(G.qmul(G.quat_from_yaw(float(F[i][0]) + d_yaw), self.rest), d_push) for i in range(len(F))}
                 draw_order.sort(key=lambda i: -round(ext[i], 2))
-            for i in draw_order[:int(self.num("f_draws_max", 4 if push else 8))]:
+            for i in draw_order[:int(self.num("f_draws_max", 8))]:  # failed B pairs are cached and skipped, so 8 draws cost little
                 self._check_deadline(f"F draw at C candidate {i_c + 1} (exact IK at B / C{', push chain' if push else ''})")
                 yaw0, g = F[int(i)]
                 yaw = yaw0 + float(rng.uniform(-TARGET_JITTER, TARGET_JITTER))
