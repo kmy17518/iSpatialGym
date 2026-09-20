@@ -532,9 +532,14 @@ def program_iors_large(sc: Sidecar, relation: str = "ontop") -> List[Action]:
     partner = push.extra.get("partner")
     avoid = (partner,) if isinstance(partner, str) and partner else ()
     place = Place(kind="drop", arm=g.arm, object=g.object, place=g.place, pre_place=g.pre_place, on=g.place_on, relation="under", avoid=avoid)
-    base_yaw = sc.stance("placement").base_pose2d[2]
+    # owner 2026-09-20 08:30 (drop first, then crouch): when the sidecar records a separate "push" stance (the deep crouch at the
+    # drop stance's base pose), the robot drops from "placement", retreats, takes the crouch with empty hands (the recorded
+    # trunk-only transition) and pushes from there; otherwise drop and push share the placement stance as before
+    push_stance = "push" if "push" in sc.stances else "placement"
+    base_yaw = sc.stance(push_stance).base_pose2d[2]
     p = Push(contact=push, base_yaw=base_yaw, touches=(g.place_on,) if g.place_on else (), avoid=avoid)
-    return head + [place, Retreat(arm=g.arm, object=g.object, after=place, distance=RETREAT_LITTLE), p, Retreat(arm=push.arm, object=push.object, after=p)]
+    to_push = _travel(sc, "placement", "push") if push_stance == "push" else []
+    return head + [place, Retreat(arm=g.arm, object=g.object, after=place, distance=RETREAT_LITTLE)] + to_push + [p, Retreat(arm=push.arm, object=push.object, after=p)]
 
 
 def program_iors_small(sc: Sidecar, relation: str = "ontop") -> List[Action]:

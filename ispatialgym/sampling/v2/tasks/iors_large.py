@@ -1638,6 +1638,7 @@ class IORSLarge(SamplerV2):
                 errors.append(f"B candidate: {e.reason}: {e}")
                 self.sidecar.stances.pop("manipulation", None)
                 self.sidecar.stances.pop("placement", None)
+                self.sidecar.stances.pop("push", None)
                 self.sidecar.grasps.clear()
                 self.carry_arm_q.clear()
         raise Reject("target_placement", "; ".join(errors[-3:]))
@@ -1692,6 +1693,28 @@ class IORSLarge(SamplerV2):
             gc = place.extras["goal_cell"]
             push = self.push_under
             cd = place.extras.get("drop_cell") if push else None
+            # push-under = DROP FIRST, THEN CROUCH (owner 2026-09-20 08:30): the object cannot be carried into the deep push crouch
+            # (the hand frozen at any carry pose sweeps into the partner / the floor / the base, and no compact carry pose keeps the
+            # grasp orientation within the wrist limits - 0920-043725 .. 075127), so the release happens from a MODERATE trunk at
+            # the same base pose ("placement" = the drop stance, drop height ``drop_height_m``), and the deep crouch ("push" stance)
+            # is entered with empty hands by a trunk-only transition before the floor push. ``generation.drop_trunks`` lists the
+            # trunks tried for the drop stance (the deepest survivors of the C search stay the push stance).
+            push_st = None
+            if push and str(self.gp.gen("push_under_drop_first", "on")) != "off":
+                push_st = place.with_trunk(place.translate, place.tilt, "push")
+                push_st.focus, push_st.arms, push_st.extras = place.focus, ["right"], dict(place.extras)
+                drop_st = None
+                for tr, ti in [tuple(float(v) for v in t) for t in (self.gp.gen("drop_trunks") or ((0.5, -0.6), (0.5, -0.9), (0.75, -0.6), (0.25, -0.6), (0.75, -0.9)))]:
+                    cand = place.with_trunk(tr, ti, "placement")
+                    cand.focus, cand.arms, cand.extras = place.focus, ["right"], dict(place.extras)
+                    with self._floor_relaxed():
+                        if bool(P0.body_free(self, [cand])[0]):
+                            drop_st = cand
+                            break
+                if drop_st is None:
+                    errors.append(f"C (d {place.stand_off:.2f}): no drop trunk is collision-free at the push stance's base pose")
+                    continue
+                place = drop_st
             if self.relation == "under" and not push:
                 cl = self.clearance_at(gc)
                 if cl is not None and not under_admissible(cl, self.place["height"], self.num("under_clearance_extra_m", 0.17)):
@@ -1742,7 +1765,7 @@ class IORSLarge(SamplerV2):
                     ck = (int(kc), int(round(yaw0 / yaw_step)))
                     if ck not in chain_cache:
                         q_chain = G.qmul(G.quat_from_yaw(yaw0 + d_yaw), self.rest)
-                        chain_cache[ck] = self._push_under_chain(place, q_chain, cd, gc, place.extras["push_dir"])
+                        chain_cache[ck] = self._push_under_chain(push_st if push_st is not None else place, q_chain, cd, gc, place.extras["push_dir"])
                     if chain_cache[ck] is None:
                         fails["C: push chain unreachable at this yaw"] = fails.get("C: push chain unreachable at this yaw", 0) + 1
                         continue
@@ -1789,7 +1812,7 @@ class IORSLarge(SamplerV2):
                     continue
                 chain = None
                 if push:  # the straight floor push drop → goal from the same stance (closed gripper, floor + target ignored)
-                    chain = self._push_under_chain(place, goal_quat, cd, gc, place.extras["push_dir"])
+                    chain = self._push_under_chain(push_st if push_st is not None else place, goal_quat, cd, gc, place.extras["push_dir"])
                     if chain is None:
                         errors.append("C: push chain unreachable")
                         continue
@@ -1800,6 +1823,18 @@ class IORSLarge(SamplerV2):
                 self._check_deadline(f"B -> C path / transition at C candidate {i_c + 1}")
                 self.sidecar.add_stance(manip)
                 self.sidecar.add_stance(place)
+                if push_st is not None:
+                    # the deep push stance at the same base pose, entered with EMPTY hands after the drop: a trunk-only transition
+                    self.sidecar.add_stance(push_st)
+                    try:
+                        with self._floor_relaxed():
+                            self.record_transition(place, push_st)
+                    except Reject as e:
+                        errors.append(f"C: drop -> push trunk transition: {e}")
+                        self.sidecar.stances.pop("placement", None)
+                        self.sidecar.stances.pop("push", None)
+                        self._drop_leg_records("push")
+                        break
                 floor_name = self.bindings.one("floor").name if self.bindings.has("floor") else None
                 grasp = GraspRecord(tname, "right", g.key, g.name, yaw, pre, eef, pre_place, place_eef, finger_q=list(g.finger_q), eef_in_object=g.pose,
                                     place_on=(floor_name or pname) if push else pname)
@@ -1848,11 +1883,13 @@ class IORSLarge(SamplerV2):
                     errors.append("C: carry leg: " + "; ".join(carry_errors[-3:]))
                     fails["B -> C path / transition"] = fails.get("B -> C path / transition", 0) + 1
                     self.sidecar.stances.pop("placement", None)
+                    self.sidecar.stances.pop("push", None)
+                    self._drop_leg_records("push")
                     self.sidecar.grasps.clear()
                     break
                 if push:
                     self.sidecar.add_contact(PushUnderRecord("right", chain["pre"], chain["start"], chain["mid"], chain["goal"], chain["direction"], chain["distance_m"],
-                                                             tname, stance="placement", pitch_deg=chain["pitch_deg"], blade_standoff_m=chain["blade_standoff_m"],
+                                                             tname, stance="push" if push_st is not None else "placement", pitch_deg=chain["pitch_deg"], blade_standoff_m=chain["blade_standoff_m"],
                                                              push_height_m=chain["push_height_m"], half_extent_m=chain["half_extent_m"], fingertip_z_m=chain["fingertip_z_m"],
                                                              drop_cell=[float(v) for v in cd], goal_cell=[float(v) for v in gc], partner=pname))
                 cam = self.camera_pose_at(init)
@@ -1919,8 +1956,8 @@ class IORSLarge(SamplerV2):
         goal = self.goal_pose_at(draft.summary["goal_cell"], self.goal_quat_of(draft))
         draft.goal_poses[tname] = goal
         draft.pose_targets[tname] = full_pose_target(goal[0], goal[1], self.tol("position", 0.03), self.tol("orientation", 0.20))
-        place = self.sidecar.stance("placement")
-        self.sidecar.set_goal(place.base_pose2d, place.translate, place.tilt, arms="same")
+        end = self.sidecar.stances.get("push") or self.sidecar.stance("placement")  # where the robot ends: the push stance when the drop and the push split
+        self.sidecar.set_goal(end.base_pose2d, end.translate, end.tilt, arms="same")
 
     def after_settle(self, draft: Draft):
         tname = self.tname
@@ -1963,8 +2000,9 @@ class IORSLarge(SamplerV2):
                 start_b = push.contact[0]
                 mid_b = 0.5 * (start_b + goal_b)
                 q = push.contact[1]
+                push_from = self.sidecar.stances.get("push") or place  # the chain is pushed from the deep push stance when the drop and the push split
                 with self.ikc.ignoring([self.obj("floor"), self.target]):
-                    r3 = self.ikc.exact([push.pre, (start_b, q), (mid_b, q), (goal_b, q)], place, "right", cache=False, fingers=C.FINGER_CLOSED)
+                    r3 = self.ikc.exact([push.pre, (start_b, q), (mid_b, q), (goal_b, q)], push_from, "right", cache=False, fingers=C.FINGER_CLOSED)
                 if not r3.ok:
                     raise Reject("push_unreachable", f"push-under chain to the settled goal fails the exact IK from stance C: {r3.reason}")
                 push.mid, push.goal = (mid_b, q), (goal_b, q)
