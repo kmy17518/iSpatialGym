@@ -1629,8 +1629,12 @@ class IORSLarge(SamplerV2):
             # 221909) used d 0.80 with the goal ~0.8 m ahead, which the deep crouch does reach. Default = the old order, largest
             # drop_ahead first; ``generation.push_under_drop_ahead_pref_m`` switches to the nearest-to-preference order.)
             ahead_pref = self.gp.gen("push_under_drop_ahead_pref_m")
-            depth = lambda k: (-float(c_pool[k].translate), float(c_pool[k].tilt), -float(c_pool[k].extras.get("drop_ahead_m", 0.0)))  # noqa: E731
-            reach = lambda k: (abs(float(c_pool[k].extras.get("drop_ahead_m", 0.0)) - float(ahead_pref)), -float(c_pool[k].translate), float(c_pool[k].tilt))  # noqa: E731
+            # the lane to the robot's RIGHT first (frontal_lane_offset_m 0.25): B3's under-edge probe reaches the floor strip at
+            # lateral -0.40..-0.16 only, and the one chain that ever solved (0919-211642) ran at lateral -0.25; the centred lane
+            # (offset 0) tied with it in the order and 482 centred chains failed their pre-pose in 0920-040824
+            lane = lambda k: 0 if abs(float(c_pool[k].extras.get("lane_offset_m", 0.0))) > 1e-6 else 1  # noqa: E731
+            depth = lambda k: (-float(c_pool[k].translate), float(c_pool[k].tilt), -float(c_pool[k].extras.get("drop_ahead_m", 0.0)), lane(k))  # noqa: E731
+            reach = lambda k: (lane(k), abs(float(c_pool[k].extras.get("drop_ahead_m", 0.0)) - float(ahead_pref)), -float(c_pool[k].translate), float(c_pool[k].tilt))  # noqa: E731
             order = sorted(side, key=depth) + sorted(front, key=reach if ahead_pref is not None else depth)
             n_try = max(12, len(side))
         yaw_step = 2.0 * math.pi / max(1, len(self.yaws()))  # the screening grid (yaw buckets of the caches / the intersection)
