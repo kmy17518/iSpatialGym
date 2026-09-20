@@ -580,9 +580,18 @@ def execute_transition(action: Transition, motions: Motions, state, targets, ctx
     yield from motions.track_path([targets["drive_in"]])
 
 
+def achievable_trunk(t: float, k: float) -> Tuple[float, float]:
+    """The (translate, tilt) the torso actually reaches for a nominal pair: ``conventions.torso_q`` clamps the tilt joint to
+    its limit, so a deep-crouch tilt of the reach-band grid ((0.95, -1.2): joint3 -0.89 - 1.2 < -1.83) lands at -0.94.
+    Sampler and oracle command the same clamped configuration; the post-conditions compare against it (0920-011106: the
+    A -> B transition 'failed' with trunk_error 0.26 rad although the torso stood exactly where the sampler had checked)."""
+    q = C.torso_q(float(t), float(k), C.TORSO_JOINT_LIMITS)
+    return C.torso_q_to_translate_tilt(q)
+
+
 def post_transition(action: Transition, state, targets, ctx) -> Optional[str]:
     cfg = _cfg(ctx)
-    t, k = targets["trunk"]
+    t, k = achievable_trunk(*targets["trunk"])
     t_now, k_now = state.trunk()
     ctx["trunk_error"] = (abs(t_now - float(t)), abs(k_now - float(k)))
     if max(ctx["trunk_error"]) > cfg.trunk_tol:
@@ -613,7 +622,7 @@ def execute_set_torso(action: SetTorso, motions: Motions, state, targets, ctx) -
 
 def post_set_torso(action: SetTorso, state, targets, ctx) -> Optional[str]:
     cfg = _cfg(ctx)
-    t, k = targets["trunk"]
+    t, k = achievable_trunk(*targets["trunk"])
     t_now, k_now = state.trunk()
     ctx["trunk_error"] = (abs(t_now - float(t)), abs(k_now - float(k)))
     if max(ctx["trunk_error"]) > cfg.trunk_tol:
