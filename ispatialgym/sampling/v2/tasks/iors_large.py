@@ -1521,7 +1521,10 @@ class IORSLarge(SamplerV2):
     #: carry pose candidates in B's base frame: (ahead, lateral, raise above the lift) — beside the body first (owner 2026-09-20
     #: 06:40: a pose in front of the chest swings INTO the base when the torso tilts 54 deg into the push-under crouch; a hand
     #: held to the right of the body swings down outside the base footprint and ends above the floor), then in front
-    CARRY_POSES = ((0.25, -0.45, 0.0), (0.30, -0.42, 0.05), (0.20, -0.48, -0.05), (0.40, None, 0.10), (0.35, None, 0.10))
+    #: (0920-071230: the poses 0.20-0.30 m ahead fold the elbow onto its limit - right_arm_joint4 within 2-19 mrad, the 0.05 rad
+    #: witness margin rejects them - so the beside-the-body poses sit 0.40-0.55 m ahead; the raise stays >= 0 so the straight
+    #: line from the lift never dips toward the partner's top edge)
+    CARRY_POSES = ((0.45, -0.45, 0.0), (0.50, -0.40, 0.05), (0.40, -0.45, 0.10), (0.55, -0.35, 0.05), (0.35, -0.45, 0.15), (0.50, None, 0.10))
 
     def carry_poses_at_b(self, manip: Stance, eef: G.Pose, carry_height: float, target, eef_in_object) -> List[Tuple[G.Pose, List[G.Pose], th.Tensor]]:
         """(iii') the CARRY poses (owner 2026‑09‑20 05:20): after the lift the held object is brought to a compact pose —
