@@ -709,8 +709,12 @@ class SamplerV2(TaskSampler):
         if arm_q is None and carried and obj is not None and carried in self.carry_arm_q:
             arm_q = {arm: self.carry_arm_q[carried]}
         extra = NAV.TRANSITION_EXTRA_MAX if extra_max is None else float(extra_max)
+        # a carried sweep is checked with more clearance than the 1 cm of an empty-handed one: the executed trunk sweep lags its
+        # targets and the loaded arm droops (0920-143723: the held sandal brushed the table top for 2 steps of an arrival the
+        # sampler had passed at 1 cm)
+        margin = float(self.gp.gen("carry_collision_margin_m", 0.04)) if (carried and obj is not None) else 0.01
         tr = NAV.transition(self.kit, frm, to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object, arm_q_override=arm_q, trunk_from=trunk_from,
-                            extra_max=extra, blame=self.ikc._collision_blame)
+                            extra_max=extra, blame=self.ikc._collision_blame, margin=margin)
         if tr is None:
             raise Reject("no_transition", f"{frm.name} -> {to.name}: no s_T in {NAV.transition_standoffs(to.stand_off or 0.0, extra_max=extra)} is swept collision-free")
         tr.holding = carried or tr.holding  # ``transitions[].holding``: the bddl instance carried through (attachment's second base pose)
@@ -726,7 +730,8 @@ class SamplerV2(TaskSampler):
         obj, arm, eef_in_object = self.carried_attachment(carried, arm)
         if arm_q is None and carried and obj is not None and carried in self.carry_arm_q:
             arm_q = {arm: self.carry_arm_q[carried]}
-        tr = NAV.departure_transition(self.kit, frm, to, travel_trunk, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object, arm_q_override=arm_q)
+        margin = float(self.gp.gen("carry_collision_margin_m", 0.04)) if (carried and obj is not None) else 0.01
+        tr = NAV.departure_transition(self.kit, frm, to, travel_trunk, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object, arm_q_override=arm_q, margin=margin)
         if tr is None:
             raise Reject("no_transition", f"{frm.name} -> {to.name} (departure): no s_T in {NAV.transition_standoffs(frm.stand_off or 0.0)} admits the drive-back + "
                                           f"trunk sweep {(frm.translate, round(frm.tilt, 2))} -> {tuple(round(float(v), 2) for v in travel_trunk)}")
