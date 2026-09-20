@@ -41,7 +41,7 @@ from ispatialgym.sampling.sim_utils import Reject
 from ispatialgym.sampling.tasks.base import Draft
 from ispatialgym.sampling.v2 import ik as IK
 from ispatialgym.sampling.v2 import tabletop as TT
-from ispatialgym.sampling.v2.core import SamplerV2, register
+from ispatialgym.sampling.v2.core import PAD_BAND_MARGIN, SamplerV2, register
 from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import EdgeFrame, Stance, Transition
 
@@ -357,6 +357,7 @@ class Attachment(SamplerV2):
         male.set_position_orientation(*m_pose)
         male.keep_still()
         self.kit.sync_world()
+        self._apply_grasp_height_extra(grasp, m_pose, manip)  # generation.grasp_height_extra_m (owner 2026-09-19 16:49; 0 = no-op)
         # step 2 (+ §6.8 owner 2026-09-16 17:10): the partner on an attach-reach cell with the attach pose and the left brace
         # reachable — from the grasp stance first; else from a recorded SECOND BASE POSE (lateral trunk move + torso adjust,
         # both arms verified there, the male carried: paths[] / transitions[] manipulation -> attach with the male held);
@@ -443,6 +444,44 @@ class Attachment(SamplerV2):
                           "joint_placement": {"left_band": self.left_bands is not None}})
         self.brace_missing = brace_state == "none"
         return d
+
+    # ------------------------------------------------------------------ grasp height margin (owner 2026-09-19 16:49)
+
+    def _apply_grasp_height_extra(self, grasp, m_pose: TT.Pose, manip: Stance) -> None:
+        """``generation.grasp_height_extra_m``: the knob pinch moves up the male by up to that much (0 = today's pose). Demo
+        0919-153953 (lid tnwisp): the pads held the top centimetre of the knob while the fingertips reached 0.7 cm below the
+        pads into the lid's dome, so the closure pressed the lid onto the table and the torso took the reaction (head camera
+        +3.5 mm at the closure; the table itself moved 0.02 mm). The generic ``contact_height_extra_m`` rule clips such a
+        grasp to zero (its pad centre already lies above the pinch band), so the attachment rule is on the pad's
+        fingertip-side end instead: it stays >= ``PAD_BAND_MARGIN`` below the male's top, and the lifted pre-grasp / grasp
+        must pass the exact IK at the grasp stance (else the library height is kept). Every derived pose (attach = goal
+        ∘ T_obj→eef, the pre-attach, the SLERP) carries the lift through ``eef_in_object``. Facts on the record."""
+        x = max(0.0, float(self.gen("grasp_height_extra_m", 0.0) or 0.0))
+        if x <= 0.0 or grasp.eef_in_object is None or grasp.grasp is None:
+            grasp.extras.update({"grasp_height_extra_m": x, "grasp_height_extra_effective_m": 0.0, "grasp_height_extra_reason": "off" if x <= 0 else "no grasp pose"})
+            return
+        pos, quat = TT._t(grasp.grasp[0]), TT._t(grasp.grasp[1])
+        a = C.approach_axis(quat)
+        pad_tip_end_z = float((pos + C.PAD_Z_RANGE[1] * a)[2])  # the fingertip-side end of the pads
+        top_z = float(self.world.hull_at(self.hull[self.t_role], m_pose)[:, 2].max())
+        room = (top_z - PAD_BAND_MARGIN) - pad_tip_end_z
+        eff = max(0.0, min(x, room))
+        why = "full" if eff >= x - 1e-9 else ("clipped: pad end at the male's top" if eff > 0 else "clipped: pads already at the male's top")
+        if eff > 0.0:
+            R_obj = C.quat_to_mat(TT._t(m_pose[1]))
+            up_obj = R_obj.T @ th.tensor([0.0, 0.0, 1.0])  # world up in the male's frame
+            eef_in_object = (TT._t(grasp.eef_in_object[0]) + eff * up_obj, TT._t(grasp.eef_in_object[1]))
+            eef = IK.grasp_pose(m_pose, eef_in_object)
+            pre = IK.pre_pose(eef)
+            support = self.obj("support")
+            res = self.ikc.exact([pre, eef], manip, grasp.arm, ignore_for_last=[support], scale_key=self.choice.models[self.t_role].scale, cache=False,
+                                 approached=[self.obj(self.t_role)])
+            if res.ok:
+                grasp.eef_in_object, grasp.grasp, grasp.pre_grasp = eef_in_object, eef, pre
+            else:
+                eff, why = 0.0, f"IK failed with the lift ({res.reason}); library height kept"
+        log.info("%s: grasp height extra %.1f mm requested -> %.1f mm (%s; pad end %.3f, male top %.3f)", self.gp.alias, x * 1000, eff * 1000, why, pad_tip_end_z, top_z)
+        grasp.extras.update({"grasp_height_extra_m": x, "grasp_height_extra_effective_m": round(eff, 4), "grasp_height_extra_reason": why})
 
     # ------------------------------------------------------------------ program check (brace-less attachment)
 
