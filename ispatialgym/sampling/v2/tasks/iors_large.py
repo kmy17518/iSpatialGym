@@ -1612,9 +1612,16 @@ class IORSLarge(SamplerV2):
             # survivor is tried before the frontal ones
             side = [k for k in order if c_pool[k].extras.get("stance_kind") == "side"]
             front = [k for k in order if c_pool[k].extras.get("stance_kind") != "side"]
+            # frontal stances: the push goal must stay inside the floor reach (B3: 0.24-0.64 m ahead at the deep trunks) - the goal
+            # lies drop_ahead + push distance (~0.3 m) ahead, so the drop cell should sit ~0.3 m ahead; ordering by the LARGEST
+            # drop_ahead first (the bed heuristic: keep the deep trunk clear of the frame) put every chain at 0.7-0.8 m ahead and
+            # 260 chain searches failed the exact IK in 0919-233031
+            ahead_pref = float(self.num("push_under_drop_ahead_pref_m", 0.30))
             depth = lambda k: (-float(c_pool[k].translate), float(c_pool[k].tilt), -float(c_pool[k].extras.get("drop_ahead_m", 0.0)))  # noqa: E731
-            order = sorted(side, key=depth) + sorted(front, key=depth)
+            reach = lambda k: (-float(c_pool[k].translate), float(c_pool[k].tilt), abs(float(c_pool[k].extras.get("drop_ahead_m", 0.0)) - ahead_pref))  # noqa: E731
+            order = sorted(side, key=depth) + sorted(front, key=reach)
             n_try = max(12, len(side))
+        chain_cache: Dict[Tuple[int, int], Optional[Dict[str, Any]]] = {}  # (C index, yaw bucket) -> push chain (push-under: the chain depends on the yaw only)
         errors = []
         for i_c, kc in enumerate(order[:n_try]):
             self._check_deadline(f"C candidate {i_c + 1} of {min(n_try, len(order))} (F_goal feasible set) at B ({manip.translate}, {manip.tilt:.2f})")
@@ -1660,6 +1667,16 @@ class IORSLarge(SamplerV2):
                 self._check_deadline(f"F draw at C candidate {i_c + 1} (exact IK at B / C{', push chain' if push else ''})")
                 yaw0, g = F[int(i)]
                 yaw = yaw0 + float(rng.uniform(-TARGET_JITTER, TARGET_JITTER))
+                if push:
+                    # the push chain depends on the object's yaw (its half extent along the push), not on the grasp: solve it once per
+                    # (C, yaw bucket) BEFORE the grasp IKs and skip the draw when this stance cannot push at that yaw
+                    ck = (int(kc), int(round(yaw0 / (math.pi / 8))))
+                    if ck not in chain_cache:
+                        q_chain = G.qmul(G.quat_from_yaw(yaw0 + d_yaw), self.rest)
+                        chain_cache[ck] = self._push_under_chain(place, q_chain, cd, gc, place.extras["push_dir"])
+                    if chain_cache[ck] is None:
+                        fails["C: push chain unreachable at this yaw"] = fails.get("C: push chain unreachable at this yaw", 0) + 1
+                        continue
                 t_pose = None
                 for _ in range(5):
                     if self.surface["kind"] == "floor":
