@@ -882,6 +882,17 @@
    "pick": "configuration_matching-articulation_close_large_scale#03",
    "slot": "representative",
    "mode": "representative"
+  },
+  {
+   "alias": "configuration_matching-attachment-cork-wine_bottle-breakfast_table",
+   "id": 83,
+   "grounded": "2026-09-20",
+   "by": "ground_isg 2.0.0 (--all dry run, imported by attachment-agent for the owner pair cork/ncxgpe -> wine_bottle/inkqch)",
+   "subtask": "configuration_matching-attachment",
+   "iddl": "configuration_matching/attachment.iddl",
+   "pick": "configuration_matching-attachment#all130",
+   "slot": "all",
+   "mode": "all"
   }
  ],
  "unregistered": [
