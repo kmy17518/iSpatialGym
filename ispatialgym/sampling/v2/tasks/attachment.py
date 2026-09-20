@@ -44,6 +44,7 @@ from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import PAD_BAND_MARGIN, SamplerV2, register
 from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import EdgeFrame, Stance, Transition
+from ispatialgym.sampling.v2.tasks.iors_small import HAND_SPHERES_EEF  # the hand beyond the finger profile (wrist camera, knuckles, body)
 
 import omnigibson as og  # noqa: E402
 from omnigibson.object_states import AttachedTo  # noqa: E402
@@ -455,6 +456,33 @@ class Attachment(SamplerV2):
         self.brace_missing = brace_state == "none"
         return d
 
+    # ------------------------------------------------------------------ hand envelope vs the partner (0919-160750)
+
+    def _hand_clear_of_partner(self, grasp, f_pose: TT.Pose, margin: float = 0.02) -> Optional[str]:
+        """The hand beyond the finger profile (``HAND_SPHERES_EEF``: wrist camera, knuckles, gripper body) along the grasp chain
+        at the male — pre-grasp, the approach, the grasp, the lift — must stay ``margin`` clear of the partner's hull box at
+        ``f_pose``; returns the offending part or None. 0919-160750 (lid pwgbsb / teapot jlalfc): the grasp is solved with
+        the partner parked away and the partner cell is admitted on a 4 cm footprint gap, but the wrist camera hangs 5.6 cm
+        beside the eef and 7.6 cm above the pads — it clipped the 29 cm teapot's spout at the end of the grasp (QA
+        ``collision`` x2). The SLERP / attach poses are IK-checked with the partner in the world already."""
+        if grasp.grasp is None or grasp.pre_grasp is None:
+            return None
+        hull = TT._t(self.hull[self.p_role])
+        lo, hi = hull.min(dim=0).values, hull.max(dim=0).values
+        inv = C.invert((TT._t(f_pose[0]), TT._t(f_pose[1])))
+        g_pos, g_q = TT._t(grasp.grasp[0]), TT._t(grasp.grasp[1])
+        p_pos = TT._t(grasp.pre_grasp[0])
+        poses = [(p_pos + (g_pos - p_pos) * k / 4.0, g_q) for k in range(5)]  # pre-grasp -> grasp
+        poses.append((g_pos + th.tensor([0.0, 0.0, max(CARRY_HEIGHTS)]), g_q))  # the lift
+        for eef in poses:
+            for part, (centres, r) in HAND_SPHERES_EEF.items():
+                pts_o = C.transform_points(inv, C.transform_points(eef, th.tensor(centres, dtype=th.float32)))
+                d = th.clamp(lo - pts_o, min=0.0) + th.clamp(pts_o - hi, min=0.0)
+                dist = float(th.linalg.norm(d, dim=1).min())
+                if dist < r + margin:
+                    return f"{part} {(dist - r) * 1000:+.0f} mm from the partner's hull box at the grasp chain (margin {margin * 1000:.0f} mm)"
+        return None
+
     # ------------------------------------------------------------------ grasp height margin (owner 2026-09-19 16:49)
 
     def _apply_grasp_height_extra(self, grasp, m_pose: TT.Pose, manip: Stance) -> None:
@@ -548,6 +576,11 @@ class Attachment(SamplerV2):
                 continue
             if not TT.in_frame(self, cam_init, TT.hull_corners_world(self.hull[self.p_role], pose), TT.IN_FRAME_MARGIN):
                 fails["frame"] += 1
+                continue
+            hand_hit = self._hand_clear_of_partner(grasp, pose)
+            if hand_hit is not None:
+                fails["hand"] = fails.get("hand", 0) + 1
+                fails.setdefault("hand_example", hand_hit)
                 continue
             # the first brace face whose point lies in the left contact band at this trunk (class passing), else the first face
             jp = None
