@@ -537,6 +537,14 @@ class Grasp(Action):
         if self.kind == "library":
             g = self.grasp
             obj = _state_pose(state, self.object)
+            # the sampler's recorded object-frame eef transform (``grasps[].eef_in_object``, spec §7) carries every adjustment
+            # of the library pinch the sampler made and program-checked - the re-centred pinch, the raised knob grasp of
+            # ``grasp_height_extra_m`` / ``contact_height_extra_m`` (attachment 0919-171109: the sidecar recorded the lid grasp
+            # 8 mm higher, the oracle re-derived the library pose and closed at the old height) - applied to the object's
+            # CURRENT pose exactly like the library transform; the library transform is the fallback for a record without it
+            eio = g.extra.get("eef_in_object") if isinstance(g.extra, dict) else None
+            if isinstance(eio, dict) and eio.get("position") is not None and eio.get("orientation") is not None:
+                return _as_pose(C.grasp_pose_from_transform(obj.tensors(), _as_pose(eio).tensors()))
             # yaw omitted on purpose: the settled pose carries the drawn yaw (see the class docstring)
             return _as_pose(C.grasp_pose(obj.tensors(), g.grasp_key, g.grasp_name))
         if self.kind == "cube":
