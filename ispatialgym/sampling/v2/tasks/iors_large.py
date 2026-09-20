@@ -1577,12 +1577,19 @@ class IORSLarge(SamplerV2):
             xy = base_xy + fwd * float(ahead) + left * lat_v
             carry = (th.tensor([float(xy[0]), float(xy[1]), float(lift[0][2]) + float(raise_m)]), lift[1])
             tag = f"({float(ahead):.2f}, {lat_v:+.2f}, z {float(carry[0][2]):.2f})"
+            # the in-hand move is a manipulation action: the FOV monitor is armed (owner 2026-09-16 10:15) - every waypoint incl. the
+            # carry pose must keep the fingertips in the head camera frame from B (0920-135626: reorient failed gripper_out_of_fov at
+            # u = 1060 for the carry pose (0.55, -0.35))
+            cam_b = self.camera_pose_at(manip)
+            wps = list(C.line_waypoints(lift, carry, 4))
+            if not all(self.ikc.eef_in_frame(w, cam_b) for w in wps):
+                why.append(f"{tag}: out of the head camera frame")
+                continue
             with attached(self.kit, "right", target, eef_in_object=eef_in_object):
                 r = self.ikc.exact([carry], manip, "right", cache=False)
                 if not r.ok or r.q is None:
                     why.append(f"{tag}: IK {r.reason}")
                     continue
-                wps = list(C.line_waypoints(lift, carry, 4))
                 ok = self.ikc.waypoints_ok([lift] + wps, manip, "right", cache=False)
             if not ok.ok:
                 why.append(f"{tag}: line from the lift {ok.reason}")
@@ -1849,11 +1856,24 @@ class IORSLarge(SamplerV2):
                 goal = release_pose(release_xy, goal_quat)
                 place_eef = IK.grasp_pose(goal, g.pose)
                 pre_place = IK.pre_pose(place_eef)
+                # the place / drop IK is seeded with the LIFT configuration (the arm the object is carried with, and the branch the
+                # carry pose's straight line stays in) and must land in the same branch: the oracle reaches the pre-place from the
+                # carry with a bounded joint swing (0920-135625: the recorded witness lay 2.09 rad away, 'plan_failed' at the drop)
+                q_lift_seed = self.lift_arm_q(manip, eef, float(self.num("carry_height_m", 0.12)), target, g.pose)
+                q_seed = None
+                if q_lift_seed is not None:
+                    q_seed = self.ikc.q_locked(place).clone()
+                    q_seed[self.kit.robot.arm_control_idx["right"]] = q_lift_seed
                 with attached(self.kit, "right", target, eef_in_object=g.pose):
-                    r2 = self.ikc.exact([pre_place, place_eef], place, "right", ignore_for_last=ignore_place, cache=False)
+                    r2 = self.ikc.exact([pre_place, place_eef], place, "right", ignore_for_last=ignore_place, cache=False, q_seed=q_seed)
                 if not r2.ok:
                     fails[f"C: [pre-place, {'drop' if push else 'place'}] exact IK (attached)"] = fails.get(f"C: [pre-place, {'drop' if push else 'place'}] exact IK (attached)", 0) + 1
                     continue
+                if q_lift_seed is not None and r2.q is not None:
+                    swing = float(th.max(th.abs(r2.q[self.kit.robot.arm_control_idx["right"]] - q_lift_seed)))
+                    if swing > float(self.num("place_branch_max_rad", 1.2)):
+                        fails["C: place branch differs from the carry (joint swing)"] = fails.get("C: place branch differs from the carry (joint swing)", 0) + 1
+                        continue
                 chain = None
                 if push:  # the straight floor push drop → goal from the same stance (closed gripper, floor + target ignored)
                     chain = self._push_under_chain(push_st if push_st is not None else place, goal_quat, cd, gc, place.extras["push_dir"])

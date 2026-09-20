@@ -230,21 +230,87 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
     report: Dict[str, Any] = {"mode": "expand", "actions": []}
     state = _SamplerState(sampler)
     tracker = _Tracker(sidecar)
-    for i, action in enumerate(actions):
-        name = getattr(action, "name", type(action).__name__)
-        try:
-            targets = action.targets(sc, state)
-        except Exception as e:
-            raise Reject("program_check_failed", f"targets() failed: {e!r}", action=name)
-        stance_name, carried = tracker.before(action)
-        locked = tracker.locked_arms(action)
-        n, witnesses = check_action_targets(sidecar, sampler, action, targets, stance_name, carried, locked_arms=locked, stance_obj=tracker.stance_obj)
-        tracker.after(action, witnesses, sampler)
-        entry = {"index": i, "name": name, "arms": list(getattr(action, "arms", ()) or []), "objects": list(getattr(action, "objects", ()) or []),
-                 "stance": stance_name, "carried": carried, "n_poses": n, "witnesses": witnesses}
-        if locked:
-            entry["locked_arms"] = sorted(locked)  # the other arm(s) held at their contact configuration while these poses were solved
-        report["actions"].append(entry)
+    # joint state carried through the program (2026-09-19, two-flap cartons): a push with an ``articulation`` record leaves its
+    # joint at q_to until that arm's retreat (the pressed flap), a base-follow leaves its joint where the follow ends - the
+    # following actions are checked in that world (0919-204505: the second pinch's approach was checked against the flat flap)
+    joint_saved: Dict[str, Any] = {}
+
+    def _set_joint(obj_name, joint, q):
+        obj = sampler.objects.get(obj_name) if obj_name else None
+        if obj is None or joint not in getattr(obj, "joints", {}):
+            return
+        if obj_name not in joint_saved:
+            joint_saved[obj_name] = obj.get_joint_positions().clone()
+        qs = obj.get_joint_positions().clone()
+        qs[list(obj.joints).index(joint)] = float(q)
+        obj.set_joint_positions(qs)
+        obj.keep_still()
+        sampler.kit.sync_world()
+
+    def _carry_joint_state(action):
+        nm = getattr(action, "name", "")
+        if nm == "push":
+            a = (getattr(getattr(action, "contact", None), "extra", None) or {}).get("articulation")
+            if a and a.get("q_to") is not None:
+                _set_joint(getattr(action.contact, "object", None), a.get("joint"), a["q_to"])
+        elif nm == "retreat":
+            after = getattr(action, "after", None)
+            if getattr(after, "name", "") == "push":
+                a = (getattr(getattr(after, "contact", None), "extra", None) or {}).get("articulation")
+                if a and a.get("q_from") is not None:
+                    _set_joint(getattr(after.contact, "object", None), a.get("joint"), a["q_from"])
+        elif nm == "base_follow":
+            art = getattr(action, "articulation", None)
+            if art is not None:
+                stop = (getattr(art, "extra", None) or {}).get("follow_to")
+                k_end = float(stop) if stop is not None else 1.0
+                _set_joint(art.object, art.joint, float(art.q_init) + k_end * (float(art.q_goal) - float(art.q_init)))
+
+    try:
+        for i, action in enumerate(actions):
+            name = getattr(action, "name", type(action).__name__)
+            try:
+                targets = action.targets(sc, state)
+            except Exception as e:
+                raise Reject("program_check_failed", f"targets() failed: {e!r}", action=name)
+            stance_name, carried = tracker.before(action)
+            locked = tracker.locked_arms(action)
+            # block design (owner 2026-09-19): the acting arm's IK is seeded from where the previous action left it - the lift
+            # tracked from the grasp witness, the reorient from the lift's end, the carry / place from the reorient's end - as
+            # the oracle's arm_along runs them (pod runs 0919-140558 / 151544: the reorient checked from a fresh exact IK passed
+            # while the oracle, tracking from the grasp's branch, jumped 0.23 rad / stalled 14 mm)
+            q_prev = tracker.arm_end_q.get((getattr(action, "arms", None) or ["right"])[0]) if getattr(sidecar, "blocks", None) else None
+            if q_prev is None and name == "place" and carried and carried in (getattr(sampler, "carry_arm_q", None) or {}):
+                # a place after a CARRY (IORS large-scale, owner 2026-09-20): the object arrives in the hand at the carry configuration the
+                # sampler recorded (``carry_arm_q``), so the pre-place / place witnesses are solved in that branch - the oracle reaches the
+                # pre-place from there with a bounded joint swing (0920-135625: a witness 2.09 rad away made the drop 'plan_failed')
+                st_seed = tracker.stance_obj if tracker.stance_obj is not None else sidecar.stances.get(stance_name)
+                if st_seed is not None:
+                    arm_c = (getattr(action, "arms", None) or ["right"])[0]
+                    q_prev = sampler.ikc.q_locked(st_seed).clone()
+                    q_prev[sampler.kit.robot.arm_control_idx[arm_c]] = th.as_tensor(sampler.carry_arm_q[carried], dtype=th.float32)
+            if name == "push" and (getattr(getattr(action, "contact", None), "extra", None) or {}).get("q_hint") is not None:
+                # a press recorded with the branch that leaves room for the other hand's pinch (two-flap v2, 2026-09-19): the IK seed
+                q_prev = th.as_tensor(action.contact.extra["q_hint"], dtype=th.float32)
+            n, witnesses = check_action_targets(sidecar, sampler, action, targets, stance_name, carried, locked_arms=locked, stance_obj=tracker.stance_obj, q_seed_prev=q_prev)
+            end_q = witnesses.pop("__arm_end_q__", None)
+            tracker.after(action, witnesses, sampler)
+            tracker.note_arm_end(action, end_q)
+            _carry_joint_state(action)
+            entry = {"index": i, "name": name, "arms": list(getattr(action, "arms", ()) or []), "objects": list(getattr(action, "objects", ()) or []),
+                     "stance": stance_name, "carried": carried, "n_poses": n, "witnesses": witnesses}
+            if locked:
+                entry["locked_arms"] = sorted(locked)  # the other arm(s) held at their contact configuration while these poses were solved
+            report["actions"].append(entry)
+    finally:
+        tracker.restore_moved(sampler)  # block records advanced through the program go back to their init poses (the TRO is written from the live world)
+        for obj_name, qs in joint_saved.items():
+            obj = sampler.objects.get(obj_name)
+            if obj is not None:
+                obj.set_joint_positions(qs)
+                obj.keep_still()
+        if joint_saved:
+            sampler.kit.sync_world()
     # the recorded joint solutions (28-D, arm joints + trunk + fingers meaningful) per checked end pose: D5 verifies them as
     # witnesses (FK + collision) instead of re-solving the randomised IK
     sidecar.ik_witnesses = [{"action": e["index"], "name": e["name"], "stance": e["stance"], "arm": (e["arms"] or ["right"])[0], "carried": e["carried"],
