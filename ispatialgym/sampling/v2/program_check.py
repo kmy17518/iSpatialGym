@@ -620,6 +620,12 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
                 frm_st = sidecar.stances.get(frm_name) if frm_name else None
                 if frm_st is not None and getattr(g, "grasp", None) is not None:
                     lift_end = (th.as_tensor(g.grasp[0], dtype=th.float32) + th.tensor([0.0, 0.0, float(g.carry_height or 0.0)]), th.as_tensor(g.grasp[1], dtype=th.float32))
+                    wps = getattr(g, "waypoints", None)
+                    if wps:
+                        # an in-hand move after the lift (``Reorient`` to the CARRY pose, owner 2026-09-20 05:20): the object rides at
+                        # the waypoint end, not at the lift
+                        end = wps[-1]
+                        lift_end = (th.as_tensor(getattr(end, "position", end[0]), dtype=th.float32), th.as_tensor(getattr(end, "orientation", end[1]), dtype=th.float32))
                     supports = list(sampler.support_objects()) if hasattr(sampler, "support_objects") else []
                     with attached(sampler.kit, attach_arm, carried_obj, eef_in_object=eef_in_object):
                         r_lift = sampler.ikc.exact([lift_end], frm_st, attach_arm, ignore_for_last=supports, cache=False)

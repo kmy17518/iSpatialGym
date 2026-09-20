@@ -512,7 +512,11 @@ def program_iors_large(sc: Sidecar, relation: str = "ontop") -> List[Action]:
     if sc.path("manipulation", "placement") is None:
         raise SidecarError("paths: IORS large-scale needs the recorded path from 'manipulation' to 'placement'")
     grasp, lift = _pick(g)
-    head = _travel(sc, "init", "manipulation") + [grasp, lift] + _travel(sc, "manipulation", "placement", carried=g.object)
+    # owner 2026-09-20 05:20: ``grasps[0].waypoints`` = the in-hand line from the lift to the CARRY pose (a compact pose in front
+    # of the chest) - the object is carried there through the transitions and the drive (the sampler checked the legs with the
+    # arm at that pose); without waypoints the object is carried at the lift configuration as before
+    carry = [Reorient(mode="line", arm=g.arm, object=g.object, after=lift, waypoints=g.waypoints)] if g.waypoints else []
+    head = _travel(sc, "init", "manipulation") + [grasp, lift] + carry + _travel(sc, "manipulation", "placement", carried=g.object)
     drop = str(g.extra.get("place_kind") or "support") == "drop"
     if not drop:
         return head + _place_and_retreat(g, "support", _IORS_RELATION_WORDS[relation])
