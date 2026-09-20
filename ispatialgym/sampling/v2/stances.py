@@ -260,8 +260,12 @@ class Stance:
         """The ``stances.<name>`` block of spec §7 (only the keys a stance has) plus the task's ``extras`` (``goal_cell``,
         ``init_surface``, ``path_length_m``, ``bearing_deg``, ``deviation_deg``, ...; the F6 ``Sidecar`` keeps unknown keys
         in ``extra``). A known key is never overridden by an extra."""
+        # F6 contract (``oracle.sidecar.Stance``): ``arms`` is the list of working arms or the string ``"untucked"`` (both arms
+        # idle); a stance solved in another posture for both arms (the tucked floor-init A of IORS large-scale, ``1dd3820``)
+        # carries that posture in ``idle_posture`` below, which the oracle reads for every arm of a posture stance
+        # (0919-233032: the first ontop large-scale demo refused the sidecar on ``arms: "tucked"``)
         d: Dict[str, Any] = {"base_pose2d": [float(v) for v in self.base_pose2d], "translate": float(self.translate), "tilt": float(self.tilt),
-                             "arms": self.arms}
+                             "arms": self.arms if isinstance(self.arms, (list, tuple)) else "untucked"}
         if self.stand_off is not None:
             d["stand_off"] = float(self.stand_off)
         if self.edge is not None:
@@ -473,7 +477,7 @@ class ContactRecord:
         d: Dict[str, Any] = {"arm": self.arm, "pre": pose_to_sidecar(self.pre), "stance": self.stance}
         if self.object is not None:
             d["object"] = self.object
-        if self.kind == "push":
+        if self.kind.startswith("push"):  # "push" and the extra push slots ("push_prep": the preparatory press of a two-flap carton, 2026-09-19)
             d.update({"init": pose_to_sidecar(self.contact), "mid": pose_to_sidecar(self.mid), "goal": pose_to_sidecar(self.goal),
                       "direction": _lst(self.direction), "distance_m": None if self.distance_m is None else float(self.distance_m)})
         else:
@@ -510,6 +514,9 @@ class SidecarDraft:
         self.contacts: Dict[str, ContactRecord] = {}
         self.articulation: Optional[Dict[str, Any]] = None
         self.blocks: List[Dict[str, Any]] = []
+        #: block design packing tail (owner 2026-09-19 21:47): ``{"stance", "stages": [{"brace": ..., "pushes": [...]}]}`` - after the
+        #: last place, the wide left brace on one column / row and the right-hand pushes that close the placement gaps
+        self.pack: Optional[Dict[str, Any]] = None
         self.goal: Optional[Dict[str, Any]] = None
         self.language: Dict[str, Any] = {"objects": {}, "goal_numbers": {}}
         self.waypoint_policy: str = "checked"
@@ -576,6 +583,8 @@ class SidecarDraft:
             d["articulation"] = _jsonable(self.articulation)
         if self.blocks:
             d["blocks"] = _jsonable(self.blocks)
+        if self.pack:
+            d["pack"] = _jsonable(self.pack)
         if self.goal:
             d["goal"] = dict(self.goal)
         d["language"] = _jsonable(self.language)
@@ -607,6 +616,7 @@ class SidecarDraft:
         self.contacts.clear()
         self.articulation = None
         self.blocks = []
+        self.pack = None
         self.goal = None
         self.language = {"objects": {}, "goal_numbers": {}}
         self.checked_waypoints = []
