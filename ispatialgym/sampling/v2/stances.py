@@ -324,7 +324,13 @@ TRANSITION_ORDER = ("drive-back", "trunk", "drive-in")
 @dataclass
 class Transition:
     """Spec §3.8: the trunk change between two consecutive stances happens at stand-off ``stand_off`` (s_T), after
-    driving back from the arriving stance along -inward and before driving in again."""
+    driving back from the arriving stance along -inward and before driving in again.
+
+    ``at`` (owner 2026‑09‑19 21:56, IORS large-scale): ``"arrival"`` = the §3.8 transition above (s_T on the *arriving*
+    stance's axis, trunk = the arriving stance's); ``"departure"`` = the mirror image at the *departing* stance — drive
+    back ``s_T - frm.stand_off`` along the departing stance's own -forward (the way it arrived), sweep the trunk to the
+    **travel trunk** ``trunk_to`` (torso straight, tilt 0), no drive-in; the recorded path ``frm -> to`` then starts at
+    that drive-back pose and is driven at ``trunk_to``. A pair of stances may record one of each (departure first)."""
 
     frm: str
     to: str
@@ -335,11 +341,20 @@ class Transition:
     n_samples: int = 5
     holding: Optional[str] = None  # bddl instance carried through the transition (attachment: the second base pose after the male grasp)
     extras: Dict[str, Any] = field(default_factory=dict)
+    at: str = "arrival"
+
+    @property
+    def departure(self) -> bool:
+        return self.at == "departure"
 
     def to_sidecar(self) -> Dict[str, Any]:
         d = {"from": self.frm, "to": self.to, "stand_off": float(self.stand_off), "order": list(self.order)}
         if self.holding is not None:
             d["holding"] = self.holding
+        if self.departure:
+            d["at"] = "departure"
+            if self.trunk_to is not None:
+                d["trunk_to"] = [float(self.trunk_to[0]), float(self.trunk_to[1])]
         for k, v in (self.extras or {}).items():
             if k not in d and v is not None and not str(k).startswith("_"):
                 d[k] = v

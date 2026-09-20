@@ -585,12 +585,27 @@ def check_action_targets(sidecar: SidecarDraft, sampler, action, targets: Any, s
             back, drive_in, goal = _p2d(targets.get("drive_back")), _p2d(targets.get("drive_in")), _p2d(targets.get("goal"))
             if name == "transition":
                 frm = sidecar.stances.get(getattr(action.transition, "frm", ""))
-                if back is not None:
-                    checks.append((back, to_trunk))
-                    if frm is not None:
-                        checks.append((back, (frm.translate, frm.tilt)))
-                if drive_in is not None:
-                    checks.append((drive_in, to_trunk))
+                if getattr(action.transition, "departure", False):
+                    # a departure transition (owner 2026-09-19 21:56): the drive-back pose on the DEPARTING stance's axis is visited
+                    # with the departing trunk and, after the sweep, with the travel trunk; there is no drive-in
+                    travel = getattr(action.transition, "trunk_to", None) or to_trunk
+                    if back is not None:
+                        if frm is not None:
+                            checks.append((back, (frm.translate, frm.tilt)))
+                        checks.append((back, (float(travel[0]), float(travel[1]))))
+                else:
+                    # the trunk the robot ARRIVES with: the departing stance's, or the travel trunk when a departure transition
+                    # of the same pair straightened it
+                    dep = next((t for t in sidecar.transitions if t.frm == action.transition.frm and t.to == action.transition.to and getattr(t, "departure", False)), None)
+                    from_trunk = (frm.translate, frm.tilt) if frm is not None else None
+                    if dep is not None and dep.trunk_to is not None:
+                        from_trunk = (float(dep.trunk_to[0]), float(dep.trunk_to[1]))
+                    if back is not None:
+                        checks.append((back, to_trunk))
+                        if from_trunk is not None:
+                            checks.append((back, from_trunk))
+                    if drive_in is not None:
+                        checks.append((drive_in, to_trunk))
             elif goal is not None:
                 checks.append((goal, to_trunk))
         for pose2d, trunk in checks:

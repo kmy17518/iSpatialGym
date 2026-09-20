@@ -103,8 +103,14 @@ def chairs_to_remove(problem: GroundedProblem, scene: str, stable_scene: dict, r
     """§3.1: table tasks sample in the stable scene minus the chairs within 1.0 m of the support."""
     from ispatialgym.sampling import scene_variants as SV
 
-    req = problem.bindings(scene).get("support")
-    names = [n for n in req if isinstance(n, str)] if isinstance(req, list) else []
+    b = problem.bindings(scene)
+    names: List[str] = []
+    # the init surface AND a fixed partner (owner 2026-09-19 21:56: IORS large-scale - the desk / breakfast table the target goes
+    # under or onto keeps its chairs otherwise, and the floor-init aliases removed none: apple-desk-floor's swivel chair sat inside
+    # the desk footprint, the six dining chairs blocked every push-under stance of the floor alias)
+    for role in ("support", "partner"):
+        req = b.get(role)
+        names += [n for n in req if isinstance(n, str) and n not in names] if isinstance(req, list) else []
     if not names or problem.gen("remove_chairs_near_tables", True) is False:
         return []
     tables = SV.tables_in_rooms(stable_scene, rooms, names)

@@ -66,8 +66,15 @@ def _travel(sc: Sidecar, frm: str, to: str, carried: Optional[str] = None) -> Li
     core ``bd10c72``) must name it too — the sampler validated the drive-back / trunk / drive-in with that object
     attached to the frozen arm, the oracle drives it with the arms as they are (no re-planning of the stance)."""
     s_from, s_to = sc.stance(frm), sc.stance(to)
-    path, transition = sc.path(frm, to), sc.transition(frm, to)
+    path, transition, departure = sc.path(frm, to), sc.transition(frm, to), sc.departure(frm, to)
     actions: List[Action] = []
+    if departure is not None:
+        # owner 2026-09-19 21:56 (IORS large-scale carry): straighten the torso FIRST - drive back along the departing stance's
+        # own axis, sweep to the travel trunk, then navigate at that trunk; the arrival transition (below) sets the arriving
+        # stance's trunk at its pre-place stand-off
+        if departure.holding is not None and departure.holding != carried:
+            raise SidecarError(f"transitions {frm!r} -> {to!r} (departure): recorded holding={departure.holding!r}, the program carries {carried!r}")
+        actions.append(Transition(transition=departure, stance_from=s_from, stance_to=s_to, carried=carried, objects=(carried,) if carried else ()))
     if path is not None:
         if (path.carried or None) != carried:
             raise SidecarError(f"paths {frm!r} -> {to!r}: recorded carried={path.carried!r}, the program carries {carried!r}")
@@ -78,7 +85,13 @@ def _travel(sc: Sidecar, frm: str, to: str, carried: Optional[str] = None) -> Li
         actions.append(Transition(transition=transition, stance_from=s_from, stance_to=s_to, carried=carried, objects=(carried,) if carried else ()))
     trunk_differs = abs(s_from.translate - s_to.translate) > 1e-6 or abs(s_from.tilt - s_to.tilt) > 1e-6
     base_differs = any(abs(a - b) > 1e-6 for a, b in zip(s_from.base_pose2d, s_to.base_pose2d))
-    if trunk_differs and transition is None:
+    if departure is not None and transition is None:
+        # the departure sweep must land on the arriving stance's trunk when no arrival transition follows
+        tt = departure.trunk_to
+        if tt is None or abs(tt[0] - s_to.translate) > 1e-6 or abs(tt[1] - s_to.tilt) > 1e-6:
+            raise SidecarError(f"stances {frm!r} -> {to!r}: the departure transition ends at trunk {tt}, the arriving stance has "
+                               f"{(s_to.translate, s_to.tilt)} and no arrival transition is recorded")
+    elif trunk_differs and transition is None:
         raise SidecarError(f"stances {frm!r} and {to!r} differ in trunk but no transition is recorded (spec §3.8)")
     if base_differs and not actions:
         raise SidecarError(f"stances {frm!r} and {to!r} differ in base pose but neither a path nor a transition is recorded")

@@ -65,6 +65,7 @@ from ispatialgym.sampling.v2 import prompt0 as P0
 from ispatialgym.sampling.v2 import tabletop as TT
 from ispatialgym.sampling.v2.core import SamplerV2, register
 from ispatialgym.robot import conventions as C
+from ispatialgym.sampling.v2 import navigation as NAV
 from ispatialgym.sampling.v2.navigation import attached
 from ispatialgym.sampling.v2.stances import ContactRecord, EdgeFrame, GraspRecord, Stance
 
@@ -915,8 +916,7 @@ class IORSLarge(SamplerV2):
                 manip = self.floor_stance_b(c_t, rb, half, rng)
                 init = self.floor_stance_a(c_t, rng, height, like=manip[0])
                 with self.ikc.ignoring([self.obj("floor")]):
-                    self.record_path(init, manip[0])  # §5.6: a path A -> B exists
-                    self.record_transition(init, manip[0])
+                    self.record_leg_a_b(init, manip[0])  # §5.6: a path A -> B exists (navigate-then-torso, else torso-then-navigate)
                 self.sidecar.transitions.clear()
             except Reject as e:
                 errors.append(f"{e.reason}: {e}")
@@ -991,10 +991,11 @@ class IORSLarge(SamplerV2):
     def floor_stance_a(self, c_t: th.Tensor, rng: np.random.Generator, height: float, like: Optional[Stance] = None) -> Stance:
         """Stance A of the floor init: base on the eroded map 0.6–1.5 m from c_t facing it, with the target and the
         partner's relevant region (goal patch / nearest bottom edge, owner decision (a)/(d)) in frame, collision-free.
-        Trunk candidates: stance B's own trunk first (``like``; then A -> B needs no trunk sweep and the path is driven
-        with B's tucked arms — countertop-floor 19:07: every A at (0.95, 0) untucked collided on the path / the sweep
-        (0.95, 0) -> (0.95, -0.9) hit the cabinets at every s_T), then tilt 0 at the translate whose optical axis is
-        closest to c_t."""
+        Trunk: **torso straight — tilt 0 at any translate** (owner 2026‑09‑19 21:56 (i): "it can have the lowest height
+        but no tilt"), the translate whose optical axis is closest to c_t among those that see the target and the
+        partner region. (``729a1ec`` had A take stance B's crouch so that A -> B needed no sweep; that is now the
+        *fallback* of the A -> B leg — a departure transition at A — not the init posture. ``like`` is kept for the
+        signature and only breaks ties toward B's translate.)"""
         fi = dict(self.gp.gen("floor_init") or {})
         d_lo, d_hi = fi.get("distance_range_m", [0.6, 1.5])
         focus = th.tensor([float(c_t[0]), float(c_t[1]), self.floor_z + height / 2])
@@ -1006,9 +1007,7 @@ class IORSLarge(SamplerV2):
             if not self.kit.trav_free(xy, eroded=True) or not P0.in_task_rooms(self, xy):
                 continue
             yaw = math.atan2(float(c_t[1] - xy[1]), float(c_t[0] - xy[0]))
-            trunks = [(float(t), 0.0) for t in RB.TRANSLATES]
-            if like is not None:
-                trunks = [(float(like.translate), float(like.tilt))] + trunks
+            trunks = [(float(t), 0.0) for t in RB.TRANSLATES]  # (i): straight torso, any height
             cands = [Stance("init", (float(xy[0]), float(xy[1]), yaw), t, ti, dist) for t, ti in trunks]
             cams = P0.camera_poses(self, cands)
             feas = []
@@ -1027,9 +1026,10 @@ class IORSLarge(SamplerV2):
             feas = [(st, a) for (st, a), f in zip(feas, free.tolist()) if f]
             if not feas or not P0.trunk_sweep_free(self, (float(xy[0]), float(xy[1]), yaw)):
                 continue
-            same = [sa for sa in feas if like is not None and (sa[0].translate, round(float(sa[0].tilt), 6)) == (like.translate, round(float(like.tilt), 6))]
-            st = same[0][0] if same else min(feas, key=lambda sa: (round(sa[1], 6), sa[0].translate))[0]
-            st.extras.update({"bearing_deg": math.degrees(bearing), "distance": dist, "trunk_like_b": bool(same)})
+            # the smallest optical-axis angle wins; ties toward B's translate (the A -> B sweep is then a pure tilt)
+            like_t = None if like is None else float(like.translate)
+            st = min(feas, key=lambda sa: (round(sa[1], 2), 0 if (like_t is not None and abs(sa[0].translate - like_t) < 1e-6) else 1, sa[0].translate))[0]
+            st.extras.update({"bearing_deg": math.degrees(bearing), "distance": dist, "trunk_like_b": bool(like_t is not None and abs(st.translate - like_t) < 1e-6)})
             return st
         raise Reject("no_stance", "floor init: no stance A sees the target at c_t and the partner")
 
@@ -1412,6 +1412,108 @@ class IORSLarge(SamplerV2):
         quat = G.qmul(G.quat_from_yaw(yaw), self.rest)
         return th.tensor([float(xy[0]), float(xy[1]), z + self.world.bottom_offset(self.hull, quat) + 0.003]), quat
 
+    # ------------------------------------------------------------------ legs A -> B and B -> C (owner 2026‑09‑19 21:56)
+
+    def _drop_leg_records(self, to: str) -> None:
+        self.sidecar.paths = [p for p in self.sidecar.paths if p.to != to]
+        self.sidecar.transitions = [t for t in self.sidecar.transitions if t.to != to]
+
+    def record_leg_a_b(self, init: Stance, manip: Stance) -> Dict[str, Any]:
+        """(ii) Init -> grasp stance. Primary: **navigate at the init trunk, then the torso** — the §3.7 path at A's
+        trunk / arms and the §3.8 arrival transition at B (trunk sweep at s_T on B's axis, drive-in with B's arms).
+        Fallback when no s_T admits that: **torso first, then navigate** — a departure transition at A (drive back
+        along A's own axis if needed, sweep to B's trunk there) and the path driven at B's trunk with B's arms from that
+        pose (what ``729a1ec`` did by spawning A in B's crouch; A itself stays upright, (i)). ``Reject`` when neither
+        leg exists. Returns the leg facts for the summary."""
+        errors: List[str] = []
+        try:
+            path = self.record_path(init, manip)
+            tr = self.record_transition(init, manip)
+            return {"order": "navigate_then_torso", "s_T": tr.stand_off, "path_m": round(path.length_m, 3)}
+        except Reject as e:
+            if e.reason not in ("no_transition", "path_collision", "no_path"):
+                raise
+            errors.append(f"navigate-then-torso: {e.reason}: {e}")
+            self._drop_leg_records(manip.name)
+        b_trunk = (float(manip.translate), float(manip.tilt))
+        try:
+            from ispatialgym.sampling.v2.ik import stance_arm_vectors
+
+            dep = self.record_departure_transition(init, manip, b_trunk)
+            r, l, _ = stance_arm_vectors(self.kit, manip)  # the oracle moves both arms to B's posture before the sweep
+            path = self.record_path(init, manip, trunk=b_trunk, arm_q={"right": r, "left": l}, start_pose2d=NAV.departure_pose(init, dep.stand_off))
+            log.info("%s: A -> B: navigate-then-torso impossible (%s); torso-then-navigate at A (s_T %.2f, drive at trunk %s)", self.gp.alias, errors[-1], dep.stand_off,
+                     tuple(round(v, 2) for v in b_trunk))
+            return {"order": "torso_then_navigate", "s_T": dep.stand_off, "path_m": round(path.length_m, 3), "primary_error": errors[-1]}
+        except Reject as e:
+            self._drop_leg_records(manip.name)
+            errors.append(f"torso-then-navigate: {e.reason}: {e}")
+        raise Reject("no_transition", "init -> manipulation: " + "; ".join(errors))
+
+    def travel_trunks(self, init: Stance, manip: Stance) -> List[Tuple[float, float]]:
+        """(iii') carry trunks in order: the grasp stance's translate with the torso straightened (tilt 0 — the object
+        stays low), then the init translate straightened; ``generation.travel_trunks`` overrides."""
+        cfg = self.gp.gen("travel_trunks")
+        if cfg:
+            return [(float(t), float(k)) for t, k in cfg]
+        out: List[Tuple[float, float]] = []
+        for t in (float(manip.translate), float(init.translate)):
+            if all(abs(t - u) > 1e-6 for u, _ in out):
+                out.append((t, 0.0))
+        return out
+
+    def record_carry_leg(self, init: Stance, manip: Stance, place: Stance, tname: str, q_lift_arm: Optional[th.Tensor], max_len: float) -> Any:
+        """(iii') Grasp stance -> place stance with the object in hand. Primary: **straighten the torso, then navigate**
+        — a departure transition at B (drive back along B's own axis to the first s_T where the sweep to the travel trunk
+        is free — "a spot along the way it has moved before" — with the holding arm at its LIFT configuration and the
+        object attached), the path from that pose at the travel trunk, and the arrival transition at C (the pre-place
+        stand-off where C's trunk is set, then the drive-in). Every travel trunk of :meth:`travel_trunks` is tried.
+        Fallback: the drive at B's trunk (the earlier behaviour) with the arrival transition. Returns the path record."""
+        if q_lift_arm is not None:
+            self.record_carry_arm_q(tname, "right", q_lift_arm)
+        errors: List[str] = []
+        for tt in self.travel_trunks(init, manip):
+            if abs(tt[0] - manip.translate) < 1e-6 and abs(tt[1] - manip.tilt) < 1e-6:
+                continue  # B already straight: the plain leg below is the same thing
+            try:
+                dep = self.record_departure_transition(manip, place, tt, carried=tname, arm="right")
+                start = NAV.departure_pose(manip, dep.stand_off)
+                path = self.record_path(manip, place, carried=tname, arm="right", max_length_m=max_len, trunk=tt, start_pose2d=start)
+                self.record_transition(manip, place, carried=tname, arm="right", trunk_from=tt)
+                where = "at the grasp spot" if dep.stand_off <= (manip.stand_off or 0.0) + 1e-6 else "after a drive-back"
+                log.info("%s: B -> C carry: torso straightened to %s at s_T %.2f (%s), path %.2f m", self.gp.alias, tuple(round(v, 2) for v in tt), dep.stand_off, where,
+                         path.length_m)
+                self._leg_bc = {"order": "straighten_then_navigate", "travel_trunk": [tt[0], tt[1]], "s_T_departure": dep.stand_off, "straightened": where,
+                                "path_m": round(path.length_m, 3), "lift_arm_q": q_lift_arm is not None, "tried": errors}
+                return path
+            except Reject as e:
+                self._drop_leg_records(place.name)
+                errors.append(f"travel trunk {tuple(round(v, 2) for v in tt)}: {e.reason}: {e}")
+        # fallback: drive at B's trunk (the object low in the crouch), the trunk set at C's pre-place stand-off
+        try:
+            path = self.record_path(manip, place, carried=tname, arm="right", max_length_m=max_len)
+            self.record_transition(manip, place, carried=tname, arm="right")
+            log.info("%s: B -> C carry: no travel trunk admits straighten-then-navigate (%s); driving at B's trunk %s", self.gp.alias, "; ".join(errors),
+                     (manip.translate, round(manip.tilt, 2)))
+            self.template_facts.setdefault("carry_fallbacks", []).append(errors)
+            self._leg_bc = {"order": "drive_at_grasp_trunk", "travel_trunk": [manip.translate, manip.tilt], "path_m": round(path.length_m, 3),
+                            "lift_arm_q": q_lift_arm is not None, "tried": errors}
+            return path
+        except Reject as e:
+            self._drop_leg_records(place.name)
+            raise Reject(e.reason, f"{e}; straighten-then-navigate: " + "; ".join(errors))
+
+    def lift_arm_q(self, manip: Stance, eef: G.Pose, carry_height: float, target, eef_in_object) -> Optional[th.Tensor]:
+        """The 7 arm-joint values of the LIFT pose (the grasp raised ``carry_height`` straight up, orientation kept) solved
+        from stance B with the object attached — the configuration the oracle carries with (``program_check`` solves the
+        same ``lift_end``); None when the lift has no solution (the leg then uses the stance posture, as before)."""
+        lift = (eef[0] + th.tensor([0.0, 0.0, float(carry_height)]), eef[1])
+        with attached(self.kit, "right", target, eef_in_object=eef_in_object):
+            r = self.ikc.exact([lift], manip, "right", ignore_for_last=self.grasp_ignore_objects(), cache=False)
+        if not r.ok or r.q is None:
+            return None
+        return r.q[self.kit.robot.arm_control_idx["right"]].clone()
+
     # ------------------------------------------------------------------ per-attempt budget
 
     def _check_deadline(self, stage: str) -> None:
@@ -1440,10 +1542,10 @@ class IORSLarge(SamplerV2):
             self.sidecar.transitions.clear()
             self.sidecar.paths.clear()
             try:
-                # A -> B (§3.7 / §3.8); floor class: the floor mesh out of the sweep / drive-in checks like stance B itself
+                # A -> B (§3.7 / §3.8; owner 2026-09-19 21:56 (ii)); floor class: the floor mesh out of the sweep / drive-in checks
+                # like stance B itself
                 with self._floor_relaxed():
-                    self.record_path(init, manip)
-                    self.record_transition(init, manip)
+                    leg_ab = self.record_leg_a_b(init, manip)
                 focus_xy = self.surface["c_t"] if kind == "floor" else manip.focus[:2]
                 z_init = self.surface["z"]
                 F_init = self.ikc.feasible_sets([focus_xy], YAWS, self.grasps, lambda xy, yaw: self.pose_on(xy, yaw, z_init), manip, "right", self.grasp_ignore_objects())
@@ -1455,7 +1557,8 @@ class IORSLarge(SamplerV2):
                     raise Reject("no_placement_stance", "no stance C survivor for this init pose")
                 d = self._couple(rng, init, manip, c_pool, F_init, focus_xy, z_init)
                 d.summary.update({"relation": self.relation, "init_surface": {"class": kind, "name": None if kind == "floor" else self.surface["obj"].name},
-                                  "init_stance": P0.summarize_stance(init), "manipulation_stance": P0.summarize_stance(manip)})
+                                  "init_stance": P0.summarize_stance(init), "manipulation_stance": P0.summarize_stance(manip),
+                                  "legs": {"A_B": leg_ab, "B_C": getattr(self, "_leg_bc", None)}})
                 return d
             except Reject as e:
                 if e.reason == "time_budget":
@@ -1464,6 +1567,7 @@ class IORSLarge(SamplerV2):
                 self.sidecar.stances.pop("manipulation", None)
                 self.sidecar.stances.pop("placement", None)
                 self.sidecar.grasps.clear()
+                self.carry_arm_q.clear()
         raise Reject("target_placement", "; ".join(errors[-3:]))
 
     def _couple(self, rng, init: Stance, manip: Stance, c_pool: List[Stance], F_init, focus_xy, z_init: float) -> Draft:
@@ -1560,21 +1664,13 @@ class IORSLarge(SamplerV2):
                     if chain is None:
                         errors.append("C: push chain unreachable")
                         continue
-                # B -> C with the object attached (§3.7 ≤ max_partner_geodesic + 1 m; §3.8 transition)
+                # B -> C with the object attached (§3.7 ≤ max_partner_geodesic + 1 m; §3.8 transition; owner 2026-09-19 21:56 (iii'):
+                # straighten the torso first, navigate, set C's trunk at its pre-place stand-off). The grasp record goes in
+                # BEFORE the leg: ``carried_attachment`` reads its ``eef_in_object`` to pose the object in the hand for every
+                # attached check (without it the object was attached at its parked pose - the WARNING of 0919-202952)
                 self._check_deadline(f"B -> C path / transition at C candidate {i_c + 1}")
                 self.sidecar.add_stance(manip)
                 self.sidecar.add_stance(place)
-                try:
-                    with attached(self.kit, "right", target, eef_in_object=g.pose):
-                        path_bc = self.record_path(manip, place, carried=tname, arm="right", max_length_m=max_len)
-                        self.record_transition(manip, place, carried=tname, arm="right")
-                except Reject as e:
-                    errors.append(f"C: {e.reason}: {e}")
-                    fails["B -> C path / transition"] = fails.get("B -> C path / transition", 0) + 1
-                    self.sidecar.stances.pop("placement", None)
-                    self.sidecar.paths = [p for p in self.sidecar.paths if p.to != "placement"]
-                    self.sidecar.transitions = [t for t in self.sidecar.transitions if t.to != "placement"]
-                    break
                 floor_name = self.bindings.one("floor").name if self.bindings.has("floor") else None
                 grasp = GraspRecord(tname, "right", g.key, g.name, yaw, pre, eef, pre_place, place_eef, finger_q=list(g.finger_q), eef_in_object=g.pose,
                                     place_on=(floor_name or pname) if push else pname)
@@ -1582,6 +1678,19 @@ class IORSLarge(SamplerV2):
                     grasp.extras.update({"place_kind": "drop", "drop_height_m": float(self.num("drop_height_m", PUSH_UNDER_DROP_HEIGHT_M)),
                                          "drop_cell": [float(v) for v in cd], "goal_cell": [float(v) for v in gc], "then": "push_under"})
                 self.sidecar.add_grasp(grasp)
+                q_lift = self.lift_arm_q(manip, eef, grasp.carry_height, target, g.pose)
+                if q_lift is None:
+                    log.info("%s: lift pose from B has no IK solution; the carry is checked with the stance posture", self.gp.alias)
+                try:
+                    path_bc = self.record_carry_leg(init, manip, place, tname, q_lift, max_len)
+                except Reject as e:
+                    errors.append(f"C: {e.reason}: {e}")
+                    fails["B -> C path / transition"] = fails.get("B -> C path / transition", 0) + 1
+                    self.sidecar.stances.pop("placement", None)
+                    self.sidecar.grasps.clear()
+                    self.record_carry_arm_q(tname, "right", None)
+                    self._drop_leg_records("placement")
+                    break
                 if push:
                     self.sidecar.add_contact(PushUnderRecord("right", chain["pre"], chain["start"], chain["mid"], chain["goal"], chain["direction"], chain["distance_m"],
                                                              tname, stance="placement", pitch_deg=chain["pitch_deg"], blade_standoff_m=chain["blade_standoff_m"],

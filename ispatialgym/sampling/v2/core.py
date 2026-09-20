@@ -618,15 +618,45 @@ class SamplerV2(TaskSampler):
             frm, to = self.sidecar.stances.get(tr.frm), self.sidecar.stances.get(tr.to)
             if frm is None or to is None:
                 continue
-            obj, arm, eef_in_object = self.carried_attachment(to.carried)
+            carried_name = tr.holding or (frm.carried if tr.departure else to.carried)
+            obj, arm, eef_in_object = self.carried_attachment(carried_name)
+            override = self.carry_arm_q.get(carried_name) if (obj is not None and carried_name) else None
             with self.ikc.ignoring([obj] if obj is not None else []):
-                new = NAV.transition(self.kit, frm, to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object,
-                                     min_standoff=tr.stand_off, path_end_standoff=self.path_end_standoff(frm, to))
+                if tr.departure:
+                    # a departure transition is re-swept at its recorded stand-off only (the recorded path starts at that pose)
+                    new = NAV.departure_transition(self.kit, frm, to, tr.trunk_to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object,
+                                                   min_standoff=tr.stand_off, arm_q_override=override)
+                    if new is not None and abs(new.stand_off - tr.stand_off) > 1e-6:
+                        new = None
+                else:
+                    dep = self.departure_of(tr.frm, tr.to)
+                    new = NAV.transition(self.kit, frm, to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object,
+                                         min_standoff=tr.stand_off, path_end_standoff=self.path_end_standoff(frm, to), arm_q_override=override,
+                                         trunk_from=dep.trunk_to if dep is not None else None)
             if new is None:
-                raise Reject("no_transition", f"{tr.frm} -> {tr.to}: no swept-free s_T >= the recorded {tr.stand_off:.2f} with the objects placed")
+                raise Reject("no_transition", f"{tr.frm} -> {tr.to}{' (departure)' if tr.departure else ''}: no swept-free s_T >= the recorded {tr.stand_off:.2f} "
+                                              f"with the objects placed")
             if abs(new.stand_off - tr.stand_off) > 1e-6:
                 log.info("%s -> %s: transition stand-off %.2f -> %.2f with the objects placed", tr.frm, tr.to, tr.stand_off, new.stand_off)
             self.sidecar.transitions[i] = new
+
+    def departure_of(self, frm: str, to: str) -> Optional[Transition]:
+        """The recorded departure transition ``frm -> to`` (None when the pair has only the §3.8 arrival one)."""
+        return next((t for t in self.sidecar.transitions if t.frm == frm and t.to == to and t.departure), None)
+
+    @property
+    def carry_arm_q(self) -> Dict[str, th.Tensor]:
+        """bddl instance -> 7 arm-joint values the carrying arm holds while the object is carried (its lift configuration,
+        recorded by the task module with :meth:`record_carry_arm_q`); the transition / path checks with that object
+        attached use it in place of the stances' recorded arm posture (the oracle never moves a holding arm)."""
+        return self.__dict__.setdefault("_carry_arm_q", {})
+
+    def record_carry_arm_q(self, carried: str, arm: str, q_arm: Optional[th.Tensor]) -> None:
+        if q_arm is None:
+            self.carry_arm_q.pop(carried, None)
+        else:
+            self.carry_arm_q[carried] = q_arm.clone()
+        self.__dict__.setdefault("_carry_arm_of", {})[carried] = arm
 
     def path_end_standoff(self, frm: Stance, to: Stance) -> float:
         """Stand-off at which the recorded path ``frm -> to`` ends: the stance's own ``s`` when the path reaches the
@@ -659,28 +689,63 @@ class SamplerV2(TaskSampler):
             return obj, arm or (g.arm if g else "right"), None
         return obj, arm or g.arm, g.eef_in_object
 
-    def record_transition(self, frm: Stance, to: Stance, carried: Optional[str] = None, arm: Optional[str] = None) -> Transition:
-        """§3.8 transition between two recorded stances (carried object attached, posed in the hand per its grasp record);
-        ``Reject("no_transition")``."""
+    def record_transition(self, frm: Stance, to: Stance, carried: Optional[str] = None, arm: Optional[str] = None,
+                          arm_q: Optional[Dict[str, th.Tensor]] = None, trunk_from: Optional[Tuple[float, float]] = None) -> Transition:
+        """§3.8 (arrival) transition between two recorded stances (carried object attached, posed in the hand per its grasp
+        record); ``arm_q`` = arms that keep their configuration (the carrying arm at its lift pose); ``trunk_from`` = the
+        trunk the robot arrives with when a departure transition straightened it; ``Reject("no_transition")``."""
         carried = carried or to.carried
         obj, arm, eef_in_object = self.carried_attachment(carried, arm)
-        tr = NAV.transition(self.kit, frm, to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object)
+        if arm_q is None and carried and obj is not None and carried in self.carry_arm_q:
+            arm_q = {arm: self.carry_arm_q[carried]}
+        tr = NAV.transition(self.kit, frm, to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object, arm_q_override=arm_q, trunk_from=trunk_from)
         if tr is None:
             raise Reject("no_transition", f"{frm.name} -> {to.name}: no s_T in {NAV.transition_standoffs(to.stand_off or 0.0)} is swept collision-free")
         tr.holding = carried or tr.holding  # ``transitions[].holding``: the bddl instance carried through (attachment's second base pose)
         return self.sidecar.add_transition(tr)
 
+    def record_departure_transition(self, frm: Stance, to: Stance, travel_trunk: Tuple[float, float], carried: Optional[str] = None,
+                                    arm: Optional[str] = None, arm_q: Optional[Dict[str, th.Tensor]] = None) -> Transition:
+        """Owner 2026‑09‑19 21:56: the departure transition at ``frm`` (drive back along its own -forward to s_T, sweep
+        the trunk to ``travel_trunk``, no drive-in); the path ``frm -> to`` recorded after it must start at
+        ``NAV.departure_pose(frm, tr.stand_off)`` and be driven at ``travel_trunk`` (:meth:`record_path` ``start_pose2d``
+        / ``trunk``). ``Reject("no_transition")``."""
+        carried = carried or frm.carried
+        obj, arm, eef_in_object = self.carried_attachment(carried, arm)
+        if arm_q is None and carried and obj is not None and carried in self.carry_arm_q:
+            arm_q = {arm: self.carry_arm_q[carried]}
+        tr = NAV.departure_transition(self.kit, frm, to, travel_trunk, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object, arm_q_override=arm_q)
+        if tr is None:
+            raise Reject("no_transition", f"{frm.name} -> {to.name} (departure): no s_T in {NAV.transition_standoffs(frm.stand_off or 0.0)} admits the drive-back + "
+                                          f"trunk sweep {(frm.translate, round(frm.tilt, 2))} -> {tuple(round(float(v), 2) for v in travel_trunk)}")
+        tr.holding = carried or tr.holding
+        return self.sidecar.add_transition(tr)
+
     def record_path(self, frm: Stance, to: Stance, carried: Optional[str] = None, arm: Optional[str] = None, max_length_m: Optional[float] = None,
                     blocked: Sequence[Any] = (), force_global: bool = False, trunk: Optional[Tuple[float, float]] = None,
-                    arm_q: Optional[Dict[str, th.Tensor]] = None) -> PathRecord:
+                    arm_q: Optional[Dict[str, th.Tensor]] = None, start_pose2d: Optional[Tuple[float, float, float]] = None) -> PathRecord:
         """§3.7 path between two recorded stances, checked at the departing stance's trunk (``trunk`` overrides) with the
         carried object attached (posed in the hand per its grasp record); ``arm_q`` (per arm) fixes the arm posture of the
-        drive (a carry: the lift configuration the oracle drives with); ``force_global`` plans on the eroded map end to
-        end; ``Reject(no_path | path_collision | path_too_long)``."""
+        drive (a carry: the lift configuration the oracle drives with; default for a carried object: its recorded
+        ``carry_arm_q``); ``start_pose2d`` = where the path starts when it is not ``frm``'s base pose (the drive-back pose
+        of a departure transition); ``force_global`` plans on the eroded map end to end;
+        ``Reject(no_path | path_collision | path_too_long)``."""
         carried = carried or to.carried or frm.carried
         obj, arm, eef_in_object = self.carried_attachment(carried, arm)
+        if arm_q is None and carried and obj is not None and carried in self.carry_arm_q:
+            from ispatialgym.sampling.v2.ik import stance_arm_vectors
+
+            r, l, _ = stance_arm_vectors(self.kit, frm)
+            arm_q = {"right": r, "left": l, arm: self.carry_arm_q[carried]}
+        start = frm
+        if start_pose2d is not None:
+            start = Stance(frm.name, tuple(float(v) for v in start_pose2d), frm.translate, frm.tilt, frm.stand_off, frm.edge, frm.face, frm.lateral, frm.focus,
+                           frm.arms, list(frm.contacts), frm.q, frm.carried, dict(frm.extras), frm.fingers, frm.idle_posture)
+        # ``paths[].posture`` = the posture the drive was checked at: a tucked init stance (the floor class of IORS large-scale,
+        # ``1dd3820``) drives tucked - the oracle re-poses empty hands to ``untucked`` only when the record says so
+        posture = "tucked" if (frm.posture == "tucked" and arm_q is None) else "untucked"
         try:
-            p = NAV.plan_path(self.kit, frm, to, carried=carried, carried_obj=obj, carried_arm=arm, rooms=self.gp.rooms(self.scene) or self.world.rooms,
+            p = NAV.plan_path(self.kit, start, to, posture=posture, carried=carried, carried_obj=obj, carried_arm=arm, rooms=self.gp.rooms(self.scene) or self.world.rooms,
                               blocked=blocked, max_length_m=max_length_m, trunk=trunk, eef_in_object=eef_in_object, force_global=force_global, arm_q=arm_q)
         except NAV.NavigationError as e:
             raise Reject(e.reason, str(e))

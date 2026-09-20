@@ -437,7 +437,8 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
 def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_obj: Any = None, carried_arm: str = "right",
                posture: Optional[str] = None, margin: float = 0.01, n_samples: int = TRANSITION_SAMPLES,
                eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None, min_standoff: Optional[float] = None,
-               check_drive_in: bool = True, path_end_standoff: Optional[float] = None) -> Optional[Transition]:
+               check_drive_in: bool = True, path_end_standoff: Optional[float] = None,
+               arm_q_override: Optional[Dict[str, th.Tensor]] = None, trunk_from: Optional[Tuple[float, float]] = None) -> Optional[Transition]:
     """§3.8: the smallest ``s_T ∈ transition_standoffs(s)`` (``s`` = the arriving stance's stand-off, driven back along
     -inward) at which (a) the swept trunk motion (``n_samples`` trunks between the two stances' values, both endpoints
     included) and (b) the **drive-in** ``s_T → s`` (``check_drive_in``, strides of ``STRIDE_M`` at the arriving trunk)
@@ -450,8 +451,15 @@ def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_
     path ends (``s`` when it ends at the stance, the recorded s_T when ``prompt0.connect`` planned it to the drive-back
     pose); a candidate beyond it adds a drive-back from the path's end to the new pose, checked at the *departing*
     trunk and arms. Returns the ``Transition`` or None (caller: ``Reject("no_transition")``). Stances with equal trunks
-    need no sweep (``n_samples = 0``; the drive-in is still checked when ``s_T > s``)."""
-    tf, tt = (stance_from.translate, stance_from.tilt), (stance_to.translate, stance_to.tilt)
+    need no sweep (``n_samples = 0``; the drive-in is still checked when ``s_T > s``).
+
+    ``arm_q_override`` (arm -> 7 joint values): arms that keep a configuration through the transition — the arm that
+    CARRIES the object holds its lift configuration (the oracle never moves a holding arm: ``move_idle_arms`` skips it),
+    so the sweep / drive-in / drive-back are checked with that arm there instead of the stances' recorded postures
+    (IORS large-scale 0919-211642: the sweep into the placement crouch was checked with the untucked arm while the
+    oracle held the sandal at the lift pose, and the sandal brushed the table top). ``trunk_from``: the trunk the robot
+    arrives with when it differs from ``stance_from``'s (a departure transition straightened it to a travel trunk)."""
+    tf, tt = (stance_from.translate, stance_from.tilt) if trunk_from is None else (float(trunk_from[0]), float(trunk_from[1])), (stance_to.translate, stance_to.tilt)
     s = float(stance_to.stand_off if stance_to.stand_off is not None else 0.0)
     same_trunk = abs(tf[0] - tt[0]) < 1e-6 and abs(tf[1] - tt[1]) < 1e-6
     floor = s if min_standoff is None else max(s, float(min_standoff))
@@ -468,6 +476,9 @@ def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_
     arms_to = {"right": right_arm, "left": left_arm}
     r_from, l_from, f_from = stance_arm_vectors(kit, stance_from)
     arms_from = {"right": r_from, "left": l_from}
+    for a, q in (arm_q_override or {}).items():
+        arms_to[a], arms_from[a] = q, q
+    right_arm, left_arm = arms_to["right"], arms_to["left"]
     end_back = None if path_end_standoff is None else max(0.0, float(path_end_standoff) - s)
     with attached(kit, carried_arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
         for s_T in transition_standoffs(s):
@@ -494,6 +505,66 @@ def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_
                 if not ok:
                     continue
             return Transition(stance_from.name, stance_to.name, s_T, trunk_from=tf, trunk_to=tt, n_samples=0 if same_trunk else n_samples, holding=stance_to.carried)
+    return None
+
+
+def departure_pose(stance_from: Stance, s_T: float) -> Tuple[float, float, float]:
+    """Drive-back pose of a departure transition: ``stance_from`` moved ``s_T - stand_off`` backwards along its own
+    forward direction (``conventions.departure_transition_poses``)."""
+    s = float(stance_from.stand_off if stance_from.stand_off is not None else 0.0)
+    back = float(s_T) - s
+    x0, y0, yaw = (float(v) for v in stance_from.base_pose2d)
+    return (x0 - back * math.cos(yaw), y0 - back * math.sin(yaw), yaw)
+
+
+def departure_transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, travel_trunk: Tuple[float, float], carried_obj: Any = None,
+                         carried_arm: str = "right", margin: float = 0.01, n_samples: int = TRANSITION_SAMPLES,
+                         eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None, min_standoff: Optional[float] = None,
+                         arm_q_override: Optional[Dict[str, th.Tensor]] = None, arms_stance: Optional[Stance] = None) -> Optional[Transition]:
+    """Owner 2026‑09‑19 21:56 ("make torso straight, then navigate"): the **departure** transition at ``stance_from`` —
+    the smallest ``s_T ∈ transition_standoffs(stance_from.stand_off)`` at which (a) the drive-back ``stance_from ->
+    departure_pose(s_T)`` (strides at the departing trunk, when ``s_T > s``) and (b) the trunk sweep ``stance_from's
+    trunk -> travel_trunk`` at that pose are whole-body collision-free with the carried object attached (posed in the
+    hand) and the arms the oracle drives with: ``arms_stance``'s recorded posture (default: the *arriving* stance's —
+    the oracle moves the idle arm there before the trunk motion, as at an arrival) with ``arm_q_override`` on top (the
+    holding arm at its lift configuration). "Preferably along the way it has moved before": the drive-back runs along
+    the departing stance's own -forward, i.e. back out the way the arrival drive-in came. Returns the departure
+    ``Transition`` (``at = "departure"``, ``trunk_to = travel_trunk``) or None."""
+    tf = (float(stance_from.translate), float(stance_from.tilt))
+    tt = (float(travel_trunk[0]), float(travel_trunk[1]))
+    s = float(stance_from.stand_off if stance_from.stand_off is not None else 0.0)
+    same_trunk = abs(tf[0] - tt[0]) < 1e-6 and abs(tf[1] - tt[1]) < 1e-6
+    floor = s if min_standoff is None else max(s, float(min_standoff))
+    if same_trunk and floor <= s + 1e-9:
+        return Transition(stance_from.name, stance_to.name, s, trunk_from=tf, trunk_to=tt, n_samples=0, holding=stance_from.carried, at="departure")
+    from ispatialgym.sampling.v2.ik import stance_arm_vectors
+
+    right_arm, left_arm, fingers = stance_arm_vectors(kit, arms_stance if arms_stance is not None else stance_to)
+    arms = {"right": right_arm, "left": left_arm}
+    for a, q in (arm_q_override or {}).items():
+        arms[a] = q
+    x0, y0, yaw = (float(v) for v in stance_from.base_pose2d)
+    sweep = trunk_sweep(tf, tt, n_samples)
+    with attached(kit, carried_arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
+        for s_T in transition_standoffs(s):
+            if s_T < floor - 1e-9:
+                continue
+            bx, by, _ = departure_pose(stance_from, s_T)
+            back = s_T - s
+            if back > 0 and not kit.trav_free((bx, by)):
+                continue
+            if back > 0:  # (a) the drive-back at the departing trunk with the arms as they are
+                drive = stride_poses([(x0, y0, yaw), (bx, by, yaw)], STRIDE_M)
+                ok, _ = path_collision_free(kit, drive, tf, "untucked", margin=margin, q_arms=arms, fingers=fingers)
+                if not ok:
+                    continue
+            if not same_trunk:  # (b) the trunk sweep to the travel trunk at the drive-back pose
+                qs = th.stack([kit.q_at_base_pose(kit.q_config(arms="untucked", translate=tr, tilt=ti, right_arm=arms["right"], left_arm=arms["left"], fingers=fingers),
+                                                  bx, by, yaw) for tr, ti in sweep])
+                if not bool(kit.collision_free(qs, margin=margin).all()):
+                    continue
+            return Transition(stance_from.name, stance_to.name, s_T, trunk_from=tf, trunk_to=tt, n_samples=0 if same_trunk else n_samples,
+                              holding=stance_from.carried, at="departure")
     return None
 
 

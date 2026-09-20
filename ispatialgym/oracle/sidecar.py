@@ -291,6 +291,21 @@ class Transition:
         v = self.extra.get("holding")
         return v if isinstance(v, str) and v else None
 
+    @property
+    def departure(self) -> bool:
+        """``at: "departure"`` (owner 2026‑09‑19 21:56, IORS large-scale): the trunk change happens at the *departing*
+        stance — drive back along its own -forward to ``stand_off``, sweep to the travel trunk ``trunk_to``, no drive-in;
+        the recorded path starts there. Default (absent / ``"arrival"``) = the spec §3.8 transition at the arriving stance."""
+        return self.extra.get("at") == "departure"
+
+    @property
+    def trunk_to(self) -> Optional[Tuple[float, float]]:
+        """The travel trunk of a departure transition (``(translate, tilt)``), None for an arrival one."""
+        v = self.extra.get("trunk_to")
+        if isinstance(v, (list, tuple)) and len(v) == 2:
+            return (float(v[0]), float(v[1]))
+        return None
+
     @classmethod
     def from_dict(cls, d: Any, where: str) -> "Transition":
         d = _dict(d, where)
@@ -1104,9 +1119,17 @@ class Sidecar:
         return hits[0] if hits else None
 
     def transition(self, frm: str, to: str) -> Optional[Transition]:
-        hits = [t for t in self.transitions if t.frm == frm and t.to == to]
+        """The §3.8 (arrival) transition ``frm -> to``; a departure transition of the same pair is :meth:`departure`."""
+        hits = [t for t in self.transitions if t.frm == frm and t.to == to and not t.departure]
         if len(hits) > 1:
             raise SidecarError(f"transitions: {len(hits)} transitions recorded from {frm!r} to {to!r}")
+        return hits[0] if hits else None
+
+    def departure(self, frm: str, to: str) -> Optional[Transition]:
+        """The departure transition ``frm -> to`` (``at: "departure"``), None when the pair records none."""
+        hits = [t for t in self.transitions if t.frm == frm and t.to == to and t.departure]
+        if len(hits) > 1:
+            raise SidecarError(f"transitions: {len(hits)} departure transitions recorded from {frm!r} to {to!r}")
         return hits[0] if hits else None
 
     def has_block(self, name: str) -> bool:
@@ -1180,9 +1203,12 @@ class Sidecar:
                 out.append(f"{w}.stand_off: negative")
             if t.order != TRANSITION_ORDER:
                 out.append(f"{w}.order: expected {TRANSITION_ORDER}, got {t.order}")
-            if (t.frm, t.to) in seen:
-                out.append(f"{w}: duplicate transition {t.frm!r} -> {t.to!r}")
-            seen.add((t.frm, t.to))
+            if t.departure and t.trunk_to is None:
+                out.append(f"{w}: a departure transition needs trunk_to (the travel trunk)")
+            key = (t.frm, t.to, "departure" if t.departure else "arrival")
+            if key in seen:
+                out.append(f"{w}: duplicate {key[2]} transition {t.frm!r} -> {t.to!r}")
+            seen.add(key)
 
         path_ends = stance_names | ({"goal"} if self.goal is not None else set())
         seen = set()

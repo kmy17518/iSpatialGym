@@ -438,7 +438,12 @@ class Transition(Action):
 
     def targets(self, sidecar, state):
         C = _conventions()
-        tp = C.transition_poses(self.stance_from.to_dict(), self.stance_to.to_dict(), self.transition.stand_off)
+        if getattr(self.transition, "departure", False):
+            # owner 2026-09-19 21:56: the trunk change at the DEPARTING stance (drive back along its own axis, sweep to the travel
+            # trunk, no drive-in); the recorded path that follows starts at ``drive_back``
+            tp = C.departure_transition_poses(self.stance_from.to_dict(), self.transition.stand_off, self.transition.trunk_to)
+        else:
+            tp = C.transition_poses(self.stance_from.to_dict(), self.stance_to.to_dict(), self.transition.stand_off)
         translate, tilt = (float(v) for v in tp.trunk)
         return {"drive_back": _as_pose2d(tp.drive_back), "trunk": (translate, tilt), "drive_in": _as_pose2d(tp.drive_in)}
 

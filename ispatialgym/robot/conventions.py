@@ -786,6 +786,23 @@ def transition_poses(stance_from, stance_to, s_T: float) -> TransitionPoses:
     return TransitionPoses(start=p_from, drive_back=drive_back, trunk_from=(t0, k0), trunk=(t1, k1), drive_in=(x, y, yaw), stand_off=float(s_T))
 
 
+def departure_transition_poses(stance_from, s_T: float, trunk_to: Tuple[float, float]) -> TransitionPoses:
+    """Poses of a **departure** transition (owner 2026‑09‑19 21:56, IORS large-scale carry: "make torso straight, then
+    navigate"; the mirror image of :func:`transition_poses`). The trunk change happens on the *departing* stance's own
+    axis: ``drive_back`` is ``stance_from`` translated ``s_T - stance_from.stand_off`` backwards along its forward
+    direction (away from the edge / the floor target, i.e. along the way the robot arrived), the trunk pair is the
+    **travel trunk** ``trunk_to`` (not a stance's), and there is no drive-in: ``drive_in == drive_back`` — the recorded
+    path that follows starts there. ``start`` is the departing stance itself; the swept samples are ``trunk_sweep``."""
+    (x, y, yaw), t0, k0, s = _stance_fields(stance_from)
+    s = 0.0 if s is None else float(s)
+    back = float(s_T) - s
+    if back < -1e-6:
+        raise ValueError(f"departure transition stand-off {s_T} is smaller than the stance stand-off {s}")
+    drive_back = (x - back * math.cos(yaw), y - back * math.sin(yaw), yaw)
+    t1, k1 = float(trunk_to[0]), float(trunk_to[1])
+    return TransitionPoses(start=(x, y, yaw), drive_back=drive_back, trunk_from=(t0, k0), trunk=(t1, k1), drive_in=drive_back, stand_off=float(s_T))
+
+
 def transition_standoffs(stand_off: float, step: float = 0.1, n: int = 6) -> List[float]:
     """The candidate transition stand-offs of spec §3.8, smallest first: ``{s, s + 0.1, …, s + 0.5}``."""
     return [round(float(stand_off) + k * step, 6) for k in range(int(n))]
