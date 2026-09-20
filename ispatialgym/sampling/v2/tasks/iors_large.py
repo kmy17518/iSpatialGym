@@ -1622,6 +1622,7 @@ class IORSLarge(SamplerV2):
             order = sorted(side, key=depth) + sorted(front, key=reach)
             n_try = max(12, len(side))
         chain_cache: Dict[Tuple[int, int], Optional[Dict[str, Any]]] = {}  # (C index, yaw bucket) -> push chain (push-under: the chain depends on the yaw only)
+        b_ik_cache: Dict[Tuple[int, str], Optional[Tuple[float, G.Pose, G.Pose, G.Pose]]] = {}  # (yaw bucket, grasp) -> (yaw, target pose, grasp eef, pre-grasp) at B, None = infeasible
         errors = []
         for i_c, kc in enumerate(order[:n_try]):
             self._check_deadline(f"C candidate {i_c + 1} of {min(n_try, len(order))} (F_goal feasible set) at B ({manip.translate}, {manip.tilt:.2f})")
@@ -1677,26 +1678,38 @@ class IORSLarge(SamplerV2):
                     if chain_cache[ck] is None:
                         fails["C: push chain unreachable at this yaw"] = fails.get("C: push chain unreachable at this yaw", 0) + 1
                         continue
-                t_pose = None
-                for _ in range(5):
-                    if self.surface["kind"] == "floor":
-                        xy = focus_xy
-                    else:
-                        r, a = float(rng.uniform(0, FOCUS_RADIUS)), float(rng.uniform(0, 2 * math.pi))
-                        xy = focus_xy + th.tensor([r * math.cos(a), r * math.sin(a)])
-                        if not self.surface["top"].polygon_supported(self.world.footprint(self.hull, self.pose_on(xy, yaw, z_init)), margin=SUPPORT_MARGIN):
-                            continue
-                    t_pose = self.pose_on(xy, yaw, z_init)
-                    break
-                if t_pose is None:
-                    fails["target footprint off the init surface"] = fails.get("target footprint off the init surface", 0) + 1
-                    continue
-                eef = IK.grasp_pose(t_pose, g.pose)
-                pre = IK.pre_pose(eef)
-                res = self.ikc.exact([pre, eef], manip, "right", ignore_for_last=self.grasp_ignore_objects(), scale_key=self.choice.models["target"].scale, cache=False)
-                if not res.ok:
-                    fails["B: [pre-grasp, grasp] exact IK"] = fails.get("B: [pre-grasp, grasp] exact IK", 0) + 1
-                    continue
+                # the grasp side (target pose at B's focus, pre-grasp + grasp exact IK from B) does not depend on C: solved once per
+                # (yaw bucket, grasp) for this B and reused across the C candidates (a failed pair is skipped everywhere)
+                bk = (int(round(yaw0 / (math.pi / 8))), getattr(g, "name", str(g)))
+                if bk in b_ik_cache:
+                    hit = b_ik_cache[bk]
+                    if hit is None:
+                        fails["B: [pre-grasp, grasp] exact IK (cached)"] = fails.get("B: [pre-grasp, grasp] exact IK (cached)", 0) + 1
+                        continue
+                    yaw, t_pose, eef, pre = hit
+                else:
+                    t_pose = None
+                    for _ in range(5):
+                        if self.surface["kind"] == "floor":
+                            xy = focus_xy
+                        else:
+                            r, a = float(rng.uniform(0, FOCUS_RADIUS)), float(rng.uniform(0, 2 * math.pi))
+                            xy = focus_xy + th.tensor([r * math.cos(a), r * math.sin(a)])
+                            if not self.surface["top"].polygon_supported(self.world.footprint(self.hull, self.pose_on(xy, yaw, z_init)), margin=SUPPORT_MARGIN):
+                                continue
+                        t_pose = self.pose_on(xy, yaw, z_init)
+                        break
+                    if t_pose is None:
+                        fails["target footprint off the init surface"] = fails.get("target footprint off the init surface", 0) + 1
+                        continue
+                    eef = IK.grasp_pose(t_pose, g.pose)
+                    pre = IK.pre_pose(eef)
+                    res = self.ikc.exact([pre, eef], manip, "right", ignore_for_last=self.grasp_ignore_objects(), scale_key=self.choice.models["target"].scale, cache=False)
+                    if not res.ok:
+                        b_ik_cache[bk] = None
+                        fails["B: [pre-grasp, grasp] exact IK"] = fails.get("B: [pre-grasp, grasp] exact IK", 0) + 1
+                        continue
+                    b_ik_cache[bk] = (yaw, t_pose, eef, pre)
                 goal_quat = G.qmul(G.quat_from_yaw(d_yaw), t_pose[1]) if abs(d_yaw) > 1e-9 else t_pose[1]
                 goal = release_pose(release_xy, goal_quat)
                 place_eef = IK.grasp_pose(goal, g.pose)
