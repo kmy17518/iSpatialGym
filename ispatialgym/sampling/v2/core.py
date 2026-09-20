@@ -620,7 +620,8 @@ class SamplerV2(TaskSampler):
                 continue
             carried_name = tr.holding or (frm.carried if tr.departure else to.carried)
             obj, arm, eef_in_object = self.carried_attachment(carried_name)
-            override = self.carry_arm_q.get(carried_name) if (obj is not None and carried_name) else None
+            q_carry = self.carry_arm_q.get(carried_name) if (obj is not None and carried_name) else None
+            override = {arm: q_carry} if q_carry is not None else None
             with self.ikc.ignoring([obj] if obj is not None else []):
                 if tr.departure:
                     # a departure transition is re-swept at its recorded stand-off only (the recorded path starts at that pose)
@@ -634,8 +635,10 @@ class SamplerV2(TaskSampler):
                                          min_standoff=tr.stand_off, path_end_standoff=self.path_end_standoff(frm, to), arm_q_override=override,
                                          trunk_from=dep.trunk_to if dep is not None else None)
             if new is None:
+                joints = {n: [round(float(v), 3) for v in o.get_joint_positions().tolist()] for n, o in self.objects.items() if getattr(o, "n_joints", 0)}
                 raise Reject("no_transition", f"{tr.frm} -> {tr.to}{' (departure)' if tr.departure else ''}: no swept-free s_T >= the recorded {tr.stand_off:.2f} "
-                                              f"with the objects placed")
+                                              f"with the objects placed (to: stand-off {float(to.stand_off or 0):.2f} trunk ({to.translate:.2f}, {to.tilt:+.2f}) arms {to.arms}; "
+                                              f"from trunk ({frm.translate:.2f}, {frm.tilt:+.2f}); object joints {joints})")
             if abs(new.stand_off - tr.stand_off) > 1e-6:
                 log.info("%s -> %s: transition stand-off %.2f -> %.2f with the objects placed", tr.frm, tr.to, tr.stand_off, new.stand_off)
             self.sidecar.transitions[i] = new
