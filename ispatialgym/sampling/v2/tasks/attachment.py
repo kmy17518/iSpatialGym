@@ -166,6 +166,7 @@ class Attachment(SamplerV2):
         for role, o in ((self.t_role, male), (self.p_role, female)):
             self.hull[role] = self.world.local_hull(o)
             self.height[role] = TT.height_of(self.hull[role], self.rest[role])
+        self.grasps = self._recentre_grasps(self.grasps, male)
         # collision filter between the members (OmniGibson's AttachedTo no longer filters child / parent collisions)
         male.states[AttachedTo]._disable_collision_between_child_and_parent(male, female)
         og.sim.step_physics()
@@ -477,6 +478,43 @@ class Attachment(SamplerV2):
                           "joint_placement": {"left_band": self.left_bands is not None}})
         self.brace_missing = brace_state == "none"
         return d
+
+    # ------------------------------------------------------------------ asymmetric library grasps re-centred (cap/xxqyrt)
+
+    def _recentre_grasps(self, grasps: List[Any], male) -> List[Any]:
+        """Library grasps whose pinch centre (pad centre) lies more than ``generation.pinch_offset_max_m`` (15 mm) off the male
+        hull's centre along the closing axis are moved onto it (iors_small's ``recentre_pinches`` rule with a wider limit):
+        the oracle closes both fingers symmetrically about the eef, but the library's asymmetric AG grasps (cap/xxqyrt: fingers
+        50 / 0 mm, eef 22 mm off the cap's centre, 'both fingertips on the rim') would put one pre-shaped pad on top of the
+        part. The re-centred pose must stay attachable (self-collision of the attached part); the limit leaves the validated
+        lid grasps (<= 10 mm off) and their cached bands untouched. ``template_facts.recentred_grasps``."""
+        import copy
+
+        limit = float(self.gen("pinch_offset_max_m", 0.015))
+        hull = TT._t(self.hull[self.t_role])
+        out, moved = [], {}
+        for g in grasps:
+            pos, quat = TT._t(g.pose[0]), TT._t(g.pose[1])
+            R = C.quat_to_mat(quat)
+            a, c = R[:, 2], R[:, 1]
+            pc = pos + C.CONTACT_CENTER_Z * a
+            proj = hull @ c
+            off = float(th.dot(pc, c)) - 0.5 * float(proj.min() + proj.max())
+            if abs(off) <= limit:
+                out.append(g)
+                continue
+            shifted = copy.copy(g)
+            shifted.position = pos - off * c
+            if self.ikc.attachable(male, shifted.pose, "right"):
+                moved[g.name] = round(off, 4)
+                out.append(shifted)
+            else:
+                log.info("%s: grasp %s pinch %+.1f mm off the male's centre; the re-centred pose is not attachable - kept", self.gp.alias, g.name, off * 1000)
+                out.append(g)
+        if moved:
+            log.info("%s: %d asymmetric library grasps re-centred along the closing axis (offsets m): %s", self.gp.alias, len(moved), moved)
+        self.template_facts["recentred_grasps"] = moved
+        return out
 
     # ------------------------------------------------------------------ pinch width from the male's geometry (0919-210926)
 
