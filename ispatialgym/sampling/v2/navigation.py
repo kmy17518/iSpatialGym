@@ -454,7 +454,8 @@ def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_
                posture: Optional[str] = None, margin: float = 0.01, n_samples: int = TRANSITION_SAMPLES,
                eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None, min_standoff: Optional[float] = None,
                check_drive_in: bool = True, path_end_standoff: Optional[float] = None,
-               arm_q_override: Optional[Dict[str, th.Tensor]] = None, trunk_from: Optional[Tuple[float, float]] = None) -> Optional[Transition]:
+               arm_q_override: Optional[Dict[str, th.Tensor]] = None, trunk_from: Optional[Tuple[float, float]] = None,
+               extra_max: float = TRANSITION_EXTRA_MAX) -> Optional[Transition]:
     """§3.8: the smallest ``s_T ∈ transition_standoffs(s)`` (``s`` = the arriving stance's stand-off, driven back along
     -inward) at which (a) the swept trunk motion (``n_samples`` trunks between the two stances' values, both endpoints
     included) and (b) the **drive-in** ``s_T → s`` (``check_drive_in``, strides of ``STRIDE_M`` at the arriving trunk)
@@ -497,7 +498,7 @@ def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_
     right_arm, left_arm = arms_to["right"], arms_to["left"]
     end_back = None if path_end_standoff is None else max(0.0, float(path_end_standoff) - s)
     with attached(kit, carried_arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
-        for s_T in transition_standoffs(s):
+        for s_T in transition_standoffs(s, extra_max=float(extra_max)):
             if s_T < floor - 1e-9:
                 continue
             back = s_T - s
@@ -545,7 +546,11 @@ def departure_transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance
     the oracle moves the idle arm there before the trunk motion, as at an arrival) with ``arm_q_override`` on top (the
     holding arm at its lift configuration). "Preferably along the way it has moved before": the drive-back runs along
     the departing stance's own -forward, i.e. back out the way the arrival drive-in came. Returns the departure
-    ``Transition`` (``at = "departure"``, ``trunk_to = travel_trunk``) or None."""
+    ``Transition`` (``at = "departure"``, ``trunk_to = travel_trunk``) or None.
+
+    ``extra_max`` of :func:`transition`: how far beyond the arriving stand-off the s_T candidates go (§3.8: 0.5 m); a
+    CARRY arrival into a deep crouch may need more — the hand frozen at the lift pose swings ~0.5 m forward and ~0.9 m
+    down during the sweep, so it must start far enough from the partner's top (0920-033402: no s_T in s..s+0.5)."""
     tf = (float(stance_from.translate), float(stance_from.tilt))
     tt = (float(travel_trunk[0]), float(travel_trunk[1]))
     s = float(stance_from.stand_off if stance_from.stand_off is not None else 0.0)

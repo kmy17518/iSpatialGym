@@ -633,9 +633,11 @@ class SamplerV2(TaskSampler):
                         new = None
                 else:
                     dep = self.departure_of(tr.frm, tr.to)
+                    s_to = float(to.stand_off if to.stand_off is not None else 0.0)
                     new = NAV.transition(self.kit, frm, to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object,
                                          min_standoff=tr.stand_off, path_end_standoff=self.path_end_standoff(frm, to), arm_q_override=override,
-                                         trunk_from=dep.trunk_to if dep is not None else None)
+                                         trunk_from=dep.trunk_to if dep is not None else None,
+                                         extra_max=max(NAV.TRANSITION_EXTRA_MAX, float(tr.stand_off) - s_to + NAV.TRANSITION_EXTRA_MAX))
             if new is None:
                 joints = {n: [round(float(v), 3) for v in o.get_joint_positions().tolist()] for n, o in self.objects.items() if getattr(o, "n_joints", 0)}
                 raise Reject("no_transition", f"{tr.frm} -> {tr.to}{' (departure)' if tr.departure else ''}: no swept-free s_T >= the recorded {tr.stand_off:.2f} "
@@ -695,17 +697,22 @@ class SamplerV2(TaskSampler):
         return obj, arm or g.arm, g.eef_in_object
 
     def record_transition(self, frm: Stance, to: Stance, carried: Optional[str] = None, arm: Optional[str] = None,
-                          arm_q: Optional[Dict[str, th.Tensor]] = None, trunk_from: Optional[Tuple[float, float]] = None) -> Transition:
+                          arm_q: Optional[Dict[str, th.Tensor]] = None, trunk_from: Optional[Tuple[float, float]] = None,
+                          extra_max: Optional[float] = None) -> Transition:
         """§3.8 (arrival) transition between two recorded stances (carried object attached, posed in the hand per its grasp
         record); ``arm_q`` = arms that keep their configuration (the carrying arm at its lift pose); ``trunk_from`` = the
-        trunk the robot arrives with when a departure transition straightened it; ``Reject("no_transition")``."""
+        trunk the robot arrives with when a departure transition straightened it; ``extra_max`` = how far beyond the
+        stand-off the s_T candidates go (§3.8 0.5 m; a carry into a deep crouch may back off further);
+        ``Reject("no_transition")``."""
         carried = carried or to.carried
         obj, arm, eef_in_object = self.carried_attachment(carried, arm)
         if arm_q is None and carried and obj is not None and carried in self.carry_arm_q:
             arm_q = {arm: self.carry_arm_q[carried]}
-        tr = NAV.transition(self.kit, frm, to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object, arm_q_override=arm_q, trunk_from=trunk_from)
+        extra = NAV.TRANSITION_EXTRA_MAX if extra_max is None else float(extra_max)
+        tr = NAV.transition(self.kit, frm, to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object, arm_q_override=arm_q, trunk_from=trunk_from,
+                            extra_max=extra)
         if tr is None:
-            raise Reject("no_transition", f"{frm.name} -> {to.name}: no s_T in {NAV.transition_standoffs(to.stand_off or 0.0)} is swept collision-free")
+            raise Reject("no_transition", f"{frm.name} -> {to.name}: no s_T in {NAV.transition_standoffs(to.stand_off or 0.0, extra_max=extra)} is swept collision-free")
         tr.holding = carried or tr.holding  # ``transitions[].holding``: the bddl instance carried through (attachment's second base pose)
         return self.sidecar.add_transition(tr)
 

@@ -1492,7 +1492,9 @@ class IORSLarge(SamplerV2):
                 dep = self.record_departure_transition(manip, place, tt, carried=tname, arm="right")
                 start = NAV.departure_pose(manip, dep.stand_off)
                 path = self.record_path(manip, place, carried=tname, arm="right", max_length_m=max_len, trunk=tt, start_pose2d=start)
-                self.record_transition(manip, place, carried=tname, arm="right", trunk_from=tt)
+                # a carry into a deep crouch backs off further before the sweep (the hand frozen at the lift pose swings ~0.5 m
+                # forward / 0.9 m down): s_T up to stand-off + generation.carry_transition_extra_m (1.0)
+                self.record_transition(manip, place, carried=tname, arm="right", trunk_from=tt, extra_max=self.num("carry_transition_extra_m", 1.0))
                 where = "at the grasp spot" if dep.stand_off <= (manip.stand_off or 0.0) + 1e-6 else "after a drive-back"
                 log.info("%s: B -> C carry: torso straightened to %s at s_T %.2f (%s), path %.2f m", self.gp.alias, tuple(round(v, 2) for v in tt), dep.stand_off, where,
                          path.length_m)
@@ -1505,7 +1507,7 @@ class IORSLarge(SamplerV2):
         # fallback: drive at B's trunk (the object low in the crouch), the trunk set at C's pre-place stand-off
         try:
             path = self.record_path(manip, place, carried=tname, arm="right", max_length_m=max_len)
-            self.record_transition(manip, place, carried=tname, arm="right")
+            self.record_transition(manip, place, carried=tname, arm="right", extra_max=self.num("carry_transition_extra_m", 1.0))
             log.info("%s: B -> C carry: no travel trunk admits straighten-then-navigate (%s); driving at B's trunk %s", self.gp.alias, "; ".join(errors),
                      (manip.translate, round(manip.tilt, 2)))
             self.template_facts.setdefault("carry_fallbacks", []).append(errors)
