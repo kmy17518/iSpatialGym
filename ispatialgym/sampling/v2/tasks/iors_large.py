@@ -98,8 +98,9 @@ FLOOR_TRUNKS = ((0.75, -0.9), (0.75, -1.2), (0.95, -0.9), (0.95, -1.2))
 #: per-attempt time budget (owner 2026‑09‑16 22:55 item 4; as attachment's 094cfe3): run 0916‑190702 spent > 2 h in one push-under
 #: attempt (6 B candidates × up to 56 C candidates × the F_goal feasible sets) and hit the 7200 s run timeout with nothing
 #: written and no rejection recorded — the attempt now stops with ``Reject("time_budget")`` naming the stage it reached
-#: (``generation.attempt_budget_s`` overrides)
-ATTEMPT_BUDGET_S = 900.0
+#: (``generation.attempt_budget_s`` overrides). 900 -> 1500 s (2026-09-20): the F_init pre-screen (8 B x 16 yaws) and the
+#: carry-leg checks (departure sweep, path, arrival sweep with the object attached) add ~3 min per attempt
+ATTEMPT_BUDGET_S = 1500.0
 
 
 class _NullContext:
@@ -1653,7 +1654,9 @@ class IORSLarge(SamplerV2):
                 errors.append(f"C: F_init ({len(F_init)}) ∩ F_goal ({len(F_goal)}) empty at {'drop' if push else 'goal'} cell {[round(v, 2) for v in release_xy]}")
                 continue
             fails: Dict[str, int] = {}
-            for i in rng.permutation(len(F))[:int(self.num("f_draws_max", 8))]:
+            # pairs of F tried per C: the push-under chain search (4 pitches x 2 wrist turns x exact IK) is the expensive leg, so the
+            # push mode keeps the earlier 4 draws (0919-233031: 8 draws x 12 C candidates spent the 900 s budget on attempts 0 and 2)
+            for i in rng.permutation(len(F))[:int(self.num("f_draws_max", 4 if push else 8))]:
                 self._check_deadline(f"F draw at C candidate {i_c + 1} (exact IK at B / C{', push chain' if push else ''})")
                 yaw0, g = F[int(i)]
                 yaw = yaw0 + float(rng.uniform(-TARGET_JITTER, TARGET_JITTER))
