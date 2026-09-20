@@ -1518,23 +1518,29 @@ class IORSLarge(SamplerV2):
             self._drop_leg_records(place.name)
             raise Reject(e.reason, f"{e}; straighten-then-navigate: " + "; ".join(errors))
 
-    def carry_pose_at_b(self, manip: Stance, eef: G.Pose, carry_height: float, target, eef_in_object) -> Optional[Tuple[G.Pose, List[G.Pose], th.Tensor]]:
-        """(iii') the CARRY pose (owner 2026‑09‑20 05:20): after the lift the held object is brought back to a compact pose
-        in front of the chest — ``generation.carry_ahead_m`` (0.40 / 0.35 / 0.45 m) ahead of the base at the lift's
-        lateral, ``carry_raise_m`` (0.10) above the lift, orientation kept — by a straight in-hand line (``Reorient`` mode
-        "line", 3 intermediate waypoints + end), so that the trunk sweeps of the carry legs move a hand near the body, not
-        one stretched 0.85 m over the partner (0920-043725: the frozen lift configuration swept the held sandal into the
-        table top / the floor at every s_T up to 1.75 m). Solved from B with the object attached: exact IK at the carry
-        pose, §3.9 waypoints from the lift. Returns ``(carry pose, waypoints, 7 arm joints at the carry pose)`` or None."""
+    #: carry pose candidates in B's base frame: (ahead, lateral, raise above the lift) — beside the body first (owner 2026-09-20
+    #: 06:40: a pose in front of the chest swings INTO the base when the torso tilts 54 deg into the push-under crouch; a hand
+    #: held to the right of the body swings down outside the base footprint and ends above the floor), then in front
+    CARRY_POSES = ((0.25, -0.45, 0.0), (0.30, -0.42, 0.05), (0.20, -0.48, -0.05), (0.40, None, 0.10), (0.35, None, 0.10))
+
+    def carry_poses_at_b(self, manip: Stance, eef: G.Pose, carry_height: float, target, eef_in_object) -> List[Tuple[G.Pose, List[G.Pose], th.Tensor]]:
+        """(iii') the CARRY poses (owner 2026‑09‑20 05:20): after the lift the held object is brought to a compact pose —
+        ``CARRY_POSES`` / ``generation.carry_poses`` as (ahead, lateral (None = the lift's), raise) in B's base frame,
+        orientation kept — by a straight in-hand line (``Reorient`` mode "line", 3 intermediate waypoints + end), so that
+        the trunk sweeps of the carry legs move a hand near the body, not one stretched 0.85 m over the partner
+        (0920-043725: the frozen lift configuration swept the held sandal into the table top / the floor at every s_T up to
+        1.75 m). Solved from B with the object attached: exact IK at the carry pose, §3.9 waypoints from the lift.
+        Returns the feasible ``(carry pose, waypoints, 7 arm joints)`` candidates in order (the legs decide)."""
         lift = (eef[0] + th.tensor([0.0, 0.0, float(carry_height)]), eef[1])
         base_xy = manip.base_xy
         fwd, left = manip.forward, manip.left
         rel = th.tensor([float(lift[0][0]), float(lift[0][1])]) - base_xy
-        lat = float(rel @ left)
-        raise_m = float(self.num("carry_raise_m", 0.10))
-        for ahead in [float(v) for v in (self.gp.gen("carry_ahead_m") or (0.40, 0.35, 0.45))]:
-            xy = base_xy + fwd * ahead + left * lat
-            carry = (th.tensor([float(xy[0]), float(xy[1]), float(lift[0][2]) + raise_m]), lift[1])
+        lat_lift = float(rel @ left)
+        out: List[Tuple[G.Pose, List[G.Pose], th.Tensor]] = []
+        for ahead, lat, raise_m in (self.gp.gen("carry_poses") or self.CARRY_POSES):
+            lat_v = lat_lift if lat is None else float(lat)
+            xy = base_xy + fwd * float(ahead) + left * lat_v
+            carry = (th.tensor([float(xy[0]), float(xy[1]), float(lift[0][2]) + float(raise_m)]), lift[1])
             with attached(self.kit, "right", target, eef_in_object=eef_in_object):
                 r = self.ikc.exact([carry], manip, "right", cache=False)
                 if not r.ok or r.q is None:
@@ -1543,8 +1549,8 @@ class IORSLarge(SamplerV2):
                 ok = self.ikc.waypoints_ok([lift] + wps, manip, "right", cache=False)
             if not ok.ok:
                 continue
-            return carry, wps, r.q[self.kit.robot.arm_control_idx["right"]].clone()
-        return None
+            out.append((carry, wps, r.q[self.kit.robot.arm_control_idx["right"]].clone()))
+        return out
 
     def lift_arm_q(self, manip: Stance, eef: G.Pose, carry_height: float, target, eef_in_object) -> Optional[th.Tensor]:
         """The 7 arm-joint values of the LIFT pose (the grasp raised ``carry_height`` straight up, orientation kept) solved
@@ -1796,31 +1802,39 @@ class IORSLarge(SamplerV2):
                 # push-under crouch at C dragged the held sandal through the table top and into the floor at every s_T) - the lift
                 # is raised until the departure sweep, the carry and the arrival sweep are free; the oracle lifts by the recorded height
                 path_bc, carry_errors = None, []
-                for h in [float(v) for v in (self.gp.gen("carry_heights_m") or (grasp.carry_height, 0.25, 0.35))]:
+                for h in [float(v) for v in (self.gp.gen("carry_heights_m") or (grasp.carry_height, 0.25))]:
                     q_lift = self.lift_arm_q(manip, eef, h, target, g.pose)
                     if q_lift is None:
                         carry_errors.append(f"lift {h:.2f} m: no IK solution from B")
                         continue
                     grasp.carry_height = h
-                    grasp.waypoints = None
-                    carry = self.carry_pose_at_b(manip, eef, h, target, g.pose) if str(self.gp.gen("carry_pose", "on")) != "off" else None
-                    if carry is not None:
-                        carry_pose, wps, q_carry = carry
-                        grasp.waypoints = wps  # the in-hand line lift -> carry pose the program's Reorient tracks
-                        grasp.extras["carry_pose"] = {"position": [float(v) for v in carry_pose[0]], "orientation": [float(v) for v in carry_pose[1]]}
-                        q_lift = q_carry  # the legs are checked with the arm at the carry pose (where the oracle holds it)
-                    else:
-                        carry_errors.append(f"lift {h:.2f} m: no carry pose (legs checked at the lift configuration)")
-                    try:
-                        with self._floor_relaxed():  # the floor mesh out (deep-crouch 1 cm margin, as the stance / program checks); the ground slab stays
-                            path_bc = self.record_carry_leg(init, manip, place, tname, q_lift, max_len)
-                        if h > 0.12 + 1e-6:
-                            log.info("%s: carry height raised to %.2f m (%s)", self.gp.alias, h, "; ".join(carry_errors) or "first that clears")
+                    # carry pose candidates (beside the body first), the plain lift configuration last
+                    options: List[Tuple[str, Optional[Tuple[G.Pose, List[G.Pose], th.Tensor]]]] = []
+                    if str(self.gp.gen("carry_pose", "on")) != "off":
+                        options += [(f"carry pose {[round(float(v), 2) for v in P0.to_base_frame(cp[0][0], manip.base_pose2d, P0.base_z(self)).tolist()]}", cp)
+                                    for cp in self.carry_poses_at_b(manip, eef, h, target, g.pose)]
+                    options.append(("lift configuration", None))
+                    for label, cp in options:
+                        if cp is not None:
+                            carry_pose, wps, q_carry = cp
+                            grasp.waypoints = wps  # the in-hand line lift -> carry pose the program's Reorient tracks
+                            grasp.extras["carry_pose"] = {"position": [float(v) for v in carry_pose[0]], "orientation": [float(v) for v in carry_pose[1]]}
+                            q_arm = q_carry  # the legs are checked with the arm at the carry pose (where the oracle holds it)
+                        else:
+                            grasp.waypoints = None
+                            grasp.extras.pop("carry_pose", None)
+                            q_arm = q_lift
+                        try:
+                            with self._floor_relaxed():  # the floor mesh out (deep-crouch 1 cm margin, as the stance / program checks); the ground slab stays
+                                path_bc = self.record_carry_leg(init, manip, place, tname, q_arm, max_len)
+                            log.info("%s: carry with lift %.2f m at the %s%s", self.gp.alias, h, label, f" (after: {'; '.join(carry_errors)})" if carry_errors else "")
+                            break
+                        except Reject as e:
+                            carry_errors.append(f"lift {h:.2f} m, {label}: {e.reason}: {str(e)[:160]}")
+                            self._drop_leg_records("placement")
+                            self.record_carry_arm_q(tname, "right", None)
+                    if path_bc is not None:
                         break
-                    except Reject as e:
-                        carry_errors.append(f"lift {h:.2f} m: {e.reason}: {e}")
-                        self._drop_leg_records("placement")
-                        self.record_carry_arm_q(tname, "right", None)
                 if path_bc is None:
                     errors.append("C: carry leg: " + "; ".join(carry_errors[-3:]))
                     fails["B -> C path / transition"] = fails.get("B -> C path / transition", 0) + 1
