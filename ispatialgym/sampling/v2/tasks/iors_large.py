@@ -1619,10 +1619,14 @@ class IORSLarge(SamplerV2):
             # lies drop_ahead + push distance (~0.3 m) ahead, so the drop cell should sit ~0.3 m ahead; ordering by the LARGEST
             # drop_ahead first (the bed heuristic: keep the deep trunk clear of the frame) put every chain at 0.7-0.8 m ahead and
             # 260 chain searches failed the exact IK in 0919-233031
-            ahead_pref = float(self.num("push_under_drop_ahead_pref_m", 0.30))
+            # (2026-09-20 01:40 correction: with the 0.30 m preference the 0.65-0.70 m stand-offs came first and every chain failed
+            # its PRE-pose - the blade start sits on the base rim there; the two instances that were written (0919-211642 /
+            # 221909) used d 0.80 with the goal ~0.8 m ahead, which the deep crouch does reach. Default = the old order, largest
+            # drop_ahead first; ``generation.push_under_drop_ahead_pref_m`` switches to the nearest-to-preference order.)
+            ahead_pref = self.gp.gen("push_under_drop_ahead_pref_m")
             depth = lambda k: (-float(c_pool[k].translate), float(c_pool[k].tilt), -float(c_pool[k].extras.get("drop_ahead_m", 0.0)))  # noqa: E731
-            reach = lambda k: (-float(c_pool[k].translate), float(c_pool[k].tilt), abs(float(c_pool[k].extras.get("drop_ahead_m", 0.0)) - ahead_pref))  # noqa: E731
-            order = sorted(side, key=depth) + sorted(front, key=reach)
+            reach = lambda k: (abs(float(c_pool[k].extras.get("drop_ahead_m", 0.0)) - float(ahead_pref)), -float(c_pool[k].translate), float(c_pool[k].tilt))  # noqa: E731
+            order = sorted(side, key=depth) + sorted(front, key=reach if ahead_pref is not None else depth)
             n_try = max(12, len(side))
         chain_cache: Dict[Tuple[int, int], Optional[Dict[str, Any]]] = {}  # (C index, yaw bucket) -> push chain (push-under: the chain depends on the yaw only)
         b_ik_cache: Dict[Tuple[int, str], Optional[Tuple[float, G.Pose, G.Pose, G.Pose]]] = {}  # (yaw bucket, grasp) -> (yaw, target pose, grasp eef, pre-grasp) at B, None = infeasible
