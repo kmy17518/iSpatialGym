@@ -248,6 +248,32 @@ class ISpatialGymTask(BehaviorTask):
         self._targets_configured = True
         for entity in self.group_entities.values():
             entity.invalidate()
+        PRED.set_attachment_context(self._attachment_pairs(meta))
+
+    def _attachment_pairs(self, meta) -> list:
+        """The TRO's ``attachment_targets`` as the predicate wrapper's context (owner 2026-09-19 17:10): scene object names of
+        the child / parent, the meta-link pair, and the child's symmetry — its pose target's ``orientation_equivalences``
+        when it has one, else those of the group both parts belong to (the sampler writes the male's mating-axis symmetry
+        there). With it the ``attached`` atom is decided modulo that symmetry (``predicates.attach_if_aligned``)."""
+        out = []
+        for rec in (meta.extras or {}).get("attachment_targets") or []:
+            child_inst, parent_inst = rec.get("child"), rec.get("parent")
+            child, parent = self.object_scope.get(child_inst), self.object_scope.get(parent_inst)
+            if child is None or parent is None or isinstance(child, GroupEntity) or isinstance(parent, GroupEntity):
+                log.warning(f"attachment_targets: {child_inst!r} -> {parent_inst!r} is not a bound pair of physical instances; skipped")
+                continue
+            eqs = None
+            pt = meta.pose_targets.get(child_inst)
+            if pt is not None and pt.orientation_equivalences:
+                eqs = pt.orientation_equivalences
+            else:
+                for g in meta.groups.values():
+                    if child_inst in g.members and parent_inst in g.members and g.orientation_equivalences:
+                        eqs = g.orientation_equivalences
+                        break
+            out.append({"child": child.name, "parent": parent.name, "child_link": rec.get("child_link"), "parent_link": rec.get("parent_link"),
+                        "equivalences": [[float(v) for v in th.as_tensor(q).reshape(-1).tolist()] for q in (eqs or [])]})
+        return out
 
     def load_tro_instance(self, env, tro=None, settle_steps=25, apply_object_states=True):
         """Load a TRO instance into the running environment (simulator must be playing).

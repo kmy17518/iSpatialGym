@@ -244,10 +244,20 @@ class Attachment(SamplerV2):
     def _symmetry_equivalences(self, male, child_link) -> List[List[float]]:
         """§6.8 mating-axis symmetry test: rotate the male hull about the female axis (the child link's z) in 15° steps; a
         rotation is accepted when >= ``symmetry_match_fraction`` of the 5 mm slabs along the axis have the same angular
-        radius profile (12 angular bins, radii within 10 %). Explicit ``generation.orientation_equivalences`` win."""
+        radius profile (12 angular bins, radii within 10 %). Explicit ``generation.orientation_equivalences`` win, then the
+        icl symmetry tags of the male (``roles.<role>.orientation_equivalences``, §3.13: ``zinf`` = the 5° rotation group
+        about the mating axis, as every other tabletop task writes them; owner 2026-09-19 17:10 — the geometric test found
+        nothing for the round lid tnwisp and the group target carried ``[]``, so ``layout_reached`` / ``attached`` pinned
+        the lid's yaw); the geometric test is the fallback for an untagged model."""
         explicit = self.gen("orientation_equivalences")
         if explicit:
             return [list(map(float, q)) for q in explicit]
+        mc = self.choice.models[self.t_role]
+        tagged = self.gp.orientation_equivalences(self.t_role, mc.category, mc.model)
+        if tagged:
+            self.template_facts["symmetry_source"] = "icl tags"
+            return [list(map(float, q)) for q in tagged if any(abs(float(v)) > 1e-9 for v in q[:3])]  # the identity is implied
+        self.template_facts["symmetry_source"] = "geometric test"
         rp, rq = male.get_position_orientation()
         cp, cq = child_link.get_position_orientation()
         axis = C.quat_rotate(C.qinv(rq.float()), C.quat_rotate(cq.float(), th.tensor([0.0, 0.0, 1.0])))

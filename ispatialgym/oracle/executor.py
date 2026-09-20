@@ -541,18 +541,23 @@ class SimState:
         }
 
     def attach(self, child: str, parent: str) -> bool:
-        """The BEHAVIOR attachment of ``child`` to ``parent`` at their current poses — ``AttachedTo.set_value(True)``, the
-        same call the sampler's goal check makes: when the meta links lie within OmniGibson's 5 cm / 15 deg the child is
-        snapped onto the female frame and the fixed attachment joint is created; otherwise nothing changes and False is
-        returned."""
+        """The BEHAVIOR attachment of ``child`` to ``parent`` at their current poses — the evaluator's own rule
+        (``predicates.attach_if_aligned``, owner 2026-09-19 17:10): the meta links within OmniGibson's 5 cm / 15 deg **modulo
+        the child's recorded symmetry** (the task registers the pair's equivalences with the TRO targets), then
+        ``AttachedTo.set_value(True)`` snaps the child onto the female frame and creates the fixed joint; otherwise nothing
+        changes and False is returned. ``self.last_attach`` keeps the alignment record."""
         from omnigibson.object_states import AttachedTo
+
+        from ispatialgym.sampling import predicates as PRED
 
         c, p = self.object(child), self.object(parent)
         if AttachedTo not in c.states:
             return False
         if c.states[AttachedTo].get_value(p):
             return True
-        return bool(c.states[AttachedTo].set_value(p, True))
+        rec = PRED.attach_if_aligned(c, p)
+        self.last_attach = {k: v for k, v in rec.items()}
+        return bool(rec.get("attached"))
 
     def q28(self) -> th.Tensor:
         return self.robot.get_joint_positions().clone().float()

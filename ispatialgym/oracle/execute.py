@@ -879,6 +879,7 @@ def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th
     motions.backend.detach_object(arm)
     ok = bool(state.attach(action.object, action.on))
     rec["attached"] = ok
+    rec["alignment"] = getattr(state, "last_attach", None)  # the evaluator's alignment record (modulo the part's symmetry)
     if ok:
         log.info("place(%s): attached to %s (fixed attachment joint)", action.object, action.on)
     else:
