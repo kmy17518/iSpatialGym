@@ -1603,8 +1603,13 @@ class IORSLarge(SamplerV2):
                     d.summary["push_under"] = {"drop_cell": [float(v) for v in cd], "distance_m": chain["distance_m"], "pitch_deg": chain["pitch_deg"],
                                                "blade_standoff_m": chain["blade_standoff_m"], "push_height_m": chain["push_height_m"], "half_extent_m": chain["half_extent_m"],
                                                "drop_ahead_m": place.extras.get("drop_ahead_m")}
-                pp, pq = partner.get_position_orientation()
-                d.pose_targets[pname] = full_pose_target(pp, pq, self.tol("position", 0.03), self.tol("orientation", 0.20))
+                # §5.6: pose targets are measured for the TARGET only — the partner is fixed furniture and the large-scale
+                # iddl's (:measure) has (pose_reached ?target) alone, so a TRO pose target for the partner fails
+                # ``validate_tro_against_problem`` at write time (sandal-breakfast_table 0919-202952: the first large-scale
+                # IORS draft to reach the writer). The sampler's own "partner unchanged <= 5 mm at the goal" check
+                # (:meth:`refine_targets_from_goal`) reads the position recorded here instead.
+                pp, _ = partner.get_position_orientation()
+                d.summary["partner_position"] = [float(v) for v in pp]
                 d.pose_targets[tname] = full_pose_target(t_pose[0], t_pose[1], self.tol("position", 0.03), self.tol("orientation", 0.20))
                 self.sidecar.describe(tname, self.choice.models["target"].category.replace("_", " "))
                 self.sidecar.describe(pname, partner.category.replace("_", " "), path_length_m=path_bc.length_m)
@@ -1652,8 +1657,10 @@ class IORSLarge(SamplerV2):
     def refine_targets_from_goal(self, draft: Draft):
         super().refine_targets_from_goal(draft)
         p, _ = self.partner.get_position_orientation()
-        tgt = draft.pose_targets[self.pname]
-        moved = float(th.linalg.norm(p.float() - th.tensor(tgt["position"])))
+        ref = draft.summary.get("partner_position")
+        if ref is None:
+            return
+        moved = float(th.linalg.norm(p.float() - th.tensor(ref, dtype=th.float32)))
         if moved > self.num("partner_moved_max_m", 0.005):
             raise Reject("goal_partner_moved", f"partner moved {moved:.3f} m at the goal")
 

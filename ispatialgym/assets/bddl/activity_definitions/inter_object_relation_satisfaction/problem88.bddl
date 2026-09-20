@@ -1,0 +1,39 @@
+(define (problem inter_object_relation_satisfaction-88)
+    (:domain ispatialgym)
+    (:alias inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table)
+
+    ; hand-grounded probe (owner 2026-09-19 20:14): inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table
+    ; (inter_object_relation_satisfaction/under_large_scale.iddl; init_surface = partner's own top). The sandal starts on
+    ; house_single_floor/breakfast_table_rhjoby_0 (the support of the small-scale under / ontop demos) and ends on the floor
+    ; under it. Same shape as problem74 (sandal-bed-bed) with the breakfast table as the partner.
+    ; IORS - under (large-scale). The target starts on a support (a table near the partner, the floor beside it, or the
+    ; partner's own top) and ends on the floor under a large scene partner (bed, sofa, desk, breakfast table; roles/candidates.csv
+    ; kind scene) at a goal cell where an upward ray hits the partner above target height + 3 cm. Argument order: the
+    ; target is under the partner. When partner and support are the same scene object the BDDL declares it once.
+
+    (:objects
+        sandal.n.01_1 - sandal.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop sandal.n.01_1 breakfast_table.n.01_1)
+        (not (under sandal.n.01_1 breakfast_table.n.01_1))
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (under ?sandal.n.01_1 ?breakfast_table.n.01_1)
+            (not (grasped ?agent.n.01_1 ?sandal.n.01_1))
+            (pose_settled ?sandal.n.01_1)
+            (pose_settled ?agent.n.01_1)
+        )
+    )
+
+    (:measure
+        (pose_reached ?sandal.n.01_1)
+    )
+)

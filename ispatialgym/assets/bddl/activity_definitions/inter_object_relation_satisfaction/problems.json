@@ -965,6 +965,28 @@
    "pick": "inter_object_relation_satisfaction-under_small_scale#04~T3",
    "slot": "representative",
    "mode": "representative"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table",
+   "id": 88,
+   "grounded": "2026-09-19",
+   "by": "hand (owner probe 2026-09-19 20:14)",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#probe-sandal-breakfast_table",
+   "slot": "representative",
+   "mode": "probe"
+  },
+  {
+   "alias": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-floor",
+   "id": 89,
+   "grounded": "2026-09-19",
+   "by": "hand (owner probe 2026-09-19 20:14)",
+   "subtask": "inter_object_relation_satisfaction-under_large_scale",
+   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+   "pick": "inter_object_relation_satisfaction-under_large_scale#probe-sandal-breakfast_table/fallback1:init_surface",
+   "slot": "representative",
+   "mode": "probe"
   }
  ]
 }
