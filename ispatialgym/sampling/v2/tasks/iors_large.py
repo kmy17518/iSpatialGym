@@ -235,9 +235,12 @@ def under_admissible(clearance_at_goal: float, target_height: float, extra: floa
     return float(clearance_at_goal) >= float(target_height) + float(extra)
 
 
-def intersect_feasible(F_init: Sequence[Tuple[float, Any]], F_goal: Sequence[Tuple[float, Any]]) -> List[Tuple[float, Any]]:
-    """F_init ∩ F_goal over (yaw, grasp) pairs (grasps compared by name)."""
-    key = lambda yg: (round(float(yg[0]), 6), getattr(yg[1], "name", yg[1]))  # noqa: E731
+def intersect_feasible(F_init: Sequence[Tuple[float, Any]], F_goal: Sequence[Tuple[float, Any]], yaw_step: float = math.pi / 8) -> List[Tuple[float, Any]]:
+    """F_init ∩ F_goal over (yaw, grasp) pairs: grasps compared by name, yaws by their bucket on the screening grid
+    (``yaw_step``; 16 yaws = π/8). The §3.10 feasible-set cache stores floats rounded to 4 decimals (``cache._plain``),
+    so a cached F_goal came back with yaws like 0.3927 against F_init's 0.39269908 and the earlier 6-decimal comparison
+    emptied the intersection on every cache hit (0920-021701: 'F_init 21, F_goal 21, F 0' next to 'F 17' for the same sets)."""
+    key = lambda yg: (int(round(float(yg[0]) / yaw_step)), getattr(yg[1], "name", yg[1]))  # noqa: E731
     goal_keys = {key(yg) for yg in F_goal}
     return [yg for yg in F_init if key(yg) in goal_keys]
 
@@ -1628,6 +1631,7 @@ class IORSLarge(SamplerV2):
             reach = lambda k: (abs(float(c_pool[k].extras.get("drop_ahead_m", 0.0)) - float(ahead_pref)), -float(c_pool[k].translate), float(c_pool[k].tilt))  # noqa: E731
             order = sorted(side, key=depth) + sorted(front, key=reach if ahead_pref is not None else depth)
             n_try = max(12, len(side))
+        yaw_step = 2.0 * math.pi / max(1, len(self.yaws()))  # the screening grid (yaw buckets of the caches / the intersection)
         chain_cache: Dict[Tuple[int, int], Optional[Dict[str, Any]]] = {}  # (C index, yaw bucket) -> push chain (push-under: the chain depends on the yaw only)
         b_ik_cache: Dict[Tuple[int, str], Optional[Tuple[float, G.Pose, G.Pose, G.Pose]]] = {}  # (yaw bucket, grasp) -> (yaw, target pose, grasp eef, pre-grasp) at B, None = infeasible
         errors = []
@@ -1658,7 +1662,7 @@ class IORSLarge(SamplerV2):
             F_goal = self.ikc.feasible_sets([release_xy], [y + d_yaw for y in yaws], self.grasps,
                                             lambda xy, yaw: release_pose(xy, G.qmul(G.quat_from_yaw(yaw), self.rest)), place, "right", ignore_place).get(0, [])
             F_goal = [(y - d_yaw, g) for y, g in F_goal]
-            F = intersect_feasible(F_init, F_goal)
+            F = intersect_feasible(F_init, F_goal, yaw_step=yaw_step)
             if push:
                 log.info("%s: push-under C try %s d %.2f λ %+.2f trunk (%.2f, %.1f): F_init %d, F_goal %d, F %d at drop %s", self.gp.alias, place.extras.get("stance_kind"),
                          place.stand_off or 0.0, place.lateral, place.translate, place.tilt, len(F_init), len(F_goal), len(F), [round(float(v), 2) for v in release_xy])
@@ -1678,7 +1682,7 @@ class IORSLarge(SamplerV2):
                 if push:
                     # the push chain depends on the object's yaw (its half extent along the push), not on the grasp: solve it once per
                     # (C, yaw bucket) BEFORE the grasp IKs and skip the draw when this stance cannot push at that yaw
-                    ck = (int(kc), int(round(yaw0 / (math.pi / 8))))
+                    ck = (int(kc), int(round(yaw0 / yaw_step)))
                     if ck not in chain_cache:
                         q_chain = G.qmul(G.quat_from_yaw(yaw0 + d_yaw), self.rest)
                         chain_cache[ck] = self._push_under_chain(place, q_chain, cd, gc, place.extras["push_dir"])
@@ -1687,7 +1691,7 @@ class IORSLarge(SamplerV2):
                         continue
                 # the grasp side (target pose at B's focus, pre-grasp + grasp exact IK from B) does not depend on C: solved once per
                 # (yaw bucket, grasp) for this B and reused across the C candidates (a failed pair is skipped everywhere)
-                bk = (int(round(yaw0 / (math.pi / 8))), getattr(g, "name", str(g)))
+                bk = (int(round(yaw0 / yaw_step)), getattr(g, "name", str(g)))
                 if bk in b_ik_cache:
                     hit = b_ik_cache[bk]
                     if hit is None:
