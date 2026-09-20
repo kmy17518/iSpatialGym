@@ -369,6 +369,7 @@ class Attachment(SamplerV2):
         male.keep_still()
         self.kit.sync_world()
         self._apply_grasp_height_extra(grasp, m_pose, manip)  # generation.grasp_height_extra_m (owner 2026-09-19 16:49; 0 = no-op)
+        self._record_pinch_width(grasp, m_pose)  # the pre-shape width from the male's own geometry at the pinch (pwgbsb 0919-210926)
         # step 2 (+ §6.8 owner 2026-09-16 17:10): the partner on an attach-reach cell with the attach pose and the left brace
         # reachable — from the grasp stance first; else from a recorded SECOND BASE POSE (lateral trunk move + torso adjust,
         # both arms verified there, the male carried: paths[] / transitions[] manipulation -> attach with the male held);
@@ -457,6 +458,33 @@ class Attachment(SamplerV2):
                           "joint_placement": {"left_band": self.left_bands is not None}})
         self.brace_missing = brace_state == "none"
         return d
+
+    # ------------------------------------------------------------------ pinch width from the male's geometry (0919-210926)
+
+    def _record_pinch_width(self, grasp, m_pose: TT.Pose) -> None:
+        """``grasps[].pinch_width_m``: the male's width across the closing axis at the pads (its hull points inside the pads'
+        band along the approach axis, ``PAD_Z_RANGE``, within the pads' lateral reach) at the recorded grasp pose. The
+        oracle pre-shapes the fingers to ``width / 2 + margin`` before the descent; it read the grasp library's ``width``,
+        which for lid/pwgbsb is 6-12 mm on a 24-30 mm knob (the library's asymmetric one-finger wedges): the pads opened
+        to a 26 mm gap, landed on the knob's flare 13 mm above the pinch, and the closure caught nothing (0919-173115 /
+        210926, failed_grasp x4). Facts on the record."""
+        if grasp.grasp is None:
+            return
+        pts = C.transform_points((TT._t(m_pose[0]), TT._t(m_pose[1])), TT._t(self.hull[self.t_role]))
+        eef = (TT._t(grasp.grasp[0]), TT._t(grasp.grasp[1]))
+        loc = C.transform_points(C.invert(eef), pts)  # object hull in the eef frame: z = approach axis (tips +), y = closing axis
+        band = (loc[:, 2] >= C.PAD_Z_RANGE[0]) & (loc[:, 2] <= C.PAD_Z_RANGE[1] + 0.002) & (loc[:, 0].abs() <= 0.03)
+        if int(band.sum()) < 2:
+            grasp.extras["pinch_width_reason"] = "no hull points in the pad band"
+            return
+        width = float(loc[band, 1].max() - loc[band, 1].min())
+        lib = None
+        try:
+            lib = float((C.grasp_entry(grasp.grasp_key, grasp.grasp_name).meta or {}).get("width"))
+        except Exception:  # noqa: BLE001
+            pass
+        grasp.extras.update({"pinch_width_m": round(width, 4), "pinch_width_library_m": lib, "pinch_width_band_points": int(band.sum())})
+        log.info("%s: pinch width at the pads %.1f mm from the male's hull (library %s mm)", self.gp.alias, width * 1000, None if lib is None else round(lib * 1000, 1))
 
     # ------------------------------------------------------------------ over-the-top pre-grasp approach (owner 2026-09-19 20:42)
 

@@ -633,6 +633,12 @@ def grasp_pinch_width(action: Grasp) -> Optional[float]:
     ``marker__xakoic/grasp_1``); None for a cube / handle grasp or an older library entry without it (fully open)."""
     if action.kind != "library" or action.grasp is None:
         return None
+    # the sampler's own measurement of the object's width at the pads (``grasps[].pinch_width_m``, attachment 2026-09-19) wins over
+    # the library's ``width``: lid/pwgbsb's library grasps are one-finger wedges whose recorded width (6-12 mm) is a third of the
+    # 24-30 mm knob - the pads pre-shaped to a 26 mm gap landed on the knob and the closure caught nothing (0919-210926)
+    recorded = _grasp_extra_float(action, "pinch_width_m")
+    if recorded is not None:
+        return recorded
     try:
         width = (C.grasp_entry(action.grasp.grasp_key, action.grasp.grasp_name).meta or {}).get("width")
     except Exception:  # noqa: BLE001  (a library entry the run cannot resolve keeps the full opening)
