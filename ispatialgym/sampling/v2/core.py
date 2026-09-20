@@ -710,7 +710,7 @@ class SamplerV2(TaskSampler):
             arm_q = {arm: self.carry_arm_q[carried]}
         extra = NAV.TRANSITION_EXTRA_MAX if extra_max is None else float(extra_max)
         tr = NAV.transition(self.kit, frm, to, carried_obj=obj, carried_arm=arm, eef_in_object=eef_in_object, arm_q_override=arm_q, trunk_from=trunk_from,
-                            extra_max=extra)
+                            extra_max=extra, blame=self.ikc._collision_blame)
         if tr is None:
             raise Reject("no_transition", f"{frm.name} -> {to.name}: no s_T in {NAV.transition_standoffs(to.stand_off or 0.0, extra_max=extra)} is swept collision-free")
         tr.holding = carried or tr.holding  # ``transitions[].holding``: the bddl instance carried through (attachment's second base pose)

@@ -455,7 +455,7 @@ def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_
                eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None, min_standoff: Optional[float] = None,
                check_drive_in: bool = True, path_end_standoff: Optional[float] = None,
                arm_q_override: Optional[Dict[str, th.Tensor]] = None, trunk_from: Optional[Tuple[float, float]] = None,
-               extra_max: float = TRANSITION_EXTRA_MAX) -> Optional[Transition]:
+               extra_max: float = TRANSITION_EXTRA_MAX, blame: Optional[Any] = None) -> Optional[Transition]:
     """§3.8: the smallest ``s_T ∈ transition_standoffs(s)`` (``s`` = the arriving stance's stand-off, driven back along
     -inward) at which (a) the swept trunk motion (``n_samples`` trunks between the two stances' values, both endpoints
     included) and (b) the **drive-in** ``s_T → s`` (``check_drive_in``, strides of ``STRIDE_M`` at the arriving trunk)
@@ -497,6 +497,7 @@ def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_
         arms_to[a], arms_from[a] = q, q
     right_arm, left_arm = arms_to["right"], arms_to["left"]
     end_back = None if path_end_standoff is None else max(0.0, float(path_end_standoff) - s)
+    why: List[str] = []
     with attached(kit, carried_arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
         for s_T in transition_standoffs(s, extra_max=float(extra_max)):
             if s_T < floor - 1e-9:
@@ -504,24 +505,39 @@ def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_
             back = s_T - s
             bx, by = x0 - float(inward[0]) * back, y0 - float(inward[1]) * back
             if back > 0 and not kit.trav_free((bx, by)):
+                why.append(f"s_T {s_T:.2f}: drive-back pose off the free floor")
                 continue
             if not same_trunk:  # (a) the trunk sweep at the drive-back pose with the arriving arms
                 qs = th.stack([kit.q_at_base_pose(kit.q_config(arms="untucked", translate=tr, tilt=ti, right_arm=right_arm, left_arm=left_arm, fingers=fingers),
                                                   bx, by, yaw) for tr, ti in sweep])
-                if not bool(kit.collision_free(qs, margin=margin).all()):
+                free = kit.collision_free(qs, margin=margin)
+                if not bool(free.all()):
+                    bad = int(th.nonzero(~free)[0])
+                    detail = ""
+                    last = transition_standoffs(s, extra_max=float(extra_max))[-1]
+                    if blame is not None and (not why or s_T >= last - 1e-9):  # the blame for the first and the last candidate only (it is slow)
+                        try:
+                            detail = f" - {blame(qs[bad], [])}"
+                        except Exception:  # noqa: BLE001
+                            detail = ""
+                    why.append(f"s_T {s_T:.2f}: sweep sample {bad + 1}/{len(sweep)} at trunk {tuple(round(float(v), 2) for v in sweep[bad])} collides{detail}")
                     continue
             if back > 0 and check_drive_in:  # (b) the drive-in s_T -> s at the arriving trunk and arms
                 drive = stride_poses([(bx, by, yaw), (x0, y0, yaw)], STRIDE_M)
-                ok, _ = path_collision_free(kit, drive, tt, "untucked", margin=margin, q_arms=arms_to, fingers=fingers)
+                ok, bad = path_collision_free(kit, drive, tt, "untucked", margin=margin, q_arms=arms_to, fingers=fingers)
                 if not ok:
+                    why.append(f"s_T {s_T:.2f}: drive-in collides at stride {bad}/{len(drive)}")
                     continue
             if end_back is not None and back > end_back + 1e-9:  # (c) the extra drive-back from the path's end, departing trunk / arms
                 ex, ey = x0 - float(inward[0]) * end_back, y0 - float(inward[1]) * end_back
                 extra = stride_poses([(ex, ey, yaw), (bx, by, yaw)], STRIDE_M)
-                ok, _ = path_collision_free(kit, extra, tf, "untucked", margin=margin, q_arms=arms_from, fingers=f_from)
+                ok, bad = path_collision_free(kit, extra, tf, "untucked", margin=margin, q_arms=arms_from, fingers=f_from)
                 if not ok:
+                    why.append(f"s_T {s_T:.2f}: drive-back from the path's end collides at stride {bad}/{len(extra)}")
                     continue
             return Transition(stance_from.name, stance_to.name, s_T, trunk_from=tf, trunk_to=tt, n_samples=0 if same_trunk else n_samples, holding=stance_to.carried)
+    log.info("transition %s -> %s: no s_T (trunk %s -> %s%s): %s", stance_from.name, stance_to.name, tuple(round(v, 2) for v in tf), tuple(round(v, 2) for v in tt),
+             f", carrying {getattr(carried_obj, 'name', carried_obj)}" if carried_obj is not None else "", "; ".join(why[:3] + (["..."] if len(why) > 4 else []) + why[-1:] if len(why) > 3 else why))
     return None
 
 
