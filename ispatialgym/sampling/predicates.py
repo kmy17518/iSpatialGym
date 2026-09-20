@@ -35,6 +35,16 @@ bypass_alignment_checking=True)``: the part snaps onto the female frame — a no
 gets the fixed joint), so the atom stays a real attachment joint and a policy can satisfy it at any equivalent yaw. The
 oracle's attach at the place pose (``executor.SimState.attach``) is the same call.
 
+``pose_settled`` of an object joined by an attachment joint (owner 2026-09-20 13:57; the attached child and its parent):
+OmniGibson's ``PoseSettled`` needs the root velocity below 1 mm/s on every step of its window AND the pose drift within
+1 cm / 0.05 rad over it. PhysX enforces the fixed attachment joint iteratively, so both bodies carry a residual velocity of
+1-3 mm/s while their pose drifts by hundredths of a millimetre (pwgbsb / jlalfc 0919-231624: lid 0.9 mm/s median, 2.7 peak,
+63 / 144 window steps above the threshold, total drift 0.015 mm / 0.000 deg) - the velocity gate can never pass, so the
+settle metric was unmeasurable for every attachment. After an OmniGibson False the **drift** branch decides from the state's
+own window (``n_steps`` samples, the configured tolerances): the buffer full and every sample's root pose (and joints)
+within tolerance of the window anchor - the velocity gate alone is dropped. Objects without an attachment joint keep the
+stock rule.
+
 Every evaluation appends ``{"predicate", "entities", "branch", "ok", "detail"}`` to the branch log (``reset_branches`` /
 ``branches``); the callers copy it into ``goal_check.binary_branch`` (sampler) and ``meta.binary_branch`` (evaluator) so the
 ledger shows which branch decided. Other predicates pass straight through.
@@ -86,7 +96,7 @@ def decided_by() -> Dict[str, str]:
     writes as ``binary_branch``."""
     out: Dict[str, str] = {}
     for e in _BRANCHES:
-        if e["predicate"] in ("under", "ontop", "touching", "attached"):
+        if e["predicate"] in ("under", "ontop", "touching", "attached") or (e["predicate"] == "pose_settled" and e["branch"] != "omnigibson"):
             out[f"{e['predicate']}({', '.join(e['entities'])})"] = e["branch"]
     return out
 
@@ -178,6 +188,54 @@ def attachment_alignment(child: Any, parent: Any, equivalences: Optional[Sequenc
     return best
 
 
+def joined_by_attachment(obj: Any) -> bool:
+    """``obj`` is a member of a BEHAVIOR attachment joint right now: the child (``AttachedTo.parent`` set) or a parent
+    (one of its female links has a child)."""
+    from omnigibson.object_states import AttachedTo
+
+    st = getattr(obj, "states", {}).get(AttachedTo) if hasattr(getattr(obj, "states", None), "get") else None
+    if st is None:
+        return False
+    if getattr(st, "parent", None) is not None:
+        return True
+    return any(c is not None for c in (getattr(st, "children", None) or {}).values())
+
+
+def settled_by_drift(obj: Any) -> Dict[str, Any]:
+    """``pose_settled`` by configuration drift alone, read from the object's ``PoseSettled`` window: active, the buffer
+    full (``n_steps`` distinct simulator steps) and every sample's root pose (and joint positions) within the state's own
+    tolerances of the window anchor — OmniGibson's rule minus the per-step velocity gate that a fixed attachment joint's
+    solver residual (1-3 mm/s at 0.0x mm of motion) never lets pass. Returns ``{"ok", "n", "n_steps", "max_pos_drift_m",
+    "max_ori_drift_rad", "velocity_still_steps"}``."""
+    from omnigibson.object_states import PoseSettled
+
+    st = obj.states.get(PoseSettled) if hasattr(obj.states, "get") else None
+    if st is None:
+        return {"ok": False, "reason": "no PoseSettled state"}
+    if not getattr(st, "is_active", False):
+        return {"ok": False, "reason": "PoseSettled inactive"}
+    hist = list(getattr(st, "_history", []) or [])
+    n_steps = int(getattr(st, "n_steps", len(hist)))
+    out: Dict[str, Any] = {"n": len(hist), "n_steps": n_steps, "velocity_still_steps": sum(1 for e in hist if e[4])}
+    if len(hist) < n_steps or not hist:
+        out.update({"ok": False, "reason": "window not full"})
+        return out
+    _, anchor_pos, anchor_quat, anchor_jpos, _ = hist[0]
+    max_pos, max_ori, max_joint = 0.0, 0.0, 0.0
+    for _, pos, quat, jpos, _ in hist:
+        max_pos = max(max_pos, float(th.linalg.norm(pos - anchor_pos)))
+        max_ori = max(max_ori, _qangle(quat.double(), anchor_quat.double()))
+        if anchor_jpos is not None and jpos is not None and jpos.numel() == anchor_jpos.numel() and jpos.numel() > 0:
+            max_joint = max(max_joint, float(th.max(th.abs(jpos - anchor_jpos))))
+    pos_tol = float(getattr(st, "_pos_tolerance", 0.01))
+    ori_tol = float(getattr(st, "_ori_tolerance", 0.05))
+    joint_tol = float(getattr(st, "_joint_tolerance", 0.05))
+    out.update({"max_pos_drift_m": round(max_pos, 6), "max_ori_drift_rad": round(max_ori, 6), "max_joint_drift": round(max_joint, 6),
+                "tolerances": {"pos_m": pos_tol, "ori_rad": ori_tol, "joint": joint_tol},
+                "ok": max_pos <= pos_tol and max_ori <= ori_tol and max_joint <= joint_tol})
+    return out
+
+
 def held_by_robot(obj: Any) -> bool:
     """``obj`` is in a robot's assisted grasp (``_ag_obj_in_hand``) in its scene."""
     scene = getattr(obj, "scene", None)
@@ -220,7 +278,21 @@ def evaluate_predicate(predicate_cls, *entities) -> bool:
     from omnigibson.utils.bddl_utils import evaluate_bddl_predicate
 
     name = str(getattr(predicate_cls, "__name__", predicate_cls)).lower()
+    name = {"posesettled": "pose_settled", "attachedto": "attached"}.get(name, name)  # the BDDL name (the callers pass it) or the state class
     ok = bool(evaluate_bddl_predicate(predicate_cls, *entities))
+    if name == "pose_settled" and len(entities) == 1 and entities[0] is not None and _is_object(entities[0]):
+        if ok:
+            _log(name, entities, "omnigibson", True)
+            return True
+        if not joined_by_attachment(entities[0]):
+            _log(name, entities, "omnigibson", False)
+            return False
+        try:
+            s = settled_by_drift(entities[0])
+        except Exception as e:  # noqa: BLE001 - a read failure must not turn into a verdict
+            s = {"ok": False, "error": repr(e)}
+        _log(name, entities, "drift" if s.get("ok") else "none", bool(s.get("ok")), s)
+        return bool(s.get("ok"))
     if name not in ("under", "ontop", "touching", "attached") or len(entities) != 2 or any(e is None or not _is_object(e) for e in entities):
         _log(name, entities, "omnigibson", ok)
         return ok
