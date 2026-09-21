@@ -545,6 +545,17 @@ class Attachment(SamplerV2):
 
     # ------------------------------------------------------------------ pinch width from the male's geometry (0919-210926)
 
+    def _contact_band_centre(self, eef_pose: TT.Pose, m_pose: TT.Pose) -> Optional[float]:
+        """Position along the approach axis (eef frame z, fingertips +) of the middle of the part's extent that lies within the
+        finger's inner face, [PAD_Z_RANGE[0], FINGERTIP_LENGTH] - where a symmetric closure pinches it. None when no hull
+        point lies in that band."""
+        pts = C.transform_points((TT._t(m_pose[0]), TT._t(m_pose[1])), TT._t(self.hull[self.t_role]))
+        loc = C.transform_points(C.invert((TT._t(eef_pose[0]), TT._t(eef_pose[1]))), pts)
+        band = (loc[:, 2] >= C.PAD_Z_RANGE[0]) & (loc[:, 2] <= C.FINGERTIP_LENGTH) & (loc[:, 0].abs() <= 0.03)
+        if int(band.sum()) < 2:
+            return None
+        return 0.5 * (float(loc[band, 2].min()) + float(loc[band, 2].max()))
+
     def _record_pinch_width(self, grasp, m_pose: TT.Pose) -> None:
         """``grasps[].pinch_width_m``: the male's width across the closing axis at the pads (its hull points inside the pads'
         band along the approach axis, ``PAD_Z_RANGE``, within the pads' lateral reach) at the recorded grasp pose. The
@@ -804,15 +815,18 @@ class Attachment(SamplerV2):
         if eff > 0.0:
             R_obj = C.quat_to_mat(TT._t(m_pose[1]))
             up_obj = R_obj.T @ th.tensor([0.0, 0.0, 1.0])  # world up in the male's frame
+            # the lift slides the part along the fingers: the contact band (the finger's inner face [PAD_Z_RANGE[0], FINGERTIP_LENGTH]
+            # over the part's extent) moves toward the fingertips, and with a tilted approach that axial shift is a horizontal
+            # offset of the pinch line - the library centres the PAD centre on the male's axis, a fingertip pinch closes 27 mm
+            # further ahead = 13-15 mm beside the axis at 30 deg: cork 0921-004359's tips passed beside the 17 mm cork and their
+            # corner tipped it over (the cap's 51 mm rim still spanned the off-centre chord: hold 43 mm). The hand moves
+            # horizontally so the contact band's centre stays on the vertical line it had at the library height
+            s0 = self._contact_band_centre(grasp.grasp, m_pose)
+            lifted = (pos + eff * th.tensor([0.0, 0.0, 1.0]), quat)
+            s1 = self._contact_band_centre(lifted, m_pose)
             shift_w = th.zeros(3)
-            if regime == "fingertip pinch":
-                # the library centres the PAD centre (CONTACT_CENTER_Z, 12 mm behind the eef) on the male's axis; a fingertip pinch
-                # closes 15 mm AHEAD of the eef (the middle of the fingertip section), and with a tilted approach that 27 mm axial
-                # difference is a horizontal offset of the pinch line - 15 mm at 30 deg: cork 0921-004359's tips passed beside the
-                # 17 mm cork and their corner tipped it over (the cap's 51 mm rim still spanned the off-centre chord: hold 43 mm).
-                # The hand moves horizontally so the fingertip section's centre lies on the male's axis
-                s_tip = 0.5 * (float(C.PAD_Z_RANGE[1]) + float(C.FINGERTIP_LENGTH))
-                shift_w = -(s_tip - float(C.CONTACT_CENTER_Z)) * th.tensor([float(a[0]), float(a[1]), 0.0])
+            if s0 is not None and s1 is not None:
+                shift_w = -(s1 - s0) * th.tensor([float(a[0]), float(a[1]), 0.0])
             eef_in_object = (TT._t(grasp.eef_in_object[0]) + eff * up_obj + R_obj.T @ shift_w, TT._t(grasp.eef_in_object[1]))
             eef = IK.grasp_pose(m_pose, eef_in_object)
             pre = IK.pre_pose(eef)
@@ -821,10 +835,10 @@ class Attachment(SamplerV2):
                                  approached=[self.obj(self.t_role)])
             if res.ok:
                 grasp.eef_in_object, grasp.grasp, grasp.pre_grasp = eef_in_object, eef, pre
-                if float(th.linalg.norm(shift_w)) > 1e-6:
-                    grasp.extras["fingertip_pinch_recentre_m"] = [round(float(v), 4) for v in shift_w.tolist()]
-                    log.info("%s: fingertip pinch re-centred: hand moved %.1f mm horizontally so the fingertip section closes on the male's axis",
-                             self.gp.alias, float(th.linalg.norm(shift_w)) * 1000)
+                if float(th.linalg.norm(shift_w)) > 1e-4:
+                    grasp.extras["pinch_recentre_m"] = [round(float(v), 4) for v in shift_w.tolist()]
+                    log.info("%s: pinch re-centred: the contact band moved %.1f mm along the fingers with the lift -> hand moved %.1f mm horizontally "
+                             "so the band's centre stays on the male's axis", self.gp.alias, (s1 - s0) * 1000, float(th.linalg.norm(shift_w)) * 1000)
             else:
                 eff, why = 0.0, f"IK failed with the lift ({res.reason}); library height kept"
         log.info("%s: grasp height extra %.1f mm requested -> %.1f mm (%s; pad end %.3f, male top %.3f)", self.gp.alias, x * 1000, eff * 1000, why, pad_tip_end_z, top_z)
