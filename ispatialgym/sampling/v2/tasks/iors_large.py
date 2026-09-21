@@ -552,6 +552,26 @@ class IORSLarge(SamplerV2):
         z = self.floor_z + self.world.bottom_offset(self.hull, quat) + float(self.num("drop_height_m", PUSH_UNDER_DROP_HEIGHT_M))
         return th.tensor([float(xy[0]), float(xy[1]), z]), quat
 
+    #: height of the blade above the fingertips that can meet the pushed object (the finger pads, PAD_Z_RANGE span)
+    BLADE_SPAN_M = 0.05
+
+    def contact_offset_along(self, quat, direction_xy, z_lo: float, z_hi: float) -> Optional[float]:
+        """Distance from the target's root back (against the push direction) to the rearmost collision point the blade can
+        meet: the collision boundary points at orientation ``quat`` whose height above the target's bottom lies in
+        ``[z_lo, z_hi]`` (the blade's band: fingertips to fingertips + ``BLADE_SPAN_M``). A sandal pushed along its length
+        with the fingertips 3.6 cm up is met at its STRAP, ~3 cm behind the root, not at the heel 12 cm behind: modelled
+        with the footprint's half extent the blade stopped 9-10 cm short of the goal cell (0920-143722 / 154503: the
+        sandal's root ended 3 cm ahead of the blade). ``None`` when nothing of the target reaches the band."""
+        pts = G.local_points_world(self.hull, (th.zeros(3), G.t(quat)))
+        z = pts[:, 2] - pts[:, 2].min()
+        sel = (z >= float(z_lo)) & (z <= float(z_hi))
+        if not bool(sel.any()):
+            return None
+        d = th.as_tensor([float(direction_xy[0]), float(direction_xy[1])])
+        d = d / th.linalg.norm(d)
+        proj = pts[sel][:, :2] @ d
+        return float(-proj.min())
+
     def half_extent_along(self, quat, direction_xy) -> float:
         """Half extent of the target's footprint along a horizontal direction at orientation ``quat``."""
         pts = G.local_points_world(self.hull, (th.zeros(3), quat))[:, :2]
@@ -570,12 +590,11 @@ class IORSLarge(SamplerV2):
         above the tips. The old rule (eef origin at ¾ of the height, fingertips ≥ 4 cm up for the cuRobo ground slab) ran
         the blade over a 4.5 cm sandal: it caught the strap near the middle and moved the sandal 17 cm of the 29 cm
         (0920-143722, 12 cm short of the goal cell). A blade below ``SLAB_TIP_M`` has its IK solved with the slab off."""
-        # a quarter of the height / 1 cm: the blade must meet the SOLE of a 4.5 cm sandal (0920-154503: fingertips at 3.6 cm still
-        # passed over the 1-2 cm sole and caught the strap at the middle - 15 of 29 cm, 13 cm short); the QA collision monitor
-        # exempts the floor categories, so fingertips brushing the floor cost nothing
+        # the fingertips at 0.8 of the height (3.6 cm for the 4.5 cm sandal: the height the exact IK admits and 0920-154503 executed;
+        # 1.1 cm had no IK solution at all, 0920-170805) - what the blade meets at that height is modelled by ``contact_offset_along``
         height = float(self.place["height"])
-        frac = float(self.num("push_tip_frac", 0.25))
-        clear = float(self.num("push_tip_clearance_m", 0.01))
+        frac = float(self.num("push_tip_frac", 0.8))
+        clear = float(self.num("push_tip_clearance_m", 0.015))
         z_tip = self.floor_z + max(clear, min(frac * height, 0.05))
         drop = C.FINGERTIP_LENGTH * math.cos(math.radians(float(pitch_deg)))
         return z_tip + drop, z_tip
@@ -589,12 +608,12 @@ class IORSLarge(SamplerV2):
         d2 = th.as_tensor([float(d2[0]), float(d2[1])])
         d2 = d2 / th.linalg.norm(d2)
         d3 = th.tensor([float(d2[0]), float(d2[1]), 0.0])
-        half_d = self.half_extent_along(quat, d2)
         height = float(self.place["height"])
         cd = th.as_tensor([float(drop_xy[0]), float(drop_xy[1])])
         gc = th.as_tensor([float(goal_xy[0]), float(goal_xy[1])])
         distance = float(th.linalg.norm(gc - cd))
         why: List[str] = []
+        half_d: Optional[float] = self.half_extent_along(quat, d2)  # the footprint's, for the log when no pitch gets a blade
         for pitch in TT.approach_pitch_order(None):
             z_push, z_tip = self.push_height(pitch)
             so = TT.blade_standoff((self.floor_z, self.floor_z + height), z_tip, pitch, PUSH_UNDER_CLEARANCE_M)
@@ -602,6 +621,14 @@ class IORSLarge(SamplerV2):
                 why.append(f"pitch {pitch:.0f}: face reaches the palm")
                 continue
             standoff = so[0]
+            # the blade meets the rearmost collision point within its height band (a sandal's strap, a box's face), not the
+            # footprint's rear edge; the (generation) ``push_contact_offset_m`` overrides the model
+            off_cfg = self.gp.gen("push_contact_offset_m")
+            off_m = float(off_cfg) if off_cfg is not None else self.contact_offset_along(quat, d2, z_tip - self.floor_z, z_tip - self.floor_z + self.BLADE_SPAN_M)
+            if off_m is None:
+                why.append(f"pitch {pitch:.0f}: nothing of the target within the blade's height band")
+                continue
+            half_d = off_m
             a_vec = TT.pitched_approach(pitch, d2)  # pitched toward the push direction (= the robot's forward for a frontal stance, its right for a side stance)
             start = th.tensor([float(cd[0]), float(cd[1]), z_push]) - d3 * (half_d + standoff)
             # the blade's goal runs ``push_goal_extra_m`` (3 cm) past the model's: the oracle's differential-IK leg stops 2-3 cm
@@ -2070,14 +2097,14 @@ class IORSLarge(SamplerV2):
             push = self.sidecar.contacts.get("push")
             if push is not None:
                 d3 = th.as_tensor(push.direction, dtype=th.float32)
-                off = float(push.extras["half_extent_m"]) + float(push.extras["blade_standoff_m"])
+                off = float(push.extras["half_extent_m"]) + float(push.extras["blade_standoff_m"]) - float(self.num("push_goal_extra_m", 0.03))
                 z_push = float(push.contact[0][2])
                 goal_b = th.tensor([float(goal_pos[0]), float(goal_pos[1]), z_push]) - d3 * off
                 start_b = push.contact[0]
                 mid_b = 0.5 * (start_b + goal_b)
                 q = push.contact[1]
                 push_from = self.sidecar.stances.get("push") or place  # the chain is pushed from the deep push stance when the drop and the push split
-                with self.ikc.ignoring([self.obj("floor"), self.target]):
+                with self.ikc.ignoring([self.obj("floor"), self.target], ground=not bool(push.extras.get("ground_ignored", False))):
                     r3 = self.ikc.exact([push.pre, (start_b, q), (mid_b, q), (goal_b, q)], push_from, "right", cache=False, fingers=C.FINGER_CLOSED)
                 if not r3.ok:
                     raise Reject("push_unreachable", f"push-under chain to the settled goal fails the exact IK from stance C: {r3.reason}")
