@@ -322,6 +322,10 @@ def _jsonable(x):
     return str(x)
 
 
+#: attachment (2026-09-20 22:30): the place re-aimed for the part's live in-hand pose at the pre-place (execute._reaim_for_inhand_pose)
+NOTE_KEYS = NOTE_KEYS + ("inhand_reaim",)
+
+
 @dataclass
 class ActionRecord:
     index: int

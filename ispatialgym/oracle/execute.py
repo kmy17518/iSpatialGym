@@ -186,6 +186,16 @@ class ExecuteConfig:
     attach_correct_min_rad: float = 0.03
     attach_correct_max_m: float = 0.06
     attach_settle_steps: int = 20
+    #: a correction pass lifts the part by this before the lateral / rotational move and descends again (0920-213721: the pass
+    #: moved a cap hovering 4.6 mm high DOWN and 4.4 mm sideways in one straight leg; its 5 deg-tilted rim caught the neck edge and
+    #: pushed the lemonade bottle 10 mm / 5 deg, which then rocked for 145 steps after the release)
+    attach_correct_lift_m: float = 0.006
+    #: (2026-09-20 22:30) the place is re-aimed for the part's LIVE in-hand pose at the pre-place: the male -> female fix measured
+    #: there gives the hand pose that aligns the links (the fingertip pinch of a 1.1 cm cap lets it pivot 3-5 deg / 5 mm about the
+    #: closing axis before the assisted grasp locks, and the carry leg's soft tolerance adds up to 1 cm); applied when the shift
+    #: from the recorded place is within these bounds
+    inhand_reaim_max_m: float = 0.03
+    inhand_reaim_max_rad: float = 0.35
     #: (owner 2026-09-20 18:25) the snap AttachedTo makes when the joint is created must stay invisible: a residual above these after
     #: the correction gets one more correction pass, and above them still the part is NOT attached (the place fails, the executor's
     #: retry re-aims at the partner's live pose) - 0920-164504 snapped the cap 17 mm
@@ -884,6 +894,9 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
     else:
         yield from motions.arm_to(arm, pose=targets["pre_place"], q_hint=_witness(ctx, "pre_place"), ignore_objects=on)
         ctx["carry_leg"] = {"kind": "trajopt"}
+    if action.kind == "attach" and action.on:
+        # the part is in the air above the partner: re-aim the descent for its live in-hand pose (and the carry's residual)
+        targets = yield from _reaim_for_inhand_pose(action, motions, state, targets, ctx, cfg)
     finish = ApproachFinish(targets["place"], q_hint=_witness(ctx, "place"), ignore_objects=on, max_stall=cfg.approach_finish_max_stall, max_remaining=cfg.approach_finish_max_remaining)
     yield from motions.arm_along(arm, targets["descent"], finish=finish)
     if finish.used:
@@ -992,6 +1005,57 @@ def _reaim_attach_targets(action: Place, state, targets: Dict[str, Any], ctx: Di
     return out
 
 
+def _reaim_for_inhand_pose(action: Place, motions: Motions, state, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: ExecuteConfig):
+    """At the pre-place (the part in the air above the partner) the live male -> female fix (modulo the child's symmetry) applied
+    to the live hand pose IS the hand pose that aligns the meta links: ``place`` becomes that pose, ``pre_place`` the same pose
+    raised by the recorded descent vector, ``descent`` the straight leg between them, ``retreat`` the recorded retreat carried
+    along; the hand first moves to the new pre-place (a few mm, free space). This absorbs the part's in-hand pose (cap/xxqyrt
+    0920-213721: 4.6 mm / 5.3 deg off the sampler's ``eef_in_object`` - the fingertip pinch of an 1.1 cm disc pivots about the
+    closing axis before the assisted grasp locks) and the carry leg's residual (soft tolerance 1 cm; cork 0920-212757 arrived
+    12.8 mm off after a perfect grasp), so the descent lands aligned instead of landing off and correcting in contact.
+    ``ctx["inhand_reaim"]`` records the facts. A generator: yields the pre-place move's steps and returns the targets."""
+    arm = action.arm
+    getter = getattr(state, "attachment_offset", None)
+    off = getter(action.object, action.on) if getter is not None else None
+    rec: Dict[str, Any] = {"applied": False}
+    ctx["inhand_reaim"] = rec
+    if off is None or not off.get("fix") or targets.get("place") is None or targets.get("pre_place") is None:
+        rec["reason"] = "no meta-link pair / no place targets"
+        return targets
+    p_now, q_now = (x.float() for x in state.eef_pose(arm))
+    p_live, q_live = C.compose(off["fix"], (p_now, q_now))
+    p_rec, q_rec = as_world_pose(targets["place"])
+    p_pre_rec, _ = as_world_pose(targets["pre_place"])
+    d = (p_live - p_rec.float())
+    dist, drot = float(th.linalg.norm(d)), C.quat_angle(q_live, q_rec.float())
+    rec.update({"shift_m": round(dist, 4), "delta": [round(float(v), 4) for v in d.tolist()], "rot_rad": round(float(drot), 4),
+                "inhand_offset_m": round(float(off["pos_m"]), 4), "inhand_offset_rad": round(float(off["rot_rad"]), 4)})
+    if dist < 1e-3 and drot < 0.01:
+        rec["reason"] = "within 1 mm / 0.01 rad of the recorded place"
+        return targets
+    if dist > cfg.inhand_reaim_max_m or drot > cfg.inhand_reaim_max_rad:
+        rec["reason"] = f"shift {dist * 1000:.1f} mm / {math.degrees(drot):.1f} deg exceeds the bounds; recorded targets kept"
+        log.warning("place(%s): in-hand re-aim skipped: %s", action.object, rec["reason"])
+        return targets
+    rise = (p_pre_rec.float() - p_rec.float())  # the recorded descent vector, reversed
+    place_live = Pose(position=[float(v) for v in p_live.tolist()], orientation=[float(v) for v in q_live.tolist()])
+    pre_live = Pose(position=[float(v) for v in (p_live + rise).tolist()], orientation=[float(v) for v in q_live.tolist()])
+    out = dict(targets)
+    out["place"], out["pre_place"], out["descent"] = place_live, pre_live, [place_live]
+    if out.get("retreat"):
+        out["retreat"] = [Pose(position=[float(v) for v in (p_live + (as_world_pose(w)[0].float() - p_rec.float())).tolist()], orientation=[float(v) for v in q_live.tolist()])
+                          for w in out["retreat"]]
+    log.info("place(%s): re-aimed for the in-hand pose: the aligned hand pose is %.1f mm / %.1f deg from the recorded place (meta links %.1f mm / %.1f deg off in the hand)",
+             action.object, dist * 1000, math.degrees(drot), off["pos_m"] * 1000, math.degrees(off["rot_rad"]))
+    try:
+        yield from motions.arm_along(arm, [pre_live], soft_pos_tol=cfg.attach_correct_min_m)
+    except SkillError as e:
+        rec["pre_place_move_error"] = e.message
+        log.warning("place(%s): the move to the re-aimed pre-place did not complete (%s); descending from where the hand is", action.object, e.message)
+    rec["applied"] = True
+    return out
+
+
 def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th.Tensor]:
     """The BEHAVIOR attachment at the place pose (2026-09-19; attachment lid / teapot 0916-205838: the hand reached the
     recorded attach pose within a millimetre, opened, and the lid fell through the collision-filtered teapot onto the
@@ -1027,8 +1091,14 @@ def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th
             break
         p, q = state.eef_pose(arm)
         target = C.compose(off["fix"], (p.float(), q.float()))
+        # lift -> lateral / rotational move at height -> descend: the part is clear of the partner while it moves sideways
+        # (0920-213721: a straight down-and-sideways leg caught the tilted rim on the neck and pushed the bottle); the leg's
+        # tolerance is the correction's own (the free-space 1 cm left cork 0920-212757 at 7.8 mm after two passes)
+        top = max(float(p[2]), float(target[0][2])) + cfg.attach_correct_lift_m
+        via1 = (th.tensor([float(p[0]), float(p[1]), top]), q.float())
+        via2 = (th.tensor([float(target[0][0]), float(target[0][1]), top]), target[1])
         try:
-            yield from motions.arm_along(arm, [target], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
+            yield from motions.arm_along(arm, [via1, via2, target], soft_pos_tol=cfg.attach_correct_min_m)
             yield from motions.settle(max_steps=cfg.attach_settle_steps)
         except SkillError as e:
             log.warning("place(%s): attach correction pass %d did not complete (%s)", action.object, k + 1, e.message)
