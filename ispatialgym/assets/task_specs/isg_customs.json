@@ -62276,74 +62276,8 @@
        "uyceta": "attachment-agent 2026-09-20: not a partner_of pair with wine_bottle/inkqch (compat sheet: ncxgpe only)"
       }
      }
-    }
-   },
-   "house_double_floor_lower": {
-    "rooms": [
-     "kitchen_0"
-    ],
-    "bindings": {
-     "support": [
-      "breakfast_table_xftrki_0"
-     ],
-     "floor": {
-      "room": "kitchen_0"
-     }
     },
-    "whitelist": {
-     "target": {
-      "cork": [
-       "ncxgpe",
-       "uyceta"
-      ]
-     },
-     "partner": {
-      "wine_bottle": [
-       "inkqch"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "cork": {
-       "lseuwf": "ground_isg 2026-09-20: heldout"
-      }
-     }
-    }
-   },
-   "Rs_int": {
-    "rooms": [
-     "living_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "breakfast_table_skczfi_0",
-      "breakfast_table_skczfi_1"
-     ],
-     "floor": {
-      "room": "living_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "cork": [
-       "ncxgpe",
-       "uyceta"
-      ]
-     },
-     "partner": {
-      "wine_bottle": [
-       "inkqch"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "cork": {
-       "lseuwf": "ground_isg 2026-09-20: heldout"
-      }
-     }
-    }
+    "_note": "attachment-agent 2026-09-20 20:10: the --all grounding also bound ['house_double_floor_lower', 'Rs_int']; the first-demo alias keeps house_single_floor only like the other attachment aliases (sample_isg --templates 1 samples one template per scene: 0920-182533 wrote the single_floor instance, then loaded house_double_floor_lower and computed its bands for an hour before any demo)"
    }
   },
   "generation": {
