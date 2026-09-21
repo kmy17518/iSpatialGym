@@ -76,7 +76,9 @@ FINGER_SUPPORT_CLEARANCE_M = 0.004
 #: rest-stability nudge test of the male / partner after the init settle (cork/ncxgpe 0920-200850 toppled off its tapered end)
 REST_NUDGE_DEG = 2.0
 REST_STABILITY_STEPS = 300
-REST_TIP_MAX_DEG = 5.0
+#: a stable part relaxes back below the nudge; one that has drifted past it is rocking over (cork probe 0920-212757: 7.5 deg on
+#: attempt 1, 4.5 deg on attempt 2 - both toppling, the second slipped under a 5 deg bound)
+REST_TIP_MAX_DEG = 3.0
 
 
 @dataclass
