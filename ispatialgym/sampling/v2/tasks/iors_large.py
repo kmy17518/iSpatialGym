@@ -1996,26 +1996,39 @@ class IORSLarge(SamplerV2):
                         continue
                     yaw, t_pose, eef, pre = hit
                 else:
-                    t_pose = None
-                    for _ in range(5):
-                        if self.surface["kind"] == "floor":
-                            xy = focus_xy
-                        else:
-                            r, a = float(rng.uniform(0, FOCUS_RADIUS)), float(rng.uniform(0, 2 * math.pi))
-                            xy = focus_xy + th.tensor([r * math.cos(a), r * math.sin(a)])
-                            if not self.surface["top"].polygon_supported(self.world.footprint(self.hull, self.pose_on(xy, yaw, z_init)), margin=SUPPORT_MARGIN):
+                    # the exact IK at B is tried at the screened pose first (the focus cell, the grid yaw: what F_init passed) and then
+                    # at up to two jittered poses; a pair is cached as infeasible only when all fail, with the reasons logged
+                    # (0920-235717/8/36: 7-8 of 8 toe-first draws failed here with one jittered pose each, no reason recorded)
+                    res, t_pose, eef, pre = None, None, None, None
+                    why_b: List[str] = []
+                    for k_try in range(int(self.num("b_ik_tries", 3))):
+                        yaw_k = yaw0 if k_try == 0 else yaw0 + float(rng.uniform(-TARGET_JITTER, TARGET_JITTER))
+                        t_pose = None
+                        for _ in range(5):
+                            if self.surface["kind"] == "floor" or k_try == 0:
+                                xy = focus_xy
+                            else:
+                                r, a = float(rng.uniform(0, FOCUS_RADIUS)), float(rng.uniform(0, 2 * math.pi))
+                                xy = focus_xy + th.tensor([r * math.cos(a), r * math.sin(a)])
+                            if self.surface["kind"] != "floor" and not self.surface["top"].polygon_supported(self.world.footprint(self.hull, self.pose_on(xy, yaw_k, z_init)), margin=SUPPORT_MARGIN):
                                 continue
-                        t_pose = self.pose_on(xy, yaw, z_init)
-                        break
-                    if t_pose is None:
-                        fails["target footprint off the init surface"] = fails.get("target footprint off the init surface", 0) + 1
-                        continue
-                    eef = IK.grasp_pose(t_pose, g.pose)
-                    pre = IK.pre_pose(eef)
-                    res = self.ikc.exact([pre, eef], manip, "right", ignore_for_last=self.grasp_ignore_objects(), scale_key=self.choice.models["target"].scale, cache=False)
-                    if not res.ok:
+                            t_pose = self.pose_on(xy, yaw_k, z_init)
+                            break
+                        if t_pose is None:
+                            why_b.append("target footprint off the init surface")
+                            continue
+                        eef = IK.grasp_pose(t_pose, g.pose)
+                        pre = IK.pre_pose(eef)
+                        res = self.ikc.exact([pre, eef], manip, "right", ignore_for_last=self.grasp_ignore_objects(), scale_key=self.choice.models["target"].scale, cache=False)
+                        if res.ok:
+                            yaw = yaw_k
+                            break
+                        why_b.append(f"try {k_try} yaw {yaw_k:.2f}: {res.reason}")
+                    if res is None or not res.ok:
                         b_ik_cache[bk] = None
                         fails["B: [pre-grasp, grasp] exact IK"] = fails.get("B: [pre-grasp, grasp] exact IK", 0) + 1
+                        log.info("%s: B exact IK fails for yaw bucket %.2f / grasp %s at B (%.2f, %.2f): %s", self.gp.alias, yaw0, getattr(g, "name", g), manip.translate, manip.tilt,
+                                 " | ".join(why_b)[:600])
                         continue
                     b_ik_cache[bk] = (yaw, t_pose, eef, pre)
                 goal_quat = G.qmul(G.quat_from_yaw(d_yaw), t_pose[1]) if abs(d_yaw) > 1e-9 else t_pose[1]
