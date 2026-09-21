@@ -36,8 +36,8 @@
   "owner": "loop / tabletop"
  },
  "configuration_matching-attachment": {
-  "blocking": "re-run 0916-205838: each attempt burns the 360 s budget in the second-base-pose search \u2014 the SLERP's first waypoint (carried lift, 0.70\u20130.82 m base-forward) fails IK from the attach stance \u2192 tabletop: start the SLERP from a carried pose reachable at the attach stance / choose stances where the lift is reachable (D-009 B class-1 admission helps)",
-  "owner": "tabletop"
+  "blocking": "VALID at HEAD (owner 2026-09-20 23:39, attachment only; STOPPED - owner decides on generalising the tight correction): cap demo-only 0921-021839 of 213721's instance (regime from the customs): attach residual 1.1 mm / 0.0036 rad at joint creation, 0 passes, table 0 steps / 0 N, bottle 0.4 mm before / 0.5 mm + 0.22 deg during the place, settled 9, 0 verdicts; cork re-sample 0921-030246 (regime from the sidecar): residual 0.92 mm / 0.0052 rad, 0 passes, table 0 / 0 N, bottle 0.2 mm before / 0.0 mm + 0.04 deg during, group 0.64 mm, settled 9, 0 verdicts, 0 robot-bottle contacts (was 7 mm / 4.3 deg in 212757). Fixes (all attachment-targeted): 88151372 in-hand re-aim + lift-lateral-descend correction; 9f1d2136 generation.attach_correction regime (1.5 mm leg tol, <= 4 passes, stop < 0.5 mm, target 2 mm / 0.02 rad; lid / cap / cork aliases + lid pair customs) + partner-present attach IK + 5 mm fingertip clearance above the partner (cork: fingertip pinch at its top, lift 31 mm); 703a3837 / a8d0b663 / 1f74eccf fingertip floor + geometric pinch re-centring (9.4 mm at 30 deg). Cork rest: convex tapered end, rest_unstable on ~5 of 6 sampler attempts (nudge test) - a stable yaw exists; 24 attempts allowed. Pods attach5 (TTL) / attach6 / attach7 all terminated; no band files lost. 0920-164504 does NOT count (owner 18:25).",
+  "owner": "attachment-agent"
  },
  "configuration_matching-articulation_open_small_scale": {
   "blocking": "D-008 A applied (e5fbced: brace_optional on the hinged_jar aliases; program 59f6426f) \u2014 handle-only loop runs next tick",
