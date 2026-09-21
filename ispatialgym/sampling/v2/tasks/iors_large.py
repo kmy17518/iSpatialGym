@@ -1893,11 +1893,14 @@ class IORSLarge(SamplerV2):
             if carry_margin > 0.011:
                 tt0 = self.travel_trunks(init, manip)[0] if self.travel_trunks(init, manip) else (0.25, 0.0)
                 probe = place.with_trunk(float(tt0[0]), float(tt0[1]), "placement")
+                # the BODY's room, not the arms': with the untucked arms the hanging hand hovered over the countertop within 4 cm and
+                # every ontop C was skipped (0921-031852, shampoo_dispenser-countertop-floor: 6 attempts, no instance) - the compact
+                # ``ready`` posture keeps the hands at the chest (collision-free up to translate 1.25 on the JoyLo curve)
                 with self._floor_relaxed():
-                    if not self.ikc.stance_collision_free(probe, margin=carry_margin):
+                    if not self.ikc.stance_collision_free(probe, margin=carry_margin, arms="ready"):
                         why_m = ""
                         try:
-                            why_m = " - " + self.ikc._collision_blame(self.ikc.q_locked(probe), [self.obj("floor")], carry_margin)
+                            why_m = " - " + self.ikc._collision_blame(self.ikc.q_locked(probe, arms="ready"), [self.obj("floor")], carry_margin)
                         except Exception:  # noqa: BLE001
                             pass
                         errors.append(f"C (d {place.stand_off or 0.0:.2f} λ {place.lateral:+.2f}): no room for the carried sweep at margin {carry_margin:.3f}{why_m}")
