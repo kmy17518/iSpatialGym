@@ -553,8 +553,8 @@ class Attachment(SamplerV2):
         jlalfc 0919-173115 / 181512: the wrist camera grazed the 29 cm teapot's spout). Recorded only when the standoff pose
         passes the exact IK at the grasp stance. Facts on the record."""
         near = float(self.gen("partner_near_m", 0.35))
-        dist = float(self.gen("grasp_approach_standoff_m", 0.12))
-        if grasp.grasp is None or grasp.pre_grasp is None or dist <= 0.0:
+        ladder = [float(v) for v in (self.gen("grasp_approach_standoff_ladder_m", None) or (0.12, 0.08, 0.05)) if float(v) > 0.0]
+        if grasp.grasp is None or grasp.pre_grasp is None or not ladder:
             return
         pts = C.transform_points((TT._t(f_pose[0]), TT._t(f_pose[1])), TT._t(self.hull[self.p_role]))
         g_xy = TT._t(grasp.grasp[0])[:2]
@@ -562,14 +562,22 @@ class Attachment(SamplerV2):
         grasp.extras["partner_distance_m"] = round(d_xy, 4)
         if d_xy > near:
             return
-        standoff = C.pre_pose((TT._t(grasp.pre_grasp[0]), TT._t(grasp.pre_grasp[1])), dist)
-        res = self.ikc.exact([standoff], manip, grasp.arm, ignore_for_last=[self.obj("support")], scale_key=self.choice.models[self.t_role].scale, cache=False)
-        if res.ok:
-            grasp.extras["approach_standoff_m"] = dist
-            log.info("%s: partner %.2f m from the grasp -> over-the-top pre-grasp approach recorded (standoff %.2f m)", self.gp.alias, d_xy, dist)
-        else:
-            grasp.extras["approach_standoff_reason"] = f"standoff pose fails the exact IK ({res.reason})"
-            log.info("%s: partner %.2f m from the grasp but the %.2f m standoff has no IK (%s): direct approach kept", self.gp.alias, d_xy, dist, res.reason)
+        # a ladder of standoff distances (cap/xxqyrt 0920-164504: the 12 cm standoff had no IK at the 0.82 m-deep stance - joint 2 on
+        # its limit - so the direct trajopt ran the open hand along the table past the 25 cm bottle and shoved it 46 mm / 32 deg)
+        reasons = []
+        for dist in ladder:
+            standoff = C.pre_pose((TT._t(grasp.pre_grasp[0]), TT._t(grasp.pre_grasp[1])), dist)
+            res = self.ikc.exact([standoff], manip, grasp.arm, ignore_for_last=[self.obj("support")], scale_key=self.choice.models[self.t_role].scale, cache=False)
+            if res.ok:
+                grasp.extras["approach_standoff_m"] = dist
+                if reasons:
+                    grasp.extras["approach_standoff_ladder"] = reasons
+                log.info("%s: partner %.2f m from the grasp -> over-the-top pre-grasp approach recorded (standoff %.2f m%s)", self.gp.alias, d_xy, dist,
+                         f"; {len(reasons)} longer standoff(s) had no IK" if reasons else "")
+                return
+            reasons.append(f"{dist:.2f} m: {res.reason}")
+        grasp.extras["approach_standoff_reason"] = "; ".join(reasons)
+        log.info("%s: partner %.2f m from the grasp but no standoff of %s has IK (%s): direct approach kept", self.gp.alias, d_xy, ladder, reasons[-1][:120])
 
     # ------------------------------------------------------------------ hand envelope vs the partner (0919-160750)
 

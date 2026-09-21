@@ -23399,8 +23399,8 @@
    },
    "groups": {},
    "path_buckets": null,
-   "partner_gap_min_m": 0.04,
-   "partner_centre_distance_min_m": 0.08,
+   "partner_gap_min_m": 0.08,
+   "partner_centre_distance_min_m": 0.18,
    "pre_attach_back_m": 0.1,
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
@@ -23410,7 +23410,8 @@
    "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
    "brace_search": false,
    "witness_residual_pre_m": 0.015,
-   "_brace_search_note": "owner 2026-09-19 14:55 / 2026-09-20 16:15 (attachment): brace_search false = the one-arm sequence; witness_residual_pre_m 15 mm (pre-pose witnesses at joint limits); alias grounded from ground_isg --all (dry run) and imported for the owner pair cork/ncxgpe -> wine_bottle/inkqch"
+   "_brace_search_note": "owner 2026-09-19 14:55 / 2026-09-20 16:15 (attachment): brace_search false = the one-arm sequence; witness_residual_pre_m 15 mm (pre-pose witnesses at joint limits); alias grounded from ground_isg --all (dry run) and imported for the owner pair cork/ncxgpe -> wine_bottle/inkqch",
+   "_partner_gap_note": "attachment-agent 2026-09-20 18:20: tall partners (25 / 22 cm bottles): 0.08 / 0.18 as for pwgbsb / jlalfc - with 0.04 / 0.08 the hand transit at table height brushed the lemonade bottle (0920-164504: shoved 46 mm / 32 deg)"
   },
   "constraints": []
  },
@@ -62352,8 +62353,8 @@
    },
    "groups": {},
    "path_buckets": null,
-   "partner_gap_min_m": 0.04,
-   "partner_centre_distance_min_m": 0.08,
+   "partner_gap_min_m": 0.08,
+   "partner_centre_distance_min_m": 0.18,
    "pre_attach_back_m": 0.1,
    "reorientation_waypoints": 3,
    "symmetry_slab_m": 0.005,
@@ -62361,7 +62362,8 @@
    "grasp_metalink_clearance_m": 0.01,
    "brace_search": false,
    "witness_residual_pre_m": 0.015,
-   "_brace_search_note": "owner 2026-09-19 14:55 / 2026-09-20 16:15 (attachment): brace_search false = the one-arm sequence; witness_residual_pre_m 15 mm (pre-pose witnesses at joint limits); alias grounded from ground_isg --all (dry run) and imported for the owner pair cork/ncxgpe -> wine_bottle/inkqch"
+   "_brace_search_note": "owner 2026-09-19 14:55 / 2026-09-20 16:15 (attachment): brace_search false = the one-arm sequence; witness_residual_pre_m 15 mm (pre-pose witnesses at joint limits); alias grounded from ground_isg --all (dry run) and imported for the owner pair cork/ncxgpe -> wine_bottle/inkqch",
+   "_partner_gap_note": "attachment-agent 2026-09-20 18:20: tall partners (25 / 22 cm bottles): 0.08 / 0.18 as for pwgbsb / jlalfc - with 0.04 / 0.08 the hand transit at table height brushed the lemonade bottle (0920-164504: shoved 46 mm / 32 deg)"
   },
   "constraints": []
  },
