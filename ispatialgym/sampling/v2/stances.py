@@ -523,6 +523,9 @@ class SidecarDraft:
         self.checked_waypoints: List[Dict[str, Any]] = []  # what §3.9 checked (debug / summary)
         #: the program check's joint solutions per action end pose (``program_check.run``): D5 verifies them as witnesses
         self.ik_witnesses: List[Dict[str, Any]] = []
+        #: task-specific top-level facts the oracle reads through ``Sidecar.extra`` (attachment: ``attach_correction``, the
+        #: per-task correction regime of ``generation.attach_correction``; owner 2026-09-20 23:39)
+        self.extra: Dict[str, Any] = {}
         self.tro_sha256: Optional[str] = None
 
     # -- writers ------------------------------------------------------------------------------------------------
@@ -591,6 +594,8 @@ class SidecarDraft:
         d["waypoint_policy"] = self.waypoint_policy
         if self.ik_witnesses:
             d["ik_witnesses"] = _jsonable(self.ik_witnesses)
+        for k, v in (self.extra or {}).items():
+            d.setdefault(k, _jsonable(v))
         return d
 
     def finalize(self, instance_id: str, tro_path: str) -> Dict[str, Any]:
@@ -621,6 +626,7 @@ class SidecarDraft:
         self.language = {"objects": {}, "goal_numbers": {}}
         self.checked_waypoints = []
         self.ik_witnesses = []
+        self.extra = {}
         self.path_bucket_m = None
         self.tro_sha256 = None
 

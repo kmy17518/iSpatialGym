@@ -297,6 +297,15 @@ class IKChecker:
             return False
         return bool(self.kit.collision_free(q, margin=0.0)[0])
 
+    def collision_free_at(self, q: th.Tensor, pose: Pose, arm: str, ignore: Sequence[Any] = ()) -> bool:
+        """``q`` (a configuration ``exact`` returned) reaches ``pose`` and is collision-free in the CURRENT world with
+        ``ignore`` removed — the witness criterion re-evaluated after the world changed around the call (attachment
+        2026-09-20 23:39: the attach pose is solved with the male attached and the partner ignored, then the same
+        configuration is verified with the male detached and the partner present: the fingers / hand against the
+        partner, which the male-partner filter never covers)."""
+        with self.ignoring(list(ignore)):
+            return self._witness_ok(q, pose, arm)
+
     def _seeded(self, q0: th.Tensor, pose: Pose, arm: str) -> th.Tensor:
         """``q0`` with the working arm set to the remembered solution of the nearest recorded pose of ``arm`` within
         (3 cm, 0.15 rad) — the same pose, or the same pose after the settle moved the object by a few mm (the other

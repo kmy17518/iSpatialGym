@@ -73,6 +73,9 @@ THIN_PART_TILT_MIN_DEG = 15.0
 #: every attachment grasp: the lowest vertex of the finger meshes (both fingers, any opening) stays this far above the
 #: support at the grasp pose (0920-203052: 0.1 mm below the table -> 22 contact steps at 110 N)
 FINGER_SUPPORT_CLEARANCE_M = 0.004
+#: after the insertion the pads' fingertip-side end (pad pinch) / the fingertip axis point (fingertip pinch) stay this far above
+#: the partner's top along the insertion axis (owner 2026-09-20 23:39 item 2b; cork/wine 0920-212757)
+PARTNER_CLEARANCE_M = 0.005
 #: rest-stability nudge test of the male / partner after the init settle (cork/ncxgpe 0920-200850 toppled off its tapered end)
 REST_NUDGE_DEG = 2.0
 REST_STABILITY_STEPS = 300
@@ -673,6 +676,49 @@ class Attachment(SamplerV2):
             zs.append(float((pts @ R.T + pos)[:, 2].min()))
         return min(zs)
 
+    def _fingers_in_partner(self, q: Optional[th.Tensor], attach_pose: TT.Pose, support, male, female) -> Optional[str]:
+        """Item 2a (owner 2026-09-20 23:39): the attach configuration ``q`` (solved with the male attached and the partner
+        ignored, as the male sits inside it) re-verified with the male DETACHED and the partner PRESENT - only the support
+        and the held male leave the world - so the fingers / hand are checked against the partner, which the male-partner
+        collision filter never covers (cork/wine 0920-212757: the fingertips 1 cm below the rim pushed the bottle 7 mm /
+        4.3 deg). Returns the reason when they collide, None when clear. Call it OUTSIDE ``attached(...)``."""
+        if q is None:
+            return None
+        if self.ikc.collision_free_at(q, attach_pose, "right", ignore=[support, male]):
+            return None
+        return f"robot links collide with {getattr(female, 'name', 'the partner')} at the attach pose (male detached, partner present)"
+
+    def _attach_clearance(self, grasp) -> Optional[Dict[str, float]]:
+        """Heights of the pads' fingertip-side end and of the fingertip axis point ABOVE the partner's top after the insertion,
+        along the insertion axis (owner 2026-09-20 23:39, item 2b; cork/wine 0920-212757: the recorded pinch 8 mm above the
+        mating end, the attach seats the cork 1.8 cm into the neck, the fingertips end 1 cm below the rim and push it - the
+        male-partner collision filter never covers the fingers). Computed in the partner's frame from the meta-link
+        transforms alone (``T_F ∘ inv(T_M) ∘ T_obj→eef``), so it is available at step 1 before the partner is placed:
+        ``depth`` = female link -> partner top along the axis (the partner hull points within the male's radius + 5 mm of
+        the axis: the rim, not a handle or spout), ``h_pad`` / ``h_tip`` = pad end / fingertip axis point above that top,
+        ``lift_sign`` = how a lift of the grasp along the male's rest up axis moves the fingers along the insertion axis
+        (+1 for an upright insertion). None when the transforms are missing."""
+        need = ("parent_link_in_female", "root_in_child_link", "insertion_axis_local")
+        if any(getattr(self, k, None) is None for k in need) or grasp.eef_in_object is None:
+            return None
+        p_f, q_f = (TT._t(v) for v in self.parent_link_in_female)
+        axis = C.unit(TT._t(self.insertion_axis_local))
+        root = C.compose((p_f, q_f), tuple(TT._t(v) for v in self.root_in_child_link))  # male root at the attach, partner frame
+        eef = C.compose(root, (TT._t(grasp.eef_in_object[0]), TT._t(grasp.eef_in_object[1])))
+        a = C.approach_axis(eef[1])
+        pts = TT._t(self.hull[self.p_role]) - p_f
+        h = pts @ axis
+        radial = (pts - h.unsqueeze(1) * axis).norm(dim=1)
+        r_male = float((TT._t(self.hull[self.t_role])[:, :2]).norm(dim=1).max())
+        near = radial <= r_male + 0.005  # the rim under / around the male, not a handle or spout base further out
+        depth = float(h[near].max()) if bool(near.any()) else float(h.max())
+        depth = max(0.0, depth)
+        h_pad = float(((eef[0] + C.PAD_Z_RANGE[1] * a) - p_f) @ axis) - depth
+        h_tip = float(((eef[0] + C.FINGERTIP_LENGTH * a) - p_f) @ axis) - depth
+        up_obj = C.quat_rotate(C.qinv(TT._t(self.rest[self.t_role])), th.tensor([0.0, 0.0, 1.0]))  # world up at rest, male frame
+        lift_sign = float(C.quat_rotate(root[1], up_obj) @ axis)
+        return {"depth_m": depth, "h_pad_m": h_pad, "h_tip_m": h_tip, "lift_sign": lift_sign, "r_male_m": r_male}
+
     def _apply_grasp_height_extra(self, grasp, m_pose: TT.Pose, manip: Stance) -> None:
         """``generation.grasp_height_extra_m``: the knob pinch moves up the male by up to that much (0 = today's pose). Demo
         0919-153953 (lid tnwisp): the pads held the top centimetre of the knob while the fingertips reached 0.7 cm below the
@@ -698,8 +744,7 @@ class Attachment(SamplerV2):
         top_z, bottom_z = float(hull_w[:, 2].max()), float(hull_w[:, 2].min())  # the male's bottom rests on the support
         room_pad = (top_z - PAD_BAND_MARGIN) - pad_tip_end_z  # the pads keep overlapping the part
         room_tip = (top_z - 0.003) - tip_z  # fingertip pinch: the tips stay >= 3 mm below the part's top
-        room, rule, regime = room_pad, "pad end 5 mm below the male's top", "pad pinch"
-        needed, floors = 0.0, {}
+        floors: Dict[str, float] = {}  # lifts the support asks for (both regimes)
         # the finger ENVELOPE (both finger meshes, every opening of the closure) must clear the support: the fingers are 3.8 cm
         # across the closing plane, so a 30 deg rim pinch hangs a tip corner up to 1.2 cm below the fingertip axis point -
         # 0920-203052 (cap, pad end 5.4 mm above the table) still touched the table for 22 steps at 110 N with the lowest
@@ -712,18 +757,40 @@ class Attachment(SamplerV2):
             # the pad rule would forbid any lift and the fingertips rest on the table during the closure (0920-184902: 23 contact
             # steps, 123 N); the pads' fingertip-side end must clear the support by PAD_TABLE_CLEARANCE_M (owner 20:41)
             floors["pad end (thin part)"] = (bottom_z + PAD_TABLE_CLEARANCE_M) - pad_tip_end_z
-        if floors:
-            which, needed = max(floors.items(), key=lambda kv: kv[1])
-            if needed > x:
-                log.info("%s: the %s sits %.1f mm above the support at the library height -> lift raised from %.1f to %.1f mm (%s)",
-                         self.gp.alias, "lowest finger vertex" if which.startswith("finger") else "pad end",
-                         ((low_z if which.startswith("finger") else pad_tip_end_z) - bottom_z) * 1000, x * 1000, needed * 1000, which)
-                x = needed
-        if room_pad <= 0.0 or (floors and needed > room_pad):
-            # the pads cannot overlap the part while the fingers clear the support (every cap/xxqyrt library grasp puts the
-            # fingertip axis 8.4-8.9 mm below the table; 0920-212214 clipped the 14.4 mm floor to the 9.2 mm pad room and the
-            # lowest vertex stayed 1.2 mm under the surface): a fingertip pinch of the part's upper band, tips >= 3 mm below the top
-            room, rule, regime = room_tip, f"fingertips 3 mm below the male's top (fingertip pinch; pad end >= {PAD_TABLE_CLEARANCE_M * 1000:.0f} mm above the support)", "fingertip pinch"
+        # the partner after the insertion (owner 2026-09-20 23:39, 2b): the pads' fingertip-side end (pad regime) / the fingertip
+        # axis point (fingertip regime) must stay PARTNER_CLEARANCE_M above the partner's top - cork/wine 0920-212757 seated
+        # the cork 1.8 cm into the neck with the fingertips 1 cm below the rim and pushed the bottle 7 mm / 4.3 deg
+        clr = self._attach_clearance(grasp)
+        floors_pad, floors_tip = dict(floors), dict(floors)
+        if clr is not None and clr["lift_sign"] > 0.5:
+            floors_pad["partner top (pad end)"] = PARTNER_CLEARANCE_M - clr["h_pad_m"]
+            floors_tip["partner top (fingertips)"] = PARTNER_CLEARANCE_M - clr["h_tip_m"]
+            grasp.extras["attach_clearance"] = {k: round(v, 4) for k, v in clr.items()}
+        elif clr is not None:
+            log.info("%s: the male is not inserted along its rest up axis (lift sign %.2f): no partner-clearance floor", self.gp.alias, clr["lift_sign"])
+        need_pad = max(floors_pad.values()) if floors_pad else 0.0
+        need_tip = max(floors_tip.values()) if floors_tip else 0.0
+        if room_pad > 0.0 and need_pad <= room_pad:
+            room, rule, regime, floors = room_pad, "pad end 5 mm below the male's top", "pad pinch", floors_pad
+        elif need_tip <= room_tip:
+            # the pads cannot overlap the part while the fingers clear the support / the partner (every cap/xxqyrt library grasp
+            # puts the fingertip axis 8.4-8.9 mm below the table; 0920-212214 clipped the 14.4 mm floor to the 9.2 mm pad room and
+            # the lowest vertex stayed 1.2 mm under the surface; the cork protrudes 1.6 cm from the neck, less than the pads need):
+            # a fingertip pinch of the part's upper band, tips >= 3 mm below the top
+            room, rule, regime, floors = room_tip, f"fingertips 3 mm below the male's top (fingertip pinch; pad end >= {PAD_TABLE_CLEARANCE_M * 1000:.0f} mm above the support)", "fingertip pinch", floors_tip
+        else:
+            facts = {"floors_pad_mm": {k: round(v * 1000, 1) for k, v in floors_pad.items()}, "room_pad_mm": round(room_pad * 1000, 1),
+                     "floors_tip_mm": {k: round(v * 1000, 1) for k, v in floors_tip.items()}, "room_tip_mm": round(room_tip * 1000, 1),
+                     "attach_clearance": grasp.extras.get("attach_clearance")}
+            self.counters["fingers_in_partner"] = self.counters.get("fingers_in_partner", 0) + 1
+            raise Reject("fingers_in_partner", f"no grasp height keeps the fingers out of the support / partner: even a fingertip pinch needs a "
+                                               f"{need_tip * 1000:.1f} mm lift with {room_tip * 1000:.1f} mm of part left ({facts})")
+        needed = max(floors.values()) if floors else 0.0
+        if floors and needed > x:
+            which = max(floors.items(), key=lambda kv: kv[1])[0]
+            log.info("%s: lift raised from %.1f to %.1f mm by the %s floor (%s regime; floors %s mm)", self.gp.alias, x * 1000, needed * 1000, which, regime,
+                     {k: round(v * 1000, 1) for k, v in floors.items()})
+            x = needed
         grasp.extras["grasp_height_floors_m"] = {k: round(v, 4) for k, v in floors.items()}
         grasp.extras["grasp_height_regime"] = regime
         if x <= 0.0:
@@ -774,7 +841,7 @@ class Attachment(SamplerV2):
         with it False the brace is optional (recorded when it passes); ``brace`` False = no brace is even tried (the one-arm
         attach of ``generation.brace_search`` false). Returns the attach facts or None (reasons in ``self._att_fails[st.name]``)."""
         male, female, support = self.obj(self.t_role), self.obj(self.p_role), self.obj("support")
-        fails = {"distance": 0, "support": 0, "gap": 0, "frame": 0, "brace_off_band": 0, "brace_class_failed": 0, "screen": 0, "ik": 0, "slerp": 0, "brace_ik": 0}
+        fails = {"distance": 0, "support": 0, "gap": 0, "frame": 0, "brace_off_band": 0, "brace_class_failed": 0, "screen": 0, "ik": 0, "fingers": 0, "slerp": 0, "brace_ik": 0}
         self._att_fails = getattr(self, "_att_fails", {})
         tag = "" if require_joint else ("/brace-optional" if brace else "/no-brace")
         self._att_fails[f"{st.name}@lat{st.lateral:+.2f}/trunk({st.translate:.2f},{st.tilt:+.2f}){tag}"] = fails
@@ -843,9 +910,15 @@ class Attachment(SamplerV2):
             with TT.posed_in_hand(self, "right", male, grasp.eef_in_object):
                 with attached(self.kit, "right", male):
                     res = self.ikc.exact([eef_pre, eef_attach], st, "right", ignore_for_last=[support, female], scale_key=self.choice.models[self.t_role].scale)
-                    if not res.ok:
-                        fails["ik"] += 1
-                        continue
+                if not res.ok:
+                    fails["ik"] += 1
+                    continue
+                why = self._fingers_in_partner(res.q, eef_attach, support, male, female)
+                if why is not None:
+                    fails["fingers"] += 1
+                    log.info("%s: partner cell rejected: %s", self.gp.alias, why)
+                    continue
+                with attached(self.kit, "right", male):
                     # the lift clears the table; the SLERP waypoints carry the male up to the pre-attach pose above the partner. The
                     # carry height ladder (owner item 2 / att_diag2: a 12 cm lift of a grasp at 0.8 m base-forward has no IK)
                     r_w, lift, wps = None, None, []
@@ -1081,8 +1154,18 @@ class Attachment(SamplerV2):
         with TT.posed_in_hand(self, "right", male, grasp.eef_in_object):
             with attached(self.kit, "right", male):
                 res = self.ikc.exact([pre, attach], manip, "right", ignore_for_last=[support, female], scale_key=self.choice.models[self.t_role].scale)
+            why = self._fingers_in_partner(res.q, attach, support, male, female) if res.ok else None
         if not res.ok:
             raise Reject("place_unreachable", f"settled partner: pre-attach / attach fail the exact IK: {res.reason}")
+        if why is not None:
+            self.counters["fingers_in_partner"] = self.counters.get("fingers_in_partner", 0) + 1
+            raise Reject("fingers_in_partner", f"settled partner: {why}; attach clearance {grasp.extras.get('attach_clearance')}")
+        # the oracle's attach correction regime (owner 2026-09-20 23:39 item 1): ``generation.attach_correction`` = {soft_pos_tol_m,
+        # settle_steps, max_passes, stop_when_improvement_below_m, target_pos_m, target_rot_rad} travels in the sidecar; absent = the
+        # oracle's own defaults (execute.AttachCorrection)
+        regime = self.gen("attach_correction", None)
+        if isinstance(regime, dict) and regime:
+            self.sidecar.extra["attach_correction"] = {k: float(v) if k != "max_passes" and k != "settle_steps" else int(v) for k, v in regime.items()}
         grasp.pre_place, grasp.place = pre, attach
         if grasp.waypoints:
             grasp.waypoints[-1] = pre

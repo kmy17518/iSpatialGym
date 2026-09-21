@@ -23413,7 +23413,16 @@
    "_brace_search_note": "owner 2026-09-19 14:55 / 2026-09-20 16:15 (attachment): brace_search false = the one-arm sequence; witness_residual_pre_m 15 mm (pre-pose witnesses at joint limits); alias grounded from ground_isg --all (dry run) and imported for the owner pair cork/ncxgpe -> wine_bottle/inkqch",
    "_partner_gap_note": "attachment-agent 2026-09-20 18:20: tall partners (25 / 22 cm bottles): 0.08 / 0.18 as for pwgbsb / jlalfc - with 0.04 / 0.08 the hand transit at table height brushed the lemonade bottle (0920-164504: shoved 46 mm / 32 deg)",
    "grasp_height_extra_m": 0.005,
-   "_grasp_height_note": "attachment-agent 2026-09-20 19:35: +5 mm (thin-part rule: fingertips 3 mm below the cap top) - 0920-184902 pinched the 1.1 cm cap rim with the fingertip plane 1.4 mm above the table: 23 table-contact steps, 123 N at the closure"
+   "_grasp_height_note": "attachment-agent 2026-09-20 19:35: +5 mm (thin-part rule: fingertips 3 mm below the cap top) - 0920-184902 pinched the 1.1 cm cap rim with the fingertip plane 1.4 mm above the table: 23 table-contact steps, 123 N at the closure",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },
@@ -24235,7 +24244,16 @@
    "_phase2_class1_note": "owner D-009 = B (chat 2026-09-16 22:02, applied 01:05): class-1 Phase-2 candidates admitted when the class-0 foci are deeper than 0.65 m base-forward",
    "brace_search": false,
    "witness_residual_pre_m": 0.015,
-   "_brace_search_note": "owner 2026-09-19 14:55 (attachment lid / teapot): brace_search false = the one-arm sequence 'pick up the lid with the right arm -> move to the place stance -> place the lid on the teapot opening' (no partner brace, no two-arm search; a recorded place stance only when the grasp stance does not reach the attach pose); witness_residual_pre_m 15 mm = the 0917-010834 program-check failures were pre_grasp witnesses 12-17 mm short at joint 2's limit, which the oracle's approach finish closes (as the touching aliases)"
+   "_brace_search_note": "owner 2026-09-19 14:55 (attachment lid / teapot): brace_search false = the one-arm sequence 'pick up the lid with the right arm -> move to the place stance -> place the lid on the teapot opening' (no partner brace, no two-arm search; a recorded place stance only when the grasp stance does not reach the attach pose); witness_residual_pre_m 15 mm = the 0917-010834 program-check failures were pre_grasp witnesses 12-17 mm short at joint 2's limit, which the oracle's approach finish closes (as the touching aliases)",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },
@@ -62299,7 +62317,16 @@
    "brace_search": false,
    "witness_residual_pre_m": 0.015,
    "_brace_search_note": "owner 2026-09-19 14:55 / 2026-09-20 16:15 (attachment): brace_search false = the one-arm sequence; witness_residual_pre_m 15 mm (pre-pose witnesses at joint limits); alias grounded from ground_isg --all (dry run) and imported for the owner pair cork/ncxgpe -> wine_bottle/inkqch",
-   "_partner_gap_note": "attachment-agent 2026-09-20 18:20: tall partners (25 / 22 cm bottles): 0.08 / 0.18 as for pwgbsb / jlalfc - with 0.04 / 0.08 the hand transit at table height brushed the lemonade bottle (0920-164504: shoved 46 mm / 32 deg)"
+   "_partner_gap_note": "attachment-agent 2026-09-20 18:20: tall partners (25 / 22 cm bottles): 0.08 / 0.18 as for pwgbsb / jlalfc - with 0.04 / 0.08 the hand transit at table height brushed the lemonade bottle (0920-164504: shoved 46 mm / 32 deg)",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  },

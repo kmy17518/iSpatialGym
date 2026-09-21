@@ -93,7 +93,16 @@
    "_pair_note": "owner 2026-09-19: second attachment pair lid/pwgbsb -> teapot/jlalfc (constraints_compatible partner_of, pwgbsbparent); grasps lid__pwgbsb (5 rows flagged one_finger, tolerated)",
    "_gap_note": "2026-09-19 20:50 (owner): intermediate partner separation for this pair (0.04/0.08 -> the wrist camera grazed the spout on the pre-grasp swing; 0.12/0.25 -> the SLERP to the far pre-attach stalled); + tracked SLERP, place stance when the carry does not track, over-the-top pre-grasp approach when the partner is within 0.35 m",
    "grasp_height_extra_m": 0.006,
-   "_grasp_height_note": "2026-09-19 23:10: +6 mm (clip 8.6 mm: pad end 5 mm under the knob top) so the fingertips (1.9 cm below the eef) clear the flat dish at r 2.5 cm once the pads open to the measured 24-30 mm knob + 10 mm"
+   "_grasp_height_note": "2026-09-19 23:10: +6 mm (clip 8.6 mm: pad end 5 mm under the knob top) so the fingertips (1.9 cm below the eef) clear the flat dish at r 2.5 cm once the pads open to the measured 24-30 mm knob + 10 mm",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  }

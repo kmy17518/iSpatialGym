@@ -895,6 +895,7 @@ class Executor:
             return v, ctx
         ctx["targets_keys"] = sorted(targets.keys())
         ctx["witnesses"] = self.witnesses_for(index)
+        ctx["sidecar"] = self.sidecar  # attachment: the correction regime travels in sidecar.extra["attach_correction"] (execute.attach_correction_regime)
         if isinstance(action, Place) and self.motions is not None and hasattr(self.motions, "release_opening"):
             # the staged release (Motions.gripper): first stage = pinch / 2 + margin, capped by the sampler's release sweep
             stage = self.release_stage_opening(action)

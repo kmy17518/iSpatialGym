@@ -91,7 +91,16 @@
    "witness_residual_pre_m": 0.015,
    "_brace_search_note": "owner 2026-09-19 14:55 (attachment lid / teapot): brace_search false = the one-arm sequence 'pick up the lid with the right arm -> move to the place stance -> place the lid on the teapot opening' (no partner brace, no two-arm search; a recorded place stance only when the grasp stance does not reach the attach pose); witness_residual_pre_m 15 mm = the 0917-010834 program-check failures were pre_grasp witnesses 12-17 mm short at joint 2's limit, which the oracle's approach finish closes (as the touching aliases)",
    "grasp_height_extra_m": 0.008,
-   "_grasp_height_note": "owner 2026-09-19 16:49 (safety margin test): the knob pinch raised by up to 8 mm (clipped so the pad end stays 5 mm below the knob top) so the fingertips clear the lid dome at closure"
+   "_grasp_height_note": "owner 2026-09-19 16:49 (safety margin test): the knob pinch raised by up to 8 mm (clipped so the pad end stays 5 mm below the knob top) so the fingertips clear the lid dome at closure",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
   },
   "constraints": []
  }

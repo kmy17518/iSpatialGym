@@ -1056,6 +1056,64 @@ def _reaim_for_inhand_pose(action: Place, motions: Motions, state, targets: Dict
     return out
 
 
+@dataclass
+class AttachCorrection:
+    """The attach correction regime (owner 2026-09-20 23:39, attachment only): read from the sidecar's ``attach_correction``
+    (the sampler copies ``generation.attach_correction`` of the alias), else from the customs entry of the sidecar's alias
+    (a demo-only re-run of an older instance), else these defaults = the behaviour before the knob (two passes at
+    ``attach_correct_min_m``). Each pass: settle -> re-measure the male / female offset modulo the symmetry -> lift /
+    lateral / descend leg at ``soft_pos_tol_m`` -> settle; the loop stops when the residual is within the targets, the
+    improvement falls below ``stop_when_improvement_below_m`` or the passes are exhausted."""
+
+    soft_pos_tol_m: float = 0.003
+    settle_steps: int = 20
+    max_passes: int = 2
+    stop_when_improvement_below_m: float = 0.0
+    target_pos_m: float = 0.003
+    target_rot_rad: float = 0.03
+    source: str = "defaults"
+
+    def as_note(self) -> Dict[str, Any]:
+        return {"soft_pos_tol_m": self.soft_pos_tol_m, "settle_steps": self.settle_steps, "max_passes": self.max_passes,
+                "stop_when_improvement_below_m": self.stop_when_improvement_below_m, "target_pos_m": self.target_pos_m,
+                "target_rot_rad": self.target_rot_rad, "source": self.source}
+
+
+def attach_correction_regime(ctx: Dict[str, Any], cfg: ExecuteConfig) -> AttachCorrection:
+    """See :class:`AttachCorrection`."""
+    reg = AttachCorrection(soft_pos_tol_m=cfg.attach_correct_min_m, settle_steps=cfg.attach_settle_steps, target_pos_m=cfg.attach_correct_min_m,
+                           target_rot_rad=cfg.attach_correct_min_rad)
+    sidecar = ctx.get("sidecar")
+    d = (getattr(sidecar, "extra", None) or {}).get("attach_correction") if sidecar is not None else None
+    source = "sidecar"
+    if not isinstance(d, dict) or not d:
+        d, source = None, "defaults"
+        alias = getattr(sidecar, "alias", None) if sidecar is not None else None
+        if alias:
+            try:
+                import json
+
+                from ispatialgym.sampling.customs import DEFAULT_CUSTOMS_PATH
+
+                # a plain read (not the schema-validating Customs.load: an unrelated entry mid-edit must not cost the regime)
+                with open(DEFAULT_CUSTOMS_PATH) as f:
+                    entry = json.load(f).get(alias) or {}
+                g = entry.get("generation") or {}
+                if isinstance(g.get("attach_correction"), dict) and g["attach_correction"]:
+                    d, source = g["attach_correction"], f"customs[{alias}]"
+            except Exception as e:  # noqa: BLE001 - the customs are optional here
+                log.warning("attach correction: customs lookup for %s failed (%s); defaults", alias, e)
+    if d:
+        for k in ("soft_pos_tol_m", "stop_when_improvement_below_m", "target_pos_m", "target_rot_rad"):
+            if k in d:
+                setattr(reg, k, float(d[k]))
+        for k in ("settle_steps", "max_passes"):
+            if k in d:
+                setattr(reg, k, int(d[k]))
+    reg.source = source
+    return reg
+
+
 def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th.Tensor]:
     """The BEHAVIOR attachment at the place pose (2026-09-19; attachment lid / teapot 0916-205838: the hand reached the
     recorded attach pose within a millimetre, opened, and the lid fell through the collision-filtered teapot onto the
@@ -1080,37 +1138,58 @@ def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th
         return
     log.info("place(%s): attach offset %.1f mm / %.1f deg modulo the part's symmetry (raw %.1f deg; male %s -> female %s of %s)", action.object, off["pos_m"] * 1000,
              math.degrees(off["rot_rad"]), math.degrees(off.get("rot_raw_rad", off["rot_rad"])), off["male_link"], off["female_link"], action.on)
-    # closed-loop correction passes (at most two): the hand moves by the transform carrying the (equivalent) male frame onto the
-    # female one until the residual is within attach_correct_min_* (owner 2026-09-20 20:41: <= 3 mm / 0.05 rad after the
-    # correction); a residual above attach_snap_max_* after both passes does NOT attach. The joint itself is created at the
-    # current relative pose (predicates.attach_in_place), so whatever residual remains is a physical misalignment, never a snap
+    # closed-loop correction passes under the task's regime (owner 2026-09-20 23:39, attachment only; AttachCorrection): each
+    # pass moves the hand by the transform carrying the (equivalent) male frame onto the female one, until the residual is
+    # within the regime's targets, the improvement falls below its floor or the passes are exhausted; a residual above
+    # attach_snap_max_* after that does NOT attach. The joint itself is created at the current relative pose
+    # (predicates.attach_in_place), so whatever residual remains is a physical misalignment, never a snap
+    reg = attach_correction_regime(ctx, cfg)
+    rec["regime"] = reg.as_note()
     passes: List[Dict[str, Any]] = []
-    for k in range(2):
-        need = off["pos_m"] > cfg.attach_correct_min_m or off["rot_rad"] > cfg.attach_correct_min_rad
+    partner0 = None
+    try:
+        partner0 = tuple(x.float().clone() for x in as_world_pose(state.object_pose(action.on)))
+    except Exception:  # noqa: BLE001
+        pass
+    for k in range(max(0, int(reg.max_passes))):
+        need = off["pos_m"] > reg.target_pos_m or off["rot_rad"] > reg.target_rot_rad
         if not need or off["pos_m"] > cfg.attach_correct_max_m:
             break
         p, q = state.eef_pose(arm)
         target = C.compose(off["fix"], (p.float(), q.float()))
         # lift -> lateral / rotational move at height -> descend: the part is clear of the partner while it moves sideways
         # (0920-213721: a straight down-and-sideways leg caught the tilted rim on the neck and pushed the bottle); the leg's
-        # tolerance is the correction's own (the free-space 1 cm left cork 0920-212757 at 7.8 mm after two passes)
+        # tolerance is the regime's (the free-space 1 cm left cork 0920-212757 at 7.8 mm after two passes)
         top = max(float(p[2]), float(target[0][2])) + cfg.attach_correct_lift_m
         via1 = (th.tensor([float(p[0]), float(p[1]), top]), q.float())
         via2 = (th.tensor([float(target[0][0]), float(target[0][1]), top]), target[1])
         try:
-            yield from motions.arm_along(arm, [via1, via2, target], soft_pos_tol=cfg.attach_correct_min_m)
-            yield from motions.settle(max_steps=cfg.attach_settle_steps)
+            yield from motions.arm_along(arm, [via1, via2, target], soft_pos_tol=reg.soft_pos_tol_m)
+            yield from motions.settle(max_steps=reg.settle_steps)
         except SkillError as e:
             log.warning("place(%s): attach correction pass %d did not complete (%s)", action.object, k + 1, e.message)
             rec["correction_error"] = e.message
         off2 = getter(action.object, action.on)
         if off2 is None:
             break
-        passes.append({k2: v for k2, v in off2.items() if k2 != "fix"})
-        log.info("place(%s): after correction pass %d: %.1f mm / %.1f deg", action.object, k + 1, off2["pos_m"] * 1000, math.degrees(off2["rot_rad"]))
+        improvement = float(off["pos_m"]) - float(off2["pos_m"])
+        passes.append({**{k2: v for k2, v in off2.items() if k2 != "fix"}, "improvement_m": round(improvement, 5)})
+        log.info("place(%s): after correction pass %d: %.1f mm / %.1f deg (improvement %.1f mm)", action.object, k + 1, off2["pos_m"] * 1000,
+                 math.degrees(off2["rot_rad"]), improvement * 1000)
         off = off2
+        if improvement < reg.stop_when_improvement_below_m and (off["pos_m"] > reg.target_pos_m or off["rot_rad"] > reg.target_rot_rad):
+            rec["stopped"] = f"pass {k + 1} improved the residual by {improvement * 1000:.2f} mm < {reg.stop_when_improvement_below_m * 1000:.2f} mm"
+            log.info("place(%s): correction stopped: %s", action.object, rec["stopped"])
+            break
     rec["offset_after_correction"] = passes[-1] if passes else None
     rec["correction_passes"] = len(passes)
+    rec["passes"] = passes
+    if partner0 is not None:
+        try:
+            p1, q1 = (x.float() for x in as_world_pose(state.object_pose(action.on)))
+            rec["partner_moved_during_correction"] = {"pos_m": round(float(th.linalg.norm(p1 - partner0[0])), 5), "rot_rad": round(float(C.quat_angle(q1, partner0[1])), 5)}
+        except Exception:  # noqa: BLE001
+            pass
     if off["pos_m"] > cfg.attach_snap_max_m or off["rot_rad"] > cfg.attach_snap_max_rad:
         # the part would sit visibly off its seat (0920-164504: 17 mm): leave it unattached, the postcondition fails and the executor's
         # retry re-aims the place at the partner's live pose
