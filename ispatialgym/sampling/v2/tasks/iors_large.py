@@ -1769,7 +1769,7 @@ class IORSLarge(SamplerV2):
             depth = lambda k: (erank(k), -float(c_pool[k].translate), float(c_pool[k].tilt), -float(c_pool[k].extras.get("drop_ahead_m", 0.0)), lane(k))  # noqa: E731
             reach = lambda k: (erank(k), lane(k), abs(float(c_pool[k].extras.get("drop_ahead_m", 0.0)) - float(ahead_pref)), -float(c_pool[k].translate), float(c_pool[k].tilt))  # noqa: E731
             order = sorted(side, key=depth) + sorted(front, key=reach if ahead_pref is not None else depth)
-            n_try = max(12, len(side))
+            n_try = max(int(self.num("c_tries", 36)), len(side))  # the chain-first screen makes a C try cheap (a few IKs) until one has a chain
         else:
             order.sort(key=lambda k: int(c_pool[k].extras.get("edge_rank", 0)))  # ontop / place variants: nearest edge first, random within
         yaw_step = 2.0 * math.pi / max(1, len(self.yaws()))  # the screening grid (yaw buckets of the caches / the intersection)
@@ -1812,6 +1812,31 @@ class IORSLarge(SamplerV2):
                     errors.append(f"C: under clearance {cl:.2f} m at the goal cell < height + 0.17")
                     continue
             yaws = sorted({float(y) for y, _ in F_init})
+            d_yaw = 0.0 if str(self.gp.gen("carry_yaw", "relative")) == "world" else float(place.yaw - manip.yaw)
+            if push:
+                # chain FIRST (2026-09-20 19:20): the floor push's IK depends on where this C stands along the edge (0920-184335: 505 chains
+                # at 12 C candidates, every one unreachable, while 0920-143722 / 154503 pushed from other laterals of the same edge) and
+                # on the object's yaw through the blade's contact offset - so the chain is solved for the two yaws with the LARGEST
+                # contact offset (the toe-first yaws of a sandal: the blade goal nearest the base) before the 60 s F_goal screening,
+                # and a C without a chain there is skipped
+                d_push = th.as_tensor(place.extras["push_dir"], dtype=th.float32)
+                z_lo = self.push_height(30.0)[1] - self.floor_z
+                offs = {}
+                for y in yaws:
+                    o = self.contact_offset_along(G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), d_push, z_lo, z_lo + self.BLADE_SPAN_M)
+                    offs[y] = -1.0 if o is None else o
+                best = sorted(yaws, key=lambda y: -offs[y])[:2]
+                found = False
+                for y in best:
+                    ck = (int(kc), int(round(y / yaw_step)))
+                    if ck not in chain_cache:
+                        chain_cache[ck] = self._push_under_chain(push_st if push_st is not None else place, G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), cd, gc, place.extras["push_dir"])
+                    if chain_cache[ck] is not None:
+                        found = True
+                        break
+                if not found:
+                    errors.append(f"C (d {place.stand_off:.2f} λ {place.lateral:+.2f}): no push chain at the largest-offset yaws ({', '.join(f'{offs[y]:.2f}' for y in best)} m)")
+                    continue
             ignore_place = [partner] if self.relation == "ontop" else [self.obj("floor")]
             # the release pose: the goal cell (ontop / under by placement) or the drop cell outside the edge (push-under)
             release_xy = cd if push else gc
@@ -1821,7 +1846,6 @@ class IORSLarge(SamplerV2):
             # (``generation.carry_yaw = "world"`` restores the spec §5.6 wording "goal yaw = init world yaw", which holds
             # only when B and C share a base yaw - countertop-floor 0916-231451: F_init 3-21 / F_goal 0-5 / F empty on
             # every candidate). The goal orientation written to the TRO is the rotated one.
-            d_yaw = 0.0 if str(self.gp.gen("carry_yaw", "relative")) == "world" else float(place.yaw - manip.yaw)
             F_goal = self.ikc.feasible_sets([release_xy], [y + d_yaw for y in yaws], self.grasps,
                                             lambda xy, yaw: release_pose(xy, G.qmul(G.quat_from_yaw(yaw), self.rest)), place, "right", ignore_place).get(0, [])
             F_goal = [(y - d_yaw, g) for y, g in F_goal]
@@ -1843,8 +1867,8 @@ class IORSLarge(SamplerV2):
                 # the blade sits half an extent behind the object centre: the LONG axis along the push puts the blade goal ~7 cm
                 # closer to the base (sandal: 0.72 vs 0.78-0.80 m ahead - the chain solved only at the long-axis yaws, 0919-211642;
                 # every short-axis chain of 0920-052659 had no IK at its goal) - longest extent first, random within a bucket
-                d_push = th.as_tensor(place.extras["push_dir"], dtype=th.float32)
-                ext = {i: self.half_extent_along(G.qmul(G.quat_from_yaw(float(F[i][0]) + d_yaw), self.rest), d_push) for i in range(len(F))}
+                # (2026-09-20 19:20: ordered by the blade's CONTACT offset at its height band - a sandal toe-first before its strap)
+                ext = {i: offs.get(float(F[i][0]), -1.0) for i in range(len(F))}
                 draw_order.sort(key=lambda i: -round(ext[i], 2))
             for i in draw_order[:int(self.num("f_draws_max", 8))]:  # failed B pairs are cached and skipped, so 8 draws cost little
                 self._check_deadline(f"F draw at C candidate {i_c + 1} (exact IK at B / C{', push chain' if push else ''})")
