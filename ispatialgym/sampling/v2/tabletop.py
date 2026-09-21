@@ -1391,7 +1391,7 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
                                stand_offs: Sequence[float] = STAND_OFFS, translates: Sequence[float] = TRANSLATES, n_tilts: int = N_TILT_SAMPLES,
                                angle_classes_deg: Sequence[float] = ANGLE_CLASSES_DEG, margin: float = IN_FRAME_MARGIN, bands: Optional[RB.ReachBands] = None,
                                class1_when_deep_m: Optional[float] = None,
-                               top=None, erosion_extra: float = 0.02, focus_z: Optional[float] = None) -> List[Stance]:
+                               top=None, erosion_extra: float = 0.02, focus_z: Optional[float] = None, order: Optional[str] = None) -> List[Stance]:
     """§4.5: scan stand-off {0.35, 0.45, 0.55} x translate {0, …, 0.95} x tilt (0 → torso_joint3 limit, ``n_tilts`` samples)
     at the init edge and lateral; (1) whole-body collision check without objects; (2) band = the grid trunk with the
     same translate and nearest tilt, focus candidates = its cells inside the top eroded by ``target_half_extent`` +
@@ -1400,7 +1400,11 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
     source tray, the block region); ``focus_candidates(s, stance, cam, cells_world)`` overrides the focus cells (block
     regions: ``[(focus_xy, info), ...]``). Returns the survivors of the **best angle class**, each a ``Stance
     ("manipulation")`` copy with ``focus`` (x, y, z) set and ``extras`` ``axis_angle`` / ``angle_class`` / ``focus_info``;
-    the caller draws uniformly (§4.5 step 4) and checks the init → manipulation transition (step 5)."""
+    the caller draws uniformly (§4.5 step 4) and checks the init → manipulation transition (step 5). ``order="reach"``
+    (W2, owner 2026-09-20 22:15; opt-in through the task's ``generation`` so the valid small-scale demos keep their uniform
+    draw) returns the survivors sorted by the right arm's reach margin to their focus (stretched arm length minus the
+    shoulder -> focus distance, 5 cm buckets, deepest margin first): the tallest torso bowing forward (translate 0,
+    tilt -0.6: the grasp 0.88 m out) comes last."""
     top = _top(s, top)
     bands = bands or ensure_bands(s, top=top, edge=init.edge)
     fk = camera_fk(s)
@@ -1474,7 +1478,28 @@ def phase2_manipulation_stance(s, init: Stance, target_half_extent: float, *, ta
         if os.environ.get("ISG_PHASE2_DEBUG"):
             trunks = sorted({(round(float(c.stand_off or 0), 2), round(float(c.translate), 2), round(float(c.tilt), 2)) for c in out})
             log.info("phase 2: surviving (stand-off, translate, tilt): %s", trunks)
+    if order == "reach" and out:
+        out = sorted(out, key=lambda c: -min(round(reach_margin(s, c, c.focus) / 0.05) * 0.05, 0.30))
     return out
+
+
+def reach_margin(s, stance: Stance, point_world) -> float:
+    """Right arm's stretched length (kit FK, arm joints at zero; cached on the sampler) minus the shoulder -> ``point_world``
+    distance at the stance's URDF-clamped trunk (``conventions.torso_fk`` / ``torso_q`` with ``TORSO_JOINT_LIMITS``)."""
+    from ispatialgym.oracle import r1pro_model as M
+    from ispatialgym.sampling import geometry as G
+    if not hasattr(s, "_arm_len_right"):
+        q = s.kit.q_config(arms="untucked", translate=0.5, tilt=0.0)
+        q[s.kit.robot.arm_control_idx["right"]] = 0.0
+        fk = s.kit.fk(["torso_link4", M.EEF_LINK["right"]], q)
+        sh = G.compose(fk["torso_link4"], (th.as_tensor(C._SHOULDER_IN_TORSO4["right"], dtype=th.float32), G.IDENTITY_QUAT))[0]
+        s._arm_len_right = float(th.linalg.norm(fk[M.EEF_LINK["right"]][0] - sh))
+    sh_b = C.torso_fk(C.torso_q(float(stance.translate), float(stance.tilt), C.TORSO_JOINT_LIMITS))["right_shoulder"][0]
+    x, y, yaw = (float(v) for v in stance.base_pose2d)
+    cs, sn = math.cos(yaw), math.sin(yaw)
+    sh_w = th.tensor([x + cs * float(sh_b[0]) - sn * float(sh_b[1]), y + sn * float(sh_b[0]) + cs * float(sh_b[1]), float(s.kit.floor_z) + C.NOMINAL_BASE_Z + float(sh_b[2])])
+    p = th.as_tensor([float(v) for v in point_world], dtype=th.float32)
+    return s._arm_len_right - float(th.linalg.norm(p - sh_w))
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -1672,7 +1697,7 @@ def whole_body_check_at(s, stances: Sequence[Stance], objects: Dict[str, Pose], 
 
 def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose], brace_arm: str, brace_poses: Sequence[Pose], *,
                      ignore_work_last: Sequence[Any] = (), ignore_brace_last: Sequence[Any] = (), fingers: Optional[float] = None,
-                     brace_only_check: Optional[Tuple[Sequence[Any], float]] = None):
+                     brace_only_check: Optional[Tuple[Sequence[Any], float]] = None, ignore_while_locked: Optional[Sequence[Any]] = None):
     """§4.6 step 6: the working arm's poses first (exact IK), then the other arm's [pre-contact, contact] with the working
     arm locked at its solution, combined whole-body check of the final configuration. Same steps as
     ``IKChecker.exact_both_arms``, except that the combined check ignores the objects the two final poses touch
@@ -1687,7 +1712,14 @@ def brace_second_arm(s, stance: Stance, work_arm: str, work_poses: Sequence[Pose
     r1 = ikc.exact(list(work_poses), stance, work_arm, list(ignore_work_last), cache=False, fingers=fingers)
     if not r1.ok:
         return IK.IKResult(False, None, f"{work_arm}: {r1.reason}")
-    r2 = ikc.exact(list(brace_poses), stance, brace_arm, list(ignore_brace_last), q_seed=r1.q.clone(), cache=False, fingers=fingers)
+    # owner 2026-09-20 21:20: the working arm is locked at its CONTACT (touching the target) while the brace chain is solved - with
+    # the target in the world every configuration of the brace chain read "in collision" through the locked arm's own contact
+    # before the brace arm was even evaluated (carton close 0920-191145 / 204807: 'the arms are in each other's way'). The objects
+    # the locked arm touches (``ignore_while_locked``, default = the working pose's ignore set; a caller may pass just the touched
+    # link) leave the world for the whole brace chain; the final pose ignores ``ignore_brace_last`` on top, as before.
+    locked_ign = list(ignore_work_last) if ignore_while_locked is None else list(ignore_while_locked)
+    with ikc.ignoring(locked_ign):
+        r2 = ikc.exact(list(brace_poses), stance, brace_arm, [o for o in ignore_brace_last if all(o is not w for w in locked_ign)], q_seed=r1.q.clone(), cache=False, fingers=fingers)
     if not r2.ok:
         return IK.IKResult(False, None, f"{brace_arm} (brace): {r2.reason}")
     touched = list(ignore_work_last) + [o for o in ignore_brace_last if all(o is not w for w in ignore_work_last)]

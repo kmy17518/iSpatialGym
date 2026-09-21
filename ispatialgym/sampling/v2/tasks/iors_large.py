@@ -572,6 +572,26 @@ class IORSLarge(SamplerV2):
         proj = pts[sel][:, :2] @ d
         return float(-proj.min())
 
+    def reach_margin(self, stance: Stance, point_world) -> float:
+        """W2 (owner 2026-09-20 22:15): the right arm's stretched length minus the shoulder -> ``point_world`` distance at the
+        stance's trunk (shoulder through the shared torso FK, ``conventions.shoulder_position``; the stretched length
+        once through the kit's FK with the arm joints at zero). Positive = inside the envelope; the trunk that bows the
+        tallest torso forward (154503 / 154504: B at (0.0, -0.61), the grasp 0.88 m out, 250-365 steps) scores lowest."""
+        if not hasattr(self, "_arm_len_right"):
+            from ispatialgym.oracle import r1pro_model as M
+            q = self.kit.q_config(arms="untucked", translate=0.5, tilt=0.0)
+            q[self.kit.robot.arm_control_idx["right"]] = 0.0
+            fk = self.kit.fk(["torso_link4", M.EEF_LINK["right"]], q)
+            sh = G.compose(fk["torso_link4"], (th.as_tensor(C._SHOULDER_IN_TORSO4["right"], dtype=th.float32), G.IDENTITY_QUAT))[0]
+            self._arm_len_right = float(th.linalg.norm(fk[M.EEF_LINK["right"]][0] - sh))
+        # the URDF-clamped torso (a tilt past the torso_joint3 limit, e.g. (0.95, -1.2), is what the robot actually reaches)
+        sh_b = C.torso_fk(C.torso_q(float(stance.translate), float(stance.tilt), C.TORSO_JOINT_LIMITS))["right_shoulder"][0]
+        x, y, yaw = (float(v) for v in stance.base_pose2d)
+        c, s_ = math.cos(yaw), math.sin(yaw)
+        sh_w = th.tensor([x + c * float(sh_b[0]) - s_ * float(sh_b[1]), y + s_ * float(sh_b[0]) + c * float(sh_b[1]), self.floor_z + C.NOMINAL_BASE_Z + float(sh_b[2])])
+        p = th.as_tensor([float(v) for v in point_world], dtype=th.float32)
+        return self._arm_len_right - float(th.linalg.norm(p - sh_w))
+
     def half_extent_along(self, quat, direction_xy) -> float:
         """Half extent of the target's footprint along a horizontal direction at orientation ``quat``."""
         pts = G.local_points_world(self.hull, (th.zeros(3), quat))[:, :2]
@@ -1729,10 +1749,23 @@ class IORSLarge(SamplerV2):
         min_off = float(self.num("push_min_contact_m", 0.10))
         idx_of = {id(t): i for i, t in enumerate(pre)}
         push_rank = (lambda t: 0 if pushable.get(idx_of[id(t)], 1.0) >= min_off else 1) if pushable else (lambda t: 0)  # noqa: E731
-        if str(self.gp.gen("b_prescreen_order", "compact")) == "compact":
-            def _ahead(m: Stance) -> float:
-                f = m.focus[:2] if m.focus is not None else m.base_xy
-                return float((th.as_tensor(f, dtype=th.float32) - m.base_xy) @ m.forward)
+
+        def _ahead(m: Stance) -> float:
+            f = m.focus[:2] if m.focus is not None else m.base_xy
+            return float((th.as_tensor(f, dtype=th.float32) - m.base_xy) @ m.forward)
+
+        def _margin(m: Stance) -> float:
+            f = m.focus if m.focus is not None else th.tensor([float(m.base_xy[0]), float(m.base_xy[1]), z_init])
+            return self.reach_margin(m, [float(f[0]), float(f[1]), z_init + 0.5 * float(self.place["height"])])
+        order_mode = str(self.gp.gen("b_trunk_order", self.gp.gen("b_prescreen_order", "reach")))
+        if order_mode == "reach":
+            # W2 (owner 2026-09-20 22:15): the B whose trunk leaves the most reach margin to the target first (5 cm buckets, capped at
+            # 0.30 m so a nearly-folded arm does not outrank a comfortable one), then a usable F_init, the compact grasp, the larger F_init
+            margins = {id(t): min(round(_margin(t[1]) / 0.05) * 0.05, 0.30) for t in pre}
+            pre.sort(key=lambda t: (push_rank(t), -margins[id(t)], 0 if t[0] >= min_f else 1, round(_ahead(t[1]), 1), -t[0]))
+            log.info("%s: pre-screen reach margins per B (trunk -> margin): %s", self.gp.alias,
+                     [(round(float(t[1].translate), 2), round(float(t[1].tilt), 2), round(_margin(t[1]), 3)) for t in pre])
+        elif order_mode == "compact":
             pre.sort(key=lambda t: (push_rank(t), 0 if t[0] >= min_f else 1, round(_ahead(t[1]), 1), -t[0]))
         else:
             pre.sort(key=lambda t: (push_rank(t), -t[0]))
