@@ -51,6 +51,12 @@ log = logging.getLogger("ispatialgym.sampling.reach_volume")
 #: trunk is 0.95. Tilts are additive on torso_joint3 (negative = forward / down).
 TRANSLATES = [0.0, 0.25, 0.5, 0.75, 0.95]
 TILTS = [0.0, -0.3, -0.6, -0.9]
+#: W1 (owner 2026-09-20 22:15): the GROUND half of the JoyLo curve (translate 1 -> 2: downward -> ground keyframe; tilt 0 - the
+#: curve's own torso_joint3 already runs -0.94 -> its limit -1.83 there). Reachable since the base_link <-> torso_link2 sphere
+#: pair is exempt (``r1pro_model.EXTRA_SELF_COLLISION_IGNORE_PAIRS``); probe 2026-09-21 on the floor blade (pitch 30, z 5.2 cm):
+#: (0.95, -1.2) reaches 0.40-0.70 m ahead, (1.75, 0) 0.40-0.80, (2.0, 0) 0.40-0.85; 1.25 / 1.5 at tilt 0 reach nothing (the
+#: shoulder still high and back). Added to the trunk grid of LOW tops (floor, low tables) only: ``reach_bands.trunk_grid``.
+GROUND_TRUNKS = [(1.75, 0.0), (2.0, 0.0)]
 LATTICE = 0.05
 X_RANGE = (0.25, 0.90)
 LAT_RANGE = (-0.70, 0.70)

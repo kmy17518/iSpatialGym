@@ -363,6 +363,59 @@ def test_block_design_flip_on_the_table_sub_chain():
         expand(sc.alias, Sidecar.from_dict(d2))
 
 
+def test_block_design_flip_in_place_then_move_and_per_block_stances():
+    """Owner 2026-09-19: (1) a ``table_flip`` record with ``in_hand_flip`` turns the block in hand BEFORE the set-down on its
+    own cell — grasp → lift → reorient → place(own cell) → retreat → grasp(re-grasp, its own tip clearance) → lift →
+    place(slot) → retreat; (2) a block whose record names another ``stance`` is preceded by the recorded travel from the
+    stance the robot stands at, with the working arm of that stance; (3) the recorded ``pre_place`` is used by the place."""
+    d = raw("configuration_matching-block_design")
+    flipping = [b for b in d["blocks"] if b["flip_sign"] != 0]
+    b = flipping[0]
+    b["tip_clearance_m"] = 0.007
+    b["table_flip"] = {
+        "cell": [0.55, -0.25], "in_hand_flip": True,
+        "place": {"position": [0.55, -0.25, 0.86], "orientation": [0.0, 0.7071, 0.0, 0.7071]},
+        "pre_place": {"position": [0.55, -0.25, 0.96], "orientation": [0.0, 0.7071, 0.0, 0.7071]},
+        "block_pose_after": {"position": [0.55, -0.25, 0.83], "orientation": [0.0, 0.0, 0.0, 1.0]},
+        "regrasp": {"face_pair": "y" if b["face_pair"] != "y" else "x", "tilt_pick_deg": 30.0, "yaw_deg": 5.0, "carry_height": 0.12, "tip_clearance_m": 0.001,
+                    "pick": {"position": [0.55, -0.25, 0.85], "orientation": [0.0, 0.7071, 0.0, 0.7071]}},
+    }
+    b["pre_place"] = {"position": [0.6, -0.2, 0.95], "orientation": [0.0, 0.7071, 0.0, 0.7071]}
+    # the last block works from a second stance 0.3 m along the edge, reached by a recorded path + transition
+    last = sorted(d["blocks"], key=lambda x: x["order"])[-1]
+    manip = d["stances"]["manipulation"]
+    st2 = dict(manip)
+    st2["base_pose2d"] = [manip["base_pose2d"][0], manip["base_pose2d"][1] + 0.3, manip["base_pose2d"][2]]
+    st2["arms"] = ["right"]
+    d["stances"]["manipulation_2"] = st2
+    last["stance"] = "manipulation_2"
+    d.setdefault("paths", []).append({"from": "manipulation", "to": "manipulation_2", "mode": "local", "waypoints": [list(manip["base_pose2d"]), list(st2["base_pose2d"])],
+                                      "length_m": 0.3, "posture": "untucked", "carried": None})
+    d.setdefault("transitions", []).append({"from": "manipulation", "to": "manipulation_2", "stand_off": float(manip.get("stand_off", 0.35)), "order": ["drive-back", "trunk", "drive-in"]})
+    sc = Sidecar.from_dict(d)
+    actions = expand(sc.alias, sc)
+    first = next(i for i, a in enumerate(actions) if a.name == "grasp" and a.objects[0] == b["instance"])
+    names = []
+    for a in actions[first:]:
+        if a.name in ("brace", "push") or (a.name == "grasp" and a.objects[0] != b["instance"]):
+            break
+        names.append(a.name)
+    assert names == ["grasp", "lift", "reorient", "place", "retreat", "grasp", "lift", "place", "retreat"]
+    grasps = [a for a in actions if a.name == "grasp" and a.object == b["instance"]]
+    assert grasps[0].block.extra["tip_clearance_m"] == 0.007 and grasps[1].block.extra["tip_clearance_m"] == 0.001
+    assert grasps[1].block.flip_sign == 0 and grasps[1].block.tilt_pick_deg == 30.0
+    reorient = [a for a in actions if a.name == "reorient" and a.object == b["instance"]][0]
+    assert reorient.mode == "flip" and reorient.block is grasps[0].block
+    places = [a for a in actions if a.name == "place" and a.object == b["instance"]]
+    assert places[0].place.position == [0.55, -0.25, 0.86] and "own cell" in places[0].relation
+    assert places[1].pre_place is not None and places[1].pre_place.position == [0.6, -0.2, 0.95]
+    # the travel to the second stance sits right before the last block's grasp
+    i_last = next(i for i, a in enumerate(actions) if a.name == "grasp" and a.objects[0] == last["instance"])
+    travel = [a.name for a in actions[:i_last] if a.name in ("navigate", "transition")]
+    assert travel[-2:] == ["navigate", "transition"] and actions[i_last - 1].name == "transition" and actions[i_last - 1].transition.to == "manipulation_2"
+    assert actions[i_last].arm == "right"
+
+
 def test_articulation_program_details():
     sc = load("configuration_matching-articulation_open_large_scale")
     follow = [a for a in expand(sc.alias, sc) if a.name == "base_follow"][0]
@@ -495,7 +548,7 @@ def test_direction_words():
 
 def _check_value(key, value, where):
     if value is None:
-        assert key in ("base_poses", "carried", "follow_path"), where  # follow_path: hybrid base-follow only
+        assert key in ("base_poses", "carried", "follow_path", "follow_segments"), where  # follow_path / follow_segments: hybrid base-follow only
         return
     if key == "follow_path":
         assert isinstance(value, list) and len(value) >= 2 and all(len(p["base_pose2d"]) == 3 and len(p["arm_q"]) == 7 for p in value), where
@@ -1184,7 +1237,7 @@ def test_attachment_without_a_brace_record_is_a_one_arm_attach():
         ("disembedding", lambda d: d.update(tro_sha256="abc"), "tro_sha256"),
         ("disembedding", lambda d: d["stances"].pop("placement"), "required block 'stances.placement'"),
         ("disembedding", lambda d: d.update(grasps=[]), "required block 'grasps'"),
-        ("disembedding", lambda d: d["stances"]["init"].update(translate=1.3), "translate"),
+        ("disembedding", lambda d: d["stances"]["init"].update(translate=2.3), "translate"),  # the JoyLo range is [0, 2] (ground half, W1 2026-09-20)
         ("disembedding", lambda d: d["transitions"][0].update(order=["trunk", "drive-in"]), "order"),
         ("disembedding", lambda d: d["paths"][0].update(to="nowhere"), "nowhere"),
         ("disembedding", lambda d: d["paths"][0].update(mode="teleport"), "mode"),

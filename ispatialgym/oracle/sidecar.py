@@ -694,17 +694,26 @@ class Articulation:
         """The waypoints the oracle drives through: every k > 0 up to and including ``passive_from`` (or all when
         ``passive_from`` is ``None``), in order (spec §5.3 "up to passive_from or q_goal")."""
         out = []
-        # rush 2026-09-17 (branch rush-20260917-2100): ISG_FOLLOW_IGNORE_PASSIVE=1 drives through every waypoint to q_goal -
-        # the dishwasher record's passive_from 0.75 assumed the door swings on by itself, the asset's joint friction held it
-        # at 0.25 rad (0917-212441: layout_reached false, error 0.098 > 0.05)
-        ignore_passive = os.environ.get("ISG_FOLLOW_IGNORE_PASSIVE", "0") == "1"
+        # ``passive_from`` is trusted again since the sampler's probe requires a real swing-on (articulation_large
+        # ``passive_reaches``, 2026-09-18): the 0917 dishwasher record's 0.75 passed a 0.10 rad probe band wider than the
+        # waypoint spacing with the door not moving (rush workaround ISG_FOLLOW_IGNORE_PASSIVE, removed) - records sampled
+        # before that fix carry a vacuous value and must be re-sampled
+        stop = self.follow_to
         for f, key in self.fractions():
             if f <= 0.0:
                 continue
-            if self.passive_from is not None and not ignore_passive and f > self.passive_from + 1e-9:
+            if stop is not None and f > stop + 1e-9:
                 break
             out.append((f, key))
         return out
+
+    @property
+    def follow_to(self) -> Optional[float]:
+        """The last fraction the arm follows the handle to: ``passive_from``, or ``articulation.follow_to`` (small
+        articulation stage 2, 2026-09-18: the hand lets go where its reach ends and a fist push on the lid takes the joint
+        on to q_goal), the smaller when both are recorded; ``None`` = all the way to q_goal."""
+        vals = [v for v in (self.passive_from, (self.extra or {}).get("follow_to")) if v is not None]
+        return min(float(v) for v in vals) if vals else None
 
 
 @dataclass
@@ -1181,8 +1190,8 @@ class Sidecar:
         stance_names = set(self.stances)
         for name, st in self.stances.items():
             w = f"stances[{name!r}]"
-            if not 0.0 <= st.translate <= 1.0:
-                out.append(f"{w}.translate: {st.translate} outside [0, 1]")
+            if not 0.0 <= st.translate <= 2.0:  # the JoyLo curve upright (0) -> downward (1) -> ground (2): r1pro_model.TRUNK_TRANSLATE_RANGE (W1 2026-09-20)
+                out.append(f"{w}.translate: {st.translate} outside [0, 2]")
             if isinstance(st.arms, str) and st.arms != "untucked":
                 out.append(f"{w}.arms: string must be 'untucked', got {st.arms!r}")
             for a in st.working_arms:
@@ -1246,8 +1255,8 @@ class Sidecar:
             out.extend(_block_problems(self.blocks))
 
         if self.goal is not None:
-            if not 0.0 <= self.goal.translate <= 1.0:
-                out.append(f"goal.translate: {self.goal.translate} outside [0, 1]")
+            if not 0.0 <= self.goal.translate <= 2.0:
+                out.append(f"goal.translate: {self.goal.translate} outside [0, 2]")
             if self.goal.arms not in GOAL_ARMS:
                 out.append(f"goal.arms: expected one of {GOAL_ARMS}, got {self.goal.arms!r}")
 

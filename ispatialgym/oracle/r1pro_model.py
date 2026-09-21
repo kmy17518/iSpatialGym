@@ -468,6 +468,12 @@ def generate_holonomic_urdf(
 #:   (torso_link4 - arm_link1 - arm_link2), exempt as cuRobo's stock configs exempt them; the chest sphere
 #:   (``torso_link4`` r 15 cm) and the base still check against the upper arm.
 EXTRA_SELF_COLLISION_IGNORE_PAIRS = (
+    # W1 (owner 2026-09-20 22:15; pod probe x0l0zrorcpakz1 2026-09-21): along the JoyLo keyframe curve the padded spheres of
+    # base_link and torso_link2 overlap from translate 1.0 on (2 mm at 1.0, 20 mm at 1.5, 37 mm at the GROUND keyframe 2.0)
+    # while the links' collision MESHES never touch (clearance 5.6 cm at 1.0, 3.5 cm at 1.5, 1.5 cm at 2.0; the simulator
+    # reports no contact) - torso_link2's pose relative to the base is a function of translate alone, so the pair is exempt
+    # and the "ground half" of the curve (translate 1 -> 2, shoulders 8 cm lower, floor reach 0.40-0.85 m) becomes usable
+    ("base_link", "torso_link2"),
     ("{arm}_arm_link1", "{arm}_arm_link3"),
     ("torso_link4", "{arm}_arm_link2"),
     ("attached_object_{arm}_eef_link", "{arm}_gripper_link"),

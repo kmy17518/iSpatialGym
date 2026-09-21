@@ -93,8 +93,10 @@ PUSH_UNDER_DROP_HEIGHT_M = 0.10     # object bottom above the floor at the relea
 PUSH_UNDER_STAND_OFFS = (0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8)  # base stand-off from the edge: the drop cell 0.25–0.6 m ahead (B3: the floor is reachable 0.24–0.64 m ahead)
 PUSH_UNDER_DROP_AHEAD_M = (0.25, 0.60)
 PUSH_UNDER_CLEARANCE_M = 0.005      # blade clearance to the target's back face at the push start
-#: trunks that reach the floor (B3 floor bands, A6 recompute: cells only at translate ≥ 0.75, tilt ≤ −0.9)
-FLOOR_TRUNKS = ((0.75, -0.9), (0.75, -1.2), (0.95, -0.9), (0.95, -1.2))
+#: trunks that reach the floor (B3 floor bands, A6 recompute: cells only at translate ≥ 0.75, tilt ≤ −0.9) + the ground half of the
+#: JoyLo curve (W1, owner 2026-09-20 22:15: (2.0, 0) puts the shoulder 8 cm lower than (0.95, -1.2) and reaches the floor blade
+#: 0.40-0.85 m ahead instead of 0.40-0.70; ``eef_reach_volume.GROUND_TRUNKS``)
+FLOOR_TRUNKS = ((0.75, -0.9), (0.75, -1.2), (0.95, -0.9), (0.95, -1.2)) + tuple(tuple(t) for t in RB.GROUND_TRUNKS)
 #: per-attempt time budget (owner 2026‑09‑16 22:55 item 4; as attachment's 094cfe3): run 0916‑190702 spent > 2 h in one push-under
 #: attempt (6 B candidates × up to 56 C candidates × the F_goal feasible sets) and hit the 7200 s run timeout with nothing
 #: written and no rejection recorded — the attempt now stops with ``Reject("time_budget")`` naming the stage it reached
@@ -777,7 +779,7 @@ class IORSLarge(SamplerV2):
             self.world.restore(parked)
             self.kit.sync_world()
         meta = {"scene": self.world.scene_model, "rooms": list(self.world.rooms or []), "support": "floor" if kind == "floor" else support_obj.name, "lattice": bc.lattice,
-                "stand_off": RB.STAND_OFF, "arms": "untucked", "grid": {"translates": RB.TRANSLATES, "tilts": RB.TILTS, "low_top_tilt": RB.LOW_TOP_TILT}, "seeds": 12,
+                "stand_off": RB.STAND_OFF, "arms": "untucked", "grid": RB.grid_meta((z - self.floor_z) < RB.LOW_TOP_Z), "seeds": 12,
                 "pre_grasp": RB.PRE_GRASP, "yaws": RB.YAWS, "mode": "floor" if kind == "floor" else "tabletop", "scale": c.scale, "placed_specs": [],
                 "object": f"{c.category}/{c.model}", "grasp_key": self.grasp_key, "n_grasps": len(self.grasps), "grasp_names": [g.name for g in self.grasps],
                 "rest_quat_xyzw": self.rest.tolist(), "generic_pinch": False, "stance": stance, "top": top_json, "z_support": z,

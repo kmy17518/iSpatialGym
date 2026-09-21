@@ -70,7 +70,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import torch as th
 
-from ispatialgym.sampling.eef_reach_volume import TILTS, TRANSLATES
+from ispatialgym.sampling.eef_reach_volume import GROUND_TRUNKS, TILTS, TRANSLATES
 
 log = logging.getLogger("ispatialgym.sampling.reach_bands")
 
@@ -152,8 +152,20 @@ def _key(d: Dict[str, Any]) -> str:
 
 
 def trunk_grid(top_z_above_floor: float) -> List[Tuple[float, float]]:
-    tilts = list(TILTS) + ([LOW_TOP_TILT] if top_z_above_floor < LOW_TOP_Z else [])
-    return [(tr, ti) for tr in TRANSLATES for ti in tilts]
+    """The band's trunk grid: ``TRANSLATES x TILTS``; a LOW top (< ``LOW_TOP_Z``: the floor, low tables) adds the deep tilt
+    ``LOW_TOP_TILT`` and the ground half of the JoyLo curve (``GROUND_TRUNKS``, W1 2026-09-20)."""
+    low = top_z_above_floor < LOW_TOP_Z
+    tilts = list(TILTS) + ([LOW_TOP_TILT] if low else [])
+    return [(tr, ti) for tr in TRANSLATES for ti in tilts] + ([tuple(t) for t in GROUND_TRUNKS] if low else [])
+
+
+def grid_meta(low_top: bool) -> Dict[str, Any]:
+    """``meta["grid"]`` of a band (part of its cache key): the ground trunks appear for low tops only, so the tabletop bands
+    keep their keys and the floor bands get new ones (the sampler prefers the band with the most trunks)."""
+    g: Dict[str, Any] = {"translates": TRANSLATES, "tilts": TILTS, "low_top_tilt": LOW_TOP_TILT}
+    if low_top:
+        g["ground"] = [list(t) for t in GROUND_TRUNKS]
+    return g
 
 
 def trunk_key(translate: float, tilt: float) -> str:
@@ -1480,7 +1492,7 @@ def main(argv=None):
     meta: Dict[str, Any] = {"scene": args.scene, "rooms": rooms, "support": args.support, "removed_chairs": removed, "lattice": lattice,
                             "stand_off": args.stand_off, "arms": "untucked (ready / tucked per trunk when untucked collides, see trunks[].posture)",
                             "postures": list(bc.postures), "arm": band_arm, "fingers": bc.fingers,
-                            "grid": {"translates": TRANSLATES, "tilts": TILTS, "low_top_tilt": LOW_TOP_TILT},
+                            "grid": grid_meta(bool(floor_mode)),  # a low TABLE top is re-keyed below once its height is known
                             "seeds": 12, "pre_grasp": PRE_GRASP, "yaws": YAWS, "mode": "brace" if args.brace else ("floor" if floor_mode else "tabletop"),
                             "smoke": bool(args.smoke), "scale": scale, "placed_specs": [PlacedSpec.parse(s).canonical() for s in args.placed],
                             "schedule": {"chunk": BandComputer.CHUNK, "ik_batch": BandComputer.IK_BATCH, "max_rounds_without_pre": BandComputer.MAX_ROUNDS_WITHOUT_PRE, "coarse": BandComputer.COARSE,
@@ -1706,6 +1718,7 @@ def main(argv=None):
                          "handle_arm": handle_arm, "brace_arm": brace_arm, "handle": hdata["handle"]})
             base_cells, world_cells = bc.lattice_on_cells(stance, lattice_world)
             trunks = trunk_sel or (SMOKE_TRUNKS if args.smoke else trunk_grid(z_support - world.floor_z))
+            meta["grid"] = grid_meta((z_support - world.floor_z) < LOW_TOP_Z)  # the ground trunks are part of a LOW top's key (W1)
             per_trunk = []
             cells_out: Dict[Tuple[float, float], np.ndarray] = {}
             bc.scope = ObstacleScope(kit, world, (x0, y0), drop_ground=(z_support - world.floor_z) >= 0.55).__enter__()
@@ -1848,6 +1861,7 @@ def main(argv=None):
             restore_placed()
             kit.sync_world()
             trunks = trunk_sel or (SMOKE_TRUNKS if args.smoke else trunk_grid(z_support - world.floor_z))
+            meta["grid"] = grid_meta((z_support - world.floor_z) < LOW_TOP_Z)  # the ground trunks are part of a LOW top's key (W1)
             result = bc.compute(stance, lattice_world, z_eval, pose_fn, grasps if not (args.generic_pinch or args.generic_contact) else None, ignore_grasp,
                                 arm=band_arm, trunks=trunks, max_grasp_offset=max_off)
             gset = [(g.key, g.name, g.position.tolist(), g.quat.tolist()) for g in grasps] if grasps else ("contact:" + ",".join(CONTACT_CLASSES_NAMES) if args.generic_contact else "generic:" + ",".join(GENERIC_CLASSES))
