@@ -2121,7 +2121,7 @@ class IORSLarge(SamplerV2):
                             log.info("%s: carry with lift %.2f m at the %s%s", self.gp.alias, h, label, f" (after: {'; '.join(carry_errors)})" if carry_errors else "")
                             break
                         except Reject as e:
-                            carry_errors.append(f"lift {h:.2f} m, {label}: {e.reason}: {str(e)[:160]}")
+                            carry_errors.append(f"lift {h:.2f} m, {label}: {e.reason}: {str(e)[:700]}")
                             self._drop_leg_records("placement")
                             self.record_carry_arm_q(tname, "right", None)
                     if path_bc is not None:
