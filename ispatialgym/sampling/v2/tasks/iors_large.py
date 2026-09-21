@@ -1677,26 +1677,65 @@ class IORSLarge(SamplerV2):
         # candidates and the coupling starts from the B with the most (yaw, grasp) pairs
         n_pre = int(self.num("b_prescreen", 8))
         pre: List[Tuple[int, Stance, List[Any]]] = []
-        for i_b in range(min(n_pre, len(b_pool))):
-            self._check_deadline(f"F_init pre-screen of B candidate {i_b + 1} of {min(n_pre, len(b_pool))}")
-            kb = int(rng.integers(len(b_pool)))
-            b_grid = b_pool.pop(kb)
-            manip = b_grid.with_trunk(b_grid.translate, b_grid.tilt, "manipulation")
-            manip.focus, manip.arms = b_grid.focus, ["right"]
-            fxy = focus_xy if focus_xy is not None else manip.focus[:2]
-            F_b = self.ikc.feasible_sets([fxy], yaws, self.grasps, lambda xy, yaw: self.pose_on(xy, yaw, z_init), manip, "right", self.grasp_ignore_objects()).get(0, [])
-            pre.append((len(F_b), manip, F_b))
+
+        def _screen(n: int) -> None:
+            for i_b in range(min(n, len(b_pool))):
+                self._check_deadline(f"F_init pre-screen of B candidate {len(pre) + 1}")
+                kb = int(rng.integers(len(b_pool)))
+                b_grid = b_pool.pop(kb)
+                manip = b_grid.with_trunk(b_grid.translate, b_grid.tilt, "manipulation")
+                manip.focus, manip.arms = b_grid.focus, ["right"]
+                fxy = focus_xy if focus_xy is not None else manip.focus[:2]
+                F_b = self.ikc.feasible_sets([fxy], yaws, self.grasps, lambda xy, yaw: self.pose_on(xy, yaw, z_init), manip, "right", self.grasp_ignore_objects()).get(0, [])
+                pre.append((len(F_b), manip, F_b))
+        _screen(n_pre)
         # order: a COMPACT grasp first (the target cell's distance ahead of the base, 10 cm buckets) among the B candidates whose F_init
         # has at least ``b_prescreen_min_f`` pairs, then the larger F_init - a grasp 0.85 m out over the table (0920-100542/3) leaves an
         # extended arm that neither lifts higher nor rounds the table corner while carrying; ``b_prescreen_order = "f"`` restores F-only
         min_f = int(self.num("b_prescreen_min_f", 8))
+        # push-under (2026-09-20 19:50): the object keeps its yaw relative to the robot from B to C, so which face the floor blade meets at
+        # C is decided by the init yaw graspable at B - a B whose F_init has no yaw with a large blade contact offset at C (a sandal
+        # toe-first: 0.11 m; its strap: 0.03 m, the blade goal then 0.85 m ahead and out of reach, 0920-192539/40) is tried last
+        pushable: Dict[int, float] = {}
+        if self.push_under and pre:
+            try:
+                pool0 = self.placement_candidates(pre[0][1].focus[:2] if pre[0][1].focus is not None else self.surface["c_t"])
+            except Reject:
+                pool0 = []
+            faces = {(round(float(c.yaw), 2), tuple(round(float(v), 3) for v in c.extras["push_dir"])) for c in pool0 if c.extras.get("push_dir") is not None}
+            z_lo = self.push_height(30.0)[1] - self.floor_z
+            min_off_ = float(self.num("push_min_contact_m", 0.10))
+
+            def _offsets() -> None:
+                for idx, (_, m, F_b) in enumerate(pre):
+                    if idx in pushable:
+                        continue
+                    best = -1.0
+                    for c_yaw, pd in faces:
+                        d_yaw = 0.0 if str(self.gp.gen("carry_yaw", "relative")) == "world" else float(c_yaw - m.yaw)
+                        for y in sorted({float(yy) for yy, _ in F_b}):
+                            o = self.contact_offset_along(G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), th.as_tensor(pd), z_lo, z_lo + self.BLADE_SPAN_M)
+                            if o is not None:
+                                best = max(best, o)
+                    pushable[idx] = best
+            _offsets()
+            # no pushable B among the first batch: screen more (up to ``b_prescreen_batches`` batches) before coupling blind
+            for _ in range(int(self.num("b_prescreen_batches", 3)) - 1):
+                if max(pushable.values(), default=-1.0) >= min_off_ or not b_pool:
+                    break
+                _screen(n_pre)
+                _offsets()
+            log.info("%s: pre-screen blade contact offsets at C per B: %s", self.gp.alias, [round(pushable[i], 3) for i in range(len(pre))])
+        min_off = float(self.num("push_min_contact_m", 0.10))
+        idx_of = {id(t): i for i, t in enumerate(pre)}
+        push_rank = (lambda t: 0 if pushable.get(idx_of[id(t)], 1.0) >= min_off else 1) if pushable else (lambda t: 0)  # noqa: E731
         if str(self.gp.gen("b_prescreen_order", "compact")) == "compact":
             def _ahead(m: Stance) -> float:
                 f = m.focus[:2] if m.focus is not None else m.base_xy
                 return float((th.as_tensor(f, dtype=th.float32) - m.base_xy) @ m.forward)
-            pre.sort(key=lambda t: (0 if t[0] >= min_f else 1, round(_ahead(t[1]), 1), -t[0]))
+            pre.sort(key=lambda t: (push_rank(t), 0 if t[0] >= min_f else 1, round(_ahead(t[1]), 1), -t[0]))
         else:
-            pre.sort(key=lambda t: -t[0])
+            pre.sort(key=lambda t: (push_rank(t), -t[0]))
         self.template_facts.setdefault("F_init_prescreen", []).append([n for n, _, _ in pre])
         log.info("%s: F_init pre-screen over %d B candidates (%d yaws): %s", self.gp.alias, len(pre), len(yaws), [n for n, _, _ in pre])
         n_couple = int(self.num("b_candidates_max", 6))
