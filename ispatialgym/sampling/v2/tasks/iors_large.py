@@ -1873,6 +1873,8 @@ class IORSLarge(SamplerV2):
         chain_cache: Dict[Tuple[int, int], Optional[Dict[str, Any]]] = {}  # (C index, yaw bucket) -> push chain (push-under: the chain depends on the yaw only)
         b_ik_cache: Dict[Tuple[int, str], Optional[Tuple[float, G.Pose, G.Pose, G.Pose]]] = {}  # (yaw bucket, grasp) -> (yaw, target pose, grasp eef, pre-grasp) at B, None = infeasible
         errors = []
+        carry_margin = float(self.gp.gen("carry_collision_margin_m", 0.04))
+        carry_failed_bases: set = set()  # base poses whose carry leg failed: the trunk variants at the same pose fail the same way
         for i_c, kc in enumerate(order[:n_try]):
             self._check_deadline(f"C candidate {i_c + 1} of {min(n_try, len(order))} (F_goal feasible set) at B ({manip.translate}, {manip.tilt:.2f})")
             place = c_pool[int(kc)].with_trunk(c_pool[int(kc)].translate, c_pool[int(kc)].tilt, "placement")
@@ -1880,6 +1882,29 @@ class IORSLarge(SamplerV2):
             place.extras = dict(c_pool[int(kc)].extras)
             gc = place.extras["goal_cell"]
             push = self.push_under
+            base_key = tuple(round(float(v), 3) for v in place.base_pose2d)
+            if base_key in carry_failed_bases:
+                errors.append(f"C (d {place.stand_off or 0.0:.2f} λ {place.lateral:+.2f}): skipped - the carry leg failed at this base pose")
+                continue
+            # 2026-09-21 02:20: a C whose base pose has no room for the carried sweep's margin is skipped before the F_goal screening
+            # (the short end next to B stands 0.38 m from the walls: every arrival sweep failed there at 2.5 / 4 cm while the 1 cm
+            # stance checks pass, 0921-012344 / 014859 - 6 candidates x 3-4 min per B). Checked at the first travel trunk with the
+            # untucked arms: the wall proximity comes from the body, not the carried object.
+            if carry_margin > 0.011:
+                tt0 = self.travel_trunks(init, manip)[0] if self.travel_trunks(init, manip) else (0.25, 0.0)
+                probe = place.with_trunk(float(tt0[0]), float(tt0[1]), "placement")
+                with self._floor_relaxed():
+                    if not self.ikc.stance_collision_free(probe, margin=carry_margin):
+                        why_m = ""
+                        try:
+                            why_m = " - " + self.ikc._collision_blame(self.ikc.q_locked(probe), [self.obj("floor")], carry_margin)
+                        except Exception:  # noqa: BLE001
+                            pass
+                        errors.append(f"C (d {place.stand_off or 0.0:.2f} λ {place.lateral:+.2f}): no room for the carried sweep at margin {carry_margin:.3f}{why_m}")
+                        log.info("%s: C skipped (d %.2f λ %+.2f edge %s): the body has no room for the carried sweep's margin %.3f at the travel trunk%s", self.gp.alias,
+                                 place.stand_off or 0.0, place.lateral, place.extras.get("edge"), carry_margin, why_m)
+                        carry_failed_bases.add(base_key)
+                        continue
             cd = place.extras.get("drop_cell") if push else None
             # push-under = DROP FIRST, THEN CROUCH (owner 2026-09-20 08:30): the object cannot be carried into the deep push crouch
             # (the hand frozen at any carry pose sweeps into the partner / the floor / the base, and no compact carry pose keeps the
@@ -2130,6 +2155,7 @@ class IORSLarge(SamplerV2):
                     errors.append("C: carry leg: " + "; ".join(carry_errors[-3:]))
                     log.info("%s: C (d %.2f λ %+.2f) carry leg failed: %s", self.gp.alias, place.stand_off or 0.0, place.lateral, " || ".join(carry_errors)[:1200])
                     fails["B -> C path / transition"] = fails.get("B -> C path / transition", 0) + 1
+                    carry_failed_bases.add(base_key)
                     self.sidecar.stances.pop("placement", None)
                     self.sidecar.stances.pop("push", None)
                     self._drop_leg_records("push")
