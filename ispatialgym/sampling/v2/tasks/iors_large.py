@@ -1803,6 +1803,7 @@ class IORSLarge(SamplerV2):
                 self.sidecar.stances.pop("push", None)
                 self.sidecar.grasps.clear()
                 self.carry_arm_q.clear()
+                self.carry_end_q.clear()
         raise Reject("target_placement", "; ".join(errors[-3:]))
 
     def _couple(self, rng, init: Stance, manip: Stance, c_pool: List[Stance], F_init, focus_xy, z_init: float) -> Draft:
@@ -2049,8 +2050,11 @@ class IORSLarge(SamplerV2):
                     fails[f"C: [pre-place, {'drop' if push else 'place'}] exact IK (attached)"] = fails.get(f"C: [pre-place, {'drop' if push else 'place'}] exact IK (attached)", 0) + 1
                     continue
                 if q_lift_seed is not None and r2.q is not None:
+                    # a loose sanity bound only (2026-09-21 01:30): the branch the oracle reaches the pre-place in is decided by the straight
+                    # carry leg it tracks from the carry configuration - checked below by ``track_chain`` once the carry leg is recorded
+                    # (0921-005514/6/8: the 1.2 rad proxy against the LIFT configuration rejected 1-4 draws per C)
                     swing = float(th.max(th.abs(r2.q[self.kit.robot.arm_control_idx["right"]] - q_lift_seed)))
-                    if swing > float(self.num("place_branch_max_rad", 1.2)):
+                    if swing > float(self.num("place_branch_max_rad", 2.6)):
                         fails["C: place branch differs from the carry (joint swing)"] = fails.get("C: place branch differs from the carry (joint swing)", 0) + 1
                         continue
                 chain = None
@@ -2124,12 +2128,54 @@ class IORSLarge(SamplerV2):
                         break
                 if path_bc is None:
                     errors.append("C: carry leg: " + "; ".join(carry_errors[-3:]))
+                    log.info("%s: C (d %.2f λ %+.2f) carry leg failed: %s", self.gp.alias, place.stand_off or 0.0, place.lateral, " || ".join(carry_errors)[:1200])
                     fails["B -> C path / transition"] = fails.get("B -> C path / transition", 0) + 1
                     self.sidecar.stances.pop("placement", None)
                     self.sidecar.stances.pop("push", None)
                     self._drop_leg_records("push")
                     self.sidecar.grasps.clear()
                     break
+                # the oracle's carry leg at C is a straight Cartesian line from where the hand is (the carry configuration after the
+                # arrival) to the pre-place, tracked by differential IK and finished by ``arm_to`` to the recorded witness within 0.6
+                # rad (0920-135625: a witness 2.09 rad away = 'plan_failed'). Track that line here from the carry configuration at C;
+                # its end configuration is the branch the witnesses must be in - the drop IK is re-solved from it and must stay within
+                # ``carry_finish_max_rad`` (0.5) of it; ``carry_end_q`` seeds the program check's place witness the same way
+                idx_r = self.kit.robot.arm_control_idx["right"]
+                q_c = self.ikc.q_locked(place).clone()
+                q_c[idx_r] = self.carry_arm_q[tname]
+                from ispatialgym.oracle import r1pro_model as M
+                h0 = self.kit.fk([M.EEF_LINK["right"]], q_c)[M.EEF_LINK["right"]]
+                with attached(self.kit, "right", target, eef_in_object=g.pose), self._floor_relaxed():
+                    q_end, why_t = self.ikc.track_chain(q_c, [h0, pre_place], "right", ignore=[self.obj("floor")], soft_stall_m=float(self.num("carry_soft_stall_m", 0.02)))
+                    r2b = None
+                    if q_end is not None:
+                        r2b = self.ikc.exact([pre_place, place_eef], place, "right", ignore_for_last=ignore_place, cache=False, q_seed=q_end)
+                if q_end is None or r2b is None or not r2b.ok or r2b.q is None:
+                    reason = why_t if q_end is None else (r2b.reason if r2b is not None else "no IK")
+                    errors.append(f"C: carry leg untrackable to the pre-place: {reason}")
+                    log.info("%s: C (d %.2f λ %+.2f) carry leg hand -> pre-place untrackable / drop IK from its end fails: %s", self.gp.alias, place.stand_off or 0.0, place.lateral, reason)
+                    fails["C: carry leg untrackable"] = fails.get("C: carry leg untrackable", 0) + 1
+                    self._drop_leg_records("placement")
+                    self.record_carry_arm_q(tname, "right", None)
+                    self.sidecar.stances.pop("placement", None)
+                    self.sidecar.stances.pop("push", None)
+                    self._drop_leg_records("push")
+                    self.sidecar.grasps.clear()
+                    continue
+                fin_swing = float(th.max(th.abs(r2b.q[idx_r] - q_end[idx_r])))
+                if fin_swing > float(self.num("carry_finish_max_rad", 0.5)):
+                    errors.append(f"C: pre-place witness {fin_swing:.2f} rad from the tracked carry end")
+                    log.info("%s: C (d %.2f λ %+.2f) pre-place IK from the tracked carry end swings %.2f rad (> 0.5)", self.gp.alias, place.stand_off or 0.0, place.lateral, fin_swing)
+                    fails["C: pre-place branch off the tracked carry"] = fails.get("C: pre-place branch off the tracked carry", 0) + 1
+                    self._drop_leg_records("placement")
+                    self.record_carry_arm_q(tname, "right", None)
+                    self.sidecar.stances.pop("placement", None)
+                    self.sidecar.stances.pop("push", None)
+                    self._drop_leg_records("push")
+                    self.sidecar.grasps.clear()
+                    continue
+                self.carry_end_q[tname] = q_end[idx_r].clone()
+                log.info("%s: carry leg hand -> pre-place tracked at C (%.2f rad swing at the finish)", self.gp.alias, fin_swing)
                 if push:
                     self.sidecar.add_contact(PushUnderRecord("right", chain["pre"], chain["start"], chain["mid"], chain["goal"], chain["direction"], chain["distance_m"],
                                                              tname, stance="push" if push_st is not None else "placement", pitch_deg=chain["pitch_deg"], blade_standoff_m=chain["blade_standoff_m"],

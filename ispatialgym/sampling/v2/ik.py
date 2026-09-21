@@ -859,28 +859,52 @@ class IKChecker:
                 return None, f"arm_proximity: {len(bad)}/{len(clear)} tracked configurations put an arm link within {clear_margin * 1000:.0f} mm of the world (first at dense pose {bad[0]})"
         return traj[-1].clone(), "ok" + finished
 
-    def _collision_blame(self, q: th.Tensor, ignored: Sequence[Any]) -> str:
+    def _collision_blame(self, q: th.Tensor, ignored: Sequence[Any], margin: float = 0.0) -> str:
         """Diagnostic: which spawned object (or 'scene / self') a colliding configuration collides with — each spawned
-        object is removed in turn on top of ``ignored``."""
+        object is removed in turn on top of ``ignored``. ``margin`` must be the failing check's margin: at a smaller one
+        the configuration may already be free and the first spawned object gets the blame (0921-005514: 'collides with
+        target_sandal' for every drive-back pose of a 4 cm carried sweep whose first sample was free at margin 0)."""
         world = getattr(self.kit, "world", None)
         spawned = list(getattr(world, "spawned", {}).values()) if world is not None else []
+        with self.ignoring(list(ignored)):
+            if bool(self.kit.collision_free(q, margin=float(margin))[0]):
+                return f"free at margin {float(margin):.2f} (the failing check used another margin or world)"
         for o in spawned:
             if any(o is x for x in ignored):
                 continue
             with self.ignoring(list(ignored) + [o]):
-                if bool(self.kit.collision_free(q, margin=0.0)[0]):
-                    return f"collides with {getattr(o, 'name', o)}"
+                if bool(self.kit.collision_free(q, margin=float(margin))[0]):
+                    return f"collides with {getattr(o, 'name', o)}" + (f" (within {float(margin):.2f} m)" if margin > 0 else "")
         try:  # world-only check: passing here means the robot (or its attached object) collides with itself
             self.kit._ensure_synced()
             with self.ignoring(list(ignored)):
-                world_only = bool(self.kit.backend.check_collision(G.t(q).unsqueeze(0), emb_name="whole_body", sync_world=False, self_collision=False, margin=0.0)[0])
+                world_only = bool(self.kit.backend.check_collision(G.t(q).unsqueeze(0), emb_name="whole_body", sync_world=False, self_collision=False, margin=float(margin))[0])
             if not world_only:
                 pairs = self.self_collision_pairs(q)
                 named = ", ".join(f"{a} x {b} ({pen * 1000:.0f} mm)" for (a, b), pen in pairs[:3]) or "arm / attached object against the robot's own links"
                 return f"self-collision ({named})"
+            # a non-spawned scene mesh within the margin: name the scene objects whose AABB lies nearest the base pose
+            # (a heuristic - the padded proximity is not attributed per mesh by the checker)
+            if world is not None and hasattr(world, "scene"):
+                from ispatialgym.oracle import r1pro_model as M
+                base = self.kit.fk([M.BASE_LINK], G.t(q))[M.BASE_LINK][0]
+                rows = []
+                for o in getattr(world.scene, "objects", []):
+                    try:
+                        lo, hi = o.aabb
+                    except Exception:  # noqa: BLE001
+                        continue
+                    dx = max(float(lo[0]) - float(base[0]), 0.0, float(base[0]) - float(hi[0]))
+                    dy = max(float(lo[1]) - float(base[1]), 0.0, float(base[1]) - float(hi[1]))
+                    d = math.hypot(dx, dy)
+                    if d < 1.0 and "floor" not in o.name and "ceiling" not in o.name:
+                        rows.append((d, o.name))
+                rows.sort()
+                if rows:
+                    return "collides with the scene within %.2f m; nearest scene objects to the base: %s" % (float(margin), ", ".join(f"{n} ({d:.2f} m)" for d, n in rows[:4]))
         except Exception:  # noqa: BLE001
             pass
-        return "collides with the scene (a non-spawned object)"
+        return "collides with the scene (a non-spawned object)" + (f" within {float(margin):.2f} m" if margin > 0 else "")
 
     def self_collision_pairs(self, q: th.Tensor) -> List[Tuple[Tuple[str, str], float]]:
         """cuRobo's overlapping self-collision link pairs at ``q`` (``backend.self_collision_pairs``, A7 relay 2026-09-16 21:07):

@@ -661,9 +661,16 @@ class SamplerV2(TaskSampler):
     def record_carry_arm_q(self, carried: str, arm: str, q_arm: Optional[th.Tensor]) -> None:
         if q_arm is None:
             self.carry_arm_q.pop(carried, None)
+            self.carry_end_q.pop(carried, None)
         else:
             self.carry_arm_q[carried] = q_arm.clone()
         self.__dict__.setdefault("_carry_arm_of", {})[carried] = arm
+
+    @property
+    def carry_end_q(self) -> Dict[str, th.Tensor]:
+        """carried instance -> the arm configuration the oracle's straight carry leg reaches the PRE-PLACE in (the end of the
+        differential-IK tracking the task module ran from ``carry_arm_q``); the program check seeds the place witnesses from it."""
+        return self.__dict__.setdefault("_carry_end_q", {})
 
     def path_end_standoff(self, frm: Stance, to: Stance) -> float:
         """Stand-off at which the recorded path ``frm -> to`` ends: the stance's own ``s`` when the path reaches the

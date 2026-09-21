@@ -288,7 +288,9 @@ def run(alias: str, sidecar: SidecarDraft, sampler, subtask: Optional[str] = Non
                 if st_seed is not None:
                     arm_c = (getattr(action, "arms", None) or ["right"])[0]
                     q_prev = sampler.ikc.q_locked(st_seed).clone()
-                    q_prev[sampler.kit.robot.arm_control_idx[arm_c]] = th.as_tensor(sampler.carry_arm_q[carried], dtype=th.float32)
+                    # the tracked end of the straight carry leg when the task recorded it (``carry_end_q``), else the carry configuration
+                    src = (getattr(sampler, "carry_end_q", None) or {}).get(carried, sampler.carry_arm_q[carried])
+                    q_prev[sampler.kit.robot.arm_control_idx[arm_c]] = th.as_tensor(src, dtype=th.float32)
             if name == "push" and (getattr(getattr(action, "contact", None), "extra", None) or {}).get("q_hint") is not None:
                 # a press recorded with the branch that leaves room for the other hand's pinch (two-flap v2, 2026-09-19): the IK seed
                 q_prev = th.as_tensor(action.contact.extra["q_hint"], dtype=th.float32)

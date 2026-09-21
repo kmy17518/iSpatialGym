@@ -543,7 +543,7 @@ def transition(kit: "RobotKit", stance_from: Stance, stance_to: Stance, carried_
                     last = transition_standoffs(s, extra_max=float(extra_max))[-1]
                     if blame is not None and (not why or s_T >= last - 1e-9):  # the blame for the first and the last candidate only (it is slow)
                         try:
-                            detail = f" - {blame(qs[bad], [])}"
+                            detail = f" - {blame(qs[bad], [], margin)}"
                         except Exception:  # noqa: BLE001
                             detail = ""
                     why.append(f"s_T {s_T:.2f}: sweep sample {bad + 1}/{len(sweep)} at trunk {tuple(round(float(v), 2) for v in sweep[bad])} collides{detail}")
