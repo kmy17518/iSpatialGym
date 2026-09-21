@@ -73,6 +73,10 @@ THIN_PART_TILT_MIN_DEG = 15.0
 #: every attachment grasp: the lowest vertex of the finger meshes (both fingers, any opening) stays this far above the
 #: support at the grasp pose (0920-203052: 0.1 mm below the table -> 22 contact steps at 110 N)
 FINGER_SUPPORT_CLEARANCE_M = 0.004
+#: rest-stability nudge test of the male / partner after the init settle (cork/ncxgpe 0920-200850 toppled off its tapered end)
+REST_NUDGE_DEG = 2.0
+REST_STABILITY_STEPS = 300
+REST_TIP_MAX_DEG = 5.0
 
 
 @dataclass
@@ -987,8 +991,47 @@ class Attachment(SamplerV2):
         manip = self.sidecar.stance("manipulation")
         self.sidecar.set_goal(manip.base_pose2d, manip.translate, manip.tilt, arms="same")
 
+    def check_rest_stability(self, draft: Draft) -> None:
+        """Nudge test of the parts' rest poses (cork/ncxgpe 0920-200850): the settled male / partner is tilted by
+        REST_NUDGE_DEG about a horizontal axis and left to physics for REST_STABILITY_STEPS with the robot held; its up axis
+        must come back within REST_TIP_MAX_DEG of the settled one, else ``Reject("rest_unstable")``. The 90-step init settle
+        only checks velocities: the cork stood on its tapered mating end (collision profile: radius 5.2-6.5 mm across a 3 mm
+        band, a convex end under a 1.7 cm high COM), sat still through the settle, and in the oracle rocked 2 -> 6 -> 12 ->
+        95 deg over the 130 steps of the transition - the demo then aimed at a cork lying 26 mm away (the "IK 235 mm off").
+        The world is restored afterwards (the recorded poses are the settled ones)."""
+        roles = [r for r in (self.t_role, self.p_role) if self.obj(r) is not None]
+        up = th.tensor([0.0, 0.0, 1.0])
+        state = self.world.snapshot()
+        tilts: Dict[str, float] = {}
+        try:
+            settled = {r: tuple(x.clone() for x in self.obj(r).get_position_orientation()) for r in roles}
+            for r in roles:
+                p, q = settled[r]
+                q_n = C.qmul(C.quat_from_axis_angle(th.tensor([1.0, 0.0, 0.0]), math.radians(REST_NUDGE_DEG)), q)
+                self.obj(r).set_position_orientation(p + th.tensor([0.0, 0.0, 0.001]), q_n)
+                self.obj(r).keep_still()
+            self.world.wake([self.obj(r) for r in roles])
+            for _ in range(REST_STABILITY_STEPS):
+                og.sim.step_physics()
+                self.robot.keep_still()
+            for r in roles:
+                _, q_now = self.obj(r).get_position_orientation()
+                c = float(th.clamp(th.dot(C.quat_rotate(settled[r][1], up), C.quat_rotate(q_now.float(), up)), -1.0, 1.0))
+                tilts[self.obj(r).name] = round(math.degrees(math.acos(c)), 2)
+        finally:
+            self.world.restore(state)
+            self.world.keep_still(self.objects.values())
+        draft.summary["rest_tilt_after_nudge_deg"] = tilts
+        bad = {n: d for n, d in tilts.items() if d > REST_TIP_MAX_DEG}
+        if bad:
+            self.counters["rest_unstable"] = self.counters.get("rest_unstable", 0) + 1
+            raise Reject("rest_unstable", f"up axis {bad} deg off the settled pose {REST_STABILITY_STEPS} steps after a {REST_NUDGE_DEG:.0f} deg nudge "
+                                          f"(> {REST_TIP_MAX_DEG:.0f}): the part does not stand on that end")
+        log.info("%s: rest stability after a %.0f deg nudge: %s deg", self.gp.alias, REST_NUDGE_DEG, tilts)
+
     def after_settle(self, draft: Draft):
         tname, pname = self.tname, self.pname
+        self.check_rest_stability(draft)
         f_pose = draft.object_poses[pname]
         goal = self._attached_pose(f_pose)
         draft.goal_poses[tname] = goal
