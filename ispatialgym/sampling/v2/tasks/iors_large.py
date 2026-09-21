@@ -1929,6 +1929,12 @@ class IORSLarge(SamplerV2):
                         chain_cache[ck] = self._push_under_chain(push_st if push_st is not None else place, G.qmul(G.quat_from_yaw(y + d_yaw), self.rest), cd, gc, place.extras["push_dir"])
                     if chain_cache[ck] is not None:
                         found = True
+                        ch = chain_cache[ck]
+                        pst = push_st if push_st is not None else place
+                        log.info("%s: push chain SOLVED at C (d %.2f λ %+.2f push trunk (%.2f, %.2f), yaw %.2f offset %.3f m): blade start %s -> goal %s in base, pitch %.0f, tips %.3f m",
+                                 self.gp.alias, place.stand_off or 0.0, place.lateral, pst.translate, pst.tilt, y, offs[y],
+                                 [round(float(v), 2) for v in P0.to_base_frame(ch["start"][0], pst.base_pose2d, P0.base_z(self)).tolist()],
+                                 [round(float(v), 2) for v in P0.to_base_frame(ch["goal"][0], pst.base_pose2d, P0.base_z(self)).tolist()], ch["pitch_deg"], ch["fingertip_z_m"])
                         break
                 if not found:
                     errors.append(f"C (d {place.stand_off:.2f} λ {place.lateral:+.2f}): no push chain at the largest-offset yaws ({', '.join(f'{offs[y]:.2f}' for y in best)} m)")
@@ -2149,6 +2155,8 @@ class IORSLarge(SamplerV2):
                     self.sidecar.describe(floor_name, "floor", push_distance_cm=100.0 * float(chain["distance_m"]))
                 return d
             errors.append(f"C (d {place.stand_off:.2f} trunk ({place.translate}, {place.tilt:.1f})): no (yaw, grasp) of F ({len(F)}) passes the exact IK at B and C — {fails}")
+            log.info("%s: C try exhausted (d %.2f λ %+.2f edge %s, push trunk %s): %s", self.gp.alias, place.stand_off or 0.0, place.lateral, place.extras.get("edge"),
+                     None if push_st is None else (push_st.translate, round(push_st.tilt, 2)), fails)
         raise Reject("grasp_unreachable", "; ".join(errors[-3:]) if errors else "no placement candidate")
 
     # ------------------------------------------------------------------ push-under: the floor mesh and the deep trunks
