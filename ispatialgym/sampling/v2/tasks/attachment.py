@@ -63,6 +63,16 @@ SECOND_BASE_MAX_TRIES = 6
 FOCUS_DEPTH_PREFERRED = 0.62  # base-forward depth of the manipulation focus beyond which the lift / SLERP fail (att_diag2 21:04)
 GOOD_TRUNKS = ((0.5, -0.45), (0.5, 0.0), (0.25, -0.3))  # (translate, tilt) verified for pick + pre-poses by the block probes
 CARRY_HEIGHTS = (0.12, 0.08, 0.05)  # the lift above the grasp: the first whose lift + SLERP pass the IK
+#: thin-part pick (owner 2026-09-20 20:41, cap/xxqyrt 1.1 cm): a male shorter than the pads' fingertip section (+ the band margin)
+#: is a fingertip pinch whatever the height; its rule is on the support, not on the male's top - the pads' fingertip-side end
+#: stays >= PAD_TABLE_CLEARANCE_M above the support surface (the pinch band = the rim's upper half), and the tilted rim pinches
+#: (approach >= THIN_PART_TILT_MIN_DEG from vertical) are screened before the vertical ones
+THIN_PART_MAX_HEIGHT_M = float(C.PAD_Z_RANGE[1]) + PAD_BAND_MARGIN
+PAD_TABLE_CLEARANCE_M = 0.005
+THIN_PART_TILT_MIN_DEG = 15.0
+#: every attachment grasp: the lowest vertex of the finger meshes (both fingers, any opening) stays this far above the
+#: support at the grasp pose (0920-203052: 0.1 mm below the table -> 22 contact steps at 110 N)
+FINGER_SUPPORT_CLEARANCE_M = 0.004
 
 
 @dataclass
@@ -381,9 +391,17 @@ class Attachment(SamplerV2):
         male, support = self.obj(self.t_role), self.obj("support")
         self.record_transition(init, manip)
         cam_init = self.camera_pose_at(init)
-        # step 1: the male at the focus from F
-        m_pose, grasp = TT.phase3_target(self, manip, rng, self.grasps, self.hull[self.t_role], self.rest[self.t_role], [support], object_name=tname,
-                                         scale_key=self.choice.models[self.t_role].scale, bands=self.bands)
+        # step 1: the male at the focus from F (a thin male: the tilted rim pinches first, every library grasp as the fallback)
+        m_pose, grasp = None, None
+        for pool, label in self._grasp_pools():
+            try:
+                m_pose, grasp = TT.phase3_target(self, manip, rng, pool, self.hull[self.t_role], self.rest[self.t_role], [support], object_name=tname,
+                                                 scale_key=self.choice.models[self.t_role].scale, bands=self.bands)
+                break
+            except Reject as e:
+                if label == "all":
+                    raise
+                log.info("%s: no %s grasp confirmed at the focus (%s); every library grasp is screened next", self.gp.alias, label, e)
         grasp.place_on = pname
         male.set_position_orientation(*m_pose)
         male.keep_still()
@@ -530,9 +548,11 @@ class Attachment(SamplerV2):
         pts = C.transform_points((TT._t(m_pose[0]), TT._t(m_pose[1])), TT._t(self.hull[self.t_role]))
         eef = (TT._t(grasp.grasp[0]), TT._t(grasp.grasp[1]))
         loc = C.transform_points(C.invert(eef), pts)  # object hull in the eef frame: z = approach axis (tips +), y = closing axis
-        band = (loc[:, 2] >= C.PAD_Z_RANGE[0]) & (loc[:, 2] <= C.PAD_Z_RANGE[1] + 0.002) & (loc[:, 0].abs() <= 0.03)
+        # the band runs from the pads' wrist-side end to the fingertips: a thin part lifted by the support-clearance rule
+        # (cap/xxqyrt) is pinched by the fingertip section beyond the pads
+        band = (loc[:, 2] >= C.PAD_Z_RANGE[0]) & (loc[:, 2] <= C.FINGERTIP_LENGTH + 0.002) & (loc[:, 0].abs() <= 0.03)
         if int(band.sum()) < 2:
-            grasp.extras["pinch_width_reason"] = "no hull points in the pad band"
+            grasp.extras["pinch_width_reason"] = "no hull points between the pads and the fingertips"
             return
         width = float(loc[band, 1].max() - loc[band, 1].min())
         lib = None
@@ -608,6 +628,45 @@ class Attachment(SamplerV2):
 
     # ------------------------------------------------------------------ grasp height margin (owner 2026-09-19 16:49)
 
+    def _is_thin_part(self) -> bool:
+        """A male shorter than the pads' fingertip section + the band margin (cap/xxqyrt 1.1 cm): a fingertip pinch whatever
+        the grasp height, so the thin-part rules (support clearance, tilted pinches first) apply."""
+        return float(self.height.get(self.t_role, 1.0)) < THIN_PART_MAX_HEIGHT_M
+
+    def _grasp_tilt_deg(self, g) -> float:
+        """Angle between the grasp's approach axis (male at rest) and the vertical: 0 = straight down, 30 = the rim pinches."""
+        a = C.quat_rotate(TT._t(self.rest[self.t_role]), C.approach_axis(TT._t(g.pose[1])))
+        return float(np.degrees(math.acos(max(-1.0, min(1.0, -float(a[2]))))))
+
+    def _grasp_pools(self) -> List[Tuple[List[Any], str]]:
+        """The grasp lists step 1 screens in order. A thin male (owner 2026-09-20 20:41): the tilted rim pinches (approach >=
+        THIN_PART_TILT_MIN_DEG from vertical; cap/xxqyrt grasp_1..3) before the vertical ones (grasp_4/5, whose fingertips rest
+        on the table around an 1.1 cm part); the full library is the fallback. Any other male: the full library only."""
+        grasps = list(self.grasps)
+        if not self._is_thin_part():
+            return [(grasps, "all")]
+        tilted = [g for g in grasps if self._grasp_tilt_deg(g) >= THIN_PART_TILT_MIN_DEG]
+        if not tilted or len(tilted) == len(grasps):
+            return [(grasps, "all")]
+        log.info("%s: thin male (%.1f cm): %d tilted rim pinch(es) screened before the %d vertical one(s)", self.gp.alias,
+                 self.height[self.t_role] * 100, len(tilted), len(grasps) - len(tilted))
+        return [(tilted, "tilted"), (grasps, "all")]
+
+    @staticmethod
+    def _finger_lowest_z(eef_pose: TT.Pose) -> Optional[float]:
+        """World z of the lowest finger-mesh vertex at ``eef_pose`` over the closure (finger joint FINGER_CLOSED .. FINGER_OPEN;
+        z is linear in the opening, both ends cover it); None without the robot assets."""
+        from ispatialgym.oracle import r1pro_model as M
+
+        pos, R = TT._t(eef_pose[0]).numpy(), C.quat_to_mat(TT._t(eef_pose[1])).numpy()
+        zs = []
+        for q in (C.FINGER_CLOSED, C.FINGER_OPEN):
+            pts = M.finger_points_eef(q)
+            if pts is None:
+                return None
+            zs.append(float((pts @ R.T + pos)[:, 2].min()))
+        return min(zs)
+
     def _apply_grasp_height_extra(self, grasp, m_pose: TT.Pose, manip: Stance) -> None:
         """``generation.grasp_height_extra_m``: the knob pinch moves up the male by up to that much (0 = today's pose). Demo
         0919-153953 (lid tnwisp): the pads held the top centimetre of the knob while the fingertips reached 0.7 cm below the
@@ -616,24 +675,50 @@ class Attachment(SamplerV2):
         grasp to zero (its pad centre already lies above the pinch band), so the attachment rule is on the pad's
         fingertip-side end instead: it stays >= ``PAD_BAND_MARGIN`` below the male's top, and the lifted pre-grasp / grasp
         must pass the exact IK at the grasp stance (else the library height is kept). Every derived pose (attach = goal
-        ∘ T_obj→eef, the pre-attach, the SLERP) carries the lift through ``eef_in_object``. Facts on the record."""
+        ∘ T_obj→eef, the pre-attach, the SLERP) carries the lift through ``eef_in_object``. Facts on the record.
+
+        Thin part (owner 2026-09-20 20:41; cap/xxqyrt 1.1 cm, 0920-184902 / 193713: 27-163 table-contact steps at the
+        closure): the pads' fingertip-side end must stay >= PAD_TABLE_CLEARANCE_M ABOVE the support surface (the pinch band
+        is the rim's upper half) - that lift is required even with the knob at 0 - and the fingertips <= 3 mm below the top."""
         x = max(0.0, float(self.gen("grasp_height_extra_m", 0.0) or 0.0))
-        if x <= 0.0 or grasp.eef_in_object is None or grasp.grasp is None:
-            grasp.extras.update({"grasp_height_extra_m": x, "grasp_height_extra_effective_m": 0.0, "grasp_height_extra_reason": "off" if x <= 0 else "no grasp pose"})
+        if grasp.eef_in_object is None or grasp.grasp is None:
+            grasp.extras.update({"grasp_height_extra_m": x, "grasp_height_extra_effective_m": 0.0, "grasp_height_extra_reason": "no grasp pose"})
             return
         pos, quat = TT._t(grasp.grasp[0]), TT._t(grasp.grasp[1])
         a = C.approach_axis(quat)
         pad_tip_end_z = float((pos + C.PAD_Z_RANGE[1] * a)[2])  # the fingertip-side end of the pads
         tip_z = float((pos + C.FINGERTIP_LENGTH * a)[2])
-        top_z = float(self.world.hull_at(self.hull[self.t_role], m_pose)[:, 2].max())
+        hull_w = self.world.hull_at(self.hull[self.t_role], m_pose)
+        top_z, bottom_z = float(hull_w[:, 2].max()), float(hull_w[:, 2].min())  # the male's bottom rests on the support
         room = (top_z - PAD_BAND_MARGIN) - pad_tip_end_z
         rule = "pad end 5 mm below the male's top"
+        needed, floors = 0.0, {}
+        # the finger ENVELOPE (both finger meshes, every opening of the closure) must clear the support: the fingers are 3.8 cm
+        # across the closing plane, so a 30 deg rim pinch hangs a tip corner up to 1.2 cm below the fingertip axis point -
+        # 0920-203052 (cap, pad end 5.4 mm above the table) still touched the table for 22 steps at 110 N with the lowest
+        # finger vertex 0.1 mm below the surface (recomputed from the meshes: r1pro_model.finger_points_eef)
+        low_z = self._finger_lowest_z(grasp.grasp)
+        if low_z is not None:
+            floors["finger envelope"] = (bottom_z + FINGER_SUPPORT_CLEARANCE_M) - low_z
         if room <= 0.0:
             # a part shorter than the pads' fingertip section (cap/xxqyrt: 1.1 cm tall) is a FINGERTIP pinch whatever the height -
             # the pad rule would forbid any lift and the fingertips rest on the table during the closure (0920-184902: 23 contact
-            # steps, 123 N); the fingertips must stay >= 3 mm below the male's top instead
+            # steps, 123 N); the pads' fingertip-side end must clear the support by PAD_TABLE_CLEARANCE_M (owner 20:41) and the
+            # fingertips must stay >= 3 mm below the male's top
+            floors["pad end (thin part)"] = (bottom_z + PAD_TABLE_CLEARANCE_M) - pad_tip_end_z
             room = (top_z - 0.003) - tip_z
-            rule = "fingertips 3 mm below the male's top (thin part)"
+            rule = f"fingertips 3 mm below the male's top (thin part; pad end >= {PAD_TABLE_CLEARANCE_M * 1000:.0f} mm above the support)"
+        if floors:
+            which, needed = max(floors.items(), key=lambda kv: kv[1])
+            if needed > x:
+                log.info("%s: the %s sits %.1f mm above the support at the library height -> lift raised from %.1f to %.1f mm (%s)",
+                         self.gp.alias, "lowest finger vertex" if which.startswith("finger") else "pad end",
+                         ((low_z if which.startswith("finger") else pad_tip_end_z) - bottom_z) * 1000, x * 1000, needed * 1000, which)
+                x = needed
+        grasp.extras["grasp_height_floors_m"] = {k: round(v, 4) for k, v in floors.items()}
+        if x <= 0.0:
+            grasp.extras.update({"grasp_height_extra_m": x, "grasp_height_extra_effective_m": 0.0, "grasp_height_extra_reason": "off"})
+            return
         eff = max(0.0, min(x, room))
         why = "full" if eff >= x - 1e-9 else (f"clipped: {rule}" if eff > 0 else f"clipped to 0: {rule}")
         if eff > 0.0:

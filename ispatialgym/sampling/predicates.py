@@ -30,10 +30,11 @@ jitter) and only when the male / female meta-link frames agree within 5 cm **and
 constraint for a rotationally symmetric part (a round lid attaches in ~1/12 of its yaws). After an OmniGibson False the
 **alignment** branch tests the meta-link pair **modulo the part's recorded symmetry** (the group / pose target's
 ``orientation_equivalences``, registered by the task through :func:`set_attachment_context`; ``zinf`` = yaw free) with the
-same 5 cm / 15° and, when aligned, creates the BEHAVIOR attachment (``AttachedTo.set_value(True,
-bypass_alignment_checking=True)``: the part snaps onto the female frame — a no-op for the shape of a symmetric part — and
-gets the fixed joint), so the atom stays a real attachment joint and a policy can satisfy it at any equivalent yaw. The
-oracle's attach at the place pose (``executor.SimState.attach``) is the same call.
+same 5 cm / 15° and, when aligned, creates the BEHAVIOR attachment — the stock fixed joint, but at the links' current
+relative pose (:func:`attach_in_place`; OmniGibson's ``set_value`` would first snap the child onto the raw female frame, a
+5° twist for a ``zinf`` cap corrected to the nearest 5° equivalence: 0920-203052) — so the atom stays a real attachment
+joint, nothing moves when it appears, and a policy can satisfy it at any equivalent yaw. The oracle's attach at the place
+pose (``executor.SimState.attach``) is the same call.
 
 ``pose_settled`` of an object joined by an attachment joint (owner 2026-09-20 13:57; the attached child and its parent):
 OmniGibson's ``PoseSettled`` needs the root velocity below 1 mm/s on every step of its window AND the pose drift within
@@ -262,13 +263,63 @@ def held_by_robot(obj: Any) -> bool:
     return False
 
 
-def attach_if_aligned(child: Any, parent: Any, equivalences: Optional[Sequence[Sequence[float]]] = None) -> Dict[str, Any]:
-    """The BEHAVIOR attachment of ``child`` to ``parent`` when :func:`attachment_alignment` passes: ``AttachedTo.set_value(True,
-    bypass_alignment_checking=True)`` snaps the child onto the female frame (its own thresholds were met modulo the symmetry)
-    and creates the fixed joint. Never while a robot holds the child (0919-174551: the evaluator's per-step check joined the
-    lid to the teapot halfway down the place descent, still in the hand, and snapped it 4 cm out of the grasp path — the
-    part must be released first, as the goal's ``(not (grasped ...))`` atoms say; the oracle drops the assisted grasp before
-    its own attach). Returns the alignment record with ``attached``."""
+def attach_in_place(child: Any, parent: Any, child_link: str, parent_link: str, can_joint_break: bool = True) -> bool:
+    """``AttachedTo._attach`` without its teleport: the BEHAVIOR fixed joint between ``child``'s male link and ``parent``'s
+    female link is created at the links' **current** relative pose, so nothing moves when the joint appears.
+
+    OmniGibson's ``_attach`` first re-poses the child so the two meta-link frames coincide exactly (raw frames, 6-DoF) and
+    only then creates the joint. For a symmetric part whose alignment was accepted modulo its recorded equivalences (a
+    ``zinf`` cap: ~72 yaw steps of 5°) the raw residual can be a full equivalence step: cap/xxqyrt 0920-203052 was corrected
+    to 2.6 mm / 0.011 rad modulo the symmetry, the raw yaw residual was 0.090 rad, and ``set_value`` twisted the cap 5.1°
+    inside the still-closed fingers - a 7.4 mm yank when they opened, i.e. the visible snap the owner rejects. The joint
+    frame here is the child link's pose in the parent link's frame (identity in the child frame); the bookkeeping is the
+    stock one (``parent`` / ``parent_link`` / the parent's ``children`` map, the stock joint prim path, so ``get_value``,
+    ``_detach`` and the joint-break subscription behave as after ``set_value``). Returns True when the joint was created."""
+    import omnigibson.utils.transform_utils as T
+    from omnigibson.object_states import AttachedTo
+    from omnigibson.object_states import attached_to as _AT
+    from omnigibson.utils.constants import JointType
+    from omnigibson.utils.usd_utils import create_joint
+
+    st = child.states[AttachedTo]
+    if st.parent is not None:
+        return st.parent == parent
+    c_link, p_link = child.links.get(child_link), parent.links.get(parent_link)
+    if c_link is None or p_link is None:
+        return False
+    parent_pos, parent_quat = p_link.get_position_orientation()
+    child_pos, child_quat = c_link.get_position_orientation()
+    # the child link (= the joint frame) expressed in the parent link's frame: pose_child = pose_parent @ rel
+    rel_pos, rel_quat = T.relative_pose_transform(child_pos, child_quat, parent_pos, parent_quat)
+    child.keep_still()
+    parent.keep_still()
+    st.parent = parent
+    st.parent_link = p_link
+    parent.states[AttachedTo].children[p_link.body_name] = child
+    kwargs = {"break_force": _AT.m.DEFAULT_BREAK_FORCE, "break_torque": _AT.m.DEFAULT_BREAK_TORQUE} if can_joint_break else {}
+    create_joint(
+        prim_path=st.attachment_joint_prim_path,
+        joint_type=JointType.JOINT_FIXED,
+        body0=f"{p_link.prim_path}",
+        body1=f"{c_link.prim_path}",
+        joint_frame_in_parent_frame_pos=rel_pos,
+        joint_frame_in_parent_frame_quat=rel_quat,
+        joint_frame_in_child_frame_pos=th.zeros(3),
+        joint_frame_in_child_frame_quat=th.tensor([0.0, 0.0, 0.0, 1.0]),
+        exclude_from_articulation=True,
+        **kwargs,
+    )
+    return True
+
+
+def attach_if_aligned(child: Any, parent: Any, equivalences: Optional[Sequence[Sequence[float]]] = None, in_place: bool = True) -> Dict[str, Any]:
+    """The BEHAVIOR attachment of ``child`` to ``parent`` when :func:`attachment_alignment` passes (its thresholds met modulo
+    the symmetry): the fixed joint is created at the current relative pose (:func:`attach_in_place`; ``in_place`` False =
+    the stock ``AttachedTo.set_value(True, bypass_alignment_checking=True)``, which snaps the child onto the raw female
+    frame first). Never while a robot holds the child (0919-174551: the evaluator's per-step check joined the lid to the
+    teapot halfway down the place descent, still in the hand, and snapped it 4 cm out of the grasp path — the part must be
+    released first, as the goal's ``(not (grasped ...))`` atoms say; the oracle drops the assisted grasp before its own
+    attach). Returns the alignment record with ``attached`` and ``joint`` (``in_place`` / ``set_value``)."""
     from omnigibson.object_states import AttachedTo
 
     a = attachment_alignment(child, parent, equivalences)
@@ -285,7 +336,12 @@ def attach_if_aligned(child: Any, parent: Any, equivalences: Optional[Sequence[S
     if a.get("first_free_pair") is not None and tuple(a["first_free_pair"]) != pair:
         a.update({"attached": False, "reason": "the aligned pair is not OmniGibson's first free candidate pair"})
         return a
-    a["attached"] = bool(child.states[AttachedTo].set_value(parent, True, bypass_alignment_checking=True))
+    if in_place:
+        a["attached"] = bool(attach_in_place(child, parent, a["child_link"], a["parent_link"]))
+        a["joint"] = "in_place"
+    else:
+        a["attached"] = bool(child.states[AttachedTo].set_value(parent, True, bypass_alignment_checking=True))
+        a["joint"] = "set_value"
     return a
 
 

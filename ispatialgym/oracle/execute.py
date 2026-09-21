@@ -1017,14 +1017,14 @@ def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th
     log.info("place(%s): attach offset %.1f mm / %.1f deg modulo the part's symmetry (raw %.1f deg; male %s -> female %s of %s)", action.object, off["pos_m"] * 1000,
              math.degrees(off["rot_rad"]), math.degrees(off.get("rot_raw_rad", off["rot_rad"])), off["male_link"], off["female_link"], action.on)
     # closed-loop correction passes (at most two): the hand moves by the transform carrying the (equivalent) male frame onto the
-    # female one; a residual the snap would make visible (> attach_snap_max_*) after both passes does NOT attach
+    # female one until the residual is within attach_correct_min_* (owner 2026-09-20 20:41: <= 3 mm / 0.05 rad after the
+    # correction); a residual above attach_snap_max_* after both passes does NOT attach. The joint itself is created at the
+    # current relative pose (predicates.attach_in_place), so whatever residual remains is a physical misalignment, never a snap
     passes: List[Dict[str, Any]] = []
     for k in range(2):
         need = off["pos_m"] > cfg.attach_correct_min_m or off["rot_rad"] > cfg.attach_correct_min_rad
         if not need or off["pos_m"] > cfg.attach_correct_max_m:
             break
-        if k == 1 and off["pos_m"] <= cfg.attach_snap_max_m and off["rot_rad"] <= cfg.attach_snap_max_rad:
-            break  # the first pass left an invisible residual: no second pass
         p, q = state.eef_pose(arm)
         target = C.compose(off["fix"], (p.float(), q.float()))
         try:
@@ -1042,13 +1042,14 @@ def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th
     rec["offset_after_correction"] = passes[-1] if passes else None
     rec["correction_passes"] = len(passes)
     if off["pos_m"] > cfg.attach_snap_max_m or off["rot_rad"] > cfg.attach_snap_max_rad:
-        # the joint would snap the part visibly (0920-164504: 17 mm): leave it unattached, the postcondition fails and the executor's
+        # the part would sit visibly off its seat (0920-164504: 17 mm): leave it unattached, the postcondition fails and the executor's
         # retry re-aims the place at the partner's live pose
-        rec.update({"attached": False, "refused": f"residual {off['pos_m'] * 1000:.1f} mm / {math.degrees(off['rot_rad']):.1f} deg exceeds the invisible-snap bound "
+        rec.update({"attached": False, "refused": f"residual {off['pos_m'] * 1000:.1f} mm / {math.degrees(off['rot_rad']):.1f} deg exceeds the misalignment bound "
                                                     f"({cfg.attach_snap_max_m * 1000:.0f} mm / {math.degrees(cfg.attach_snap_max_rad):.0f} deg)"})
         log.warning("place(%s): %s - not attached", action.object, rec["refused"])
         raise SkillError("execution", f"attach refused: {rec['refused']}")  # still held: the checkpoint rollback + retry re-aim the place
-    # drop the assisted grasp and attach in one step (no physics in between): the snap acts on a free part
+    # drop the assisted grasp and attach in one step (no physics in between): the fixed joint is created at the current relative
+    # pose of the meta links (predicates.attach_in_place), so the part does not move when it appears nor when the fingers open
     if state.held_object(arm) is not None:
         state.robot.release_grasp_immediately(arm)
     motions.backend.detach_object(arm)
@@ -1056,7 +1057,8 @@ def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th
     rec["attached"] = ok
     rec["alignment"] = getattr(state, "last_attach", None)  # the evaluator's alignment record (modulo the part's symmetry)
     if ok:
-        log.info("place(%s): attached to %s (fixed attachment joint)", action.object, action.on)
+        log.info("place(%s): attached to %s (fixed attachment joint at the current relative pose, %s)", action.object, action.on,
+                 (rec["alignment"] or {}).get("joint", "?"))
     else:
         log.warning("place(%s): AttachedTo.set_value(True) refused at the place pose (meta links beyond 5 cm / 15 deg?)", action.object)
 

@@ -266,6 +266,75 @@ def source_curobo_yaml_path() -> str:
     return os.path.join(robot_assets_dir(), "curobo", "r1pro_description_curobo_default.yaml")
 
 
+_FINGER_HULLS: Dict[str, Optional[List[tuple]]] = {}
+
+
+def _rpy_matrix(r: float, p: float, y: float):
+    import numpy as np
+
+    cr, sr, cp, sp, cy, sy = math.cos(r), math.sin(r), math.cos(p), math.sin(p), math.cos(y), math.sin(y)
+    return np.array([[cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
+                     [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
+                     [-sp, cp * sr, cp * cr]])
+
+
+def finger_hulls_eef(arm: str = "right") -> Optional[List[tuple]]:
+    """Convex-hull vertices of the two finger meshes (``FINGER_LINKS``) in the eef frame at finger joint 0, with each
+    finger's slide axis in the eef frame: ``[(points (N, 3) ndarray, axis (3,) ndarray), ...]``. The finger joint value
+    ``q`` moves the finger by ``q * axis`` (URDF prismatic joints ``{arm}_gripper_finger_joint1/2``, opening ~ 2 q).
+    Parsed once from the shipped URDF + visual meshes (``urdf/meshes/<finger link>.obj``); None when unavailable
+    (tooling without the assets). Used by the sampler's thin-part rule: the finger envelope - 3.8 cm across the closing
+    plane, so a 30 deg tilt hangs a tip corner up to 1.2 cm below the fingertip axis point - must clear the support."""
+    if arm in _FINGER_HULLS:
+        return _FINGER_HULLS[arm]
+    out: Optional[List[tuple]] = None
+    try:
+        import numpy as np
+        from scipy.spatial import ConvexHull
+
+        root = ET.parse(source_urdf_path()).getroot()
+        joints = {j.find("child").get("link"): j for j in root.iter("joint") if j.find("child") is not None}
+        R_ge = _rpy_matrix(*EEF_IN_GRIPPER_RPY)  # gripper -> eef rotation; p_eef = R_ge^T (p_gripper - t)
+        t_ge = np.asarray(EEF_IN_GRIPPER_XYZ, dtype=float)
+        out = []
+        for link in FINGER_LINKS[arm]:
+            j = joints[link]
+            assert j.find("parent").get("link") == GRIPPER_LINK[arm], f"{link} is not a child of {GRIPPER_LINK[arm]}"
+            o = j.find("origin")
+            xyz = np.array([float(v) for v in (o.get("xyz") if o is not None and o.get("xyz") else "0 0 0").split()])
+            rpy = [float(v) for v in (o.get("rpy") if o is not None and o.get("rpy") else "0 0 0").split()]
+            R_gf = _rpy_matrix(*rpy)
+            axis_g = R_gf @ np.array([float(v) for v in j.find("axis").get("xyz").split()])
+            lk = [l for l in root.iter("link") if l.get("name") == link][0]
+            vis = lk.find("visual")
+            mesh = vis.find("geometry").find("mesh")
+            path = os.path.join(robot_assets_dir(), "urdf", mesh.get("filename"))
+            scale = np.array([float(v) for v in (mesh.get("scale") or "1 1 1").split()])
+            pts = np.array([[float(v) for v in line.split()[1:4]] for line in open(path) if line.startswith("v ")]) * scale
+            vo = vis.find("origin")
+            if vo is not None:
+                pts = pts @ _rpy_matrix(*[float(v) for v in (vo.get("rpy") or "0 0 0").split()]).T + np.array([float(v) for v in (vo.get("xyz") or "0 0 0").split()])
+            pts_g = pts @ R_gf.T + xyz  # finger frame -> gripper frame (joint at q = 0)
+            pts_e = (pts_g - t_ge) @ R_ge  # gripper -> eef (R_ge is symmetric for rpy (0, pi, 0); written as R^T via @ R)
+            hull = pts_e[ConvexHull(pts_e).vertices]
+            out.append((hull.astype(float), (R_ge.T @ axis_g).astype(float)))
+    except Exception:  # noqa: BLE001 - assets missing: the caller falls back to the fingertip constants
+        out = None
+    _FINGER_HULLS[arm] = out
+    return out
+
+
+def finger_points_eef(finger_q: float, arm: str = "right"):
+    """The finger hull vertices in the eef frame at finger joint value ``finger_q`` (both fingers stacked, (N, 3) ndarray),
+    None without the assets."""
+    import numpy as np
+
+    hulls = finger_hulls_eef(arm)
+    if not hulls:
+        return None
+    return np.vstack([pts + float(finger_q) * axis for pts, axis in hulls])
+
+
 def cache_dir() -> str:
     d = os.environ.get("ISPATIALGYM_CACHE_DIR", os.path.join(os.path.expanduser("~"), ".cache", "ispatialgym"))
     os.makedirs(d, exist_ok=True)

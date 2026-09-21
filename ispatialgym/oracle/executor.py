@@ -557,9 +557,10 @@ class SimState:
     def attach(self, child: str, parent: str) -> bool:
         """The BEHAVIOR attachment of ``child`` to ``parent`` at their current poses — the evaluator's own rule
         (``predicates.attach_if_aligned``, owner 2026-09-19 17:10): the meta links within OmniGibson's 5 cm / 15 deg **modulo
-        the child's recorded symmetry** (the task registers the pair's equivalences with the TRO targets), then
-        ``AttachedTo.set_value(True)`` snaps the child onto the female frame and creates the fixed joint; otherwise nothing
-        changes and False is returned. ``self.last_attach`` keeps the alignment record."""
+        the child's recorded symmetry** (the task registers the pair's equivalences with the TRO targets), then the fixed
+        attachment joint is created at the current relative pose (``predicates.attach_in_place``: no teleport onto the raw
+        female frame, so the residual the place correction left - <= attach_snap_max_m - is never a visible snap); otherwise
+        nothing changes and False is returned. ``self.last_attach`` keeps the alignment record."""
         from omnigibson.object_states import AttachedTo
 
         from ispatialgym.sampling import predicates as PRED
