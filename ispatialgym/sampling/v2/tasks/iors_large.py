@@ -570,9 +570,12 @@ class IORSLarge(SamplerV2):
         above the tips. The old rule (eef origin at ¾ of the height, fingertips ≥ 4 cm up for the cuRobo ground slab) ran
         the blade over a 4.5 cm sandal: it caught the strap near the middle and moved the sandal 17 cm of the 29 cm
         (0920-143722, 12 cm short of the goal cell). A blade below ``SLAB_TIP_M`` has its IK solved with the slab off."""
+        # a quarter of the height / 1 cm: the blade must meet the SOLE of a 4.5 cm sandal (0920-154503: fingertips at 3.6 cm still
+        # passed over the 1-2 cm sole and caught the strap at the middle - 15 of 29 cm, 13 cm short); the QA collision monitor
+        # exempts the floor categories, so fingertips brushing the floor cost nothing
         height = float(self.place["height"])
-        frac = float(self.num("push_tip_frac", 0.5))
-        clear = float(self.num("push_tip_clearance_m", 0.015))
+        frac = float(self.num("push_tip_frac", 0.25))
+        clear = float(self.num("push_tip_clearance_m", 0.01))
         z_tip = self.floor_z + max(clear, min(frac * height, 0.05))
         drop = C.FINGERTIP_LENGTH * math.cos(math.radians(float(pitch_deg)))
         return z_tip + drop, z_tip
@@ -601,7 +604,9 @@ class IORSLarge(SamplerV2):
             standoff = so[0]
             a_vec = TT.pitched_approach(pitch, d2)  # pitched toward the push direction (= the robot's forward for a frontal stance, its right for a side stance)
             start = th.tensor([float(cd[0]), float(cd[1]), z_push]) - d3 * (half_d + standoff)
-            goal = th.tensor([float(gc[0]), float(gc[1]), z_push]) - d3 * (half_d + standoff)
+            # the blade's goal runs ``push_goal_extra_m`` (3 cm) past the model's: the oracle's differential-IK leg stops 2-3 cm
+            # short of its last waypoint (0920-143722 / 154503: eef 0.704-0.716 m ahead for a 0.736 m goal)
+            goal = th.tensor([float(gc[0]), float(gc[1]), z_push]) - d3 * (half_d + standoff - float(self.num("push_goal_extra_m", 0.03)))
             mid = 0.5 * (start + goal)
             low = (z_tip - self.floor_z) < self.SLAB_TIP_M
             for c_sign in (1.0, -1.0):

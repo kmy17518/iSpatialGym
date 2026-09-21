@@ -62364,5 +62364,304 @@
    "_brace_search_note": "owner 2026-09-19 14:55 / 2026-09-20 16:15 (attachment): brace_search false = the one-arm sequence; witness_residual_pre_m 15 mm (pre-pose witnesses at joint limits); alias grounded from ground_isg --all (dry run) and imported for the owner pair cork/ncxgpe -> wine_bottle/inkqch"
   },
   "constraints": []
+ },
+ "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table": {
+  "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+  "definition_id": 88,
+  "roles": {
+   "target": {
+    "category": "sandal",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "chgcrm",
+    "orientation_equivalences": {
+     "sandal/chgcrm": []
+    },
+    "grasp_keys": {
+     "sandal/chgcrm": "sandal__chgcrm"
+    }
+   },
+   "partner": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "partner": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "support": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "sandal": [
+       "chgcrm"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "sandal": {
+       "shdahi": "ground_isg 2026-09-16: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.08,
+    "orientation": 0.8
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 3.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "under_ray_extra_m": 0.03,
+   "under_near_edge_max_m": 0.45,
+   "under_clearance_extra_m": 0.17,
+   "under_leg_margin_m": 0.05,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.2,
+   "argument_order": [
+    "target",
+    "partner"
+   ],
+   "push_under_drop_extra_m": 0.1,
+   "push_under_inside_m": 0.07,
+   "push_under_stand_offs_m": [
+    0.75,
+    0.8
+   ],
+   "_push_under_table_note": "2026-09-20 03:10: table geometry - the deep crouch clears the table only at d >= 0.65 and the floor is reached 0.24-0.64 m ahead, so the push lane is shortened: drop half+0.03 m outside the edge (was 0.10), goal 0.05 m inside (was 0.07): for d 0.70 the blade runs 0.41 -> 0.61 m ahead (0.80 m goals failed the chain IK: 106 chain failures / 50 C tries in 0920-024734) | 03:35: d 0.75 (goal 0.69-0.75 ahead) still fails on the shoulder limit (joint2 within 3 mrad): stand-offs 0.65/0.70 only, 0.70 first | 04:00: lane 0.16 m (drop half+0.02 outside, goal 0.02 inside; the centre column still hits the top), d 0.75 first (blade 0.47 -> 0.63 ahead), carry arrival may back off up to 1.0 m before the sweep | 04:40: the working chain ran on the RIGHT lane (offset 0.25, pre 0.38 / start 0.43 / goal 0.72 ahead); centred lanes fail their pre-pose -> right lane only, d 0.80/0.75, drop half+0.10, goal 0.05 inside | 06:05: long-axis yaws first (short-axis blade goals at 0.78-0.80 m have no IK); inside back to 0.07; attempt budget 2400 s | 08:45: DROP FIRST, THEN CROUCH - the release from a moderate trunk (drop 0.30 m), the deep push crouch entered with empty hands (stances.push) | 09:00: (0.5,-0.6) cannot reach the drop (eef 0.31 m at 0.54 ahead, no IK even world-free) -> drop trunks (0.75,-0.9) first, drop 0.25 m | 09:55: C at the LONG sides only (-y/+y): behind the short end the room blocks every carry drive-back pose (0920-092254 diagnostics)",
+   "push_under_drop_ahead_pref_m": 0.6,
+   "carry_transition_extra_m": 1.0,
+   "frontal_lane_offset_m": [
+    0.25
+   ],
+   "attempt_budget_s": 2400,
+   "drop_height_m": 0.25,
+   "drop_trunks": [
+    [
+     0.75,
+     -0.9
+    ],
+    [
+     0.75,
+     -0.6
+    ],
+    [
+     0.75,
+     -1.2
+    ],
+    [
+     0.5,
+     -0.9
+    ]
+   ],
+   "placement_edges": [
+    "-y",
+    "+y"
+   ],
+   "_tolerances_note": "2026-09-20 17:20: push-under - the pushed sandal's resting pose is uncertain by the differential-IK leg's 2-3 cm shortfall and the rounded heel's spin (0.56 rad in 0920-154503), so the measured pose target is 0.08 m / 0.8 rad here (spec 0.03 / 0.20 for placed IORS)"
+  },
+  "constraints": [],
+  "_note": "owner 2026-09-19 20:14: sandal under the breakfast table (the small-scale under/ontop support); hand-grounded probe, breakfast_table_rhjoby_0 has no B4 partner record (under-clearance by raycast in-process)"
+ },
+ "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-floor": {
+  "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
+  "definition_id": 89,
+  "roles": {
+   "target": {
+    "category": "sandal",
+    "sampleable": true,
+    "require": {
+     "grasps": "tabletop"
+    },
+    "representative": "chgcrm",
+    "orientation_equivalences": {
+     "sandal/chgcrm": []
+    },
+    "grasp_keys": {
+     "sandal/chgcrm": "sandal__chgcrm"
+    }
+   },
+   "partner": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "support": {
+    "category": "floors",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "partner": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "support": {
+      "room": "dining_room_0"
+     },
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "sandal": [
+       "chgcrm"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "sandal": {
+       "shdahi": "ground_isg 2026-09-16: heldout"
+      }
+     }
+    }
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.08,
+    "orientation": 0.8
+   },
+   "groups": {},
+   "path_buckets": null,
+   "max_partner_geodesic_m": 3.0,
+   "path_max_extra_m": 1.0,
+   "goal_cell_margin_m": 0.05,
+   "goal_drop_m": 0.003,
+   "under_ray_extra_m": 0.03,
+   "under_near_edge_max_m": 0.45,
+   "under_clearance_extra_m": 0.17,
+   "under_leg_margin_m": 0.05,
+   "partner_corners_in_frame_min": 4,
+   "floor_init": {
+    "distance_range_m": [
+     0.6,
+     1.5
+    ],
+    "cell_m": 0.02,
+    "clearance_m": 0.02,
+    "max_geodesic_m": 3.0
+   },
+   "stand_offs_m": [
+    0.35,
+    0.45,
+    0.55
+   ],
+   "partner_moved_max_m": 0.005,
+   "target_max_height_m": 0.2,
+   "argument_order": [
+    "target",
+    "partner"
+   ],
+   "remove_objects": {
+    "house_single_floor": [
+     "straight_chair_jgoolz_0",
+     "straight_chair_jgoolz_1",
+     "straight_chair_jgoolz_2",
+     "straight_chair_jgoolz_3",
+     "straight_chair_jgoolz_4",
+     "straight_chair_jgoolz_5"
+    ]
+   },
+   "_remove_objects_note": "floor init: chairs_to_remove keys on the support binding (= floor here), so the six chairs around breakfast_table_rhjoby_0 are removed explicitly to match the own-top world",
+   "push_under_drop_extra_m": 0.1,
+   "push_under_inside_m": 0.07,
+   "push_under_stand_offs_m": [
+    0.75,
+    0.8
+   ],
+   "_push_under_table_note": "2026-09-20 03:10: table geometry - the deep crouch clears the table only at d >= 0.65 and the floor is reached 0.24-0.64 m ahead, so the push lane is shortened: drop half+0.03 m outside the edge (was 0.10), goal 0.05 m inside (was 0.07): for d 0.70 the blade runs 0.41 -> 0.61 m ahead (0.80 m goals failed the chain IK: 106 chain failures / 50 C tries in 0920-024734) | 03:35: d 0.75 (goal 0.69-0.75 ahead) still fails on the shoulder limit (joint2 within 3 mrad): stand-offs 0.65/0.70 only, 0.70 first | 04:00: lane 0.16 m (drop half+0.02 outside, goal 0.02 inside; the centre column still hits the top), d 0.75 first (blade 0.47 -> 0.63 ahead), carry arrival may back off up to 1.0 m before the sweep | 04:40: the working chain ran on the RIGHT lane (offset 0.25, pre 0.38 / start 0.43 / goal 0.72 ahead); centred lanes fail their pre-pose -> right lane only, d 0.80/0.75, drop half+0.10, goal 0.05 inside | 06:05: long-axis yaws first (short-axis blade goals at 0.78-0.80 m have no IK); inside back to 0.07; attempt budget 2400 s | 08:45: DROP FIRST, THEN CROUCH - the release from a moderate trunk (drop 0.30 m), the deep push crouch entered with empty hands (stances.push) | 09:00: (0.5,-0.6) cannot reach the drop (eef 0.31 m at 0.54 ahead, no IK even world-free) -> drop trunks (0.75,-0.9) first, drop 0.25 m | 09:55: C at the LONG sides only (-y/+y): behind the short end the room blocks every carry drive-back pose (0920-092254 diagnostics)",
+   "push_under_drop_ahead_pref_m": 0.6,
+   "carry_transition_extra_m": 1.0,
+   "frontal_lane_offset_m": [
+    0.25
+   ],
+   "attempt_budget_s": 2400,
+   "drop_height_m": 0.25,
+   "drop_trunks": [
+    [
+     0.75,
+     -0.9
+    ],
+    [
+     0.75,
+     -0.6
+    ],
+    [
+     0.75,
+     -1.2
+    ],
+    [
+     0.5,
+     -0.9
+    ]
+   ],
+   "placement_edges": [
+    "-y",
+    "+y"
+   ],
+   "_tolerances_note": "2026-09-20 17:20: push-under - the pushed sandal's resting pose is uncertain by the differential-IK leg's 2-3 cm shortfall and the rounded heel's spin (0.56 rad in 0920-154503), so the measured pose target is 0.08 m / 0.8 rad here (spec 0.03 / 0.20 for placed IORS)"
+  },
+  "constraints": [],
+  "_note": "owner 2026-09-19 20:14: sandal under the breakfast table (the small-scale under/ontop support); hand-grounded probe, breakfast_table_rhjoby_0 has no B4 partner record (under-clearance by raycast in-process)",
+  "fallback_of": "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table",
+  "fallback_rank": 1,
+  "fallback_kind": "init_surface",
+  "fallback_params": {
+   "init_surface": "floor"
+  }
  }
 }
