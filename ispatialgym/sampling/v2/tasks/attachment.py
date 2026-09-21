@@ -624,10 +624,18 @@ class Attachment(SamplerV2):
         pos, quat = TT._t(grasp.grasp[0]), TT._t(grasp.grasp[1])
         a = C.approach_axis(quat)
         pad_tip_end_z = float((pos + C.PAD_Z_RANGE[1] * a)[2])  # the fingertip-side end of the pads
+        tip_z = float((pos + C.FINGERTIP_LENGTH * a)[2])
         top_z = float(self.world.hull_at(self.hull[self.t_role], m_pose)[:, 2].max())
         room = (top_z - PAD_BAND_MARGIN) - pad_tip_end_z
+        rule = "pad end 5 mm below the male's top"
+        if room <= 0.0:
+            # a part shorter than the pads' fingertip section (cap/xxqyrt: 1.1 cm tall) is a FINGERTIP pinch whatever the height -
+            # the pad rule would forbid any lift and the fingertips rest on the table during the closure (0920-184902: 23 contact
+            # steps, 123 N); the fingertips must stay >= 3 mm below the male's top instead
+            room = (top_z - 0.003) - tip_z
+            rule = "fingertips 3 mm below the male's top (thin part)"
         eff = max(0.0, min(x, room))
-        why = "full" if eff >= x - 1e-9 else ("clipped: pad end at the male's top" if eff > 0 else "clipped: pads already at the male's top")
+        why = "full" if eff >= x - 1e-9 else (f"clipped: {rule}" if eff > 0 else f"clipped to 0: {rule}")
         if eff > 0.0:
             R_obj = C.quat_to_mat(TT._t(m_pose[1]))
             up_obj = R_obj.T @ th.tensor([0.0, 0.0, 1.0])  # world up in the male's frame
