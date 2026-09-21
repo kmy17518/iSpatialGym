@@ -694,8 +694,9 @@ class Attachment(SamplerV2):
         tip_z = float((pos + C.FINGERTIP_LENGTH * a)[2])
         hull_w = self.world.hull_at(self.hull[self.t_role], m_pose)
         top_z, bottom_z = float(hull_w[:, 2].max()), float(hull_w[:, 2].min())  # the male's bottom rests on the support
-        room = (top_z - PAD_BAND_MARGIN) - pad_tip_end_z
-        rule = "pad end 5 mm below the male's top"
+        room_pad = (top_z - PAD_BAND_MARGIN) - pad_tip_end_z  # the pads keep overlapping the part
+        room_tip = (top_z - 0.003) - tip_z  # fingertip pinch: the tips stay >= 3 mm below the part's top
+        room, rule, regime = room_pad, "pad end 5 mm below the male's top", "pad pinch"
         needed, floors = 0.0, {}
         # the finger ENVELOPE (both finger meshes, every opening of the closure) must clear the support: the fingers are 3.8 cm
         # across the closing plane, so a 30 deg rim pinch hangs a tip corner up to 1.2 cm below the fingertip axis point -
@@ -704,14 +705,11 @@ class Attachment(SamplerV2):
         low_z = self._finger_lowest_z(grasp.grasp)
         if low_z is not None:
             floors["finger envelope"] = (bottom_z + FINGER_SUPPORT_CLEARANCE_M) - low_z
-        if room <= 0.0:
+        if room_pad <= 0.0:
             # a part shorter than the pads' fingertip section (cap/xxqyrt: 1.1 cm tall) is a FINGERTIP pinch whatever the height -
             # the pad rule would forbid any lift and the fingertips rest on the table during the closure (0920-184902: 23 contact
-            # steps, 123 N); the pads' fingertip-side end must clear the support by PAD_TABLE_CLEARANCE_M (owner 20:41) and the
-            # fingertips must stay >= 3 mm below the male's top
+            # steps, 123 N); the pads' fingertip-side end must clear the support by PAD_TABLE_CLEARANCE_M (owner 20:41)
             floors["pad end (thin part)"] = (bottom_z + PAD_TABLE_CLEARANCE_M) - pad_tip_end_z
-            room = (top_z - 0.003) - tip_z
-            rule = f"fingertips 3 mm below the male's top (thin part; pad end >= {PAD_TABLE_CLEARANCE_M * 1000:.0f} mm above the support)"
         if floors:
             which, needed = max(floors.items(), key=lambda kv: kv[1])
             if needed > x:
@@ -719,7 +717,13 @@ class Attachment(SamplerV2):
                          self.gp.alias, "lowest finger vertex" if which.startswith("finger") else "pad end",
                          ((low_z if which.startswith("finger") else pad_tip_end_z) - bottom_z) * 1000, x * 1000, needed * 1000, which)
                 x = needed
+        if room_pad <= 0.0 or (floors and needed > room_pad):
+            # the pads cannot overlap the part while the fingers clear the support (every cap/xxqyrt library grasp puts the
+            # fingertip axis 8.4-8.9 mm below the table; 0920-212214 clipped the 14.4 mm floor to the 9.2 mm pad room and the
+            # lowest vertex stayed 1.2 mm under the surface): a fingertip pinch of the part's upper band, tips >= 3 mm below the top
+            room, rule, regime = room_tip, f"fingertips 3 mm below the male's top (fingertip pinch; pad end >= {PAD_TABLE_CLEARANCE_M * 1000:.0f} mm above the support)", "fingertip pinch"
         grasp.extras["grasp_height_floors_m"] = {k: round(v, 4) for k, v in floors.items()}
+        grasp.extras["grasp_height_regime"] = regime
         if x <= 0.0:
             grasp.extras.update({"grasp_height_extra_m": x, "grasp_height_extra_effective_m": 0.0, "grasp_height_extra_reason": "off"})
             return
