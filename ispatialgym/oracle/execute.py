@@ -374,16 +374,27 @@ def reach_via_standoff(motions: Motions, arm: str, pre, distance: float, q_hint,
     rec: Dict[str, Any] = {"distance_m": float(distance)}
     ctx["approach_standoff"] = rec
     q_standoff = standoff_configuration(motions, arm, pre, standoff, q_hint) if q_hint is not None else None
-    try:
-        if q_standoff is not None:
-            rec["branch"] = "witness"
-            yield from motions.arm_to(arm, q=q_standoff, ignore_objects=list(ignore))
-        else:
-            rec["branch"] = "planner"
-            yield from motions.arm_to(arm, pose=standoff, ignore_objects=list(ignore))
-    except SkillError as e:
-        log.warning("grasp(%s): the standoff plan failed (%s); direct plan to the pre-grasp", arm, e.message)
-        rec["fallback"] = e.message
+    # the transit to the standoff is planned with the supports PRESENT (owner 2026-09-20 18:25, as the direct transit of
+    # 8254a8fc): the standoff stands 15-20 cm above the table, nothing needs ignoring - planned with the table ignored, trajopt
+    # dragged the open hand along the table for 162 steps and brushed the lemonade bottle 14 mm / 16 deg (cap 0920-193713);
+    # the supports leave the collision world only for the fallbacks
+    for ignore_now, tag in (([], "supports present"), (list(ignore), "supports ignored (fallback)")):
+        try:
+            if q_standoff is not None:
+                rec["branch"] = "witness"
+                yield from motions.arm_to(arm, q=q_standoff, ignore_objects=ignore_now)
+            else:
+                rec["branch"] = "planner"
+                yield from motions.arm_to(arm, pose=standoff, ignore_objects=ignore_now)
+            ctx["pre_grasp_transit"] = f"{tag} (standoff {distance:.2f} m)"
+            break
+        except SkillError as e:
+            log.warning("grasp(%s): the standoff plan with %s failed (%s)", arm, tag, e.message)
+            rec.setdefault("failures", []).append(f"{tag}: {e.message[:100]}")
+    else:
+        log.warning("grasp(%s): no plan to the standoff; direct plan to the pre-grasp with the supports ignored", arm)
+        rec["fallback"] = "direct"
+        ctx["pre_grasp_transit"] = "supports ignored (direct fallback)"
         yield from motions.arm_to(arm, pose=pre, q_hint=q_hint, ignore_objects=list(ignore))
         return
     yield from motions.arm_along(arm, [pre], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
