@@ -89,6 +89,7 @@ class PrivilegedState(Protocol):
     def attached(self, child: str, parent: str) -> bool: ...
     def attachment_offset(self, child: str, parent: str) -> Optional[Dict[str, Any]]: ...  # live meta-link offset + correcting transform
     def attach(self, child: str, parent: str) -> bool: ...  # AttachedTo.set_value(True) at the current poses
+    def init_pose(self, name: str) -> Optional[Tuple[th.Tensor, th.Tensor]]: ...  # the object's pose at the program start
 
 
 @dataclass
@@ -185,6 +186,15 @@ class ExecuteConfig:
     attach_correct_min_rad: float = 0.03
     attach_correct_max_m: float = 0.06
     attach_settle_steps: int = 20
+    #: (owner 2026-09-20 18:25) the snap AttachedTo makes when the joint is created must stay invisible: a residual above these after
+    #: the correction gets one more correction pass, and above them still the part is NOT attached (the place fails, the executor's
+    #: retry re-aims at the partner's live pose) - 0920-164504 snapped the cap 17 mm
+    attach_snap_max_m: float = 0.008
+    attach_snap_max_rad: float = 0.10
+    #: an attach place re-aims at the partner's LIVE pose: the recorded pre-place / place / descent / retreat / carry are moved by the
+    #: partner's displacement since the program start when it exceeds this (0920-164504: the bottle knocked 4.7 cm during the grasp
+    #: phase, the descent came down 4 cm beside the neck)
+    partner_shift_min_m: float = 0.005
     #: approach / descent finish (owner rule 2026-09-16): when the straight differential-IK segment stalls with a
     #: residual below ``approach_finish_max_stall`` (m) and no more than ``approach_finish_max_remaining`` (m) of the
     #: segment left, the converged prefix is executed and the last part is planned by ``arm_to`` to the end pose — to
@@ -672,7 +682,18 @@ def execute_grasp(action: Grasp, motions: Motions, state, targets, ctx) -> Itera
     if standoff_m:
         yield from reach_via_standoff(motions, arm, targets["pre_grasp"], standoff_m, _witness(ctx, "pre_grasp"), supports, ctx)
     else:
-        yield from motions.arm_to(arm, pose=targets["pre_grasp"], q_hint=_witness(ctx, "pre_grasp"), ignore_objects=supports)
+        # the transit to the pre-grasp is planned with the supports PRESENT (owner 2026-09-20 18:25; the contact pre-poses' rule
+        # ``reach_pre_pose``: a low pre-pose is reached through a standoff away from the support, the support leaves the collision
+        # world only for the last straight leg) - planned with the table ignored, trajopt swept the open hand 55 cm at table
+        # height, the fingertips dragging the table for 94 steps at 135 N and knocking the partner bottle 4.7 cm (cap 0920-164504).
+        # The former plan (supports ignored throughout) is the fallback when no plan exists with them present
+        try:
+            yield from reach_pre_pose(motions, state, arm, targets["pre_grasp"], supports, [], _witness(ctx, "pre_grasp"), ctx, _cfg(ctx))
+            ctx["pre_grasp_transit"] = "supports present"
+        except SkillError as e:
+            log.warning("grasp(%s): no transit to the pre-grasp with the supports present (%s); planning with them ignored", arm, e.message)
+            ctx["pre_grasp_transit"] = f"supports ignored (fallback: {e.message[:80]})"
+            yield from motions.arm_to(arm, pose=targets["pre_grasp"], q_hint=_witness(ctx, "pre_grasp"), ignore_objects=supports)
     _hook(ctx, "fov")(True)  # from the pre-grasp on the fingertips enter the frame and must stay (recorded grasp pose in frame)
     obj = state.object(action.object)
     cfg = _cfg(ctx)
@@ -838,6 +859,8 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
         else:
             on = contact_ignores(state, action.on)  # next to / touching: the partner stays an obstacle, only the shared support leaves
     ctx["plan_ignored"] = [getattr(o, "name", str(o)) for o in on]
+    if action.kind == "attach" and action.on:
+        targets = _reaim_attach_targets(action, state, targets, ctx, cfg)
     carry = list(targets.get("carry") or ())
     if cfg.carry_leg == "straight" and carry:
         # the carry leg: a straight Cartesian leg from where the hand is (the lift end) to the recorded pre-place, through
@@ -902,6 +925,62 @@ def execute_place(action: Place, motions: Motions, state, targets, ctx) -> Itera
         yield from motions.settle(max_steps=cfg.place_settle_steps)
 
 
+def _reaim_attach_targets(action: Place, state, targets: Dict[str, Any], ctx: Dict[str, Any], cfg: ExecuteConfig) -> Dict[str, Any]:
+    """The attach place re-aimed at the partner's LIVE pose (owner 2026-09-20 18:25): the recorded pre-place / place / descent /
+    retreat / carry were computed for the partner at its init pose; when the partner has moved since the program start by more
+    than ``partner_shift_min_m`` (0920-164504: the bottle knocked 4.7 cm during the grasp phase; the descent came down 4 cm
+    beside the neck, the correction then dragged the cap into it), every target moves with it. A child with a (near-)continuous
+    symmetry about the insertion axis (>= 12 recorded equivalences, a zinf cap / cork / lid) follows the partner's TRANSLATION
+    only - its yaw is free, and turning the hand to a spun bottle's yaw is wasted motion; an asymmetric child follows the full
+    planar rigid motion (translation + yaw about the partner's position). ``ctx["partner_shift"]`` records the facts."""
+    getter = getattr(state, "init_pose", None)
+    init = getter(action.on) if getter is not None else None
+    if init is None:
+        return targets
+    try:
+        live = state.object_pose(action.on)
+    except Exception:  # noqa: BLE001
+        return targets
+    p0, q0 = as_world_pose(init)
+    p1, q1 = as_world_pose(live)
+    d = (p1 - p0).float()
+    dist = float(th.linalg.norm(d))
+    dyaw = C.wrap_angle(C.yaw_of(q1) - C.yaw_of(q0)) if hasattr(C, "yaw_of") else 0.0
+    rec: Dict[str, Any] = {"partner": action.on, "shift_m": round(dist, 4), "delta": [round(float(v), 4) for v in d.tolist()], "yaw_rad": round(float(dyaw), 4)}
+    ctx["partner_shift"] = rec
+    if dist < cfg.partner_shift_min_m and abs(float(dyaw)) < 0.02:
+        rec["applied"] = False
+        return targets
+    n_eq = 0
+    try:
+        from ispatialgym.sampling import predicates as PRED
+
+        n_eq = len((PRED.attachment_context(state.object(action.object), state.object(action.on)) or {}).get("equivalences") or [])
+    except Exception:  # noqa: BLE001
+        n_eq = 0
+    symmetric = n_eq >= 12
+    rec.update({"child_equivalences": n_eq, "mode": "translation" if symmetric else "translation+yaw"})
+
+    def moved(pose):
+        p, q = as_world_pose(pose)
+        if symmetric or abs(float(dyaw)) < 1e-6:
+            return Pose(position=[float(v) for v in (p.float() + d).tolist()], orientation=[float(v) for v in q.tolist()])
+        qz = C.quat_from_yaw(float(dyaw))
+        p_new = p1.float() + C.quat_rotate(qz, p.float() - p0.float())  # the planar rigid motion of the partner applied to the eef target
+        return Pose(position=[float(v) for v in p_new.tolist()], orientation=[float(v) for v in C.qmul(qz, q.float()).tolist()])
+
+    out = dict(targets)
+    for key in ("pre_place", "place"):
+        if out.get(key) is not None:
+            out[key] = moved(out[key])
+    for key in ("descent", "retreat", "carry"):
+        if out.get(key):
+            out[key] = [moved(w) for w in out[key]]
+    rec["applied"] = True
+    log.info("place(%s): %s moved %.1f mm / %.1f deg since the start -> attach targets re-aimed (%s)", action.object, action.on, dist * 1000, math.degrees(float(dyaw)), rec["mode"])
+    return out
+
+
 def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th.Tensor]:
     """The BEHAVIOR attachment at the place pose (2026-09-19; attachment lid / teapot 0916-205838: the hand reached the
     recorded attach pose within a millimetre, opened, and the lid fell through the collision-filtered teapot onto the
@@ -924,21 +1003,40 @@ def _attach_at_place(action: Place, motions: Motions, state, ctx) -> Iterator[th
     if off is None:
         log.warning("place(%s): no attachment meta-link pair with %s; releasing without an explicit attach", action.object, action.on)
         return
-    log.info("place(%s): attach offset %.1f mm / %.1f deg (male %s -> female %s of %s)", action.object, off["pos_m"] * 1000, math.degrees(off["rot_rad"]),
-             off["male_link"], off["female_link"], action.on)
-    if (off["pos_m"] > cfg.attach_correct_min_m or off["rot_rad"] > cfg.attach_correct_min_rad) and off["pos_m"] <= cfg.attach_correct_max_m:
+    log.info("place(%s): attach offset %.1f mm / %.1f deg modulo the part's symmetry (raw %.1f deg; male %s -> female %s of %s)", action.object, off["pos_m"] * 1000,
+             math.degrees(off["rot_rad"]), math.degrees(off.get("rot_raw_rad", off["rot_rad"])), off["male_link"], off["female_link"], action.on)
+    # closed-loop correction passes (at most two): the hand moves by the transform carrying the (equivalent) male frame onto the
+    # female one; a residual the snap would make visible (> attach_snap_max_*) after both passes does NOT attach
+    passes: List[Dict[str, Any]] = []
+    for k in range(2):
+        need = off["pos_m"] > cfg.attach_correct_min_m or off["rot_rad"] > cfg.attach_correct_min_rad
+        if not need or off["pos_m"] > cfg.attach_correct_max_m:
+            break
+        if k == 1 and off["pos_m"] <= cfg.attach_snap_max_m and off["rot_rad"] <= cfg.attach_snap_max_rad:
+            break  # the first pass left an invisible residual: no second pass
         p, q = state.eef_pose(arm)
         target = C.compose(off["fix"], (p.float(), q.float()))
         try:
             yield from motions.arm_along(arm, [target], soft_pos_tol=motions.cfg.diff_ik_soft_pos_tol_free)
             yield from motions.settle(max_steps=cfg.attach_settle_steps)
         except SkillError as e:
-            log.warning("place(%s): the attach correction leg did not complete (%s); attaching from where the hand is", action.object, e.message)
+            log.warning("place(%s): attach correction pass %d did not complete (%s)", action.object, k + 1, e.message)
             rec["correction_error"] = e.message
         off2 = getter(action.object, action.on)
-        rec["offset_after_correction"] = None if off2 is None else {k: v for k, v in off2.items() if k != "fix"}
-        if off2 is not None:
-            log.info("place(%s): after the correction %.1f mm / %.1f deg", action.object, off2["pos_m"] * 1000, math.degrees(off2["rot_rad"]))
+        if off2 is None:
+            break
+        passes.append({k2: v for k2, v in off2.items() if k2 != "fix"})
+        log.info("place(%s): after correction pass %d: %.1f mm / %.1f deg", action.object, k + 1, off2["pos_m"] * 1000, math.degrees(off2["rot_rad"]))
+        off = off2
+    rec["offset_after_correction"] = passes[-1] if passes else None
+    rec["correction_passes"] = len(passes)
+    if off["pos_m"] > cfg.attach_snap_max_m or off["rot_rad"] > cfg.attach_snap_max_rad:
+        # the joint would snap the part visibly (0920-164504: 17 mm): leave it unattached, the postcondition fails and the executor's
+        # retry re-aims the place at the partner's live pose
+        rec.update({"attached": False, "refused": f"residual {off['pos_m'] * 1000:.1f} mm / {math.degrees(off['rot_rad']):.1f} deg exceeds the invisible-snap bound "
+                                                    f"({cfg.attach_snap_max_m * 1000:.0f} mm / {math.degrees(cfg.attach_snap_max_rad):.0f} deg)"})
+        log.warning("place(%s): %s - not attached", action.object, rec["refused"])
+        raise SkillError("execution", f"attach refused: {rec['refused']}")  # still held: the checkpoint rollback + retry re-aim the place
     # drop the assisted grasp and attach in one step (no physics in between): the snap acts on a free part
     if state.held_object(arm) is not None:
         state.robot.release_grasp_immediately(arm)

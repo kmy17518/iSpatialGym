@@ -2010,11 +2010,14 @@ def test_plan_failed_is_retried_and_counted_separately(tmp_path):
     sc, env = iors_world()
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
     ex, motions, backend, rec = make_executor(env, sc, tmp_path)
-    backend.fail_plans = 1  # the first trajopt of the program (grasp pre-grasp) fails once
+    # the pre-grasp transit tries two plans per attempt (2026-09-20: with the supports present, then the former plan with them
+    # ignored as the fallback): both trajopts of the first attempt fail, the retry's plan succeeds
+    backend.fail_plans = 2
     result = ex.run_program(expand(sc.alias, sc))
     assert result["success"], result["verdict"]
     assert result["qa"]["stats"]["by_category"] == {"plan_failed": 1}
     assert result["actions"][1]["attempts"][0]["details"]["stage"] == "trajopt"
+    assert result["actions"][1]["notes"]["pre_grasp_transit"] == "supports present"
 
 
 def test_qa_monitor_verdict_propagates_and_is_retried(tmp_path):

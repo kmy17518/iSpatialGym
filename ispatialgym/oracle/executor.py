@@ -307,7 +307,7 @@ TASK_TRACKING_ATTRS = ("_first_success_step", "_first_settled_success_step", "_e
 
 #: ctx keys the execute functions write for the record (meta.json ``actions[].notes``)
 NOTE_KEYS = ("push_residual", "push_pivot_offset_m", "push_object_drift_m", "approach_finish", "descent_finish", "lift_finish", "retreat_finish", "pre_pose_standoff", "plan_relaxed_links", "push_axis", "carry_leg", "idle_arms_moved", "arms_posture", "fingers_set", "plan_ignored", "object_motion",
-             "camera_error_before_correction", "camera_error", "attached", "preshape_opening_m", "closure_rate_m_per_step", "release_stage_m", "attach", "reorient_finish", "approach_standoff")
+             "camera_error_before_correction", "camera_error", "attached", "preshape_opening_m", "closure_rate_m_per_step", "release_stage_m", "attach", "reorient_finish", "approach_standoff", "partner_shift", "pre_grasp_transit")
 
 
 def _jsonable(x):
@@ -521,24 +521,38 @@ class SimState:
         return None
 
     def attachment_offset(self, child: str, parent: str) -> Optional[Dict[str, Any]]:
-        """Live male-vs-female meta-link offset of the attachment pair: ``pos_m`` / ``rot_rad`` (what OmniGibson's 5 cm /
-        15 deg snap test reads) and ``fix`` = the world transform ``T_female @ inv(T_male)`` that would carry the male
-        frame onto the female one (applied to the hand pose it is the closed-loop correction of the place)."""
+        """Live male-vs-female meta-link offset of the attachment pair **modulo the child's recorded symmetry**
+        (``predicates.attachment_alignment``, the evaluator's own rule): ``pos_m`` / ``rot_rad`` and ``fix`` = the world
+        transform carrying the best equivalent male frame onto the female one (applied to the hand pose it is the
+        closed-loop correction of the place; a zinf cap is not turned to the knocked bottle's yaw - 0920-164504 rotated the
+        hand 35 deg for nothing and dragged the cap into the neck). ``rot_raw_rad`` keeps the full-SO(3) difference."""
+        from ispatialgym.sampling import predicates as PRED
+
         pair = self.attachment_links(child, parent)
         if pair is None:
             return None
+        c, p = self.object(child), self.object(parent)
+        a = PRED.attachment_alignment(c, p, with_fix=True)
+        if not a.get("fix"):
+            return None
         male, female = pair
-        mp, mq = (x.float().clone() for x in male.get_position_orientation())
-        fp, fq = (x.float().clone() for x in female.get_position_orientation())
-        fix = C.compose((fp, fq), C.invert((mp, mq)))
+        mp, _ = (x.float().clone() for x in male.get_position_orientation())
+        fp, _ = (x.float().clone() for x in female.get_position_orientation())
         return {
-            "pos_m": float(th.linalg.norm(fp - mp)),
-            "rot_rad": C.quat_angle(mq, fq),
+            "pos_m": float(a["pos_m"]),
+            "rot_rad": float(a["rot_rad"]),
+            "rot_raw_rad": float(a.get("rot_raw_rad", a["rot_rad"])),
+            "equivalence": a.get("equivalence"),
             "delta_pos": [round(float(v), 4) for v in (fp - mp).tolist()],
             "male_link": male.body_name,
             "female_link": female.body_name,
-            "fix": fix,
+            "fix": a["fix"],
         }
+
+    def init_pose(self, name: str) -> Optional[Tuple[th.Tensor, th.Tensor]]:
+        """The object's pose at the start of the program (``Executor.run_program`` snapshot), None when unknown."""
+        p = (getattr(self, "init_poses", None) or {}).get(name)
+        return None if p is None else (p[0].clone(), p[1].clone())
 
     def attach(self, child: str, parent: str) -> bool:
         """The BEHAVIOR attachment of ``child`` to ``parent`` at their current poses — the evaluator's own rule
@@ -993,6 +1007,17 @@ class Executor:
         actions = list(actions)
         self.program_actions = actions
         self._init_support_load()
+        # every tracked object's pose at the start (the loaded init): the reference for a partner displaced during the run
+        # (attachment 0920-164504: the bottle knocked 4.7 cm during the grasp phase, the place aimed at its recorded pose)
+        init_poses: Dict[str, Tuple[th.Tensor, th.Tensor]] = {}
+        for inst, obj in self.tracked.items():
+            if obj is self.robot:
+                continue
+            try:
+                init_poses[inst] = tuple(x.clone().float() for x in obj.get_position_orientation())
+            except Exception:  # noqa: BLE001
+                continue
+        self.state.init_poses = init_poses
         verdict: Optional[Verdict] = None
         i = 0
         while i < len(actions):

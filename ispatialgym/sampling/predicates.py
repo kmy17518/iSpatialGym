@@ -138,7 +138,17 @@ def _qangle(a, b) -> float:
     return 2.0 * math.acos(min(1.0, d))
 
 
-def attachment_alignment(child: Any, parent: Any, equivalences: Optional[Sequence[Sequence[float]]] = None) -> Dict[str, Any]:
+def _rotate(q, v):
+    """``R(q) v`` for a xyzw quaternion and a 3-vector (float64)."""
+    x, y, z, w = (float(c) for c in q)
+    v = th.as_tensor(v, dtype=th.float64)
+    R = th.tensor([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                   [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                   [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]], dtype=th.float64)
+    return R @ v
+
+
+def attachment_alignment(child: Any, parent: Any, equivalences: Optional[Sequence[Sequence[float]]] = None, with_fix: bool = False) -> Dict[str, Any]:
     """Meta-link alignment of ``child``'s male link with ``parent``'s free female link, modulo the child's symmetry: for every
     object-frame equivalence ``q_e`` (identity included) the male frame of the equivalently rotated child is
     ``q_obj q_e q_obj^-1 q_male``; the smallest orientation difference to the female frame decides. Returns ``{"ok", "pos_m",
@@ -172,14 +182,20 @@ def attachment_alignment(child: Any, parent: Any, equivalences: Optional[Sequenc
             pp, pq = (x.double() for x in pl.get_position_orientation())
             pos = float(th.linalg.norm(cp - pp))
             raw = _qangle(cq, pq)
-            rot, which = raw, 0
+            rot, which, q_best = raw, 0, cq
             for k, qe in enumerate(eqs[1:], start=1):
                 q_alt = _qmul(_qmul(_qmul(oq, qe), _qinv(oq)), cq)
                 ang = _qangle(q_alt, pq)
                 if ang < rot:
-                    rot, which = ang, k
+                    rot, which, q_best = ang, k, q_alt
             rec = {"ok": pos <= ATTACH_POS_MAX_M and rot <= ATTACH_ORN_MAX_RAD, "pos_m": round(pos, 5), "rot_rad": round(rot, 5), "rot_raw_rad": round(raw, 5),
                    "equivalence": which, "n_equivalences": len(eqs) - 1, "child_link": child_name, "parent_link": parent_name}
+            if with_fix:
+                # the world transform carrying the (best equivalent) male frame onto the female frame: applied to the hand it is the
+                # closed-loop correction of an attach place that leaves a symmetric part's free yaw alone
+                q_fix = _qmul(pq, _qinv(q_best / th.linalg.norm(q_best)))
+                p_fix = pp - th.as_tensor(_rotate(q_fix, cp), dtype=th.float64)
+                rec["fix"] = (p_fix.float(), q_fix.float())
             if best is None or (rec["ok"] and not best["ok"]) or (rec["ok"] == best["ok"] and rec["pos_m"] + rec["rot_rad"] < best["pos_m"] + best["rot_rad"]):
                 best = rec
     if best is None:
