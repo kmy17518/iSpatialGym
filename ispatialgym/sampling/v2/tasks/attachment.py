@@ -763,7 +763,10 @@ class Attachment(SamplerV2):
         clr = self._attach_clearance(grasp)
         floors_pad, floors_tip = dict(floors), dict(floors)
         if clr is not None and clr["lift_sign"] > 0.5:
-            floors_pad["partner top (pad end)"] = PARTNER_CLEARANCE_M - clr["h_pad_m"]
+            # the fingertips reach 6.9 mm beyond the pads' end along the approach, so they - not the pad end - are the lowest part
+            # of the finger over the rim in BOTH regimes (cork 0920-235939: the pad end 5 mm above the rim left the tips 1 mm below
+            # it); the owner's pad-end condition (pinch point >= depth + PAD_Z_RANGE[1] + 5 mm) is implied by the tips' clearance
+            floors_pad["partner top (fingertips)"] = PARTNER_CLEARANCE_M - clr["h_tip_m"]
             floors_tip["partner top (fingertips)"] = PARTNER_CLEARANCE_M - clr["h_tip_m"]
             grasp.extras["attach_clearance"] = {k: round(v, 4) for k, v in clr.items()}
         elif clr is not None:
