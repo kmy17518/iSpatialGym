@@ -804,7 +804,16 @@ class Attachment(SamplerV2):
         if eff > 0.0:
             R_obj = C.quat_to_mat(TT._t(m_pose[1]))
             up_obj = R_obj.T @ th.tensor([0.0, 0.0, 1.0])  # world up in the male's frame
-            eef_in_object = (TT._t(grasp.eef_in_object[0]) + eff * up_obj, TT._t(grasp.eef_in_object[1]))
+            shift_w = th.zeros(3)
+            if regime == "fingertip pinch":
+                # the library centres the PAD centre (CONTACT_CENTER_Z, 12 mm behind the eef) on the male's axis; a fingertip pinch
+                # closes 15 mm AHEAD of the eef (the middle of the fingertip section), and with a tilted approach that 27 mm axial
+                # difference is a horizontal offset of the pinch line - 15 mm at 30 deg: cork 0921-004359's tips passed beside the
+                # 17 mm cork and their corner tipped it over (the cap's 51 mm rim still spanned the off-centre chord: hold 43 mm).
+                # The hand moves horizontally so the fingertip section's centre lies on the male's axis
+                s_tip = 0.5 * (float(C.PAD_Z_RANGE[1]) + float(C.FINGERTIP_LENGTH))
+                shift_w = -(s_tip - float(C.CONTACT_CENTER_Z)) * th.tensor([float(a[0]), float(a[1]), 0.0])
+            eef_in_object = (TT._t(grasp.eef_in_object[0]) + eff * up_obj + R_obj.T @ shift_w, TT._t(grasp.eef_in_object[1]))
             eef = IK.grasp_pose(m_pose, eef_in_object)
             pre = IK.pre_pose(eef)
             support = self.obj("support")
@@ -812,6 +821,10 @@ class Attachment(SamplerV2):
                                  approached=[self.obj(self.t_role)])
             if res.ok:
                 grasp.eef_in_object, grasp.grasp, grasp.pre_grasp = eef_in_object, eef, pre
+                if float(th.linalg.norm(shift_w)) > 1e-6:
+                    grasp.extras["fingertip_pinch_recentre_m"] = [round(float(v), 4) for v in shift_w.tolist()]
+                    log.info("%s: fingertip pinch re-centred: hand moved %.1f mm horizontally so the fingertip section closes on the male's axis",
+                             self.gp.alias, float(th.linalg.norm(shift_w)) * 1000)
             else:
                 eff, why = 0.0, f"IK failed with the lift ({res.reason}); library height kept"
         log.info("%s: grasp height extra %.1f mm requested -> %.1f mm (%s; pad end %.3f, male top %.3f)", self.gp.alias, x * 1000, eff * 1000, why, pad_tip_end_z, top_z)
