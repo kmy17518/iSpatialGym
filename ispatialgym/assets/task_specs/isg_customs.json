@@ -52816,7 +52816,8 @@
    "partner_moved_max_m": 0.005,
    "target_max_height_m": 0.35,
    "carry_collision_margin_m": 0.01,
-   "_carry_margin_note": "2026-09-21 04:20: carried sweeps at 1 cm - the conditions of the demo of record 0920-014411 (the 4 cm default came with the sandal carry of 2026-09-20 15:45); at 4 cm every countertop C was skipped / its arrival sweep fails in the small utility room (0921-031852 / 035744)"
+   "_carry_margin_note": "2026-09-21 04:20: carried sweeps at 1 cm - the conditions of the demo of record 0920-014411 (the 4 cm default came with the sandal carry of 2026-09-20 15:45); at 4 cm every countertop C was skipped / its arrival sweep fails in the small utility room (0921-031852 / 035744) | 04:55: the carried DRIVE is checked at 3 cm (carry_path_margin_m; the transitions stay at 1 cm): 0921-040940 the untucked idle arm brushed wardrobe_pyuwgc_0 on the 0.54 m carry the 1 cm check had passed (left_arm_link5, 2 attempts) - a local path failing it retries on the eroded global map",
+   "carry_path_margin_m": 0.03
   },
   "constraints": []
  },

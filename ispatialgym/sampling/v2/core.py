@@ -769,8 +769,12 @@ class SamplerV2(TaskSampler):
         # ``1dd3820``) drives tucked - the oracle re-poses empty hands to ``untucked`` only when the record says so
         posture = "tucked" if (frm.posture == "tucked" and arm_q is None) else "untucked"
         try:
+            # a CARRIED drive may ask for more clearance than the 1 cm of the whole-body stride checks (generation.carry_path_margin_m;
+            # 0921-040940: the idle arm brushed a wardrobe on a 0.54 m carry the 1 cm check had passed) - a local path that fails it
+            # falls back to the eroded global map in the callers' path_collision retry
+            margin = float(self.gp.gen("carry_path_margin_m", 0.01)) if (carried and obj is not None) else 0.01
             p = NAV.plan_path(self.kit, start, to, posture=posture, carried=carried, carried_obj=obj, carried_arm=arm, rooms=self.gp.rooms(self.scene) or self.world.rooms,
-                              blocked=blocked, max_length_m=max_length_m, trunk=trunk, eef_in_object=eef_in_object, force_global=force_global, arm_q=arm_q)
+                              blocked=blocked, max_length_m=max_length_m, trunk=trunk, eef_in_object=eef_in_object, force_global=force_global, arm_q=arm_q, margin=margin)
         except NAV.NavigationError as e:
             raise Reject(e.reason, str(e))
         return self.sidecar.add_path(p)

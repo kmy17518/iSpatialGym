@@ -385,7 +385,8 @@ class attached:
 def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: str = "untucked", carried: Optional[str] = None,
               carried_obj: Any = None, carried_arm: str = "right", rooms: Optional[Sequence[str]] = None, blocked: Sequence[Any] = (),
               max_length_m: Optional[float] = None, stride: float = STRIDE_M, trunk: Optional[Tuple[float, float]] = None,
-              eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None, force_global: bool = False, arm_q: Optional[Dict[str, th.Tensor]] = None) -> PathRecord:
+              eef_in_object: Optional[Tuple[th.Tensor, th.Tensor]] = None, force_global: bool = False, arm_q: Optional[Dict[str, th.Tensor]] = None,
+              margin: float = 0.01) -> PathRecord:
     """§3.7: the base path from ``stance_from`` to ``stance_to`` (world (x, y, yaw) waypoints), ``mode`` ``local`` or
     ``global``, validated with whole-body checks every ``stride`` m at the navigation posture with ``carried_obj``
     attached to ``carried_arm`` (posed in the hand per ``eef_in_object``, the grasp record's T_obj→eef). ``trunk``
@@ -439,9 +440,10 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
         raise NavigationError("path_too_long", f"{length:.2f} m > {max_length_m:.2f} m")
     poses = stride_poses(filled, stride)
     with attached(kit, carried_arm if carried_obj is not None else None, carried_obj, eef_in_object=eef_in_object):
-        ok, bad = path_collision_free(kit, poses, trunk, posture, q_arms=arm_q)
+        ok, bad = path_collision_free(kit, poses, trunk, posture, margin=float(margin), q_arms=arm_q)
     if not ok:
-        raise NavigationError("path_collision", f"{mode} path {stance_from.name} -> {stance_to.name} collides at stride {bad}/{len(poses)} ({poses[bad]}) at trunk {trunk}")
+        raise NavigationError("path_collision", f"{mode} path {stance_from.name} -> {stance_to.name} collides at stride {bad}/{len(poses)} ({poses[bad]}) at trunk {trunk}"
+                                                + (f" (margin {float(margin):.3f})" if float(margin) > 0.011 else ""))
     return PathRecord(stance_from.name, stance_to.name, mode, filled, length, posture, carried, trunk, stride, len(poses))
 
 
