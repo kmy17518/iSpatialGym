@@ -590,10 +590,12 @@ class IORSLarge(SamplerV2):
         above the tips. The old rule (eef origin at ¾ of the height, fingertips ≥ 4 cm up for the cuRobo ground slab) ran
         the blade over a 4.5 cm sandal: it caught the strap near the middle and moved the sandal 17 cm of the 29 cm
         (0920-143722, 12 cm short of the goal cell). A blade below ``SLAB_TIP_M`` has its IK solved with the slab off."""
-        # the fingertips at 0.8 of the height (3.6 cm for the 4.5 cm sandal: the height the exact IK admits and 0920-154503 executed;
-        # 1.1 cm had no IK solution at all, 0920-170805) - what the blade meets at that height is modelled by ``contact_offset_along``
+        # the fingertips at half the height (3.6 cm for the 7.2 cm sandal chgcrm: the height the exact IK admits and 0920-154503
+        # executed; 1.1 cm had no IK solution at all, 0920-170805) - what the blade meets at that height is modelled per yaw by
+        # ``contact_offset_along`` (pod probe 2026-09-20: the sandal's heel face reaches 12.8 cm back only up to z 3.5 cm, its toe
+        # 11.4 cm forward up to z 4.5 cm, the strap 2.7 cm behind the root above - so the blade at 3.6 cm pushes it toe-first)
         height = float(self.place["height"])
-        frac = float(self.num("push_tip_frac", 0.8))
+        frac = float(self.num("push_tip_frac", 0.5))
         clear = float(self.num("push_tip_clearance_m", 0.015))
         z_tip = self.floor_z + max(clear, min(frac * height, 0.05))
         drop = C.FINGERTIP_LENGTH * math.cos(math.radians(float(pitch_deg)))
