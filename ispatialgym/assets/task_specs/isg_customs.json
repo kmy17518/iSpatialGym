@@ -62436,12 +62436,9 @@
      -0.9
     ]
    ],
-   "placement_edges": [
-    "-y",
-    "+y"
-   ],
    "_tolerances_note": "2026-09-20 17:20: push-under - the pushed sandal's resting pose is uncertain by the differential-IK leg's 2-3 cm shortfall and the rounded heel's spin (0.56 rad in 0920-154503), so the measured pose target is 0.08 m / 0.8 rad here (spec 0.03 / 0.20 for placed IORS)",
-   "push_goal_extra_m": 0.01
+   "push_goal_extra_m": 0.01,
+   "_placement_edges_note": "W3 (owner 2026-09-20 22:15): placement_edges ['-y', '+y'] removed - every partner edge is a C candidate again, ordered by the B->C travel (c_order=travel); the short end next to B is tried first and falls back to the long sides when its carry arrival has no drive-back (the transition logs the collision blame)"
   },
   "constraints": [],
   "_note": "owner 2026-09-19 20:14: sandal under the breakfast table (the small-scale under/ontop support); hand-grounded probe, breakfast_table_rhjoby_0 has no B4 partner record (under-clearance by raycast in-process)"
@@ -62590,12 +62587,9 @@
      -0.9
     ]
    ],
-   "placement_edges": [
-    "-y",
-    "+y"
-   ],
    "_tolerances_note": "2026-09-20 17:20: push-under - the pushed sandal's resting pose is uncertain by the differential-IK leg's 2-3 cm shortfall and the rounded heel's spin (0.56 rad in 0920-154503), so the measured pose target is 0.08 m / 0.8 rad here (spec 0.03 / 0.20 for placed IORS)",
-   "push_goal_extra_m": 0.01
+   "push_goal_extra_m": 0.01,
+   "_placement_edges_note": "W3 (owner 2026-09-20 22:15): placement_edges ['-y', '+y'] removed - every partner edge is a C candidate again, ordered by the B->C travel (c_order=travel); the short end next to B is tried first and falls back to the long sides when its carry arrival has no drive-back (the transition logs the collision blame)"
   },
   "constraints": [],
   "_note": "owner 2026-09-19 20:14: sandal under the breakfast table (the small-scale under/ontop support); hand-grounded probe, breakfast_table_rhjoby_0 has no B4 partner record (under-clearance by raycast in-process)",

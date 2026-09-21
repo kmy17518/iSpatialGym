@@ -1840,8 +1840,30 @@ class IORSLarge(SamplerV2):
             erank = lambda k: int(c_pool[k].extras.get("edge_rank", 0))  # noqa: E731  (the nearest allowed partner edge first)
             depth = lambda k: (erank(k), -float(c_pool[k].translate), float(c_pool[k].tilt), -float(c_pool[k].extras.get("drop_ahead_m", 0.0)), lane(k))  # noqa: E731
             reach = lambda k: (erank(k), lane(k), abs(float(c_pool[k].extras.get("drop_ahead_m", 0.0)) - float(ahead_pref)), -float(c_pool[k].translate), float(c_pool[k].tilt))  # noqa: E731
-            order = sorted(side, key=depth) + sorted(front, key=reach if ahead_pref is not None else depth)
+            if str(self.gp.gen("c_order", "travel")) == "travel":
+                # W3 (owner 2026-09-20 22:15): the survivors of the feasibility filters (collision-free crouch, free drop lane, goal cell
+                # under the top) are ordered by the B -> C base travel (shortest path on the eroded map, 0.25 m buckets; the straight
+                # distance as fallback), deterministic given B: the same B gave C at the far end (4.2 m), the middle (3.2 m) and the near
+                # end (2.6 m) of the table with the seeded permutation deciding (0920-143722 / 154503 / 154504). Within a bucket the
+                # right lane, the stand-off nearest ``push_under_drop_ahead_pref_m`` and the deepest trunk keep their order.
+                trav_cache: Dict[Any, float] = {}
+                trav = lambda k: round(NAV.travel_length(self.kit, manip.base_xy, c_pool[k].base_xy, trav_cache) / 0.25)  # noqa: E731
+                pref = float(ahead_pref) if ahead_pref is not None else 0.6
+                key_t = lambda k: (trav(k), lane(k), abs(float(c_pool[k].extras.get("drop_ahead_m", 0.0)) - pref), -float(c_pool[k].translate), float(c_pool[k].tilt))  # noqa: E731
+                order = sorted(side + front, key=key_t)
+                if order:
+                    k0 = order[0]
+                    log.info("%s: C order by travel from B %s: nearest %s (%.2f m, edge %s, d %.2f, λ %+.2f), farthest %.2f m over %d survivors", self.gp.alias,
+                             [round(float(v), 2) for v in manip.base_xy.tolist()], [round(float(v), 2) for v in c_pool[k0].base_xy.tolist()],
+                             NAV.travel_length(self.kit, manip.base_xy, c_pool[k0].base_xy, trav_cache), c_pool[k0].extras.get("edge"), c_pool[k0].stand_off or 0.0,
+                             c_pool[k0].lateral, max(NAV.travel_length(self.kit, manip.base_xy, c_pool[k].base_xy, trav_cache) for k in order), len(order))
+            else:
+                order = sorted(side, key=depth) + sorted(front, key=reach if ahead_pref is not None else depth)
             n_try = max(int(self.num("c_tries", 36)), len(side))  # the chain-first screen makes a C try cheap (a few IKs) until one has a chain
+        elif str(self.gp.gen("c_order", "travel")) == "travel":
+            # W3: ontop / place variants - the nearest survivor by base travel first (edge rank as the tie-break), deterministic given B
+            trav_cache = {}
+            order.sort(key=lambda k: (round(NAV.travel_length(self.kit, manip.base_xy, c_pool[k].base_xy, trav_cache) / 0.25), int(c_pool[k].extras.get("edge_rank", 0))))
         else:
             order.sort(key=lambda k: int(c_pool[k].extras.get("edge_rank", 0)))  # ontop / place variants: nearest edge first, random within
         yaw_step = 2.0 * math.pi / max(1, len(self.yaws()))  # the screening grid (yaw buckets of the caches / the intersection)

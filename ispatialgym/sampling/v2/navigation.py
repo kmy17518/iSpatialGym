@@ -445,6 +445,32 @@ def plan_path(kit: "RobotKit", stance_from: Stance, stance_to: Stance, posture: 
     return PathRecord(stance_from.name, stance_to.name, mode, filled, length, posture, carried, trunk, stride, len(poses))
 
 
+def travel_length(kit: "RobotKit", a_xy, b_xy, cache: Optional[Dict[Any, float]] = None) -> float:
+    """W3 (owner 2026-09-20 22:15): the base travel from ``a_xy`` to ``b_xy`` = the shortest path on the eroded map (no
+    whole-body checks: an ordering key, not a record), the straight distance when either end has no eroded-free cell
+    within 20 cells or the two are disconnected. ``cache`` (keyed by the rounded end points) makes the per-candidate
+    ordering of a stance pool cheap."""
+    a_xy, b_xy = th.as_tensor(a_xy, dtype=th.float32)[:2], th.as_tensor(b_xy, dtype=th.float32)[:2]
+    key = (tuple(round(float(v), 2) for v in a_xy.tolist()), tuple(round(float(v), 2) for v in b_xy.tolist()))
+    if cache is not None and key in cache:
+        return cache[key]
+    straight = float(th.linalg.norm(a_xy - b_xy))
+    length = straight
+    try:
+        free_g = eroded_map(kit)
+        ga, gb = nearest_free_cell(free_g, _to_map(kit, a_xy), 20), nearest_free_cell(free_g, _to_map(kit, b_xy), 20)
+        if ga is not None and gb is not None:
+            cells = grid_shortest_path(free_g, ga, gb)
+            if cells:
+                pts = [_to_world(kit, c) for c in simplify_path(cells, free_g)]
+                length = max(straight, path_length([(float(p[0]), float(p[1]), 0.0) for p in pts]))
+    except Exception:  # noqa: BLE001 - an ordering key never fails the attempt
+        length = straight
+    if cache is not None:
+        cache[key] = length
+    return length
+
+
 # ----------------------------------------------------------------------------------------------------------------
 # §3.8 transitions
 # ----------------------------------------------------------------------------------------------------------------
