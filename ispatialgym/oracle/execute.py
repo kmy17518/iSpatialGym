@@ -1248,7 +1248,21 @@ def execute_retreat(action: Retreat, motions: Motions, state, targets, ctx) -> I
             ignore = []
     finish = _free_leg_finish(state, targets["retreat"][-1], _witness(ctx, "retreat"), ignore, cfg)
     leg = list(targets["retreat"])
-    if isinstance(getattr(action, "after", None), (Brace, Push)) and cfg.contact_retreat_escape_m > 0:
+    after_x = (getattr(getattr(getattr(action, "after", None), "contact", None), "extra", None) or {}) if isinstance(getattr(action, "after", None), Push) else {}
+    if after_x.get("hold"):
+        motions.press_hold = None
+        held_press = True  # the pressing fist leaves a springy flap straight back along its approach, no radial slide on the paper
+    else:
+        held_press = bool(after_x.get("straight_retreat"))  # a push-close segment: the fist leaves the tip straight back (no radial slide on the link)
+    if after_x.get("kind") == "push_under":
+        # a FLOOR blade (IORS push-under) leaves along its own approach axis - straight UP to the recorded pre pose (the default leg
+        # already in ``targets``). The radial escape below combined the partner (the table the object went under is in the
+        # contact's support list) and the floor into a diagonal escape normal (back + up) and projected the back-off
+        # perpendicular to it: 10 cm back AND 7 cm DOWN, the fingertips into the floor within 0.4 s, the arm pressing the
+        # floor for ~100 steps and rocking the base 0.4-0.9 deg (0921-021333 / 021337: the wobble at the end of the push)
+        held_press = True
+        ctx["retreat_escape"] = {"skipped": "push_under: straight up along -a"}
+    if isinstance(getattr(action, "after", None), (Brace, Push)) and cfg.contact_retreat_escape_m > 0 and not held_press:
         # rush 2026-09-17: a pad leaving a contact first moves straight away from the supports (the wall normal / up from a
         # table: escape_direction, as the pre-pose standoff) before the leg to the recorded clear pose - that single
         # straight leg has a component along the face and rubbed the painting from +0.053 to +0.135 rad (0917-213345;

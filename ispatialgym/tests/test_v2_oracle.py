@@ -2557,3 +2557,90 @@ def test_goal_override_thresholds_measured_only_vs_gating():
     assert rec["applied"] and rec["position_tolerance"] == pytest.approx(0.03)
     depth = PoseTarget.from_dict("apple.n.01_1", {"position": [0, 0, -0.5], "position_metric": "depth", "frame": f"{AGENT_INSTANCE}::{CAM_KEY}", "position_tolerance": 0.02})
     assert ex._override_pose_target("apple.n.01_1", depth, Gating())["applied"] is False
+
+
+def test_locked_joint_transform_is_exact_under_tf32():
+    """cuRobo / OmniGibson switch TF32 matmul on process-wide; a locked virtual base joint carries the 40-60 m from the
+    parked articulation root, and the float32 composition of its fixed transform rounded that to the 10-bit mantissa
+    (door_crtrpa_0 stance: -13.75 / -5 mm = the TF32 rounding of the base x / y joint values). ``_lock_transform``
+    composes in float64: exact to the micrometre wherever the base stands."""
+    from ispatialgym.oracle import curobo_planner as CP
+
+    dev = "cuda" if th.cuda.is_available() else "cpu"
+    origin = th.eye(4, dtype=th.float32, device=dev)
+    origin[:3, 3] = th.tensor([0.05, -0.02, 0.10], device=dev)
+    prev = th.backends.cuda.matmul.allow_tf32
+    try:
+        th.backends.cuda.matmul.allow_tf32 = True
+        for jtype, val, axis in ((CP.JointType.X_PRISM, -45.955, 0), (CP.JointType.Y_PRISM, -35.37, 1), (CP.JointType.Z_PRISM, -5.0171, 2)):
+            t = CP._lock_transform(origin, jtype, val, dev)
+            expect = origin[:3, 3].double().clone()
+            expect[axis] += val
+            err = float(th.max(th.abs(t[:3, 3].double().cpu() - expect.cpu())))
+            assert err < 1e-5, (jtype, val, err)
+        # a locked yaw: rotation exact to float32 precision, translation untouched
+        t = CP._lock_transform(origin, CP.JointType.Z_ROT, -3.126, dev)
+        assert float(th.abs(t[:3, 3].cpu() - origin[:3, 3].cpu()).max()) < 1e-6
+        assert abs(float(t[0, 0]) - math.cos(-3.126)) < 1e-6 and abs(float(t[1, 0]) - math.sin(-3.126)) < 1e-6
+    finally:
+        th.backends.cuda.matmul.allow_tf32 = prev
+
+
+def test_push_under_retreat_leaves_the_floor_straight_up():
+    """2026-09-21 (the wobble at the end of the push in 0921-021333 / 021337): the radial contact escape of a retreat after a
+    push combined the partner (the table the object went under is in the contact's support list) and the floor into a
+    diagonal escape normal and projected the back-off perpendicular to it - 10 cm back AND 7 cm down, the fingertips into
+    the floor, the arm pressing it for ~100 steps while the base rocked. A floor blade (``contacts.push.kind ==
+    "push_under"``) now leaves straight up along its own approach axis: every waypoint of the executed leg is at or above
+    the hand, the last one at the recorded pre pose, and the escape is recorded as skipped."""
+    sc = Sidecar.load(os.path.join(VARIANTS, "inter_object_relation_satisfaction-under_large_scale__push_under.json"))
+    actions = expand(sc.alias, sc)
+    push = [a for a in actions if isinstance(a, Push)][0]
+    retreat = [a for a in actions[actions.index(push) + 1:] if a.name == "retreat"][0]
+    assert retreat.after is push and push.kind == "push_under"
+    goal = th.tensor(push.contact.goal.position, dtype=th.float32)
+    here = goal - th.tensor([0.0, 0.0, 0.0])  # the blade sits at the recorded goal after the push
+    table = FakeObject("breakfast_table_x_0", [float(goal[0]), float(goal[1]) + 0.6, 0.4], category="breakfast_table", extent=(1.2, 1.2, 0.8))
+    floor = FakeObject("floors_x_0", [float(goal[0]), float(goal[1]), -0.05], category="floors", extent=(10.0, 10.0, 0.1))
+    target = FakeObject("target_x_0", [float(goal[0]), float(goal[1]) + 0.15, 0.03], category="briefcase", extent=(0.25, 0.1, 0.06))
+    objs = {"breakfast_table.n.01_1": table, "floor.n.01_1": floor, retreat.object: target}
+    quat = th.tensor(push.contact.goal.orientation, dtype=th.float32)
+    state = SimpleNamespace(eef_pose=lambda arm: (here.clone(), quat.clone()), object_pose=lambda n: (objs[n].pos.clone(), objs[n].quat.clone()),
+                            object=lambda n: objs[n], held_object=lambda arm: None, robot=None)
+    legs: List[Any] = []
+
+    class StubMotions:
+        cfg = MotionsConfig()
+        press_hold = None
+
+        def arm_along(self, arm, leg, finish=None, soft_pos_tol=None, **kw):
+            legs.append([tuple(float(v) for v in (p[0] if isinstance(p, (tuple, list)) else p.position)) for p in leg])
+            if False:
+                yield None
+
+        def gripper(self, *a, **k):
+            if False:
+                yield None
+
+        def hold(self, n):
+            if False:
+                yield None
+
+    ctx: Dict[str, Any] = {"cfg": EX.ExecuteConfig(), "witnesses": {}, "hooks": {}}
+    targets = retreat.targets(sc, state)
+    list(EX.execute_retreat(retreat, StubMotions(), state, targets, ctx))
+    assert ctx.get("retreat_escape", {}).get("skipped", "").startswith("push_under")
+    assert legs, "the retreat leg was not executed"
+    leg = legs[-1]
+    z0 = float(here[2])
+    assert all(p[2] >= z0 - 1e-6 for p in leg), f"a floor blade must not descend on its retreat: {leg}"
+    assert leg[-1][2] > z0 + 0.05, f"the retreat ends above the floor blade: {leg[-1]}"
+    # the old radial escape would have gone down: the escape normal of table + floor points back and up, and the radial
+    # back-off (from the pushed object to the blade, horizontal) projected perpendicular to it points into the floor
+    for o in (table, floor):
+        o.aabb = (o.pos - o.aabb_extent / 2, o.pos + o.aabb_extent / 2)
+    n = EX.escape_direction(state, (here, quat), [table, floor])
+    assert n is not None and n[2] > 0.5 and abs(n[1]) > 0.5
+    radial = here - target.pos
+    radial = radial - n * float(th.dot(radial, n))
+    assert float(radial[2]) < -0.01
