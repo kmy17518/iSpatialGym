@@ -136,8 +136,12 @@ def main():
     try:
         if args.sync:
             sync_tree(ep)
+        # ``ISG_*`` variables of the local environment reach the pod (2026-09-21: ISG_BASE_MASS_KG for a chassis-mass A/B run);
+        # the pod-selection variable stays local
+        passthrough = " ".join(f"{k}={shlex.quote(v)}" for k, v in sorted(os.environ.items())
+                               if k.startswith("ISG_") and k not in ("ISG_SMOKE_PODS_FILE",) and "\n" not in v)
         remote = (f"mkdir -p /root/smoke/{run_id} && cd /root/ispatialgym && source /root/miniforge3/etc/profile.d/conda.sh && "
-                  f"conda activate ispatialgym && export OMNIGIBSON_HEADLESS=1 OMNI_KIT_ACCEPT_EULA=YES SMOKE_OUT=/root/smoke/{run_id} && "
+                  f"conda activate ispatialgym && export OMNIGIBSON_HEADLESS=1 OMNI_KIT_ACCEPT_EULA=YES SMOKE_OUT=/root/smoke/{run_id}{(' ' + passthrough) if passthrough else ''} && "
                   f"timeout {int(args.timeout)} bash -c {shlex.quote(cmd)}")
         ssh_proc["p"] = subprocess.Popen(rp.ssh_base(*ep) + [remote], stdin=subprocess.DEVNULL)
         rc = ssh_proc["p"].wait()
