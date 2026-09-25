@@ -49,6 +49,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
+import numpy as np
 import torch as th
 
 from ispatialgym import ASSETS_ROOT
@@ -148,8 +149,30 @@ class ExecutorConfig:
     #: a placed object's principal axis against the recorded goal's (rad)
     demo_tilt_tolerance: float = math.radians(15.0)
     #: renders after a checkpoint restore before the (recorded) hold step, so no frame of the rolled-back attempt
-    #: survives in the video / dataset (the renderer trails ``load_state`` by 1-2 frames)
-    restore_renders: int = 3
+    #: survives in the video / dataset (:meth:`Executor.render_restored`). ``restore_renders`` frames are always
+    #: rendered; from then on the head camera is read after every render until its image is **fresh** - closer to the
+    #: checkpoint's own observation than to the last observation of the rolled-back attempt - and **settled** - within
+    #: ``restore_frame_tol`` (mean abs rgb difference, 0-255 scale) of the checkpoint observation, or a new frame whose
+    #: distance to the checkpoint observation shrank by at most ``restore_frame_gain_tol`` since the previous new frame
+    #: (the RTX temporal accumulation ghosts the rolled-back scene into the first fresh frames and fades it
+    #: geometrically: 0924-171522 set_torso 28.95 stale -> 3.51 -> 2.86 -> 2.72 -> 2.52 ..., 0924-170128 navigate
+    #: 61.7 stale -> 13.0 -> 6.0 -> 5.7; the steady grain that remains varies by ~1.0 per frame and only converges
+    #: over tens of frames, so neither a small absolute distance nor a small frame-to-frame change can be waited for)
+    #: - or ``restore_renders_max`` frames were rendered (then ``checkpoint_reports[].restore_renders.converged =
+    #: False``; a warning when the last frame was not even fresh). A fixed count is not enough: the first read after
+    #: ``load_state`` returned the rolled-back scene whether 1 or 3 frames had been rendered before it (0924-164130 /
+    #: 0924-170128 / 0924-171522) - the annotator hands frames out with a load-dependent lag of 1-2 *reads* on top of
+    #: the 1-frame pose -> renderer lag (``sampling.sim_utils.SimWorld.seg_instance``); with the 3 fixed renders of
+    #: 2026-09-16 the hold step still recorded the failed attempt's last arm pose in ~half of the retried demos of
+    #: 09-18 .. 09-22 (the one-frame flash of the hand at the failed grasp in 0919-062149 / 0920-193713 / 0921-021337 ...).
+    #: Minimum 30 (owner decision 2026-09-24 17:30): at the 5-8 renders the settle rule stops at, the hold step's frame is
+    #: still ~2 mean-abs softer than its neighbours (the accumulation grain of the reset scene: a visible one-frame blink
+    #: in 0924-165803 / 0924-170537); the grain converges over ~30 frames (~8 s at 1080 x 1080, not recorded: renders are
+    #: not steps, a retry adds exactly the one hold step to the demo)
+    restore_renders: int = 30
+    restore_renders_max: int = 40
+    restore_frame_tol: float = 1.0
+    restore_frame_gain_tol: float = 0.25
     #: TRO goal override thresholds for measured-only targets (spec §8): max(min_pos, extent_fraction × smallest
     #: horizontal extent) / rot
     override_min_pos: float = 0.01
@@ -766,6 +789,7 @@ class Executor:
         """Roll the simulator and the executor back to ``cp``; returns the round-trip report."""
         robot = self.robot
         report: Dict[str, Any] = {"action_index": cp.action_index, "ag_roundtrip_ok": True, "ag_fixed": [], "attached_fixed": []}
+        stale = self.head_rgb_of(self.last_obs)  # what the camera showed last: the rolled-back attempt's final scene
         self.sim.load_state(cp.sim_state, serialized=True)
         # -- assisted grasp: verify OmniGibson's own round-trip, re-apply what it does not carry
         ag = getattr(robot, "_ag_obj_in_hand", None)
@@ -825,18 +849,97 @@ class Executor:
         self.last_obs, self.last_info = cp.obs, cp.info
         if self.recorder is not None:
             self.recorder.set_observation(cp.obs)
+        # -- the renderer trails the physics: the first frames after ``load_state`` still show the pre-restore scene
+        #    (a sensor read lags the last render by a load-dependent 1-2 frames plus the USD sync, B10), so the failed
+        #    attempt's last arm pose leaked into the committed video as the restore step's frame. Render until the
+        #    head camera shows the restored scene (= the checkpoint's observation) before anything is recorded again.
+        report["restore_renders"] = self.render_restored(cp, stale)
         self.checkpoint_reports.append(report)
-        # -- the renderer trails the physics: the first frame after ``load_state`` still shows the pre-restore scene
-        #    (a sensor read lags the last render by 1-2 frames plus the USD sync, B10), so the failed attempt's last
-        #    arm pose leaked into the committed video as the restore step's frame. Render until the buffers show the
-        #    restored scene before anything is recorded again.
-        for _ in range(int(self.cfg.restore_renders)):
-            self.sim.render()
         # -- the PhysX drive targets are not state: apply the restored hold targets with one (recorded) hold step;
         #    the monitors are off for it (their per-action whitelist is not set up yet)
         if self.motions is not None:
             self.run_generator(self.motions.hold(1), PHASE_ORACLE, action_index, attempt, monitor=False)
         return report
+
+    def head_rgb_of(self, obs) -> Optional[np.ndarray]:
+        """The head camera's rgb of an observation as uint8 (H, W, 3); None when the observation has none."""
+        try:
+            robs = obs.get(self.robot.name, obs) if isinstance(obs, dict) else None
+            return to_uint8_rgb(robs[self.cam_key]["rgb"]) if robs else None
+        except Exception:  # noqa: BLE001
+            return None
+
+    def head_rgb_now(self) -> Optional[np.ndarray]:
+        """The head camera's rgb read from the sensor now (the annotator buffer as it currently stands; a read does
+        not render) as uint8 (H, W, 3); None when there is no readable camera (fakes without one)."""
+        try:
+            sensor = (getattr(self.robot, "sensors", None) or {}).get(self.cam_key) if self.cam_key else None
+            if sensor is None or not hasattr(sensor, "get_obs"):
+                return None
+            out = sensor.get_obs()
+            robs = out[0] if isinstance(out, tuple) else out
+            return to_uint8_rgb(robs["rgb"])
+        except Exception:  # noqa: BLE001
+            return None
+
+    @staticmethod
+    def frame_difference(a: np.ndarray, b: np.ndarray) -> Optional[float]:
+        """Mean absolute rgb difference of two uint8 frames (0-255 scale); None when the shapes differ."""
+        if a is None or b is None or a.shape != b.shape:
+            return None
+        return float(np.abs(a.astype(np.float32) - b.astype(np.float32)).mean())
+
+    def render_restored(self, cp: Checkpoint, stale: Optional[np.ndarray] = None) -> Dict[str, Any]:
+        """Render after ``load_state`` until the head camera shows the restored scene (``ExecutorConfig.restore_*``):
+        at least ``restore_renders`` frames, then one frame at a time until the sensor image is *fresh* (closer to the
+        checkpoint observation ``cp.obs`` than to ``stale``, the last observation of the rolled-back attempt; always
+        fresh without a ``stale`` reference) and *settled* (within ``restore_frame_tol`` of the checkpoint observation,
+        or a new frame whose distance to it shrank by at most ``restore_frame_gain_tol`` since the previous new frame:
+        the ghost of the rolled-back scene has faded), up to ``restore_renders_max`` frames. Returns ``{"n", "diff",
+        "diff_stale", "change", "gain", "fresh", "converged", "checked"}`` - of the last frame read: its distance to the
+        checkpoint observation / to the rolled-back one / to the previous read, the shrinkage of ``diff`` since the
+        previous new frame, freshness; ``checked`` False = no checkpoint observation / no readable camera: the fixed
+        minimum was rendered. A frame within ``restore_frame_tol`` of the checkpoint observation is fresh whatever the
+        rolled-back scene looked like (an attempt that barely moved leaves the two references alike)."""
+        n_min, n_max = int(self.cfg.restore_renders), max(int(self.cfg.restore_renders), int(self.cfg.restore_renders_max))
+        tol, gain_tol = float(self.cfg.restore_frame_tol), float(self.cfg.restore_frame_gain_tol)
+        ref = self.head_rgb_of(cp.obs)
+        out: Dict[str, Any] = {"n": 0, "diff": None, "diff_stale": None, "change": None, "gain": None, "fresh": None, "converged": None, "checked": ref is not None}
+        prev: Optional[np.ndarray] = None
+        prev_diff: Optional[float] = None
+        for k in range(1, n_max + 1):
+            self.sim.render()
+            out["n"] = k
+            if k < n_min:
+                continue
+            if ref is None:
+                break
+            cur = self.head_rgb_now()
+            diff = self.frame_difference(cur, ref)
+            if diff is None:  # the sensor cannot be read: nothing to wait for beyond the minimum
+                out["checked"] = False
+                break
+            out["diff"], out["diff_stale"], out["change"] = diff, self.frame_difference(cur, stale), self.frame_difference(cur, prev)
+            out["fresh"] = diff <= tol or out["diff_stale"] is None or diff <= out["diff_stale"]
+            # an exactly repeated read is the queue handing out the same frame twice (the GPU behind), not a new frame
+            # (0924-170128: 6.04 -> 5.68 -> 5.68 duplicate; 0924-171522: 2.52 -> 2.52); it neither settles nor counts
+            new_frame = out["change"] is None or out["change"] > 0.0
+            out["gain"] = None if (prev_diff is None or not new_frame) else prev_diff - diff
+            settled = diff <= tol or (out["gain"] is not None and out["gain"] <= gain_tol)
+            if out["fresh"] and settled:
+                out["converged"] = True
+                break
+            if new_frame:
+                prev, prev_diff = cur, diff
+        if out["checked"] and not out["converged"]:
+            out["converged"] = False
+            if out["fresh"]:
+                log.info("restore of action %d: the head camera shows the restored scene after %d renders but its distance to the checkpoint observation is still shrinking (%.2f, by %s per frame)",
+                         cp.action_index, out["n"], out["diff"], None if out["gain"] is None else round(out["gain"], 2))
+            else:
+                log.warning("restore of action %d: after %d renders the head camera still shows the rolled-back scene (diff %.2f to the checkpoint observation, %.2f to the rolled-back attempt's last frame); the recorded hold step may show the rolled-back attempt",
+                            cp.action_index, out["n"], out["diff"], out["diff_stale"])
+        return out
 
     # ------------------------------------------------------------------ one action
 

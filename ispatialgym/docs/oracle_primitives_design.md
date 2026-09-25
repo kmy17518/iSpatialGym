@@ -272,7 +272,18 @@ epilogue: binary success -> max(50, 20 % of the action steps) no-op -> pose-sett
   Restoring the sim without the executor state resumes with stale hold targets or a planner that still thinks the
   object is attached — the reason executor state can no longer live as loose attributes on `Skills`.
 * **One retry**, then the episode fails with the action's category (6.4). The retry re-runs `targets()` from the
-  restored state, so tracking error accumulated before the checkpoint is not inherited.
+  restored state, so tracking error accumulated before the checkpoint is not inherited. A rolled-back attempt leaves
+  no trace in the demo, the video or the LeRobot episode (recorder segments, 6.5; the attempt's steps go to the hdf5
+  `rollbacks` group). Because the head camera's annotator buffer trails the last render by a load-dependent 1–2
+  frames on top of the one-frame pose → renderer lag (the same lag the sampler's `seg_instance` settles, B10), the
+  restore renders **until the camera shows the checkpoint scene again** — the frame read after each render must be
+  closer to the checkpoint's own observation than to the rolled-back attempt's last one, and settled (matching it, or
+  no longer getting closer to it: the RTX temporal accumulation ghosts the rolled-back scene into the first fresh
+  frames and fades it geometrically over 2–3 frames) — at least `restore_renders` (3) and at most
+  `restore_renders_max` (20) frames, before the recorded hold step (`Executor.render_restored`, reported in
+  `meta.checkpoint_reports[].restore_renders`). Measured 2026‑09‑24: the first read after `load_state` shows the
+  rolled-back scene whether 1 or 3 frames were rendered before it. A fixed 3 renders (2026‑09‑16) still recorded the
+  failed attempt's last arm pose as a one-frame flash in about half of the retried demos.
 * **The epilogue belongs to the executor, not to an action.** The TRO goal override makes `run_isg --mode oracle`
   a producer of evaluation targets; it is the only place where the demo pipeline writes into the TRO. The loader
   and `ISpatialGymTask` never read the sidecar.

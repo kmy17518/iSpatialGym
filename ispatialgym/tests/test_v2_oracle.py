@@ -113,6 +113,11 @@ class FakeSensor:
         p, o = C.camera_pose(q, base_pose=(self.robot.pos, self.robot.quat))
         return p.clone(), o.clone()
 
+    def get_obs(self):
+        """The annotator buffer as it stands (``VisionSensor.get_obs``: no render happens on a read)."""
+        env = getattr(self.robot, "_env", None)
+        return ({"rgb": env._frame.clone()} if env is not None else {}), {}
+
 
 class FakeRobot:
     name = "robot_r1"
@@ -393,7 +398,7 @@ class FakeSim:
 
 
 class FakeEnv:
-    def __init__(self, robot: FakeRobot, objects: Dict[str, FakeObject], evaluate=None, ag_roundtrip=True):
+    def __init__(self, robot: FakeRobot, objects: Dict[str, FakeObject], evaluate=None, ag_roundtrip=True, render_lag: int = 1):
         self.robot = robot
         self.robots = [robot]
         self.objects = objects
@@ -408,10 +413,13 @@ class FakeEnv:
         self._closing = {a: False for a in M.ARMS}
         self._refuse = {a: False for a in M.ARMS}
         robot._env = self  # the fake robot's in-hand rule (``_calculate_in_hand_object``) reads the env's objects
-        # the fake renderer: like the simulator, a frame shows the scene the renderer last synced, one step behind
-        # the physics (after ``load_state`` the first draw still shows the pre-restore scene)
-        self._usd_state = self._render_state()
-        self._frame = self._image_of(self._usd_state)
+        # the fake renderer: like the simulator, a frame shows the scene the renderer synced ``render_lag`` renders ago
+        # (a pipeline: the pose -> renderer sync lags one frame, the annotator buffer a read returns trails the last
+        # render by a further, load-dependent 1-2 frames; after ``load_state`` the first draws still show the
+        # pre-restore scene). ``render_lag=1`` is the light-load simulator, 4 the loaded one (sim_utils.seg_instance).
+        self.render_lag = int(render_lag)
+        self._pipeline: List[th.Tensor] = [self._render_state() for _ in range(self.render_lag)]
+        self._frame = self._image_of(self._pipeline[0])
 
     def _render_state(self):
         """What the renderer would draw: the robot joints + every object pose (a scalar signature per pixel row)."""
@@ -432,8 +440,8 @@ class FakeEnv:
         return img
 
     def _render_once(self):
-        self._frame = self._image_of(self._usd_state)  # draws the last synced scene ...
-        self._usd_state = self._render_state()  # ... then syncs the current physics state for the next draw
+        self._frame = self._image_of(self._pipeline.pop(0))  # draws the oldest synced scene of the pipeline ...
+        self._pipeline.append(self._render_state())  # ... then syncs the current physics state for a later draw
 
     def frame_matches_state(self, rgb, state=None) -> bool:
         """Whether an observed frame (rgb or rgba) shows ``state`` (default: the current physics state)."""
@@ -529,7 +537,7 @@ def drive(motions_env: FakeEnv, gen) -> int:
     return n
 
 
-def iors_world(ag_roundtrip=True, evaluate=None):
+def iors_world(ag_roundtrip=True, evaluate=None, render_lag: int = 1):
     """The IORS ontop small-scale test sidecar as a fake world: robot at the init stance, apple / plate on the table."""
     sc = Sidecar.load(os.path.join(SIDECARS, "inter_object_relation_satisfaction-ontop_small_scale.json"))
     init = sc.stance("init")
@@ -538,7 +546,7 @@ def iors_world(ag_roundtrip=True, evaluate=None):
     apple = FakeObject("apple_omzprq_0", [g.grasp.position[0], g.grasp.position[1], g.grasp.position[2] - 0.03], category="apple")
     plate = FakeObject("plate_pkkgzc_0", [g.place.position[0], g.place.position[1], g.place.position[2] - 0.06], category="plate", extent=(0.2, 0.2, 0.02))
     objects = {"apple.n.01_1": apple, "plate.n.04_1": plate}
-    env = FakeEnv(robot, objects, evaluate=evaluate, ag_roundtrip=ag_roundtrip)
+    env = FakeEnv(robot, objects, evaluate=evaluate, ag_roundtrip=ag_roundtrip, render_lag=render_lag)
     return sc, env
 
 
@@ -987,13 +995,18 @@ class _CollectingWriter:
         pass
 
 
-def test_failed_attempt_leaves_no_frame_in_the_committed_episode(tmp_path, monkeypatch):
+@pytest.mark.parametrize("render_lag", [1, 4])
+def test_failed_attempt_leaves_no_frame_in_the_committed_episode(tmp_path, monkeypatch, render_lag):
     """Owner review 2026-09-16: frames of a rolled-back attempt survived in ``head_rgb.mp4``. The renderer trails the
     physics, so the restore's recorded hold step showed the failed attempt's last arm pose. Every committed row,
     video frame and LeRobot frame must belong to the committed steps, and every committed frame must show the state
-    of its own row (the fake renderer lags one frame like the simulator)."""
+    of its own row (or the previous one: the renderer's lag). ``render_lag=1`` is the lightly loaded simulator (the
+    2026-09-16 fix's 3 fixed renders were enough); ``render_lag=4`` the loaded one, where the annotator buffer trails
+    the last render by further frames and the fixed 3 renders still recorded the failed attempt's last arm pose as the
+    hold step's frame (the one-frame flash of the hand in ~half of the retried demos of 09-18 .. 09-22): the restore
+    must render until the head camera shows the checkpoint scene again."""
     monkeypatch.setattr(Recorder, "_open_video", lambda self: setattr(self, "_writer", _CollectingWriter()))
-    sc, env = iors_world()
+    sc, env = iors_world(render_lag=render_lag)
     env.evaluate = success_eval("apple.n.01_1", _place_goal(sc), tol=0.08)
     ex, motions, backend, rec = make_executor(env, sc, tmp_path, recorder_cfg=RecorderConfig(hdf5=True, lerobot=False, video=True, frame_buffer="raw"))
     backend.fail_ik_paths = 1  # the grasp approach fails once: attempt 0 has N > 0 recorded steps (gripper + arm_to)
@@ -1008,8 +1021,8 @@ def test_failed_attempt_leaves_no_frame_in_the_committed_episode(tmp_path, monke
     assert len(steps) == result["n_steps"] and np.all(np.diff(steps) == 1)  # committed steps only, contiguous
     frames = rec._writer.frames
     assert len(frames) == result["n_steps"]
-    # every committed frame shows a state of the committed sequence: its own row's or (the renderer's one-frame lag)
-    # the previous committed row's — never the failed attempt's (the restore hold step used to show its last pose)
+    # every committed frame shows a state of the committed sequence: its own row's or (the renderer's lag) an earlier
+    # committed row's — never the failed attempt's (the restore hold step used to show its last pose)
     q = np.asarray(rows["joint_positions"])
     base = np.asarray(rows["base_pose"])
     obj_pose = {name: np.asarray(rows[f"object_pose/{name}"]) for name in env.objects}
@@ -1018,8 +1031,8 @@ def test_failed_attempt_leaves_no_frame_in_the_committed_episode(tmp_path, monke
         return th.cat([th.tensor(q[i]).float(), th.tensor(base[i][:3]).float()] + [th.cat([th.tensor(obj_pose[n][i][:3]).float(), th.tensor(obj_pose[n][i][3:]).float()]) for n in env.objects])
 
     states = [state_of(i) for i in range(len(steps))]
-    for i in range(1, len(steps)):
-        ok = env.frame_matches_state(frames[i], states[i]) or env.frame_matches_state(frames[i], states[i - 1])
+    for i in range(render_lag, len(steps)):  # the first frames show the reset state the pipeline was primed with
+        ok = any(env.frame_matches_state(frames[i], states[j]) for j in range(i - render_lag, i + 1))
         assert ok, f"frame at committed row {i} (step {steps[i]}) shows a state outside the committed episode"
     # and the boundary frame in particular is the restored state, not the failed attempt's last one
     b = grasp["step_start"]  # row index of the restore hold step (steps are 1-based)
@@ -1032,6 +1045,74 @@ def test_failed_attempt_leaves_no_frame_in_the_committed_episode(tmp_path, monke
         q_fail = th.tensor(rb["isg/joint_positions"][-1]).float()
     failed_state = th.cat([q_fail, states[b][28:]])
     assert not env.frame_matches_state(frames[b], failed_state) and not env.frame_matches_state(frames[b + 1], failed_state)
+    assert env.frame_matches_state(frames[b], states[b - 1]) or env.frame_matches_state(frames[b], states[b])
+    # the restore rendered until the head camera showed the checkpoint scene: 3 frames with the light lag, more with
+    # the deep pipeline (each frame read and compared, meta.checkpoint_reports records it)
+    rr = result["checkpoint_reports"][0]["restore_renders"]
+    assert rr["checked"] and rr["converged"] and rr["diff"] == 0.0
+    # the pipeline holds render_lag pre-restore frames; the next one is the scene - but never fewer than the configured
+    # minimum (30 by default, owner 2026-09-24: the accumulation grain of the reset scene fades over ~30 frames)
+    assert rr["n"] == max(ex.cfg.restore_renders, render_lag + 1), rr
+
+
+def test_restore_render_loop_caps_and_falls_back():
+    """The restore's render loop is bounded and anchored: a head camera stuck on the rolled-back scene (identical
+    reads, never closer to the checkpoint observation than to the pre-restore one) stops at ``restore_renders_max``
+    with ``converged False`` (a warning, the run goes on); a fresh frame that keeps changing (the temporal
+    accumulation after the state jump) is waited for until it settles; without a readable camera or a checkpoint
+    observation the fixed ``restore_renders`` minimum is rendered (``checked False``)."""
+    sc, env = iors_world(render_lag=1)
+    ex, *_ = make_executor(env, sc, exec_cfg=ExecutorConfig(restore_renders=3, restore_renders_max=8, restore_frame_tol=1.0, restore_frame_gain_tol=0.25))
+    ex.last_obs, ex.last_info = env.get_obs()[0], {}
+    cp = ex.checkpoint(0)
+    unchecked = {"n": 3, "diff": None, "diff_stale": None, "change": None, "gain": None, "fresh": None, "converged": None, "checked": False}
+    # the plain case: the scene is unchanged, the first read after the minimum matches the checkpoint observation
+    renders0 = env.sim.renders
+    rr = ex.render_restored(cp)
+    assert env.sim.renders - renders0 == 3 and rr["n"] == 3 and rr["diff"] == 0.0 and rr["converged"] and rr["checked"]
+    # a camera stuck on the rolled-back scene (identical reads, never fresh): the cap, reported
+    sensor = env.robot.sensors[CAM_KEY]
+    stuck = th.full((8, 8, 4), 7, dtype=th.uint8)
+    sensor.get_obs = lambda: ({"rgb": stuck.clone()}, {})
+    renders0 = env.sim.renders
+    rr = ex.render_restored(cp, stale=stuck[..., :3].numpy())
+    assert env.sim.renders - renders0 == 8 and rr["n"] == 8 and rr["checked"] and rr["converged"] is False and rr["fresh"] is False
+    assert rr["diff"] > 1.0 and rr["diff_stale"] == 0.0 and rr["change"] == 0.0
+    # a fresh frame converging over renders toward a steady residual above restore_frame_tol (the grain of a reset
+    # temporal accumulation): reads 3 .. 7 = the rolled-back scene (not fresh), ref + 40 (fresh, the ghost fading),
+    # ref + 10 (still fading: gain 30), ref + 10 again (an exactly repeated read = a duplicate from the queue: neither
+    # settles nor counts), ref + 10 with a quarter of the entries + 1 (a new frame no closer to the checkpoint scene
+    # than the previous new one: gain -0.25 <= restore_frame_gain_tol, settled)
+    ref = np.asarray(ex.head_rgb_of(cp.obs)).astype(np.float32)
+    far = np.full_like(ref, 200.0)
+    quarter = np.zeros_like(ref)
+    quarter.reshape(-1)[: quarter.size // 4] = 1.0
+    frames = iter([far, ref + 40, ref + 10, ref + 10, ref + 10 + quarter, ref + 10 + quarter])
+
+    def converging():
+        img = np.concatenate([np.clip(next(frames), 0, 255).astype(np.uint8), np.full((8, 8, 1), 255, dtype=np.uint8)], axis=-1)
+        return {"rgb": th.from_numpy(img)}, {}
+
+    sensor.get_obs = converging
+    renders0 = env.sim.renders
+    rr = ex.render_restored(cp, stale=far.astype(np.uint8))
+    assert rr["converged"] and rr["n"] == 7 and 1.0 < rr["diff"] < rr["diff_stale"] and 0.0 < rr["change"] <= 0.25 and -0.25 <= rr["gain"] <= 0.0, rr
+    assert env.sim.renders - renders0 == 7
+    del sensor.get_obs
+    # no camera to read: the minimum, unchecked
+    sensors = env.robot.sensors
+    env.robot.sensors = {}
+    try:
+        renders0 = env.sim.renders
+        rr = ex.render_restored(cp)
+    finally:
+        env.robot.sensors = sensors
+    assert env.sim.renders - renders0 == 3 and rr == unchecked
+    # no checkpoint observation (a checkpoint before the first observation): the minimum, unchecked
+    cp.obs = None
+    renders0 = env.sim.renders
+    rr = ex.render_restored(cp)
+    assert env.sim.renders - renders0 == 3 and rr == unchecked
 
 
 def test_placed_orientation_gates_the_demo_verdict_only(tmp_path):
