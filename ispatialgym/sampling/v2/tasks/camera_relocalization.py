@@ -22,7 +22,11 @@ first / last waypoints the exact base poses, the interior waypoints carrying the
 ``style = "face_travel"``: the oracle drives it as the shared ``robot.base_path`` schedule (fillets under a 5 cm
 deviation budget, the body facing the way, end turns on the spot above 90° and blended below), and it is whole-body
 collision-checked every 0.1 m **of that schedule** (the on-the-spot turns in ≤ 0.2 rad steps) at the navigation posture
-(JoyLo reset arms, init trunk). The bucket is decided on the polyline length of the recorded waypoints.
+(JoyLo reset arms, init trunk). The bucket is decided on the **geodesic** (§2.3 / §6.1: the eroded-map shortest-path
+length ``kit.geodesic`` returns, the 8-connected grid path's length; on the blocked map for the obstructed variant) —
+an instance property, independent of how the path is recorded or driven: the shortcut polyline (``paths[].length_m``,
+informational) is shorter than the grid path by up to ~8 % and the driven arc shorter again by the fillets, and the
+pilot's instances were bucketed on the grid geodesic (their dense records had that very length).
 
 Obstructed (§6.2): one obstacle (group ``obstacles``) stood upright on a cell of the middle 30–70 % of the free
 shortest path so that the shortest path on the map **with its footprint blocked** (``blocked_footprints``, recorded in
@@ -458,12 +462,12 @@ class CameraRelocalizationV2(SamplerV2):
             if geo is None or path is None or len(path) < 2:
                 fails["no_path"] = fails.get("no_path", 0) + 1
                 continue
+            if bucket_index(float(geo), buckets) != bi:  # the bucket is the geodesic's (module docstring), before the path check
+                fails["bucket"] = fails.get("bucket", 0) + 1
+                continue
             rec = self.build_path_record(path, base0, base1, (tr0, ti0))
             if rec is None:
                 fails["path_collision"] = fails.get("path_collision", 0) + 1
-                continue
-            if bucket_index(rec.length_m, buckets) != bi:
-                fails["bucket"] = fails.get("bucket", 0) + 1
                 continue
             # renders: goal first (needs >= min_objs non-structural objects), then init (shared fraction)
             self.kit.apply(q1, base1)
@@ -547,8 +551,8 @@ class CameraRelocalizationV2(SamplerV2):
     def build_path_record(self, path: th.Tensor, base0, base1, trunk: Tuple[float, float], frm: str = "init", to: str = "goal",
                           plan: Optional[Tuple[List[Tuple[float, float, float]], BP.BasePath]] = None) -> Optional[PathRecord]:
         """The ``paths[]`` record of an eroded-map shortest path (``path_schedule``; ``plan`` = its result when the
-        caller already has it): the shortcut waypoints, ``length_m`` = their polyline length (the bucket is decided on
-        it), ``style = face_travel``, whole-body collision-checked at 0.1 m strides **of the driven schedule** (the
+        caller already has it): the shortcut waypoints, ``length_m`` = their polyline length (informational — the bucket
+        is decided on the geodesic), ``style = face_travel``, whole-body collision-checked at 0.1 m strides **of the driven schedule** (the
         fillets, the on-the-spot turns in ≤ 0.2 rad steps) at the navigation posture (reset arms, init trunk). None when
         a stride collides."""
         waypoints, sched = plan if plan is not None else self.path_schedule(path, base0, base1)
@@ -859,11 +863,9 @@ class CameraRelocalizationV2(SamplerV2):
                     why = "view"
             if why is None:
                 self.kit.sync_world()  # the obstacle enters the collision world
-                rec_path = self.build_path_record(path_b, base0, base1, trunk, plan=plan)
+                rec_path = self.build_path_record(path_b, base0, base1, trunk, plan=plan)  # the bucket bound: detour_failure, on geo_b
                 if rec_path is None:
                     why = "path_collision"
-                elif rec_path.length_m > bucket_hi:
-                    why = "too_long"
         if why is None:
             qs = th.stack([q0, q1])
             free = self.kit.collision_free(qs, margin=float(self.g("collision_margin_m"))).tolist()
@@ -919,11 +921,11 @@ class CameraRelocalizationV2(SamplerV2):
                                 "in_view_at_init": self.frustum_ok(cam0, corners, float(P["in_frame_margin"])),
                                 "in_view_at_goal": self.frustum_ok(cam1, corners, float(P["in_frame_margin"]))}
             cur_path, cur_geo, last = placed["path"], placed["geodesic_m"], placed
-        # the final path (all obstacles blocked) replaces the free-map path in the sidecar; the bucket is re-decided on it, and
-        # every obstacle must be seen before the departure from *its* reference path along this final path
+        # the final path (all obstacles blocked) replaces the free-map path in the sidecar; the bucket is re-decided on its
+        # geodesic, and every obstacle must be seen before the departure from *its* reference path along this final path
         rec_path: PathRecord = last["path_record"]
-        if bucket_index(rec_path.length_m, self.buckets()) != d.extras["bucket"]["index"]:
-            raise Reject("obstacle", f"blocked-map path {rec_path.length_m:.2f} m leaves the bucket ({lo}, {hi}]")
+        if bucket_index(float(cur_geo), self.buckets()) != d.extras["bucket"]["index"]:
+            raise Reject("obstacle", f"blocked-map geodesic {cur_geo:.2f} m leaves the bucket ({lo}, {hi}]")
         view = self.view_record(poses, cur_path, last["schedule"], float(P["in_frame_margin"]), ref_paths)
         for name in names:
             placements[name].update({"view_waypoint_index": view["view_waypoint_index"][name], "divergence_waypoint_index": view["divergence_waypoint_index"][name]})
@@ -976,8 +978,8 @@ class CameraRelocalizationV2(SamplerV2):
                 self.kit.sync_world()
                 plan = self.path_schedule(path_b, base0, base1)
                 rec = self.build_path_record(path_b, base0, base1, self.init_trunk(), plan=plan)
-            if rec is None or bucket_index(rec.length_m, self.buckets()) != draft.extras["bucket"]["index"]:
-                raise Reject("obstacle", "re-planned path after the settle collides or leaves the bucket")
+            if rec is None or bucket_index(float(geo_b), self.buckets()) != draft.extras["bucket"]["index"]:
+                raise Reject("obstacle", f"re-planned path after the settle collides or its geodesic {float(geo_b):.2f} m leaves the bucket")
             sched = plan[1]
             draft.extras["obstacle_path"] = (path_b, float(geo_b))
             draft.summary.update({"geodesic_blocked_m": float(geo_b), "path_length_m": rec.length_m})

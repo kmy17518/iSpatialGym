@@ -4,6 +4,12 @@ Version = `ispatialgym.sampling.SAMPLER_VERSION` (also written into every `sampl
 
 ## 1.5.0 (unreleased) - one arm pose per task, scene variants without chairs, goal check without the robot
 
+- **Camera relocalization bucket = the geodesic** (2026-09-24). The four bucket decisions (goal sampling, the
+  per-cell obstacle try, the final blocked-map path, the re-plan after the settle) read the eroded-map shortest-path
+  length `kit.geodesic` returns (spec §2.3 / §6.1), not `paths[].length_m`: since the record became the line-of-sight
+  shortcut (2026-09-22) its polyline is up to ~8 % shorter than the grid geodesic the pilot's dense records had, so an
+  instance near a bound could change bucket. `path_length_m` stays in the summary as information; the goal candidate's
+  bucket is now checked before its path is collision-checked.
 - **World horizontal retired** (2026-09-23). The `alignment-world_horizontal` subtask (v1 `world_alignment-2`, alias
   `world_horizontal`) is removed everywhere: the v2 sampler `alignment_wall.py` registers world vertical only (the
   horizontal `swept_patch` extents, `level_axis` frame key and the `V1_DEFINITION_ID` 2 are gone), the v1
