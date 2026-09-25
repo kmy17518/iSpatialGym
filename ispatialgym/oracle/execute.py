@@ -16,7 +16,7 @@ error, never to choose between alternatives (§3 rules).
 
 Behaviour per action (§3.6 / §6.1):
 
-* ``Navigate``   ``track_path(waypoints)``; post: base within tolerance of the last waypoint.
+* ``Navigate``   ``track_path(waypoints, style)``; post: base within tolerance of the last waypoint.
 * ``Transition`` ``track_path(drive_back)`` → ``trunk_to`` → ``track_path(drive_in)``; post: trunk pair and base.
 * ``SetTorso``   (``arm_to(untucked)`` when ``goal.arms`` says so) → ``trunk_to``; head-camera residual above the
   correction threshold → one corrective ``track_path`` to the recorded goal base (correction, not fallback); post:
@@ -652,7 +652,7 @@ def execute_navigate(action: Navigate, motions: Motions, state, targets, ctx) ->
         ctx["navigate_arms_reposed"] = sorted(move)
         if move:
             yield from motions.arm_to(tuple(sorted(move)), q=move)
-    yield from motions.track_path(targets["waypoints"], posture=posture)
+    yield from motions.track_path(targets["waypoints"], posture=posture, style=targets.get("style"))
 
 
 def post_navigate(action: Navigate, state, targets, ctx) -> Optional[str]:

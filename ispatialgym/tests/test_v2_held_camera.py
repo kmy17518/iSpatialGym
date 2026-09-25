@@ -156,6 +156,156 @@ def test_obstructed_path_record_carries_view_facts():
     assert p.extra["divergence_waypoint_index"] == {"o": 1} and p.goal == [2.0, 0.0, 0.3]
 
 
+# ----------------------------------------------------------------------------------------------------------------
+# camera relocalization: the recorded path is the driven schedule (owner 2026-09-22)
+# ----------------------------------------------------------------------------------------------------------------
+
+
+class _FakeTrav:
+    """A 0.1 m grid whose world frame is the map frame (cell (i, j) at (0.1 i, 0.1 j)); erosion is the identity."""
+
+    def __init__(self, n: int = 60, blocked=()):
+        self.map_resolution = 0.1
+        m = th.full((n, n), 255, dtype=th.uint8)
+        for i0, i1, j0, j1 in blocked:
+            m[i0:i1, j0:j1] = 0
+        self.floor_map = [m]
+
+    def _erode_trav_map(self, m, robot=None):
+        return m
+
+    def world_to_map(self, xy):
+        return th.tensor([int(round(float(xy[0]) / self.map_resolution)), int(round(float(xy[1]) / self.map_resolution))])
+
+    def map_to_world(self, ij):
+        return th.tensor([float(ij[0]) * self.map_resolution, float(ij[1]) * self.map_resolution])
+
+
+def _fake_camera_sampler(trav: _FakeTrav, fov_deg: float = 80.0, reach_m: float = 4.0):
+    """A ``CameraRelocalizationV2`` without a simulator: the kit puts the camera at the base pose, the frustum test is a
+    planar bearing / range test on the obstacle box's centre."""
+    from types import SimpleNamespace
+
+    world = SimpleNamespace(scene=SimpleNamespace(trav_map=trav))
+    kit = SimpleNamespace(world=world, robot=None, q_at_base_pose=lambda q, x, y, yaw: th.tensor([x, y, yaw]), camera_poses_batch=lambda qs: [tuple(float(v) for v in q) for q in qs])
+    cr = object.__new__(CR.CameraRelocalizationV2)
+    cr.kit, cr.world = kit, world
+    cr.q_reset_rel = th.zeros(3)
+    cr.gp = SimpleNamespace(alias="camera_relocalization-test")
+
+    def frustum_ok(cam, corners, margin):
+        cx, cy = float(corners[:, 0].mean()), float(corners[:, 1].mean())
+        bearing = math.atan2(cy - cam[1], cx - cam[0]) - cam[2]
+        return abs(C.wrap_angle(bearing)) <= math.radians(fov_deg / 2) and math.hypot(cx - cam[0], cy - cam[1]) <= reach_m
+
+    cr.frustum_ok = frustum_ok
+    cr.obstacle_aabb = lambda name, pose: (pose[0] - 0.15, pose[0] + 0.15)
+    return cr
+
+
+def _dist_to_segment(p, a, b) -> float:
+    ax, ay, bx, by = a[0], a[1], b[0], b[1]
+    dx, dy = bx - ax, by - ay
+    L2 = dx * dx + dy * dy
+    t = 0.0 if L2 < 1e-12 else min(1.0, max(0.0, ((p[0] - ax) * dx + (p[1] - ay) * dy) / L2))
+    return math.hypot(p[0] - (ax + t * dx), p[1] - (ay + t * dy))
+
+
+def _grid_path(trav: _FakeTrav, a, b) -> th.Tensor:
+    """BEHAVIOR-style dense cell path between two world points on the fake map (8-connected A*)."""
+    from ispatialgym.sampling.v2 import navigation as NAV
+
+    free = trav.floor_map[0] == 255
+    cells = NAV.grid_shortest_path(free, tuple(int(v) for v in trav.world_to_map(a).tolist()), tuple(int(v) for v in trav.world_to_map(b).tolist()))
+    assert cells is not None
+    return th.stack([trav.map_to_world(th.tensor(c)) for c in cells])
+
+
+def test_camera_relocalization_records_the_shortcut_path_and_checks_the_driven_schedule(monkeypatch):
+    from ispatialgym.robot import base_path as BP
+    from ispatialgym.sampling.v2 import navigation as NAV
+
+    # a wall stump between init and goal: the grid path is a staircase around it
+    trav = _FakeTrav(blocked=[(20, 23, 0, 12)])
+    cr = _fake_camera_sampler(trav)
+    base0, base1 = (0.5, 0.5, math.pi), (4.5, 0.5, 0.0)  # the robot starts facing away from its path
+    path_b = _grid_path(trav, base0[:2], base1[:2])
+    assert len(path_b) >= 30  # one waypoint per cell
+    waypoints, sched = cr.path_schedule(path_b, base0, base1)
+    # the record is the line-of-sight shortcut: a handful of corners, the exact base poses at the ends, headings inside
+    assert 3 <= len(waypoints) <= 8
+    assert waypoints[0] == pytest.approx(base0) and waypoints[-1] == pytest.approx(base1)
+    for (x0, y0, yaw), (x1, y1, _) in zip(waypoints[1:-1], waypoints[2:]):
+        assert yaw == pytest.approx(math.atan2(y1 - y0, x1 - x0))
+    # the recorded polyline never goes through the stump (line of sight on the map it was planned on: at most a corner
+    # clip of one cell, which the real eroded map's >= 0.53 m margin absorbs) and the drive stays within the fillet budget
+    # of the polyline; the whole-body check below sees the driven poses themselves
+    cfg = BP.BasePathConfig()
+    free_xy = th.stack([trav.map_to_world(ij) for ij in th.nonzero(trav.floor_map[0] == 255)])
+    for a, b in zip(waypoints[:-1], waypoints[1:]):
+        for f in np.linspace(0.0, 1.0, 50):
+            p = th.tensor([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f])
+            assert float(th.linalg.norm(free_xy - p, dim=1).min()) <= trav.map_resolution * math.sqrt(0.5) + 0.03, p.tolist()
+    for x, y, _ in sched.stride_poses(0.05):
+        d = min(_dist_to_segment((x, y), a, b) for a, b in zip(waypoints[:-1], waypoints[1:]))
+        assert d <= cfg.fillet_deviation_m + 1e-6, (x, y, d)
+    # facing away from the path: the schedule turns on the spot first (the hybrid policy)
+    assert [d.kind for d in sched.dwells if d.kind == "start"] == ["start"]
+    # the record's whole-body check sees the schedule: the start sweep at the init cell, then the drive every 0.1 m
+    seen = {}
+
+    def fake_check(kit, poses, trunk, posture, **kw):
+        seen["poses"] = list(poses)
+        return True, -1
+
+    monkeypatch.setattr(NAV, "path_collision_free", fake_check)
+    rec = cr.build_path_record(path_b, base0, base1, (0.5, 0.0), plan=(waypoints, sched))
+    assert rec is not None and rec.style == BP.FACE_TRAVEL and rec.mode == "global"
+    assert rec.waypoints == waypoints and rec.length_m == pytest.approx(sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(waypoints[:-1], waypoints[1:])))
+    poses = seen["poses"]
+    assert rec.n_checked == len(poses) == len(sched.stride_poses(NAV.STRIDE_M))
+    at_init = [p for p in poses if math.hypot(p[0] - base0[0], p[1] - base0[1]) < 1e-6]
+    assert len(at_init) >= 8  # the on-the-spot turn is checked in <= 0.2 rad steps
+    assert rec.to_sidecar()["style"] == BP.FACE_TRAVEL
+    # a record re-read from its waypoints rebuilds the same schedule (the oracle drives exactly what was checked)
+    again = BP.BasePath.build(rec.waypoints, BP.BasePathConfig())
+    assert again.length == pytest.approx(sched.length) and len(again.pieces) == len(sched.pieces)
+    assert [d.kind for d in again.dwells] == [d.kind for d in sched.dwells]
+
+
+def test_camera_relocalization_view_rule_on_the_driven_schedule():
+    from ispatialgym.sampling import geometry as G
+    from ispatialgym.sampling.sim_utils import Reject
+
+    trav_free = _FakeTrav()
+    base0, base1 = (0.5, 0.5, 0.0), (4.5, 0.5, 0.0)
+    path_free = _grid_path(trav_free, base0[:2], base1[:2])  # the straight shortest path without the obstacle
+    # the obstacle stands on that path at x = 2.1; the blocked map forces the detour above it
+    trav_b = _FakeTrav(blocked=[(19, 24, 3, 8)])
+    cr = _fake_camera_sampler(trav_b)
+    path_b = _grid_path(trav_b, base0[:2], base1[:2])
+    k = CR.divergence_index(path_free, path_b, cr.map_tol())
+    _, sched = cr.path_schedule(path_b, base0, base1)
+    kk, s_div = cr.divergence_s(sched, path_b, path_free)
+    assert kk == k and 0.0 <= s_div <= sched.length
+    obstacle = (th.tensor([2.1, 0.5, 0.2]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    corners = G.aabb_corners(*cr.obstacle_aabb("obs", obstacle))
+    hits = cr.view_indices(sched, path_b, corners, 0.05, path_before=path_free)
+    ss, drive = sched.drive_poses(0.1)
+    assert hits and all(ss[i] <= s_div + 1e-9 for i in hits)
+    # the pose the fact is recorded at is a driven pose: on the shared prefix, facing the way the robot drives
+    view = cr.view_record({"obs": obstacle}, path_b, sched, 0.05, {"obs": path_free})
+    first = view["view_waypoint_index"]["obs"]
+    assert first == hits[0] and view["view_pose2d"]["obs"] == pytest.approx(list(drive[first]))
+    assert view["view_s_m"]["obs"] <= view["divergence_s_m"]["obs"] and view["divergence_waypoint_index"]["obs"] == k
+    sc = cr.sidecar_view(view)
+    assert sc["view_heading"] == "driven schedule" and set(sc) >= {"view_waypoint_index", "view_s_m", "divergence_waypoint_index", "divergence_s_m", "view_pose2d"}
+    # an obstacle that only comes into the frame after the departure (behind and above the detour) is not admissible
+    behind = (th.tensor([0.2, 3.5, 0.2]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+    with pytest.raises(Reject):
+        cr.view_record({"obs": behind}, path_b, sched, 0.05, {"obs": path_free})
+
+
 def test_structural_categories_never_count():
     for c in ("walls", "floors", "ceilings", "window", "door", "downlight", "room_light", "table_lamp", "curtain"):
         assert CR.is_structural(c)

@@ -49,6 +49,7 @@ from ispatialgym.oracle.actions import (
     block_reorients,
 )
 from ispatialgym.oracle.sidecar import ARMS, BraceContact, GraspRecord, Pose, PushContact, Sidecar, SidecarError, subtask_of_alias
+from ispatialgym.robot import base_path as BP
 
 # ----------------------------------------------------------------------------------------------------------------
 # Shared pieces
@@ -214,7 +215,9 @@ def _brace_push_retreat(sc: Sidecar, brace, push, base_yaw: float) -> List[Actio
 def program_camera_relocalization(sc: Sidecar, obstructed: bool = False) -> List[Action]:
     """navigate_to the goal base (recorded path, bucket length) → set_torso to the goal (translate, tilt), lifting the
     arms to untucked first where ``goal.arms`` says so. Obstructed: the same on the map with the obstacle blocked; the
-    obstacles (every object the sidecar names) go into the annotation, not into the contact whitelist."""
+    obstacles (every object the sidecar names) go into the annotation, not into the contact whitelist. The drive is
+    ``face_travel`` (owner 2026-09-22): the long paths of this family are driven as the shared ``robot.base_path``
+    schedule — also for the pilot's dense grid records, which it simplifies within one map cell."""
     if sc.goal is None:
         raise SidecarError("goal: required for camera relocalization")
     path = sc.path("init", "goal")
@@ -225,7 +228,7 @@ def program_camera_relocalization(sc: Sidecar, obstructed: bool = False) -> List
     obstacles = tuple(sorted(sc.language.objects)) if obstructed else ()
     if obstructed and not obstacles:
         raise SidecarError("language.objects: the obstructed variant must name its obstacle(s)")
-    return [Navigate(path=path, obstacles=obstacles), SetTorso(goal=sc.goal)]
+    return [Navigate(path=path, obstacles=obstacles, style=BP.FACE_TRAVEL), SetTorso(goal=sc.goal)]
 
 
 def program_held_object_scaling(sc: Sidecar) -> List[Action]:

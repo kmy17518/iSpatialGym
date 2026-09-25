@@ -18,6 +18,7 @@ import pytest
 
 from ispatialgym.oracle import actions as A
 from ispatialgym.oracle.programs import PROGRAMS, expand
+from ispatialgym.robot import base_path as BP
 from ispatialgym.oracle.sidecar import (
     ARMS,
     REQUIRED_BLOCKS,
@@ -449,6 +450,17 @@ def test_camera_relocalization_program_details():
     nav_o, torso_o = expand(obs.alias, obs)
     assert nav_s.obstacles == () and nav_o.obstacles == ("hamper.n.02_1",)
     assert nav_o.objects == ()  # the obstacle is never an intended contact
+    # the long drives of this family are the shared face_travel schedule, also for records without a ``style``
+    assert nav_s.style == BP.FACE_TRAVEL and nav_s.targets(std, None)["style"] == BP.FACE_TRAVEL
+    assert nav_o.targets(obs, None)["style"] == BP.FACE_TRAVEL
+    # every other family drives its record as recorded unless the record says otherwise
+    iors = load("inter_object_relation_satisfaction-ontop_large_scale")
+    navs = [a for a in expand(iors.alias, iors) if a.name == "navigate"]
+    assert navs and all(a.style is None and a.targets(iors, None)["style"] == BP.RECORDED for a in navs)
+    navs[0].path.extra["style"] = BP.FACE_TRAVEL
+    assert navs[0].targets(iors, None)["style"] == BP.FACE_TRAVEL
+    with pytest.raises(ValueError, match="style"):
+        A.Navigate(path=nav_s.path, style="sideways")
     assert torso_s.goal.arms == "same" and torso_s.arms == ()
     assert torso_o.goal.arms == "untucked" and torso_o.arms == ("left", "right")
     d = raw("camera_relocalization-standard")
@@ -568,6 +580,8 @@ def _check_value(key, value, where):
         assert value and all(isinstance(v, float) for v in value), where
     elif key in ("posture", "arms", "mode", "carried"):
         assert isinstance(value, str) and value, where
+    elif key == "style":
+        assert value in BP.STYLES, where  # navigate: the recorded polyline or the shared face_travel schedule
     elif key == "distance_m":
         assert value > 0, where
     elif key in ("carry", "carry_via"):

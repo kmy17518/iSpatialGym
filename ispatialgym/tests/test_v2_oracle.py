@@ -1407,6 +1407,64 @@ def test_track_path_stays_in_the_corridor_at_corners():
     assert float(v_ref[len(ref) // 2 :].min()) < 0.2 < float(v_ref.max())
 
 
+def test_track_path_face_travel_drives_the_staircase_smoothly():
+    """Owner 2026-09-22 (camera relocalization): the dense grid record of the pilot (one waypoint per 0.2 m cell, headings
+    alternating 0° / -45°, the base slowing at every stair and zig-zagging) is driven as the shared ``face_travel``
+    schedule: the base reaches the goal pose, cruises through the stairs without speed dips, turns left / right no more
+    often than the real corners, and stays within one map cell + the fillet budget of the recorded polyline."""
+    from ispatialgym.robot import base_path as BP
+
+    wps = [[0.2, 0.0, 0.0], [0.4, 0.0, 0.0], [0.6, 0.0, -0.785], [0.8, -0.2, 0.0], [1.0, -0.2, 0.0], [1.2, -0.2, 0.0], [1.4, -0.2, -0.464],
+           [1.6, -0.3, 0.0], [1.8, -0.3, 0.0], [2.0, -0.3, 0.0], [2.2, -0.3, 0.0], [2.4, -0.3, -0.785], [2.6, -0.5, 0.0], [2.8, -0.5, 0.0],
+           [3.0, -0.5, 0.0], [3.2, -0.5, 0.464], [3.4, -0.4, 0.464], [3.6, -0.3, 0.4]]
+    robot = FakeRobot(base=(0.0, 0.0, 0.0))
+    env = FakeEnv(robot, {})
+    m = Motions(env, FakeBackend(robot))
+    poly = [[0.0, 0.0, 0.0]] + wps
+
+    def cross_track(pt):
+        best = 1e9
+        for a, b in zip(poly[:-1], poly[1:]):
+            a, b = th.tensor(a[:2]), th.tensor(b[:2])
+            ab = b - a
+            t = float(th.clamp(th.dot(pt - a, ab) / max(float(th.dot(ab, ab)), 1e-9), 0.0, 1.0))
+            best = min(best, float(th.linalg.norm(pt - (a + ab * t))))
+        return best
+
+    errs, speeds, yaw_rates = [], [], []
+    for a in m.track_path(wps, style=BP.FACE_TRAVEL):
+        env.step(a)
+        p, _ = robot.get_position_orientation()
+        errs.append(cross_track(p[:2]))
+        speeds.append(float(th.linalg.norm(a[:2] * th.tensor(M.BASE_VEL_LIMITS[:2]))))
+        yaw_rates.append(float(a[2]) * float(M.BASE_VEL_LIMITS[2]))
+    x, y, yaw = m.base_pose2d()
+    assert math.hypot(x - 3.6, y + 0.3) < 0.03 and abs(C.wrap_angle(yaw - 0.4)) < 0.05
+    cfg = m.cfg.face_travel
+    assert max(errs) < cfg.simplify_tol_m + cfg.fillet_deviation_m + 0.02, max(errs)
+    # the commanded speed: at cruise most of the drive, no dip below half cruise once up to speed (the stairs are gone)
+    v = th.tensor(speeds)
+    moving = (v > 0.05).nonzero().flatten()
+    inner = v[int(moving[0]) + 40 : int(moving[-1]) - 40]
+    assert float(inner.min()) > 0.2, float(inner.min())
+    assert float((inner > 0.36).float().mean()) > 0.7
+    # the body turns left / right at most as often as the real corners of the simplified path (the record reversed 6 times)
+    sign, reversals = None, 0
+    for w in yaw_rates:
+        if abs(w) < 0.1:
+            continue
+        s = 1 if w > 0 else -1
+        reversals += int(sign is not None and s != sign)
+        sign = s
+    assert reversals <= 4, reversals
+    # the reference the tracker followed is the shared schedule: the same call the sampler validates
+    ref = m.tracker.ref
+    v_ref = th.linalg.norm(ref[1:, :2] - ref[:-1, :2], dim=1) * 30
+    assert float(v_ref[len(ref) // 4 : -len(ref) // 4].min()) > 0.3
+    with pytest.raises(SkillError, match="style"):
+        drive(env, m.track_path(wps, style="sideways"))
+
+
 def test_trunk_to_moves_both_scalars_jointly_at_bounded_rates():
     robot = FakeRobot()
     env = FakeEnv(robot, {})

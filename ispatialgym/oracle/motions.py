@@ -4,7 +4,8 @@ Eight motions, each a generator of 23-D JoyLo actions (one per environment step)
 target** and either reaches it or raises :class:`SkillError` with a QA category of §6.4:
 
 ==================================  ==========================================================================
-``track_path(waypoints)``           the v1 base tracker follows a recorded ``[x, y, yaw]`` waypoint list
+``track_path(waypoints, style)``    the v1 base tracker follows a recorded ``[x, y, yaw]`` waypoint list (as
+                                    recorded, or as the shared ``robot.base_path`` ``face_travel`` schedule)
 ``trunk_to(translate, tilt)``       the trunk along the JoyLo keyframe curve at bounded rates, both scalars
                                     interpolated jointly (the sweep the sampler checked, conventions
                                     ``trunk_sweep``)
@@ -50,6 +51,7 @@ from ispatialgym.oracle import r1pro_model as M
 from ispatialgym.oracle.action import GRIPPER_OPEN, ActionState
 from ispatialgym.oracle.base_tracker import BaseTrackerConfig, BaseTrajectoryTracker
 from ispatialgym.oracle.trunk import TrunkState
+from ispatialgym.robot import base_path as BP
 from ispatialgym.robot import conventions as C
 
 log = logging.getLogger(__name__)
@@ -179,6 +181,12 @@ class MotionsConfig:
     path_max_lag: float = 0.04
     #: arc-length resolution of the speed profile (m)
     path_profile_ds: float = 0.005
+    #: ``track_path(style="face_travel")`` (camera relocalization, owner 2026-09-22): the shared driven schedule of
+    #: ``robot.base_path`` — the polyline simplified within one map cell, corners filleted under a 5 cm deviation budget
+    #: with the body turning over a window that keeps cruise speed, the end turns on the spot above 90° and blended
+    #: below; the speed profile adds the lateral-acceleration and yaw limits through the arcs. The sampler validates
+    #: the same schedule with the same (default) configuration: change it on both sides or not at all.
+    face_travel: BP.BasePathConfig = field(default_factory=BP.BasePathConfig)
     #: JoyLo trunk rates (translate units / s, rad / s); JoyLo defaults are 0.1 / 0.05, faster here for shorter demos
     trunk_translate_rate: float = 0.25
     trunk_tilt_rate: float = 0.15
@@ -1158,6 +1166,11 @@ class Motions:
         obstacle; 25 cm off after a 90° turn)."""
         a_max = float(self.cfg.base_tracker.a_max[0] if a_max is None else a_max)
         pts = [self.base_pose2d()] + [as_pose2d(w) for w in waypoints]
+        if style == BP.FACE_TRAVEL:
+            path = BP.BasePath.build(pts, self.cfg.face_travel)
+            return BP.time_parameterise(path, self.dt, v_lin, v_ang, a_lin=a_max, a_yaw=float(self.cfg.base_tracker.a_max[2]), ds=float(self.cfg.path_profile_ds))
+        if style not in (None, BP.RECORDED):
+            raise SkillError("execution", f"track_path: unknown style {style!r}")
         xy = th.tensor([[p[0], p[1]] for p in pts], dtype=th.float64)
         yaws = [pts[0][2]]
         for p in pts[1:]:
@@ -1266,18 +1279,20 @@ class Motions:
         samples.append([float(xy[-1][0]), float(xy[-1][1]), yaws[-1]])
         return th.tensor(samples, dtype=th.float32)
 
-    def track_path(self, waypoints: Sequence[Any], posture: Optional[str] = None, tracker_cfg: Optional[BaseTrackerConfig] = None) -> Iterator[th.Tensor]:
+    def track_path(self, waypoints: Sequence[Any], posture: Optional[str] = None, tracker_cfg: Optional[BaseTrackerConfig] = None,
+                   style: Optional[str] = None) -> Iterator[th.Tensor]:
         """Follow a recorded ``[x, y, yaw]`` waypoint list with the joystick-like tracker (feed-forward + pose
         feedback, velocity / acceleration limited, smoothed; translation and rotation simultaneous). ``posture`` is the
-        recorded navigation posture (informational: Layer 1 changes no posture). Arm and trunk hold targets stay as
-        they are. Raises ``execution`` when the tracker times out."""
+        recorded navigation posture (informational: Layer 1 changes no posture). ``style`` (``Navigate.style``): the
+        polyline as recorded (default) or the ``face_travel`` schedule of ``robot.base_path`` (``_base_reference``).
+        Arm and trunk hold targets stay as they are. Raises ``execution`` when the tracker times out."""
         waypoints = list(waypoints)
         if not waypoints:
             return
         cfg = tracker_cfg or self.cfg.base_tracker
         v_lin = self.cfg.path_speed_fraction * min(cfg.v_max[0], cfg.v_max[1])
         v_ang = self.cfg.path_speed_fraction * cfg.v_max[2]
-        ref = self._base_reference(waypoints, v_lin, v_ang, a_max=min(cfg.a_max[0], cfg.a_max[1]))
+        ref = self._base_reference(waypoints, v_lin, v_ang, a_max=min(cfg.a_max[0], cfg.a_max[1]), style=style)
         tracker = PathTracker(ref, self.dt, cfg, max_lag=self.cfg.path_max_lag)
         self.tracker = tracker
         try:

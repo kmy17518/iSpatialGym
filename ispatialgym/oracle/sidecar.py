@@ -326,8 +326,10 @@ class Transition:
 
 @dataclass
 class Path:
-    """A recorded base path (spec §3.7): ``waypoints`` = ``[x, y, yaw]`` list the tracker follows exactly, validated
-    at ``posture`` with ``carried`` attached (``None`` = nothing carried)."""
+    """A recorded base path (spec §3.7): ``waypoints`` = ``[x, y, yaw]`` list, validated at ``posture`` with ``carried``
+    attached (``None`` = nothing carried). The tracker follows the polyline as recorded unless the record's optional
+    ``style`` (kept in ``extra``; ``robot.base_path.STYLES``) or the program says ``face_travel``: then the record is the
+    shared ``robot.base_path`` schedule the sampler checked (camera relocalization, owner 2026-09-22)."""
 
     frm: str
     to: str

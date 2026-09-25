@@ -15,11 +15,14 @@ structural categories of §6.1 never count, nor does the robot), ≥ ``min_share
 the init; both configurations whole-body collision-free (``collision_margin_m``).
 
 The recorded path (§3.7 / §7 ``paths[]``, ``mode = "global"``: both stances lie on the eroded map, so the eroded-map
-shortest path *is* the path and the local connections are empty) is the dense eroded-map shortest path itself (one
-waypoint per map cell, 0.1 m; the first / last waypoints are the exact base poses), its waypoints carry the heading of
-the following segment (the goal yaw last), and it is whole-body collision-checked every 0.1 m at the navigation posture
-(JoyLo reset arms, init trunk). The bucket is decided on the length of the recorded path (= the grid geodesic, what the
-oracle drives).
+shortest path *is* the path and the local connections are empty) is the eroded-map shortest path **shortcut by line of
+sight** on that map (``navigation.simplify_path``, as every other family's ``plan_path`` records; owner 2026-09-22 — the
+pilot's dense one-waypoint-per-cell records made the oracle slow at every 45° stair of the grid path and zig-zag), the
+first / last waypoints the exact base poses, the interior waypoints carrying the heading of the following segment, and
+``style = "face_travel"``: the oracle drives it as the shared ``robot.base_path`` schedule (fillets under a 5 cm
+deviation budget, the body facing the way, end turns on the spot above 90° and blended below), and it is whole-body
+collision-checked every 0.1 m **of that schedule** (the on-the-spot turns in ≤ 0.2 rad steps) at the navigation posture
+(JoyLo reset arms, init trunk). The bucket is decided on the polyline length of the recorded waypoints.
 
 Obstructed (§6.2): one obstacle (group ``obstacles``) stood upright on a cell of the middle 30–70 % of the free
 shortest path so that the shortest path on the map **with its footprint blocked** (``blocked_footprints``, recorded in
@@ -28,13 +31,15 @@ without closing (corridor ≥ ``obstacle.min_corridor_width_m`` on one side), th
 obstacle stands stably (settled ``obstacle.settle_steps``, drift ≤ ``obstacle.settle_drift_max_m``), init and goal
 stay collision-free with it in the world, it is not a look-alike of an object the init or goal view counts (§3.12), and
 its displacement is checked at the goal. **Visibility (owner decision 2026-09-15, spec §6.2 / ``e6a6b68``)**: the
-obstacle must be inside the head camera frame (``obstacle.in_frame_margin``) at a waypoint of the new path **before the
-path departs from the unobstructed shortest path** — one of the waypoints the blocked path shares with the path the
-robot would have taken without the obstacle (the divergence waypoint included), with the base heading along the
-*unobstructed* path (at the divergence waypoint: toward where it would have continued) and the JoyLo reset trunk;
-seeing the obstacle only after the detour is not admissible. With several obstacles each one is checked against the
-shortest path before it was placed. ``divergence_waypoint_index`` / ``view_waypoint_index`` (indices into the recorded
-dense path) are recorded in the summary and in the sidecar ``paths[]`` entry.
+obstacle must be inside the head camera frame (``obstacle.in_frame_margin``) at a driven stride of the new path
+**before the path departs from the unobstructed shortest path** — the strides of the recorded schedule up to the last
+dense waypoint the blocked path shares with the path the robot would have taken without the obstacle (the divergence
+waypoint included, projected onto the schedule), at the pose the oracle drives there (along the shared prefix: the
+unobstructed heading; since 2026-09-22 the record and the drive are one schedule, so what is checked is what the camera
+sees) and the JoyLo reset trunk; seeing the obstacle only after the detour is not admissible. With several obstacles
+each one is checked against the shortest path before it was placed. ``divergence_waypoint_index`` (dense planner path),
+``view_waypoint_index`` (stride of the schedule), ``view_s_m`` / ``divergence_s_m`` (arc lengths) are recorded in the
+summary and in the sidecar ``paths[]`` entry.
 
 TRO: ``pose_targets[agent]`` = the goal head-camera sensor pose (§8: 0.05 m / 0.10 rad, ``link`` = the sensor key),
 measured at the goal configuration. Sidecar: ``stances.init`` and ``stances.goal`` (reset arms recorded as
@@ -63,6 +68,7 @@ from ispatialgym.sampling.tro_writer import pose_target
 from ispatialgym.sampling.v2 import navigation as NAV
 from ispatialgym.sampling.v2.core import SamplerV2, register
 from ispatialgym.sampling.v2.stances import PathRecord, Stance, path_length
+from ispatialgym.robot import base_path as BP
 
 from ispatialgym.activity.problem import AGENT_INSTANCE  # noqa: E402
 
@@ -203,11 +209,12 @@ def divergence_index(path_before: Sequence[Sequence[float]], path_after: Sequenc
 
 def view_candidates(path: Sequence[Sequence[float]], final_yaw: float, path_before: Optional[Sequence[Sequence[float]]] = None,
                     tol: float = 0.05) -> Tuple[List[int], List[Tuple[float, float]], List[float], Optional[int]]:
-    """The waypoints of ``path`` at which an obstacle may count as seen and the base heading there (§6.2): without
+    """The waypoints of a dense ``path`` at which an obstacle may count as seen and the base heading there (§6.2): without
     ``path_before`` every waypoint with the heading of ``path``; with ``path_before`` (the shortest path the robot would
     take without the obstacle) only the waypoints **up to the divergence point**, with the headings of ``path_before``
     (at the divergence waypoint: toward where the unobstructed path would have continued). Returns ``(indices, xy
-    points, yaws, divergence index or None)``."""
+    points, yaws, divergence index or None)``. Dense-path form of the rule; the sampler evaluates it on the driven
+    schedule since 2026-09-22 (``CameraRelocalizationV2.view_indices``)."""
     pts = [(float(p[0]), float(p[1])) for p in path]
     if not pts:
         return [], [], [], None
@@ -242,12 +249,14 @@ def heading_between(axis0, axis1) -> float:
 
 class ObstructedPathRecord(PathRecord):
     """``paths[]`` entry of the obstructed variant: the blocked-map path plus the §6.2 view facts per obstacle
-    (``view_waypoint_index`` — the first waypoint at which the obstacle is in frame before the departure from the
-    unobstructed path —, ``divergence_waypoint_index``, ``view_pose2d`` = that waypoint with the unobstructed heading;
-    indices into ``waypoints``). The F6 ``Path`` keeps them in ``extra``."""
+    (``view_waypoint_index`` — the first driven stride (``stride_m`` along the record's ``face_travel`` schedule) at
+    which the obstacle is in frame before the departure from the unobstructed path —, ``view_s_m`` / ``divergence_s_m``
+    (the same as arc lengths along the schedule), ``divergence_waypoint_index`` (index into the dense planner path the
+    summary keeps), ``view_pose2d`` = the driven pose at that stride). The F6 ``Path`` keeps them in ``extra``."""
 
     def __init__(self, base: PathRecord, view: Optional[Dict[str, Any]] = None):
-        super().__init__(base.frm, base.to, base.mode, list(base.waypoints), base.length_m, base.posture, base.carried, base.trunk, base.stride_m, base.n_checked)
+        super().__init__(base.frm, base.to, base.mode, list(base.waypoints), base.length_m, base.posture, base.carried, base.trunk, base.stride_m, base.n_checked,
+                         style=base.style)
         self.view: Dict[str, Any] = dict(view or {})
 
     def to_sidecar(self) -> Dict[str, Any]:
@@ -508,29 +517,48 @@ class CameraRelocalizationV2(SamplerV2):
 
     @staticmethod
     def dense_points(path: th.Tensor, base0, base1) -> List[th.Tensor]:
-        """The waypoints of an eroded-map shortest path as recorded: BEHAVIOR's dense cell-centre path with the first /
-        last point replaced by the exact base positions (same count, so view / divergence indices line up)."""
+        """The dense cell-centre path BEHAVIOR's A* returns with the first / last point replaced by the exact base
+        positions (same count, so the divergence index of the obstructed variant lines up with the planner path)."""
         pts = [G.t(p)[:2].clone() for p in path]
         if len(pts) < 2:
             return [G.t(base0[:2]), G.t(base1[:2])]
         pts[0], pts[-1] = G.t(base0[:2]), G.t(base1[:2])
         return pts
 
-    def build_path_record(self, path: th.Tensor, base0, base1, trunk: Tuple[float, float], frm: str = "init", to: str = "goal") -> Optional[PathRecord]:
-        """The ``paths[]`` record of an eroded-map shortest path: the dense path (one waypoint per 0.1 m map cell), waypoint
-        yaws = heading of the following segment (init yaw first, goal yaw last), whole-body collision-checked at 0.1 m
-        strides at the navigation posture (reset arms, init trunk). None when a stride collides."""
+    def path_schedule(self, path: th.Tensor, base0, base1) -> Tuple[List[Tuple[float, float, float]], BP.BasePath]:
+        """The recorded waypoints of an eroded-map shortest path and the schedule the oracle drives them as (owner
+        2026-09-22): the dense cell path shortcut by line of sight on the eroded map it was planned on (the blocked
+        copy inside ``blocked_map``: ``simplify_path``, what every other family's ``plan_path`` records — the pilot's
+        dense records made the base slow at every 45° stair and zig-zag), init yaw first, interior yaws = heading of
+        the following segment, goal yaw last; the schedule is the shared ``robot.base_path`` ``face_travel`` build of
+        those waypoints (fillets, the body facing the way, the hybrid end turns), at the module's default configuration
+        — the one the oracle's ``MotionsConfig.face_travel`` defaults to."""
         pts = self.dense_points(path, base0, base1)
-        yaws = path_yaws(pts, base1[2])
-        yaws[0] = float(base0[2])
-        waypoints = [(float(p[0]), float(p[1]), float(y)) for p, y in zip(pts, yaws)]
-        length = path_length(waypoints)
-        poses = NAV.stride_poses(waypoints, NAV.STRIDE_M)
+        trav = self.world.scene.trav_map
+        free = trav._erode_trav_map(th.clone(trav.floor_map[0]), robot=self.kit.robot) == 255
+        cells = [NAV._to_map(self.kit, p) for p in pts]
+        cells = NAV.simplify_path(cells, free)
+        interior = [NAV._to_world(self.kit, c) for c in cells[1:-1]]
+        raw = [(float(base0[0]), float(base0[1]), float(base0[2]))] + [(float(p[0]), float(p[1]), float("nan")) for p in interior] \
+            + [(float(base1[0]), float(base1[1]), float(base1[2]))]
+        sched = BP.BasePath.build(raw, BP.BasePathConfig())
+        return list(sched.waypoints), sched
+
+    def build_path_record(self, path: th.Tensor, base0, base1, trunk: Tuple[float, float], frm: str = "init", to: str = "goal",
+                          plan: Optional[Tuple[List[Tuple[float, float, float]], BP.BasePath]] = None) -> Optional[PathRecord]:
+        """The ``paths[]`` record of an eroded-map shortest path (``path_schedule``; ``plan`` = its result when the
+        caller already has it): the shortcut waypoints, ``length_m`` = their polyline length (the bucket is decided on
+        it), ``style = face_travel``, whole-body collision-checked at 0.1 m strides **of the driven schedule** (the
+        fillets, the on-the-spot turns in ≤ 0.2 rad steps) at the navigation posture (reset arms, init trunk). None when
+        a stride collides."""
+        waypoints, sched = plan if plan is not None else self.path_schedule(path, base0, base1)
+        poses = sched.stride_poses(NAV.STRIDE_M, dwell_step_rad=BP.DWELL_CHECK_STEP_RAD)
         ok, bad = NAV.path_collision_free(self.kit, poses, trunk, posture=RESET_ARMS)
         if not ok:
             log.info("%s: path %s -> %s collides at stride %d/%d (%s)", self.gp.alias, frm, to, bad, len(poses), [round(v, 2) for v in poses[bad]])
             return None
-        return PathRecord(frm, to, "global", waypoints, length, posture=RESET_ARMS, carried=None, trunk=trunk, stride_m=NAV.STRIDE_M, n_checked=len(poses))
+        return PathRecord(frm, to, "global", waypoints, path_length(waypoints), posture=RESET_ARMS, carried=None, trunk=trunk, stride_m=NAV.STRIDE_M,
+                          n_checked=len(poses), style=BP.FACE_TRAVEL)
 
     def map_tol(self) -> float:
         """Divergence tolerance: half a map cell (v1)."""
@@ -680,47 +708,67 @@ class CameraRelocalizationV2(SamplerV2):
         finally:
             trav.floor_map[0] = orig
 
-    def view_indices(self, path: th.Tensor, final_yaw: float, corners: th.Tensor, margin: float, path_before: Optional[th.Tensor] = None) -> List[int]:
-        """Waypoints of ``path`` at which the whole box ``corners`` is inside the head-camera image with ``margin``, the
-        robot at the reset trunk / arms and the base facing along the path (§6.2: the oracle navigates first).
+    def divergence_s(self, sched: BP.BasePath, path: th.Tensor, path_before: Optional[th.Tensor]) -> Tuple[Optional[int], float]:
+        """The dense-path divergence index of ``path`` from ``path_before`` (``divergence_index``) and the arc length
+        along the driven schedule up to which the robot is still on the unobstructed path (that waypoint projected on
+        the schedule, plus half a map cell); ``(None, length)`` without a reference path."""
+        if path_before is None:
+            return None, sched.length
+        k = divergence_index(path_before, path, self.map_tol())
+        return int(k), sched.project(G.t(path[k])[:2]) + self.map_tol()
 
-        With ``path_before`` (the shortest path the robot would take without the obstacle) only the waypoints **up to
-        the divergence point** count (owner decision 2026-09-15): the obstacle must be seen before the robot's path
-        departs from the unobstructed path, otherwise a policy could learn the detour without ever seeing its cause
-        (e.g. an obstacle that only enters the frame at the last waypoint, when the base turns to the goal yaw). The
-        heading at those waypoints is the heading of ``path_before`` (at the divergence waypoint: toward where the
-        unobstructed path would have continued)."""
-        idx, pts, yaws, _ = view_candidates(path, final_yaw, path_before, self.map_tol())
+    def view_indices(self, sched: BP.BasePath, path: th.Tensor, corners: th.Tensor, margin: float, path_before: Optional[th.Tensor] = None) -> List[int]:
+        """Strides of the driven schedule ``sched`` (``drive_poses`` every ``STRIDE_M``) at which the whole box
+        ``corners`` is inside the head-camera image with ``margin``, the robot at the reset trunk / arms and the base at
+        the pose the oracle drives there (§6.2: the oracle navigates first).
+
+        With ``path_before`` (the shortest path the robot would take without the obstacle) only the strides **up to the
+        divergence point** count (owner decision 2026-09-15): the obstacle must be seen before the robot's path departs
+        from the unobstructed path, otherwise a policy could learn the detour without ever seeing its cause (e.g. an
+        obstacle that only enters the frame at the last waypoint, when the base turns to the goal yaw). Since the record
+        and the drive share one schedule (owner 2026-09-22) the heading at those strides is the heading the robot
+        actually has there — along the shared prefix it is the unobstructed heading, the detour's fillet turns the body
+        only over the last fraction of a metre before the departure."""
+        _, s_div = self.divergence_s(sched, path, path_before)
+        ss, poses = sched.drive_poses(NAV.STRIDE_M)
+        idx = [i for i, s in enumerate(ss) if s <= s_div + 1e-9]
         if not idx:
             return []
-        qs = th.stack([self.kit.q_at_base_pose(self.q_reset_rel, float(p[0]), float(p[1]), yaw) for p, yaw in zip(pts, yaws)])
+        qs = th.stack([self.kit.q_at_base_pose(self.q_reset_rel, poses[i][0], poses[i][1], poses[i][2]) for i in idx])
         cams = self.kit.camera_poses_batch(qs)
         return [i for i, cam in zip(idx, cams) if self.frustum_ok(cam, corners, margin)]
 
-    def view_record(self, poses: Dict[str, G.Pose], path_b: th.Tensor, final_yaw: float, margin: float, ref_paths: Dict[str, th.Tensor]) -> Dict[str, Any]:
-        """Per obstacle the waypoints of ``path_b`` at which it is inside the head-camera frame **before the path departs
-        from the obstacle's reference path** (the shortest path before that obstacle was placed; at least one, else
-        Reject), the divergence index and the view pose (waypoint + unobstructed heading)."""
-        view, div, pose2d = {}, {}, {}
+    def view_record(self, poses: Dict[str, G.Pose], path_b: th.Tensor, sched: BP.BasePath, margin: float, ref_paths: Dict[str, th.Tensor]) -> Dict[str, Any]:
+        """Per obstacle the strides of the driven schedule of ``path_b`` at which it is inside the head-camera frame
+        **before the path departs from the obstacle's reference path** (the shortest path before that obstacle was
+        placed; at least one, else Reject), the divergence facts and the view pose (the driven pose at the first such
+        stride)."""
+        view, div, div_s, view_s, pose2d = {}, {}, {}, {}, {}
+        ss, drive = sched.drive_poses(NAV.STRIDE_M)
         for name, pose in poses.items():
             ref = ref_paths[name]
-            hits = self.view_indices(path_b, final_yaw, G.aabb_corners(*self.obstacle_aabb(name, pose)), margin, path_before=ref)
-            k = divergence_index(ref, path_b, self.map_tol())
-            div[name] = int(k)
-            first = first_admissible_view(hits, k)
+            hits = self.view_indices(sched, path_b, G.aabb_corners(*self.obstacle_aabb(name, pose)), margin, path_before=ref)
+            k, s_div = self.divergence_s(sched, path_b, ref)
+            div[name], div_s[name] = int(k), round(float(s_div), 3)
+            first = first_admissible_view(hits, None)  # view_indices already stops at the divergence
             if first is None:
-                raise Reject("obstacle", f"{name} is not inside the head camera frame at any waypoint before the path departs from the unobstructed path "
-                                         f"(divergence at waypoint {k} of {len(path_b)})")
+                raise Reject("obstacle", f"{name} is not inside the head camera frame at any driven stride before the path departs from the unobstructed "
+                                         f"path (divergence at dense waypoint {k} of {len(path_b)}, {s_div:.2f} m along the {sched.length:.2f} m drive)")
             view[name] = [int(h) for h in hits]
-            yaw = path_yaws([G.t(p)[:2] for p in ref], final_yaw)[first]
-            pose2d[name] = [float(path_b[first][0]), float(path_b[first][1]), float(yaw)]
-        return {"view_waypoint_index": {n: h[0] for n, h in view.items()}, "view_waypoints": view, "divergence_waypoint_index": div, "view_pose2d": pose2d}
+            view_s[name] = round(float(ss[first]), 3)
+            pose2d[name] = [float(v) for v in drive[first]]
+        return {"view_waypoint_index": {n: h[0] for n, h in view.items()}, "view_waypoints": view, "view_s_m": view_s, "divergence_waypoint_index": div,
+                "divergence_s_m": div_s, "view_pose2d": pose2d}
 
     @staticmethod
     def sidecar_view(rec: Dict[str, Any]) -> Dict[str, Any]:
-        """The view facts written into the sidecar ``paths[]`` entry (indices into the recorded dense path)."""
-        return {"view_waypoint_index": dict(rec["view_waypoint_index"]), "divergence_waypoint_index": dict(rec["divergence_waypoint_index"]),
-                "view_pose2d": {n: list(p) for n, p in rec["view_pose2d"].items()}, "view_heading": "unobstructed path", "view_trunk": "JoyLo reset"}
+        """The view facts written into the sidecar ``paths[]`` entry: ``view_waypoint_index`` = the stride (0.1 m along
+        the record's driven schedule) of the first admissible view, ``view_s_m`` / ``divergence_s_m`` the arc lengths,
+        ``divergence_waypoint_index`` the index into the dense planner path (the summary's ``path_free`` / obstacle
+        facts), ``view_pose2d`` the driven pose at the view stride."""
+        return {"view_waypoint_index": dict(rec["view_waypoint_index"]), "view_s_m": dict(rec["view_s_m"]), "divergence_waypoint_index": dict(rec["divergence_waypoint_index"]),
+                "divergence_s_m": dict(rec["divergence_s_m"]), "view_pose2d": {n: list(p) for n, p in rec["view_pose2d"].items()}, "view_heading": "driven schedule",
+                "view_trunk": "JoyLo reset"}
 
     def corridor_widths(self, blocked_map: th.Tensor, xy: th.Tensor, direction: th.Tensor, max_m: float = 3.0) -> List[float]:
         """Free floor run (m) on the blocked un-eroded map on either side of the obstacle, perpendicular to the path
@@ -793,6 +841,7 @@ class CameraRelocalizationV2(SamplerV2):
         pose = (p1.clone(), r1.clone())
         fps = self.footprints({**placed, name: pose}, margin)
         rec_path = None
+        sched = None
         with self.blocked_map(fps) as blocked:
             path_b, geo_b = self.kit.geodesic(th.tensor(base0[:2]), th.tensor(base1[:2]))
             corridor = self.corridor_widths(blocked, pose[0][:2], direction)
@@ -801,13 +850,16 @@ class CameraRelocalizationV2(SamplerV2):
             if why is None and max(corridor) < float(P["min_corridor_width_m"]):
                 why = "corridor"
             if why is None:
-                # the obstacle must be seen before the robot departs from the path it would have taken without it
-                hits = self.view_indices(path_b, base1[2], G.aabb_corners(*self.obstacle_aabb(name, pose)), float(P["in_frame_margin"]), path_before=path_before)
+                # the obstacle must be seen before the robot departs from the path it would have taken without it, at the
+                # poses the oracle drives (the shortcut + schedule on the blocked eroded map: inside ``blocked_map``)
+                plan = self.path_schedule(path_b, base0, base1)
+                sched = plan[1]
+                hits = self.view_indices(sched, path_b, G.aabb_corners(*self.obstacle_aabb(name, pose)), float(P["in_frame_margin"]), path_before=path_before)
                 if not hits:
                     why = "view"
             if why is None:
                 self.kit.sync_world()  # the obstacle enters the collision world
-                rec_path = self.build_path_record(path_b, base0, base1, trunk)
+                rec_path = self.build_path_record(path_b, base0, base1, trunk, plan=plan)
                 if rec_path is None:
                     why = "path_collision"
                 elif rec_path.length_m > bucket_hi:
@@ -822,7 +874,7 @@ class CameraRelocalizationV2(SamplerV2):
             self.kit.sync_world()
             return None, why
         return {"pose": pose, "path": path_b, "geodesic_m": float(geo_b), "corridor_m": corridor, "view_indices": hits, "yaw": yaw, "settle_drift_m": drift,
-                "settle_tilt_rad": tilt, "path_record": rec_path, "footprints": fps}, None
+                "settle_tilt_rad": tilt, "path_record": rec_path, "schedule": sched, "footprints": fps}, None
 
     def place_obstacles(self, d: Draft, rng, base0, q0, cam0: G.Pose, base1, q1, cam1: G.Pose, path_free: th.Tensor, geo_free: float, free_rec: PathRecord,
                         lo: float, hi: float):
@@ -872,7 +924,7 @@ class CameraRelocalizationV2(SamplerV2):
         rec_path: PathRecord = last["path_record"]
         if bucket_index(rec_path.length_m, self.buckets()) != d.extras["bucket"]["index"]:
             raise Reject("obstacle", f"blocked-map path {rec_path.length_m:.2f} m leaves the bucket ({lo}, {hi}]")
-        view = self.view_record(poses, cur_path, base1[2], float(P["in_frame_margin"]), ref_paths)
+        view = self.view_record(poses, cur_path, last["schedule"], float(P["in_frame_margin"]), ref_paths)
         for name in names:
             placements[name].update({"view_waypoint_index": view["view_waypoint_index"][name], "divergence_waypoint_index": view["divergence_waypoint_index"][name]})
         rec_path = ObstructedPathRecord(rec_path, self.sidecar_view(view))
@@ -922,19 +974,22 @@ class CameraRelocalizationV2(SamplerV2):
                 if why:
                     raise Reject("obstacle", f"blocked-map path after the settle {why}")
                 self.kit.sync_world()
-                rec = self.build_path_record(path_b, base0, base1, self.init_trunk())
+                plan = self.path_schedule(path_b, base0, base1)
+                rec = self.build_path_record(path_b, base0, base1, self.init_trunk(), plan=plan)
             if rec is None or bucket_index(rec.length_m, self.buckets()) != draft.extras["bucket"]["index"]:
                 raise Reject("obstacle", "re-planned path after the settle collides or leaves the bucket")
+            sched = plan[1]
             draft.extras["obstacle_path"] = (path_b, float(geo_b))
             draft.summary.update({"geodesic_blocked_m": float(geo_b), "path_length_m": rec.length_m})
             draft.summary["obstacles"]["replanned_after_settle"] = True
         else:
             path_b = draft.extras["obstacle_path"][0]
             rec = next(p for p in self.sidecar.paths if p.frm == "init" and p.to == "goal")
+            sched = BP.BasePath.build(rec.waypoints, BP.BasePathConfig())  # the recorded waypoints rebuild the same schedule
             draft.summary["obstacles"]["replanned_after_settle"] = False
         # the view facts follow the settled poses (and the re-planned path): each obstacle before the departure from its
-        # reference path, along the final path
-        view = self.view_record(draft.object_poses, path_b, base1[2], float(P["in_frame_margin"]), ref_paths)
+        # reference path, along the final path's driven schedule
+        view = self.view_record(draft.object_poses, path_b, sched, float(P["in_frame_margin"]), ref_paths)
         for name in draft.object_poses:
             draft.summary["obstacles"]["placements"][name].update({"view_waypoint_index": view["view_waypoint_index"][name],
                                                                    "divergence_waypoint_index": view["divergence_waypoint_index"][name]})

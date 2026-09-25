@@ -383,6 +383,15 @@ end to end:
 The path (waypoints, posture, length) is recorded; the oracle drives exactly this path. Path length limits: Prompt 0
 step 6 (≤ 3 m), IORS large-scale B → C (≤ `max_partner_geodesic` + 1 m), camera relocalization buckets.
 
+Camera relocalization (owner decision 2026-09-22) records `style = "face_travel"`: its eroded-map path is the
+line-of-sight shortcut of the grid path (as `plan_path` records for every other family; the dense one-waypoint-per-cell
+records of the pilot made the oracle slow at every 45° stair and zig-zag), and "exactly this path" means the shared
+driven schedule of `robot.base_path` — fillets under a 5 cm deviation budget, the body facing the way with each corner's
+turn spread over a window that keeps the cruise speed, the end turns on the spot above 90° and blended below — which the
+sampler collision-checks at 0.1 m strides (the on-the-spot turns in ≤ 0.2 rad steps) and the oracle drives with the same
+code and configuration. The obstructed variant's view rule (6.2) is evaluated on that schedule's driven poses up to the
+divergence from the unobstructed path.
+
 ### 3.8 Stance transitions (swept trunk motion)
 
 Wherever two consecutive recorded stances differ in trunk (init → manipulation, B → C, manipulation → placement),

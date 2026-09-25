@@ -513,7 +513,7 @@ def draft_from_sidecar(d: Mapping[str, Any]) -> LoadedSidecar:
         sd.add_transition(Transition(t["from"], t["to"], float(t["stand_off"]), tuple(t.get("order") or TRANSITION_ORDER)))
     for p in d.get("paths") or []:
         sd.add_path(PathRecord(p["from"], p["to"], p.get("mode", "local"), [tuple(float(v) for v in w) for w in p["waypoints"]],
-                               float(p.get("length_m", 0.0)), p.get("posture", "untucked"), p.get("carried")))
+                               float(p.get("length_m", 0.0)), p.get("posture", "untucked"), p.get("carried"), style=p.get("style")))
     for g in d.get("grasps") or []:
         ch = g.get("carry_height", 0.12)
         sd.add_grasp(GraspRecord(g["object"], g["arm"], g.get("grasp_key"), g.get("grasp_name"), float(g.get("yaw", 0.0) or 0.0),
@@ -801,7 +801,7 @@ def materialise_goal(env, task, tro, physical: Mapping[str, Any], robot, sidecar
         out["skipped"].append("attachment needs AttachedTo.set_value")
         return out
     held = {g["object"] for g in (extras.get("grasps") or []) if isinstance(g, dict)}
-    hinges = {c["child"]: c for c in (extras.get("constraints") or []) if isinstance(c, dict)}
+    hinges = {c["child"]: c for c in (extras.get("constraints") or []) if isinstance(c, dict) and c.get("type", "revolute") == "revolute"}  # joint_friction records name no child
     for inst, tgt in meta.pose_targets.items():
         if inst == AGENT_INSTANCE:
             continue
@@ -1211,7 +1211,7 @@ def validate_template(template_dir: str, extra_steps: int, check_goal: bool, pos
         try:
             tro = load_tro(path)
             extras = tro.meta.extras
-            constrained = {c["child"] for c in (extras.get("constraints") or [])} | {g["object"] for g in (extras.get("grasps") or [])}
+            constrained = {c.get("child") or c.get("object") for c in (extras.get("constraints") or [])} | {g["object"] for g in (extras.get("grasps") or [])}
             if constrained:
                 rec["notes"].append(f"loader cannot restore grasps / constraints yet for {sorted(constrained)}; dependent checks skipped")
             task.load_tro_instance(env, tro=tro, settle_steps=25)

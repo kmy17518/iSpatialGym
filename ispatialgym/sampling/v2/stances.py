@@ -369,7 +369,10 @@ class Transition:
 class PathRecord:
     """Spec §3.7 / §7 ``paths[]``: the base path the oracle drives, ``mode`` ``local`` (un-eroded shortest path) or
     ``global`` (eroded global path + straight local connections), ``waypoints`` [[x, y, yaw], ...] world, ``length_m``,
-    ``posture`` (``untucked``), ``carried`` bddl instance or None, ``trunk`` (translate, tilt) the checks were made at."""
+    ``posture`` (``untucked``), ``carried`` bddl instance or None, ``trunk`` (translate, tilt) the checks were made at.
+    ``style`` (optional, ``robot.base_path.STYLES``): how the oracle drives the waypoints — ``face_travel`` = the shared
+    ``robot.base_path`` schedule the record was collision-checked as (camera relocalization, owner 2026-09-22); absent =
+    the polyline as recorded."""
 
     frm: str
     to: str
@@ -381,10 +384,14 @@ class PathRecord:
     trunk: Optional[Tuple[float, float]] = None
     stride_m: float = 0.1
     n_checked: int = 0
+    style: Optional[str] = None
 
     def to_sidecar(self) -> Dict[str, Any]:
-        return {"from": self.frm, "to": self.to, "mode": self.mode, "waypoints": [[float(a) for a in w] for w in self.waypoints],
-                "length_m": float(self.length_m), "posture": self.posture, "carried": self.carried}
+        out = {"from": self.frm, "to": self.to, "mode": self.mode, "waypoints": [[float(a) for a in w] for w in self.waypoints],
+               "length_m": float(self.length_m), "posture": self.posture, "carried": self.carried}
+        if self.style is not None:
+            out["style"] = self.style
+        return out
 
     @staticmethod
     def schema_ok(d: Dict[str, Any]) -> bool:

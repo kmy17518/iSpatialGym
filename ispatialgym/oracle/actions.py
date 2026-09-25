@@ -79,6 +79,7 @@ from ispatialgym.oracle.sidecar import (
     Stance,
     Transition as TransitionRecord,
 )
+from ispatialgym.robot import base_path as BP
 
 # Geometry constants of the action behaviour (§6.1, spec §3.6); the eef offsets themselves live in the conventions.
 PRE_DIST = 0.10  # pre-grasp / pre-contact / pre-place stand-off along −a
@@ -447,16 +448,27 @@ class Action:
 class Navigate(Action):
     """Follow a recorded base path (``paths[i]``; motion ``track_path``).
 
-    targets: ``{"waypoints": [[x, y, yaw], ...], "goal": [x, y, yaw], "posture": str, "carried": str | None}`` —
-    the recorded waypoints (whole-body collision-checked at ``posture`` with ``carried`` attached), copied from the
-    record; the tracker follows them exactly (spec §3.7). ``obstacles`` (camera relocalization — obstructed) name
-    the objects the path avoids for the annotation; they are deliberately **not** in ``objects`` (never touched).
+    targets: ``{"waypoints": [[x, y, yaw], ...], "goal": [x, y, yaw], "posture": str, "carried": str | None,
+    "style": str}`` — the recorded waypoints (whole-body collision-checked at ``posture`` with ``carried`` attached),
+    copied from the record, and how they are driven (spec §3.7): ``"recorded"`` tracks the polyline as recorded
+    (interior yaws blended per segment); ``"face_travel"`` drives the shared schedule of ``robot.base_path`` (grid
+    staircase simplified within one map cell, corners filleted, the body facing the way with the hybrid end turns —
+    what the camera-relocalization sampler collision-checked, owner 2026-09-22). The program sets ``style``; when it
+    does not, the record's own ``style`` (sidecar ``paths[].style``) decides, else ``"recorded"``. ``obstacles`` (camera
+    relocalization — obstructed) name the objects the path avoids for the annotation; they are deliberately **not** in
+    ``objects`` (never touched).
     """
 
     name: str = "navigate"
     path: PathRecord
     obstacles: Tuple[str, ...] = ()
-    TARGET_KEYS = ("waypoints", "goal", "posture", "carried")
+    style: Optional[str] = None
+    TARGET_KEYS = ("waypoints", "goal", "posture", "carried", "style")
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.style is not None and self.style not in BP.STYLES:
+            raise ValueError(f"navigate: unknown style {self.style!r} (one of {BP.STYLES})")
 
     def targets(self, sidecar, state):
         return {
@@ -464,6 +476,7 @@ class Navigate(Action):
             "goal": self.path.goal,
             "posture": self.path.posture,
             "carried": self.path.carried,
+            "style": self.style or (self.path.extra or {}).get("style") or BP.RECORDED,
         }
 
     def annotate(self, sidecar):
