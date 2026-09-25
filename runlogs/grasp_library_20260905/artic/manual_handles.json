@@ -28,8 +28,8 @@
  },
  "blender__eyedvd": {
   "j_lid": {
-   "use": "F",
-   "note": "reviewer: marker A is a hinge tab; pinch the lid's front edge"
+   "use": "A",
+   "note": "owner 2026-09-18: the pull ring beside the hinge is the handle (was F: reviewer took it for a hinge tab); approach re-pitched 20 deg toward the hinge, sideways layout"
   }
  },
  "door__aleker": {
@@ -977,6 +977,12 @@
  "violin_case__jlasop": {
   "j_lid": {
    "skip": "round-2 review: infeasible - Lid rim sits flush on the base rim all round; smooth domed lid with no lip or kn"
+  }
+ },
+ "blender__cwkvib": {
+  "j_lid": {
+   "use": "A",
+   "note": "owner 2026-09-18: manual bar record for the lug beside the rear hinge (artic_handles found no protrusion; the F edge pinch failed the library grasp test grasp_no_ag)"
   }
  }
 }

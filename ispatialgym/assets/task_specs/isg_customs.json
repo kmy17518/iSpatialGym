@@ -18049,12 +18049,12 @@
     1.0
    ],
    "require_goal_handle": "auto",
-   "arm": "auto",
+   "arm": "right",
    "arm_side_threshold_m": 0.1,
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.005,
     0.08
    ],
    "direction": "close",
@@ -18073,7 +18073,29 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "close_push": true,
+   "brace_optional": true,
+   "brace_search": false,
+   "joint_limit_margin_rad": 0.1,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "focus_at_handle": true,
+   "phase2_loose_class_deg": 45.0,
+   "close_tolerance_rad": 0.05,
+   "prefer_near": false,
+   "close_push_edge_inset_m": 0.02,
+   "attempt_budget_s": 900,
+   "close_init_fraction": 0.9,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0"
+   ],
+   "_test_note": "2026-09-19 22:59 owner: push-close - the lid starts open (close_init_fraction of the range, held by the USD Coulomb brake), the closed fist pushes DOWN at the lid's TIP along the closing arc to 0 (fixed, close_tolerance_rad); the base may re-stance between push segments (close_push, sampler _sample_with_close_push); joint_limit_margin_rad 0.1 (0920-070645: the fist's arc tracked into right_arm_joint2's limit at margin 0); 13:50 owner: the blender oriented as in the small-scale open (lid_facing hinge_right, the hinge along the line of sight on the robot's right; the raised tip on the left, pushed down-right); arm left (0920-135131: the side rule picked the right arm by 1 cm; pushing the tip down-RIGHT is the left arm's inward direction - the right arm needed 3 stances and self-collided); 15:21 owner: right arm with the base moved left (close_push_lat_pref_m -0.20: the blender to the robot's right so the arm extends sideways instead of folding), over-arc 0.08; the left arm needed the blender 0.4-0.5 m to the left, 44-45 deg off the camera axis (0920-144508)",
+   "lid_facing": "hinge_right",
+   "close_push_lat_pref_m": -0.2,
+   "close_push_overshoot_rad": 0.08
   },
   "constraints": []
  },
@@ -18384,12 +18406,12 @@
     1.0
    ],
    "require_goal_handle": "auto",
-   "arm": "auto",
+   "arm": "right",
    "arm_side_threshold_m": 0.1,
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.005,
     0.08
    ],
    "direction": "close",
@@ -18408,7 +18430,29 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "close_push": true,
+   "brace_optional": true,
+   "brace_search": false,
+   "joint_limit_margin_rad": 0.1,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "focus_at_handle": true,
+   "phase2_loose_class_deg": 45.0,
+   "close_tolerance_rad": 0.05,
+   "prefer_near": false,
+   "close_push_edge_inset_m": 0.02,
+   "attempt_budget_s": 900,
+   "close_init_fraction": 0.9,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0"
+   ],
+   "_test_note": "2026-09-19 22:59 owner: push-close - the lid starts open (close_init_fraction of the range, held by the USD Coulomb brake), the closed fist pushes DOWN at the lid's TIP along the closing arc to 0 (fixed, close_tolerance_rad); the base may re-stance between push segments (close_push, sampler _sample_with_close_push); joint_limit_margin_rad 0.1 (0920-070645: the fist's arc tracked into right_arm_joint2's limit at margin 0); 13:50 owner: the blender oriented as in the small-scale open (lid_facing hinge_right, the hinge along the line of sight on the robot's right; the raised tip on the left, pushed down-right); arm left (0920-135131: the side rule picked the right arm by 1 cm; pushing the tip down-RIGHT is the left arm's inward direction - the right arm needed 3 stances and self-collided); 15:21 owner: right arm with the base moved left (close_push_lat_pref_m -0.20: the blender to the robot's right so the arm extends sideways instead of folding), over-arc 0.08; the left arm needed the blender 0.4-0.5 m to the left, 44-45 deg off the camera axis (0920-144508)",
+   "lid_facing": "hinge_right",
+   "close_push_lat_pref_m": -0.2,
+   "close_push_overshoot_rad": 0.08
   },
   "constraints": []
  },
@@ -21096,7 +21140,7 @@
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.01,
     0.08
    ],
    "direction": "open",
@@ -21115,7 +21159,21 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "brace_search": false,
+   "lid_facing": "hinge_right",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0",
+    "brake:2.0",
+    "brake:4.0"
+   ],
+   "_test_note": "2026-09-18 first-demo TEST setting (owner 22:38): the lid's lug beside the hinge is the handle (manual bar record A, 13.3 mm -> pinch min 10 mm); joint_friction 'brake:<N.m>' ladder = the joint drive as a Coulomb brake (constraints.apply_joint_brake) so the lid holds any angle - stock, it falls closed (the PhysX jointFriction coefficient does not hold it even at 5.0); lid_facing hinge_right (hinge line along the line of sight, the hand rolls above the hinge); brace optional + brace_search off (handle-only, second stances for the handle alone); margin 0 + residual gates 15 mm as on the touching alias"
   },
   "constraints": []
  },
@@ -21409,8 +21467,8 @@
    "groups": {},
    "path_buckets": null,
    "open_fraction_range": [
-    0.5,
-    0.95
+    0.6,
+    0.8
    ],
    "stable_set_fractions": 7,
    "stable_hold_steps": 120,
@@ -21431,7 +21489,7 @@
    "handle_eef_offset_m": 0.012,
    "pre_grasp_back_m": 0.1,
    "pinch_width_range_m": [
-    0.015,
+    0.005,
     0.08
    ],
    "direction": "open",
@@ -21450,7 +21508,24 @@
     0.35,
     0.45,
     0.55
-   ]
+   ],
+   "brace_optional": true,
+   "_test_note": "2026-09-18/19 first-demo TEST setting (this alias only): the lid's pull ring (7.8 mm) is the handle (pinch min 5 mm), approach 20 deg toward the hinge; joint_friction 'brake:<N.m>' ladder = the joint drive as a Coulomb brake (USD force drive) so the lid holds any angle (stock it falls closed below ~102 deg); STAGE 2 demo (owner 22:38): goal 0.6-0.8 of the range (77-98 deg, beyond the arm's roll from the ring grasp) -> follow to the last reachable waypoint, release, closed-gripper push on the lid underside from inside the opening along the hinge arc (stage2_push); focus_at_handle: Phase-2 focus at the ring's height (the reaching stances failed gripper_not_in_frame at the mid-height focus); lid_facing hinge_right; brace optional + brace_search off; margin 0 + residual gates 15 mm; stage2_max_follow_k 0.75: the hand swings to 73.5 deg, the fist push does the last quarter (0919-001843 reached 98 deg by hand alone)",
+   "lid_facing": "hinge_right",
+   "joint_limit_margin_rad": 0.0,
+   "witness_residual_at_draw_m": 0.015,
+   "witness_residual_max_m": 0.015,
+   "brace_search": false,
+   "joint_friction": [
+    "brake:0.15",
+    "brake:0.5",
+    "brake:1.0",
+    "brake:2.0",
+    "brake:4.0"
+   ],
+   "stage2_push": true,
+   "focus_at_handle": true,
+   "stage2_max_follow_k": 0.75
   },
   "constraints": []
  },
@@ -62227,112 +62302,6 @@
   },
   "constraints": []
  },
- "configuration_matching-attachment-cork-wine_bottle-breakfast_table": {
-  "iddl": "configuration_matching/attachment.iddl",
-  "definition_id": 83,
-  "roles": {
-   "target": {
-    "category": "cork",
-    "sampleable": true,
-    "require": {
-     "grasps": "attachment"
-    },
-    "representative": "ncxgpe",
-    "orientation_equivalences": {
-     "cork/ncxgpe": [
-      "zinf"
-     ]
-    },
-    "grasp_keys": {
-     "cork/ncxgpe": "cork__ncxgpe"
-    }
-   },
-   "partner": {
-    "category": "wine_bottle",
-    "sampleable": true,
-    "representative": "inkqch",
-    "orientation_equivalences": {
-     "wine_bottle/inkqch": [
-      "zinf"
-     ]
-    }
-   },
-   "support": {
-    "category": "breakfast_table",
-    "sampleable": false
-   },
-   "floor": {
-    "sampleable": false
-   }
-  },
-  "scenes": {
-   "house_single_floor": {
-    "rooms": [
-     "dining_room_0"
-    ],
-    "bindings": {
-     "support": [
-      "breakfast_table_rhjoby_0"
-     ],
-     "floor": {
-      "room": "dining_room_0"
-     }
-    },
-    "whitelist": {
-     "target": {
-      "cork": [
-       "ncxgpe"
-      ]
-     },
-     "partner": {
-      "wine_bottle": [
-       "inkqch"
-      ]
-     }
-    },
-    "blacklist": {
-     "target": {
-      "cork": {
-       "lseuwf": "ground_isg 2026-09-20: heldout",
-       "uyceta": "attachment-agent 2026-09-20: not a partner_of pair with wine_bottle/inkqch (compat sheet: ncxgpe only)"
-      }
-     }
-    },
-    "_note": "attachment-agent 2026-09-20 20:10: the --all grounding also bound ['house_double_floor_lower', 'Rs_int']; the first-demo alias keeps house_single_floor only like the other attachment aliases (sample_isg --templates 1 samples one template per scene: 0920-182533 wrote the single_floor instance, then loaded house_double_floor_lower and computed its bands for an hour before any demo)"
-   }
-  },
-  "generation": {
-   "templates_max": 20,
-   "instances_per_template": 5,
-   "tolerances": {
-    "position": 0.01,
-    "orientation": 0.15
-   },
-   "groups": {},
-   "path_buckets": null,
-   "partner_gap_min_m": 0.08,
-   "partner_centre_distance_min_m": 0.18,
-   "pre_attach_back_m": 0.1,
-   "reorientation_waypoints": 3,
-   "symmetry_slab_m": 0.005,
-   "symmetry_match_fraction": 0.9,
-   "grasp_metalink_clearance_m": 0.01,
-   "brace_search": false,
-   "witness_residual_pre_m": 0.015,
-   "_brace_search_note": "owner 2026-09-19 14:55 / 2026-09-20 16:15 (attachment): brace_search false = the one-arm sequence; witness_residual_pre_m 15 mm (pre-pose witnesses at joint limits); alias grounded from ground_isg --all (dry run) and imported for the owner pair cork/ncxgpe -> wine_bottle/inkqch",
-   "_partner_gap_note": "attachment-agent 2026-09-20 18:20: tall partners (25 / 22 cm bottles): 0.08 / 0.18 as for pwgbsb / jlalfc - with 0.04 / 0.08 the hand transit at table height brushed the lemonade bottle (0920-164504: shoved 46 mm / 32 deg)",
-   "attach_correction": {
-    "soft_pos_tol_m": 0.0015,
-    "settle_steps": 20,
-    "max_passes": 4,
-    "stop_when_improvement_below_m": 0.0005,
-    "target_pos_m": 0.002,
-    "target_rot_rad": 0.02
-   },
-   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
-  },
-  "constraints": []
- },
  "inter_object_relation_satisfaction-under_large_scale-sandal-breakfast_table-breakfast_table": {
   "iddl": "inter_object_relation_satisfaction/under_large_scale.iddl",
   "definition_id": 88,
@@ -62633,5 +62602,111 @@
   "fallback_params": {
    "init_surface": "floor"
   }
+ },
+ "configuration_matching-attachment-cork-wine_bottle-breakfast_table": {
+  "iddl": "configuration_matching/attachment.iddl",
+  "definition_id": 83,
+  "roles": {
+   "target": {
+    "category": "cork",
+    "sampleable": true,
+    "require": {
+     "grasps": "attachment"
+    },
+    "representative": "ncxgpe",
+    "orientation_equivalences": {
+     "cork/ncxgpe": [
+      "zinf"
+     ]
+    },
+    "grasp_keys": {
+     "cork/ncxgpe": "cork__ncxgpe"
+    }
+   },
+   "partner": {
+    "category": "wine_bottle",
+    "sampleable": true,
+    "representative": "inkqch",
+    "orientation_equivalences": {
+     "wine_bottle/inkqch": [
+      "zinf"
+     ]
+    }
+   },
+   "support": {
+    "category": "breakfast_table",
+    "sampleable": false
+   },
+   "floor": {
+    "sampleable": false
+   }
+  },
+  "scenes": {
+   "house_single_floor": {
+    "rooms": [
+     "dining_room_0"
+    ],
+    "bindings": {
+     "support": [
+      "breakfast_table_rhjoby_0"
+     ],
+     "floor": {
+      "room": "dining_room_0"
+     }
+    },
+    "whitelist": {
+     "target": {
+      "cork": [
+       "ncxgpe"
+      ]
+     },
+     "partner": {
+      "wine_bottle": [
+       "inkqch"
+      ]
+     }
+    },
+    "blacklist": {
+     "target": {
+      "cork": {
+       "lseuwf": "ground_isg 2026-09-20: heldout",
+       "uyceta": "attachment-agent 2026-09-20: not a partner_of pair with wine_bottle/inkqch (compat sheet: ncxgpe only)"
+      }
+     }
+    },
+    "_note": "attachment-agent 2026-09-20 20:10: the --all grounding also bound ['house_double_floor_lower', 'Rs_int']; the first-demo alias keeps house_single_floor only like the other attachment aliases (sample_isg --templates 1 samples one template per scene: 0920-182533 wrote the single_floor instance, then loaded house_double_floor_lower and computed its bands for an hour before any demo)"
+   }
+  },
+  "generation": {
+   "templates_max": 20,
+   "instances_per_template": 5,
+   "tolerances": {
+    "position": 0.01,
+    "orientation": 0.15
+   },
+   "groups": {},
+   "path_buckets": null,
+   "partner_gap_min_m": 0.08,
+   "partner_centre_distance_min_m": 0.18,
+   "pre_attach_back_m": 0.1,
+   "reorientation_waypoints": 3,
+   "symmetry_slab_m": 0.005,
+   "symmetry_match_fraction": 0.9,
+   "grasp_metalink_clearance_m": 0.01,
+   "brace_search": false,
+   "witness_residual_pre_m": 0.015,
+   "_brace_search_note": "owner 2026-09-19 14:55 / 2026-09-20 16:15 (attachment): brace_search false = the one-arm sequence; witness_residual_pre_m 15 mm (pre-pose witnesses at joint limits); alias grounded from ground_isg --all (dry run) and imported for the owner pair cork/ncxgpe -> wine_bottle/inkqch",
+   "_partner_gap_note": "attachment-agent 2026-09-20 18:20: tall partners (25 / 22 cm bottles): 0.08 / 0.18 as for pwgbsb / jlalfc - with 0.04 / 0.08 the hand transit at table height brushed the lemonade bottle (0920-164504: shoved 46 mm / 32 deg)",
+   "attach_correction": {
+    "soft_pos_tol_m": 0.0015,
+    "settle_steps": 20,
+    "max_passes": 4,
+    "stop_when_improvement_below_m": 0.0005,
+    "target_pos_m": 0.002,
+    "target_rot_rad": 0.02
+   },
+   "_attach_correction_note": "owner 2026-09-20 23:39 (attachment only): the oracle's attach correction regime - each pass settles, re-measures the male/female offset modulo the symmetry, runs the lift-lateral-descend leg at soft_pos_tol_m and settles; stops within target_pos_m / target_rot_rad, when a pass improves < stop_when_improvement_below_m, or after max_passes. Absent = the oracle default (two passes at 3 mm). 0920-213721 / 212757: 5.9 / 7.8 mm after two passes at the 1 cm free-space tolerance"
+  },
+  "constraints": []
  }
 }

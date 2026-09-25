@@ -70,10 +70,16 @@
       0.0
      ],
      "approach_dir": [
+      0.0,
+      0.342,
+      -0.9397
+     ],
+     "approach_dir_detected": [
       -0.0,
       -0.0,
       -1.0
      ],
+     "note": "pull ring standing on the lid top beside the rear hinge (loop 27 x 25 mm, wire 7.8 mm thick in x, 26 mm from the hinge axis). Approach re-pitched 2026-09-18 from top-down to 20 deg from vertical toward the hinge (+y): the hand rotates with the lid about the hinge, so with the sideways layout (generation.lid_facing hinge_right: the hinge line along the robot's line of sight, the hinge on the robot's right) the right hand starts 20 deg right of vertical and ends the 112 deg follow (waypoint 0.91) about horizontal pointing left, its wrist outside the blender. Band probes 0918-2115: a 55 deg pitch passed the END pose in 15-25 cells per trunk but the START in 1-6 (the right hand tilted rightward is the awkward side), the free-edge layout passed nothing. Pads sandwich the loop's top bar (z 0.284-0.289).",
      "width": 0.0078,
      "length": 0.0269,
      "depth": 0.0263,

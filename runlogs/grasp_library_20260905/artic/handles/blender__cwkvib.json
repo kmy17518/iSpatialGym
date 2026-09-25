@@ -56,7 +56,38 @@
     0.0855,
     0.2912
    ],
-   "handles": [],
+   "handles": [
+    {
+     "kind": "bar",
+     "contact": [
+      -0.004,
+      0.0535,
+      0.287
+     ],
+     "pinch_axis": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "approach_dir": [
+      0.0,
+      0.342,
+      -0.9397
+     ],
+     "width": 0.0133,
+     "length": 0.027,
+     "depth": 0.012,
+     "face_s": 0.2858,
+     "n_pieces": 1,
+     "pull_dir": [
+      0.0,
+      0.3,
+      0.954
+     ],
+     "source": "manual 2026-09-18 (owner: annotate the tab near the hinge)",
+     "note": "Lug / thumb tab on the lid top just in front of the rear hinge (lid mesh: faces at x -0.0106 / +0.0027 -> 13.3 mm thick, y 0.040-0.067, top z 0.291, the dome under it at z 0.277; the central cap in front tops at 0.286). Pinch across x with the pads' end 4 mm below the tab top (contact z 0.287: fingertips 7 mm beyond stay 3 mm above the dome); approach 20 deg from vertical toward the hinge as for the eyedvd ring (sideways layout, generation.lid_facing hinge_right). Lever 42 mm from the hinge axis. Not detected by artic_handles (protrudes only 12 mm)."
+    }
+   ],
    "flush_handles": [],
    "fallback": {
     "kind": "edge_lid",
@@ -85,7 +116,7 @@
     ]
    },
    "sub_links": [],
-   "status": "edge"
+   "status": "handle"
   }
  ]
 }
