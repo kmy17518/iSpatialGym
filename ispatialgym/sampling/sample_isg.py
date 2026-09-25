@@ -349,7 +349,8 @@ def main(argv=None):
     finally:
         report["finished"] = time.strftime("%Y-%m-%dT%H:%M:%S")
         report["wall_time_s"] = round(time.time() - t_start, 2)
-        report["world"] = {"n_loads": pool.n_loads, "load_time_s": round(pool.load_time_s, 2), "key": world_key_str(pool.key) if pool.key else None}
+        report["world"] = {"n_loads": pool.n_loads, "load_time_s": round(pool.load_time_s, 2), "key": world_key_str(pool.key) if pool.key else None,
+                           "base_link_mass_kg": getattr(pool.world, "base_link_mass_kg", None)}
         report["n_written"] = sum(int(e.get("n_written", 0)) for temps in report["problems"].values() for e in temps.values())
         with open(os.path.join(args.out, "summary.json"), "w") as f:
             json.dump(report, f, indent=2, default=str)

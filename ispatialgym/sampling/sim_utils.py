@@ -138,6 +138,10 @@ class SimWorld:
         self._set_measurement_render_settings()
         self.scene = self.env.scene
         self.robot = self.env.robots[0]
+        # the BEHAVIOR-1K evaluator's 250 kg chassis, so the sampler's physics probes (passive continuation, stable set,
+        # the drop tests) see the grader's robot (owner 2026-09-21 23:49; ``r1pro_model.apply_eval_base_mass``)
+        self.base_link_mass_kg = M.apply_eval_base_mass(self.robot)
+        log.info("robot base_link mass %.2f -> %.2f kg (BEHAVIOR-1K eval: %.0f)", self.base_link_mass_kg["before"], self.base_link_mass_kg["after"], M.EVAL_BASE_LINK_MASS_KG)
         self.cam_key = [k for k in self.robot.sensors if k.endswith(M.HEAD_CAMERA_SENSOR_SUFFIX)][0]
         self.cam = self.robot.sensors[self.cam_key]
         self.cam.horizontal_aperture = HEAD_APERTURE_MM
@@ -898,6 +902,29 @@ class SimWorld:
             if o.category == "floors" and room in (o.in_rooms or []):
                 return o
         raise KeyError(f"no floors object in room {room!r}")
+
+    def floor_object_under(self, xy):
+        """The ``floors`` scene object whose collision surface a downward raycast at world ``xy`` hits (the robot's bodies
+        ignored), or None. A room may hold several overlapping floor objects (house_single_floor garden_0: the lawn
+        ``floors_khjmrr_0`` and ``floors_pyoemr_0`` both span the sauna door's approach); ``floor_of_room`` returns the first
+        one, and the BDDL ``(ontop agent floor)`` is judged against the object the robot actually stands on
+        (door_crtrpa_0 0919-153516: init_false at settle with the room's first floor bound)."""
+        z0 = self.floor_z_default
+        x, y = float(G.t(xy)[0]), float(G.t(xy)[1])
+        try:
+            ignore = [link.prim_path for link in self.robot.links.values()]
+            hits = raytest_batch([[x, y, z0 + 0.5]], [[x, y, z0 - 0.5]], only_closest=True, ignore_bodies=ignore)
+            h = hits[0] if hits else {}
+            body = str(h.get("rigidBody") or "") if h.get("hit") else ""
+        except Exception as e:  # noqa: BLE001
+            log.debug("floor raycast failed at (%.2f, %.2f): %r", x, y, e)
+            return None
+        if not body:
+            return None
+        for o in self.scene.objects:
+            if o.category == "floors" and (body == o.prim_path or body.startswith(o.prim_path + "/")):
+                return o
+        return None
 
 
 @dataclass

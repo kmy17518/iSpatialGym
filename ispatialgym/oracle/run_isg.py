@@ -284,6 +284,10 @@ class InstanceLoader:
         self.report["trav_cells_blocked"] = block_trav_map_from_meta(self.env.scene, self.tro.meta.scene or {})
         self.task = self.env.task
         self.robot = self.env.robots[0]
+        # the BEHAVIOR-1K evaluator's 250 kg chassis (owner 2026-09-21 23:49): the stock 47.6 kg base tipped 0.8 deg on
+        # its wheel spheres under the dishwasher pull and snapped back at the release - the grader's physics, not ours
+        self.report["base_link_mass_kg"] = M.apply_eval_base_mass(self.robot)
+        log.info("robot base_link mass %.2f -> %.2f kg (BEHAVIOR-1K eval: %.0f)", self.report["base_link_mass_kg"]["before"], self.report["base_link_mass_kg"]["after"], M.EVAL_BASE_LINK_MASS_KG)
         self.cam_key = _first_key(self.robot.sensors, M.HEAD_CAMERA_SENSOR_SUFFIX)
         if self.cam_key is None:
             raise RuntimeError(f"robot {self.robot.name} has no head camera sensor ({M.HEAD_CAMERA_SENSOR_SUFFIX})")

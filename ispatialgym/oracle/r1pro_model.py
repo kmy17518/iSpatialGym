@@ -73,6 +73,35 @@ EEF_IN_GRIPPER_RPY = (0.0, math.pi, 0.0)
 #: Head camera sensor key suffix (``<robot_name>:zed_link:Camera:0``).
 HEAD_CAMERA_SENSOR_SUFFIX = f"{HEAD_CAMERA_LINK}:Camera:0"
 
+#: The BEHAVIOR-1K evaluator's chassis mass for r1 / r1pro (``omnigibson/eval/evaluator.py: EVAL_BASE_LINK_MASS``,
+#: "heavier base so contact with the (heavy) world does not shove the robot around during eval"); the URDF's
+#: ``base_link`` weighs 47.63 kg. The holonomic base stands on three bounding-sphere wheels with its z / rx / ry virtual
+#: joints undriven and gravity disabled on every link above it, so the chassis mass alone resists the wrench of a loaded
+#: arm: at 47.6 kg the dishwasher pull tipped it 0.8 deg / 5 mm and it snapped back at the release (0921-050314).
+#: ``ISG_BASE_MASS_KG`` overrides (0 = leave the URDF's mass).
+EVAL_BASE_LINK_MASS_KG = 250.0
+
+
+def apply_eval_base_mass(robot, mass_kg: Optional[float] = None) -> Dict[str, float]:
+    """Set the robot's base footprint link mass the way the BEHAVIOR-1K evaluator does (a mass write needs the simulator
+    stopped: ``og.sim.stop()`` / ``play()`` around it, then ``update_handles``). ``mass_kg`` defaults to
+    ``ISG_BASE_MASS_KG`` or :data:`EVAL_BASE_LINK_MASS_KG`; ``<= 0`` leaves the mass alone. Returns
+    ``{"before": kg, "after": kg}``."""
+    import omnigibson as og
+
+    if mass_kg is None:
+        mass_kg = float(os.environ.get("ISG_BASE_MASS_KG", EVAL_BASE_LINK_MASS_KG))
+    link = robot.base_footprint_link if hasattr(robot, "base_footprint_link") else robot.links[BASE_LINK]
+    before = float(link.mass)
+    if mass_kg <= 0.0 or abs(before - mass_kg) < 1e-6:
+        return {"before": before, "after": before}
+    og.sim.stop()
+    link.mass = float(mass_kg)
+    og.sim.play()
+    if hasattr(og.sim, "update_handles"):
+        og.sim.update_handles()
+    return {"before": before, "after": float(link.mass)}
+
 # --------------------------------------------------------------------------------------
 # JoyLo trunk keyframes (joylo/gello/utils/og_teleop_cfg.py, r1pro entry)
 # --------------------------------------------------------------------------------------
