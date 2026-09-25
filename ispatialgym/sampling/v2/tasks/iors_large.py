@@ -1058,10 +1058,14 @@ class IORSLarge(SamplerV2):
         """Stance A of the floor init: base on the eroded map 0.6–1.5 m from c_t facing it, with the target and the
         partner's relevant region (goal patch / nearest bottom edge, owner decision (a)/(d)) in frame, collision-free.
         Trunk: **torso straight — tilt 0 at any translate** (owner 2026‑09‑19 21:56 (i): "it can have the lowest height
-        but no tilt"), the translate whose optical axis is closest to c_t among those that see the target and the
-        partner region. (``729a1ec`` had A take stance B's crouch so that A -> B needed no sweep; that is now the
-        *fallback* of the A -> B leg — a departure transition at A — not the init posture. ``like`` is kept for the
-        signature and only breaks ties toward B's translate.)"""
+        but no tilt"), the **most upright** translate among those that see the target and the partner region, the
+        optical-axis angle to c_t breaking ties (owner 2026-09-24). Until then the smallest optical-axis angle won: with
+        the tucked spawn of ``1dd3820b`` the hanging hands of a crouched A touched the floor and ``body_free`` dropped it,
+        so A came out upright by accident (0921-045713: 0.25); with the untucked spawn the 0.95 crouch passes and looks
+        down at a floor target best, and it then swept the target on the direct A -> B drive at every draw and became the
+        carry's second travel trunk (0924-225021: 8/8 draws at 0.95, no instance). (``729a1ec`` had A take stance B's
+        crouch so that A -> B needed no sweep; that is now the *fallback* of the A -> B leg — a departure transition at
+        A — not the init posture. ``like`` is kept for the signature; ``trunk_like_b`` is recorded for the log.)"""
         fi = dict(self.gp.gen("floor_init") or {})
         d_lo, d_hi = fi.get("distance_range_m", [0.6, 1.5])
         focus = th.tensor([float(c_t[0]), float(c_t[1]), self.floor_z + height / 2])
@@ -1085,17 +1089,18 @@ class IORSLarge(SamplerV2):
                 continue
             # floor class: A spawns UNTUCKED like every other family's init (owner 2026-09-24; ``Stance.arms`` default). 1dd3820b
             # (2026-09-16) spawned it tucked because A then stood at B's crouch (0.95, 0) and the untucked hands hanging at floor
-            # level swept the floor target on the A -> B drive; A is now chosen among the straight trunks by camera angle
-            # (0921-045713: translate 0.25) and the crouch happens at the transition, where the arms were untucked again anyway
-            # (arm_to(left,right), 161 steps). The A -> B path sweep still judges the hands: a low A whose untucked hands reach
-            # the target is rejected ``path_collision`` and the init is re-drawn.
+            # level swept the floor target on the A -> B drive; A is now the most upright straight trunk that sees the target
+            # (below) and the crouch happens at the transition, where the arms were untucked again anyway (arm_to(left,right),
+            # 161 steps). The A -> B path sweep still judges the hands: an A whose untucked hands reach the target is rejected
+            # ``path_collision`` and the init is re-drawn.
             free = P0.body_free(self, [st for st, _ in feas])
             feas = [(st, a) for (st, a), f in zip(feas, free.tolist()) if f]
             if not feas or not P0.trunk_sweep_free(self, (float(xy[0]), float(xy[1]), yaw)):
                 continue
-            # the smallest optical-axis angle wins; ties toward B's translate (the A -> B sweep is then a pure tilt)
+            # the most upright translate wins (the hands highest on the drive, the carry's travel trunk straightest); the
+            # optical-axis angle breaks ties (owner 2026-09-24)
             like_t = None if like is None else float(like.translate)
-            st = min(feas, key=lambda sa: (round(sa[1], 2), 0 if (like_t is not None and abs(sa[0].translate - like_t) < 1e-6) else 1, sa[0].translate))[0]
+            st = min(feas, key=lambda sa: (sa[0].translate, round(sa[1], 2)))[0]
             st.extras.update({"bearing_deg": math.degrees(bearing), "distance": dist, "trunk_like_b": bool(like_t is not None and abs(st.translate - like_t) < 1e-6)})
             return st
         raise Reject("no_stance", "floor init: no stance A sees the target at c_t and the partner")
